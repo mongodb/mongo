@@ -172,7 +172,7 @@ namespace mongo {
         DBConfig * cfg = grid.getDBConfig( ns );
         assert( cfg );
         
-        ChunkManager * cm = cfg->getChunkManager( ns );
+        ChunkManagerPtr cm = cfg->getChunkManager( ns );
         assert( cm );
         
         ChunkPtr c = cm->findChunk( chunkToMove["min"].Obj() );

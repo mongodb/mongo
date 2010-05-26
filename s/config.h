@@ -47,7 +47,8 @@ namespace mongo {
     extern Grid grid;
 
     class ChunkManager;
-
+    typedef shared_ptr<ChunkManager> ChunkManagerPtr;
+    
     class CollectionInfo {
     public:
         CollectionInfo( ShardKeyPattern _key = BSONObj() , bool _unique = false ) : 
@@ -76,14 +77,14 @@ namespace mongo {
         }
         
         void enableSharding();
-        ChunkManager* shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique );
+        ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique );
         
         /**
          * @return whether or not this partition is partitioned
          */
         bool isSharded( const string& ns );
         
-        ChunkManager* getChunkManager( const string& ns , bool reload = false );
+        ChunkManagerPtr getChunkManager( const string& ns , bool reload = false );
         
         /**
          * @return the correct for shard for the ns
@@ -135,7 +136,7 @@ namespace mongo {
         bool _shardingEnabled;
         
         map<string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
-        map<string,ChunkManager*> _shards; // this will only have entries for things that have been looked at
+        map<string,ChunkManagerPtr> _shards; // this will only have entries for things that have been looked at
 
         mongo::mutex _lock; // TODO: change to r/w lock ??
 

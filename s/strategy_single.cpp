@@ -110,7 +110,7 @@ namespace mongo {
                                  ! o["unique"].trueValue() || 
                                  r.getConfig()->getChunkManager( ns )->getShardKey().uniqueAllowd( newIndexKey ) );
 
-                        ChunkManager * cm = r.getConfig()->getChunkManager( ns );
+                        ChunkManagerPtr cm = r.getConfig()->getChunkManager( ns );
                         assert( cm );
                         for ( int i=0; i<cm->numChunks();i++)
                             doWrite( op , r , cm->getChunk(i)->getShard() );

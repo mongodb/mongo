@@ -101,10 +101,10 @@ namespace mongo {
                     return passthrough( conf , cmdObj , result );
                 }
                 
-                ChunkManager * cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 10418 ,  "how could chunk manager be null!" , cm );
                 
-                cm->drop();
+                cm->drop( cm );
 
                 return 1;
             }
@@ -184,7 +184,7 @@ namespace mongo {
                     return true;
                 }
                 
-                ChunkManager * cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 10419 ,  "how could chunk manager be null!" , cm );
                 
                 vector<shared_ptr<ChunkRange> > chunks;
@@ -216,7 +216,7 @@ namespace mongo {
                 }
                 result.appendBool("sharded", true);
 
-                ChunkManager * cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 12594 ,  "how could chunk manager be null!" , cm );
 
                 set<Shard> servers;
@@ -276,7 +276,7 @@ namespace mongo {
                     return passthrough( conf , cmdObj , result);
                 }
                 
-                ChunkManager * cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 13002 ,  "how could chunk manager be null!" , cm );
                 
                 vector<shared_ptr<ChunkRange> > chunks;
@@ -390,7 +390,7 @@ namespace mongo {
                     return passthrough( conf , cmdObj , result );
                 }
                 
-                ChunkManager * cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 10420 ,  "how could chunk manager be null!" , cm );
                 
                 vector<shared_ptr<ChunkRange> > chunks;
@@ -456,7 +456,7 @@ namespace mongo {
                     return passthrough( conf , cmdObj , result );
                 }
                 
-                ChunkManager * cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 13091 , "how could chunk manager be null!" , cm );
                 uassert( 13092 , "GridFS chunks collection can only be sharded on files_id", cm->getShardKey().key() == BSON("files_id" << 1));
 
@@ -524,7 +524,7 @@ namespace mongo {
                 
                 BSONObjBuilder timingBuilder;
 
-                ChunkManager * cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
 
                 BSONObj q;
                 if ( cmdObj["query"].type() == Object ){

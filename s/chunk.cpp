@@ -770,7 +770,7 @@ namespace mongo {
         }
     }
     
-    void ChunkManager::drop(){
+    void ChunkManager::drop( ChunkManagerPtr me ){
         rwlock lk( _lock , true ); 
         
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );

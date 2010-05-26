@@ -58,7 +58,7 @@ namespace mongo {
             uassert( 10193 ,  (string)"no shard info for: " + getns() , _chunkManager );
         }
         else {
-            _chunkManager = 0;
+            _chunkManager.reset();
         }        
 
         _m.header()->id = _id;

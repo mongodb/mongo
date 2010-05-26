@@ -71,13 +71,13 @@ namespace mongo {
         _shardingEnabled = true; 
     }
     
-    ChunkManager* DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique ){
+    ChunkManagerPtr DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique ){
         if ( ! _shardingEnabled )
             throw UserException( 8042 , "db doesn't have sharding enabled" );
         
         scoped_lock lk( _lock );
 
-        ChunkManager * info = _shards[ns];
+        ChunkManagerPtr info = _shards[ns];
         if ( info )
             return info;
         
@@ -87,7 +87,7 @@ namespace mongo {
         log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
         _sharded[ns] = CollectionInfo( fieldsAndOrder , unique );
 
-        info = new ChunkManager( this , ns , fieldsAndOrder , unique );
+        info.reset( new ChunkManager( this , ns , fieldsAndOrder , unique ) );
         _shards[ns] = info;
         return info;
 
@@ -100,7 +100,7 @@ namespace mongo {
         
         scoped_lock lk( _lock );
 
-        ChunkManager * info = _shards[ns];
+        ChunkManagerPtr info = _shards[ns];
         map<string,CollectionInfo>::iterator i = _sharded.find( ns );
 
         if ( info == 0 && i == _sharded.end() ){
@@ -110,21 +110,21 @@ namespace mongo {
         uassert( 10180 ,  "info but no sharded" , i != _sharded.end() );
         
         _sharded.erase( i );
-        _shards.erase( ns ); // TODO: clean this up, maybe switch to shared_ptr
+        _shards.erase( ns );
         return true;
     }
 
-    ChunkManager* DBConfig::getChunkManager( const string& ns , bool reload ){
+    ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool reload ){
         scoped_lock lk( _lock );
 
-        ChunkManager* m = _shards[ns];
+        ChunkManagerPtr m = _shards[ns];
         if ( m && ! reload )
             return m;
 
         uassert( 10181 ,  (string)"not sharded:" + ns , _isSharded( ns ) );
         if ( m && reload )
             log() << "reloading shard info for: " << ns << endl;
-        m = new ChunkManager( this , ns , _sharded[ ns ].key , _sharded[ns].unique );
+        m.reset( new ChunkManager( this , ns , _sharded[ ns ].key , _sharded[ns].unique ) );
         _shards[ns] = m;
         return m;
     }
@@ -176,7 +176,7 @@ namespace mongo {
         Model::save( check );
 
         scoped_lock lk( _lock );
-        for ( map<string,ChunkManager*>::iterator i=_shards.begin(); i != _shards.end(); i++)
+        for ( map<string,ChunkManagerPtr>::iterator i=_shards.begin(); i != _shards.end(); i++)
             i->second->save();
     }
 
@@ -261,7 +261,7 @@ namespace mongo {
         num = 0;
         set<string> seen;
         while ( true ){
-            map<string,ChunkManager*>::iterator i = _shards.begin();
+            map<string,ChunkManagerPtr>::iterator i = _shards.begin();
 
             if ( i == _shards.end() )
                 break;
@@ -275,7 +275,7 @@ namespace mongo {
             log(1) << "\t dropping sharded collection: " << i->first << endl;
 
             i->second->getAllShards( allServers );
-            i->second->drop();
+            i->second->drop( i->second );
             
             num++;
             uassert( 10184 ,  "_dropShardedCollections too many collections - bailing" , num < 100000 );
