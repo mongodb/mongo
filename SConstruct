@@ -1369,7 +1369,7 @@ testEnv.AlwaysBuild( "startMongodSmallOplog" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
 
 def addMongodReqTargets( env, target, source ):
-    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeQuota" ]
+    mongodReqTargets = [ "smokeClient", "smokeJs" ]
     for target in mongodReqTargets:
         testEnv.Depends( target, "startMongod" )
         testEnv.Depends( "smokeAll", target )
