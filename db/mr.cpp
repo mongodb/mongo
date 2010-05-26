@@ -697,6 +697,7 @@ namespace mongo {
                 for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ){
                     ScopedDbConnection conn( i->_server );
                     conn->dropCollection( dbname + "." + shardedOutputCollection );
+                    conn.done();
                 }
                 
                 result.append( "shardCounts" , shardCounts.obj() );
