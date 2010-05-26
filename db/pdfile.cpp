@@ -998,9 +998,9 @@ namespace mongo {
         auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
         while( i->more() ) { 
             BSONObjExternalSorter::Data d = i->next();
-            cout << d.second.toString() << endl;
+            /*cout << d.second.toString() << endl;
             cout << d.first.objsize() << endl;
-            cout<<"SORTER next:" << d.first.toString() << endl;
+            cout<<"SORTER next:" << d.first.toString() << endl;*/
         }
     }
 
