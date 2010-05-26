@@ -37,7 +37,7 @@ namespace mongo {
         int level;
         mongo::mutex mutex;
 
-        DiagLog() : f(0) , level(0) { }
+        DiagLog() : f(0) , level(0), mutex("DiagLog") { }
         void init() {
             if ( ! f && level ){
                 log() << "diagLogging = " << level << endl;

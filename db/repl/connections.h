@@ -51,7 +51,7 @@ namespace mongo {
         struct X { 
             mutex z;
             DBClientConnection cc;
-            X() : cc(/*reconnect*/true, 0, /*timeout*/10) { 
+            X() : z("X"), cc(/*reconnect*/true, 0, /*timeout*/10) { 
                 cc._logLevel = 2;
             }
         } *x;

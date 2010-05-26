@@ -40,7 +40,7 @@ namespace mongo {
         mutex m;
         int _locked;
     protected:
-        RSBase() : _locked(0) { }
+        RSBase() : m("RSBase"), _locked(0) { }
         class lock : scoped_lock { 
             RSBase& _b;
         public:

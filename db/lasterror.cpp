@@ -28,7 +28,7 @@ namespace mongo {
 
     LastError LastError::noError;
     LastErrorHolder lastError;
-    mongo::mutex LastErrorHolder::_idsmutex;
+    mongo::mutex LastErrorHolder::_idsmutex("LastErrorHolder");
 
     void LastError::appendSelf( BSONObjBuilder &b ) {
         if ( !valid ) {

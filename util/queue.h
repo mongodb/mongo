@@ -29,6 +29,8 @@ namespace mongo {
      */
     template<typename T> class BlockingQueue : boost::noncopyable {
     public:
+        BlockingQueue() : _lock("BlockingQueue") { }
+
         void push(T const& t){
             scoped_lock l( _lock );
             _queue.push( t );

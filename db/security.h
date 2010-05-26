@@ -38,7 +38,7 @@ namespace mongo {
 		static int warned;
     public:
 		bool isLocalHost;
-        AuthenticationInfo() { isLocalHost = false; }
+        AuthenticationInfo() : _lock("AuthenticationInfo") { isLocalHost = false; }
         ~AuthenticationInfo() {
         }
         void logout(const string& dbname ) { 

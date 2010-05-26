@@ -228,7 +228,7 @@ namespace mongo {
     class ScopeCache {
     public:
 
-        ScopeCache(){
+        ScopeCache() : _mutex("ScopeCache") {
             _magic = 17;
         }
         

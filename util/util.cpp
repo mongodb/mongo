@@ -66,7 +66,7 @@ void setThreadName(const char *name)
 
     int logLevel = 0;
     int tlogLevel = 0;
-    mongo::mutex Logstream::mutex;
+    mongo::mutex Logstream::mutex("Logstream");
     int Logstream::doneSetup = Logstream::magicNumber();
     
     bool goingAway = false;

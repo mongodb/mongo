@@ -18,9 +18,23 @@
 
 #include "pch.h"
 #include "value.h"
+#include "mutex.h"
 
 namespace mongo { 
 
-    mutex _atomicMutex;
+    mutex _atomicMutex("_atomicMutex");
+    MutexDebugger mutexDebugger;
+
+    void MutexDebugger::programEnding() { 
+        if( followers.size() ) {
+            std::cout << followers.size() << " mongo::mutexes in program" << endl;
+            for( map< mid, set<mid> >::iterator i = followers.begin(); i != followers.end(); i++ ) { 
+                cout << i->first << '\n';
+                for( set<mid>::iterator j = i->second.begin(); j != i->second.end(); j++ )
+                    cout << "  " << *j << '\n';
+            }
+            cout.flush();
+        }
+    }
 
 }

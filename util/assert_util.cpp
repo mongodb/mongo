@@ -112,7 +112,7 @@ namespace mongo {
         throw UserException( code , ss.str() );
     }
     
-    mongo::mutex *Assertion::_mutex = new mongo::mutex();
+    mongo::mutex *Assertion::_mutex = new mongo::mutex("Assertion");
 
     string Assertion::toString() {
         if( _mutex == 0 )

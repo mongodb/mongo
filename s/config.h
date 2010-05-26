@@ -63,7 +63,8 @@ namespace mongo {
     */
     class DBConfig : public Model {
     public:
-        DBConfig( string name = "" ) : _name( name ) , _primary("config","") , _shardingEnabled(false){ }
+        DBConfig( string name = "" ) : _name( name ) , _primary("config","") , 
+            _shardingEnabled(false), _lock("DBConfig") { }
         
         string getName(){ return _name; };
 
@@ -148,6 +149,8 @@ namespace mongo {
      */
     class Grid {
     public:
+        Grid() : _lock("Grid") { }
+
         /**
            gets the config the db.
            will return an empty DBConfig if not in db already

@@ -246,7 +246,7 @@ namespace mongo {
 
     class ListeningSockets {
     public:
-        ListeningSockets() : _sockets( new set<int>() ){
+        ListeningSockets() : _mutex("ListeningSockets"), _sockets( new set<int>() ){
         }
         
         void add( int sock ){

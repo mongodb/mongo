@@ -80,7 +80,7 @@ namespace mongo {
 
     // see FSyncCommand:
     unsigned lockedForWriting; 
-    mongo::mutex lockedForWritingMutex;
+    mongo::mutex lockedForWritingMutex("lockedForWriting");
     bool unlockRequested = false;
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
@@ -609,7 +609,7 @@ namespace mongo {
 
     //void recCacheCloseAll();
 
-    mongo::mutex exitMutex;
+    mongo::mutex exitMutex("exit");
     int numExitCalls = 0;
     void shutdown();
 
@@ -661,6 +661,11 @@ namespace mongo {
         catch ( ... ){
             tryToOutputFatal( "shutdown failed with exception" );
         }
+
+        try { 
+            mutexDebugger.programEnding();
+        }
+        catch (...) { }
         
         tryToOutputFatal( "dbexit: really exiting now\n" );
         if ( c ) c->shutdown();

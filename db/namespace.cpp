@@ -702,8 +702,8 @@ namespace mongo {
     
     /* ------------------------------------------------------------------------- */
 
-    mongo::mutex NamespaceDetailsTransient::_qcMutex;
-    mongo::mutex NamespaceDetailsTransient::_isMutex;
+    mongo::mutex NamespaceDetailsTransient::_qcMutex("qc");
+    mongo::mutex NamespaceDetailsTransient::_isMutex("is");
     map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
