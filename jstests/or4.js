@@ -52,9 +52,27 @@ assert.eq.automsg( "3", "t.count( {z:1} )" );
 
 assert.eq.automsg( "3", "t.find( {$or:[{a:2},{b:3}]} ).toArray().length" );
 checkArrs( "t.find().toArray()", "t.find( {$or:[{a:2},{b:3}]} ).toArray()" );
+assert.eq.automsg( "2", "t.find( {$or:[{a:2},{b:3}]} ).skip(1).toArray().length" );
 
 assert.eq.automsg( "3", "t.find( {$or:[{a:2},{b:3}]} ).batchSize( 2 ).toArray().length" );
 
+t.save( {a:1} );
+t.save( {b:4} );
 t.save( {a:2} );
 
 assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).batchSize( 2 ).toArray().length" );
+assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).snapshot().toArray().length" );
+
+t.save( {a:1,b:3} );
+assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).batchSize(-4).toArray().length" );
+
+assert.eq.automsg( "[1,2]", "t.distinct( 'a', {$or:[{a:2},{b:3}]} )" );
+
+assert.eq.automsg( "[{a:2},{a:null},{a:1}]", "t.group( {key:{a:1}, cond:{$or:[{a:2},{b:3}]}, reduce:function( x, y ) { }, initial:{} } )" );
+assert.eq.automsg( "5", "t.mapReduce( function() { emit( 'a', this.a ); }, function( key, vals ) { return vals.length; }, {query:{$or:[{a:2},{b:3}]}} ).counts.input" );
+
+t.remove( {} );
+
+t.save( {a:[1,2]} );
+assert.eq.automsg( "1", "t.find( {$or:[{a:1},{a:2}]} ).toArray().length" );
+assert.eq.automsg( "1", "t.count( {$or:[{a:1},{a:2}]} )" );

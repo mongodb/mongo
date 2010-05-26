@@ -452,12 +452,9 @@ namespace mongo {
                         readlock lock( mr.ns );
                         Client::Context ctx( mr.ns );
                         
-                        shared_ptr<Cursor> temp = MultiPlanScanner(mr.ns.c_str() , mr.filter , BSONObj() ).getBestGuess()->newCursor();
+                        shared_ptr<Cursor> temp = bestGuessCursor( mr.ns.c_str(), mr.filter, BSONObj() );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.ns.c_str() ) );
 
-                        if ( ! mr.filter.isEmpty() )
-                            cursor->matcher.reset( new CoveredIndexMatcher( mr.filter , cursor->indexKeyPattern() ) );
-                        
                         Timer mt;
                         while ( cursor->ok() ){
                             
@@ -533,7 +530,7 @@ namespace mongo {
                         
                         assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) ) );
 
-                        shared_ptr<Cursor> temp = MultiPlanScanner(mr.incLong.c_str() , BSONObj() , sortKey ).getBestGuess()->newCursor();
+                        shared_ptr<Cursor> temp = bestGuessCursor( mr.incLong.c_str() , BSONObj() , sortKey );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.incLong.c_str() ) );
                         
                         while ( cursor->ok() ){

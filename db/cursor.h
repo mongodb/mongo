@@ -20,10 +20,12 @@
 
 #include "jsobj.h"
 #include "diskloc.h"
+#include "matcher.h"
 
 namespace mongo {
     
     class Record;
+    class CoveredIndexMatcher;
 
     /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
        concept and is for the user's cursor.
@@ -93,6 +95,17 @@ namespace mongo {
 
         virtual bool capped() const { return false; }
 
+        // The implementation may return different matchers depending on the
+        // position of the cursor.  If matcher() is nonzero at the start,
+        // matcher() should be checked each time advance() is called.
+        virtual CoveredIndexMatcher *matcher() const { return 0; }
+        
+        // A convenience function for setting the value of matcher() manually
+        // so it may accessed later.  Implementations which must generate
+        // their own matcher() should assert here.
+        virtual void setMatcher( auto_ptr< CoveredIndexMatcher > matcher ) {
+            massert( 13285, "manual matcher config not allowed", false );
+        }
     };
 
     // strategy object implementing direction of traversal.
@@ -113,6 +126,7 @@ namespace mongo {
 
     private:
         bool tailable_;
+        auto_ptr< CoveredIndexMatcher > _matcher;
         void init() {
             tailable_ = false;
         }
@@ -157,6 +171,13 @@ namespace mongo {
         virtual bool getsetdup(DiskLoc loc) { return false; }
 
         virtual bool supportGetMore() { return true; }
+
+        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
+        
+        virtual void setMatcher( auto_ptr< CoveredIndexMatcher > matcher ) {
+            _matcher = matcher;
+        }
+        
     };
 
     /* used for order { $natural: -1 } */

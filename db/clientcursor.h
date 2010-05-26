@@ -103,7 +103,6 @@ namespace mongo {
 
         /*const*/ CursorId cursorid;
         string ns;
-        auto_ptr<CoveredIndexMatcher> matcher;
         shared_ptr<Cursor> c;
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
@@ -198,9 +197,9 @@ namespace mongo {
         }
 
         bool currentMatches(){
-            if ( ! matcher.get() )
+            if ( ! c->matcher() )
                 return true;
-            return matcher->matchesCurrent( c.get() );
+            return c->matcher()->matchesCurrent( c.get() );
         }
 
         BSONObj current(){

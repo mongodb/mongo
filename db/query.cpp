@@ -148,7 +148,7 @@ namespace mongo {
         unsigned long long nScanned = 0;
         bool justOne = justOneOrig;
         do {
-            if ( ++nScanned % 128 == 0 && !god && !creal->matcher().docMatcher().atomic() ) {
+            if ( ++nScanned % 128 == 0 && !god && !creal->matcher()->docMatcher().atomic() ) {
                 if ( ! cc->yield() ){
                     cc.release(); // has already been deleted elsewhere
                     break;
@@ -164,7 +164,7 @@ namespace mongo {
 
             // NOTE Calling advance() may change the matcher, so it's important 
             // to try to match first.
-            bool match = creal->matcher().matches( key , rloc );
+            bool match = creal->matcher()->matches( key , rloc );
             
             if ( ! cc->c->advance() )
                 justOne = true;
@@ -299,8 +299,6 @@ namespace mongo {
             
             start = cc->pos;
             Cursor *c = cc->c.get();
-            // TODO clean up
-            MultiCursor *mc = dynamic_cast< MultiCursor * >( c );
             c->checkLocation();
             DiskLoc last;
 
@@ -327,8 +325,8 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
-                CoveredIndexMatcher *matcher = mc ? &mc->matcher() : cc->matcher.get();
-                if ( !matcher->matches(c->currKey(), c->currLoc() ) ) {
+                // in some cases (clone collection) there won't be a matcher
+                if ( c->matcher() && !c->matcher()->matches(c->currKey(), c->currLoc() ) ) {
                 }
                 else {
                     //out() << "matches " << c->currLoc().toString() << '\n';
@@ -674,6 +672,7 @@ namespace mongo {
         virtual QueryOp *clone() const {
             UserQueryOp *ret = new UserQueryOp( _pq, _response, _explainSuffix, _curop );
             ret->_oldN = _n;
+            ret->_ntoskip = _ntoskip;
             // do these when implement explain - store total or per or clause?
 //            ret->_nscanned = _nscanned;
 //            ret->_nscannedObjects = _nscannedObjects;
@@ -893,14 +892,12 @@ namespace mongo {
                 shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher() ) );
                 cc = new ClientCursor(queryOptions, multi, ns);
             } else {
+                cursor->setMatcher( dqo.matcher() );
                 cc = new ClientCursor( queryOptions, cursor, ns );
             }
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
             DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
-            if ( !moreClauses ) {
-                cc->matcher = dqo.matcher();
-            }
             cc->pos = n;
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();

@@ -455,6 +455,7 @@ namespace mongo {
 
     QueryPlanSet::PlanPtr QueryPlanSet::getBestGuess() const {
         assert( plans_.size() );
+        massert( 13284, "best guess plan requested, but scan and order required", !plans_[ 0 ]->scanAndOrderRequired() );
         return plans_[0];
     }
     

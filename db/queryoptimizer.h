@@ -224,7 +224,6 @@ namespace mongo {
         bool mayRunMore() const { return _i < _n; }
         BSONObj explain() const { assertNotOr(); return _currentQps->explain(); }
         bool usingPrerecordedPlan() const { assertNotOr(); return _currentQps->usingPrerecordedPlan(); }
-        QueryPlanSet::PlanPtr getBestGuess() const { assertNotOr(); return _currentQps->getBestGuess(); }
         void setBestGuessOnly() { _bestGuessOnly = true; }
     private:
         //temp
@@ -283,9 +282,14 @@ namespace mongo {
             virtual auto_ptr< CoveredIndexMatcher > newMatcher() const = 0;
         };
         // takes ownership of 'op'
-        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, auto_ptr< CursorOp > op )
-        : _op( op ),
-        _mps( new MultiPlanScanner( ns, pattern, order ) ) {
+        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, auto_ptr< CursorOp > op = auto_ptr< CursorOp >( 0 ) )
+        : _mps( new MultiPlanScanner( ns, pattern, order ) ) {
+            if ( op.get() ) {
+                _op = op;
+            } else {
+                _op.reset( new NoOp() );
+                _mps->setBestGuessOnly();
+            }
             if ( _mps->mayRunMore() ) {
                 nextClause();
                 if ( !ok() ) {
@@ -320,14 +324,14 @@ namespace mongo {
                 advance();
             }
         }        
-        virtual bool supportGetMore() { return false; }
+        virtual bool supportGetMore() { return true; }
         // with update we could potentially get the same document on multiple
         // indexes, but update appears to already handle this with seenObjects
         // so we don't have to do anything special here.
         virtual bool getsetdup(DiskLoc loc) {
             return _c->getsetdup( loc );   
         }
-        CoveredIndexMatcher &matcher() const { return *_matcher; }
+        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
     private:
         class NoOp : public CursorOp {
             virtual void init() { setComplete(); }
@@ -359,6 +363,20 @@ namespace mongo {
             strcmp( query.firstElement().fieldName() , "_id" ) == 0 && 
             query.nFields() == 1 && 
             query.firstElement().isSimpleType();
+    }
+    
+    // matcher() will always work on the returned cursor
+    inline shared_ptr< Cursor > bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {
+        if( !query.getField( "$or" ).eoo() ) {
+            return shared_ptr< Cursor >( new MultiCursor( ns, query, sort ) );
+        } else {
+            shared_ptr< Cursor > ret = QueryPlanSet( ns, query, sort ).getBestGuess()->newCursor();
+            if ( !query.isEmpty() ) {
+                auto_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
+                ret->setMatcher( matcher );
+            }
+            return ret;
+        }
     }
         
 } // namespace mongo
