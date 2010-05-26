@@ -27,7 +27,7 @@
 
 #include "message.h"
 #include "message_server.h"
-#include "../util/mvar.h"
+#include "../util/concurrency/mvar.h"
 
 using namespace boost;
 using namespace boost::asio;
