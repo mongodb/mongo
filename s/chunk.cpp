@@ -127,7 +127,7 @@ namespace mongo {
             //TODO compound support
             BSONElement key = getMin().firstElement();
             BSONObjBuilder b;
-            b.appendAs("$gt", key);
+            b.appendAs(key, "$gt");
 
             Query q = QUERY(key.fieldName() << b.obj());
             q.sort(_manager->getShardKey().key());

@@ -341,7 +341,7 @@ public:
     }
         
     // If maxLen is specified, don't scan more than maxLen bytes.
-    BSONElement(const char *d, int maxLen = -1) : data(d) {
+    explicit BSONElement(const char *d, int maxLen = -1) : data(d) {
         fieldNameSize_ = -1;
         if ( eoo() )
             fieldNameSize_ = 0;
