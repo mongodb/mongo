@@ -71,6 +71,11 @@ assert.eq.automsg( "[1,2]", "t.distinct( 'a', {$or:[{a:2},{b:3}]} )" );
 assert.eq.automsg( "[{a:2},{a:null},{a:1}]", "t.group( {key:{a:1}, cond:{$or:[{a:2},{b:3}]}, reduce:function( x, y ) { }, initial:{} } )" );
 assert.eq.automsg( "5", "t.mapReduce( function() { emit( 'a', this.a ); }, function( key, vals ) { return vals.length; }, {query:{$or:[{a:2},{b:3}]}} ).counts.input" );
 
+explain = t.find( {$or:[{a:2},{b:3}]} ).explain();
+assert.eq.automsg( "2", "explain.clauses.length" );
+assert.eq.automsg( "5", "explain.n" );
+assert.eq.automsg( "6", "explain.nscanned" );
+
 t.remove( {} );
 
 t.save( {a:[1,2]} );

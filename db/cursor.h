@@ -91,7 +91,7 @@ namespace mongo {
         */
         virtual bool getsetdup(DiskLoc loc) = 0;
 
-        virtual BSONObj prettyIndexBounds() const { return BSONObj(); }
+        virtual BSONArray prettyIndexBounds() const { return BSONArray(); }
 
         virtual bool capped() const { return false; }
 

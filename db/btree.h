@@ -342,7 +342,7 @@ namespace mongo {
             return key.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
         }
 
-        virtual BSONObj prettyIndexBounds() const {
+        virtual BSONArray prettyIndexBounds() const {
             BSONArrayBuilder ba;
             if ( bounds_.size() == 0 ) {
                 ba << BSON_ARRAY( prettyKey( startKey ) << prettyKey( endKey ) );

@@ -493,24 +493,85 @@ namespace mongo {
         return res->count();
     }
 
+    class ExplainBuilder {
+    public:
+        ExplainBuilder() : _i() {}
+        void ensureStartScan() {
+            if ( !_a.get() ) {
+                _a.reset( new BSONArrayBuilder() );
+            }
+        }
+        void noteCursor( Cursor *c ) {
+            BSONObjBuilder b( _a->subobjStart() );
+            b << "cursor" << c->toString() << "indexBounds" << c->prettyIndexBounds();
+            b.done();
+        }
+        void noteScan( Cursor *c, long long nscanned, long long nscannedObjects, int n, bool scanAndOrder, int millis, bool hint ) {
+            if ( _i == 1 ) {
+                _c << _b->obj();
+            }
+            if ( _i == 0 ) {
+                _b.reset( new BSONObjBuilder() );
+            } else {
+                _b.reset( new BSONObjBuilder( _c.subobjStart() ) );
+            }
+            *_b << "cursor" << c->toString() << "indexBounds" << c->prettyIndexBounds();
+            _b->appendNumber( "nscanned", nscanned );
+            _b->appendNumber( "nscannedObjects", nscannedObjects );
+            *_b << "n" << n;
+            if ( scanAndOrder ) {
+                *_b << "scanAndOrder" << true;
+            }
+            *_b << "millis" << millis;
+            if ( !hint ) {
+                *_b << "allPlans" << _a->arr();
+            }
+            if ( _i != 0 ) {
+                _b->done();
+            }
+            _a.reset( 0 );
+            ++_i;
+        }
+        BSONObj finishWithSuffix( long long nscanned, long long nscannedObjects, int n, int millis, const BSONObj &suffix ) { 
+            if ( _i > 1 ) {
+                BSONObjBuilder b;
+                b << "clauses" << _c.arr();
+                b.appendNumber( "nscanned", nscanned );
+                b.appendNumber( "nscanneObjects", nscannedObjects );
+                b << "n" << n;
+                b << "millis" << millis;
+                b.appendElements( suffix );
+                return b.obj();
+            } else {
+                _b->appendElements( suffix );
+                return _b->obj();                
+            }
+        }
+    private:
+        auto_ptr< BSONArrayBuilder > _a;
+        auto_ptr< BSONObjBuilder > _b;
+        BSONArrayBuilder _c;
+        int _i;
+    };
+    
     // Implements database 'query' requests using the query optimizer's QueryOp interface
     class UserQueryOp : public QueryOp {
     public:
         
-        UserQueryOp( const ParsedQuery& pq, Message &response, const BSONObj &explainSuffix, CurOp &curop ) :
+        UserQueryOp( const ParsedQuery& pq, Message &response, ExplainBuilder &eb, CurOp &curop ) :
         //int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
         //                   bool explain, FieldMatcher *filter, int queryOptions ) :
             _buf( 32768 ) , // TODO be smarter here
             _pq( pq ) ,
             _ntoskip( pq.getSkip() ) ,
-            _nscanned(0), _nscannedObjects(0),
+            _nscanned(0), _oldNscanned(0), _nscannedObjects(0), _oldNscannedObjects(0),
             _n(0),
             _oldN(0),
             _inMemSort(false),
             _saveClientCursor(false),
             _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
             _response( response ),
-            _explainSuffix( explainSuffix ),
+            _eb( eb ),
             _curop( curop )
         {}
         
@@ -531,6 +592,10 @@ namespace mongo {
             if ( qp().scanAndOrderRequired() ) {
                 _inMemSort = true;
                 _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder() ) );
+            }
+            
+            if ( _pq.isExplain() ) {
+                _eb.noteCursor( _c.get() );
             }
         }
         
@@ -643,23 +708,11 @@ namespace mongo {
                 _saveClientCursor = true;
 
             if ( _pq.isExplain()) {
-                BSONObjBuilder builder;
-                builder.append("cursor", _c->toString());
-                builder.appendArray("indexBounds", _c->prettyIndexBounds());
-                builder.appendNumber("nscanned", nscanned() );
-                builder.appendNumber("nscannedObjects", nscannedObjects() );
-                builder.append("n", _n);
-                if ( scanAndOrderRequired() )
-                    builder.append("scanAndOrder", true);
-                builder.append("millis", _curop.elapsedMillis());
-                builder.appendElements( _explainSuffix );
-                BSONObj obj = builder.done();
-                fillQueryResultFromObj(_buf, 0, obj);
-                _n = 1;
-            }            
-            
-            _response.appendData( _buf.buf(), _buf.len() );
-            _buf.decouple();
+                _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(), _curop.elapsedMillis(), useHints && !_pq.getHint().eoo() );
+            } else {
+                _response.appendData( _buf.buf(), _buf.len() );
+                _buf.decouple();
+            }
             if ( stop ) {
                 setStop();
             } else {
@@ -667,15 +720,26 @@ namespace mongo {
             }
         }
         
+        void finishExplain( const BSONObj &suffix ) {
+            BSONObj obj = _eb.finishWithSuffix( nscanned(), nscannedObjects(), n(), _curop.elapsedMillis(), suffix);
+            fillQueryResultFromObj(_buf, 0, obj);
+            _n = 1;
+            _oldN = 0;
+            _response.appendData( _buf.buf(), _buf.len() );
+            _buf.decouple();
+        }
+        
         virtual bool mayRecordPlan() const { return _pq.getNumToReturn() != 1; }
         
         virtual QueryOp *clone() const {
-            UserQueryOp *ret = new UserQueryOp( _pq, _response, _explainSuffix, _curop );
-            ret->_oldN = _n;
+            if ( _pq.isExplain() ) {
+                _eb.ensureStartScan();
+            }
+            UserQueryOp *ret = new UserQueryOp( _pq, _response, _eb, _curop );
+            ret->_oldN = n();
+            ret->_oldNscanned = nscanned();
+            ret->_oldNscannedObjects = nscannedObjects();
             ret->_ntoskip = _ntoskip;
-            // do these when implement explain - store total or per or clause?
-//            ret->_nscanned = _nscanned;
-//            ret->_nscannedObjects = _nscannedObjects;
             return ret;
         }
 
@@ -683,8 +747,8 @@ namespace mongo {
         shared_ptr<Cursor> cursor() { return _c; }
         auto_ptr< CoveredIndexMatcher > matcher() { return _matcher; }
         int n() const { return _oldN + _n; }
-        long long nscanned() const { return _nscanned; }
-        long long nscannedObjects() const { return _nscannedObjects; }
+        long long nscanned() const { return _nscanned + _oldNscanned; }
+        long long nscannedObjects() const { return _nscannedObjects + _oldNscannedObjects; }
         bool saveClientCursor() const { return _saveClientCursor; }
 
     private:
@@ -693,7 +757,9 @@ namespace mongo {
 
         long long _ntoskip;
         long long _nscanned;
+        long long _oldNscanned;
         long long _nscannedObjects;
+        long long _oldNscannedObjects;
         int _n; // found so far
         int _oldN;
         
@@ -711,7 +777,7 @@ namespace mongo {
         auto_ptr< FindingStartCursor > _findingStartCursor;
         
         Message &_response;
-        const BSONObj &_explainSuffix;
+        ExplainBuilder &_eb;
         CurOp &_curop;
     };
     
@@ -863,7 +929,7 @@ namespace mongo {
         if ( explain && ! pq.hasIndexSpecifier() ){
             MultiPlanScanner mps( ns, query, order );
             if ( mps.usingPrerecordedPlan() )
-                oldPlan = mps.explain();
+                oldPlan = mps.oldExplain();
         }
         auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() ) );
         BSONObj explainSuffix;
@@ -871,14 +937,16 @@ namespace mongo {
             BSONObjBuilder bb;
             if ( !oldPlan.isEmpty() )
                 bb.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
-            if ( hint.eoo() )
-                bb.appendElements(mps->explain());            
             explainSuffix = bb.obj();
         }
-        UserQueryOp original( pq, result, explainSuffix, curop );
+        ExplainBuilder eb;
+        UserQueryOp original( pq, result, eb, curop );
         shared_ptr< UserQueryOp > o = mps->runOp( original );
         UserQueryOp &dqo = *o;
         massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
+        if ( explain ) {
+            dqo.finishExplain( explainSuffix );
+        }
         n = dqo.n();
         nscanned = dqo.nscanned();
         if ( dqo.scanAndOrderRequired() )

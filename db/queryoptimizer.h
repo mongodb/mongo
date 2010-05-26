@@ -222,8 +222,11 @@ namespace mongo {
             return dynamic_pointer_cast< T >( runOpOnce( static_cast< QueryOp& >( op ) ) );
         }       
         bool mayRunMore() const { return _i < _n; }
-        BSONObj explain() const { assertNotOr(); return _currentQps->explain(); }
-        bool usingPrerecordedPlan() const { assertNotOr(); return _currentQps->usingPrerecordedPlan(); }
+        BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
+        // just report this when only one query op
+        bool usingPrerecordedPlan() const {
+            return !_or && _currentQps->usingPrerecordedPlan();
+        }
         void setBestGuessOnly() { _bestGuessOnly = true; }
     private:
         //temp

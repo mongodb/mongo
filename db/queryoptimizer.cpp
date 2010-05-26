@@ -439,20 +439,6 @@ namespace mongo {
         return r.run();
     }
     
-    BSONObj QueryPlanSet::explain() const {
-        vector< BSONObj > arr;
-        for( PlanSet::const_iterator i = plans_.begin(); i != plans_.end(); ++i ) {
-            shared_ptr<Cursor> c = (*i)->newCursor();
-            BSONObjBuilder explain;
-            explain.append( "cursor", c->toString() );
-            explain.appendArray( "indexBounds", c->prettyIndexBounds() );
-            arr.push_back( explain.obj() );
-        }
-        BSONObjBuilder b;
-        b.append( "allPlans", arr );
-        return b.obj();
-    }
-
     QueryPlanSet::PlanPtr QueryPlanSet::getBestGuess() const {
         assert( plans_.size() );
         massert( 13284, "best guess plan requested, but scan and order required", !plans_[ 0 ]->scanAndOrderRequired() );

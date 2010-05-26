@@ -582,7 +582,7 @@ namespace mongo {
             return *this;
         }
         
-        BufBuilder &subobjStart( const char *name ) {
+        BufBuilder &subobjStart( const char *name = "0" ) {
             fill( name );
             return _b.subobjStart( num().c_str() );
         }
