@@ -232,6 +232,7 @@ namespace mongo {
 #if 0
                     if (program == "mongos") {
                         argv_.push_back("valgrind");
+                        argv_.push_back("--log-file=/tmp/mongos-%p.valgrind");
                         argv_.push_back("--leak-check=yes");
                         argv_.push_back("--suppressions=valgrind.suppressions");
                         //argv_.push_back("--error-exitcode=1");

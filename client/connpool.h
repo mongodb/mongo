@@ -56,7 +56,7 @@ namespace mongo {
     */
     class DBConnectionPool {
         mongo::mutex _mutex;
-        map<string,PoolForHost*> _pools; // servername -> pool
+        map<string,PoolForHost> _pools; // servername -> pool
         list<DBConnectionHook*> _hooks;
 
     public:        
@@ -73,7 +73,7 @@ namespace mongo {
                 return;
             }
             scoped_lock L(_mutex);
-            _pools[host]->pool.push(c);
+            _pools[host].pool.push(c);
         }
         void addHook( DBConnectionHook * hook );
         void appendInfo( BSONObjBuilder& b );

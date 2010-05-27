@@ -31,10 +31,9 @@ namespace mongo {
     DBClientBase* DBConnectionPool::get(const string& host) {
         scoped_lock L(_mutex);
         
-        PoolForHost *&p = _pools[host];
-        if ( p == 0 )
-            p = new PoolForHost();
-        if ( p->pool.empty() ) {
+        PoolForHost& p = _pools[host];
+
+        if ( p.pool.empty() ) {
             int numCommas = DBClientBase::countCommas( host );
             DBClientBase *c;
             
@@ -66,31 +65,31 @@ namespace mongo {
                 uassert( 13071 , (string)"invalid hostname [" + host + "]" , 0 );
                 c = 0; // prevents compiler warning
             }
-            p->created++;
+            p.created++;
             return c;
         }
-        DBClientBase *c = p->pool.top();
-        p->pool.pop();
+        DBClientBase *c = p.pool.top();
+        p.pool.pop();
         onHandedOut( c );
         return c;
     }
 
     void DBConnectionPool::flush(){
         scoped_lock L(_mutex);
-        for ( map<string,PoolForHost*>::iterator i = _pools.begin(); i != _pools.end(); i++ ){
-            PoolForHost* p = i->second;
+        for ( map<string,PoolForHost>::iterator i = _pools.begin(); i != _pools.end(); i++ ){
+            PoolForHost& p = i->second;
 
             vector<DBClientBase*> all;
-            while ( ! p->pool.empty() ){
-                DBClientBase * c = p->pool.top();
-                p->pool.pop();
+            while ( ! p.pool.empty() ){
+                DBClientBase * c = p.pool.top();
+                p.pool.pop();
                 all.push_back( c );
                 bool res;
                 c->isMaster( res );
             }
             
             for ( vector<DBClientBase*>::iterator i=all.begin(); i != all.end(); i++ ){
-                p->pool.push( *i );
+                p.pool.push( *i );
             }
         }
     }
@@ -120,11 +119,11 @@ namespace mongo {
     void DBConnectionPool::appendInfo( BSONObjBuilder& b ){
         scoped_lock lk( _mutex );
         BSONObjBuilder bb( b.subobjStart( "hosts" ) );
-        for ( map<string,PoolForHost*>::iterator i=_pools.begin(); i!=_pools.end(); ++i ){
+        for ( map<string,PoolForHost>::iterator i=_pools.begin(); i!=_pools.end(); ++i ){
             string s = i->first;
             BSONObjBuilder temp( bb.subobjStart( s.c_str() ) );
-            temp.append( "available" , (int)(i->second->pool.size()) );
-            temp.appendNumber( "created" , i->second->created );
+            temp.append( "available" , (int)(i->second.pool.size()) );
+            temp.appendNumber( "created" , i->second.created );
             temp.done();
         }
         bb.done();

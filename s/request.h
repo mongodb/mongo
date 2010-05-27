@@ -135,7 +135,7 @@ namespace mongo {
         int _lastAccess;
         
         static mongo::mutex _clientsLock;
-        static ClientCache _clients;
+        static ClientCache& _clients;
         static boost::thread_specific_ptr<ClientInfo> _tlInfo;
     };
 }

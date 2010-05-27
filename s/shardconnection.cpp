@@ -117,6 +117,7 @@ namespace mongo {
                     pool.release( addr , conn );
                     s.pop();
                 }
+                delete ss;
             }
             _hosts.clear();
         }
