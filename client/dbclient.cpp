@@ -469,8 +469,8 @@ namespace mongo {
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
-        server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
-        p = auto_ptr<MessagingPort>(new MessagingPort( _timeout, _logLevel ));
+        server.reset(new SockAddr(ip.c_str(), port));
+        p.reset(new MessagingPort( _timeout, _logLevel ));
 
         if (server->getAddr() == "0.0.0.0"){
             failed = true;

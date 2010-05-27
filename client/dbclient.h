@@ -635,8 +635,8 @@ namespace mongo {
     */
     class DBClientConnection : public DBClientBase {
         DBClientPaired *clientPaired;
-        auto_ptr<MessagingPort> p;
-        auto_ptr<SockAddr> server;
+        boost::scoped_ptr<MessagingPort> p;
+        boost::scoped_ptr<SockAddr> server;
         bool failed; // true if some sort of fatal error has ever happened
         bool autoReconnect;
         time_t lastReconnectTry;
@@ -699,7 +699,7 @@ namespace mongo {
         }
 
         MessagingPort& port() {
-            return *p.get();
+            return *p;
         }
 
         string toStringLong() const {
