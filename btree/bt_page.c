@@ -223,19 +223,18 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 			if (idb->huffman_key == NULL) {
-				ip->data = WT_ITEM_BYTE(item);
-				ip->size = WT_ITEM_LEN(item);
+				WT_KEY_SET(ip,
+				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-			ip->data = item;
-			ip->size = 0;
+			WT_KEY_SET_PROCESS(ip, item);
 			break;
 		case WT_ITEM_OFF:
 			off = WT_ITEM_BYTE_OFF(item);
 			records += WT_RECORDS(off);
-			ip->page_data = item;
+			ip->data = item;
 			++ip;
 			break;
 		WT_ILLEGAL_FORMAT(db);
@@ -286,30 +285,25 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 			else
 				++ip;
 			if (idb->huffman_key != NULL ||
-			    WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL) {
-				ip->data = item;
-				ip->size = 0;
-			} else {
-				ip->data = WT_ITEM_BYTE(item);
-				ip->size = WT_ITEM_LEN(item);
-			}
+			    WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL)
+				WT_KEY_SET_PROCESS(ip, item);
+			else
+				WT_KEY_SET(ip,
+				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			++indx_count;
 			break;
-		case WT_ITEM_DATA:
-		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
-			/*
-			 * The page_data field references the first of the
-			 * duplicate data sets, only set it if it hasn't yet
-			 * been set.
-			 */
-			if (ip->page_data == NULL)
-				ip->page_data = item;
+			/* Duplicate the previous key. */
+			WT_KEY_SET(ip, ip[-1].key, ip[-1].size);
+			/* FALLTHROUGH */
+		case WT_ITEM_DATA:
+		case WT_ITEM_DATA_OVFL:
+			ip->data = item;
 			++records;
 			break;
 		case WT_ITEM_OFF:
-			ip->page_data = item;
+			ip->data = item;
 			records += WT_ROW_OFF_RECORDS(ip);
 			break;
 		WT_ILLEGAL_FORMAT(db);
@@ -344,7 +338,7 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 	 * The page contains WT_OFF structures.
 	 */
 	WT_OFF_FOREACH(page, off, i) {
-		ip->page_data = off;
+		ip->data = off;
 		++ip;
 		records += WT_RECORDS(off);
 	}
@@ -378,7 +372,7 @@ __wt_bt_page_inmem_col_leaf(WT_PAGE *page)
 	 */
 	ip = page->u.c_indx;
 	WT_ITEM_FOREACH(page, item, i) {
-		ip->page_data = item;
+		ip->data = item;
 		++ip;
 	}
 
@@ -413,16 +407,15 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	WT_ITEM_FOREACH(page, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DUP:
-			ip->data = WT_ITEM_BYTE(item);
-			ip->size = WT_ITEM_LEN(item);
+			WT_KEY_SET(ip,
+			    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			break;
 		case WT_ITEM_DUP_OVFL:
-			ip->data = WT_ITEM_BYTE(item);
-			ip->size = 0;
+			WT_KEY_SET_PROCESS(ip, WT_ITEM_BYTE(item));
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
-		ip->page_data = item;
+		ip->data = item;
 		++ip;
 	}
 
@@ -458,13 +451,13 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	 */
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		WT_FIX_REPEAT_ITERATE(db, page, p, i, j) {
-			ip->page_data = p;
+			ip->data = p;
 			++ip;
 			++records;
 		}
 	else
 		WT_FIX_FOREACH(db, page, p, i) {
-			ip->page_data = p;
+			ip->data = p;
 			++ip;
 			++records;
 		}
@@ -482,7 +475,7 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
+__wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *rip, DBT *dbt)
 {
 	DBT local_dbt;
 	ENV *env;
@@ -490,7 +483,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
 	WT_PAGE *ovfl_page;
-	u_int32_t size;
+	u_int32_t i, size;
 	int ret;
 	void *orig;
 
@@ -499,7 +492,12 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	ovfl_page = NULL;
 	ret = 0;
 
-	WT_ASSERT(env, ip->size == 0);
+	/* We only get called when there's a key to process. */
+	WT_ASSERT(env, WT_KEY_PROCESS(rip));
+
+	/* We only need a  WT_PAGE when instantiating a key in the tree. */
+	WT_ASSERT(env,
+	    (page == NULL && dbt != NULL) || (page != NULL && dbt == NULL));
 
 	/*
 	 * 3 cases:
@@ -513,7 +511,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	 *
 	 * If the item is an overflow item, bring it into memory.
 	 */
-	item = ip->data;
+	item = rip->key;
 	if (WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL) {
 		ovfl = WT_ITEM_BYTE_OVFL(item);
 		WT_RET(
@@ -550,10 +548,17 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	 * If no target DBT specified (that is, we're intending to persist this
 	 * conversion in our in-memory tree), update the WT_ROW_INDX reference
 	 * with the processed key.
+	 *
+	 * If there are any duplicates of this item, update them as well.
 	 */
 	if (dbt == &local_dbt) {
-		ip->data = dbt->data;
-		ip->size = dbt->size;
+		WT_KEY_SET(rip, dbt->data, dbt->size);
+		if (WT_ITEM_TYPE(rip->data) == WT_ITEM_DUP ||
+		    WT_ITEM_TYPE(rip->data) == WT_ITEM_DUP_OVFL) {
+			WT_INDX_FOREACH(page, rip, i)
+				if (rip->key == item)
+					WT_KEY_SET(rip, dbt->data, dbt->size);
+		}
 	}
 
 err:	if (ovfl_page != NULL)
