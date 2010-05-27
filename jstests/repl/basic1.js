@@ -108,6 +108,23 @@ printjson( as.rpos.findOne() )
 
 //am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().limit(10).sort( { $natural : -1 } ).forEach( printjson )
 
+t = am.b;
+t.update( { "_id" : "fun"}, { $inc : {"ws.fs.cp.wsj" : 6743} } , true, false)
+block()
+check( "b 1" );
+
+t.update( { "_id" : "fun"}, { $inc : {"ws.fs.cp.wsj" : 5} } , true, false)
+block()
+check( "b 2" );
+
+t.update( { "_id" : "fun"}, { $inc : {"ws.fs.cp.wsj" : 100, "ws.fs.cp.forbes" : 911} } , true, false)
+block()
+printjson( t.findOne() )
+printjson( as.b.findOne() )
+//check( "b 3" );
+
+
+
 rt.stop();
 
 
