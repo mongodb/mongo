@@ -121,11 +121,29 @@ t.update( { "b" : 3} , { $set : { "b.$" : 17 } } )
 block();
 check( "after pos 4 " );
 
-
 printjson( am.rpos.findOne() )
 printjson( as.rpos.findOne() )
 
 //am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().limit(10).sort( { $natural : -1 } ).forEach( printjson )
+
+
+t = am.b;
+t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 6743} } , true, false)
+block()
+check( "b 1" );
+
+t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 5} } , true, false)
+block()
+check( "b 2" );
+
+t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 100, "a.b.c.y" : 911} } , true, false)
+block()
+assert.eq( { _id : "fun" , a : { b : { c : { x : 6848 , y : 911 } } } } , as.b.findOne() , "b 3" );
+//printjson( t.findOne() )
+//printjson( as.b.findOne() )
+//am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().sort( { $natural : -1 } ).limit(3).forEach( printjson )
+check( "b 4" );
+
 
 rt.stop();
 

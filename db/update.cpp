@@ -67,7 +67,7 @@ namespace mongo {
             ms.incint = elt.numberInt() + in.numberInt();
         }
         
-        ms.appendIncValue( bb );
+        ms.appendIncValue( bb , false );
     }
 
     template< class Builder >

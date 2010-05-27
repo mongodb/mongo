@@ -413,7 +413,7 @@ namespace mongo {
         void appendForOpLog( BSONObjBuilder& b ) const {
             if ( incType ){
                 BSONObjBuilder bb( b.subobjStart( "$set" ) );
-                appendIncValue( bb );
+                appendIncValue( bb , true );
                 bb.done();
                 return;
             }
@@ -434,14 +434,16 @@ namespace mongo {
         }
         
         template< class Builder >
-        void appendIncValue( Builder& b ) const {
+        void appendIncValue( Builder& b , bool useFullName ) const {
+            const char * n = useFullName ? m->fieldName : m->shortFieldName;
+            
             switch ( incType ){
             case NumberDouble:
-                b.append( m->shortFieldName , incdouble ); break;
+                b.append( n , incdouble ); break;
             case NumberLong:
-                b.append( m->shortFieldName , inclong ); break;
+                b.append( n , inclong ); break;
             case NumberInt:
-                b.append( m->shortFieldName , incint ); break;
+                b.append( n , incint ); break;
             default:
                 assert(0);
             }
