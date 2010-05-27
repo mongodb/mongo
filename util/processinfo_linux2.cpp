@@ -40,9 +40,9 @@ namespace mongo {
             FILE * f = fopen( name , "r");
             if ( ! f ){
                 stringstream ss;
-                ss << "couldn't open [" << name << "] " << errnoWithDescription();
+                ss << "couldn't open [" << name << "] " << OUTPUT_ERRNO;
                 string s = ss.str();
-                msgassertedNoTrace( s.c_str() );
+                msgasserted( 13276 , s.c_str() );
             }
 
             int found = fscanf(f,
