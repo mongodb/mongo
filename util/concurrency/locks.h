@@ -16,9 +16,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-//#include "../pch.h"
-
 #pragma once
+
+#include "mutex.h"
 
 #if BOOST_VERSION >= 103500
   #define BOOST_RWLOCK
@@ -43,20 +43,37 @@ namespace mongo {
 #ifdef BOOST_RWLOCK
     class RWLock {
         boost::shared_mutex _m;
-
     public:
+#if defined(_DEBUG)
+        const char *_name;
+        RWLock(const char *name) : _name(name) { }
+#else
+        RWLock(const char *) { }
+#endif
         void lock(){
             _m.lock();
+#if defined(_DEBUG)
+            mutexDebugger.entering(_name);
+#endif
         }
         void unlock(){
+#if defined(_DEBUG)
+            mutexDebugger.leaving(_name);
+#endif
             _m.unlock();
         }
         
         void lock_shared(){
+#if defined(_DEBUG)
+            mutexDebugger.entering(_name);
+#endif
             _m.lock_shared();
         }
         
         void unlock_shared(){
+#if defined(_DEBUG)
+            mutexDebugger.leaving(_name);
+#endif
             _m.unlock_shared();
         }
 
@@ -86,7 +103,12 @@ namespace mongo {
         }
 
     public:
-        RWLock(){
+#if defined(_DEBUG)
+        const char *_name;
+        RWLock(const char *name) : _name(name) {
+#else
+        RWLock(const char *) {
+#endif
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
         
@@ -98,16 +120,28 @@ namespace mongo {
 
         void lock(){
             check( pthread_rwlock_wrlock( &_lock ) );
+#if defined(_DEBUG)
+            mutexDebugger.entering(_name);
+#endif
         }
         void unlock(){
+#if defined(_DEBUG)
+            mutexDebugger.leaving(_name);
+#endif
             check( pthread_rwlock_unlock( &_lock ) );
         }
         
         void lock_shared(){
             check( pthread_rwlock_rdlock( &_lock ) );
+#if defined(_DEBUG)
+            mutexDebugger.entering(_name);
+#endif
         }
         
         void unlock_shared(){
+#if defined(_DEBUG)
+            mutexDebugger.leaving(_name);
+#endif
             check( pthread_rwlock_unlock( &_lock ) );
         }
         

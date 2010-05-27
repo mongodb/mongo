@@ -36,7 +36,7 @@ namespace mongo {
         return true;
     }
 
-    RWLock chunkSplitLock;
+    RWLock chunkSplitLock("rw:chunkSplitLock");
 
     // -------  Shard --------
 
@@ -510,7 +510,8 @@ namespace mongo {
     ChunkManager::ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique ) : 
         _config( config ) , _ns( ns ) , 
         _key( pattern ) , _unique( unique ) , 
-        _sequenceNumber(  ++NextSequenceNumber ) {
+        _sequenceNumber(  ++NextSequenceNumber ), _lock("rw:ChunkManager")
+    {
         
         _reload();
         

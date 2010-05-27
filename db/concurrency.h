@@ -86,6 +86,8 @@ namespace mongo {
         */
         ThreadLocalValue<bool> _releasedEarly;
     public:
+        MongoMutex(const char * name) : _m(name) { }
+
         /**
          * @return
          *    > 0  write lock

@@ -56,7 +56,7 @@ namespace mongo {
     */
 
     static set<MongoFile*> mmfiles;
-    static RWLock mmmutex;
+    static RWLock mmmutex("rw:mmmutex");
 
     void MongoFile::destroyed() {
         rwlock lk( mmmutex , true );

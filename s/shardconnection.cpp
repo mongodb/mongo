@@ -117,6 +117,7 @@ namespace mongo {
                     pool.release( addr , conn );
                     s.pop();
                 }
+                delete ss;
             }
             _hosts.clear();
         }
@@ -181,5 +182,15 @@ namespace mongo {
 
     void ShardConnection::sync(){
         ClientConnections::get()->sync();
+    }
+
+    ShardConnection::~ShardConnection() {
+        if ( _conn ){
+            if ( ! _conn->isFailed() ) {
+                /* see done() comments above for why we log this line */
+                log() << "~ScopedDBConnection: _conn != null" << endl;
+            }
+            kill();
+        }
     }
 }

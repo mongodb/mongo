@@ -199,7 +199,7 @@ namespace mongo {
         return info;
     }
         
-    map<int,ClientInfo*> ClientInfo::_clients;
+    ClientCache& ClientInfo::_clients = *(new ClientCache());
     mongo::mutex ClientInfo::_clientsLock("_clientsLock");
     boost::thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
 

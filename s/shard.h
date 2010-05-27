@@ -162,11 +162,13 @@ namespace mongo {
         double _writeLock;
     };
 
-    class ShardConnection {
+    class ShardConnection : boost::noncopyable{
     public:
         ShardConnection( const Shard * s , const string& ns );
         ShardConnection( const Shard& s , const string& ns );
         ShardConnection( const string& addr , const string& ns );
+
+        ~ShardConnection();
 
         void done();
         void kill();
