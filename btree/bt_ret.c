@@ -66,7 +66,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	 */
 	if (key_return) {
 		if (WT_KEY_PROCESS(rip)) {
-			WT_RET(__wt_bt_key_process(toc, rip, &toc->key));
+			WT_RET(__wt_bt_key_process(toc, NULL, rip, &toc->key));
 
 			key->data = toc->key.data;
 			key->size = toc->key.size;
@@ -75,7 +75,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 				WT_RET(__wt_realloc(env,
 				    &toc->key.mem_size,
 				    rip->size, &toc->key.data));
-			memcpy(toc->key.data, rip->data, rip->size);
+			memcpy(toc->key.data, rip->key, rip->size);
 			toc->key.size = rip->size;
 
 			key->data = toc->key.data;
@@ -83,7 +83,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 		} else {
 			WT_CLEAR(local_key);
 			key = &local_key;
-			key->data = rip->data;
+			key->data = rip->key;
 			key->size = rip->size;
 		}
 	}
@@ -122,19 +122,19 @@ repl:			if (sdbt->data == WT_DATA_DELETED)
 			WT_CLEAR(local_data);
 			data = &local_data;
 			data->data = F_ISSET(idb, WT_REPEAT_COMP) ?
-			    WT_FIX_REPEAT_DATA(cip->page_data) : cip->page_data;
+			    WT_FIX_REPEAT_DATA(cip->data) : cip->data;
 			data->size = db->fixed_len;
 			return (callback(db, key, data));
 		}
 		orig = F_ISSET(idb, WT_REPEAT_COMP) ?
-		    WT_FIX_REPEAT_DATA(cip->page_data) : cip->page_data;
+		    WT_FIX_REPEAT_DATA(cip->data) : cip->data;
 		size = db->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:
-		item = cip->page_data;
+		item = cip->data;
 		goto item_set;
 	case WT_PAGE_ROW_LEAF:
-		item = rip->page_data;
+		item = rip->data;
 item_set:	if (callback != NULL &&
 		    WT_ITEM_TYPE(item) == WT_ITEM_DATA &&
 		    idb->huffman_data == NULL) {
@@ -152,19 +152,19 @@ item_set:	if (callback != NULL &&
 			ovfl = WT_ITEM_BYTE_OVFL(item);
 		break;
 	case WT_PAGE_DUP_LEAF:
-		item = rip->page_data;
+		item = rip->data;
 		if (callback != NULL &&
 		    WT_ITEM_TYPE(item) == WT_ITEM_DUP &&
 		    idb->huffman_data == NULL) {
 			WT_CLEAR(local_data);
 			data = &local_data;
-			data->data = rip->data;
+			data->data = rip->key;
 			data->size = rip->size;
 			return (callback(db, key, data));
 		}
 
 		if (WT_ITEM_TYPE(item) == WT_ITEM_DUP) {
-			orig = rip->data;
+			orig = rip->key;
 			size = rip->size;
 		} else
 			ovfl = WT_ITEM_BYTE_OVFL(item);

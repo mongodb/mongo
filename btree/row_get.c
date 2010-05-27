@@ -41,8 +41,8 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	 * here.   Re-visit this when we figure out how we handle
 	 * dup inserts into the tree.
 	 */
-	if (ip->page_data != NULL) {
-		type = WT_ITEM_TYPE(ip->page_data);
+	if (ip->data != NULL) {
+		type = WT_ITEM_TYPE(ip->data);
 		if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
 			__wt_api_db_errx(db,
 			    "the Db.get method cannot return keys with "

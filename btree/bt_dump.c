@@ -93,14 +93,14 @@ __wt_bt_dump(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_DSTUFF *dp)
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_INT:
 		WT_INDX_FOREACH(page, page_cip, i) {
-			off = (WT_OFF *)page_cip->page_data;
+			off = (WT_OFF *)page_cip->data;
 			WT_ERR(__wt_bt_dump(toc, off->addr, off->size, dp));
 		}
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_INDX_FOREACH(page, page_rip, i) {
-			off = WT_ITEM_BYTE_OFF(page_rip->page_data);
+			off = WT_ITEM_BYTE_OFF(page_rip->data);
 			WT_ERR(__wt_bt_dump(toc, off->addr, off->size, dp));
 		}
 		break;
