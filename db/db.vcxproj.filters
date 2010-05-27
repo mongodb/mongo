@@ -698,6 +698,15 @@
     <ClInclude Include="stats\top.h">
       <Filter>stats</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\concurrency\locks.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mvar.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\thread_pool.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">

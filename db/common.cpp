@@ -9,6 +9,6 @@
 namespace mongo {
 
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
-    MongoMutex &dbMutex( *(new MongoMutex) );
+    MongoMutex &dbMutex( *(new MongoMutex("rw:dbMutex")) );
 
 }
