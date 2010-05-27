@@ -410,23 +410,7 @@ namespace mongo {
             }
         }
         
-        void appendForOpLog( BSONObjBuilder& b ) const {
-            if ( incType ){
-                BSONObjBuilder bb( b.subobjStart( "$set" ) );
-                appendIncValue( bb );
-                bb.done();
-                return;
-            }
-            
-            const char * name = fixedOpName ? fixedOpName : Mod::modNames[op()];
-
-            BSONObjBuilder bb( b.subobjStart( name ) );
-            if ( fixed )
-                bb.appendAs( *fixed , m->fieldName );
-            else
-                bb.appendAs( m->elt , m->fieldName );
-            bb.done();
-        }
+        void appendForOpLog( BSONObjBuilder& b ) const;
 
         template< class Builder >
         void apply( Builder& b , BSONElement in ){
@@ -434,18 +418,22 @@ namespace mongo {
         }
         
         template< class Builder >
-        void appendIncValue( Builder& b ) const {
+        void appendIncValue( Builder& b , bool useFullName ) const {
+            const char * n = useFullName ? m->fieldName : m->shortFieldName;
+
             switch ( incType ){
             case NumberDouble:
-                b.append( m->shortFieldName , incdouble ); break;
+                b.append( n , incdouble ); break;
             case NumberLong:
-                b.append( m->shortFieldName , inclong ); break;
+                b.append( n , inclong ); break;
             case NumberInt:
-                b.append( m->shortFieldName , incint ); break;
+                b.append( n , incint ); break;
             default:
                 assert(0);
             }
         }
+
+        string toString() const;
     };
     
     /**
@@ -576,6 +564,7 @@ namespace mongo {
             }
         }
 
+        string toString() const;
 
         friend class ModSet;
     };
