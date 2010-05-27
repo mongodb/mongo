@@ -168,6 +168,8 @@ namespace mongo {
         ShardConnection( const Shard& s , const string& ns );
         ShardConnection( const string& addr , const string& ns );
 
+        ~ShardConnection() { assert(!_conn); }
+
         void done();
         void kill();
 

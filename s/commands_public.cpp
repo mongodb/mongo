@@ -566,7 +566,10 @@ namespace mongo {
                 Timer t2;
                 ShardConnection conn( conf->getPrimary() , fullns );
                 BSONObj finalResult;
-                if ( ! conn->runCommand( dbName , finalCmd.obj() , finalResult ) ){
+                bool ok = conn->runCommand( dbName , finalCmd.obj() , finalResult );
+                conn.done();
+
+                if ( ! ok ){
                     errmsg = "final reduce failed: ";
                     errmsg += finalResult.toString();
                     return 0;
