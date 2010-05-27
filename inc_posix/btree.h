@@ -289,16 +289,23 @@ struct __wt_row_indx {
 	 * without copying (this is important for keys on internal pages).
 	 *
 	 * If a key requires processing (for example, an overflow key or an
-	 * Huffman encoded key), the data field references the on-page key
-	 * information, but the size is set to 0 to indicate the key requires
-	 * processing.
+	 * Huffman encoded key), the key field points to the on-page key,
+	 * but the size is set to 0 to indicate the key requires processing.
 	 */
-#define	WT_KEY_PROCESS(ip)		((ip)->size == 0)
-	void	 *data;			/* DBT: data */
-	u_int32_t size;			/* DBT: data length */
+#define	WT_KEY_PROCESS(ip)						\
+	((ip)->size == 0)
+#define	WT_KEY_SET(ip, _key, _size) do {				\
+	(ip)->key = (_key);						\
+	(ip)->size = _size;						\
+} while (0)
+#define	WT_KEY_SET_PROCESS(ip, _key) do {				\
+	(ip)->key = (_key);						\
+	(ip)->size = 0;							\
+} while (0)
+	void	 *key;			/* DBT: key */
+	u_int32_t size;			/* DBT: key length */
 
-	/* The original on-page data associated with this particular key. */
-	void	 *page_data;
+	WT_ITEM	 *data;			/* Key's on-page data item */
 
 	WT_REPL	 *repl;			/* Replacement data array */
 };
@@ -316,7 +323,12 @@ struct __wt_row_indx {
  * item on a column-store database page.
  */
 struct __wt_col_indx {
-	void	 *page_data;		/* Original on-page data */
+	/*
+	 * The on-page data is untyped for column-store pages -- if the page
+	 * has variable-length objects, it's a WT_ITEM layout, like row-store
+	 * pages.  If the page has fixed-length objects, it's untyped data.
+	 */
+	void	 *data;			/* On-page data */
 	WT_REPL	 *repl;			/* Replacement data array */
 };
 /*
@@ -334,23 +346,23 @@ struct __wt_col_indx {
 
 /*
  * On both row- and column-store internal pages, the on-page data referenced
- * by the WT_INDX page_data field is a WT_OFF structure, which contains a
+ * by the WT_{ROW,COL}_INDX data field is a WT_OFF structure, which contains a
  * record count and a page addr/size pair.   Macros to reach into the on-page
  * structure and return the values.
  */
 #define	WT_COL_OFF_RECORDS(ip)						\
-	WT_RECORDS((WT_OFF *)((ip)->page_data))
+	WT_RECORDS((WT_OFF *)((ip)->data))
 #define	WT_COL_OFF_ADDR(ip)						\
-	(((WT_OFF *)((ip)->page_data))->addr)
+	(((WT_OFF *)((ip)->data))->addr)
 #define	WT_COL_OFF_SIZE(ip)						\
-	(((WT_OFF *)((ip)->page_data))->size)
+	(((WT_OFF *)((ip)->data))->size)
 
 #define	WT_ROW_OFF_RECORDS(ip)						\
-	WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
+	WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->data))
 #define	WT_ROW_OFF_ADDR(ip)						\
-	(((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
+	(((WT_OFF *)WT_ITEM_BYTE((ip)->data))->addr)
 #define	WT_ROW_OFF_SIZE(ip)						\
-	(((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->size)
+	(((WT_OFF *)WT_ITEM_BYTE((ip)->data))->size)
 
 /*
  * WT_BIN_INDX --
