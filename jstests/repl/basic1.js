@@ -109,19 +109,21 @@ printjson( as.rpos.findOne() )
 //am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().limit(10).sort( { $natural : -1 } ).forEach( printjson )
 
 t = am.b;
-t.update( { "_id" : "fun"}, { $inc : {"ws.fs.cp.wsj" : 6743} } , true, false)
+t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 6743} } , true, false)
 block()
 check( "b 1" );
 
-t.update( { "_id" : "fun"}, { $inc : {"ws.fs.cp.wsj" : 5} } , true, false)
+t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 5} } , true, false)
 block()
 check( "b 2" );
 
-t.update( { "_id" : "fun"}, { $inc : {"ws.fs.cp.wsj" : 100, "ws.fs.cp.forbes" : 911} } , true, false)
+t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 100, "a.b.c.y" : 911} } , true, false)
 block()
-printjson( t.findOne() )
-printjson( as.b.findOne() )
-//check( "b 3" );
+assert.eq( { _id : "fun" , a : { b : { c : { x : 6848 , y : 911 } } } } , as.b.findOne() , "b 3" );
+//printjson( t.findOne() )
+//printjson( as.b.findOne() )
+//am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().sort( { $natural : -1 } ).limit(3).forEach( printjson )
+check( "b 4" );
 
 
 

@@ -67,7 +67,7 @@ namespace mongo {
             ms.incint = elt.numberInt() + in.numberInt();
         }
         
-        ms.appendIncValue( bb );
+        ms.appendIncValue( bb , false );
     }
 
     template< class Builder >
@@ -306,8 +306,10 @@ namespace mongo {
     }
 
     auto_ptr<ModSetState> ModSet::prepare(const BSONObj &obj) const {
+        DEBUGUPDATE( "\t start prepare" );
         ModSetState * mss = new ModSetState( obj );
-
+        
+        
         // Perform this check first, so that we don't leave a partially modified object on uassert.
         for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             DEBUGUPDATE( "\t\t prepare : " << i->first );
@@ -407,8 +409,40 @@ namespace mongo {
                 mss->amIInPlacePossible( false );
             }
         }
+
+        DEBUGUPDATE( "\t mss\n" << mss->toString() << "\t--" );
         
         return auto_ptr<ModSetState>( mss );
+    }
+
+    void ModState::appendForOpLog( BSONObjBuilder& b ) const {
+        if ( incType ){
+            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog inc fieldname: " << m->fieldName << " short:" << m->shortFieldName );
+            BSONObjBuilder bb( b.subobjStart( "$set" ) );
+            appendIncValue( bb , true );
+            bb.done();
+            return;
+        }
+        
+        const char * name = fixedOpName ? fixedOpName : Mod::modNames[op()];
+
+        DEBUGUPDATE( "\t\t\t\t\t appendForOpLog name:" << name << " fixed: " << fixed << " fn: " << m->fieldName );
+
+        BSONObjBuilder bb( b.subobjStart( name ) );
+        if ( fixed )
+            bb.appendAs( *fixed , m->fieldName );
+        else
+            bb.appendAs( m->elt , m->fieldName );
+        bb.done();
+    }
+
+    string ModState::toString() const {
+        stringstream ss;
+        if ( fixedOpName )
+            ss << " fixedOpName: " << fixedOpName;
+        if ( fixed )
+            ss << " fixed: " << fixed;
+        return ss.str();
     }
     
     void ModSetState::applyModsInPlace() {
@@ -492,7 +526,7 @@ namespace mongo {
             string field = root + e.fieldName();
             FieldCompareResult cmp = compareDottedFieldNames( m->second.m->fieldName , field );
 
-            DEBUGUPDATE( "\t\t\t" << field << "\t" << m->second.m->fieldName << "\t" << cmp );
+            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second.m->fieldName << "\t cmp:" << cmp );
             
             switch ( cmp ){
                 
@@ -518,15 +552,18 @@ namespace mongo {
                 continue;
             }
             case LEFT_BEFORE: // Mod on a field that doesn't exist
+                DEBUGUPDATE( "\t\t\t\t creating new field for: " << m->second.m->fieldName );
                 _appendNewFromMods( root , m->second , b , onedownseen );
                 m++;
                 continue;
             case SAME:
+                DEBUGUPDATE( "\t\t\t\t applying mod on: " << m->second.m->fieldName );
                 m->second.apply( b , e );
                 e = es.next();
                 m++;
                 continue;
             case RIGHT_BEFORE: // field that doesn't have a MOD
+                DEBUGUPDATE( "\t\t\t\t just copying" );
                 b.append( e ); // if array, ignore field name
                 e = es.next();
                 continue;
@@ -540,12 +577,14 @@ namespace mongo {
         
         // finished looping the mods, just adding the rest of the elements
         while ( e.type() ){
+            DEBUGUPDATE( "\t\t\t copying: " << e.fieldName() );
             b.append( e );  // if array, ignore field name
             e = es.next();
         }
         
         // do mods that don't have fields already
         for ( ; m != mend; m++ ){
+            DEBUGUPDATE( "\t\t\t\t appending from mod at end: " << m->second.m->fieldName );
             _appendNewFromMods( root , m->second , b , onedownseen );
         }
     }
@@ -554,6 +593,14 @@ namespace mongo {
         BSONObjBuilder b( (int)(_obj.objsize() * 1.1) );
         createNewFromMods( "" , b , _obj );
         return b.obj();
+    }
+
+    string ModSetState::toString() const {
+        stringstream ss;
+        for ( ModStateHolder::const_iterator i=_mods.begin(); i!=_mods.end(); ++i ){
+            ss << "\t\t" << i->first << "\t" << i->second.toString() << "\n";
+        }
+        return ss.str();
     }
 
     BSONObj ModSet::createNewFromQuery( const BSONObj& query ){
@@ -610,6 +657,7 @@ namespace mongo {
             
             uassert( 10147 ,  "Invalid modifier specified" + string( fn ), e.type() == Object );
             BSONObj j = e.embeddedObject();
+            DEBUGUPDATE( "\t" << j );
             
             BSONObjIterator jt(j);
             Mod::Op op = opFromStr( fn );
@@ -639,7 +687,7 @@ namespace mongo {
 
                 _mods[m.fieldName] = m;
 
-                DEBUGUPDATE( "\t\t " << fieldName << "\t" << _hasDynamicArray );
+                DEBUGUPDATE( "\t\t " << fieldName << "\t" << m.fieldName << "\t" << _hasDynamicArray );
             }
         }
 
