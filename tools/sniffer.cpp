@@ -74,6 +74,10 @@ using mongo::MemoryMappedFile;
 int captureHeaderSize;
 set<int> serverPorts;
 string forwardAddress;
+bool objcheck = false;
+
+ostream *outPtr = &cout;
+ostream &out() { return *outPtr; }
 
 /* IP header */
 struct sniff_ip {
@@ -237,74 +241,93 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
     DbMessage d( m );
 
-    cout << inet_ntoa(ip->ip_src) << ":" << ntohs( tcp->th_sport )
-         << ( serverPorts.count( ntohs( tcp->th_dport ) ) ? "  -->> " : "  <<--  " )
-         << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport )
-         << " " << d.getns()
-         << "  " << m.header()->len << " bytes "
-         << " id:" << hex << m.header()->id << dec << "\t" << m.header()->id;
+    out() << inet_ntoa(ip->ip_src) << ":" << ntohs( tcp->th_sport )
+          << ( serverPorts.count( ntohs( tcp->th_dport ) ) ? "  -->> " : "  <<--  " )
+          << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport )
+          << " " << d.getns()
+          << "  " << m.header()->len << " bytes "
+          << " id:" << hex << m.header()->id << dec << "\t" << m.header()->id;
 
     processMessage( c , m );
 }
 
-void processMessage( Connection& c , Message& m ){
-    DbMessage d(m);
-
-    if ( m.operation() == mongo::opReply )
-        cout << " - " << m.header()->responseTo;
-    cout << endl;
-
-    switch( m.operation() ){
-    case mongo::opReply:{
-        mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
-        cout << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
-        if ( r->nReturned ){
-            mongo::BSONObj o( r->data() , 0 );
-            cout << "\t" << o << endl;
+class AuditingDbMessage : public DbMessage {
+public:
+    AuditingDbMessage( const Message &m ) : DbMessage( m ) {}
+    BSONObj nextJsObj( const char *context ) {
+        BSONObj ret = DbMessage::nextJsObj();
+        if ( objcheck && !ret.valid() ) {
+            // TODO provide more debugging info
+            cout << "invalid object in " << context << ": " << ret.hexDump() << endl;
         }
-        break;
+        return ret;
     }
-    case mongo::dbQuery:{
-        mongo::QueryMessage q(d);
-        cout << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip << endl;
-        break;
-    }
-    case mongo::dbUpdate:{
-        int flags = d.pullInt();
-        BSONObj q = d.nextJsObj();
-        BSONObj o = d.nextJsObj();
-        cout << "\tupdate  flags:" << flags << " q:" << q << " o:" << o << endl;
-        break;
-    }
-    case mongo::dbInsert:{
-        cout << "\tinsert: " << d.nextJsObj() << endl;
-        while ( d.moreJSObjs() )
-            cout << "\t\t" << d.nextJsObj() << endl;
-        break;
-    }
-    case mongo::dbGetMore:{
-        int nToReturn = d.pullInt();
-        long long cursorId = d.pullInt64();
-        cout << "\tgetMore nToReturn: " << nToReturn << " cursorId: " << cursorId << endl;
-        break;
-    }
-    case mongo::dbDelete:{
-        int flags = d.pullInt();
-        BSONObj q = d.nextJsObj();
-        cout << "\tdelete flags: " << flags << " q: " << q << endl;
-        break;
-    }
-    case mongo::dbKillCursors:{
-        int *x = (int *) m.singleData()->_data;
-        x++; // reserved
-        int n = *x;
-        cout << "\tkillCursors n: " << n << endl;
-        break;
-    }
-    default:
-        cerr << "*** CANNOT HANDLE TYPE: " << m.operation() << endl;
-    }
+};
 
+void processMessage( Connection& c , Message& m ){
+    AuditingDbMessage d(m);
+    
+    if ( m.operation() == mongo::opReply )
+        out() << " - " << (unsigned)m.header()->responseTo;
+    out() << endl;
+
+    try {
+        switch( m.operation() ){
+            case mongo::opReply:{
+                mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
+                out() << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
+                if ( r->nReturned ){
+                    mongo::BSONObj o( r->data() , 0 );
+                    out() << "\t" << o << endl;
+                }
+                break;
+            }
+            case mongo::dbQuery:{
+                mongo::QueryMessage q(d);
+                out() << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip << endl;
+                break;
+            }
+            case mongo::dbUpdate:{
+                int flags = d.pullInt();
+                BSONObj q = d.nextJsObj( "update" );
+                BSONObj o = d.nextJsObj( "update" );
+                out() << "\tupdate  flags:" << flags << " q:" << q << " o:" << o << endl;
+                break;
+            }
+            case mongo::dbInsert:{
+                out() << "\tinsert: " << d.nextJsObj( "insert" ) << endl;
+                while ( d.moreJSObjs() ) {
+                    out() << "\t\t" << d.nextJsObj( "insert" ) << endl;
+                }
+                break;
+            }
+            case mongo::dbGetMore:{
+                int nToReturn = d.pullInt();
+                long long cursorId = d.pullInt64();
+                out() << "\tgetMore nToReturn: " << nToReturn << " cursorId: " << cursorId << endl;
+                break;
+            }
+            case mongo::dbDelete:{
+                int flags = d.pullInt();
+                BSONObj q = d.nextJsObj( "delete" );
+                out() << "\tdelete flags: " << flags << " q: " << q << endl;
+                break;
+            }
+            case mongo::dbKillCursors:{
+                int *x = (int *) m.singleData()->_data;
+                x++; // reserved
+                int n = *x;
+                out() << "\tkillCursors n: " << n << endl;
+                break;
+            }
+            default:
+                cerr << "*** CANNOT HANDLE TYPE: " << m.operation() << endl;
+        }
+    } catch ( ... ) {
+        cerr << "Error parsing message for operation: " << m.operation() << endl;
+    }
+    
+        
     if ( !forwardAddress.empty() ) {
         if ( m.operation() != mongo::opReply ) {
             boost::shared_ptr<DBClientConnection> conn = forwarder[ c ];
@@ -389,6 +412,9 @@ void usage() {
     "                or a file containing output from mongod's --diaglog option.\n"
     "                If no source is specified, mongosniff will attempt to sniff\n"
     "                from one of the machine's network interfaces.\n"
+    "--objcheck      Log hex representation of invalid BSON objects and nothing\n"
+    "                else.  Spurious messages about invalid objects may result\n"
+    "                when there are dropped tcp packets.\n"
     "<port0>...      These parameters are used to filter sniffing.  By default, \n"
     "                only port 27017 is sniffed.\n"
     "--help          Print this help message.\n"
@@ -396,6 +422,9 @@ void usage() {
 }
 
 int main(int argc, char **argv){
+
+    stringstream nullStream;
+    nullStream.clear(ios::failbit);
 
     const char *dev = NULL;
     char errbuf[PCAP_ERRBUF_SIZE];
@@ -434,6 +463,10 @@ int main(int argc, char **argv){
                     file = args[ ++i ];
                 else
                     dev = args[ ++i ];
+            }
+            else if ( arg == string( "--objcheck" ) ) {
+                objcheck = true;
+                outPtr = &nullStream;
             }
             else {
                 serverPorts.insert( atoi( args[ i ] ) );
