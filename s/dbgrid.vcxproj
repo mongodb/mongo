@@ -184,6 +184,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="balance.cpp" />
     <ClCompile Include="chunk.cpp" />
@@ -500,7 +501,6 @@
     <ClCompile Include="..\util\processinfo_win32.cpp" />
     <ClCompile Include="..\util\sock.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
-    <ClCompile Include="..\util\thread_pool.cpp" />
     <ClCompile Include="..\util\util.cpp" />
   </ItemGroup>
   <ItemGroup>

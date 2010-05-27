@@ -50,6 +50,9 @@
     <Filter Include="util\concurrency">
       <UniqueIdentifier>{d499fdba-b256-4b12-af20-cdd1ae1addff}</UniqueIdentifier>
     </Filter>
+    <Filter Include="util\h">
+      <UniqueIdentifier>{353b6f01-1cab-4156-a576-bc75ab204776}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
@@ -184,45 +187,6 @@
     <ClInclude Include="..\db\security.h">
       <Filter>db\h</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\builder.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\file.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\goodies.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\hashtab.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\lasterror.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\log.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\lruishmap.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\md5.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\md5.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\miniwebserver.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\mmap.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\sock.h">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\unittest.h">
-      <Filter>util</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\btree.h">
       <Filter>btree related</Filter>
     </ClInclude>
@@ -234,6 +198,45 @@
     </ClInclude>
     <ClInclude Include="..\util\concurrency\task.h">
       <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\builder.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\unittest.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\file.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\goodies.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\hashtab.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\lasterror.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\log.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\lruishmap.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\md5.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\md5.hpp">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\miniwebserver.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\mmap.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\sock.h">
+      <Filter>util\h</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -499,9 +502,6 @@
     <ClCompile Include="..\util\sock.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\thread_pool.cpp">
-      <Filter>util\cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\util.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
@@ -627,6 +627,9 @@
     </ClCompile>
     <ClCompile Include="..\s\d_util.cpp">
       <Filter>shard</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\thread_pool.cpp">
+      <Filter>util\concurrency</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

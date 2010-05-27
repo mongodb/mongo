@@ -246,9 +246,6 @@
     <ClCompile Include="..\client\syncclusterconnection.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\thread_pool.cpp">
-      <Filter>Shared Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\util.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
@@ -259,6 +256,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\vars.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\thread_pool.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
   </ItemGroup>
