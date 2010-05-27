@@ -508,12 +508,13 @@ namespace mongo {
         }
         void noteScan( Cursor *c, long long nscanned, long long nscannedObjects, int n, bool scanAndOrder, int millis, bool hint ) {
             if ( _i == 1 ) {
-                _c << _b->obj();
+                _c.reset( new BSONArrayBuilder() );
+                *_c << _b->obj();
             }
             if ( _i == 0 ) {
                 _b.reset( new BSONObjBuilder() );
             } else {
-                _b.reset( new BSONObjBuilder( _c.subobjStart() ) );
+                _b.reset( new BSONObjBuilder( _c->subobjStart() ) );
             }
             *_b << "cursor" << c->toString() << "indexBounds" << c->prettyIndexBounds();
             _b->appendNumber( "nscanned", nscanned );
@@ -535,7 +536,7 @@ namespace mongo {
         BSONObj finishWithSuffix( long long nscanned, long long nscannedObjects, int n, int millis, const BSONObj &suffix ) { 
             if ( _i > 1 ) {
                 BSONObjBuilder b;
-                b << "clauses" << _c.arr();
+                b << "clauses" << _c->arr();
                 b.appendNumber( "nscanned", nscanned );
                 b.appendNumber( "nscanneObjects", nscannedObjects );
                 b << "n" << n;
@@ -550,7 +551,7 @@ namespace mongo {
     private:
         auto_ptr< BSONArrayBuilder > _a;
         auto_ptr< BSONObjBuilder > _b;
-        BSONArrayBuilder _c;
+        auto_ptr< BSONArrayBuilder > _c;
         int _i;
     };
     
