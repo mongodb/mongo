@@ -34,7 +34,7 @@ static int __wt_bt_verify_page_col_int(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_desc(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_tree(
-    WT_TOC *, WT_ROW_INDX *, u_int32_t, WT_OFF *, WT_VSTUFF *);
+		WT_TOC *, WT_ROW_INDX *, u_int32_t, WT_OFF *, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -232,8 +232,8 @@ __wt_bt_verify_tree(WT_TOC *toc,
 	u_int32_t i;
 	case WT_PAGE_COL_INT:
 		WT_INDX_FOREACH(page, page_cip, i)
-			WT_ERR(__wt_bt_verify_tree(toc, NULL,
-			    level - 1, (WT_OFF *)page_cip->page_data, vs));
+			WT_ERR(__wt_bt_verify_tree(
+			    toc, NULL, level - 1, page_cip->data, vs));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -253,9 +253,8 @@ __wt_bt_verify_tree(WT_TOC *toc,
 				__wt_bt_page_out(toc, &vs->leaf, 0);
 			}
 
-			WT_ERR(
-			    __wt_bt_verify_tree(toc, page_rip, level - 1,
-			    WT_ITEM_BYTE_OFF(page_rip->page_data), vs));
+			WT_ERR(__wt_bt_verify_tree(toc, page_rip,
+			    level - 1, WT_ITEM_BYTE_OFF(page_rip->data), vs));
 		}
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
@@ -280,15 +279,13 @@ __wt_bt_verify_cmp(
     WT_TOC *toc, WT_ROW_INDX *parent_rip, WT_PAGE *child, int first_entry)
 {
 	DB *db;
-	DBT *cd_ref, child_dbt, *pd_ref, parent_dbt;
+	DBT *cd_ref, *pd_ref;
 	ENV *env;
 	WT_ROW_INDX *child_rip;
 	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
 	env = toc->env;
-	WT_CLEAR(child_dbt);
-	WT_CLEAR(parent_dbt);
 
 	/* Set the comparison function. */
 	switch (child->hdr->type) {
@@ -303,17 +300,25 @@ __wt_bt_verify_cmp(
 	WT_ILLEGAL_FORMAT(db);
 	}
 
-	/* The two keys we're going to compare may be overflow keys. */
+	/*
+	 * The two keys we're going to compare may be overflow keys -- don't
+	 * bother instantiating the keys in the tree, there's no reason to
+	 * believe we're going to be working in this database.
+	 *
+	 * !!!
+	 * Use DBT's from the WT_TOC instead of repeatedly instantiating new
+	 * memory.
+	 */
 	child_rip = first_entry ?
 	    child->u.r_indx : child->u.r_indx + (child->indx_count - 1);
 	if (WT_KEY_PROCESS(child_rip)) {
-		cd_ref = &child_dbt;
-		WT_RET(__wt_bt_key_process(toc, child_rip, cd_ref));
+		cd_ref = &toc->key;			/* Ugly, but fast. */
+		WT_RET(__wt_bt_key_process(toc, NULL, child_rip, cd_ref));
 	} else
 		cd_ref = (DBT *)child_rip;
 	if (WT_KEY_PROCESS(parent_rip)) {
-		pd_ref = &parent_dbt;
-		WT_RET(__wt_bt_key_process(toc, parent_rip, pd_ref));
+		pd_ref = &toc->data;			/* Ugly, but fast. */
+		WT_RET(__wt_bt_key_process(toc, NULL, parent_rip, pd_ref));
 	} else
 		pd_ref = (DBT *)parent_rip;
 
@@ -336,8 +341,6 @@ __wt_bt_verify_cmp(
 		ret = WT_ERROR;
 	}
 
-	__wt_free(env, child_dbt.data, child_dbt.mem_size);
-	__wt_free(env, parent_dbt.data, parent_dbt.mem_size);
 	return (ret);
 }
 
