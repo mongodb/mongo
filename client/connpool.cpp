@@ -74,6 +74,18 @@ namespace mongo {
         return c;
     }
 
+    DBConnectionPool::~DBConnectionPool(){
+        for ( map<string,PoolForHost>::iterator i = _pools.begin(); i != _pools.end(); i++ ){
+            PoolForHost& p = i->second;
+
+            while ( ! p.pool.empty() ){
+                DBClientBase * c = p.pool.top();
+                delete c;
+                p.pool.pop();
+            }
+        }
+    }
+
     void DBConnectionPool::flush(){
         scoped_lock L(_mutex);
         for ( map<string,PoolForHost>::iterator i = _pools.begin(); i != _pools.end(); i++ ){

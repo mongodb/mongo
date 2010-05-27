@@ -61,6 +61,8 @@ namespace mongo {
 
     public:        
         DBConnectionPool() : _mutex("DBConnectionPool") { }
+        ~DBConnectionPool();
+
 
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );
