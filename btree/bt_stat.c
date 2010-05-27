@@ -19,10 +19,9 @@ int
 __wt_bt_stat(WT_TOC *toc, u_int32_t addr, u_int32_t size)
 {
 	DB *db;
-	WT_COL_INDX *page_cip;
-	WT_OFF *off;
+	WT_COL_INDX *cip;
 	WT_PAGE *page;
-	WT_ROW_INDX *page_rip;
+	WT_ROW_INDX *rip;
 	u_int32_t i;
 	int ret;
 
@@ -35,17 +34,15 @@ __wt_bt_stat(WT_TOC *toc, u_int32_t addr, u_int32_t size)
 
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(page, page_cip, i) {
-			off = (WT_OFF *)page_cip->page_data;
-			WT_ERR(__wt_bt_stat(toc, off->addr, off->size));
-		}
+		WT_INDX_FOREACH(page, cip, i)
+			WT_ERR(__wt_bt_stat(toc,
+			    WT_COL_OFF_ADDR(cip), WT_COL_OFF_SIZE(cip)));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(page, page_rip, i) {
-			off = WT_ITEM_BYTE_OFF(page_rip->page_data);
-			WT_ERR(__wt_bt_stat(toc, off->addr, off->size));
-		}
+		WT_INDX_FOREACH(page, rip, i)
+			WT_ERR(__wt_bt_stat(toc,
+			    WT_ROW_OFF_ADDR(rip), WT_ROW_OFF_SIZE(rip)));
 		break;
 	case WT_PAGE_COL_FIX:
 		WT_ERR(__wt_bt_stat_page(toc, page));
