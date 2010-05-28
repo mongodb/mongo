@@ -208,7 +208,7 @@ namespace mongo {
         ~PiggyBackData() {
             DESTRUCTOR_GUARD (
                 flush();
-                delete( _cur );
+                delete[]( _cur );
             );
         }
 
