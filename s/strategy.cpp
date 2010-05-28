@@ -163,7 +163,7 @@ namespace mongo {
         
         WriteBackListener::init( conn );
 
-        DBConfig * conf = grid.getDBConfig( ns );
+        DBConfigPtr conf = grid.getDBConfig( ns );
         if ( ! conf )
             return;
         

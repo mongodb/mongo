@@ -212,7 +212,7 @@ namespace mongo {
                     return false;
                 }
 
-                DBConfig * config = grid.getDBConfig( dbname , false );
+                DBConfigPtr config = grid.getDBConfig( dbname , false );
                 if ( ! config ){
                     errmsg = "can't find db!";
                     return false;
@@ -287,7 +287,7 @@ namespace mongo {
                     return false;
                 }
 
-                DBConfig * config = grid.getDBConfig( dbname );
+                DBConfigPtr config = grid.getDBConfig( dbname );
                 if ( config->isShardingEnabled() ){
                     errmsg = "already enabled";
                     return false;
@@ -319,7 +319,7 @@ namespace mongo {
                     return false;
                 }
 
-                DBConfig * config = grid.getDBConfig( ns );
+                DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isShardingEnabled() ){
                     errmsg = "sharding not enabled for db";
                     return false;
@@ -395,7 +395,7 @@ namespace mongo {
                     return false;
                 }
                 
-                DBConfig * config = grid.getDBConfig( ns );
+                DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ){
                     errmsg = "ns not sharded.";
                     return false;
@@ -435,7 +435,7 @@ namespace mongo {
                     return false;
                 }
 
-                DBConfig * config = grid.getDBConfig( ns );
+                DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ){
                     errmsg = "ns not sharded.  have to shard before can split";
                     return false;
@@ -515,7 +515,7 @@ namespace mongo {
                     return false;
                 }
 
-                DBConfig * config = grid.getDBConfig( ns );
+                DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ){
                     errmsg = "ns not sharded.  have to shard before can move a chunk";
                     return false;
@@ -783,7 +783,7 @@ namespace mongo {
                     }
                 }
                 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 ClientInfo * client = ClientInfo::get();
                 set<string> * shards = client->getPrev();

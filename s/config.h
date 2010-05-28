@@ -43,7 +43,11 @@ namespace mongo {
     class Grid;
     class ConfigServer;
 
-    extern ConfigServer configServer;
+    class DBConfig;
+    typedef boost::shared_ptr<DBConfig> DBConfigPtr;
+
+    extern DBConfigPtr configServerPtr;
+    extern ConfigServer& configServer;
     extern Grid grid;
 
     class ChunkManager;
@@ -64,6 +68,7 @@ namespace mongo {
     */
     class DBConfig : public Model {
     public:
+
         DBConfig( string name = "" ) : _name( name ) , _primary("config","") , 
             _shardingEnabled(false), _lock("DBConfig") { }
         
@@ -156,7 +161,7 @@ namespace mongo {
            gets the config the db.
            will return an empty DBConfig if not in db already
          */
-        DBConfig * getDBConfig( string ns , bool create=true);
+        DBConfigPtr getDBConfig( string ns , bool create=true);
         
         /**
          * removes db entry.
@@ -168,7 +173,7 @@ namespace mongo {
         
         unsigned long long getNextOpTime() const;
     private:
-        map<string,DBConfig*> _databases;
+        map<string, DBConfigPtr > _databases;
         mongo::mutex _lock; // TODO: change to r/w lock ??
     };
 

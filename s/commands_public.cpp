@@ -47,15 +47,15 @@ namespace mongo {
             virtual LockType locktype() const { return NONE; } 
 
         protected:
-            bool passthrough( DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
+            bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
                 return _passthrough(conf->getName(), conf, cmdObj, result);
             }
-            bool adminPassthrough( DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
+            bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
                 return _passthrough("admin", conf, cmdObj, result);
             }
             
         private:
-            bool _passthrough(const string& db,  DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
+            bool _passthrough(const string& db,  DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
                 ShardConnection conn( conf->getPrimary() , "" );
                 BSONObj res;
                 bool ok = conn->runCommand( db , cmdObj , res );
@@ -74,7 +74,7 @@ namespace mongo {
             virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string fullns = getFullNS( dbName , cmdObj );
                 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     return passthrough( conf , cmdObj , result );
@@ -93,7 +93,7 @@ namespace mongo {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
                 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 log() << "DROP: " << fullns << endl;
                 
@@ -122,7 +122,7 @@ namespace mongo {
                     return 0;
                 }
                 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 log() << "DROP DATABASE: " << dbName << endl;
 
@@ -145,11 +145,11 @@ namespace mongo {
             bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string fullnsFrom = cmdObj.firstElement().valuestrsafe();
                 string dbNameFrom = nsToDatabase( fullnsFrom.c_str() );
-                DBConfig * confFrom = grid.getDBConfig( dbNameFrom , false );
+                DBConfigPtr confFrom = grid.getDBConfig( dbNameFrom , false );
 
                 string fullnsTo = cmdObj["to"].valuestrsafe();
                 string dbNameTo = nsToDatabase( fullnsTo.c_str() );
-                DBConfig * confTo = grid.getDBConfig( dbNameTo , false );
+                DBConfigPtr confTo = grid.getDBConfig( dbNameTo , false );
 
                 uassert(13140, "Don't recognize source or target DB", confFrom && confTo);
                 uassert(13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom));
@@ -175,7 +175,7 @@ namespace mongo {
                 if ( cmdObj["query"].isABSONObj() )
                     filter = cmdObj["query"].Obj();
                 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     ShardConnection conn( conf->getPrimary() , fullns );
@@ -208,7 +208,7 @@ namespace mongo {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
                 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     result.appendBool("sharded", false);
@@ -270,7 +270,7 @@ namespace mongo {
                 
                 BSONObj filter = cmdObj.getObjectField("query");
                 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     return passthrough( conf , cmdObj , result);
@@ -384,7 +384,7 @@ namespace mongo {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     return passthrough( conf , cmdObj , result );
@@ -450,7 +450,7 @@ namespace mongo {
                 }
                 fullns += ".chunks";
 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     return passthrough( conf , cmdObj , result );
@@ -516,7 +516,7 @@ namespace mongo {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
-                DBConfig * conf = grid.getDBConfig( dbName , false );
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     return passthrough( conf , cmdObj , result );

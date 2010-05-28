@@ -293,7 +293,7 @@ namespace mongo {
         return ! shard.isEmpty();
     }
 
-    DBConfig* Grid::getDBConfig( string database , bool create ){
+    DBConfigPtr Grid::getDBConfig( string database , bool create ){
         {
             string::size_type i = database.find( "." );
             if ( i != string::npos )
@@ -301,13 +301,13 @@ namespace mongo {
         }
         
         if ( database == "config" )
-            return &configServer;
+            return configServerPtr;
 
         scoped_lock l( _lock );
 
-        DBConfig*& cc = _databases[database];
-        if ( cc == 0 ){
-            cc = new DBConfig( database );
+        DBConfigPtr& cc = _databases[database];
+        if ( !cc ){
+            cc.reset(new DBConfig( database ));
             if ( ! cc->doload() ){
                 if ( create ){
                     // note here that cc->primary == 0.
@@ -328,7 +328,7 @@ namespace mongo {
                     }
                 }
                 else {
-                    cc = 0;
+                    cc.reset();
                 }
             }
             
@@ -524,7 +524,8 @@ namespace mongo {
         conn.done();
     }
 
-    ConfigServer configServer;    
+    DBConfigPtr configServerPtr (new ConfigServer());    
+    ConfigServer& configServer = dynamic_cast<ConfigServer&>(*configServerPtr);    
     Grid grid;
 
     class DBConfigUnitTest : public UnitTest {

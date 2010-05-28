@@ -176,7 +176,7 @@ namespace mongo {
         BSONObj chunkToMove = pickChunk( shards[from] , shards[to] );
         log() << "balancer: move a chunk from [" << from << "] to [" << to << "] " << chunkToMove << endl;        
 
-        DBConfig * cfg = grid.getDBConfig( ns );
+        DBConfigPtr cfg = grid.getDBConfig( ns );
         assert( cfg );
         
         ChunkManagerPtr cm = cfg->getChunkManager( ns );

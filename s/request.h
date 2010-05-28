@@ -52,7 +52,7 @@ namespace mongo {
             return _id;
         }
 
-        DBConfig * getConfig() const {
+        DBConfigPtr getConfig() const {
             return _config;
         }
         bool isShardingEnabled() const {
@@ -96,7 +96,7 @@ namespace mongo {
         AbstractMessagingPort* _p;
         
         MSGID _id;
-        DBConfig * _config;
+        DBConfigPtr _config;
         ChunkManagerPtr _chunkManager;
         
         int _clientId;
