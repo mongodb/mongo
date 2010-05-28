@@ -72,4 +72,10 @@ for ( i=0; i<100; i++ ){
 gc(); gc();
 assert.eq( 0 , db.runCommand( "cursorInfo" ).total , "cursor2" );
 
+x = db.runCommand( "connPoolStats" );
+for ( host in x.hosts ){
+    var foo = x.hosts[host];
+    assert.lt( 0 , foo.available , "pool: " + host );
+}
+
 s.stop();

@@ -24,10 +24,16 @@
 namespace mongo {
 
     class Shard;
-
+    
     struct PoolForHost {
         PoolForHost()
             : created(0){}
+        PoolForHost( const PoolForHost& other ){
+            assert(other.pool.size() == 0);
+            created = other.created;
+            assert( created == 0 );
+        }
+            
         std::stack<DBClientBase*> pool;
         long long created;
     };
