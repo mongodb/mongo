@@ -27,7 +27,7 @@ namespace mongo {
 
     void MutexDebugger::programEnding() { 
         if( followers.size() ) {
-            std::cout << followers.size() << " mongo::mutexes in program" << endl;
+            std::cout << followers.size() << " mutexes in program" << endl;
             for( map< mid, set<mid> >::iterator i = followers.begin(); i != followers.end(); i++ ) { 
                 cout << i->first << '\n';
                 for( set<mid>::iterator j = i->second.begin(); j != i->second.end(); j++ )
