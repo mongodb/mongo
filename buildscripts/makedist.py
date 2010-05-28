@@ -642,7 +642,7 @@ class ScriptFile(object):
         specs=self.mongo_version_spec.split(',')
         for spec in specs:
             (version, pkg_name_suffix, pkg_version) = parse_mongo_version_spec(spec)
-            mongo_version       = version if version[0] != 'n' else 'HEAD'
+            mongo_version       = version if version[0] != 'n' else ('HEAD' if version == 'nlatest' else 'r'+version[1:]) #'HEAD'
             mongo_pub_version       = version.lstrip('n') if version[0] in 'n' else 'latest'
             pkg_name_suffix    = pkg_name_suffix if pkg_name_suffix else ''
             pkg_version        = pkg_version
