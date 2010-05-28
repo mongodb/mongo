@@ -81,10 +81,7 @@ namespace mongo {
     // pdfile versions
     const int VERSION = 4;
     const int VERSION_MINOR = 5;
-    
-    // mongo version
-    extern const char versionString[];
-    
+
     enum ExitCode {
         EXIT_CLEAN = 0 , 
         EXIT_BADOPTIONS = 2 , 
@@ -138,12 +135,6 @@ namespace mongo {
 
 namespace mongo {
 
-    const char * gitVersion();
-    string sysInfo();
-    string mongodVersion();
-    
-    void printGitVersion();
-    void printSysInfo();
-
     typedef char _TCHAR;
+
 } // namespace mongo

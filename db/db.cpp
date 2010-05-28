@@ -44,6 +44,7 @@
 #include "cmdline.h"
 #include "stats/snapshots.h"
 #include "../util/concurrency/task.h"
+#include "../util/version.h"
 
 namespace mongo {
 
@@ -437,30 +438,6 @@ namespace mongo {
         
         double _sleepsecs; // default value controlled by program options
     } dataFileSync;
-
-    void show_32_warning(){
-#if BOOST_VERSION < 103500
-        cout << "\nwarning: built with boost version <= 1.34, limited concurrency" << endl;
-#endif
-
-        {
-            const char * foo = strchr( versionString , '.' ) + 1;
-            int bar = atoi( foo );
-            if ( ( 2 * ( bar / 2 ) ) != bar ){
-                log() << "****\n";
-                log() << "WARNING: This is development a version (" << versionString << ") of MongoDB.  Not recommended for production.\n";
-                log() << "****" << endl;
-            }
-                
-        }
-
-        if ( sizeof(int*) != 4 )
-            return;
-        cout << endl;
-        cout << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
-        cout << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations for more" << endl;
-        cout << endl;
-    }
 
     Timer startupSrandTimer;
 

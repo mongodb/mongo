@@ -31,6 +31,7 @@ jmp_buf jbuf;
 #include "../db/cmdline.h"
 #include "utils.h"
 #include "../util/password.h"
+#include "../util/version.h"
 
 using namespace std;
 using namespace boost::filesystem;

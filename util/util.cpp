@@ -151,34 +151,6 @@ void setThreadName(const char *name)
 #endif
     }
 
-#ifndef _SCONS
-    // only works in scons
-    const char * gitVersion(){ return "not-scons"; }
-#if defined(_WIN32)
-    string sysInfo(){ 
-        stringstream ss;
-        ss << "not-scons win";
-        ss << " mscver:" << _MSC_FULL_VER << " built:" << __DATE__;
-        ss << " boostver:" << BOOST_VERSION;
-#if( !defined(_MT) )
-#error _MT is not defined
-#endif
-        ss << (sizeof(char *) == 8) ? " 64bit" : " 32bit";
-        return ss.str();
-    }
-#else
-    string sysInfo(){ return ""; }
-#endif
-#endif
-
-    void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
-    void printSysInfo() { log() << "sys info: " << sysInfo() << endl; }
-    string mongodVersion() {
-        stringstream ss;
-        ss << "db version v" << versionString << ", pdfile version " << VERSION << "." << VERSION_MINOR;
-        return ss.str();
-    }
-
     ostream& operator<<( ostream &s, const ThreadSafeString &o ){
         s << (string)o;
         return s;

@@ -21,6 +21,7 @@
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../util/message_server.h"
+#include "../util/version.h"
 
 #include "server.h"
 #include "request.h"

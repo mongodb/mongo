@@ -31,6 +31,7 @@
 #include "stats/snapshots.h"
 #include "background.h"
 #include "commands.h"
+#include "../util/version.h"
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #undef assert

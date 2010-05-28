@@ -17,6 +17,7 @@
 */
 
 #include "pch.h"
+#include "../util/version.h"
 #include <boost/program_options.hpp>
 
 #undef assert

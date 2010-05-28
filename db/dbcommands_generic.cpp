@@ -43,6 +43,7 @@
 #include "../scripting/engine.h"
 #include "stats/counters.h"
 #include "background.h"
+#include "../util/version.h"
 
 namespace mongo {
 
