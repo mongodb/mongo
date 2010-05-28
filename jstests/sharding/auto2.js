@@ -57,6 +57,7 @@ for ( i=0; i<100; i++ ){
     gc(); 
 }
 
+print( "checkpoint D")
 
 // test not-sharded cursors
 db = s.getDB( "test2" ); 
@@ -72,10 +73,27 @@ for ( i=0; i<100; i++ ){
 gc(); gc();
 assert.eq( 0 , db.runCommand( "cursorInfo" ).total , "cursor2" );
 
+print( "checkpoint E")
+
 x = db.runCommand( "connPoolStats" );
 for ( host in x.hosts ){
     var foo = x.hosts[host];
     assert.lt( 0 , foo.available , "pool: " + host );
 }
+
+print( "checkpoint F")
+
+assert( t.findOne() , "check close 0" );
+
+for ( i=0; i<20; i++ ){
+    temp = new Mongo( db.getMongo().host )
+    temp2 = temp.getDB( "test2" ).foobar;
+    assert.eq( temp._fullNameSpace , t._fullNameSpace , "check close 1" );
+    assert( temp2.findOne() , "check close 2" );
+    temp = null;
+    gc();
+}
+
+print( "checkpoint G")
 
 s.stop();

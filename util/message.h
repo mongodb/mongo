@@ -57,6 +57,12 @@ namespace mongo {
         
         virtual HostAndPort remote() const = 0;
         virtual unsigned remotePort() const = 0;
+
+        virtual int getClientId(){
+            int x = remotePort();
+            x = x << 16;
+            return x;
+        }
     };
 
     class MessagingPort : public AbstractMessagingPort {

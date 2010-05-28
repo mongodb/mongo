@@ -30,6 +30,7 @@ namespace mongo {
     public:
         virtual ~MessageHandler(){}
         virtual void process( Message& m , AbstractMessagingPort* p ) = 0;
+        virtual void disconnected( AbstractMessagingPort* p ) = 0;
     };
 
     class MessageServer {

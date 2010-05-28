@@ -121,6 +121,7 @@ namespace mongo {
         void disconnect();
         
         static ClientInfo * get( int clientId = 0 , bool create = true );
+        static void disconnect( int clientId );
         
     private:
         int _id;

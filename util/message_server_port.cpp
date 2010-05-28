@@ -67,6 +67,7 @@ namespace mongo {
                 problem() << "uncaught exception in PortMessageServer::threadRun, closing connection" << endl;
             }            
             
+            handler->disconnected( p.get() );
         }
 
     }

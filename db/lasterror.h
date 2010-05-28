@@ -88,6 +88,8 @@ namespace mongo {
         void startRequest( Message& m , LastError * connectionOwned );
         LastError * startRequest( Message& m , int clientId = 0 );
         
+        void disconnect( int clientId );
+
         // used to disable lastError reporting while processing a killCursors message
         // disable causes get() to return 0.
         LastError *disableForCommand(); // only call once per command invocation!

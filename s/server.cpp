@@ -72,6 +72,7 @@ namespace mongo {
     class ShardedMessageHandler : public MessageHandler {
     public:
         virtual ~ShardedMessageHandler(){}
+
         virtual void process( Message& m , AbstractMessagingPort* p ){
             assert( p );
             Request r( m , p );
@@ -96,6 +97,11 @@ namespace mongo {
                     replyToQuery( QueryResult::ResultFlag_ErrSet, p , m , err );
                 }
             }
+        }
+
+        virtual void disconnected( AbstractMessagingPort* p ){
+            ClientInfo::disconnect( p->getClientId() );
+            lastError.disconnect( p->getClientId() );
         }
     };
 
