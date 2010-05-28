@@ -87,7 +87,7 @@ namespace mongo {
             Message response;
             bool ok = c.port().call( r.m() , response);
             uassert( 10204 , "dbgrid: getmore: error calling db", ok);
-            r.reply( response );
+            r.reply( response , c.getServerAddress() );
         
             dbcon.done();
 

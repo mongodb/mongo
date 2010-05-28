@@ -77,10 +77,13 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk );
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend );
+
+        virtual void killCursor( long long cursorID );
         
         virtual string getServerAddress() const { return _address; }
         virtual bool isFailed() const { return false; }
         virtual string toString() { return _toString(); }
+        
 
     private:
         SyncClusterConnection( SyncClusterConnection& prev );

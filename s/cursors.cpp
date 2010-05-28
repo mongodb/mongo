@@ -20,6 +20,7 @@
 #include "cursors.h"
 #include "../client/connpool.h"
 #include "../db/queryutil.h"
+#include "../db/commands.h"
 
 namespace mongo {
     
@@ -93,7 +94,8 @@ namespace mongo {
     }
     
 
-    CursorCache::CursorCache(){
+    CursorCache::CursorCache()
+        :_mutex( "CursorCache" ){
     }
 
     CursorCache::~CursorCache(){
@@ -101,7 +103,8 @@ namespace mongo {
     }
 
     ShardedClientCursor* CursorCache::get( long long id ){
-        map<long long,ShardedClientCursor*>::iterator i = _cursors.find( id );
+        scoped_lock lk( _mutex );
+        MapSharded::iterator i = _cursors.find( id );
         if ( i == _cursors.end() ){
             OCCASIONALLY log() << "Sharded CursorCache missing cursor id: " << id << endl;
             return 0;
@@ -110,11 +113,78 @@ namespace mongo {
     }
     
     void CursorCache::store( ShardedClientCursor * cursor ){
+        scoped_lock lk( _mutex );
         _cursors[cursor->getId()] = cursor;
     }
     void CursorCache::remove( long long id ){
+        scoped_lock lk( _mutex );
         _cursors.erase( id );
     }
 
+    void CursorCache::storeRef( const string& server , long long id ){
+        scoped_lock lk( _mutex );
+        _refs[id] = server;
+    }
+    
+    void CursorCache::gotKillCursors(Message& m ){
+        int *x = (int *) m.singleData()->_data;
+        x++; // reserved
+        int n = *x++;
+        
+        uassert( 13286 , "sent 0 cursors to kill" , n >= 1 );
+        uassert( 13287 , "too many cursors to kill" , n < 10000 );
+        
+        long long * cursors = (long long *)x;
+        for ( int i=0; i<n; i++ ){
+            long long id = cursors[i];
+
+            string server;            
+            {
+                scoped_lock lk( _mutex );
+
+                MapSharded::iterator i = _cursors.find( id );
+                if ( i != _cursors.end() ){
+                    _cursors.erase( i );
+                    continue;
+                }
+                
+                MapNormal::iterator j = _refs.find( id );
+                if ( j == _refs.end() ){
+                    log() << "can't find cursor: " << id << endl;
+                    continue;
+                }
+                server = j->second;
+                _refs.erase( j );
+            }
+            
+            assert( server.size() );
+            ScopedDbConnection conn( server );
+            conn->killCursor( id );
+            conn.done();
+        }
+    }
+
+    void CursorCache::appendInfo( BSONObjBuilder& result ){
+        scoped_lock lk( _mutex );
+        result.append( "sharded" , (int)_cursors.size() );
+        result.append( "refs" , (int)_refs.size() );
+        result.append( "total" , (int)(_cursors.size() + _refs.size() ) );
+    }
+
     CursorCache cursorCache;
+
+    class CmdCursorInfo : public Command {
+    public:
+        CmdCursorInfo() : Command( "cursorInfo", true ) {}
+        virtual bool slaveOk() const { return true; }
+        virtual void help( stringstream& help ) const {
+            help << " example: { cursorInfo : 1 }";
+        }
+        virtual LockType locktype() const { return NONE; }
+        bool run(const string&, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            cursorCache.appendInfo( result );
+            return true;
+        }
+    } cmdCursorInfo;
+
 }

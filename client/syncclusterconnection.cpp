@@ -334,4 +334,8 @@ namespace mongo {
         return lockType;
     }
 
+    void SyncClusterConnection::killCursor( long long cursorID ){
+        // should never need to do this
+        assert(0);
+    }
 }

@@ -167,6 +167,13 @@ namespace mongo {
             return true;
         }
 
+        long long getCursor(){
+            assert( responseTo > 0 );
+            assert( _operation == opReply );
+            long long * l = (long long *)(_data + 4);
+            return l[0];
+        }
+
         int dataLen(); // len without header
     };
     const int MsgDataHeaderSize = sizeof(MsgData) - 4;

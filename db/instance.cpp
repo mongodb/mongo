@@ -602,6 +602,9 @@ namespace mongo {
         //throw UserException( (string)"yay:" + ns );
     }
 
+    void DBDirectClient::killCursor( long long id ){
+        ClientCursor::erase( id );
+    }
 
     DBClientBase * createDirectClient(){
         return new DBDirectClient();

@@ -32,6 +32,7 @@
 #include "config.h"
 #include "chunk.h"
 #include "stats.h"
+#include "cursors.h"
 
 namespace mongo {
 
@@ -49,6 +50,10 @@ namespace mongo {
     }
 
     void Request::reset( bool reload ){
+        if ( _m.operation() == dbKillCursors ){
+            return;
+        }
+        
         _config = grid.getDBConfig( getns() );
         if ( reload )
             uassert( 10192 ,  "db config reload failed!" , _config->reload() );
@@ -77,10 +82,17 @@ namespace mongo {
     }
     
     void Request::process( int attempt ){
-        log(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
 
         int op = _m.operation();
         assert( op > dbMsg );
+        
+        if ( op == dbKillCursors ){
+            cursorCache.gotKillCursors( _m );
+            return;
+        }
+        
+
+        log(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
         
         Strategy * s = SINGLE;
         _counter = &opsNonSharded;
@@ -128,6 +140,14 @@ namespace mongo {
     void Request::gotInsert(){
         globalOpCounters.gotInsert();
         _counter->gotInsert();
+    }
+
+    void Request::reply( Message & response , const string& fromServer ){
+        long long cursor =response.header()->getCursor();
+        if ( cursor ){
+            cursorCache.storeRef( fromServer , cursor );
+        }
+        _p->reply( _m , response , _id );
     }
     
     ClientInfo::ClientInfo( int clientId ) : _id( clientId ){

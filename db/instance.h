@@ -130,6 +130,8 @@ namespace mongo {
             // don't need to piggy back when connected locally
             return say( toSend );
         }
+
+        virtual void killCursor( long long cursorID );
     };
 
     extern int lockFile;

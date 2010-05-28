@@ -55,7 +55,7 @@ namespace mongo {
             }
 
             uassert( 10200 , "mongos: error calling db", ok);
-            r.reply( response );
+            r.reply( response , c.getServerAddress() );
             dbcon.done();
         }
         catch ( AssertionException& e ) {

@@ -57,6 +57,10 @@ namespace mongo {
     
     class CursorCache {
     public:
+        
+        typedef map<long long,ShardedClientCursor*> MapSharded;
+        typedef map<long long,string> MapNormal;
+
         CursorCache();
         ~CursorCache();
         
@@ -64,8 +68,16 @@ namespace mongo {
         void store( ShardedClientCursor* cursor );
         void remove( long long id );
 
+        void storeRef( const string& server , long long id );
+
+        void gotKillCursors(Message& m );
+        
+        void appendInfo( BSONObjBuilder& result );
+
     private:
-        map<long long,ShardedClientCursor*> _cursors;
+        mutex _mutex;
+        MapSharded _cursors;
+        MapNormal _refs;
     };
     
     extern CursorCache cursorCache;

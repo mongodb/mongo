@@ -612,6 +612,8 @@ namespace mongo {
         virtual string getServerAddress() const = 0;
         
         virtual bool isFailed() const = 0;
+        
+        virtual void killCursor( long long cursorID ) = 0;
 
         static int countCommas( const string& s ){
             int n = 0;
@@ -717,6 +719,8 @@ namespace mongo {
         string getServerAddress() const {
             return serverAddress;
         }
+        
+        virtual void killCursor( long long cursorID );
 
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );
         virtual void say( Message &toSend );
@@ -791,6 +795,10 @@ namespace mongo {
             return checkMaster().update(ns, query, obj, upsert,multi);
         }
         
+        virtual void killCursor( long long cursorID ){
+            checkMaster().killCursor( cursorID );
+        }
+
         string toString();
 
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
@@ -802,7 +810,7 @@ namespace mongo {
         string getServerAddress() const {
             return left.getServerAddress() + "," + right.getServerAddress();
         }
-
+        
         DBClientConnection& slaveConn();
 
         /* TODO - not yet implemented. mongos may need these. */

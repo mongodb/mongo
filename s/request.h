@@ -77,9 +77,7 @@ namespace mongo {
         
         // ---- low level access ----
 
-        void reply( Message & response ){
-            _p->reply( _m , response , _id );
-        }
+        void reply( Message & response , const string& fromServer );
         
         Message& m() { return _m; }
         DbMessage& d() { return _d; }
