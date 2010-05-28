@@ -204,9 +204,11 @@ namespace mongo {
 
     class AsyncMessageServer : public MessageServer {
     public:
-        AsyncMessageServer( int port , MessageHandler * handler )
-            : MessageServer( port , handler )
-            , _endpoint( tcp::v4() , port )
+        // TODO accept an IP address to bind to
+        AsyncMessageServer( const MessageServer::Options& opts , MessageHandler * handler )
+            : _port( opts.port )
+            , _handler(handler)
+            , _endpoint( tcp::v4() , opts.port )
             , _acceptor( _ioservice , _endpoint )
         {
             _accept();
@@ -232,7 +234,7 @@ namespace mongo {
             _accept();
         }
         
-        void _accept(){
+        void _accept( ){
             shared_ptr<MessageServerSession> session( new MessageServerSession( _handler , _ioservice ) );
             _acceptor.async_accept( session->socket() ,
                 boost::bind( &AsyncMessageServer::handleAccept,
@@ -243,13 +245,15 @@ namespace mongo {
         }
 
     private:
+        int _port;
+        MessageHandler * _handler;
         io_service _ioservice;
         tcp::endpoint _endpoint;
         tcp::acceptor _acceptor;
     };
 
-    MessageServer * createServer( int port , MessageHandler * handler ){
-        return new AsyncMessageServer( port , handler );
+    MessageServer * createServer( const MessageServer::Options& opts , MessageHandler * handler ){
+        return new AsyncMessageServer( opts , handler );
     }    
 
 }

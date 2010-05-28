@@ -73,9 +73,8 @@ namespace mongo {
 
     class PortMessageServer : public MessageServer , public Listener {
     public:
-        PortMessageServer( int port , MessageHandler * handler ) :
-            MessageServer( port , handler ) , 
-            Listener( "", port ){
+            PortMessageServer(  const MessageServer::Options& opts, MessageHandler * handler ) :
+            Listener( opts.ipList, opts.port ){
             
             uassert( 10275 ,  "multiple PortMessageServer not supported" , ! pms::handler );
             pms::handler = handler;
@@ -117,8 +116,8 @@ namespace mongo {
     };
 
 
-    MessageServer * createServer( int port , MessageHandler * handler ){
-        return new PortMessageServer( port , handler );
+    MessageServer * createServer( const MessageServer::Options& opts , MessageHandler * handler ){
+        return new PortMessageServer( opts , handler );
     }    
 
     TicketHolder connTicketHolder(20000);
