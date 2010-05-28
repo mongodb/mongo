@@ -161,7 +161,6 @@ namespace mongo {
                           !m.isEmpty() && _min.woCompare(m) && _max.woCompare(m)); 
 
         ChunkPtr s( new Chunk( _manager ) );
-        s->_this = s;
         s->_ns = _ns;
         s->_shard = _shard;
         s->setMin(m.getOwned());
@@ -176,8 +175,8 @@ namespace mongo {
             _manager->_chunkMap[s->getMax()] = s;
             
             setMax(m.getOwned());
-            DEV assert( _this );
-            _manager->_chunkMap[_max] = _this;
+            DEV assert( shared_from_this() );
+            _manager->_chunkMap[_max] = shared_from_this();
         }
         
         log(1) << " after split:\n" 
@@ -325,8 +324,8 @@ namespace mongo {
             toMove = newChunk;
         }
         else if ( this->countObjects() <= 1 ){
-            DEV assert( _this );
-            toMove = _this;
+            DEV assert( shared_from_this() );
+            toMove = shared_from_this();
         }
         else {
             log(1) << "don't know how to decide if i should move inner shard" << endl;
@@ -517,7 +516,6 @@ namespace mongo {
         
         if ( _chunks.size() == 0 ){
             ChunkPtr c( new Chunk( this ) );
-            c->_this = c;
             c->_ns = ns;
             c->setMin(_key.globalMin());
             c->setMax(_key.globalMax());
@@ -575,7 +573,6 @@ namespace mongo {
             }
             
             ChunkPtr c( new Chunk( this ) );
-            c->_this = c;
             c->unserialize( d );
             c->_id = d["_id"].wrap().getOwned();
 
