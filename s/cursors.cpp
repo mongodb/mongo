@@ -102,17 +102,17 @@ namespace mongo {
         // TODO: delete old cursors?
     }
 
-    ShardedClientCursor* CursorCache::get( long long id ){
+    ShardedClientCursorPtr CursorCache::get( long long id ){
         scoped_lock lk( _mutex );
         MapSharded::iterator i = _cursors.find( id );
         if ( i == _cursors.end() ){
             OCCASIONALLY log() << "Sharded CursorCache missing cursor id: " << id << endl;
-            return 0;
+            return ShardedClientCursorPtr();
         }
         return i->second;
     }
     
-    void CursorCache::store( ShardedClientCursor * cursor ){
+    void CursorCache::store( ShardedClientCursorPtr cursor ){
         scoped_lock lk( _mutex );
         _cursors[cursor->getId()] = cursor;
     }

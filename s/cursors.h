@@ -54,18 +54,20 @@ namespace mongo {
 
         long long _id;
     };
+
+    typedef boost::shared_ptr<ShardedClientCursor> ShardedClientCursorPtr;
     
     class CursorCache {
     public:
         
-        typedef map<long long,ShardedClientCursor*> MapSharded;
+        typedef map<long long,ShardedClientCursorPtr> MapSharded;
         typedef map<long long,string> MapNormal;
 
         CursorCache();
         ~CursorCache();
         
-        ShardedClientCursor * get( long long id );
-        void store( ShardedClientCursor* cursor );
+        ShardedClientCursorPtr get( long long id );
+        void store( ShardedClientCursorPtr cursor );
         void remove( long long id );
 
         void storeRef( const string& server , long long id );

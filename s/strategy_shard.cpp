@@ -101,9 +101,8 @@ namespace mongo {
                 return;
             }
 
-            ShardedClientCursor * cc = new ShardedClientCursor( q , cursor );
+            ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
             if ( ! cc->sendNextBatch( r ) ){
-                delete( cursor );
                 return;
             }
             log(6) << "storing cursor : " << cc->getId() << endl;
@@ -116,7 +115,7 @@ namespace mongo {
 
             log(6) << "want cursor : " << id << endl;
 
-            ShardedClientCursor * cursor = cursorCache.get( id );
+            ShardedClientCursorPtr cursor = cursorCache.get( id );
             if ( ! cursor ){
                 log(6) << "\t invalid cursor :(" << endl;
                 replyToQuery( QueryResult::ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
@@ -128,7 +127,6 @@ namespace mongo {
                 return;
             }
             
-            delete( cursor );
             cursorCache.remove( id );
         }
         
