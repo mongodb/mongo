@@ -104,7 +104,10 @@ namespace mongo {
     BSONObj Query::getSort() const {
         if ( ! isComplex() )
             return BSONObj();
-        return obj.getObjectField( "orderby" );
+        BSONObj ret = obj.getObjectField( "orderby" );
+        if (ret.isEmpty())
+            ret = obj.getObjectField( "$orderby" );
+        return ret;
     }
     BSONObj Query::getHint() const {
         if ( ! isComplex() )
