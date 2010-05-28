@@ -1468,6 +1468,9 @@ def getCodeVersion():
         return None
     return allMatches[0]
 
+if getCodeVersion() == None:
+    Exit(-1)
+
 def getDistName( sofar ):
     global distName
     global dontReplacePackage
