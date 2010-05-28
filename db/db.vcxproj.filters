@@ -769,6 +769,9 @@
       <Filter>replset\test stuff</Filter>
     </None>
     <None Include="mongo.ico" />
+    <None Include="readme.txt">
+      <Filter>util\concurrency</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
