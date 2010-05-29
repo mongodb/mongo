@@ -57,8 +57,7 @@ namespace mongo {
                 free(data);
                 data = (char*)malloc(maxSize);
                 size = maxSize;
-            }
-            
+            }            
         }
 
         /* leave room for some stuff later */

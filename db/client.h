@@ -101,20 +101,11 @@ namespace mongo {
             Context( string ns , Database * db, bool doauth=true );
             
             ~Context();
-            
-            Client* getClient() const { return _client; }
-            
-            Database* db() const {
-                return _db;
-            }
 
-            const char * ns() const {
-                return _ns.c_str();
-            }
-            
-            bool justCreated() const {
-                return _justCreated;
-            }
+            Client* getClient() const { return _client; }            
+            Database* db() const { return _db; }
+            const char * ns() const { return _ns.c_str(); }            
+            bool justCreated() const { return _justCreated; }
 
             bool equals( const string& ns , const string& path=dbpath ) const {
                 return _ns == ns && _path == path;

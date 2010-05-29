@@ -53,7 +53,9 @@ namespace mongo {
          when set, indicates this is the first thing we have logged for this database.
          thus, the slave does not need to copy down all the data when it sees this.
     */
-    static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
+    static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
+        DEV assertInWriteLock();
+        
         if ( strncmp(ns, "local.", 6) == 0 ){
             if ( strncmp(ns, "local.slaves", 12) == 0 ){
                 resetSlaveCache();
@@ -61,8 +63,7 @@ namespace mongo {
             return;
         }
 
-        DEV assertInWriteLock();
-        
+        const OpTime ts = OpTime::now();
         Client::Context context;
         
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
@@ -117,12 +118,12 @@ namespace mongo {
 
     void logKeepalive() { 
         BSONObj obj;
-        _logOp("n", "", "local.oplog.$main", obj, 0, 0, OpTime::now());
+        _logOp("n", "", "local.oplog.$main", obj, 0, 0);
     }
 
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( replSettings.master ) {
-            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
+            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b);
             // why? :
             //char cl[ 256 ];
             //nsToDatabase( ns, cl );
@@ -130,7 +131,7 @@ namespace mongo {
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
         if ( t.cllEnabled() ) {
             try {
-                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b, OpTime::now());
+                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b);
             } catch ( const DBException & ) {
                 t.cllInvalidate();
             }

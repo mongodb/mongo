@@ -486,7 +486,6 @@ namespace mongo {
 
         void appendKeys( const BSONObj& keyPattern , const BSONObj& values );
 
-    public:
         static string numStr( int i ) {
             if (i>=0 && i<100)
                 return numStrs[i];
