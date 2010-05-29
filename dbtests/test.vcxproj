@@ -260,6 +260,7 @@
     <ClCompile Include="..\db\repl\consensus.cpp" />
     <ClCompile Include="..\db\repl\heartbeat.cpp" />
     <ClCompile Include="..\db\repl\manager.cpp" />
+    <ClCompile Include="..\db\repl\rs.cpp" />
     <ClCompile Include="..\db\repl\rs_initiate.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -624,7 +625,6 @@
     <ClCompile Include="..\db\stats\snapshots.cpp" />
     <ClCompile Include="..\db\stats\top.cpp" />
     <ClCompile Include="..\db\repl\health.cpp" />
-    <ClCompile Include="..\db\repl\replset.cpp" />
     <ClCompile Include="..\db\repl\replset_commands.cpp" />
     <ClCompile Include="..\db\repl\rs_config.cpp" />
   </ItemGroup>

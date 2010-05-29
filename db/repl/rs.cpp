@@ -17,13 +17,14 @@
 #include "pch.h"
 #include "../cmdline.h"
 #include "../../util/sock.h"
-#include "rs.h"
 #include "../client.h"
+#include "rs.h"
 
 namespace mongo { 
 
     bool replSet = false;
     ReplSet *theReplSet = 0;
+    rsoptime rsOpTime;
 
     void ReplSet::assumePrimary() { 
         _myState = PRIMARY;
