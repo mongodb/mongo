@@ -55,6 +55,7 @@ namespace mongo {
     */
     static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
+        static BufBuilder bufbuilder(32*1024);
         
         if ( strncmp(ns, "local.", 6) == 0 ){
             if ( strncmp(ns, "local.slaves", 12) == 0 ){
@@ -70,7 +71,8 @@ namespace mongo {
            instead we do a single copy to the destination position in the memory mapped file.
         */
 
-        BSONObjBuilder b;
+        bufbuilder.reset();
+        BSONObjBuilder b(bufbuilder);
         b.appendTimestamp("ts", ts.asDate());
         b.append("op", opstr);
         b.append("ns", ns);
