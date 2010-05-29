@@ -329,6 +329,7 @@
     <ClCompile Include="..\client\syncclusterconnection.cpp">
       <Filter>client</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\version.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client.h">

@@ -597,6 +597,7 @@
       </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\scripting\utils.cpp" />
+    <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="basictests.cpp" />
     <ClCompile Include="btreetests.cpp" />
     <ClCompile Include="clienttests.cpp" />

@@ -261,6 +261,9 @@
     <ClCompile Include="..\util\concurrency\thread_pool.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\version.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gridconfig.h">
@@ -316,6 +319,9 @@
     </ClInclude>
     <ClInclude Include="..\client\model.h">
       <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\version.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
