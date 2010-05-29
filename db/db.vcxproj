@@ -648,7 +648,6 @@
     <ClInclude Include="..\util\log.h" />
     <ClInclude Include="..\util\lruishmap.h" />
     <ClInclude Include="..\util\mmap.h" />
-    <ClInclude Include="..\util\mvar.h" />
     <ClInclude Include="..\util\ntservice.h" />
     <ClInclude Include="..\util\optime.h" />
     <ClInclude Include="..\util\processinfo.h" />
@@ -667,7 +666,6 @@
     <ClInclude Include="..\util\message_server.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\scripting\engine.h" />
-    <ClInclude Include="..\scripting\engine_java.h" />
     <ClInclude Include="..\scripting\engine_spidermonkey.h" />
     <ClInclude Include="..\scripting\engine_v8.h" />
     <ClInclude Include="..\scripting\v8_db.h" />
