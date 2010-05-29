@@ -123,8 +123,9 @@ namespace mongo {
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( replSettings.master ) {
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
-            char cl[ 256 ];
-            nsToDatabase( ns, cl );
+            // why? :
+            //char cl[ 256 ];
+            //nsToDatabase( ns, cl );
         }
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
         if ( t.cllEnabled() ) {
