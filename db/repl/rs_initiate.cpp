@@ -23,7 +23,7 @@
 #include "../../util/mmap.h"
 #include "../../util/mongoutils/str.h"
 #include "health.h"
-#include "replset.h"
+#include "rs.h"
 #include "rs_config.h"
 
 using namespace bson;
@@ -80,6 +80,18 @@ namespace mongo {
         }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;
+
+            {
+                // just make sure we can get a write lock before doing anything else.  we'll reacquire one 
+                // later.  of course it could be stuck then, but this check lowers the risk if weird things 
+                // are up.
+                time_t t = time(0);
+                writelock lk("admin.");
+                if( time(0)-t > 10 ) { 
+                    errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
+                    return false;
+                }
+            }
 
             if( !replSet ) { 
                 errmsg = "server is not running with --replSet";

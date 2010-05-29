@@ -181,17 +181,14 @@
     <ClCompile Include="..\util\util.cpp">
       <Filter>db</Filter>
     </ClCompile>
-    <ClCompile Include="repl\replset.cpp">
-      <Filter>db\replset</Filter>
-    </ClCompile>
     <ClCompile Include="repl\replset_commands.cpp">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClCompile>
     <ClCompile Include="repl\rs_config.cpp">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClCompile>
     <ClCompile Include="repl\health.cpp">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClCompile>
     <ClCompile Include="..\util\background.cpp">
       <Filter>util</Filter>
@@ -209,7 +206,7 @@
       <Filter>db\btree</Filter>
     </ClCompile>
     <ClCompile Include="repl\consensus.cpp">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClCompile>
     <ClCompile Include="..\pch.cpp" />
     <ClCompile Include="..\client\connpool.cpp">
@@ -222,7 +219,7 @@
       <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="repl\manager.cpp">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcreposix.c">
       <Filter>util\pcre</Filter>
@@ -303,7 +300,7 @@
       <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="repl\rs_initiate.cpp">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\vars.cpp">
       <Filter>util\concurrency</Filter>
@@ -312,7 +309,7 @@
       <Filter>util\concurrency</Filter>
     </ClCompile>
     <ClCompile Include="repl\heartbeat.cpp">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClCompile>
     <ClCompile Include="..\s\shardconnection.cpp">
       <Filter>db</Filter>
@@ -330,6 +327,9 @@
       <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="..\util\version.cpp" />
+    <ClCompile Include="repl\rs.cpp">
+      <Filter>db\rs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client.h">
@@ -542,14 +542,11 @@
     <ClInclude Include="update.h">
       <Filter>db</Filter>
     </ClInclude>
-    <ClInclude Include="repl\replset.h">
-      <Filter>db\replset</Filter>
-    </ClInclude>
     <ClInclude Include="repl\rs_config.h">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClInclude>
     <ClInclude Include="repl\health.h">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClInclude>
     <ClInclude Include="..\util\allocator.h">
       <Filter>util</Filter>
@@ -598,7 +595,7 @@
     </ClInclude>
     <ClInclude Include="..\pch.h" />
     <ClInclude Include="repl\connections.h">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClInclude>
     <ClInclude Include="..\client\connpool.h">
       <Filter>client</Filter>
@@ -608,9 +605,6 @@
     </ClInclude>
     <ClInclude Include="..\util\ramlog.h">
       <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="repl\rstime.h">
-      <Filter>db\replset</Filter>
     </ClInclude>
     <ClInclude Include="..\util\mongoutils\html.h">
       <Filter>util\mongoutils</Filter>
@@ -631,7 +625,7 @@
       <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="repl\rsmember.h">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClInclude>
     <ClInclude Include="..\util\concurrency\list.h">
       <Filter>util\concurrency</Filter>
@@ -652,7 +646,7 @@
       <Filter>util\concurrency</Filter>
     </ClInclude>
     <ClInclude Include="repl\multicmd.h">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </ClInclude>
     <ClInclude Include="..\util\concurrency\msg.h">
       <Filter>util\concurrency</Filter>
@@ -702,6 +696,12 @@
     <ClInclude Include="..\client\syncclusterconnection.h">
       <Filter>client</Filter>
     </ClInclude>
+    <ClInclude Include="repl\rs_optime.h">
+      <Filter>db\rs</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs.h">
+      <Filter>db\rs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
@@ -734,14 +734,14 @@
     <Filter Include="db\btree">
       <UniqueIdentifier>{37b238b2-21ec-4788-bdf9-a59b43490454}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\replset">
-      <UniqueIdentifier>{3b73f786-d352-446f-a5f5-df49384baf7a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="db\replset\test stuff">
-      <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
-    </Filter>
     <Filter Include="scripting">
       <UniqueIdentifier>{6b78f34f-e6b0-49e4-b04e-6478c3a3c077}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\rs">
+      <UniqueIdentifier>{3b73f786-d352-446f-a5f5-df49384baf7a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\rs\test stuff">
+      <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -751,17 +751,17 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="repl\notes.txt">
-      <Filter>db\replset</Filter>
+      <Filter>db\rs</Filter>
     </None>
     <None Include="..\util\mongoutils\README">
       <Filter>util\mongoutils</Filter>
     </None>
     <None Include="..\SConstruct" />
     <None Include="repl\testing.js">
-      <Filter>db\replset\test stuff</Filter>
+      <Filter>db\rs\test stuff</Filter>
     </None>
     <None Include="repl\test.html">
-      <Filter>db\replset\test stuff</Filter>
+      <Filter>db\rs\test stuff</Filter>
     </None>
     <None Include="readme.txt">
       <Filter>util\concurrency</Filter>

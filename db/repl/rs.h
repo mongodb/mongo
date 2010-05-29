@@ -1,4 +1,4 @@
-// /db/repl/replset.h
+// /db/repl/rs.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -23,7 +23,7 @@
 #include "../../util/concurrency/msg.h"
 #include "../../util/hostandport.h"
 #include "../commands.h"
-#include "rstime.h"
+#include "rs_optime.h"
 #include "rsmember.h"
 #include "rs_config.h"
 

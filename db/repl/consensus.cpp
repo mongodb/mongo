@@ -16,7 +16,7 @@
 
 #include "pch.h"
 #include "../commands.h"
-#include "replset.h"
+#include "rs.h"
 #include "multicmd.h"
 
 namespace mongo { 

@@ -549,7 +549,7 @@
     <ClCompile Include="btree.cpp" />
     <ClCompile Include="btreecursor.cpp" />
     <ClCompile Include="repl\health.cpp" />
-    <ClCompile Include="repl\replset.cpp" />
+    <ClCompile Include="repl\rs.cpp" />
     <ClCompile Include="repl\replset_commands.cpp" />
     <ClCompile Include="repl\rs_config.cpp" />
   </ItemGroup>
@@ -588,7 +588,7 @@
     <ClInclude Include="repl\connections.h" />
     <ClInclude Include="repl\multicmd.h" />
     <ClInclude Include="repl\rsmember.h" />
-    <ClInclude Include="repl\rstime.h" />
+    <ClInclude Include="repl\rs_optime.h" />
     <ClInclude Include="stats\counters.h" />
     <ClInclude Include="stats\snapshots.h" />
     <ClInclude Include="stats\top.h" />
@@ -675,7 +675,7 @@
     <ClInclude Include="btree.h" />
     <ClInclude Include="repl\health.h" />
     <ClInclude Include="..\util\hostandport.h" />
-    <ClInclude Include="repl\replset.h" />
+    <ClInclude Include="repl\rs.h" />
     <ClInclude Include="repl\rs_config.h" />
     <ClInclude Include="..\bson\bsonelement.h" />
     <ClInclude Include="..\bson\bsoninlines.h" />

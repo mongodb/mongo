@@ -18,7 +18,7 @@
 */
 
 #include "pch.h"
-#include "replset.h"
+#include "rs.h"
 
 namespace mongo {
 

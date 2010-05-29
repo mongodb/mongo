@@ -15,7 +15,7 @@
 */
 
 #include "pch.h"
-#include "replset.h"
+#include "rs.h"
 #include "health.h"
 #include "../../util/background.h"
 #include "../../client/dbclient.h"

@@ -18,7 +18,7 @@
 #include "../cmdline.h"
 #include "../commands.h"
 #include "health.h"
-#include "replset.h"
+#include "rs.h"
 #include "rs_config.h"
 
 namespace mongo { 

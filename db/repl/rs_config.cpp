@@ -17,7 +17,7 @@
 */
 
 #include "pch.h"
-#include "replset.h"
+#include "rs.h"
 #include "../../client/dbclient.h"
 #include "../../client/syncclusterconnection.h"
 #include "../../util/hostandport.h"

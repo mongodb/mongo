@@ -46,7 +46,7 @@
 #include "security.h"
 #include "cmdline.h"
 #include "repl_block.h"
-#include "repl/replset.h"
+#include "repl/rs.h"
 
 namespace mongo {
     

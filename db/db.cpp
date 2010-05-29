@@ -30,7 +30,7 @@
 #include "clientcursor.h"
 #include "pdfile.h"
 #include "stats/counters.h"
-#include "repl/replset.h"
+#include "repl/rs.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif

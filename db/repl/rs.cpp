@@ -17,7 +17,7 @@
 #include "pch.h"
 #include "../cmdline.h"
 #include "../../util/sock.h"
-#include "replset.h"
+#include "rs.h"
 #include "../client.h"
 
 namespace mongo { 
