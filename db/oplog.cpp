@@ -125,7 +125,7 @@ namespace mongo {
         context.getClient()->setLastOp( ts );
     }
 
-    static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb );
+    static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) = _logOpOld;
     void newRepl() { _logOp = _logOpRS; }
     void oldRepl() { _logOp = _logOpOld; }
 
