@@ -1,4 +1,4 @@
-// oplog.cpp
+// @file oplog.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -35,6 +35,10 @@ namespace mongo {
         localOplogMainDetails = 0;
     }
 
+    static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
+        log() << "replSet logop not done" << endl;
+    }
+
     /* we write to local.opload.$main:
          { ts : ..., op: ..., ns: ..., o: ... }
        ts: an OpTime timestamp
@@ -52,8 +56,10 @@ namespace mongo {
        first: true
          when set, indicates this is the first thing we have logged for this database.
          thus, the slave does not need to copy down all the data when it sees this.
+
+       note this is used for single collection logging even when --replSet is enabled.
     */
-    static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
+    static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
         static BufBuilder bufbuilder(32*1024);
         
@@ -119,6 +125,10 @@ namespace mongo {
         context.getClient()->setLastOp( ts );
     }
 
+    static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb );
+    void newRepl() { _logOp = _logOpRS; }
+    void oldRepl() { _logOp = _logOpOld; }
+
     void logKeepalive() { 
         BSONObj obj;
         _logOp("n", "", 0, obj, 0, 0);
@@ -134,7 +144,7 @@ namespace mongo {
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
         if ( t.cllEnabled() ) {
             try {
-                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b);
+                _logOpOld(opstr, ns, t.cllNS().c_str(), obj, patt, b);
             } catch ( const DBException & ) {
                 t.cllInvalidate();
             }
@@ -272,7 +282,5 @@ namespace mongo {
             assert( !(q != t) );
         }
     } testoptime;
-
-    
 
 }
