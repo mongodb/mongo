@@ -26,7 +26,7 @@ namespace mongo {
 
     int __findingStartInitialTimeout = 5; // configurable for testing    
 
-    // cached copies of these...so don't rename them
+    // cached copies of these...so don't rename them, drop them, etc.!!!
     NamespaceDetails *localOplogMainDetails = 0;
     Database *localOplogDB = 0;
 
@@ -45,7 +45,7 @@ namespace mongo {
         "c" db cmd
         "db" declares presence of a database (ns is set to the db name + '.')
         "n" no op
-       logNS - e.g. "local.oplog.$main"
+       logNS - where to log it.  0/null means "local.oplog.$main".
        bb:
          if not null, specifies a boolean to pass along to the other side as b: param.
          used for "justOne" or "upsert" flags on 'd', 'u'
@@ -85,7 +85,8 @@ namespace mongo {
         int len = posz + obj.objsize() + 1 + 2 /*o:*/;
 
         Record *r;
-        if ( strncmp( logNS, "local.", 6 ) == 0 ) { // For now, assume this is olog main
+        if( logNS == 0 ) {
+            logNS = "local.oplog.$main";
             if ( localOplogMainDetails == 0 ) {
                 Client::Context ctx("local.", dbpath, 0, false);
                 localOplogDB = ctx.db();
@@ -120,12 +121,12 @@ namespace mongo {
 
     void logKeepalive() { 
         BSONObj obj;
-        _logOp("n", "", "local.oplog.$main", obj, 0, 0);
+        _logOp("n", "", 0, obj, 0, 0);
     }
 
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( replSettings.master ) {
-            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b);
+            _logOp(opstr, ns, 0, obj, patt, b);
             // why? :
             //char cl[ 256 ];
             //nsToDatabase( ns, cl );

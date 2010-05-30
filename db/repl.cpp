@@ -1732,8 +1732,12 @@ namespace mongo {
 
     void startReplication() {
         /* if we are going to be a replica set, we aren't doing other forms of replication. */
-        if( !cmdLine.replSet.empty() )
+        if( !cmdLine.replSet.empty() ) {
+            if( replSettings.slave || replSettings.master || replPair ) { 
+                log() << "ERROR: can't use --slave or --master replication options with --replSet" << endl;
+            }
             return;
+        }
 
         /* this was just to see if anything locks for longer than it should -- we need to be careful
            not to be locked when trying to connect() or query() the other side.
