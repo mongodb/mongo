@@ -29,6 +29,7 @@
 
 namespace mongo {
 
+    void newReplUp();
     struct Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
@@ -81,7 +82,11 @@ namespace mongo {
         ReplSet(string cfgString);
 
         /* call after constructing to start - returns fairly quickly after launching its threads */
-        void go() { _myState = STARTUP2; startThreads(); }
+        void go() { 
+            _myState = STARTUP2; 
+            startThreads();
+            newReplUp();
+        }
 
         // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
