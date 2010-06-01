@@ -264,7 +264,7 @@ namespace mongo {
             BSONElement f = j.next();
             uassert( 13087, "$or/$nor match element must be an object", f.type() == Object );
             // until SERVER-109 this is never a covered index match, so don't constrain index key for $or matchers
-            matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), BSONObj(), true ) ) );
+            matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), true ) ) );
         }
     }
 
@@ -284,7 +284,7 @@ namespace mongo {
     
     /* _jsobj          - the query pattern
     */
-    Matcher::Matcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey, bool subMatcher) :
+    Matcher::Matcher(const BSONObj &_jsobj, bool subMatcher) :
         where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
 
         BSONObjIterator i(jsobj);
@@ -389,8 +389,6 @@ namespace mongo {
             // normal, simple case e.g. { a : "foo" }
             addBasic(e, BSONObj::Equality, false);
         }
-        
-        constrainIndexKey_ = constrainIndexKey;
     }
     
     Matcher::Matcher( const Matcher &other, const BSONObj &key ) :
@@ -836,6 +834,40 @@ namespace mongo {
         return false;
     }
 
+    bool Matcher::sameCriteriaCount( const Matcher &other ) const {
+        if ( !( basics.size() == other.basics.size() && nRegex == other.nRegex && !where == !other.where ) ) {
+            return false;
+        }
+        if ( _norMatchers.size() != other._norMatchers.size() ) {
+            return false;
+        }
+        if ( _orMatchers.size() != other._orMatchers.size() ) {
+            return false;
+        }
+        {
+            list< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
+            list< shared_ptr< Matcher > >::const_iterator j = other._norMatchers.begin();
+            while( i != _norMatchers.end() ) {
+                if ( !(*i)->sameCriteriaCount( **j ) ) {
+                    return false;
+                }
+                ++i; ++j;
+            }
+        }
+        {
+            list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
+            list< shared_ptr< Matcher > >::const_iterator j = other._orMatchers.begin();
+            while( i != _orMatchers.end() ) {
+                if ( !(*i)->sameCriteriaCount( **j ) ) {
+                    return false;
+                }
+                ++i; ++j;
+            }
+        }
+        return true;
+    }        
+        
+    
     /*- just for testing -- */
 #pragma pack(1)
     struct JSObj1 {

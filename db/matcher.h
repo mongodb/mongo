@@ -136,7 +136,7 @@ namespace mongo {
 
         // Only specify constrainIndexKey if matches() will be called with
         // index keys having empty string field names.
-        Matcher(const BSONObj &pattern, const BSONObj &constrainIndexKey = BSONObj(), bool subMatcher = false);
+        Matcher(const BSONObj &pattern, bool subMatcher = false);
 
         Matcher( const Matcher &other, const BSONObj &constrainIndexKey );
         
@@ -161,38 +161,7 @@ namespace mongo {
             _orMatchers.pop_front();
         }
         
-        bool sameCriteriaCount( const Matcher &other ) const {
-            if ( !( basics.size() == other.basics.size() && nRegex == other.nRegex && !where == !other.where ) ) {
-                return false;
-            }
-            if ( _norMatchers.size() != other._norMatchers.size() ) {
-                return false;
-            }
-            if ( _orMatchers.size() != other._orMatchers.size() ) {
-                return false;
-            }
-            {
-                list< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
-                list< shared_ptr< Matcher > >::const_iterator j = other._norMatchers.begin();
-                while( i != _norMatchers.end() ) {
-                    if ( !(*i)->sameCriteriaCount( **j ) ) {
-                        return false;
-                    }
-                    ++i; ++j;
-                }
-            }
-            {
-                list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
-                list< shared_ptr< Matcher > >::const_iterator j = other._orMatchers.begin();
-                while( i != _orMatchers.end() ) {
-                    if ( !(*i)->sameCriteriaCount( **j ) ) {
-                        return false;
-                    }
-                    ++i; ++j;
-                }
-            }
-            return true;
-        }
+        bool sameCriteriaCount( const Matcher &other ) const;
         
     private:
         void addBasic(const BSONElement &e, int c, bool isNot) {

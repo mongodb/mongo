@@ -52,11 +52,9 @@ namespace mongo {
         if ( details )
             details->reset();
         
-//        if ( _keyMatcher.keyMatch() ) {
-            if ( !_keyMatcher.matches(key, details ) ){
-                return false;
-            }
-//        }
+        if ( !_keyMatcher.matches(key, details ) ){
+            return false;
+        }
         
         if ( ! _needRecord ){
             return true;
