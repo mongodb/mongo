@@ -147,7 +147,7 @@ namespace mongo {
         };
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
-        bool primary() const { return _myState == PRIMARY; }
+        bool isPrimary() const { return _myState == PRIMARY; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
         void msgUpdateHBInfo(HeartbeatInfo);
 

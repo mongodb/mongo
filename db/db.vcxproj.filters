@@ -131,7 +131,7 @@
       <Filter>rs</Filter>
     </ClCompile>
     <ClCompile Include="oplog.cpp">
-      <Filter>db\repl_old</Filter>
+      <Filter>repl_old</Filter>
     </ClCompile>
     <ClCompile Include="client.cpp">
       <Filter>db\core</Filter>
@@ -140,7 +140,7 @@
       <Filter>db\core</Filter>
     </ClCompile>
     <ClCompile Include="cloner.cpp">
-      <Filter>db\repl_old</Filter>
+      <Filter>repl_old</Filter>
     </ClCompile>
     <ClCompile Include="cmdline.cpp">
       <Filter>db\core</Filter>
@@ -278,10 +278,10 @@
       <Filter>db\storage engine</Filter>
     </ClCompile>
     <ClCompile Include="repl_block.cpp">
-      <Filter>db\repl_old</Filter>
+      <Filter>repl_old</Filter>
     </ClCompile>
     <ClCompile Include="repl.cpp">
-      <Filter>db\repl_old</Filter>
+      <Filter>repl_old</Filter>
     </ClCompile>
     <ClCompile Include="..\s\shardconnection.cpp">
       <Filter>db\sharding</Filter>
@@ -460,7 +460,7 @@
       <Filter>rs</Filter>
     </ClInclude>
     <ClInclude Include="..\util\optime.h">
-      <Filter>db\repl_old</Filter>
+      <Filter>repl_old</Filter>
     </ClInclude>
     <ClInclude Include="client.h">
       <Filter>db\core</Filter>
@@ -625,10 +625,10 @@
       <Filter>db\storage engine</Filter>
     </ClInclude>
     <ClInclude Include="repl.h">
-      <Filter>db\repl_old</Filter>
+      <Filter>repl_old</Filter>
     </ClInclude>
     <ClInclude Include="replpair.h">
-      <Filter>db\repl_old</Filter>
+      <Filter>repl_old</Filter>
     </ClInclude>
     <ClInclude Include="..\util\sock.h">
       <Filter>util\util</Filter>
@@ -734,9 +734,6 @@
     <Filter Include="rs\test stuff">
       <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\repl_old">
-      <UniqueIdentifier>{e899caa1-9a90-4604-ac2e-68d5ca12425c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="db\sharding">
       <UniqueIdentifier>{03b0d798-b13d-48f4-930d-ca827e2a3f00}</UniqueIdentifier>
     </Filter>
@@ -751,6 +748,9 @@
     </Filter>
     <Filter Include="util\util">
       <UniqueIdentifier>{9775f24c-3a29-4e0d-b5de-991c592cf376}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="repl_old">
+      <UniqueIdentifier>{e899caa1-9a90-4604-ac2e-68d5ca12425c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

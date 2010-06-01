@@ -43,14 +43,15 @@ namespace mongo {
         return p;
     }
 
-    ReplSet::Manager::Manager(ReplSet *_rs) : task::Server("ReplSet::Manager"), rs(_rs), _primary(NOPRIMARY)
+    ReplSet::Manager::Manager(ReplSet *_rs) : 
+      task::Server("ReplSet::Manager"), rs(_rs), _primary(NOPRIMARY)
     { 
     }
 
     void ReplSet::Manager::noteARemoteIsPrimary(const Member *m) { 
-        if( !rs->primary() )
-            rs->_currentPrimary = m;
+        rs->_currentPrimary = m;
         rs->_self->lhb() = "";
+        rs->_myState = RECOVERING;
     }
 
     /** called as the health threads get new results */

@@ -27,6 +27,12 @@ namespace mongo {
         virtual int getCode() const { return 20001; }
     };
 
+    /* replsets use RSOpTime.  
+       M/S uses OpTime.
+       But this is useable from both.
+       */
+    typedef unsigned long long ReplTime;
+
     /* Operation sequence #.  A combination of current second plus an ordinal value.
      */
 #pragma pack(4)
@@ -44,8 +50,8 @@ namespace mongo {
         OpTime(Date_t date) {
             reinterpret_cast<unsigned long long&>(*this) = date.millis;
         }
-        OpTime(unsigned long long date) {
-            reinterpret_cast<unsigned long long&>(*this) = date;
+        OpTime(ReplTime x) {
+            reinterpret_cast<unsigned long long&>(*this) = x;
         }
         OpTime(unsigned a, unsigned b) {
             secs = a;

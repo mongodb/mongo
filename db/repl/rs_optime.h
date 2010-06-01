@@ -4,10 +4,10 @@
 
 namespace mongo {
 
-    struct rsoptime { 
+    struct RSOpTime { 
         unsigned long long ord;
 
-        rsoptime() : ord(0) { }
+        RSOpTime() : ord(0) { }
 
         bool initiated() const { return ord > 0; }
 
@@ -15,8 +15,13 @@ namespace mongo {
             assert( !initiated() );
             ord = 1000000;
         }
+
+        ReplTime inc() {
+            DEV assertInWriteLock();
+            return ++ord;
+        }
     };
 
-    extern rsoptime rsOpTime;
+    extern RSOpTime rsOpTime;
 
 }

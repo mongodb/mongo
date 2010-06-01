@@ -27,12 +27,13 @@ namespace mongo {
     int __findingStartInitialTimeout = 5; // configurable for testing    
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
-    NamespaceDetails *localOplogMainDetails = 0;
-    Database *localOplogDB = 0;
-
+    static NamespaceDetails *localOplogMainDetails = 0;
+    static Database *localDB = 0;
+    static NamespaceDetails *rsOplogDetails = 0;
     void oplogCheckCloseDatabase( Database * db ){
-        localOplogDB = 0;
+        localDB = 0;
         localOplogMainDetails = 0;
+        rsOplogDetails = 0;
     }
 
     static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
@@ -41,8 +42,68 @@ namespace mongo {
     }
 
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
-        log() << "replSet logop not done" << endl;
-        //DEV assert( theReplSet );
+        DEV assertInWriteLock();
+        DEV assert( theReplSet );
+        static BufBuilder bufbuilder(32*1024);
+        
+        if ( strncmp(ns, "local.", 6) == 0 ){
+            if ( strncmp(ns, "local.slaves", 12) == 0 ){
+                resetSlaveCache();
+            }
+            return;
+        }
+
+        //Client::Context context;
+        
+        /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
+           instead we do a single copy to the destination position in the memory mapped file.
+        */
+
+        bufbuilder.reset();
+        BSONObjBuilder b(bufbuilder);
+        DEV assert( theReplSet->isPrimary() );
+        DEV assert( rsOpTime.initiated() );
+        const ReplTime ts = rsOpTime.inc();
+        b.append("t", (long long) ts);
+        b.append("op", opstr);
+        b.append("ns", ns);
+        if ( bb )
+            b.appendBool("b", *bb);
+        if ( o2 )
+            b.append("o2", *o2);
+        BSONObj partial = b.done();
+        int posz = partial.objsize();
+        int len = posz + obj.objsize() + 1 + 2 /*o:*/;
+
+        Record *r;
+        DEV assert( logNS == 0 );
+        {
+            const char *logns = "local.oplog.rs";
+            if ( rsOplogDetails == 0 ) {
+                Client::Context ctx("local.", dbpath, 0, false);
+                localDB = ctx.db();
+                rsOplogDetails = nsdetails(logns);
+            }
+            Client::Context ctx( "" , localDB, false );
+            r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logns, len);
+            ctx.getClient()->setLastOp( ts );
+        }
+
+        char *p = r->data;
+        memcpy(p, partial.objdata(), posz);
+        *((unsigned *)p) += obj.objsize() + 1 + 2;
+        p += posz - 1;
+        *p++ = (char) Object;
+        *p++ = 'o';
+        *p++ = 0;
+        memcpy(p, obj.objdata(), obj.objsize());
+        p += obj.objsize();
+        *p = EOO;
+        
+        if ( logLevel >= 6 ) {
+            BSONObj temp(r);
+            log( 6 ) << "logging op:" << temp << endl;
+        }
     }
 
     /* we write to local.opload.$main:
@@ -101,10 +162,10 @@ namespace mongo {
             logNS = "local.oplog.$main";
             if ( localOplogMainDetails == 0 ) {
                 Client::Context ctx("local.", dbpath, 0, false);
-                localOplogDB = ctx.db();
+                localDB = ctx.db();
                 localOplogMainDetails = nsdetails(logNS);
             }
-            Client::Context ctx( "" , localOplogDB, false );
+            Client::Context ctx( "" , localDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         } else {
             Client::Context ctx( logNS, dbpath, 0, false );
@@ -128,7 +189,7 @@ namespace mongo {
             log( 6 ) << "logging op:" << temp << endl;
         }
         
-        context.getClient()->setLastOp( ts );
+        context.getClient()->setLastOp( ts.asDate() );
     }
 
     static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) = _logOpOld;

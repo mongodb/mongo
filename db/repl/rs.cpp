@@ -24,9 +24,10 @@ namespace mongo {
 
     bool replSet = false;
     ReplSet *theReplSet = 0;
-    rsoptime rsOpTime;
+    RSOpTime rsOpTime;
 
     void ReplSet::assumePrimary() { 
+        writelock lk("admin."); // so we are synchronized with _logOp() 
         _myState = PRIMARY;
         _currentPrimary = _self;
         log() << "replSet self is now primary" << rsLog;

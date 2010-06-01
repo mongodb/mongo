@@ -29,6 +29,7 @@
 #include "namespace.h"
 #include "lasterror.h"
 #include "stats/top.h"
+#include "repl/rs.h"
 
 namespace mongo { 
 
@@ -155,7 +156,7 @@ namespace mongo {
         const char *_desc;
         bool _god;
         AuthenticationInfo _ai;
-        OpTime _lastOp;
+        ReplTime _lastOp;
         BSONObj _handshake;
         BSONObj _remoteId;
 
@@ -176,17 +177,23 @@ namespace mongo {
         void dropTempCollectionsInDB(const string db);
         void dropAllTempCollectionsInDB(const string db);
 
-        void setLastOp( const OpTime& op ){
+        void setLastOp( ReplTime op ) {
             _lastOp = op;
         }
 
-        OpTime getLastOp() const {
+        ReplTime getLastOp() const {
             return _lastOp;
         }
 
-        void appendLastOp( BSONObjBuilder& b ){
-            if ( ! _lastOp.isNull() )
-                b.appendTimestamp( "lastOp" , _lastOp.asDate() );
+        void appendLastOp( BSONObjBuilder& b ) {
+            if( theReplSet ) { 
+                b.append("lastOp" , (long long) _lastOp);
+            }
+            else {
+                OpTime lo(_lastOp);
+                if ( ! lo.isNull() )
+                    b.appendTimestamp( "lastOp" , lo.asDate() );
+            }
         }
 
         /* each thread which does db operations has a Client object in TLS.  
