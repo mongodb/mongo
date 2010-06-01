@@ -465,7 +465,11 @@ namespace mongo {
             ss << "best guess plan requested, but scan and order required:";
             ss << " query: " << query_;
             ss << " order: " << order_;
-            
+            ss << " choices: ";
+            for ( unsigned i=0; i<plans_.size(); i++ ){
+                ss << plans_[i]->indexKey() << " ";
+            }
+
             string s = ss.str();
             msgassertedNoTrace( 13284, s.c_str() );
         }
