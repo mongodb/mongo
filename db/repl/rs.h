@@ -45,8 +45,14 @@ namespace mongo {
         class lock : scoped_lock { 
             RSBase& _b;
         public:
-            lock(RSBase* b) : scoped_lock(b->m), _b(*b) { b->_locked++; }
-            ~lock() { _b._locked--; }
+            lock(RSBase* b) : scoped_lock(b->m), _b(*b) { 
+                DEV assert(b->_locked == 0);
+                b->_locked++; 
+            }
+            ~lock() { 
+                DEV assert(_b._locked == 1);
+                _b._locked--; 
+            }
         };
         bool locked() const { return _locked; }
     };
@@ -195,9 +201,12 @@ namespace mongo {
         return false;
     }
 
+    /** base class for repl set commands.  checks basic things such as in rs mode before the command 
+        does its real work
+        */
     class ReplSetCommand : public Command { 
     protected:
-        ReplSetCommand(const char * s) : Command(s) { }
+        ReplSetCommand(const char * s, bool show=false) : Command(s) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }

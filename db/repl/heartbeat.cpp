@@ -36,17 +36,15 @@ namespace mongo {
     using namespace bson;
 
     /* { replSetHeartbeat : <setname> } */
-    class CmdReplSetHeartbeat : public Command {
+    class CmdReplSetHeartbeat : public ReplSetCommand {
     public:
-        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
-        virtual bool logTheOp() { return false; }
-        virtual LockType locktype() const { return NONE; }
-        virtual void help( stringstream &help ) const { help<<"internal"; }
-        CmdReplSetHeartbeat() : Command("replSetHeartbeat") { }
+        CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            /* we don't call ReplSetCommand::check() here because heartbeat 
+               checks many things that are pre-initialization. */
             if( !replSet ) {
-                errmsg = "not a replset member";
+                errmsg = "not running with --replSet";
                 return false;
             }
             if( cmdObj["pv"].Int() != 1 ) { 
