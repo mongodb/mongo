@@ -138,8 +138,6 @@ namespace mongo {
         // index keys having empty string field names.
         Matcher(const BSONObj &pattern, bool subMatcher = false);
 
-        Matcher( const Matcher &other, const BSONObj &constrainIndexKey );
-        
         ~Matcher();
 
         bool matches(const BSONObj& j, MatchDetails * details = 0 );
@@ -164,6 +162,8 @@ namespace mongo {
         bool sameCriteriaCount( const Matcher &other ) const;
         
     private:
+        Matcher( const Matcher &other, const BSONObj &constrainIndexKey );
+        
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
@@ -210,16 +210,28 @@ namespace mongo {
     class CoveredIndexMatcher : boost::noncopyable {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
-        bool matches(const BSONObj &o){ return _docMatcher.matches( o ); }
+        bool matches(const BSONObj &o){ return _docMatcher->matches( o ); }
         bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 );
         bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 );
         bool needRecord(){ return _needRecord; }
         
-        Matcher& docMatcher() { return _docMatcher; }
+        Matcher& docMatcher() { return *_docMatcher; }
+
+        // once this is called, shouldn't use this matcher for matching any more
+        CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {
+            if ( !_orPopped ) {
+                _docMatcher->popOr();
+                _orPopped = true;
+            }
+            return new CoveredIndexMatcher( _docMatcher, indexKeyPattern, alwaysUseRecord );
+        }
     private:
-        Matcher _docMatcher;
+        CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
+        void init( bool alwaysUseRecord );
+        shared_ptr< Matcher > _docMatcher;
         Matcher _keyMatcher;
         bool _needRecord;
+        bool _orPopped;
     };
     
 } // namespace mongo

@@ -415,6 +415,9 @@ namespace mongo {
                 regexs[ nRegex++ ] = other.regexs[ i ];
             }
         }
+        for( list< shared_ptr< Matcher > >::const_iterator i = other._orMatchers.begin(); i != other._orMatchers.end(); ++i ) {
+            _orMatchers.push_back( shared_ptr< Matcher >( new Matcher( **i, key ) ) );
+        }
     }
     
     inline bool regexMatches(const RegexMatcher& rm, const BSONElement& e) {

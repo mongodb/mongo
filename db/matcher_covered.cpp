@@ -31,19 +31,31 @@
 
 namespace mongo {
 
-    CoveredIndexMatcher::CoveredIndexMatcher(const BSONObj &jsobj, const BSONObj &indexKeyPattern, bool alwaysUseRecord) :
-        _docMatcher(jsobj),
-        _keyMatcher(_docMatcher, indexKeyPattern)
+    CoveredIndexMatcher::CoveredIndexMatcher( const BSONObj &jsobj, const BSONObj &indexKeyPattern, bool alwaysUseRecord) :
+        _docMatcher( new Matcher( jsobj ) ),
+        _keyMatcher( *_docMatcher, indexKeyPattern ),
+        _orPopped()
     {
-        _needRecord = 
-            alwaysUseRecord || 
-            ! ( _docMatcher.keyMatch() && 
-                _keyMatcher.sameCriteriaCount( _docMatcher ) &&
-                ! _keyMatcher.hasType( BSONObj::opEXISTS ) );
-        ;
-
+        init( alwaysUseRecord );
+    }
+ 
+    CoveredIndexMatcher::CoveredIndexMatcher( const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord ) :
+        _docMatcher( docMatcher ),
+        _keyMatcher( *_docMatcher, indexKeyPattern ),
+        _orPopped()
+    {
+        init( alwaysUseRecord );
     }
 
+    void CoveredIndexMatcher::init( bool alwaysUseRecord ) {
+        _needRecord = 
+        alwaysUseRecord || 
+        ! ( _docMatcher->keyMatch() && 
+           _keyMatcher.sameCriteriaCount( *_docMatcher ) &&
+           ! _keyMatcher.hasType( BSONObj::opEXISTS ) );
+        ;        
+    }
+    
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ){
         return matches( cursor->currKey() , cursor->currLoc() , details );
     }
@@ -63,7 +75,7 @@ namespace mongo {
         if ( details )
             details->loadedObject = true;
 
-        return _docMatcher.matches(recLoc.rec() , details );
+        return _docMatcher->matches(recLoc.rec() , details );
     }
     
 
