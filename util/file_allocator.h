@@ -1,4 +1,4 @@
-//file_allocator.h
+// @file file_allocator.h
 
 /*    Copyright 2009 10gen Inc.
  *

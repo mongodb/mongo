@@ -1,4 +1,4 @@
-// log.h
+// @file log.h
 
 /*    Copyright 2009 10gen Inc.
  *

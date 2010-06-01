@@ -1,4 +1,4 @@
-// mms.cpp
+// @file mms.cpp
 /*
  *    Copyright (C) 2010 10gen Inc.
  *

@@ -1,4 +1,4 @@
-// queue.h
+// @file queue.h
 
 /*    Copyright 2009 10gen Inc.
  *
