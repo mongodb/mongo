@@ -28,8 +28,23 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            errmsg = "not done";
-            return false;
+
+            if( cmdObj["set"].String() != theReplSet->name() ) { 
+                errmsg = "wrong repl set name";
+                return false;
+            }
+            string who = cmdObj["who"].String();
+            int cfgver = cmdObj["cfgver"].Int();
+
+            bool weAreFresher = false;
+            if( theReplSet->config().version > cfgver ) { 
+                log() << "replSet member " << who << " is not yet aware its cfg version " << cfgver << " is stale" << rsLog;
+                weAreFresher = true;
+            }
+            result.append("fresher", weAreFresher);
+
+            log() << "replSet error: replSetFresh command not implemented yet." << rsLog;
+            return true;
         }
     } cmdReplSetFresh;
 
