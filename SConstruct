@@ -49,7 +49,6 @@ AddOption('--distmod',
           metavar='DIR',
           help='additional piece for full dist name')
 
-
 AddOption( "--64",
            dest="force64",
            type="string",
@@ -554,8 +553,8 @@ elif os.sys.platform.startswith( "freebsd" ):
 
 elif "win32" == os.sys.platform:
     windows = True
-    if force64:
-        release = True
+    #if force64:
+    #    release = True
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
 	if os.path.exists(os.path.join(pathdir, 'cl.exe')):
@@ -600,24 +599,36 @@ elif "win32" == os.sys.platform:
 
     env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
 
+    # consider adding /MP build with multiple processes option.
+
+    # /EHsc exception handling style for visual studio
+    # /W3 warning level
     env.Append( CPPFLAGS=" /EHsc /W3 " )
-    env.Append( CPPFLAGS=" /wd4355 /wd4800 " ) #some warnings we don't like
+
+    # some warnings we don't like:
+    env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
+
     env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE","SUPPORT_UCP","SUPPORT_UTF8,PSAPI_VERSION=1" ] )
 
     #env.Append( CPPFLAGS='  /Yu"pch.h" ' ) # this would be for pre-compiled headers, could play with it later
 
+    # docs say don't use /FD from command line
+    # /Gy funtion level linking
+    # /Gm is minimal rebuild, but may not work in parallel mode.
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /FD /MT /Gy /Zi /TP /errorReport:prompt /Gm " )
+        env.Append( CPPFLAGS= " /O2 /MT /Gy /Zi /TP /errorReport:none " )
         # TODO: this has caused some linking problems :
+        # /GL whole program optimization
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
     else:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )
         # /Od disable optimization
         # /ZI debug info w/edit & continue 
+        # /TP it's a c++ file
         # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
-        env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
+        env.Append( CPPFLAGS=" /Od /RTC1 /MDd /Zi /TP /errorReport:none " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
         env.Append( LINKFLAGS=" /incremental:yes /debug " )
 
