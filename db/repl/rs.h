@@ -31,9 +31,61 @@ namespace mongo {
 
     void newReplUp();
     struct Target;
+    class ReplSetInfo;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
+
+    class Member : public List1<Member>::Base {
+    public:
+        Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c);
+
+        string fullName() const { return h().toString(); }
+        const ReplSetConfig::MemberCfg& config() const { return *_config; }
+        const HeartbeatInfo& hbinfo() const { return _hbinfo; }
+        string lhb() { return _hbinfo.lastHeartbeatMsg; }
+        MemberState state() const { return _hbinfo.hbstate; }
+        const HostAndPort& h() const { return _h; }
+        unsigned id() const { return _hbinfo.id(); }
+
+        void summarizeAsHtml(stringstream& s) const;
+        friend class ReplSetImpl;
+    private:
+        const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
+        HostAndPort _h;
+        HeartbeatInfo _hbinfo;
+    };
+
+    class Manager : public task::Server {
+        bool got(const any&);
+        ReplSetImpl *rs;
+        int _primary;
+        const Member* findOtherPrimary();
+        void noteARemoteIsPrimary(const Member *);
+    public:
+        Manager(ReplSetImpl *rs);
+        void msgReceivedNewConfig(BSONObj) { assert(false); }
+        void msgCheckNewState();
+    };
+
+    class Consensus {
+        ReplSetImpl &rs;
+        struct LastYea { 
+            LastYea() : when(0), who(0xffffffff) { }
+            time_t when;
+            unsigned who;
+        };
+        Atomic<LastYea> ly;
+        unsigned yea(unsigned memberId); // throws VoteException
+        void _electSelf();
+        bool weAreFreshest(bool& allUp);
+    public:
+        Consensus(ReplSetImpl *t) : rs(*t) { }
+        int totalVotes() const;
+        bool aMajoritySeemsToBeUp() const;
+        void electSelf();
+        void electCmdReceived(BSONObj, BSONObjBuilder*);
+    };
 
     /** most operations on a ReplSet object should be done while locked. */
     class RSBase : boost::noncopyable { 
@@ -61,7 +113,7 @@ namespace mongo {
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
              singleton and long lived.
     */
-    class ReplSet : RSBase {
+    class ReplSetImpl : RSBase {
     public:
         /** info on our state if the replset isn't yet "up".  for example, if we are pre-initiation. */
         enum StartupStatus { 
@@ -70,36 +122,44 @@ namespace mongo {
         };
         static StartupStatus startupStatus;
         static string startupStatusMsg;
+        static string stateAsStr(MemberState state);
+        static string stateAsHtml(MemberState state);
 
-        void fatal();
-        bool isMaster(const char *client);
-        void fillIsMaster(BSONObjBuilder&);
+        /* todo thread */
+        void msgUpdateHBInfo(HeartbeatInfo);
+        bool isPrimary() const { return _myState == PRIMARY; }
+
+    private:
+        Consensus elect;
         bool ok() const { return _myState != FATAL; }
-        MemberState state() const { return _myState; }        
-        string name() const { return _name; } /* @return replica set's logical name */
 
         void relinquish();
         void assumePrimary();
+
+    protected:
+        void _fillIsMaster(BSONObjBuilder&);
+        const ReplSetConfig& config() { return *_cfg; }
+        string name() const { return _name; } /* @return replica set's logical name */
+        MemberState state() const { return _myState; }        
+        void _fatal();
+        void _summarizeAsHtml(stringstream&) const;        
+        void _summarizeStatus(BSONObjBuilder&) const; // for replSetGetStatus command
 
         /* cfgString format is 
            replsetname/host1,host2:port,...
            where :port is optional.
            throws exception if a problem initializing. */
-        ReplSet(string cfgString);
+        ReplSetImpl(string cfgString);
 
         /* call after constructing to start - returns fairly quickly after launching its threads */
-        void go() { 
+        void _go() { 
             _myState = STARTUP2; 
             startThreads();
             newReplUp();
         }
 
-        // for replSetGetStatus command
-        void summarizeStatus(BSONObjBuilder&) const;
-        void summarizeAsHtml(stringstream&) const;
-        const ReplSetConfig& config() { return *_cfg; }
-
     private:
+
         MemberState _myState;
         string _name;
         const vector<HostAndPort> *_seeds;
@@ -112,50 +172,9 @@ namespace mongo {
         void loadConfig();
         void initFromConfig(ReplSetConfig& c);//, bool save);
 
-        class Consensus {
-            ReplSet &rs;
-            struct LastYea { 
-                LastYea() : when(0), who(0xffffffff) { }
-                time_t when;
-                unsigned who;
-            };
-            Atomic<LastYea> ly;
-            unsigned yea(unsigned memberId); // throws VoteException
-            void _electSelf();
-            bool weAreFreshest();
-        public:
-            Consensus(ReplSet *t) : rs(*t) { }
-            int totalVotes() const;
-            bool aMajoritySeemsToBeUp() const;
-            void electSelf();
-            void electCmdReceived(BSONObj, BSONObjBuilder*);
-        } elect;
-
-    public:
-        class Member : public List1<Member>::Base {
-        public:
-            Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c);
-
-            string fullName() const { return h().toString(); }
-            const ReplSetConfig::MemberCfg& config() const { return *_config; }
-            const HeartbeatInfo& hbinfo() const { return _hbinfo; }
-            string lhb() { return _hbinfo.lastHeartbeatMsg; }
-            MemberState state() const { return _hbinfo.hbstate; }
-            const HostAndPort& h() const { return _h; }
-            unsigned id() const { return _hbinfo.id(); }
-
-            void summarizeAsHtml(stringstream& s) const;
-            friend class ReplSet;
-        private:
-            const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
-            HostAndPort _h;
-            HeartbeatInfo _hbinfo;
-        };
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
-        bool isPrimary() const { return _myState == PRIMARY; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
-        void msgUpdateHBInfo(HeartbeatInfo);
 
     private:
         const Member *_currentPrimary;
@@ -163,43 +182,33 @@ namespace mongo {
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
-        class Manager : public task::Server {
-            bool got(const any&);
-            ReplSet *rs;
-            int _primary;
-            const Member* findOtherPrimary();
-            void noteARemoteIsPrimary(const Member *);
-        public:
-            Manager(ReplSet *rs);
-            void msgReceivedNewConfig(BSONObj) { assert(false); }
-            void msgCheckNewState();
-        };
         shared_ptr<Manager> mgr;
 
     private:
         Member* head() const { return _members.head(); }
         void getTargets(list<Target>&);
-        static string stateAsStr(MemberState state);
-        static string stateAsHtml(MemberState state);
         void startThreads();
         friend class FeedbackThread;
         friend class CmdReplSetElect;
+        friend class Member;
+        friend class Manager;
+        friend class Consensus;
     };
 
-    inline void ReplSet::fatal() 
-    { 
-        lock l(this);
-        _myState = FATAL; 
-        log() << "replSet error fatal error, stopping replication" << rsLog; 
-    }
-
-    inline ReplSet::Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 
-        _config(c), _h(h), _hbinfo(ord) { }
-
-    inline bool ReplSet::isMaster(const char *client) {         
-        /* todo replset */
-        return false;
-    }
+    class ReplSet : public ReplSetImpl { 
+    public:
+        ReplSet(string cfgString) : ReplSetImpl(cfgString) { }
+        /* call after constructing to start - returns fairly quickly after launching its threads */
+        void go() { _go(); }
+        void fatal() { _fatal(); }
+        bool isMaster(const char *client);
+        MemberState state() const { return ReplSetImpl::state(); }
+        string name() const { return ReplSetImpl::name(); }
+        const ReplSetConfig& config() { return ReplSetImpl::config(); }
+        void summarizeAsHtml(stringstream& ss) const { _summarizeAsHtml(ss); }
+        void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
+        void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
+    };
 
     /** base class for repl set commands.  checks basic things such as in rs mode before the command 
         does its real work
@@ -225,6 +234,15 @@ namespace mongo {
             return true;
         }
     };
+    
+    /** inlines ----------------- */
 
+    inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 
+        _config(c), _h(h), _hbinfo(ord) { }
+
+    inline bool ReplSet::isMaster(const char *client) {         
+        /* todo replset */
+        return false;
+    }
 
 }

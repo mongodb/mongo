@@ -40,14 +40,14 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            //task::lam f = boost::bind(&ReplSet::Consensus::electCmdReceived, &theReplSet->elect, cmdObj, &result);
+            //task::lam f = boost::bind(&Consensus::electCmdReceived, &theReplSet->elect, cmdObj, &result);
             //theReplSet->mgr->call(f);
             theReplSet->elect.electCmdReceived(cmdObj, &result);
             return true;
         }
     } cmdReplSetElect;
 
-    int ReplSet::Consensus::totalVotes() const { 
+    int Consensus::totalVotes() const { 
         static int complain = 0;
         int vTot = rs._self->config().votes;
         for( Member *m = rs.head(); m; m=m->next() ) 
@@ -57,7 +57,7 @@ namespace mongo {
         return vTot;
     }
 
-    bool ReplSet::Consensus::aMajoritySeemsToBeUp() const {
+    bool Consensus::aMajoritySeemsToBeUp() const {
         int vUp = rs._self->config().votes;
         for( Member *m = rs.head(); m; m=m->next() ) 
             vUp += m->hbinfo().up() ? m->config().votes : 0;
@@ -71,21 +71,24 @@ namespace mongo {
 
     const time_t LeaseTime = 30;
 
-    unsigned ReplSet::Consensus::yea(unsigned memberId) /* throws VoteException */ {
+    unsigned Consensus::yea(unsigned memberId) /* throws VoteException */ {
         Atomic<LastYea>::tran t(ly);
         LastYea &ly = t.ref();
         time_t now = time(0);
-        if( ly.when + LeaseTime >= now )
+        if( ly.when + LeaseTime >= now && ly.who != memberId ) {
+            log() << "replSet TEMP not voting yea for " << memberId << rsLog;
+            log() << "replSet TEMP voted for " << ly.who << ' ' << now-ly.when << " secs ago" << rsLog;
             throw VoteException();
+        }
         ly.when = now;
         ly.who = memberId;
         return rs._self->config().votes;
     }
 
     /* todo: threading **************** !!!!!!!!!!!!!!!! */
-    void ReplSet::Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder* _b) { 
+    void Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder* _b) { 
         BSONObjBuilder& b = *_b;
-        log() << "replSet TEMP ELECT " << cmd.toString() << rsLog;
+        log() << "replSet TEMP RECEIVED ELECT MSG " << cmd.toString() << rsLog;
         string set = cmd["set"].String();
         unsigned whoid = cmd["whoid"].Int();
         int cfgver = cmd["cfgver"].Int();
@@ -109,7 +112,7 @@ namespace mongo {
             try {
                 vote = yea(whoid);
                 rs.relinquish();
-                log() << "replSet info voting yea" << rsLog;
+                log() << "replSet info voting yea for " << whoid << rsLog;
             }
             catch(VoteException&) { 
                 log() << "replSet voting no already voted for another" << rsLog;
@@ -120,13 +123,14 @@ namespace mongo {
         b.append("round", round);
     }
 
-    void ReplSet::getTargets(list<Target>& L) { 
+    void ReplSetImpl::getTargets(list<Target>& L) { 
         for( Member *m = head(); m; m=m->next() )
             if( m->hbinfo().up() )
                 L.push_back( Target(m->fullName()) );
     }
 
-    bool ReplSet::Consensus::weAreFreshest() {
+    /* allUp only meaningful when true returned! */
+    bool Consensus::weAreFreshest(bool& allUp) {
         BSONObj cmd = BSON(
                "replSetFresh" << 1 <<
                "set" << rs.name() << 
@@ -136,25 +140,36 @@ namespace mongo {
         rs.getTargets(L);
         multiCommand(cmd, L);
         int nok = 0;
+        allUp = true;
         for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
             if( i->ok ) {
                 nok++;
                 if( i->result["fresher"].trueValue() )
                     return false;
             }
+            else {
+                log() << "replSet TEMP freshest returns " << i->result.toString() << rsLog;
+                allUp = false;
+            }
         }
-        log() << "replSet temp we are freshest, nok:" << nok << rsLog; 
+        log() << "replSet TEMP we are freshest of up nodes, nok:" << nok << rsLog; 
         return true;
     }
 
-    void ReplSet::Consensus::_electSelf() {
-        if( !weAreFreshest() ) { 
-            log() << "replSet info not going to elect self, we are not freshest" << rsLog;
+    extern time_t started;
+
+    void Consensus::_electSelf() {
+        bool allUp;
+        if( !weAreFreshest(allUp) ) { 
+            log() << "replSet info not electing self, we are not freshest" << rsLog;
             return;
+        }
+        if( !allUp && time(0) - started < 60 * 5 ) { 
+            log() << "replSet info not electing self, not all members up and we have been up less than 5 minutes" << rsLog;
         }
 
         time_t start = time(0);
-        ReplSet::Member& me = *rs._self;        
+        Member& me = *rs._self;        
         int tally = yea( me.id() );
         log() << "replSet info electSelf" << rsLog;
 
@@ -185,6 +200,7 @@ namespace mongo {
                 log() << "replSet too much time passed during election, ignoring result" << rsLog;
             }
             /* succeeded. */
+            log() << "replSet election succeeded assuming primary role" << rsLog;
             rs.assumePrimary();
             return;
         } 
@@ -193,7 +209,7 @@ namespace mongo {
         }
     }
 
-    void ReplSet::Consensus::electSelf() {
+    void Consensus::electSelf() {
         try { 
             _electSelf(); 
         } 

@@ -120,7 +120,7 @@ namespace mongo {
                     if( cfg.ok() ) {
                         // received a new config
                         boost::function<void()> f = 
-                            boost::bind(&ReplSet::Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
+                            boost::bind(&Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
                         theReplSet->mgr->send(f);
                     }
                 }
@@ -138,7 +138,7 @@ namespace mongo {
             time_t now = time(0);
             if( mem.changed(old) || now-last>4 ) {
                 last = now;
-                theReplSet->mgr->send( boost::bind(&ReplSet::Manager::msgCheckNewState, theReplSet->mgr) );
+                theReplSet->mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
             }
         }
 
@@ -157,7 +157,7 @@ namespace mongo {
         note ReplSet object is only created once we get a config - so this won't run 
         until the initiation.
     */
-    void ReplSet::startThreads() {
+    void ReplSetImpl::startThreads() {
         task::fork(mgr->taskPtr());
 
         Member* m = _members.head();
@@ -167,7 +167,7 @@ namespace mongo {
             m = m->next();
         }
 
-        mgr->send( boost::bind(&ReplSet::Manager::msgCheckNewState, theReplSet->mgr) );
+        mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
     }
 
 }
