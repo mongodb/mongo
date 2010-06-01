@@ -32,14 +32,13 @@
 namespace mongo {
 
     CoveredIndexMatcher::CoveredIndexMatcher(const BSONObj &jsobj, const BSONObj &indexKeyPattern, bool alwaysUseRecord) :
-        _keyMatcher(jsobj.filterFieldsUndotted(indexKeyPattern, true), 
-        indexKeyPattern),
-        _docMatcher(jsobj) 
+        _docMatcher(jsobj),
+        _keyMatcher(_docMatcher, indexKeyPattern)
     {
         _needRecord = 
             alwaysUseRecord || 
             ! ( _docMatcher.keyMatch() && 
-                _keyMatcher.jsobj.nFields() == _docMatcher.jsobj.nFields() &&
+                _keyMatcher.sameCriteriaCount( _docMatcher ) &&
                 ! _keyMatcher.hasType( BSONObj::opEXISTS ) );
         ;
 
@@ -53,11 +52,11 @@ namespace mongo {
         if ( details )
             details->reset();
         
-        if ( _keyMatcher.keyMatch() ) {
+//        if ( _keyMatcher.keyMatch() ) {
             if ( !_keyMatcher.matches(key, details ) ){
                 return false;
             }
-        }
+//        }
         
         if ( ! _needRecord ){
             return true;

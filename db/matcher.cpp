@@ -393,6 +393,32 @@ namespace mongo {
         constrainIndexKey_ = constrainIndexKey;
     }
     
+    Matcher::Matcher( const Matcher &other, const BSONObj &key ) :
+    where(0), constrainIndexKey_( key ), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
+        // do not include fields which would make keyMatch() false
+        for( vector< ElementMatcher >::const_iterator i = other.basics.begin(); i != other.basics.end(); ++i ) {
+            if ( key.hasField( i->toMatch.fieldName() ) ) {
+                switch( i->compareOp ) {
+                    case BSONObj::opSIZE:
+                    case BSONObj::opALL:
+                    case BSONObj::NE:
+                    case BSONObj::NIN:
+                        break;
+                    default: {
+                        if ( !i->isNot && i->toMatch.type() != Array ) {
+                            basics.push_back( *i );                            
+                        }
+                    }
+                }
+            }
+        }
+        for( int i = 0; i < other.nRegex; ++i ) {
+            if ( !other.regexs[ i ].isNot && key.hasField( other.regexs[ i ].fieldName ) ) {
+                regexs[ nRegex++ ] = other.regexs[ i ];
+            }
+        }
+    }
+    
     inline bool regexMatches(const RegexMatcher& rm, const BSONElement& e) {
         switch (e.type()){
             case String:

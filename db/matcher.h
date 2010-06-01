@@ -138,6 +138,8 @@ namespace mongo {
         // index keys having empty string field names.
         Matcher(const BSONObj &pattern, const BSONObj &constrainIndexKey = BSONObj(), bool subMatcher = false);
 
+        Matcher( const Matcher &other, const BSONObj &constrainIndexKey );
+        
         ~Matcher();
 
         bool matches(const BSONObj& j, MatchDetails * details = 0 );
@@ -153,11 +155,44 @@ namespace mongo {
             return jsobj.toString();
         }
 
-//        void popOr() {
-//            massert( 13261, "no or to pop", !_orMatchers.empty() );
-//            _norMatchers.push_back( _orMatchers.front() );
-//            _orMatchers.pop_front();
-//        }
+        void popOr() {
+            massert( 13261, "no or to pop", !_orMatchers.empty() );
+            _norMatchers.push_back( _orMatchers.front() );
+            _orMatchers.pop_front();
+        }
+        
+        bool sameCriteriaCount( const Matcher &other ) const {
+            if ( !( basics.size() == other.basics.size() && nRegex == other.nRegex && !where == !other.where ) ) {
+                return false;
+            }
+            if ( _norMatchers.size() != other._norMatchers.size() ) {
+                return false;
+            }
+            if ( _orMatchers.size() != other._orMatchers.size() ) {
+                return false;
+            }
+            {
+                list< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
+                list< shared_ptr< Matcher > >::const_iterator j = other._norMatchers.begin();
+                while( i != _norMatchers.end() ) {
+                    if ( !(*i)->sameCriteriaCount( **j ) ) {
+                        return false;
+                    }
+                    ++i; ++j;
+                }
+            }
+            {
+                list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
+                list< shared_ptr< Matcher > >::const_iterator j = other._orMatchers.begin();
+                while( i != _orMatchers.end() ) {
+                    if ( !(*i)->sameCriteriaCount( **j ) ) {
+                        return false;
+                    }
+                    ++i; ++j;
+                }
+            }
+            return true;
+        }
         
     private:
         void addBasic(const BSONElement &e, int c, bool isNot) {
@@ -213,8 +248,8 @@ namespace mongo {
         
         Matcher& docMatcher() { return _docMatcher; }
     private:
-        Matcher _keyMatcher;
         Matcher _docMatcher;
+        Matcher _keyMatcher;
         bool _needRecord;
     };
     
