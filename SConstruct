@@ -607,7 +607,7 @@ elif "win32" == os.sys.platform:
 
     # some warnings we don't like:
     env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
-
+    
     env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE","SUPPORT_UCP","SUPPORT_UTF8,PSAPI_VERSION=1" ] )
 
     #env.Append( CPPFLAGS='  /Yu"pch.h" ' ) # this would be for pre-compiled headers, could play with it later
@@ -675,10 +675,11 @@ elif "win32" == os.sys.platform:
 
     env.Append( LIBS=Split(winLibString) )
 
-    if force64:
-        env.Append( CPPDEFINES=["_AMD64_=1"] )
-    else:
-        env.Append( CPPDEFINES=["_X86_=1"] )
+    # dm these should automatically be defined by the compiler. commenting out to see if works. jun2010
+    #if force64:
+    #    env.Append( CPPDEFINES=["_AMD64_=1"] )
+    #else:
+    #    env.Append( CPPDEFINES=["_X86_=1"] )
 
     env.Append( CPPPATH=["../winpcap/Include"] )
     env.Append( LIBPATH=["../winpcap/Lib"] )
