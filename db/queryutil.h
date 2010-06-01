@@ -208,40 +208,40 @@ namespace mongo {
     };
 
     // generages FieldRangeSet objects, accounting for or clauses
-//    class FieldRangeOrSet {
-//    public:
-//        FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
-//        // if there's a trivial or clause, we won't use or ranges to help with scanning
-//        bool trivialOr() const {
-//            for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
-//                if ( i->nNontrivialRanges() == 0 ) {
-//                    return true;
-//                }
-//            }
-//            return false;
-//        }
-//        bool orFinished() const { return _orFound && _orSets.empty(); }
-//        // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
-//        void popOrClause() {
-//            massert( 13274, "no or clause to pop", !orFinished() );
-//            const FieldRangeSet &toPop = _orSets.front();
-//            list< FieldRangeSet >::iterator i = _orSets.begin();
-//            ++i;
-//            while( i != _orSets.end() ) {
-//                *i -= toPop;
-//                if( !i->matchPossible() ) {
-//                    i = _orSets.erase( i );
-//                } else {
-//                    ++i;
-//                }
-//            }
-//            _orSets.pop_front();
-//        }
-//    private:
-//        FieldRangeSet _baseSet;
-//        list< FieldRangeSet > _orSets;
-//        bool _orFound;
-//    };
+    class FieldRangeOrSet {
+    public:
+        FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
+        // if there's a trivial or clause, we won't use or ranges to help with scanning
+        bool trivialOr() const {
+            for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
+                if ( i->nNontrivialRanges() == 0 ) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        bool orFinished() const { return _orFound && _orSets.empty(); }
+        // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
+        void popOrClause() {
+            massert( 13274, "no or clause to pop", !orFinished() );
+            const FieldRangeSet &toPop = _orSets.front();
+            list< FieldRangeSet >::iterator i = _orSets.begin();
+            ++i;
+            while( i != _orSets.end() ) {
+                *i -= toPop;
+                if( !i->matchPossible() ) {
+                    i = _orSets.erase( i );
+                } else {
+                    ++i;
+                }
+            }
+            _orSets.pop_front();
+        }
+    private:
+        FieldRangeSet _baseSet;
+        list< FieldRangeSet > _orSets;
+        bool _orFound;
+    };
     
     /**
        used for doing field limiting

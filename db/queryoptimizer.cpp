@@ -228,10 +228,10 @@ namespace mongo {
         }
     }
     
-    QueryPlanSet::QueryPlanSet( const char *_ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
+    QueryPlanSet::QueryPlanSet( const char *_ns, auto_ptr< FieldRangeSet > frs, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
     ns(_ns),
     query_( query.getOwned() ),
-    fbs_( _ns, query ),
+    fbs_( frs ),
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
     hint_( BSONObj() ),
@@ -252,10 +252,10 @@ namespace mongo {
             string errmsg;
             BSONObj keyPattern = id.keyPattern();
             // This reformats min_ and max_ to be used for index lookup.
-            massert( 10365 ,  errmsg, indexDetailsForRange( fbs_.ns(), errmsg, min_, max_, keyPattern ) );
+            massert( 10365 ,  errmsg, indexDetailsForRange( fbs_->ns(), errmsg, min_, max_, keyPattern ) );
         }
         NamespaceDetails *d = nsdetails(ns);
-        plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(id), fbs_, order_, min_, max_ ) ) );
+        plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(id), *fbs_, order_, min_, max_ ) ) );
     }
     
     void QueryPlanSet::init() {
@@ -264,11 +264,11 @@ namespace mongo {
         mayRecordPlan_ = true;
         usingPrerecordedPlan_ = false;
         
-        const char *ns = fbs_.ns();
+        const char *ns = fbs_->ns();
         NamespaceDetails *d = nsdetails( ns );
-        if ( !d || !fbs_.matchPossible() ) {
+        if ( !d || !fbs_->matchPossible() ) {
             // Table scan plan, when no matches are possible
-            plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
+            plans_.push_back( PlanPtr( new QueryPlan( d, -1, *fbs_, order_ ) ) );
             return;
         }
         
@@ -292,7 +292,7 @@ namespace mongo {
                 if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
                     massert( 10366 ,  "natural order cannot be specified with $min/$max", min_.isEmpty() && max_.isEmpty() );
                     // Table scan plan
-                    plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
+                    plans_.push_back( PlanPtr( new QueryPlan( d, -1, *fbs_, order_ ) ) );
                     return;
                 }
                 NamespaceDetails::IndexIterator i = d->ii();
@@ -312,7 +312,7 @@ namespace mongo {
             BSONObj keyPattern;
             IndexDetails *idx = indexDetailsForRange( ns, errmsg, min_, max_, keyPattern );
             massert( 10367 ,  errmsg, idx );
-            plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(*idx), fbs_, order_, min_, max_ ) ) );
+            plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(*idx), *fbs_, order_, min_, max_ ) ) );
             return;
         }
 
@@ -321,19 +321,19 @@ namespace mongo {
             if ( idx >= 0 ){
                 usingPrerecordedPlan_ = true;
                 mayRecordPlan_ = false;
-                plans_.push_back( PlanPtr( new QueryPlan( d , idx , fbs_ , order_ ) ) );
+                plans_.push_back( PlanPtr( new QueryPlan( d , idx , *fbs_ , order_ ) ) );
                 return;
             }
         }
 
         if ( query_.isEmpty() && order_.isEmpty() ){
-            plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
+            plans_.push_back( PlanPtr( new QueryPlan( d, -1, *fbs_, order_ ) ) );
             return;
         }
 
-        DEBUGQO( "\t special : " << fbs_.getSpecial() );
-        if ( fbs_.getSpecial().size() ){
-            _special = fbs_.getSpecial();
+        DEBUGQO( "\t special : " << fbs_->getSpecial() );
+        if ( fbs_->getSpecial().size() ){
+            _special = fbs_->getSpecial();
             NamespaceDetails::IndexIterator i = d->ii();
             while( i.more() ) {
                 int j = i.pos();
@@ -342,7 +342,7 @@ namespace mongo {
                 if ( spec.getTypeName() == _special && spec.suitability( query_ , order_ ) ){
                     usingPrerecordedPlan_ = true;
                     mayRecordPlan_ = true;
-                    plans_.push_back( PlanPtr( new QueryPlan( d , j , fbs_ , order_ , 
+                    plans_.push_back( PlanPtr( new QueryPlan( d , j , *fbs_ , order_ , 
                                                               BSONObj() , BSONObj() , _special ) ) );
                     return;
                 }
@@ -353,14 +353,14 @@ namespace mongo {
         if ( honorRecordedPlan_ ) {
             scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns );
-            BSONObj bestIndex = nsd.indexForPattern( fbs_.pattern( order_ ) );
+            BSONObj bestIndex = nsd.indexForPattern( fbs_->pattern( order_ ) );
             if ( !bestIndex.isEmpty() ) {
                 usingPrerecordedPlan_ = true;
                 mayRecordPlan_ = false;
-                oldNScanned_ = nsd.nScannedForPattern( fbs_.pattern( order_ ) );
+                oldNScanned_ = nsd.nScannedForPattern( fbs_->pattern( order_ ) );
                 if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
                     // Table scan plan
-                    plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
+                    plans_.push_back( PlanPtr( new QueryPlan( d, -1, *fbs_, order_ ) ) );
                     return;
                 }
 
@@ -369,7 +369,7 @@ namespace mongo {
                     int j = i.pos();
                     IndexDetails& ii = i.next();
                     if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                        plans_.push_back( PlanPtr( new QueryPlan( d, j, fbs_, order_ ) ) );
+                        plans_.push_back( PlanPtr( new QueryPlan( d, j, *fbs_, order_ ) ) );
                         return;
                     }
                 }
@@ -381,16 +381,16 @@ namespace mongo {
     }
     
     void QueryPlanSet::addOtherPlans( bool checkFirst ) {
-        const char *ns = fbs_.ns();
+        const char *ns = fbs_->ns();
         NamespaceDetails *d = nsdetails( ns );
         if ( !d )
             return;
 
         // If table scan is optimal or natural order requested or tailable cursor requested
-        if ( !fbs_.matchPossible() || ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
+        if ( !fbs_->matchPossible() || ( fbs_->nNontrivialRanges() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan
-            addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );
+            addPlan( PlanPtr( new QueryPlan( d, -1, *fbs_, order_ ) ), checkFirst );
             return;
         }
         
@@ -407,7 +407,7 @@ namespace mongo {
                     continue;
             }
 
-            PlanPtr p( new QueryPlan( d, i, fbs_, order_ ) );
+            PlanPtr p( new QueryPlan( d, i, *fbs_, order_ ) );
             if ( p->optimal() ) {
                 addPlan( p, checkFirst );
                 return;
@@ -419,7 +419,7 @@ namespace mongo {
             addPlan( *i, checkFirst );
 
         // Table scan plan
-        addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );
+        addPlan( PlanPtr( new QueryPlan( d, -1, *fbs_, order_ ) ), checkFirst );
     }
     
     shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
@@ -431,7 +431,7 @@ namespace mongo {
                 return res;
             {
                 scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-                NamespaceDetailsTransient::get_inlock( fbs_.ns() ).registerIndexForPattern( fbs_.pattern( order_ ), BSONObj(), 0 );
+                NamespaceDetailsTransient::get_inlock( fbs_->ns() ).registerIndexForPattern( fbs_->pattern( order_ ), BSONObj(), 0 );
             }
             init();
         }
@@ -571,7 +571,8 @@ namespace mongo {
             _or = false;
         }
         if ( !_or ) {
-            _currentQps.reset( new QueryPlanSet( ns, query, order, hint, honorRecordedPlan, min, max ) );
+            auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
+            _currentQps.reset( new QueryPlanSet( ns, frs, query, order, hint, honorRecordedPlan, min, max ) );
             _n = 1; // only one run
         } else {
             BSONElement e = query.getField( "$or" );
@@ -586,7 +587,9 @@ namespace mongo {
             ++_i;
             return _currentQps->runOp( op );
         }
-        _currentQps.reset( new QueryPlanSet( _ns, nextSimpleQuery(), BSONObj(), 0, _honorRecordedPlan ) );
+        BSONObj q = nextSimpleQuery();
+        auto_ptr< FieldRangeSet > frs( new FieldRangeSet( _ns, q ) );
+        _currentQps.reset( new QueryPlanSet( _ns, frs, q, BSONObj(), 0, _honorRecordedPlan ) );
         return _currentQps->runOp( op );
     }
     

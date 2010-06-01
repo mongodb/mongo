@@ -128,6 +128,7 @@ namespace mongo {
         typedef vector< PlanPtr > PlanSet;
 
         QueryPlanSet( const char *ns,
+                     auto_ptr< FieldRangeSet > frs,
                      const BSONObj &query,
                      const BSONObj &order,
                      const BSONElement *hint = 0,
@@ -145,7 +146,7 @@ namespace mongo {
         PlanPtr getBestGuess() const;
         void setBestGuessOnly() { _bestGuessOnly = true; }
         //for testing
-        const FieldRangeSet &fbs() const { return fbs_; }
+        const FieldRangeSet &fbs() const { return *fbs_; }
     private:
         void addOtherPlans( bool checkFirst );
         void addPlan( PlanPtr plan, bool checkFirst ) {
@@ -165,7 +166,7 @@ namespace mongo {
         };
         const char *ns;
         BSONObj query_;
-        FieldRangeSet fbs_;
+        auto_ptr< FieldRangeSet > fbs_;
         PlanSet plans_;
         bool mayRecordPlan_;
         bool usingPrerecordedPlan_;
@@ -229,7 +230,6 @@ namespace mongo {
         }
         void setBestGuessOnly() { _bestGuessOnly = true; }
     private:
-        //temp
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
         }
@@ -373,7 +373,8 @@ namespace mongo {
         if( !query.getField( "$or" ).eoo() ) {
             return shared_ptr< Cursor >( new MultiCursor( ns, query, sort ) );
         } else {
-            shared_ptr< Cursor > ret = QueryPlanSet( ns, query, sort ).getBestGuess()->newCursor();
+            auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
+            shared_ptr< Cursor > ret = QueryPlanSet( ns, frs, query, sort ).getBestGuess()->newCursor();
             if ( !query.isEmpty() ) {
                 auto_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
                 ret->setMatcher( matcher );

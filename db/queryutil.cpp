@@ -593,66 +593,66 @@ namespace mongo {
             }   
         }
 
-//    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
-//        : _baseSet( ns, query, optimize ), _orFound() {
-//
-//        BSONObjIterator i( query );
-//        
-//        while( i.more() ) {
-//            BSONElement e = i.next();
-//            // e could be x:1 or x:{$gt:1}
-//
-//            if ( strcmp( e.fieldName(), "$where" ) == 0 )
-//                continue;
-//            
-//            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
-//                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );                                                                                         
-//                BSONObjIterator j( e.embeddedObject() );                                                                                                                                                        
-//                while( j.more() ) {                                                                                                                                                                             
-//                    BSONElement f = j.next();                                                                                                                                                                   
-//                    massert( 13263, "$or array must contain objects", f.type() == Object );                                                                                                                     
-//                    _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
-//                }
-//                _orFound = true;
-//                continue;
-//            }
-//
-//            bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
-//            if ( equality && e.type() == Object ) {
-//                equality = ( strcmp( e.embeddedObject().firstElement().fieldName(), "$not" ) != 0 );
-//            }
-//            
-//            if ( equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
-//                _baseSet._ranges[ e.fieldName() ] &= FieldRange( e , false , optimize );
-//            }
-//            if ( !equality ) {
-//                BSONObjIterator j( e.embeddedObject() );
-//                while( j.more() ) {
-//                    BSONElement f = j.next();
-//                    if ( strcmp( f.fieldName(), "$not" ) == 0 ) {
-//                        switch( f.type() ) {
-//                            case Object: {
-//                                BSONObjIterator k( f.embeddedObject() );
-//                                while( k.more() ) {
-//                                    BSONElement g = k.next();
-//                                    uassert( 13264, "invalid use of $not", g.getGtLtOp() != BSONObj::Equality );
-//                                    _baseSet.processOpElement( e.fieldName(), g, true, optimize );
-//                                }
-//                                break;
-//                            }
-//                            case RegEx:
-//                                _baseSet.processOpElement( e.fieldName(), f, true, optimize );
-//                                break;
-//                            default:
-//                                uassert( 13265, "invalid use of $not", false );
-//                        }
-//                    } else {
-//                        _baseSet.processOpElement( e.fieldName(), f, false, optimize );
-//                    }
-//                }                
-//            }
-//        }
-//    }
+    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
+        : _baseSet( ns, query, optimize ), _orFound() {
+
+        BSONObjIterator i( query );
+        
+        while( i.more() ) {
+            BSONElement e = i.next();
+            // e could be x:1 or x:{$gt:1}
+
+            if ( strcmp( e.fieldName(), "$where" ) == 0 )
+                continue;
+            
+            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
+                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );                                                                                         
+                BSONObjIterator j( e.embeddedObject() );                                                                                                                                                        
+                while( j.more() ) {                                                                                                                                                                             
+                    BSONElement f = j.next();                                                                                                                                                                   
+                    massert( 13263, "$or array must contain objects", f.type() == Object );                                                                                                                     
+                    _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
+                }
+                _orFound = true;
+                continue;
+            }
+
+            bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
+            if ( equality && e.type() == Object ) {
+                equality = ( strcmp( e.embeddedObject().firstElement().fieldName(), "$not" ) != 0 );
+            }
+            
+            if ( equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
+                _baseSet._ranges[ e.fieldName() ] &= FieldRange( e , false , optimize );
+            }
+            if ( !equality ) {
+                BSONObjIterator j( e.embeddedObject() );
+                while( j.more() ) {
+                    BSONElement f = j.next();
+                    if ( strcmp( f.fieldName(), "$not" ) == 0 ) {
+                        switch( f.type() ) {
+                            case Object: {
+                                BSONObjIterator k( f.embeddedObject() );
+                                while( k.more() ) {
+                                    BSONElement g = k.next();
+                                    uassert( 13264, "invalid use of $not", g.getGtLtOp() != BSONObj::Equality );
+                                    _baseSet.processOpElement( e.fieldName(), g, true, optimize );
+                                }
+                                break;
+                            }
+                            case RegEx:
+                                _baseSet.processOpElement( e.fieldName(), f, true, optimize );
+                                break;
+                            default:
+                                uassert( 13265, "invalid use of $not", false );
+                        }
+                    } else {
+                        _baseSet.processOpElement( e.fieldName(), f, false, optimize );
+                    }
+                }                
+            }
+        }
+    }
 
     FieldRange *FieldRangeSet::trivialRange_ = 0;
     FieldRange &FieldRangeSet::trivialRange() {
