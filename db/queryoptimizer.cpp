@@ -455,7 +455,20 @@ namespace mongo {
 
     QueryPlanSet::PlanPtr QueryPlanSet::getBestGuess() const {
         assert( plans_.size() );
-        massert( 13284, "best guess plan requested, but scan and order required", !plans_[ 0 ]->scanAndOrderRequired() );
+        if ( plans_[ 0 ]->scanAndOrderRequired() ){
+            for ( unsigned i=1; i<plans_.size(); i++ ){
+                if ( ! plans_[i]->scanAndOrderRequired() )
+                    return plans_[i];
+            }
+            
+            stringstream ss;
+            ss << "best guess plan requested, but scan and order required:";
+            ss << " query: " << query_;
+            ss << " order: " << order_;
+            
+            string s = ss.str();
+            msgassertedNoTrace( 13284, s.c_str() );
+        }
         return plans_[0];
     }
     
