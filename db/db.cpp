@@ -593,6 +593,9 @@ int main(int argc, char* argv[], char *envp[] )
     getcurns = ourgetns;
 
     po::options_description general_options("General options");
+	#if defined(_WIN32)
+	po::options_description windows_scm_options("Windows Service Control Manager options");
+	#endif
     po::options_description replication_options("Replication options");
     po::options_description sharding_options("Sharding options");
     po::options_description visible_options("Allowed options");
@@ -635,18 +638,21 @@ int main(int argc, char* argv[], char *envp[] )
         ("profile",po::value<int>(), "0=off 1=slow, 2=all")
         ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
         ("maxConns",po::value<int>(), "max number of simultaneous connections")
-#if defined(_WIN32)
-        ("install", "install mongodb service")
+		#if !defined(_WIN32)
+        ("nounixsocket", "disable listening on unix sockets")
+		#endif
+        ("ipv6", "enable IPv6 support (disabled by default)")
+        ;
+	#if defined(_WIN32)
+    windows_scm_options.add_options()
+		("install", "install mongodb service")
         ("remove", "remove mongodb service")
         ("service", "start mongodb service")
         ("serviceName", po::value<string>(), "windows service name")
-#else
-        ("nounixsocket", "disable listening on unix sockets")
-#endif
-        ("ipv6", "enable IPv6 support (disabled by default)")
-        ;
+		;
+	#endif
 
-    replication_options.add_options()
+	replication_options.add_options()
         ("master", "master mode")
         ("slave", "slave mode")
         ("source", po::value<string>(), "when slave: specify master as <server:port>")
@@ -674,6 +680,9 @@ int main(int argc, char* argv[], char *envp[] )
 
     positional_options.add("command", 3);
     visible_options.add(general_options);
+	#if defined(_WIN32)
+	visible_options.add(windows_scm_options);
+	#endif
     visible_options.add(replication_options);
     visible_options.add(sharding_options);
     Module::addOptions( visible_options );
