@@ -31,7 +31,7 @@ namespace mongo {
 
     void newReplUp();
     struct Target;
-    class ReplSetInfo;
+    class ReplSetImpl;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;

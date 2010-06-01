@@ -137,8 +137,8 @@ namespace mongo {
         }
     }
 
-    ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
-    string ReplSet::startupStatusMsg;
+    ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
+    string ReplSetImpl::startupStatusMsg;
 
     void ReplSetImpl::initFromConfig(ReplSetConfig& c) { //, bool save) { 
         _cfg = new ReplSetConfig(c);
