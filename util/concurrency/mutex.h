@@ -25,6 +25,7 @@ namespace mongo {
     extern bool __destroyingStatics;
 
     class mutex;
+    // only used on _DEBUG builds:
     class MutexDebugger { 
         typedef const char * mid; // mid = mutex ID
         typedef map<mid,int> Preceeding;
@@ -34,14 +35,30 @@ namespace mongo {
         boost::mutex &x;
         unsigned magic;
     public:
+        // set these to create an assert that
+        //   b must never be locked before a
+        //   so 
+        //     a.lock(); b.lock(); is fine
+        //     b.lock(); alone is fine too
+        //   only checked on _DEBUG builds.
+        string a,b;
+
         void programEnding();
-        MutexDebugger() : x( *(new boost::mutex()) ), magic(0x12345678) { }
+        MutexDebugger();
         void entering(mid m) {
             if( magic != 0x12345678 ) return;
+
             Preceeding *_preceeding = us.get();
             if( _preceeding == 0 )
                 us.reset( _preceeding = new Preceeding() );
             Preceeding &preceeding = *_preceeding;
+
+            if( a == m ) { 
+                if( preceeding[b.c_str()] ) {
+                    cout << "mutex problem " << b << " was locked before " << a << endl;
+                    assert(false);
+                }
+            }
 
             preceeding[m]++;
             if( preceeding[m] > 1 ) { 
@@ -65,7 +82,8 @@ namespace mongo {
                             mid bad = i->first;
                             ss << "mutex problem" <<
                                 "\n  when locking " << m <<
-                                "\n  " << bad << " was already locked and should not be.\n";
+                                "\n  " << bad << " was already locked and should not be."
+                                "\n  set a and b above to debug.\n";
                             stringstream q;
                             for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
                                 if( i->first != m && i->first != bad && i->second > 0 )

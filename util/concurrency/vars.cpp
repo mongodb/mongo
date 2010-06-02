@@ -25,6 +25,15 @@ namespace mongo {
     mutex _atomicMutex("_atomicMutex");
     MutexDebugger mutexDebugger;
 
+    MutexDebugger::MutexDebugger() : 
+      x( *(new boost::mutex()) ), magic(0x12345678) {
+          // optional way to debug lock order
+          /*
+          a = "a_lock";
+          b = "b_lock";
+          */
+    }
+
     void MutexDebugger::programEnding() { 
         if( followers.size() ) {
             std::cout << followers.size() << " mutexes in program" << endl;
