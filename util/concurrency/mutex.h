@@ -27,7 +27,8 @@ namespace mongo {
     class mutex;
     class MutexDebugger { 
         typedef const char * mid; // mid = mutex ID
-        boost::thread_specific_ptr< set<mid> > us;
+        typedef map<mid,int> Preceeding;
+        boost::thread_specific_ptr< Preceeding > us;
         map< mid, set<mid> > followers;
         boost::mutex &x;
         unsigned magic;
@@ -36,25 +37,39 @@ namespace mongo {
         MutexDebugger() : x( *(new boost::mutex()) ), magic(0x12345678) { }
         void entering(mid m) {
             if( magic != 0x12345678 ) return;
-            set<mid> *preceeding = us.get();
-            if( preceeding == 0 )
-                us.reset( preceeding = new set<mid>() );
-            
+            Preceeding *_preceeding = us.get();
+            if( _preceeding == 0 )
+                us.reset( _preceeding = new Preceeding() );
+            Preceeding &preceeding = *_preceeding;
+
+            preceeding[m]++;
+            if( preceeding[m] > 1 ) { 
+                // recursive re-locking.
+                return;
+            }
+
             bool failed = false;
             string err;
             {
                 boost::mutex::scoped_lock lk(x);
                 followers[m];
-                for( set<mid>::iterator i = preceeding->begin(); i != preceeding->end(); i++ ) { 
-                    followers[*i].insert(m);
-                    if( m != *i && followers[m].count(*i) != 0 ){
-                        failed = true;
-                        stringstream ss;
-                        ss << "mutex problem" <<
-                            "\n  when locking " << m <<
-                            "\n  " << *i << " was already locked and should not be.";
-                        err = ss.str();
-                        break;
+                for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
+                    if( m != i->first && i->second > 0 ) {
+                        followers[i->first].insert(m);
+                        if( followers[m].count(i->first) != 0 ){
+                            failed = true;
+                            stringstream ss;
+                            ss << "mutex problem" <<
+                                "\n  when locking " << m <<
+                                "\n  " << i->first << " was already locked and should not be.\n";
+                            ss << "preceeding " << m << ":\n";
+                            for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
+                                if( i->first != m )
+                                    ss << "  " << i->first << '\n';
+                            }
+                            err = ss.str();
+                            break;
+                        }
                     }
                 }
             }
@@ -62,11 +77,12 @@ namespace mongo {
                 cout << err << endl;
                 assert( 0 );
             }
-            preceeding->insert(m);
         }
         void leaving(mid m) { 
             if( magic != 0x12345678 ) return;
-            us.get()->erase(m);
+            Preceeding& preceeding = *us.get();
+            preceeding[m]--;
+            assert( preceeding[m] >= 0 );
         }
     };
     extern MutexDebugger mutexDebugger;
