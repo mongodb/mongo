@@ -17,7 +17,6 @@
  */
 
 #include "../pch.h"
-#include <limits>
 
 #include "dbtests.h"
 #include "../util/histogram.h"
