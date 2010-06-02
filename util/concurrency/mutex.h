@@ -47,7 +47,7 @@ namespace mongo {
                 followers[m];
                 for( set<mid>::iterator i = preceeding->begin(); i != preceeding->end(); i++ ) { 
                     followers[*i].insert(m);
-                    if ( followers[m].count(*i) != 0 ){
+                    if( m != *i && followers[m].count(*i) != 0 ){
                         failed = true;
                         stringstream ss;
                         ss << "mutex problem" <<
