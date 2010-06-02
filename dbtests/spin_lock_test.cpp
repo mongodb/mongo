@@ -30,14 +30,16 @@ namespace {
         LockTester( SpinLock* spin, int* counter )
             : _spin(spin), _counter(counter), _requests(0){}
 
-        ~LockTester(){}
+        ~LockTester(){
+            delete _t;
+        }
 
         void start( int increments ){
-            _t = boost::thread( boost::bind(&LockTester::test, this, increments) ); 
+            _t = new boost::thread( boost::bind(&LockTester::test, this, increments) ); 
         }
 
         void join(){
-            _t.join();
+            if ( _t ) _t->join();
         }
 
         int requests() const{ 
@@ -45,10 +47,10 @@ namespace {
         } 
 
     private:
-        SpinLock*     _spin;     // not owned here
-        int*          _counter;  // not owned here
-        int           _requests;
-        boost::thread _t;
+        SpinLock*      _spin;     // not owned here
+        int*           _counter;  // not owned here
+        int            _requests;
+        boost::thread* _t;
 
         void test( int increments ){
             while ( increments-- > 0 ) {
