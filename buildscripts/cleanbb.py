@@ -38,15 +38,17 @@ def killprocs( signal="" ):
 
 def cleanup( root ):
     
+
+    if killprocs() > 0:
+        time.sleep(3)
+        killprocs("-9")
+
     # delete all regular files, directories can stay
     # NOTE: if we delete directories later, we can't delete diskfulltest
     for ( dirpath , dirnames , filenames ) in os.walk( root , topdown=False ):
         for x in filenames: 
             os.remove( dirpath + "/" + x )
 
-    if killprocs() > 0:
-        time.sleep(3)
-        killprocs("-9")
 
 if __name__ == "__main__":
     root = "/data/db/"
