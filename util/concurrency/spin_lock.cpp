@@ -46,7 +46,7 @@ namespace mongo {
         }
 #else
 
-#warning "TODO Missing spin lock in this platform."
+        // WARNING "TODO Missing spin lock in this platform."
 
 #endif
     }
@@ -58,7 +58,7 @@ namespace mongo {
 
 #else
 
-#warning "TODO Missing spin lock in this platform."
+        // WARNING "TODO Missing spin lock in this platform."
 
 #endif
     }

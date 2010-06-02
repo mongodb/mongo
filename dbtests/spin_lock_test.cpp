@@ -93,8 +93,10 @@ namespace {
           ASSERT_EQUALS( counter, threads*incs );
 #else
 
-#warning "TODO Missing spin lock in this platform."
+          // WARNING "TODO Missing spin lock in this platform."
+          ASSERT( true );
 
+          
 #endif
 
         }
