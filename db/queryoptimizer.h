@@ -129,7 +129,7 @@ namespace mongo {
 
         QueryPlanSet( const char *ns,
                      auto_ptr< FieldRangeSet > frs,
-                     const BSONObj &query,
+                     const BSONObj &originalQuery,
                      const BSONObj &order,
                      const BSONElement *hint = 0,
                      bool honorRecordedPlan = true,
@@ -165,7 +165,7 @@ namespace mongo {
             static void nextOp( QueryOp &op );
         };
         const char *ns;
-        BSONObj query_;
+        BSONObj _originalQuery;
         auto_ptr< FieldRangeSet > fbs_;
         PlanSet plans_;
         bool mayRecordPlan_;

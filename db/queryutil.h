@@ -263,7 +263,6 @@ namespace mongo {
             FieldRangeSet *ret = new FieldRangeSet( _baseSet );
             *ret &= _orSets.front();
             ret->_query = query;
-            log() << "ret: " << ret->simplifiedQuery() << endl;
             return ret;
         }
     private:

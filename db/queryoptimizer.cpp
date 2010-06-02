@@ -229,9 +229,9 @@ namespace mongo {
         }
     }
     
-    QueryPlanSet::QueryPlanSet( const char *_ns, auto_ptr< FieldRangeSet > frs, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
+    QueryPlanSet::QueryPlanSet( const char *_ns, auto_ptr< FieldRangeSet > frs, const BSONObj &originalQuery, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
     ns(_ns),
-    query_( query.getOwned() ),
+    _originalQuery( originalQuery ),
     fbs_( frs ),
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
@@ -260,7 +260,7 @@ namespace mongo {
     }
     
     void QueryPlanSet::init() {
-        DEBUGQO( "QueryPlanSet::init " << ns << "\t" << query_ );
+        DEBUGQO( "QueryPlanSet::init " << ns << "\t" << _originalQuery );
         plans_.clear();
         mayRecordPlan_ = true;
         usingPrerecordedPlan_ = false;
@@ -317,7 +317,7 @@ namespace mongo {
             return;
         }
 
-        if ( isSimpleIdQuery( query_ ) ){
+        if ( isSimpleIdQuery( _originalQuery ) ){
             int idx = d->findIdIndex();
             if ( idx >= 0 ){
                 usingPrerecordedPlan_ = true;
@@ -327,7 +327,7 @@ namespace mongo {
             }
         }
 
-        if ( query_.isEmpty() && order_.isEmpty() ){
+        if ( _originalQuery.isEmpty() && order_.isEmpty() ){
             plans_.push_back( PlanPtr( new QueryPlan( d, -1, *fbs_, order_ ) ) );
             return;
         }
@@ -340,7 +340,7 @@ namespace mongo {
                 int j = i.pos();
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
-                if ( spec.getTypeName() == _special && spec.suitability( query_ , order_ ) ){
+                if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , order_ ) ){
                     usingPrerecordedPlan_ = true;
                     mayRecordPlan_ = true;
                     plans_.push_back( PlanPtr( new QueryPlan( d , j , *fbs_ , order_ , 
@@ -348,7 +348,7 @@ namespace mongo {
                     return;
                 }
             }
-            uassert( 13038 , (string)"can't find special index: " + _special + " for: " + query_.toString() , 0 );
+            uassert( 13038 , (string)"can't find special index: " + _special + " for: " + _originalQuery.toString() , 0 );
         }
 
         if ( honorRecordedPlan_ ) {
@@ -395,7 +395,7 @@ namespace mongo {
             return;
         }
         
-        bool normalQuery = hint_.isEmpty() && min_.isEmpty() && max_.isEmpty() && query_.getField( "$or" ).eoo();
+        bool normalQuery = hint_.isEmpty() && min_.isEmpty() && max_.isEmpty() && _originalQuery.getField( "$or" ).eoo();
 
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
@@ -403,7 +403,7 @@ namespace mongo {
             const IndexSpec& spec = id.getSpec();
             IndexSuitability suitability = HELPFUL;
             if ( normalQuery ){
-                suitability = spec.suitability( query_ , order_ );
+                suitability = spec.suitability( fbs_->simplifiedQuery() , order_ );
                 if ( suitability == USELESS )
                     continue;
             }
@@ -464,7 +464,7 @@ namespace mongo {
             
             stringstream ss;
             ss << "best guess plan requested, but scan and order required:";
-            ss << " query: " << query_;
+            ss << " query: " << fbs_->simplifiedQuery();
             ss << " order: " << order_;
             ss << " choices: ";
             for ( unsigned i=0; i<plans_.size(); i++ ){
@@ -608,7 +608,7 @@ namespace mongo {
         BSONObj q = nextSimpleQuery();
         auto_ptr< FieldRangeSet > frs( _fros.topFrs( q ) );
         _fros.popOrClause();
-        _currentQps.reset( new QueryPlanSet( _ns, frs, q, BSONObj(), 0, _honorRecordedPlan ) );
+        _currentQps.reset( new QueryPlanSet( _ns, frs, _query, BSONObj(), 0, _honorRecordedPlan ) );
         return _currentQps->runOp( op );
     }
     
