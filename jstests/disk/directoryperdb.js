@@ -6,7 +6,7 @@ dbpath = "/data/db/" + baseDir + "/";
 var m = startMongod( "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 db[ baseName ].save( {} );
-assert.eq( 1, db[ baseName ].count() );
+assert.eq( 1, db[ baseName ].count() , "A" );
 
 checkDir = function( dir ) {
     db.runCommand( {fsync:1} );
@@ -22,7 +22,7 @@ checkDir = function( dir ) {
 
     files = listFiles( dir + baseName );
     for( f in files ) {
-        assert( new RegExp( baseName + "/" + baseName + "." ).test( files[ f ].name ) );
+        assert( new RegExp( baseName + "/" + baseName + "." ).test( files[ f ].name ) , "B dir:" + dir + " f: " + f );
     }
 }
 checkDir( dbpath );
@@ -40,7 +40,7 @@ for( f in files ) {
     }
 }
 checkDir( backupDir );
-assert.eq( 1, db[ baseName ].count() );
+assert.eq( 1, db[ baseName ].count() , "C" );
 
 // tool test
 stopMongod( port );
@@ -53,7 +53,7 @@ runMongoProgram( "mongorestore", "--dbpath", dbpath, "--directoryperdb", "--dir"
 m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 checkDir( dbpath );
-assert.eq( 1, db[ baseName ].count() );
+assert.eq( 1, db[ baseName ].count() , "C" );
 assert( m.getDBs().totalSize > 0, "bad size calc" );
 
 // drop db test

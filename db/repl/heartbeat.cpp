@@ -36,17 +36,15 @@ namespace mongo {
     using namespace bson;
 
     /* { replSetHeartbeat : <setname> } */
-    class CmdReplSetHeartbeat : public Command {
+    class CmdReplSetHeartbeat : public ReplSetCommand {
     public:
-        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
-        virtual bool logTheOp() { return false; }
-        virtual LockType locktype() const { return NONE; }
-        virtual void help( stringstream &help ) const { help<<"internal"; }
-        CmdReplSetHeartbeat() : Command("replSetHeartbeat") { }
+        CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            /* we don't call ReplSetCommand::check() here because heartbeat 
+               checks many things that are pre-initialization. */
             if( !replSet ) {
-                errmsg = "not a replset member";
+                errmsg = "not running with --replSet";
                 return false;
             }
             if( cmdObj["pv"].Int() != 1 ) { 
@@ -122,7 +120,7 @@ namespace mongo {
                     if( cfg.ok() ) {
                         // received a new config
                         boost::function<void()> f = 
-                            boost::bind(&ReplSet::Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
+                            boost::bind(&Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
                         theReplSet->mgr->send(f);
                     }
                 }
@@ -140,7 +138,7 @@ namespace mongo {
             time_t now = time(0);
             if( mem.changed(old) || now-last>4 ) {
                 last = now;
-                theReplSet->mgr->send( boost::bind(&ReplSet::Manager::msgCheckNewState, theReplSet->mgr) );
+                theReplSet->mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
             }
         }
 
@@ -159,7 +157,7 @@ namespace mongo {
         note ReplSet object is only created once we get a config - so this won't run 
         until the initiation.
     */
-    void ReplSet::startThreads() {
+    void ReplSetImpl::startThreads() {
         task::fork(mgr->taskPtr());
 
         Member* m = _members.head();
@@ -169,7 +167,7 @@ namespace mongo {
             m = m->next();
         }
 
-        mgr->send( boost::bind(&ReplSet::Manager::msgCheckNewState, theReplSet->mgr) );
+        mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
     }
 
 }

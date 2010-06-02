@@ -44,17 +44,14 @@ namespace mongo {
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
         DEV assert( theReplSet );
-        static BufBuilder bufbuilder(32*1024);
+        static BufBuilder bufbuilder(8*1024);
         
         if ( strncmp(ns, "local.", 6) == 0 ){
-            if ( strncmp(ns, "local.slaves", 12) == 0 ){
+            if ( strncmp(ns, "local.slaves", 12) == 0 )
                 resetSlaveCache();
-            }
             return;
         }
 
-        //Client::Context context;
-        
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
         */
@@ -102,7 +99,7 @@ namespace mongo {
         
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
-            log( 6 ) << "logging op:" << temp << endl;
+            log( 6 ) << "logOp:" << temp << endl;
         }
     }
 
@@ -128,7 +125,7 @@ namespace mongo {
     */
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
-        static BufBuilder bufbuilder(32*1024);
+        static BufBuilder bufbuilder(8*1024);
         
         if ( strncmp(ns, "local.", 6) == 0 ){
             if ( strncmp(ns, "local.slaves", 12) == 0 ){

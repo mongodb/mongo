@@ -783,8 +783,6 @@ namespace mongo {
                     }
                 }
                 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                
                 ClientInfo * client = ClientInfo::get();
                 set<string> * shards = client->getPrev();
                 
@@ -793,27 +791,55 @@ namespace mongo {
                     return true;
                 }
                 
+                // handle single server
                 if ( shards->size() == 1 ){
                     string theShard = *(shards->begin() );
                     result.append( "theshard" , theShard.c_str() );
                     ShardConnection conn( theShard , "" );
                     BSONObj res;
-                    bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                    bool ok = conn->runCommand( dbName , cmdObj , res );
                     result.appendElements( res );
                     conn.done();
+                    
+                    // hit other machines just to block
+                    for ( set<string>::iterator i=client->sinceLastGetError().begin(); i!=client->sinceLastGetError().end(); ++i ){
+                        string temp = *i;
+                        if ( temp == theShard )
+                            continue;
+                        
+                        ShardConnection conn( temp , "" );
+                        conn->getLastError();
+                        conn.done();
+                    }
+                    client->clearSinceLastGetError();
                     return ok;
                 }
                 
+                // hit each shard
                 vector<string> errors;
                 for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
                     string theShard = *i;
                     ShardConnection conn( theShard , "" );
-                    string temp = conn->getLastError();
-                    if ( temp.size() )
+                    BSONObj res;
+                    bool ok = conn->runCommand( dbName , cmdObj , res );
+                    string temp = DBClientWithCommands::getLastErrorString( res );
+                    if ( ok == false || temp.size() )
                         errors.push_back( temp );
                     conn.done();
                 }
                 
+                // hit other machines just to block
+                for ( set<string>::iterator i=client->sinceLastGetError().begin(); i!=client->sinceLastGetError().end(); ++i ){
+                    string temp = *i;
+                    if ( shards->count( temp ) )
+                        continue;
+                    
+                    ShardConnection conn( temp , "" );
+                    conn->getLastError();
+                    conn.done();
+                }
+                client->clearSinceLastGetError();
+
                 if ( errors.size() == 0 ){
                     result.appendNull( "err" );
                     return true;

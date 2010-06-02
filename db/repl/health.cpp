@@ -62,7 +62,7 @@ namespace mongo {
         return s.str();
     }
 
-    void ReplSet::Member::summarizeAsHtml(stringstream& s) const { 
+    void Member::summarizeAsHtml(stringstream& s) const { 
         s << tr();
         {
             stringstream u;
@@ -86,7 +86,7 @@ namespace mongo {
         s << _tr();
     }
 
-    string ReplSet::stateAsHtml(MemberState s) { 
+    string ReplSetImpl::stateAsHtml(MemberState s) { 
         if( s == STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
         if( s == PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
         if( s == SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
@@ -96,7 +96,7 @@ namespace mongo {
         return "";
     }
 
-    string ReplSet::stateAsStr(MemberState s) { 
+    string ReplSetImpl::stateAsStr(MemberState s) { 
         if( s == STARTUP ) return "STARTUP";
         if( s == PRIMARY ) return "PRIMARY";
         if( s == SECONDARY ) return "SECONDARY";
@@ -108,7 +108,7 @@ namespace mongo {
 
     extern time_t started;
 
-    void ReplSet::summarizeAsHtml(stringstream& s) const { 
+    void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 
         s << table(0, false);
         s << tr("Set name:", _name);
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
@@ -223,7 +223,7 @@ namespace mongo {
         s << "</pre>\n";
     }
 
-    void ReplSet::summarizeStatus(BSONObjBuilder& b) const { 
+    void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const { 
         Member *m =_members.head();
         vector<BSONObj> v;
 

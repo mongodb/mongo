@@ -39,13 +39,26 @@ namespace mongo {
             set<mid> *preceeding = us.get();
             if( preceeding == 0 )
                 us.reset( preceeding = new set<mid>() );
+            
+            bool failed = false;
+            string err;
             {
                 boost::mutex::scoped_lock lk(x);
                 followers[m];
                 for( set<mid>::iterator i = preceeding->begin(); i != preceeding->end(); i++ ) { 
                     followers[*i].insert(m);
-                    assert( followers[m].count(*i) == 0 );
+                    if ( followers[m].count(*i) != 0 ){
+                        failed = true;
+                        stringstream ss;
+                        ss << "mid: " << m << " followers[m] first: " << *(followers[m].begin());
+                        err = ss.str();
+                        break;
+                    }
                 }
+            }
+            if ( failed ){
+                cout << "ERROR with mutex: " << err << endl;
+                assert( 0 );
             }
             preceeding->insert(m);
         }

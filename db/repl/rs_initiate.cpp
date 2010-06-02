@@ -67,13 +67,10 @@ namespace mongo {
         }
     }
 
-    class CmdReplSetInitiate : public Command { 
+    class CmdReplSetInitiate : public ReplSetCommand { 
     public:
         virtual LockType locktype() const { return WRITE; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool logTheOp() { return false; }
-        CmdReplSetInitiate() : Command("replSetInitiate") { }
+        CmdReplSetInitiate() : ReplSetCommand("replSetInitiate") { }
         virtual void help(stringstream& h) const { 
             h << "Initiate/christen a replica set."; 
             h << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
@@ -81,7 +78,7 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
-            {
+            if( 0 ) {
                 // just make sure we can get a write lock before doing anything else.  we'll reacquire one 
                 // later.  of course it could be stuck then, but this check lowers the risk if weird things 
                 // are up.

@@ -29,7 +29,8 @@ start()
   echo -n $"Starting mongod: "
   daemon --user "$MONGO_USER" $mongod $OPTIONS
   RETVAL=$?
-  [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod && success
+  echo
+  [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod
 }
 
 stop()
@@ -37,7 +38,8 @@ stop()
   echo -n $"Stopping mongod: "
   killproc -p /var/lib/mongo/mongod.lock -t30 -TERM /usr/bin/mongod
   RETVAL=$?
-  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod && success
+  echo
+  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
 }
 
 restart () {

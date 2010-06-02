@@ -4,16 +4,37 @@ import os
 import utils
 import time
 
+cwd = os.getcwd();
+if cwd.find("buildscripts" ) > 0 :
+    cwd = cwd.partition( "buildscripts" )[0]
+
+print( "cwd [" + cwd + "]" )
+
+def shouldKill( c ):
+    if c.find( cwd ) >= 0:
+        return True
+
+    if c.find( "buildbot" ) >= 0 and c.find( "/mongo/" ) >= 0:
+        return True
+
+    return False
+
 def killprocs( signal="" ):
-    cwd = os.getcwd();
-    if cwd.find("buildscripts" ) > 0 :
-        cwd = cwd.partition( "buildscripts" )[0]
 
     killed = 0
         
-    for x in utils.getprocesslist():
+    l = utils.getprocesslist()
+    print( "num procs:" + str( len( l ) ) )
+    if len(l) == 0:
+        print( "no procs" )
+        try:
+            print( execsys( "/sbin/ifconfig -a" ) )
+        except Exception,e:
+            print( "can't get interfaces" + str( e ) )
+
+    for x in l:
         x = x.lstrip()
-        if x.find( cwd ) < 0:
+        if not shouldKill( x ):
             continue
         
         pid = x.partition( " " )[0]
@@ -26,15 +47,17 @@ def killprocs( signal="" ):
 
 def cleanup( root ):
     
+
+    if killprocs() > 0:
+        time.sleep(3)
+        killprocs("-9")
+
     # delete all regular files, directories can stay
     # NOTE: if we delete directories later, we can't delete diskfulltest
     for ( dirpath , dirnames , filenames ) in os.walk( root , topdown=False ):
         for x in filenames: 
             os.remove( dirpath + "/" + x )
 
-    if killprocs() > 0:
-        time.sleep(3)
-        killprocs("-9")
 
 if __name__ == "__main__":
     root = "/data/db/"

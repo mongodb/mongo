@@ -188,7 +188,7 @@
       <Filter>db\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\httpclient.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="index.cpp">
       <Filter>db\core</Filter>
@@ -212,7 +212,7 @@
       <Filter>db\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\md5.c">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="matcher_covered.cpp">
       <Filter>db\core</Filter>
@@ -224,22 +224,22 @@
       <Filter>db\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\message_server_port.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\md5main.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\message.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="modules\mms.cpp">
       <Filter>db\modules</Filter>
     </ClCompile>
     <ClCompile Include="..\util\mmap.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\mmap_win.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\shell\mongo_vstudio.cpp">
       <Filter>db\core</Filter>
@@ -257,7 +257,7 @@
       <Filter>db\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\ntservice.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="queryutil.cpp">
       <Filter>db\core</Filter>
@@ -287,46 +287,46 @@
       <Filter>db\sharding</Filter>
     </ClCompile>
     <ClCompile Include="..\util\sock.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\util.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="security.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="security_commands.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="stats\snapshots.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="storage.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="tests.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="stats\top.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="update.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\background.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
     <ClCompile Include="..\util\assert_util.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\base64.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\miniwebserver.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\processinfo_win32.cpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClCompile>
     <ClCompile Include="..\util\version.cpp">
       <Filter>db</Filter>
@@ -493,25 +493,25 @@
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\embedded_builder.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\debug_util.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="diskloc.h">
       <Filter>db\storage engine</Filter>
     </ClInclude>
     <ClInclude Include="..\util\hashtab.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\file.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\file_allocator.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\goodies.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="dbhelpers.h">
       <Filter>db\core</Filter>
@@ -526,16 +526,16 @@
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\hostandport.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\hex.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\web\html.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\httpclient.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="introspect.h">
       <Filter>db\core</Filter>
@@ -553,10 +553,10 @@
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\log.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\md5.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="lasterror.h">
       <Filter>db\core</Filter>
@@ -565,19 +565,19 @@
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\md5.hpp">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\message.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\message_server.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="minilex.h">
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\mmap.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\client\model.h">
       <Filter>client</Filter>
@@ -586,7 +586,7 @@
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\ntservice.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\bson\oid.h">
       <Filter>bson</Filter>
@@ -631,31 +631,31 @@
       <Filter>repl_old</Filter>
     </ClInclude>
     <ClInclude Include="..\util\sock.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\client\redef_macros.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="update.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="scanandorder.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="security.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\targetver.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\client\undef_macros.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\unittest.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="background.h">
       <Filter>db\core</Filter>
@@ -664,31 +664,31 @@
       <Filter>util\concurrency</Filter>
     </ClInclude>
     <ClInclude Include="..\util\ramlog.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\allocator.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\array.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\assert_util.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\base64.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\builder.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\lruishmap.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\miniwebserver.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\processinfo.h">
-      <Filter>util\util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\pch.h">
       <Filter>db</Filter>
@@ -746,11 +746,11 @@
     <Filter Include="db\core">
       <UniqueIdentifier>{d7f08f93-36bf-49cd-9e1c-ba1fec3234ce}</UniqueIdentifier>
     </Filter>
-    <Filter Include="util\util">
-      <UniqueIdentifier>{9775f24c-3a29-4e0d-b5de-991c592cf376}</UniqueIdentifier>
-    </Filter>
     <Filter Include="repl_old">
       <UniqueIdentifier>{e899caa1-9a90-4604-ac2e-68d5ca12425c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\core">
+      <UniqueIdentifier>{9775f24c-3a29-4e0d-b5de-991c592cf376}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
