@@ -21,7 +21,7 @@
 #include "dbtests.h"
 #include "../util/histogram.h"
 
-namespace {
+namespace mongo {
 
     using mongo::Histogram;
 
