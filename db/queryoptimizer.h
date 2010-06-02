@@ -96,7 +96,7 @@ namespace mongo {
                     the QueryOp of the winning plan from a given set will be cloned
                     to generate QueryOps for the subsequent plan set.
         */
-        virtual QueryOp *clone() const = 0;
+        virtual QueryOp *createChild() const = 0;
         bool complete() const { return _complete; }
         bool error() const { return _error; }
         bool stopRequested() const { return _stopRequested; }
@@ -340,7 +340,7 @@ namespace mongo {
             virtual void init() { setComplete(); }
             virtual void next() {}
             virtual bool mayRecordPlan() const { return false; }
-            virtual QueryOp *clone() const { return new NoOp(); }
+            virtual QueryOp *createChild() const { return new NoOp(); }
             virtual shared_ptr< Cursor > newCursor() const { return qp().newCursor(); }
             virtual auto_ptr< CoveredIndexMatcher > newMatcher() const {
                 return auto_ptr< CoveredIndexMatcher >( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );

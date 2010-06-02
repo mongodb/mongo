@@ -115,7 +115,7 @@ namespace mongo {
             }
         }
         virtual bool mayRecordPlan() const { return false; }
-        virtual QueryOp *clone() const { return new FindOne( requireIndex_ ); }
+        virtual QueryOp *createChild() const { return new FindOne( requireIndex_ ); }
         BSONObj one() const { return one_; }
     private:
         bool requireIndex_;

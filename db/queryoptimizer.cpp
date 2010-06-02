@@ -487,14 +487,14 @@ namespace mongo {
         
         vector< shared_ptr< QueryOp > > ops;
         if ( plans_._bestGuessOnly ) {
-            shared_ptr< QueryOp > op( op_.clone() );
+            shared_ptr< QueryOp > op( op_.createChild() );
             op->setQueryPlan( plans_.getBestGuess().get() );
             ops.push_back( op );            
         } else {
             if ( plans_.plans_.size() > 1 )
                 log(1) << "  running multiple plans" << endl;            
             for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
-                shared_ptr< QueryOp > op( op_.clone() );
+                shared_ptr< QueryOp > op( op_.createChild() );
                 op->setQueryPlan( i->get() );
                 ops.push_back( op );
             }
@@ -533,7 +533,7 @@ namespace mongo {
                 PlanSet::iterator i = plans_.plans_.begin();
                 ++i;
                 for( ; i != plans_.plans_.end(); ++i ) {
-                    shared_ptr< QueryOp > op( op_.clone() );
+                    shared_ptr< QueryOp > op( op_.createChild() );
                     op->setQueryPlan( i->get() );
                     ops.push_back( op );
                     initOp( *op );

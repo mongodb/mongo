@@ -827,7 +827,7 @@ namespace QueryOptimizerTests {
                     if ( ++i_ > 10 )
                         setComplete();
                 }
-                virtual QueryOp *clone() const {
+                virtual QueryOp *createChild() const {
                     QueryOp *op = new TestOp( youThrow_, threw_ );
                     youThrow_ = !youThrow_;
                     return op;
@@ -861,7 +861,7 @@ namespace QueryOptimizerTests {
                 virtual void next() {
                     massert( 10409 ,  "throw", false );
                 }
-                virtual QueryOp *clone() const {
+                virtual QueryOp *createChild() const {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }
@@ -928,7 +928,7 @@ namespace QueryOptimizerTests {
                 virtual void next() {
                     setComplete();
                 }
-                virtual QueryOp *clone() const {
+                virtual QueryOp *createChild() const {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }
@@ -963,7 +963,7 @@ namespace QueryOptimizerTests {
                         massert( 10410 ,  "throw", false );
                     setComplete();
                 }
-                virtual QueryOp *clone() const {
+                virtual QueryOp *createChild() const {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }

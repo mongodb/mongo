@@ -750,7 +750,7 @@ namespace mongo {
         }
 
         virtual bool mayRecordPlan() const { return false; }
-        virtual QueryOp *clone() const {
+        virtual QueryOp *createChild() const {
             return new UpdateOp( _hasPositionalField );
         }
         // already scanned to the first match, so return _c

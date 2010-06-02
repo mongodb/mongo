@@ -88,8 +88,8 @@ namespace mongo {
             }
         }
         virtual bool mayRecordPlan() const { return !justOne_; }
-        virtual QueryOp *clone() const {
-            bestCount_ = 0; // should be safe to reset this in contexts where clone() is called
+        virtual QueryOp *createChild() const {
+            bestCount_ = 0; // should be safe to reset this in contexts where createChild() is called
             return new DeleteOp( justOne_, bestCount_ );
         }
         virtual shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
@@ -420,7 +420,7 @@ namespace mongo {
             }
             c_->advance();
         }
-        virtual QueryOp *clone() const {
+        virtual QueryOp *createChild() const {
             CountOp *ret = new CountOp( BSONObj() );
             ret->count_ = count_;
             ret->skip_ = skip_;
@@ -732,7 +732,7 @@ namespace mongo {
         
         virtual bool mayRecordPlan() const { return _pq.getNumToReturn() != 1; }
         
-        virtual QueryOp *clone() const {
+        virtual QueryOp *createChild() const {
             if ( _pq.isExplain() ) {
                 _eb.ensureStartScan();
             }
