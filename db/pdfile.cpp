@@ -1562,7 +1562,9 @@ namespace mongo {
        assumes ns is capped and no indexes
     */
     Record* DataFileMgr::fast_oplog_insert(NamespaceDetails *d, const char *ns, int len) {
+        assert( d );
         RARELY assert( d == nsdetails(ns) );
+        DEV assert( d == nsdetails(ns) );
 
         DiskLoc extentLoc;
         int lenWHdr = len + Record::HeaderSize;
