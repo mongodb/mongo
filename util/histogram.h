@@ -19,6 +19,8 @@
 #ifndef UTIL_HISTOGRAM_HEADER
 #define UTIL_HISTOGRAM_HEADER
 
+#include "../pch.h"
+
 #include <stdint.h>
 #include <string>
 
@@ -37,9 +39,9 @@ namespace mongo {
          * start at 'initialValue' rather than 0.
          */
         struct Options {
-            uint32_t numBuckets;
-            uint32_t bucketSize;
-            uint32_t initialValue;
+            boost::uint32_t numBuckets;
+            boost::uint32_t bucketSize;
+            boost::uint32_t initialValue;
 
             Options() : numBuckets(0), bucketSize(0), initialValue(0){}
         };
@@ -49,7 +51,7 @@ namespace mongo {
         /**
          * Find the bucket that 'element' falls into and increment its count.
          */
-        void insert( uint32_t element );
+        void insert( boost::uint32_t element );
 
         /**
          * Render the histogram as string that can be used inside an
@@ -62,18 +64,18 @@ namespace mongo {
         /**
          * Return the count for the 'bucket'-th bucket.
          */
-        uint64_t getCount( uint32_t bucket ) const;
+        boost::uint64_t getCount( boost::uint32_t bucket ) const;
 
         /**
          * Return the maximum element that would fall in the
          * 'bucket'-th bucket.
          */
-        uint32_t getBoundary( uint32_t bucket ) const;
+        boost::uint32_t getBoundary( boost::uint32_t bucket ) const;
 
         /**
          * Return the number of buckets in this histogram.
          */
-        uint32_t getBucketsNum() const;
+        boost::uint32_t getBucketsNum() const;
         
     private:
         /**
@@ -81,14 +83,14 @@ namespace mongo {
          * into. Currently assumes that 'element' is greater than the
          * minimum 'inialValue'.
          */
-        uint32_t findBucket( uint32_t element ) const;
+        boost::uint32_t findBucket( boost::uint32_t element ) const;
 
-        uint32_t  _initialValue;  // no value lower than it is recorded
-        uint32_t  _numBuckets;    // total buckets in the histogram
+        boost::uint32_t  _initialValue;  // no value lower than it is recorded
+        boost::uint32_t  _numBuckets;    // total buckets in the histogram
 
         // all below owned here
-        uint32_t* _boundaries;    // maximum element of each bucket
-        uint64_t* _buckets;       // current count of each bucket
+        boost::uint32_t* _boundaries;    // maximum element of each bucket
+        boost::uint64_t* _buckets;       // current count of each bucket
 
         Histogram( const Histogram& );
         Histogram& operator=( const Histogram& );
