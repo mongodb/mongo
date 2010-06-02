@@ -54,6 +54,7 @@ assert.eq( 0 , db.foo.count() , "D7" );
 db.foo2.save( { _id : new ObjectId() } );
 db.foo2.save( { _id : new ObjectId() } );
 db.foo2.save( { _id : new ObjectId() } );
+db.getLastError();
 
 assert.eq( 1 , s.onNumShards( "foo2" ) , "F1" );
 
