@@ -269,7 +269,7 @@ namespace mongo {
         const char * _ns;
         bool _or;
         BSONObj _query;
-//        FieldRangeOrSet _fros;
+        FieldRangeOrSet _fros;
         auto_ptr< QueryPlanSet > _currentQps;
         int _i;
         int _n;

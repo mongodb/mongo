@@ -172,8 +172,9 @@ namespace mongo {
             indexBounds_ = newBounds;
         }
         if ( ( scanAndOrderRequired_ || order_.isEmpty() ) &&
-            !fbs.range( idxKey.firstElement().fieldName() ).nontrivial() )
+            !fbs.range( idxKey.firstElement().fieldName() ).nontrivial() ) {
             unhelpful_ = true;
+        }
     }
     
     shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
@@ -562,10 +563,10 @@ namespace mongo {
     _ns( ns ),
     _or( !query.getField( "$or" ).eoo() ),
     _query( query.getOwned() ),
+    _fros( ns, query ),
     _i(),
     _honorRecordedPlan( honorRecordedPlan ),
     _bestGuessOnly() {
-//    _fros( ns, query ) {
         // eventually implement (some of?) these
         if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
@@ -588,7 +589,8 @@ namespace mongo {
             return _currentQps->runOp( op );
         }
         BSONObj q = nextSimpleQuery();
-        auto_ptr< FieldRangeSet > frs( new FieldRangeSet( _ns, q ) );
+        auto_ptr< FieldRangeSet > frs( _fros.topFrs( q ) );
+        _fros.popOrClause();
         _currentQps.reset( new QueryPlanSet( _ns, frs, q, BSONObj(), 0, _honorRecordedPlan ) );
         return _currentQps->runOp( op );
     }

@@ -186,13 +186,35 @@ namespace mongo {
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
         string getSpecial() const;
-        // intended to handle sets without _orSets
         const FieldRangeSet &operator-=( const FieldRangeSet &other ) {
             for( map< string, FieldRange >::const_iterator i = other._ranges.begin();
                 i != other._ranges.end(); ++i ) {
                 map< string, FieldRange >::iterator f = _ranges.find( i->first.c_str() );
                 if ( f != _ranges.end() )
                     f->second -= i->second;
+            }
+            return *this;
+        }
+        const FieldRangeSet &operator&=( const FieldRangeSet &other ) {
+            map< string, FieldRange >::const_iterator i = _ranges.begin();
+            map< string, FieldRange >::const_iterator j = other._ranges.begin();
+            while( i != _ranges.end() && j != other._ranges.end() ) {
+                int cmp = i->first.compare( j->first );
+                if ( cmp == 0 ) {
+                    // TODO possible to update _ranges using i iterator?
+                    _ranges[ i->first ] &= j->second;
+                    ++i;
+                    ++j;
+                } else if ( cmp < 0 ) {
+                    ++i;
+                } else {
+                    _ranges[ j->first ] = j->second;
+                    ++j;
+                }
+            }
+            while( j != other._ranges.end() ) {
+                _ranges[ j->first ] = j->second;
+                ++j;                
             }
             return *this;
         }
@@ -212,30 +234,37 @@ namespace mongo {
     public:
         FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
         // if there's a trivial or clause, we won't use or ranges to help with scanning
-        bool trivialOr() const {
-            for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
-                if ( i->nNontrivialRanges() == 0 ) {
-                    return true;
-                }
-            }
-            return false;
-        }
+//        bool trivialOr() const {
+//            for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
+//                if ( i->nNontrivialRanges() == 0 ) {
+//                    return true;
+//                }
+//            }
+//            return false;
+//        }
         bool orFinished() const { return _orFound && _orSets.empty(); }
         // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
         void popOrClause() {
             massert( 13274, "no or clause to pop", !orFinished() );
-            const FieldRangeSet &toPop = _orSets.front();
-            list< FieldRangeSet >::iterator i = _orSets.begin();
-            ++i;
-            while( i != _orSets.end() ) {
-                *i -= toPop;
-                if( !i->matchPossible() ) {
-                    i = _orSets.erase( i );
-                } else {
-                    ++i;
-                }
-            }
+//            const FieldRangeSet &toPop = _orSets.front();
+//            list< FieldRangeSet >::iterator i = _orSets.begin();
+//            ++i;
+//            while( i != _orSets.end() ) {
+//                *i -= toPop;
+//                if( !i->matchPossible() ) {
+//                    i = _orSets.erase( i );
+//                } else {
+//                    ++i;
+//                }
+//            }
             _orSets.pop_front();
+        }
+        FieldRangeSet *topFrs( BSONObj &query ) const {
+            FieldRangeSet *ret = new FieldRangeSet( _baseSet );
+            *ret &= _orSets.front();
+            ret->_query = query;
+            log() << "ret: " << ret->simplifiedQuery() << endl;
+            return ret;
         }
     private:
         FieldRangeSet _baseSet;
