@@ -308,6 +308,7 @@ namespace mongo {
     private:
         
         void _reload();
+        void _reload_inlock();
         void _load();
         
         DBConfig * _config;
