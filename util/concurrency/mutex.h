@@ -50,14 +50,16 @@ namespace mongo {
                     if ( followers[m].count(*i) != 0 ){
                         failed = true;
                         stringstream ss;
-                        ss << "mid: " << m << " followers[m] first: " << *(followers[m].begin());
+                        ss << "mutex problem" <<
+                            "\n  when locking " << m <<
+                            "\n  " << *i << " was already locked and should not be.";
                         err = ss.str();
                         break;
                     }
                 }
             }
-            if ( failed ){
-                cout << "ERROR with mutex: " << err << endl;
+            if( failed ) {
+                cout << err << endl;
                 assert( 0 );
             }
             preceeding->insert(m);
