@@ -23,7 +23,16 @@ def killprocs( signal="" ):
 
     killed = 0
         
-    for x in utils.getprocesslist():
+    l = utils.getprocesslist()
+    print( "num procs:" + str( len( l ) ) )
+    if len(l) == 0:
+        print( "no procs" )
+        try:
+            print( execsys( "/sbin/ifconfig -a" ) )
+        except Exception,e:
+            print( "can't get interfaces" + str( e ) )
+
+    for x in l:
         x = x.lstrip()
         if not shouldKill( x ):
             continue
