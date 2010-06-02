@@ -100,11 +100,13 @@ namespace mongo {
                 scoped_lock bl(Client::clientsMutex);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
+                    assert( c );
                     if ( c == &me )
                         continue;
-                    CurOp& co = *(c->curop());
-                    if( all || co.active() )
-                        vals.push_back( co.infoNoauth() );
+                    CurOp* co = c->curop();
+                    assert( co );
+                    if( all || co->active() )
+                        vals.push_back( co->infoNoauth() );
                 }
             }
             b.append("inprog", vals);
