@@ -137,4 +137,7 @@ namespace mongo {
 
     typedef char _TCHAR;
 
+    using boost::uint32_t;
+    using boost::uint64_t;
+
 } // namespace mongo
