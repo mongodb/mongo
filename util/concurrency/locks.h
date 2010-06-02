@@ -80,13 +80,25 @@ namespace mongo {
         bool lock_shared_try( int millis ){
             boost::system_time until = get_system_time();
             until += boost::posix_time::milliseconds(millis);
-            return _m.timed_lock_shared( until );
+            if( _m.timed_lock_shared( until ) ) { 
+#if defined(_DEBUG)
+                mutexDebugger.entering(_name);
+#endif
+                return true;
+            }
+            return false;
         }
 
         bool lock_try( int millis ){
             boost::system_time until = get_system_time();
             until += boost::posix_time::milliseconds(millis);
-            return _m.timed_lock( until );
+            if( _m.timed_lock( until ) ) { 
+#if defined(_DEBUG)
+                mutexDebugger.entering(_name);
+#endif
+                return true;
+            }
+            return false;
         }
 
 
@@ -159,8 +171,12 @@ namespace mongo {
                     pthread_rwlock_trywrlock( &_lock ) : 
                     pthread_rwlock_tryrdlock( &_lock );
                 
-                if ( x <= 0 )
+                if ( x <= 0 ) {
+#if defined(_DEBUG)
+                    mutexDebugger.entering(_name);
+#endif
                     return true;
+                }
                 
                 if ( millis-- <= 0 )
                     return false;

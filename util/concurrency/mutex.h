@@ -28,6 +28,7 @@ namespace mongo {
     class MutexDebugger { 
         typedef const char * mid; // mid = mutex ID
         typedef map<mid,int> Preceeding;
+        map< mid, int > maxNest;
         boost::thread_specific_ptr< Preceeding > us;
         map< mid, set<mid> > followers;
         boost::mutex &x;
@@ -45,6 +46,8 @@ namespace mongo {
             preceeding[m]++;
             if( preceeding[m] > 1 ) { 
                 // recursive re-locking.
+                if( preceeding[m] > maxNest[m] )
+                    maxNest[m] = preceeding[m];
                 return;
             }
 
@@ -62,7 +65,7 @@ namespace mongo {
                             ss << "mutex problem" <<
                                 "\n  when locking " << m <<
                                 "\n  " << i->first << " was already locked and should not be.\n";
-                            ss << "preceeding " << m << ":\n";
+                            ss << "locked before " << m << " in this thread:\n";
                             for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
                                 if( i->first != m )
                                     ss << "  " << i->first << '\n';
@@ -82,7 +85,10 @@ namespace mongo {
             if( magic != 0x12345678 ) return;
             Preceeding& preceeding = *us.get();
             preceeding[m]--;
-            assert( preceeding[m] >= 0 );
+            if( preceeding[m] < 0 ) {
+                cout << "ERROR: lock count for " << m << " is " << preceeding[m] << endl;
+                assert( preceeding[m] >= 0 );
+            }
         }
     };
     extern MutexDebugger mutexDebugger;
