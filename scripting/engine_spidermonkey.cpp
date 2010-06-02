@@ -503,10 +503,10 @@ namespace mongo {
             free( dst );
 
             if ( ! res ){
-                log() << "decode failed. probably invalid utf-8 string [" << c << "]" << endl;
+                tlog() << "decode failed. probably invalid utf-8 string [" << c << "]" << endl;
                 jsval v;
                 if ( JS_GetPendingException( _context , &v ) )
-                    log() << "\t why: " << toString( v ) << endl;
+                    tlog() << "\t why: " << toString( v ) << endl;
                 throw InvalidUTF8Exception();
             }
 
