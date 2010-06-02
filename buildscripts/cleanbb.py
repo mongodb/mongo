@@ -4,16 +4,28 @@ import os
 import utils
 import time
 
+cwd = os.getcwd();
+if cwd.find("buildscripts" ) > 0 :
+    cwd = cwd.partition( "buildscripts" )[0]
+
+print( "cwd [" + cwd + "]" )
+
+def shouldKill( c ):
+    if c.find( cwd ) >= 0:
+        return True
+
+    if c.find( "buildbot" ) >= 0 and c.find( "/mongo/" ) >= 0:
+        return True
+
+    return False
+
 def killprocs( signal="" ):
-    cwd = os.getcwd();
-    if cwd.find("buildscripts" ) > 0 :
-        cwd = cwd.partition( "buildscripts" )[0]
 
     killed = 0
         
     for x in utils.getprocesslist():
         x = x.lstrip()
-        if x.find( cwd ) < 0:
+        if not shouldKill( x ):
             continue
         
         pid = x.partition( " " )[0]
