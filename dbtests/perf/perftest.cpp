@@ -629,7 +629,7 @@ namespace Plan {
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                QueryPlanSet s( ns_.c_str(), BSONObj(), BSONObj(), &hintElt_ );
+                MultiPlanScanner s( ns_.c_str(), BSONObj(), BSONObj(), &hintElt_ );
         }
         string ns_;
         auto_ptr< dblock > lk_;
@@ -650,7 +650,7 @@ namespace Plan {
         void run() {
             Client::Context ctx( ns_ );
             for( int i = 0; i < 10000; ++i )
-                QueryPlanSet s( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) );
+                MultiPlanScanner s( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) );
         }
         string ns_;
         auto_ptr< dblock > lk_;
@@ -669,7 +669,7 @@ namespace Plan {
         void run() {
             Client::Context ctx( ns_.c_str() );
             for( int i = 0; i < 10000; ++i )
-                QueryPlanSet s( ns_.c_str(), BSON( "a" << 1 ), BSONObj() );
+                MultiPlanScanner s( ns_.c_str(), BSON( "a" << 1 ), BSONObj() );
         }
         string ns_;
         auto_ptr< dblock > lk_;
