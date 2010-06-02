@@ -165,10 +165,14 @@ namespace mongo {
 
     string DBClientWithCommands::getLastError() { 
         BSONObj info = getLastErrorDetailed();
+        return getLastErrorString( info );
+    }
+    
+    string DBClientWithCommands::getLastErrorString( const BSONObj& info ){
         BSONElement e = info["err"];
         if( e.eoo() ) return "";
         if( e.type() == Object ) return e.toString();
-        return e.str();
+        return e.str();        
     }
 
     BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");

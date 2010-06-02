@@ -168,6 +168,7 @@ namespace mongo {
     
     void ClientInfo::addShard( const string& shard ){
         _cur->insert( shard );
+        _sinceLastGetError.insert( shard );
     }
     
     void ClientInfo::newRequest( AbstractMessagingPort* p ){

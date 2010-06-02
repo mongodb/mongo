@@ -326,6 +326,8 @@ namespace mongo {
 		*/
 		BSONObj getLastErrorDetailed();
 
+        static string getLastErrorString( const BSONObj& res );
+
         /** Return the last error which has occurred, even if not the very last operation.
 
            @return { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
