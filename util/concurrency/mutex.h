@@ -62,14 +62,18 @@ namespace mongo {
                         if( followers[m].count(i->first) != 0 ){
                             failed = true;
                             stringstream ss;
+                            mid bad = i->first;
                             ss << "mutex problem" <<
                                 "\n  when locking " << m <<
-                                "\n  " << i->first << " was already locked and should not be.\n";
-                            ss << "locked before " << m << " in this thread:\n";
+                                "\n  " << bad << " was already locked and should not be.\n";
+                            stringstream q;
                             for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
-                                if( i->first != m && i->second > 0 )
-                                    ss << "  " << i->first << '\n';
+                                if( i->first != m && i->first != bad && i->second > 0 )
+                                    q << "  " << i->first << '\n';
                             }
+                            string also = q.str();
+                            if( !also.empty() )
+                                ss << "also locked before " << m << " in this thread (no particular order):\n" << also;
                             err = ss.str();
                             break;
                         }
