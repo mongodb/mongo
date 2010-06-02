@@ -67,7 +67,7 @@ namespace mongo {
                                 "\n  " << i->first << " was already locked and should not be.\n";
                             ss << "locked before " << m << " in this thread:\n";
                             for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
-                                if( i->first != m )
+                                if( i->first != m && i->second > 0 )
                                     ss << "  " << i->first << '\n';
                             }
                             err = ss.str();
