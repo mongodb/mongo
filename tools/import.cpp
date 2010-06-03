@@ -142,6 +142,7 @@ public:
             ("drop", "drop collection first " )
             ("headerline","CSV,TSV only - use first line as headers")
             ("upsert", "insert or update objects that already exist" )
+            ("stopOnError", "stop importing at first error rather than continuing" )
             ;
         addPositionArg( "file" , 1 );
         _type = JSON;
@@ -255,14 +256,18 @@ public:
                         conn().insert( ns.c_str() , o );
                     }
                 }
+
+                num++;
             }
             catch ( std::exception& e ){
                 cout << "exception:" << e.what() << endl;
                 cout << buf << endl;
                 errors++;
+                
+                if (hasParam("stopOnError"))
+                    break;
             }
 
-            num++;
             if ( pm.hit( len + 1 ) ){
                 cout << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
             }

@@ -117,7 +117,7 @@ namespace mongo {
 
     /**
        this is here so you can't just type exit() to quit the program
-       you should either use dbexit to shutdown cleanly, or ::exit to tell the system to quiy
+       you should either use dbexit to shutdown cleanly, or ::exit to tell the system to quit
        if you use this, you'll get a link error since mongo::exit isn't defined
      */
     void exit( ExitCode returnCode );
