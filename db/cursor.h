@@ -103,7 +103,7 @@ namespace mongo {
         // A convenience function for setting the value of matcher() manually
         // so it may accessed later.  Implementations which must generate
         // their own matcher() should assert here.
-        virtual void setMatcher( auto_ptr< CoveredIndexMatcher > matcher ) {
+        virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
             massert( 13285, "manual matcher config not allowed", false );
         }
     };
@@ -126,7 +126,7 @@ namespace mongo {
 
     private:
         bool tailable_;
-        auto_ptr< CoveredIndexMatcher > _matcher;
+        shared_ptr< CoveredIndexMatcher > _matcher;
         void init() {
             tailable_ = false;
         }
@@ -174,7 +174,7 @@ namespace mongo {
 
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         
-        virtual void setMatcher( auto_ptr< CoveredIndexMatcher > matcher ) {
+        virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
             _matcher = matcher;
         }
         

@@ -93,21 +93,20 @@ namespace mongo {
     class FindOne : public QueryOp {
     public:
         FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
-        virtual void init() {
+        virtual void _init() {
             if ( requireIndex_ && strcmp( qp().indexKey().firstElement().fieldName(), "$natural" ) == 0 )
                 throw MsgAssertionException( 9011 , "Not an index cursor" );
             c_ = qp().newCursor();
-            if ( !c_->ok() )
+            if ( !c_->ok() ) {
                 setComplete();
-            else
-                matcher_.reset( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
+            }
         }
         virtual void next() {
             if ( !c_->ok() ) {
                 setComplete();
                 return;
             }
-            if ( matcher_->matches( c_->currKey(), c_->currLoc() ) ) {
+            if ( matcher()->matches( c_->currKey(), c_->currLoc() ) ) {
                 one_ = c_->current();
                 setStop();
             } else {
@@ -115,12 +114,11 @@ namespace mongo {
             }
         }
         virtual bool mayRecordPlan() const { return false; }
-        virtual QueryOp *createChild() const { return new FindOne( requireIndex_ ); }
+        virtual QueryOp *_createChild() const { return new FindOne( requireIndex_ ); }
         BSONObj one() const { return one_; }
     private:
         bool requireIndex_;
         shared_ptr<Cursor> c_;
-        auto_ptr< CoveredIndexMatcher > matcher_;
         BSONObj one_;
     };
     

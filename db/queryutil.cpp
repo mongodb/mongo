@@ -558,7 +558,7 @@ namespace mongo {
     }
     
     FieldRangeSet::FieldRangeSet( const char *ns, const BSONObj &query , bool optimize )
-        : _ns( ns ), _query( query.getOwned() ) {
+        : _ns( ns ) {
             BSONObjIterator i( query );
             
             while( i.more() ) {

@@ -819,7 +819,7 @@ namespace QueryOptimizerTests {
             class TestOp : public QueryOp {
             public:
                 TestOp( bool iThrow, bool &threw ) : iThrow_( iThrow ), threw_( threw ), i_(), youThrow_( false ) {}
-                virtual void init() {}
+                virtual void _init() {}
                 virtual void next() {
                     if ( iThrow_ )
                         threw_ = true;
@@ -827,7 +827,7 @@ namespace QueryOptimizerTests {
                     if ( ++i_ > 10 )
                         setComplete();
                 }
-                virtual QueryOp *createChild() const {
+                virtual QueryOp *_createChild() const {
                     QueryOp *op = new TestOp( youThrow_, threw_ );
                     youThrow_ = !youThrow_;
                     return op;
@@ -857,11 +857,11 @@ namespace QueryOptimizerTests {
         private:
             class TestOp : public QueryOp {
             public:
-                virtual void init() {}
+                virtual void _init() {}
                 virtual void next() {
                     massert( 10409 ,  "throw", false );
                 }
-                virtual QueryOp *createChild() const {
+                virtual QueryOp *_createChild() const {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }
@@ -924,11 +924,11 @@ namespace QueryOptimizerTests {
             }
             class TestOp : public QueryOp {
             public:
-                virtual void init() {}
+                virtual void _init() {}
                 virtual void next() {
                     setComplete();
                 }
-                virtual QueryOp *createChild() const {
+                virtual QueryOp *_createChild() const {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }
@@ -957,13 +957,13 @@ namespace QueryOptimizerTests {
         private:
             class TestOp : public QueryOp {
             public:
-                virtual void init() {}
+                virtual void _init() {}
                 virtual void next() {
                     if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
                         massert( 10410 ,  "throw", false );
                     setComplete();
                 }
-                virtual QueryOp *createChild() const {
+                virtual QueryOp *_createChild() const {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }

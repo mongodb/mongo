@@ -218,7 +218,6 @@ namespace mongo {
             }
             return *this;
         }
-        BSONObj query() const { return _query; }
     private:
         void processQueryField( const BSONElement &e, bool optimize );
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
@@ -226,7 +225,6 @@ namespace mongo {
         static FieldRange &trivialRange();
         mutable map< string, FieldRange > _ranges;
         const char *_ns;
-        BSONObj _query;
     };
 
     // generages FieldRangeSet objects, accounting for or clauses
@@ -259,10 +257,9 @@ namespace mongo {
 //            }
             _orSets.pop_front();
         }
-        FieldRangeSet *topFrs( BSONObj &query ) const {
+        FieldRangeSet *topFrs() const {
             FieldRangeSet *ret = new FieldRangeSet( _baseSet );
             *ret &= _orSets.front();
-            ret->_query = query;
             return ret;
         }
     private:

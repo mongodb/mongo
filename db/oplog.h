@@ -189,7 +189,7 @@ namespace mongo {
             _findingStartCursor = new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns());
             _findingStartTimer.reset();
             _findingStartMode = Initial;
-            BSONElement tsElt = _qp.query()[ "ts" ];
+            BSONElement tsElt = _qp.originalQuery()[ "ts" ];
             massert( 13044, "no ts field in query", !tsElt.eoo() );
             BSONObjBuilder b;
             b.append( tsElt );
