@@ -256,6 +256,8 @@ public:
                         conn().insert( ns.c_str() , o );
                     }
                 }
+
+                num++;
             }
             catch ( std::exception& e ){
                 cout << "exception:" << e.what() << endl;
@@ -266,7 +268,6 @@ public:
                     break;
             }
 
-            num++;
             if ( pm.hit( len + 1 ) ){
                 cout << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
             }
