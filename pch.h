@@ -20,6 +20,10 @@
 
 #pragma once
 
+#if defined(MONGO_EXPOSE_MACROS)
+#define JS_C_STRINGS_ARE_UTF8
+#endif
+
 #if defined(_WIN32)
 #  define NOMINMAX
 #  include <winsock2.h> //this must be included before the first windows.h include
