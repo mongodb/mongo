@@ -62,10 +62,6 @@ namespace mongo {
     //
 
     void show_32_warning(){
-#if BOOST_VERSION < 103500
-        cout << "\nwarning: built with boost version <= 1.34, limited concurrency" << endl;
-#endif
-
         {
             const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );

@@ -119,7 +119,11 @@ namespace mongo {
                 arrElt = e;
             }
             // enforce single array path here
-            uassert( 10088 ,  "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
+            if ( e.type() == Array && e.rawdata() != arrElt.rawdata() ){
+                stringstream ss;
+                ss << "cannot index parallel arrays [" << e.fieldName() << "] [" << arrElt.fieldName() << "]";
+                uasserted( 10088 ,  ss.str() );
+            }
         }
 
         bool allFound = true; // have we found elements for all field names in the key spec?
