@@ -20,7 +20,7 @@
 #include "../db/concurrency.h"
 
 namespace mongo {
-    void exitCleanly( int code );
+    void exitCleanly( ExitCode code );
     
     struct ClockSkewException : public DBException {
         virtual const char* what() const throw() { return "clock skew exception"; }
