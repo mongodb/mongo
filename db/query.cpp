@@ -127,7 +127,7 @@ namespace mongo {
         long long nDeleted = 0;
 
         int best = 0;
-        auto_ptr< MultiCursor::CursorOp > opPtr( new DeleteOp( justOneOrig, best ) );
+        shared_ptr< MultiCursor::CursorOp > opPtr( new DeleteOp( justOneOrig, best ) );
         shared_ptr< MultiCursor > creal( new MultiCursor( ns, pattern, BSONObj(), opPtr ) );
         
         if( !creal->ok() )
@@ -944,7 +944,7 @@ namespace mongo {
             ClientCursor *cc;
             bool moreClauses = mps->mayRunMore();
             if ( moreClauses ) {
-                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher() ) );
+                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher(), dqo ) );
                 cc = new ClientCursor(queryOptions, multi, ns);
             } else {
                 cursor->setMatcher( dqo.matcher() );

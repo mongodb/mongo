@@ -794,7 +794,7 @@ namespace mongo {
         int numModded = 0;
         long long nscanned = 0;
         MatchDetails details;
-        auto_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
+        shared_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
         shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr ) );
         
         auto_ptr<ClientCursor> cc;

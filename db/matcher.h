@@ -153,10 +153,8 @@ namespace mongo {
             return jsobj.toString();
         }
 
-        void popOr() {
-            massert( 13261, "no or to pop", !_orMatchers.empty() );
-            _norMatchers.push_back( _orMatchers.front() );
-            _orMatchers.pop_front();
+        void addOrConstraint( const BSONObj &o ) {
+            _norMatchers.push_back( shared_ptr< Matcher >( new Matcher( o ) ) );
         }
         
         bool sameCriteriaCount( const Matcher &other ) const;
@@ -218,11 +216,11 @@ namespace mongo {
         Matcher& docMatcher() { return *_docMatcher; }
 
         // once this is called, shouldn't use this matcher for matching any more
+        void addOrConstraint( const BSONObj &o ) {
+            _docMatcher->addOrConstraint( o );
+        }
+        
         CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {
-            if ( !_orPopped ) {
-                _docMatcher->popOr();
-                _orPopped = true;
-            }
             return new CoveredIndexMatcher( _docMatcher, indexKeyPattern, alwaysUseRecord );
         }
     private:
