@@ -122,13 +122,13 @@ namespace mongo {
                 if ( x == EADDRINUSE )
                     log() << "  addr already in use" << endl;
                 closesocket(sock);
-                return;
+                exitCleanly( EXIT_NET_ERROR );
             }
 
             if ( ::listen(sock, 128) != 0 ) {
                 log() << "listen(): listen() failed " << errnoWithDescription() << endl;
                 closesocket(sock);
-                return;
+                exitCleanly( EXIT_NET_ERROR );
             }
 
             ListeningSockets::get()->add( sock );
@@ -162,7 +162,7 @@ namespace mongo {
 #endif
                 if ( ! inShutdown() )
                     log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x) << endl;
-                return;
+                exitCleanly( EXIT_NET_ERROR );
             }
 
             for (vector<int>::iterator it=socks.begin(), end=socks.end(); it != end; ++it){
@@ -175,7 +175,7 @@ namespace mongo {
                     int x = errno; // so no global issues
                     if ( x == ECONNABORTED || x == EBADF ) {
                         log() << "Listener on port " << _port << " aborted" << endl;
-                        return;
+                        exitCleanly( EXIT_NET_ERROR );
                     } if ( x == 0 && inShutdown() ){
                         return;   // socket closed
                     }
