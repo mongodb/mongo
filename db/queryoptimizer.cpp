@@ -517,10 +517,12 @@ namespace mongo {
                 QueryOp &op = **i;
                 nextOp( op );
                 if ( op.complete() ) {
-                    if ( first )
+                    if ( first ) {
                         nScanned += nScannedBackup;
-                    if ( plans_.mayRecordPlan_ && op.mayRecordPlan() )
+                    }
+                    if ( plans_.mayRecordPlan_ && op.mayRecordPlan() ) {
                         op.qp().registerSelf( nScanned );
+                    }
                     return *i;
                 }
                 if ( op.error() )

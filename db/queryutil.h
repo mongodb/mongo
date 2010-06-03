@@ -225,6 +225,8 @@ namespace mongo {
         static FieldRange &trivialRange();
         mutable map< string, FieldRange > _ranges;
         const char *_ns;
+        // make sure memory for FieldRange BSONElements is owned
+        BSONObj _query;
     };
 
     // generages FieldRangeSet objects, accounting for or clauses
