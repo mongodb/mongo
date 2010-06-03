@@ -6,7 +6,7 @@ dbpath = "/data/db/" + baseDir + "/";
 var m = startMongod( "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 db[ baseName ].save( {} );
-assert.eq( 1, db[ baseName ].count() , "A" );
+assert.eq( 1, db[ baseName ].count() , "A : " + tojson( db[baseName].find().toArray() ) );
 
 checkDir = function( dir ) {
     db.runCommand( {fsync:1} );

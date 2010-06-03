@@ -37,7 +37,7 @@
 #include "jstypes.h"
 #undef JS_PUBLIC_API
 #undef JS_PUBLIC_DATA
-#define JS_PUBLIC_API(t)    t
+#define JS_PUBLIC_API(t)    t __cdecl 
 #define JS_PUBLIC_DATA(t)   t
 #endif
 
