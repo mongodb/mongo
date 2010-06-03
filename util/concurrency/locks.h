@@ -64,29 +64,32 @@ namespace mongo {
         }
         
         void lock_shared(){
-#if defined(_DEBUG)
-            mutexDebugger.entering(_name);
-#endif
             _m.lock_shared();
         }
         
         void unlock_shared(){
-#if defined(_DEBUG)
-            mutexDebugger.leaving(_name);
-#endif
             _m.unlock_shared();
         }
 
         bool lock_shared_try( int millis ){
             boost::system_time until = get_system_time();
             until += boost::posix_time::milliseconds(millis);
-            return _m.timed_lock_shared( until );
+            if( _m.timed_lock_shared( until ) ) { 
+                return true;
+            }
+            return false;
         }
 
         bool lock_try( int millis ){
             boost::system_time until = get_system_time();
             until += boost::posix_time::milliseconds(millis);
-            return _m.timed_lock( until );
+            if( _m.timed_lock( until ) ) { 
+#if defined(_DEBUG)
+                mutexDebugger.entering(_name);
+#endif
+                return true;
+            }
+            return false;
         }
 
 
@@ -133,15 +136,9 @@ namespace mongo {
         
         void lock_shared(){
             check( pthread_rwlock_rdlock( &_lock ) );
-#if defined(_DEBUG)
-            mutexDebugger.entering(_name);
-#endif
         }
         
         void unlock_shared(){
-#if defined(_DEBUG)
-            mutexDebugger.leaving(_name);
-#endif
             check( pthread_rwlock_unlock( &_lock ) );
         }
         
@@ -150,7 +147,13 @@ namespace mongo {
         }
 
         bool lock_try( int millis ){
-            return _try( millis , true );
+            if( _try( millis , true ) ) { 
+#if defined(_DEBUG)
+                mutexDebugger.entering(_name);
+#endif
+                return true;
+            }
+            return false;
         }
 
         bool _try( int millis , bool write ){
@@ -159,8 +162,9 @@ namespace mongo {
                     pthread_rwlock_trywrlock( &_lock ) : 
                     pthread_rwlock_tryrdlock( &_lock );
                 
-                if ( x <= 0 )
+                if ( x <= 0 ) {
                     return true;
+                }
                 
                 if ( millis-- <= 0 )
                     return false;

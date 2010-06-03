@@ -512,7 +512,7 @@ namespace mongo {
         _sequenceNumber(  ++NextSequenceNumber ), _lock("rw:ChunkManager")
     {
         
-        _reload();
+        _reload_inlock();
         
         if ( _chunks.size() == 0 ){
             ChunkPtr c( new Chunk( this ) );
@@ -539,7 +539,10 @@ namespace mongo {
     
     void ChunkManager::_reload(){
         rwlock lk( _lock , true );
+        _reload_inlock();
+    }
 
+    void ChunkManager::_reload_inlock(){
         int tries = 3;
         while (tries--){
             _chunks.clear();

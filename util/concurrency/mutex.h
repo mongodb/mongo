@@ -25,46 +25,92 @@ namespace mongo {
     extern bool __destroyingStatics;
 
     class mutex;
+    // only used on _DEBUG builds:
     class MutexDebugger { 
         typedef const char * mid; // mid = mutex ID
-        boost::thread_specific_ptr< set<mid> > us;
+        typedef map<mid,int> Preceeding;
+        map< mid, int > maxNest;
+        boost::thread_specific_ptr< Preceeding > us;
         map< mid, set<mid> > followers;
         boost::mutex &x;
         unsigned magic;
     public:
+        // set these to create an assert that
+        //   b must never be locked before a
+        //   so 
+        //     a.lock(); b.lock(); is fine
+        //     b.lock(); alone is fine too
+        //   only checked on _DEBUG builds.
+        string a,b;
+
         void programEnding();
-        MutexDebugger() : x( *(new boost::mutex()) ), magic(0x12345678) { }
+        MutexDebugger();
         void entering(mid m) {
             if( magic != 0x12345678 ) return;
-            set<mid> *preceeding = us.get();
-            if( preceeding == 0 )
-                us.reset( preceeding = new set<mid>() );
-            
+
+            Preceeding *_preceeding = us.get();
+            if( _preceeding == 0 )
+                us.reset( _preceeding = new Preceeding() );
+            Preceeding &preceeding = *_preceeding;
+
+            if( a == m ) { 
+                if( preceeding[b.c_str()] ) {
+                    cout << "mutex problem " << b << " was locked before " << a << endl;
+                    assert(false);
+                }
+            }
+
+            preceeding[m]++;
+            if( preceeding[m] > 1 ) { 
+                // recursive re-locking.
+                if( preceeding[m] > maxNest[m] )
+                    maxNest[m] = preceeding[m];
+                return;
+            }
+
             bool failed = false;
             string err;
             {
                 boost::mutex::scoped_lock lk(x);
                 followers[m];
-                for( set<mid>::iterator i = preceeding->begin(); i != preceeding->end(); i++ ) { 
-                    followers[*i].insert(m);
-                    if ( followers[m].count(*i) != 0 ){
-                        failed = true;
-                        stringstream ss;
-                        ss << "mid: " << m << " followers[m] first: " << *(followers[m].begin());
-                        err = ss.str();
-                        break;
+                for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
+                    if( m != i->first && i->second > 0 ) {
+                        followers[i->first].insert(m);
+                        if( followers[m].count(i->first) != 0 ){
+                            failed = true;
+                            stringstream ss;
+                            mid bad = i->first;
+                            ss << "mutex problem" <<
+                                "\n  when locking " << m <<
+                                "\n  " << bad << " was already locked and should not be."
+                                "\n  set a and b above to debug.\n";
+                            stringstream q;
+                            for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
+                                if( i->first != m && i->first != bad && i->second > 0 )
+                                    q << "  " << i->first << '\n';
+                            }
+                            string also = q.str();
+                            if( !also.empty() )
+                                ss << "also locked before " << m << " in this thread (no particular order):\n" << also;
+                            err = ss.str();
+                            break;
+                        }
                     }
                 }
             }
-            if ( failed ){
-                cout << "ERROR with mutex: " << err << endl;
+            if( failed ) {
+                cout << err << endl;
                 assert( 0 );
             }
-            preceeding->insert(m);
         }
         void leaving(mid m) { 
             if( magic != 0x12345678 ) return;
-            us.get()->erase(m);
+            Preceeding& preceeding = *us.get();
+            preceeding[m]--;
+            if( preceeding[m] < 0 ) {
+                cout << "ERROR: lock count for " << m << " is " << preceeding[m] << endl;
+                assert( preceeding[m] >= 0 );
+            }
         }
     };
     extern MutexDebugger mutexDebugger;

@@ -25,11 +25,23 @@ namespace mongo {
     mutex _atomicMutex("_atomicMutex");
     MutexDebugger mutexDebugger;
 
+    MutexDebugger::MutexDebugger() : 
+      x( *(new boost::mutex()) ), magic(0x12345678) {
+          // optional way to debug lock order
+          /*
+          a = "a_lock";
+          b = "b_lock";
+          */
+    }
+
     void MutexDebugger::programEnding() { 
         if( followers.size() ) {
             std::cout << followers.size() << " mutexes in program" << endl;
             for( map< mid, set<mid> >::iterator i = followers.begin(); i != followers.end(); i++ ) { 
-                cout << i->first << '\n';
+                cout << i->first;
+                if( maxNest[i->first] > 1 ) 
+                    cout << " maxNest:" << maxNest[i->first];
+                cout << '\n';
                 for( set<mid>::iterator j = i->second.begin(); j != i->second.end(); j++ )
                     cout << "  " << *j << '\n';
             }

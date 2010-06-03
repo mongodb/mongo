@@ -56,7 +56,9 @@ def cleanup( root ):
     # NOTE: if we delete directories later, we can't delete diskfulltest
     for ( dirpath , dirnames , filenames ) in os.walk( root , topdown=False ):
         for x in filenames: 
-            os.remove( dirpath + "/" + x )
+            foo = dirpath + "/" + x
+            print( "removing: " + foo )
+            os.remove( foo )
 
 
 if __name__ == "__main__":
