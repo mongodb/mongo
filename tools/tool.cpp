@@ -45,6 +45,7 @@ namespace mongo {
             ("help","produce help message")
             ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
             ("host,h",po::value<string>(), "mongo host to connect to (\"left,right\" for pairs)" )
+            ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
             ("db,d",po::value<string>(), "database to use" )
             ("collection,c",po::value<string>(), "collection to use (some commands)" )
             ("username,u",po::value<string>(), "username" )
@@ -146,6 +147,9 @@ namespace mongo {
             _host = "127.0.0.1";
             if ( _params.count( "host" ) )
                 _host = _params["host"].as<string>();
+
+            if ( _params.count( "port" ) )
+                _host += ':' + _params["port"].as<string>();
             
             if ( _noconnection ){
                 // do nothing
