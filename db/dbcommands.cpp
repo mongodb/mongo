@@ -1185,6 +1185,7 @@ namespace mongo {
             result.appendNumber( "numExtents" , numExtents );
             result.appendNumber( "indexes" , indexes );
             result.appendNumber( "indexSize" , indexSize );
+            result.appendNumber( "fileSize" , d->fileSize() );
 
                 return true;
         }

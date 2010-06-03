@@ -207,6 +207,13 @@ namespace mongo {
         void finishInit();
 
         static bool validDBName( const string& ns );
+
+        long long fileSize(){
+            long long size=0;
+            for (int n=0; exists(n); n++)
+                size += boost::filesystem::file_size( fileName(n) );
+            return size;
+        }
         
         vector<MongoDataFile*> files;
         string name; // "alleyinsider"
