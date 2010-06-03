@@ -142,6 +142,7 @@ public:
             ("drop", "drop collection first " )
             ("headerline","CSV,TSV only - use first line as headers")
             ("upsert", "insert or update objects that already exist" )
+            ("stopOnError", "stop importing at first error rather than continuing" )
             ;
         addPositionArg( "file" , 1 );
         _type = JSON;
@@ -260,6 +261,9 @@ public:
                 cout << "exception:" << e.what() << endl;
                 cout << buf << endl;
                 errors++;
+                
+                if (hasParam("stopOnError"))
+                    break;
             }
 
             num++;
