@@ -634,6 +634,9 @@
     <ClCompile Include="..\db\repl\rs.cpp">
       <Filter>replsets</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\text.cpp">
+      <Filter>util\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
