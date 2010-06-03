@@ -186,7 +186,6 @@ namespace mongo {
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
         string getSpecial() const;
-        // intended to handle sets without _orSets
         const FieldRangeSet &operator-=( const FieldRangeSet &other ) {
             for( map< string, FieldRange >::const_iterator i = other._ranges.begin();
                 i != other._ranges.end(); ++i ) {
@@ -196,7 +195,29 @@ namespace mongo {
             }
             return *this;
         }
-        BSONObj query() const { return _query; }
+        const FieldRangeSet &operator&=( const FieldRangeSet &other ) {
+            map< string, FieldRange >::const_iterator i = _ranges.begin();
+            map< string, FieldRange >::const_iterator j = other._ranges.begin();
+            while( i != _ranges.end() && j != other._ranges.end() ) {
+                int cmp = i->first.compare( j->first );
+                if ( cmp == 0 ) {
+                    // TODO possible to update _ranges using i iterator?
+                    _ranges[ i->first ] &= j->second;
+                    ++i;
+                    ++j;
+                } else if ( cmp < 0 ) {
+                    ++i;
+                } else {
+                    _ranges[ j->first ] = j->second;
+                    ++j;
+                }
+            }
+            while( j != other._ranges.end() ) {
+                _ranges[ j->first ] = j->second;
+                ++j;                
+            }
+            return *this;
+        }
     private:
         void processQueryField( const BSONElement &e, bool optimize );
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
@@ -204,14 +225,15 @@ namespace mongo {
         static FieldRange &trivialRange();
         mutable map< string, FieldRange > _ranges;
         const char *_ns;
+        // make sure memory for FieldRange BSONElements is owned
         BSONObj _query;
     };
 
     // generages FieldRangeSet objects, accounting for or clauses
-//    class FieldRangeOrSet {
-//    public:
-//        FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
-//        // if there's a trivial or clause, we won't use or ranges to help with scanning
+    class FieldRangeOrSet {
+    public:
+        FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
+        // if there's a trivial or clause, we won't use or ranges to help with scanning
 //        bool trivialOr() const {
 //            for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
 //                if ( i->nNontrivialRanges() == 0 ) {
@@ -220,10 +242,11 @@ namespace mongo {
 //            }
 //            return false;
 //        }
-//        bool orFinished() const { return _orFound && _orSets.empty(); }
-//        // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
-//        void popOrClause() {
-//            massert( 13274, "no or clause to pop", !orFinished() );
+        bool orFinished() const { return _orFound && _orSets.empty(); }
+        // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
+        // this could invalidate the result of the last topFrs()
+        void popOrClause() {
+            massert( 13274, "no or clause to pop", !orFinished() );
 //            const FieldRangeSet &toPop = _orSets.front();
 //            list< FieldRangeSet >::iterator i = _orSets.begin();
 //            ++i;
@@ -235,13 +258,18 @@ namespace mongo {
 //                    ++i;
 //                }
 //            }
-//            _orSets.pop_front();
-//        }
-//    private:
-//        FieldRangeSet _baseSet;
-//        list< FieldRangeSet > _orSets;
-//        bool _orFound;
-//    };
+            _orSets.pop_front();
+        }
+        FieldRangeSet *topFrs() const {
+            FieldRangeSet *ret = new FieldRangeSet( _baseSet );
+            *ret &= _orSets.front();
+            return ret;
+        }
+    private:
+        FieldRangeSet _baseSet;
+        list< FieldRangeSet > _orSets;
+        bool _orFound;
+    };
     
     /**
        used for doing field limiting

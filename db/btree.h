@@ -358,7 +358,7 @@ namespace mongo {
 
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         
-        virtual void setMatcher( auto_ptr< CoveredIndexMatcher > matcher ) {
+        virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
             _matcher = matcher;
         }
         
@@ -399,7 +399,7 @@ namespace mongo {
         BoundList bounds_;
         unsigned boundIndex_;
         const IndexSpec& _spec;
-        auto_ptr< CoveredIndexMatcher > _matcher;
+        shared_ptr< CoveredIndexMatcher > _matcher;
     };
 
 

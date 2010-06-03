@@ -21,6 +21,7 @@
 #include "db/json.h"
 
 #include "tool.h"
+#include "../util/text.h"
 
 #include <fstream>
 #include <iostream>
@@ -53,6 +54,8 @@ class Import : public Tool {
     }
     
     BSONObj parseLine( char * line ){
+        uassert(13289, "Invalid UTF8 character detected", isValidUTF8(line));
+
         if ( _type == JSON ){
             char * end = ( line + strlen( line ) ) - 1;
             while ( isspace(*end) ){
@@ -224,10 +227,12 @@ public:
         ProgressMeter pm( fileSize );
         const int BUF_SIZE = 1024 * 1024 * 4;
         boost::scoped_array<char> line(new char[BUF_SIZE+2]);
-        while ( *in ){
+        while ( in->rdstate() == 0 ){
             char * buf = line.get();
             in->getline( buf , BUF_SIZE );
-            uassert( 10263 ,  "unknown error reading file" , ( in->rdstate() & ios_base::badbit ) == 0 );
+            uassert( 10263 ,  "unknown error reading file" ,
+                    (!(in->rdstate() & ios_base::badbit)) &&
+                    (!(in->rdstate() & ios_base::failbit) || (in->rdstate() & ios_base::eofbit)) );
             log(1) << "got line:" << buf << endl;
 
             while( isspace( buf[0] ) ) buf++;
@@ -237,10 +242,6 @@ public:
                 continue;
             
             buf[len+1] = 0;
-
-            if ( in->rdstate() == ios_base::eofbit )
-                break;
-            assert( in->rdstate() == 0 );
 
             try {
                 BSONObj o = parseLine( buf );

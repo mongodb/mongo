@@ -57,10 +57,8 @@ namespace mongo {
             bestCount_( bestCount ),
             _nscanned() {
         }
-        virtual void init() {
+        virtual void _init() {
             c_ = qp().newCursor();
-            // FIXME originalQuery won't work for $or
-            _matcher.reset( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -70,7 +68,7 @@ namespace mongo {
             
             DiskLoc rloc = c_->currLoc();
             
-            if ( _matcher->matches(c_->currKey(), rloc ) ) {
+            if ( matcher()->matches(c_->currKey(), rloc ) ) {
                 if ( !c_->getsetdup(rloc) )
                     ++count_;
             }
@@ -88,21 +86,17 @@ namespace mongo {
             }
         }
         virtual bool mayRecordPlan() const { return !justOne_; }
-        virtual QueryOp *clone() const {
-            bestCount_ = 0; // should be safe to reset this in contexts where clone() is called
+        virtual QueryOp *_createChild() const {
+            bestCount_ = 0; // should be safe to reset this in contexts where createChild() is called
             return new DeleteOp( justOne_, bestCount_ );
         }
         virtual shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
-        virtual auto_ptr< CoveredIndexMatcher > newMatcher() const {
-            return auto_ptr< CoveredIndexMatcher >( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
-        }
     private:
         bool justOne_;
         int count_;
         int &bestCount_;
         long long _nscanned;
         shared_ptr<Cursor> c_;
-        auto_ptr< CoveredIndexMatcher > _matcher;
     };
     
     /* ns:      namespace, e.g. <database>.<collection>
@@ -133,7 +127,7 @@ namespace mongo {
         long long nDeleted = 0;
 
         int best = 0;
-        auto_ptr< MultiCursor::CursorOp > opPtr( new DeleteOp( justOneOrig, best ) );
+        shared_ptr< MultiCursor::CursorOp > opPtr( new DeleteOp( justOneOrig, best ) );
         shared_ptr< MultiCursor > creal( new MultiCursor( ns, pattern, BSONObj(), opPtr ) );
         
         if( !creal->ok() )
@@ -378,12 +372,10 @@ namespace mongo {
         limit_( spec["limit"].numberLong() ),
         bc_() {}
         
-        virtual void init() {
-            query_ = qp().query();
+        virtual void _init() {
             c_ = qp().newCursor();
             
-            _matcher.reset( new CoveredIndexMatcher( query_, c_->indexKeyPattern() ) );
-            if ( qp().exactKeyMatch() && ! _matcher->needRecord() ) {
+            if ( qp().exactKeyMatch() && ! matcher()->needRecord() ) {
                 query_ = qp().simplifiedQuery( qp().indexKey() );
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
                 bc_->forgetEndKey();
@@ -412,7 +404,7 @@ namespace mongo {
                     _gotOne();
                 }
             } else {
-                if ( !_matcher->matches(c_->currKey(), c_->currLoc() ) ) {
+                if ( !matcher()->matches(c_->currKey(), c_->currLoc() ) ) {
                 }
                 else if( !c_->getsetdup(c_->currLoc()) ) {
                     _gotOne();
@@ -420,7 +412,7 @@ namespace mongo {
             }
             c_->advance();
         }
-        virtual QueryOp *clone() const {
+        virtual QueryOp *_createChild() const {
             CountOp *ret = new CountOp( BSONObj() );
             ret->count_ = count_;
             ret->skip_ = skip_;
@@ -451,7 +443,6 @@ namespace mongo {
         shared_ptr<Cursor> c_;
         BSONObj query_;
         BtreeCursor *bc_;
-        auto_ptr< CoveredIndexMatcher > _matcher;
         BSONObj firstMatch_;
     };
     
@@ -576,7 +567,7 @@ namespace mongo {
             _curop( curop )
         {}
         
-        virtual void init() {
+        virtual void _init() {
             // only need to put the QueryResult fields there if we're building the first buffer in the message.
             if ( _response.empty() ) {
                 _buf.skip( sizeof( QueryResult ) );
@@ -587,8 +578,6 @@ namespace mongo {
             } else {
                 _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
             }
-            // FIXME get query right way
-            _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
 
             if ( qp().scanAndOrderRequired() ) {
                 _inMemSort = true;
@@ -628,7 +617,7 @@ namespace mongo {
             }
 
             _nscanned++;
-            if ( !_matcher->matches(_c->currKey(), _c->currLoc() , &_details ) ) {
+            if ( !matcher()->matches(_c->currKey(), _c->currLoc() , &_details ) ) {
                 // not a match, continue onward
                 if ( _details.loadedObject )
                     _nscannedObjects++;
@@ -732,7 +721,7 @@ namespace mongo {
         
         virtual bool mayRecordPlan() const { return _pq.getNumToReturn() != 1; }
         
-        virtual QueryOp *clone() const {
+        virtual QueryOp *_createChild() const {
             if ( _pq.isExplain() ) {
                 _eb.ensureStartScan();
             }
@@ -746,7 +735,6 @@ namespace mongo {
 
         bool scanAndOrderRequired() const { return _inMemSort; }
         shared_ptr<Cursor> cursor() { return _c; }
-        auto_ptr< CoveredIndexMatcher > matcher() { return _matcher; }
         int n() const { return _oldN + _n; }
         long long nscanned() const { return _nscanned + _oldNscanned; }
         long long nscannedObjects() const { return _nscannedObjects + _oldNscannedObjects; }
@@ -770,8 +758,6 @@ namespace mongo {
         auto_ptr< ScanAndOrder > _so;
         
         shared_ptr<Cursor> _c;
-
-        auto_ptr< CoveredIndexMatcher > _matcher;
 
         bool _saveClientCursor;
         bool _oplogReplay;
@@ -958,7 +944,7 @@ namespace mongo {
             ClientCursor *cc;
             bool moreClauses = mps->mayRunMore();
             if ( moreClauses ) {
-                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher() ) );
+                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher(), dqo ) );
                 cc = new ClientCursor(queryOptions, multi, ns);
             } else {
                 cursor->setMatcher( dqo.matcher() );

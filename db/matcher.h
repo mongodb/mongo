@@ -134,9 +134,7 @@ namespace mongo {
             return op <= BSONObj::LTE ? -1 : 1;
         }
 
-        // Only specify constrainIndexKey if matches() will be called with
-        // index keys having empty string field names.
-        Matcher(const BSONObj &pattern, const BSONObj &constrainIndexKey = BSONObj(), bool subMatcher = false);
+        Matcher(const BSONObj &pattern, bool subMatcher = false);
 
         ~Matcher();
 
@@ -153,13 +151,17 @@ namespace mongo {
             return jsobj.toString();
         }
 
-//        void popOr() {
-//            massert( 13261, "no or to pop", !_orMatchers.empty() );
-//            _norMatchers.push_back( _orMatchers.front() );
-//            _orMatchers.pop_front();
-//        }
+        void addOrConstraint( const BSONObj &o ) {
+            _norMatchers.push_back( shared_ptr< Matcher >( new Matcher( o ) ) );
+        }
+        
+        bool sameCriteriaCount( const Matcher &other ) const;
         
     private:
+        // Only specify constrainIndexKey if matches() will be called with
+        // index keys having empty string field names.
+        Matcher( const Matcher &other, const BSONObj &constrainIndexKey );
+        
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
@@ -206,15 +208,26 @@ namespace mongo {
     class CoveredIndexMatcher : boost::noncopyable {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
-        bool matches(const BSONObj &o){ return _docMatcher.matches( o ); }
+        bool matches(const BSONObj &o){ return _docMatcher->matches( o ); }
         bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 );
         bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 );
         bool needRecord(){ return _needRecord; }
         
-        Matcher& docMatcher() { return _docMatcher; }
+        Matcher& docMatcher() { return *_docMatcher; }
+
+        // once this is called, shouldn't use this matcher for matching any more
+        void addOrConstraint( const BSONObj &o ) {
+            _docMatcher->addOrConstraint( o );
+        }
+        
+        CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {
+            return new CoveredIndexMatcher( _docMatcher, indexKeyPattern, alwaysUseRecord );
+        }
     private:
+        CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
+        void init( bool alwaysUseRecord );
+        shared_ptr< Matcher > _docMatcher;
         Matcher _keyMatcher;
-        Matcher _docMatcher;
         bool _needRecord;
     };
     

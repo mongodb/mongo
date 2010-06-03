@@ -136,7 +136,6 @@ namespace mongo {
             ss << setw(width) << val << " ";
         }
 
-
         string doRow( const BSONObj& a , const BSONObj& b ){
             stringstream ss;
 
@@ -150,7 +149,14 @@ namespace mongo {
                 }
             }
 
-            if ( b.getFieldDotted("mem.supported").trueValue() ){
+			if ( b["backgroundFlushing"].type() == Object ){
+                BSONObj ax = a["backgroundFlushing"].embeddedObject();
+                BSONObj bx = b["backgroundFlushing"].embeddedObject();
+                BSONObjIterator i( bx );
+                cell( ss , "flushes/s" , 6 , (int)diff( "flushes" , ax , bx ) );
+            }
+
+			if ( b.getFieldDotted("mem.supported").trueValue() ){
                 BSONObj bx = b["mem"].embeddedObject();
                 BSONObjIterator i( bx );
                 cell( ss , "mapped" , 6 , bx["mapped"].numberInt() );

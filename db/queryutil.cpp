@@ -559,7 +559,7 @@ namespace mongo {
     
     FieldRangeSet::FieldRangeSet( const char *ns, const BSONObj &query , bool optimize )
         : _ns( ns ), _query( query.getOwned() ) {
-            BSONObjIterator i( query );
+            BSONObjIterator i( _query );
             
             while( i.more() ) {
                 BSONElement e = i.next();
@@ -570,18 +570,18 @@ namespace mongo {
                 
                 // if only one $or clause, use it - this works with our first cut hack way of rewriting queries
                 if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
-                    massert( 13272, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
-                    BSONObjIterator j( e.embeddedObject() );
-                    if ( j.more() ) { // could be assert instead
-                        BSONElement f = j.next();
-                        massert( 13275, "$or array must contain objects", f.type() == Object );
-                        if ( !j.more() ) { // if only one $or field, subfields are all required
-                            BSONObjIterator k( f.embeddedObject() );
-                            while( k.more() ) {
-                                processQueryField( k.next(), optimize );
-                            }
-                        }
-                    }
+//                    massert( 13272, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+//                    BSONObjIterator j( e.embeddedObject() );
+//                    if ( j.more() ) { // could be assert instead
+//                        BSONElement f = j.next();
+//                        massert( 13275, "$or array must contain objects", f.type() == Object );
+//                        if ( !j.more() ) { // if only one $or field, subfields are all required
+//                            BSONObjIterator k( f.embeddedObject() );
+//                            while( k.more() ) {
+//                                processQueryField( k.next(), optimize );
+//                            }
+//                        }
+//                    }
                     continue;
                 }
                 
@@ -593,29 +593,29 @@ namespace mongo {
             }   
         }
 
-//    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
-//        : _baseSet( ns, query, optimize ), _orFound() {
-//
-//        BSONObjIterator i( query );
-//        
-//        while( i.more() ) {
-//            BSONElement e = i.next();
-//            // e could be x:1 or x:{$gt:1}
-//
-//            if ( strcmp( e.fieldName(), "$where" ) == 0 )
-//                continue;
-//            
-//            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
-//                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );                                                                                         
-//                BSONObjIterator j( e.embeddedObject() );                                                                                                                                                        
-//                while( j.more() ) {                                                                                                                                                                             
-//                    BSONElement f = j.next();                                                                                                                                                                   
-//                    massert( 13263, "$or array must contain objects", f.type() == Object );                                                                                                                     
-//                    _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
-//                }
-//                _orFound = true;
-//                continue;
-//            }
+    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
+        : _baseSet( ns, query, optimize ), _orFound() {
+
+        BSONObjIterator i( query );
+        
+        while( i.more() ) {
+            BSONElement e = i.next();
+            // e could be x:1 or x:{$gt:1}
+
+            if ( strcmp( e.fieldName(), "$where" ) == 0 )
+                continue;
+            
+            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
+                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );                                                                                         
+                BSONObjIterator j( e.embeddedObject() );                                                                                                                                                        
+                while( j.more() ) {                                                                                                                                                                             
+                    BSONElement f = j.next();                                                                                                                                                                   
+                    massert( 13263, "$or array must contain objects", f.type() == Object );                                                                                                                     
+                    _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
+                }
+                _orFound = true;
+                continue;
+            }
 //
 //            bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
 //            if ( equality && e.type() == Object ) {
@@ -651,8 +651,8 @@ namespace mongo {
 //                    }
 //                }                
 //            }
-//        }
-//    }
+        }
+    }
 
     FieldRange *FieldRangeSet::trivialRange_ = 0;
     FieldRange &FieldRangeSet::trivialRange() {

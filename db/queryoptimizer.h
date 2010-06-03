@@ -33,6 +33,7 @@ namespace mongo {
         QueryPlan(NamespaceDetails *_d, 
                   int _idxNo, // -1 = no index
                   const FieldRangeSet &fbs,
+                  const BSONObj &originalQuery,
                   const BSONObj &order,
                   const BSONObj &startKey = BSONObj(),
                   const BSONObj &endKey = BSONObj() ,
@@ -55,7 +56,7 @@ namespace mongo {
         BSONObj indexKey() const;
         const char *ns() const { return fbs_.ns(); }
         NamespaceDetails *nsd() const { return d; }
-        BSONObj query() const { return fbs_.query(); }
+        BSONObj originalQuery() const { return _originalQuery; }
         BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return fbs_.simplifiedQuery( fields ); }
         const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
@@ -65,6 +66,7 @@ namespace mongo {
         NamespaceDetails *d;
         int idxNo;
         const FieldRangeSet &fbs_;
+        const BSONObj &_originalQuery;
         const BSONObj &order_;
         const IndexDetails *index_;
         bool optimal_;
@@ -83,20 +85,43 @@ namespace mongo {
     // each clone its own query plan.
     class QueryOp {
     public:
-        QueryOp() : _complete(), _stopRequested(), _qp(), _error() {}
+        QueryOp() : _complete(), _stopRequested(), _qp(), _error(), _haveOrConstraint() {}
+
+        // Used when handing off from one QueryOp type to another
+        QueryOp( const QueryOp &other ) :
+        _complete(), _stopRequested(), _qp(), _error(), _matcher( other._matcher ),
+        _haveOrConstraint( other._haveOrConstraint ), _orConstraint( other._orConstraint ) {}
+        
         virtual ~QueryOp() {}
         
-        /** this gets called after a query plan is set? ERH 2/16/10 */
-        virtual void init() = 0;
+        /** these gets called after a query plan is set */
+        void init() { 
+            if ( _oldMatcher.get() ) {
+                _matcher.reset( _oldMatcher->nextClauseMatcher( qp().indexKey() ) );
+            } else {
+                _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey(), alwaysUseRecord() ) );
+            }
+            _init();
+        }
         virtual void next() = 0;
+
         virtual bool mayRecordPlan() const = 0;
         
         /** @return a copy of the inheriting class, which will be run with its own
                     query plan.  If multiple plan sets are required for an $or query,
                     the QueryOp of the winning plan from a given set will be cloned
-                    to generate QueryOps for the subsequent plan set.
+                    to generate QueryOps for the subsequent plan set.  This function
+                    should only be called after the query op has completed executing.
         */
-        virtual QueryOp *clone() const = 0;
+        QueryOp *createChild() {
+            if( _haveOrConstraint ) {
+                _matcher->addOrConstraint( _orConstraint );
+                _haveOrConstraint = false;
+            }
+            QueryOp *ret = _createChild();
+            ret->_oldMatcher = _matcher;
+            return ret;
+        }
         bool complete() const { return _complete; }
         bool error() const { return _error; }
         bool stopRequested() const { return _stopRequested; }
@@ -108,15 +133,31 @@ namespace mongo {
             _error = true;
             _exceptionMessage = exceptionMessage;
         }
+        shared_ptr< CoveredIndexMatcher > matcher() const { return _matcher; }
     protected:
-        void setComplete() { _complete = true; }
+        void setComplete() {
+            _haveOrConstraint = true;
+            _orConstraint = qp().simplifiedQuery( qp().indexKey() );
+            _complete = true;
+        }
         void setStop() { setComplete(); _stopRequested = true; }
+
+        virtual void _init() = 0;
+        
+        virtual QueryOp *_createChild() const = 0;
+        
+        virtual bool alwaysUseRecord() const { return false; }
+    
     private:
         bool _complete;
         bool _stopRequested;
         string _exceptionMessage;
         const QueryPlan *_qp;
         bool _error;
+        shared_ptr< CoveredIndexMatcher > _matcher;
+        shared_ptr< CoveredIndexMatcher > _oldMatcher;
+        bool _haveOrConstraint;
+        BSONObj _orConstraint;
     };
     
     // Set of candidate query plans for a particular query.  Used for running
@@ -128,7 +169,8 @@ namespace mongo {
         typedef vector< PlanPtr > PlanSet;
 
         QueryPlanSet( const char *ns,
-                     const BSONObj &query,
+                     auto_ptr< FieldRangeSet > frs,
+                     const BSONObj &originalQuery,
                      const BSONObj &order,
                      const BSONElement *hint = 0,
                      bool honorRecordedPlan = true,
@@ -145,7 +187,7 @@ namespace mongo {
         PlanPtr getBestGuess() const;
         void setBestGuessOnly() { _bestGuessOnly = true; }
         //for testing
-        const FieldRangeSet &fbs() const { return fbs_; }
+        const FieldRangeSet &fbs() const { return *fbs_; }
     private:
         void addOtherPlans( bool checkFirst );
         void addPlan( PlanPtr plan, bool checkFirst ) {
@@ -164,8 +206,8 @@ namespace mongo {
             static void nextOp( QueryOp &op );
         };
         const char *ns;
-        BSONObj query_;
-        FieldRangeSet fbs_;
+        BSONObj _originalQuery;
+        auto_ptr< FieldRangeSet > fbs_;
         PlanSet plans_;
         bool mayRecordPlan_;
         bool usingPrerecordedPlan_;
@@ -229,47 +271,13 @@ namespace mongo {
         }
         void setBestGuessOnly() { _bestGuessOnly = true; }
     private:
-        //temp
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
-        }
-        // temp (and yucky)
-        BSONObj nextSimpleQuery() {
-            massert( 13267, "only generate simple query if $or", _or );
-            massert( 13270, "no more simple queries", mayRunMore() );
-            BSONObjBuilder b;
-            BSONArrayBuilder norb;
-            BSONObjIterator i( _query );
-            while( i.more() ) {
-                BSONElement e = i.next();
-                if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
-                    massert( 13269, "$nor must be array", e.type() == Array );
-                    BSONObjIterator j( e.embeddedObject() );
-                    while( j.more() ) {
-                        norb << j.next();
-                    }
-                } else if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-                    BSONObjIterator j( e.embeddedObject() );
-                    for( int k = 0; k < _i; ++k ) {
-                        norb << j.next();
-                    }
-                    b << "$or" << BSON_ARRAY( j.next() );
-                } else {
-                    b.append( e );
-                }
-            }
-            BSONArray nor = norb.arr();
-            if ( !nor.isEmpty() ) {
-                b << "$nor" << nor;
-            }
-            ++_i;
-            BSONObj ret = b.obj();
-            return ret;
         }
         const char * _ns;
         bool _or;
         BSONObj _query;
-//        FieldRangeOrSet _fros;
+        FieldRangeOrSet _fros;
         auto_ptr< QueryPlanSet > _currentQps;
         int _i;
         int _n;
@@ -281,11 +289,12 @@ namespace mongo {
     public:
         class CursorOp : public QueryOp {
         public:
+            CursorOp() {}
+            CursorOp( const QueryOp &other ) : QueryOp( other ) {}
             virtual shared_ptr< Cursor > newCursor() const = 0;  
-            virtual auto_ptr< CoveredIndexMatcher > newMatcher() const = 0;
         };
         // takes ownership of 'op'
-        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, auto_ptr< CursorOp > op = auto_ptr< CursorOp >( 0 ) )
+        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr< CursorOp > op = shared_ptr< CursorOp >() )
         : _mps( new MultiPlanScanner( ns, pattern, order ) ) {
             if ( op.get() ) {
                 _op = op;
@@ -303,8 +312,8 @@ namespace mongo {
             }
         }
         // used to handoff a query to a getMore()
-        MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, auto_ptr< CoveredIndexMatcher > matcher )
-        : _op( new NoOp() ), _c( c ), _mps( mps ), _matcher( matcher ) {
+        MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, const shared_ptr< CoveredIndexMatcher > &matcher, const QueryOp &op )
+        : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ) {
             _mps->setBestGuessOnly();
         }
         virtual bool ok() { return _c->ok(); }
@@ -337,25 +346,29 @@ namespace mongo {
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
     private:
         class NoOp : public CursorOp {
-            virtual void init() { setComplete(); }
+        public:
+            NoOp() {}
+            NoOp( const QueryOp &other ) : CursorOp( other ) {}
+            virtual void _init() { setComplete(); }
             virtual void next() {}
             virtual bool mayRecordPlan() const { return false; }
-            virtual QueryOp *clone() const { return new NoOp(); }
+            virtual QueryOp *_createChild() const { return new NoOp(); }
             virtual shared_ptr< Cursor > newCursor() const { return qp().newCursor(); }
-            virtual auto_ptr< CoveredIndexMatcher > newMatcher() const {
-                return auto_ptr< CoveredIndexMatcher >( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
-            }
+        private:
+            shared_ptr< CoveredIndexMatcher > _matcher;
+            shared_ptr< CoveredIndexMatcher > _oldMatcher;
         };
         void nextClause() {
             shared_ptr< CursorOp > best = _mps->runOpOnce( *_op );
             massert( 10401 , best->exceptionMessage(), best->complete() );
             _c = best->newCursor();
-            _matcher = best->newMatcher();
+            _matcher = best->matcher();
+            _op = best;
         }
-        auto_ptr< CursorOp > _op;
+        shared_ptr< CursorOp > _op;
         shared_ptr< Cursor > _c;
         auto_ptr< MultiPlanScanner > _mps;
-        auto_ptr< CoveredIndexMatcher > _matcher;
+        shared_ptr< CoveredIndexMatcher > _matcher;
     };
     
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
@@ -373,9 +386,10 @@ namespace mongo {
         if( !query.getField( "$or" ).eoo() ) {
             return shared_ptr< Cursor >( new MultiCursor( ns, query, sort ) );
         } else {
-            shared_ptr< Cursor > ret = QueryPlanSet( ns, query, sort ).getBestGuess()->newCursor();
+            auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
+            shared_ptr< Cursor > ret = QueryPlanSet( ns, frs, query, sort ).getBestGuess()->newCursor();
             if ( !query.isEmpty() ) {
-                auto_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
+                shared_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
                 ret->setMatcher( matcher );
             }
             return ret;

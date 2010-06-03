@@ -728,13 +728,11 @@ namespace mongo {
     class UpdateOp : public MultiCursor::CursorOp {
     public:
         UpdateOp( bool hasPositionalField ) : _nscanned(), _hasPositionalField( hasPositionalField ){}
-        virtual void init() {
-            BSONObj pattern = qp().query();
+        virtual void _init() {
             _c = qp().newCursor();
-            if ( ! _c->ok() )
+            if ( ! _c->ok() ) {
                 setComplete();
-            else
-                _matcher.reset( new CoveredIndexMatcher( pattern, qp().indexKey() , _hasPositionalField ) );
+            }
         }
         virtual void next() {
             if ( ! _c->ok() ) {
@@ -742,7 +740,7 @@ namespace mongo {
                 return;
             }
             _nscanned++;
-            if ( _matcher->matches(_c->currKey(), _c->currLoc(), &_details ) ) {
+            if ( matcher()->matches(_c->currKey(), _c->currLoc(), &_details ) ) {
                 setComplete();
                 return;
             }
@@ -750,19 +748,16 @@ namespace mongo {
         }
 
         virtual bool mayRecordPlan() const { return false; }
-        virtual QueryOp *clone() const {
+        virtual QueryOp *_createChild() const {
             return new UpdateOp( _hasPositionalField );
         }
         // already scanned to the first match, so return _c
         virtual shared_ptr< Cursor > newCursor() const { return _c; }
-        virtual auto_ptr< CoveredIndexMatcher > newMatcher() const {
-            return auto_ptr< CoveredIndexMatcher >( new CoveredIndexMatcher( qp().query(), qp().indexKey(), _hasPositionalField ) );
-        }
+        virtual bool alwaysUseRecord() const { return _hasPositionalField; }
     private:
         shared_ptr< Cursor > _c;
         long long _nscanned;
         bool _hasPositionalField;
-        auto_ptr< CoveredIndexMatcher > _matcher;
         MatchDetails _details;
     };
 
@@ -800,7 +795,7 @@ namespace mongo {
         int numModded = 0;
         long long nscanned = 0;
         MatchDetails details;
-        auto_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
+        shared_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
         shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr ) );
         
         auto_ptr<ClientCursor> cc;
