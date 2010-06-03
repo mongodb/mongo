@@ -125,7 +125,7 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query 
        set your db SavedContext first
     */
-    bool Helpers::findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex) { 
+    bool Helpers::findOne(const char *ns, const BSONObj &query, BSONObj& result, bool requireIndex) { 
         MultiPlanScanner s( ns, query, BSONObj(), 0, !requireIndex );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );

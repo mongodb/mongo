@@ -753,6 +753,7 @@ namespace mongo {
         }
         // already scanned to the first match, so return _c
         virtual shared_ptr< Cursor > newCursor() const { return _c; }
+        virtual bool alwaysUseRecord() const { return _hasPositionalField; }
     private:
         shared_ptr< Cursor > _c;
         long long _nscanned;

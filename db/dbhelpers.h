@@ -71,7 +71,7 @@ namespace mongo {
 
            @return true if object found
         */
-        static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex = false);
+        static bool findOne(const char *ns, const BSONObj &query, BSONObj& result, bool requireIndex = false);
         
 
         /**

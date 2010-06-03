@@ -99,8 +99,7 @@ namespace mongo {
             if ( _oldMatcher.get() ) {
                 _matcher.reset( _oldMatcher->nextClauseMatcher( qp().indexKey() ) );
             } else {
-                // TODO do we want to make 'alwaysUseRecord' optional?
-                _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey() ) );
+                _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey(), alwaysUseRecord() ) );
             }
             _init();
         }
@@ -146,6 +145,8 @@ namespace mongo {
         virtual void _init() = 0;
         
         virtual QueryOp *_createChild() const = 0;
+        
+        virtual bool alwaysUseRecord() const { return false; }
     
     private:
         bool _complete;

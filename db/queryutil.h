@@ -244,6 +244,7 @@ namespace mongo {
 //        }
         bool orFinished() const { return _orFound && _orSets.empty(); }
         // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
+        // this could invalidate the result of the last topFrs()
         void popOrClause() {
             massert( 13274, "no or clause to pop", !orFinished() );
 //            const FieldRangeSet &toPop = _orSets.front();
