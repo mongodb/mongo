@@ -22,6 +22,14 @@
 
 #if defined(MONGO_EXPOSE_MACROS)
 #define JS_C_STRINGS_ARE_UTF8
+#undef _UNICODE
+#define _UNICODE
+#undef UNICODE
+#define UNICODE
+#undef SUPPORT_UCP
+#define SUPPORT_UCP
+#undef SUPPORT_UTF8
+#define SUPPORT_UTF8
 #endif
 
 #if defined(_WIN32)
