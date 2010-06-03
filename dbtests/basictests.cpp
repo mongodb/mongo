@@ -423,6 +423,39 @@ namespace BasicTests {
         }
     };
 
+    struct IsValidUTF8Test {
+// macros used to get valid line numbers
+#define good(s)  ASSERT(isValidUTF8(s));
+#define bad(s)   ASSERT(!isValidUTF8(s));
+
+        void run() {
+            good("A");
+            good("\xC2\xA2"); // cent: ¢
+            good("\xE2\x82\xAC"); // euro: €
+            good("\xF0\x9D\x90\x80"); // Blackboard A: 𝐀
+
+            //abrupt end
+            bad("\xC2");
+            bad("\xE2\x82");
+            bad("\xF0\x9D\x90");
+            bad("\xC2 ");
+            bad("\xE2\x82 ");
+            bad("\xF0\x9D\x90 ");
+
+            //too long
+            bad("\xF8\x80\x80\x80\x80");
+            bad("\xFC\x80\x80\x80\x80\x80");
+            bad("\xFE\x80\x80\x80\x80\x80\x80");
+            bad("\xFF\x80\x80\x80\x80\x80\x80\x80");
+
+            bad("\xF5\x80\x80\x80"); // U+140000 > U+10FFFF
+            bad("\x80"); //cant start with continuation byte
+            bad("\xC0\x80"); // 2-byte version of ASCII NUL
+#undef good
+#undef bad
+        }
+    };
+
 
 
     class All : public Suite {
@@ -450,6 +483,7 @@ namespace BasicTests {
             add< PtrTests >();
 
             add< StringSplitterTest >();
+            add< IsValidUTF8Test >();
         }
     } myall;
     

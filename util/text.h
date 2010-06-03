@@ -76,5 +76,11 @@ namespace mongo {
         const char * _splitter;
     };
     
+    /* This doesn't defend against ALL bad UTF8, but it will guarantee that the
+     * string can be converted to sequence of codepoints. However, it doesn't
+     * guarantee that the codepoints are valid.
+     */
+    bool isValidUTF8(const char *s);
+    inline bool isValidUTF8(string s) { return isValidUTF8(s.c_str()); }
     
 }
