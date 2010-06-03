@@ -33,16 +33,14 @@ namespace mongo {
 
     CoveredIndexMatcher::CoveredIndexMatcher( const BSONObj &jsobj, const BSONObj &indexKeyPattern, bool alwaysUseRecord) :
         _docMatcher( new Matcher( jsobj ) ),
-        _keyMatcher( *_docMatcher, indexKeyPattern ),
-        _orPopped()
+        _keyMatcher( *_docMatcher, indexKeyPattern )
     {
         init( alwaysUseRecord );
     }
  
     CoveredIndexMatcher::CoveredIndexMatcher( const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord ) :
         _docMatcher( docMatcher ),
-        _keyMatcher( *_docMatcher, indexKeyPattern ),
-        _orPopped()
+        _keyMatcher( *_docMatcher, indexKeyPattern )
     {
         init( alwaysUseRecord );
     }
