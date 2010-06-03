@@ -427,16 +427,14 @@ namespace mongo {
 
     void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
 
-#if !defined(_WIN32)
-        pid_t pid = 0;
-        pid = getpid();
-#else
-        int pid=0;
-#endif
-
         bool is32bit = sizeof(int*) == 4;
 
         {
+#if !defined(_WIN32)
+            pid_t pid = getpid();
+#else
+            DWORD pid=GetCurrentProcessId();
+#endif
             Nullstream& l = log();
             l << "MongoDB starting : pid=" << pid << " port=" << cmdLine.port << " dbpath=" << dbpath;
             if( replSettings.master ) l << " master=" << replSettings.master;
