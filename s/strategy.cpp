@@ -171,15 +171,19 @@ namespace mongo {
         unsigned long long officialSequenceNumber = 0;
 
         ChunkManagerPtr manager;
-        if ( conf->isSharded( ns ) ){
+        const bool isSharded = conf->isSharded( ns );
+        if ( isSharded ){
             manager = conf->getChunkManager( ns , authoritative );
             officialSequenceNumber = manager->getSequenceNumber();
-            version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
 
         unsigned long long & sequenceNumber = checkShardVersionLastSequence[ make_pair(&conn,ns) ];        
         if ( sequenceNumber == officialSequenceNumber )
             return;
+
+        if ( isSharded ){
+            version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
+        }
         
         log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns 
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber 
