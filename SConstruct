@@ -590,9 +590,10 @@ elif "win32" == os.sys.platform:
 
     boostLibs = []
 
-    env.Append( CPPPATH=[ "js/src/" ] )
+    env.Append(CPPPATH=[ "js/src/" ])
     env.Append(CPPPATH=["../js/src/"])
     env.Append(LIBPATH=["../js/src"])
+    env.Append(LIBPATH=["../js/"])
     env.Append( CPPDEFINES=[ "OLDJS" ] )
 
     winSDKHome = findVersion( [ "C:/Program Files/Microsoft SDKs/Windows/", "C:/Program Files (x86)/Microsoft SDKs/Windows/" ] ,
@@ -621,6 +622,7 @@ elif "win32" == os.sys.platform:
         env.Append( CPPFLAGS= " /O2 /MT /Gy /Zi /TP /errorReport:none " )
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
+        # /LTCG link time code generation
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
     else:
@@ -631,7 +633,7 @@ elif "win32" == os.sys.platform:
         # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
         env.Append( CPPFLAGS=" /Od /RTC1 /MDd /Zi /TP /errorReport:none " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
-        env.Append( LINKFLAGS=" /incremental:yes /debug " )
+        env.Append( LINKFLAGS=" /debug " )
 
     if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
         env.Append( LIBPATH=[ boostDir + "/lib/vs2010_64" ] )
@@ -642,7 +644,7 @@ elif "win32" == os.sys.platform:
 
     if force64:
         env.Append( LIBPATH=[ winSDKHome + "/Lib/x64" ] )
-        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT " )
+        #env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT " )
     else:
         env.Append( LIBPATH=[ winSDKHome + "/Lib" ] )
 
@@ -669,7 +671,10 @@ elif "win32" == os.sys.platform:
     winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib"
 
     if force64:
-        winLibString += " LIBCMT LIBCPMT "
+        
+        winLibString += ""
+        #winLibString += " LIBCMT LIBCPMT "
+
     else:
         winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
         winLibString += " odbc32.lib odbccp32.lib uuid.lib "
@@ -930,7 +935,16 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
     if usesm:
 
-        myCheckLib( [ "mozjs" , "js", "js_static" ] , True )
+        # see http://www.mongodb.org/pages/viewpageattachments.action?pageId=12157032
+        J = [ "mozjs" , "js", "js_static" ]
+        if windows and msarch == "amd64":
+            if release:
+                J = [ "js64r", "js", "mozjs" , "js_static" ]
+            else:
+                J = "js64d"
+                print( "will use js64d.lib for spidermonkey. (available at mongodb.org prebuilt.)" );
+
+        myCheckLib( J , True )
         mozHeader = "js"
         if bigLibString(myenv).find( "mozjs" ) >= 0:
             mozHeader = "mozjs"
