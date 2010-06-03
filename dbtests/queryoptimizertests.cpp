@@ -929,7 +929,6 @@ namespace QueryOptimizerTests {
             }
         private:
             void nPlans( int n ) {
-                log() << "checking nplans: " << n << endl;
                 auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns(), BSON( "a" << 4 ) ) );
                 QueryPlanSet s( ns(), frs, BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ASSERT_EQUALS( n, s.nPlans() );                
