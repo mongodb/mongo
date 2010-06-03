@@ -134,8 +134,6 @@ namespace mongo {
             return op <= BSONObj::LTE ? -1 : 1;
         }
 
-        // Only specify constrainIndexKey if matches() will be called with
-        // index keys having empty string field names.
         Matcher(const BSONObj &pattern, bool subMatcher = false);
 
         ~Matcher();
@@ -160,6 +158,8 @@ namespace mongo {
         bool sameCriteriaCount( const Matcher &other ) const;
         
     private:
+        // Only specify constrainIndexKey if matches() will be called with
+        // index keys having empty string field names.
         Matcher( const Matcher &other, const BSONObj &constrainIndexKey );
         
         void addBasic(const BSONElement &e, int c, bool isNot) {
@@ -229,7 +229,6 @@ namespace mongo {
         shared_ptr< Matcher > _docMatcher;
         Matcher _keyMatcher;
         bool _needRecord;
-        bool _orPopped;
     };
     
 } // namespace mongo

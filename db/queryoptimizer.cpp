@@ -85,6 +85,7 @@ namespace mongo {
             optimal_ = true;
             _type  = index_->getSpec().getType();
             massert( 13040 , (string)"no type for special: " + _special , _type );
+            // hopefully safe to use original query in these contexts - don't think we can mix special with $or clause separation yet
             scanAndOrderRequired_ = _type->scanAndOrderRequired( _originalQuery , order );
             return;
         }
@@ -180,8 +181,10 @@ namespace mongo {
     
     shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
 
-        if ( _type )
+        if ( _type ) {
+            // hopefully safe to use original query in these contexts - don't think we can mix type with $or clause separation yet   
             return _type->newCursor( _originalQuery , order_ , numWanted );
+        }
         
         if ( !fbs_.matchPossible() ){
             if ( fbs_.nNontrivialRanges() )
@@ -587,6 +590,7 @@ namespace mongo {
     _i(),
     _honorRecordedPlan( honorRecordedPlan ),
     _bestGuessOnly() {
+        // TODO add special/type check
         // eventually implement (some of?) these
         if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
