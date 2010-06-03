@@ -150,13 +150,13 @@ namespace mongo {
                 nextjsobj += strlen(data) + 1; // skip namespace
                 massert( 13066 ,  "Message contains no documents", theEnd > nextjsobj );
             }
-            massert( 10304 ,  "Remaining data too small for BSON object", theEnd - nextjsobj > 3 );
+            massert( 10304 ,  "Client Error: Remaining data too small for BSON object", theEnd - nextjsobj > 3 );
             BSONObj js(nextjsobj);
-            massert( 10305 ,  "Invalid object size", js.objsize() > 3 );
-            massert( 10306 ,  "Next object larger than available space",
+            massert( 10305 ,  "Client Error: Invalid object size", js.objsize() > 3 );
+            massert( 10306 ,  "Client Error: Next object larger than space left in message",
                     js.objsize() < ( theEnd - data ) );
             if ( objcheck && !js.valid() ) {
-                massert( 10307 , "bad object in message", false);
+                massert( 10307 , "Client Error: bad object in message", false);
             }            
             nextjsobj += js.objsize();
             if ( nextjsobj >= theEnd )
