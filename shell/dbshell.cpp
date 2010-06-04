@@ -44,6 +44,12 @@ bool inMultiLine = 0;
 #define CTRLC_HANDLE
 #endif
 
+static char** my_completion(const char* text , int start ,int end ){
+    cout << "YO [" << text << "] " << start << " " << end << endl;
+    return 0;
+}
+
+
 void shellHistoryInit(){
 #ifdef USE_READLINE
     stringstream ss;
@@ -56,6 +62,9 @@ void shellHistoryInit(){
     using_history();
     read_history( historyFile.c_str() );
 
+    // TODO: do auto-completion
+    //rl_attempted_completion_function = my_completion;
+        
 #else
     cout << "type \"exit\" to exit" << endl;
 #endif
