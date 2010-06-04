@@ -111,6 +111,52 @@ namespace mongo {
 
     extern time_t started;
 
+    static void say(stringstream&ss, const bo& op) {
+        ss << op.toString() << '\n';
+    }
+
+    void ReplSetImpl::_getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { 
+        Member *m = findById(server_id);
+        if( m == 0 ) { 
+            ss << "Error : can't find a member with id: " << server_id << '\n';
+            return;
+        }
+
+        const bo fields = BSON( "o" << -1 << "o2" << -1 );
+
+        ScopedConn conn(m->fullName());        
+
+        auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
+        ss << "<pre>\n";
+        int n = 0;
+        long long lastOrd = 0;
+        while( c->more() ) {
+            bo o = c->next();
+            lastOrd = o["t"].Long();
+            say(ss, o);
+            n++;            
+        }
+        if( n == 0 ) {
+            ss << rsoplog << " is empty\n";
+        }
+        else { 
+            auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
+            string x;
+            while( c->more() ) {
+                stringstream z;
+                bo o = c->next();
+                if( o["t"].Long() == lastOrd ) 
+                    break;
+                say(z, o);
+                x = z.str() + x;
+            }
+            if( !x.empty() ) {
+                ss << "\n...\n\n" << x;
+            }
+        }
+        ss << "</pre>\n";
+    }
+
     void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 
         s << table(0, false);
         s << tr("Set name:", _name);
@@ -229,6 +275,14 @@ namespace mongo {
             }
         }
         s << "</pre>\n";
+    }
+
+    Member* ReplSetImpl::findById(unsigned id) const { 
+        if( id == _self->id() ) return _self;
+        for( Member *m = head(); m; m = m->next() )
+            if( m->id() == id ) 
+                return m;
+        return 0;
     }
 
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const { 

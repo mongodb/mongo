@@ -265,6 +265,33 @@ namespace mongo {
             return s.str();
         }
 
+        string _replSetOplog(string parms) { 
+            stringstream s;
+            string t = "Replica Set oplog for host : " + hostname();
+            s << start(t);
+            s << p(t);
+
+            if( theReplSet == 0 ) { 
+                if( cmdLine.replSet.empty() ) 
+                    s << p("Not using --replSet");
+                else  {
+                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated") 
+                           + ".<br>" + ReplSet::startupStatusMsg);
+                }
+            }
+            else {
+                try {
+                    theReplSet->getOplogDiagsAsHtml(stringToNum(parms.c_str()), s);
+                }
+                catch(std::exception& e) { 
+                    s << "error querying oplog: " << e.what() << '\n'; 
+                }
+            }
+
+            s << _end();
+            return s.str();
+        }
+
         /* /_replSet show replica set status in html format */
         string _replSet() { 
             stringstream s;
@@ -411,7 +438,11 @@ namespace mongo {
                 }
 
                 if( startsWith(url, "/_replSet") ) {
-                    responseMsg = _replSet();
+                    string s = str::after(url, "/_replSetOplog?");
+                    if( !s.empty() )
+                        responseMsg = _replSetOplog(s);
+                    else
+                        responseMsg = _replSet();
                     responseCode = 200;
                     return;
                 }
