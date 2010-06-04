@@ -442,20 +442,20 @@ public:
                 array = ch_p( '[' )[ arrayStart( self.b ) ] >> !elements >> ']';
                 elements = list_p(value, ch_p(',')[arrayNext( self.b )]);
                 value =
-                    oid[ oidEnd( self.b ) ] |
-                    dbref[ dbrefEnd( self.b ) ] |
-                    bindata[ binDataEnd( self.b ) ] |
-                    date[ dateEnd( self.b ) ] |
-                    regex[ regexEnd( self.b ) ] |
                     str[ stringEnd( self.b ) ] |
-                    singleQuoteStr[ stringEnd( self.b ) ] |
                     number |
                     integer |
-                    object[ subobjectEnd( self.b ) ] |
                     array[ arrayEnd( self.b ) ] |
                     lexeme_d[ str_p( "true" ) ][ trueValue( self.b ) ] |
                     lexeme_d[ str_p( "false" ) ][ falseValue( self.b ) ] |
-                    lexeme_d[ str_p( "null" ) ][ nullValue( self.b ) ];
+                    lexeme_d[ str_p( "null" ) ][ nullValue( self.b ) ] |
+                    singleQuoteStr[ stringEnd( self.b ) ] |
+                    date[ dateEnd( self.b ) ] |
+                    oid[ oidEnd( self.b ) ] |
+                    bindata[ binDataEnd( self.b ) ] |
+                    dbref[ dbrefEnd( self.b ) ] |
+                    regex[ regexEnd( self.b ) ] |
+                    object[ subobjectEnd( self.b ) ] ;
                 // NOTE lexeme_d and rules don't mix well, so we have this mess.
                 // NOTE We use range_p rather than cntrl_p, because the latter is locale dependent.
                 str = lexeme_d[ ch_p( '"' )[ chClear( self.b ) ] >>
