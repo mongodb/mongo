@@ -20,6 +20,8 @@
 
 namespace mongo {
 
+    const string rsoplog = "local.oplog.rs";
+
     struct RSOpTime { 
         unsigned long long ord;
 
@@ -38,6 +40,9 @@ namespace mongo {
         }
 
         string toString() const { return str::stream() << ord; }
+
+        /* query the oplog and set the highest value herein.  acquires a db read lock. throws. */
+        void load();
     };
 
     extern RSOpTime rsOpTime;

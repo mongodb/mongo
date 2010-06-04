@@ -29,14 +29,11 @@
 
 namespace mongo {
 
-    void newReplUp();
     struct Target;
     class ReplSetImpl;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
-
-    const string rsoplog = "local.oplog.rs";
 
     class Member : public List1<Member>::Base {
     public:
@@ -157,11 +154,7 @@ namespace mongo {
         ReplSetImpl(string cfgString);
 
         /* call after constructing to start - returns fairly quickly after launching its threads */
-        void _go() { 
-            _myState = STARTUP2; 
-            startThreads();
-            newReplUp();
-        }
+        void _go();
 
     private:
 
