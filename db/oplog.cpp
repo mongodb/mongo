@@ -195,7 +195,9 @@ namespace mongo {
     void oldRepl() { _logOp = _logOpOld; }
 
     void logKeepalive() { 
-        BSONObj obj;
+        _logOp("n", "", 0, BSONObj(), 0, 0);
+    }
+    void logOpComment(const BSONObj& obj) {
         _logOp("n", "", 0, obj, 0, 0);
     }
 

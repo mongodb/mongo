@@ -193,6 +193,15 @@ namespace mongo {
         return true;
     }
 
+    bool Helpers::getLast(const char *ns, BSONObj& result) {
+        Client::Context ctx(ns);
+        shared_ptr<Cursor> c = findTableScan(ns, reverseNaturalObj);
+        if( !c->ok() ) 
+            return false;
+        result = c->current();
+        return true;
+    }
+
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         OpDebug debug;
         Client::Context context(ns);

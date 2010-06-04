@@ -126,10 +126,6 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
-                //log() << newConfig.toString() << rsLog;
-
-                string z = str::after("abcde", 'c');
-
                 newConfig.saveConfigLocally();
             }
             catch( DBException& e ) { 

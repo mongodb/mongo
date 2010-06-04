@@ -18,6 +18,8 @@
 #include "../cmdline.h"
 #include "../../util/sock.h"
 #include "../client.h"
+#include "../../client/dbclient.h"
+#include "../dbhelpers.h"
 #include "rs.h"
 
 namespace mongo { 
@@ -137,6 +139,35 @@ namespace mongo {
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
             log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
+    }
+
+    void newReplUp();
+
+    void RSOpTime::load() { 
+        ord = 0;
+        readlock lk(rsoplog);
+        BSONObj o;
+        if( Helpers::getLast(rsoplog.c_str(), o) ) { 
+            ord = (unsigned long long) o["t"].Long();
+            uassert(13290, "bad replSet oplog entry?", ord > 0);
+        }
+    }
+
+    /* call after constructing to start - returns fairly quickly after launching its threads */
+    void ReplSetImpl::_go() { 
+        try { 
+            rsOpTime.load();
+        }
+        catch(std::exception& e) { 
+            log() << "replSet ERROR FATAL couldn't query the local " << rsoplog << " collection.  Terminating mongod after 30 seconds." << rsLog;
+            log() << e.what() << rsLog;
+            sleepsecs(30);
+            dbexit( EXIT_REPLICATION_ERROR );
+            return;
+        }
+        _myState = STARTUP2;
+        startThreads();
+        newReplUp();
     }
 
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
