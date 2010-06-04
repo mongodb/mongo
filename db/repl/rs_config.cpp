@@ -23,6 +23,7 @@
 #include "../../util/hostandport.h"
 #include "../dbhelpers.h"
 #include "connections.h"
+#include "../oplog.h"
 
 using namespace bson;
 
@@ -42,9 +43,11 @@ namespace mongo {
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
         MemoryMappedFile::flushAll(true);
         { 
-            writelock lk("admin.");
+            writelock lk("");
+            rsOpTime.initiate();
             BSONObj o = asBson();
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
+            logOpComment(BSON("msg"<<"initiating"));
             MemoryMappedFile::flushAll(true);
         }
     }
