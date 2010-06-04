@@ -96,6 +96,14 @@ namespace mongo {
      * guarantee that the codepoints are valid.
      */
     bool isValidUTF8(const char *s);
-    inline bool isValidUTF8(string s) { return isValidUTF8(s.c_str()); }
+    inline bool isValidUTF8(string s) { return isValidUTF8(s.c_str()); }   
+
+    #if defined(_WIN32)
+
+    std::string toUtf8String(const std::wstring& wide);
+
+    std::wstring toWideString(const char *s);
+	
+    #endif
     
 }

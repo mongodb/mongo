@@ -1502,6 +1502,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\util\text.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\util\text.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\unittest.h"
 				>
 			</File>

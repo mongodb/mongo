@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "mmap.h"
+#include "text.h"
 #include <windows.h>
 
 namespace mongo {
@@ -39,12 +40,6 @@ namespace mongo {
         if ( fd )
             CloseHandle(fd);
         fd = 0;
-    }
-
-    std::wstring toWideString(const char *s) {
-        std::basic_ostringstream<TCHAR> buf;
-        buf << s;
-        return buf.str();
     }
     
     unsigned mapped = 0;

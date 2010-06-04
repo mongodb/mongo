@@ -59,5 +59,46 @@ namespace mongo{
         }
         if (left!=0) return false; // string ended mid-codepoint
         return true;
+    }   
+
+    #if defined(_WIN32)
+
+	std::string toUtf8String(const std::wstring& wide)
+	{
+		if (wide.size() > boost::integer_traits<int>::const_max)
+			throw std::length_error(
+					"Wide string cannot be more than INT_MAX characters long.");
+		if (wide.size() == 0)
+			return "";
+
+		// Calculate necessary buffer size
+		int len = ::WideCharToMultiByte(
+			CP_UTF8, 0, wide.c_str(), static_cast<int>(wide.size()), 
+			NULL, 0, NULL, NULL);
+
+		// Perform actual conversion
+		if (len > 0)
+		{
+			std::vector<char> buffer(len);
+			len = ::WideCharToMultiByte(
+					CP_UTF8, 0, wide.c_str(), static_cast<int>(wide.size()),
+					&buffer[0], static_cast<int>(buffer.size()), NULL, NULL);
+			if (len > 0)
+			{
+					assert(len == static_cast<int>(buffer.size()));
+					return std::string(&buffer[0], buffer.size());
+			}
+		}
+
+		throw boost::system::system_error(
+			::GetLastError(), boost::system::system_category);
+	}
+
+	std::wstring toWideString(const char *s) {
+        std::basic_ostringstream<TCHAR> buf;
+        buf << s;
+        return buf.str();
     }
+
+    #endif
 }

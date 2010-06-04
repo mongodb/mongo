@@ -185,6 +185,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\balancer_policy.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\chunk.cpp"
 				>
 			</File>
@@ -263,11 +267,7 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\gridconfig.h"
-				>
-			</File>
-			<File
-				RelativePath=".\griddatabase.h"
+				RelativePath=".\balancer_policy.h"
 				>
 			</File>
 			<File
@@ -311,6 +311,10 @@
 				</File>
 				<File
 					RelativePath="..\pch.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\text.h"
 					>
 				</File>
 			</Filter>
@@ -1006,6 +1010,10 @@
 			</File>
 			<File
 				RelativePath="..\util\thread_pool.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\util\text.cpp"
 				>
 			</File>
 			<File
