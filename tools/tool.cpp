@@ -258,7 +258,7 @@ namespace mongo {
             pcrecpp::StringPiece input(fields_arg);
         
             string f;
-            pcrecpp::RE re("([#\\w\\.\\s]+),?" );
+            pcrecpp::RE re("([#\\w\\.\\s\\-]+),?" );
             while ( re.Consume( &input, &f ) ){
                 _fields.push_back( f );
                 b.append( f.c_str() , 1 );
