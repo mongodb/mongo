@@ -29,10 +29,10 @@ namespace mongo {
     class Shard {
     public:
         Shard()
-            : _name(""),_addr(""){
+            : _name(""), _addr(""), _maxSize(0){
         }
-        Shard( const string& name , const string& addr )
-            : _name(name), _addr( addr ){
+        Shard( const string& name , const string& addr, unsigned long maxSize = 0)
+            : _name(name), _addr( addr ), _maxSize( maxSize ){
         }
 
         Shard( const string& ident ){
@@ -40,11 +40,11 @@ namespace mongo {
         }
 
         Shard( const Shard& other )
-            : _name( other._name ) , _addr( other._addr ){
+            : _name( other._name ) , _addr( other._addr ), _maxSize( other._maxSize ){
         }
 
         Shard( const Shard* other )
-            : _name( other->_name ) ,_addr( other->_addr ){
+            : _name( other->_name ) ,_addr( other->_addr ), _maxSize( other->_maxSize ){
         }
         
         static Shard make( const string& ident ){
@@ -68,6 +68,10 @@ namespace mongo {
         string getConnString() const {
             assert( _addr.size() );
             return _addr;
+        }
+
+        unsigned long getMaxSize() const {
+            return _maxSize;
         }
 
         string toString() const {
@@ -128,8 +132,9 @@ namespace mongo {
         static Shard EMPTY;
 
     private:
-        string _name;
-        string _addr;
+        string        _name;
+        string        _addr;
+        unsigned long _maxSize;  // in MBytes, 0 is unlimited 
     };
 
     class ShardStatus {

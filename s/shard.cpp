@@ -110,6 +110,7 @@ namespace mongo {
         uassert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
         _name = s._name;
         _addr = s._addr;
+        _maxSize = s._maxSize;
     }
     
     void Shard::getAllShards( vector<Shard>& all ){
