@@ -24,7 +24,8 @@
    (4) are clean and easy to use in any c++ project without pulling in lots of other stuff
 
    Note: within this module, we use int for all offsets -- there are no unsigned offsets 
-   and no size_t's.  If you need 3 gigabyte long strings, don't use this module. */
+   and no size_t's.  If you need 3 gigabyte long strings, don't use this module. 
+*/
 
 #include <string>
 
@@ -33,6 +34,27 @@ namespace mongoutils {
     namespace str {
 
         using namespace std;
+
+        /** the idea here is to make one liners easy.  e.g.: 
+
+               return str::stream() << 1 << ' ' << 2;
+
+            since the following doesn't work:
+               
+               (stringstream() << 1).str();
+        */
+        class stream {
+        public:
+            stringstream ss;
+
+            template<class T>
+            stream& operator<<(const T& v) {
+                ss << v;
+                return *this;
+            }
+
+            operator std::string () const { return ss.str(); }
+        };
 
         inline bool startsWith(const char *str, const char *prefix) {
             size_t l = strlen(prefix);

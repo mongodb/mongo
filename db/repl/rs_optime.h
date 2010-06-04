@@ -36,6 +36,8 @@ namespace mongo {
             DEV assertInWriteLock();
             return ++ord;
         }
+
+        string toString() const { return str::stream() << ord; }
     };
 
     extern RSOpTime rsOpTime;
