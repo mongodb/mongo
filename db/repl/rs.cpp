@@ -60,15 +60,17 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMaster(BSONObjBuilder& b) {
-        b.append("ismaster", 0);
-        b.append("ok", false);
-        b.append("msg", "not yet implemented");
+        b.append("ismaster", isPrimary());
+        b.append("secondary", isSecondary());
+        b.append("msg", "replica sets not yet fully implemented. do not use yet.");
         {
             BSONObjBuilder a;
             int n = 0;
             a.append("0", _self->h().toString());
-            for( Member *m = _members.head(); m; m = m->next() )
-                a.append(BSONObjBuilder::numStr(n++).c_str(), m->h().toString());
+            for( Member *m = _members.head(); m; m = m->next() ) {
+                if( m->hot() )
+                    a.append(BSONObjBuilder::numStr(++n).c_str(), m->h().toString());
+            }
             b.appendArray("hosts", a.done());
         }
     }

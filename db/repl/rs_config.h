@@ -48,6 +48,9 @@ namespace mongo {
             bool arbiterOnly;
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
+            bool hot() const { 
+                return !arbiterOnly;
+            }
         };
         vector<MemberCfg> members;
         string _id;

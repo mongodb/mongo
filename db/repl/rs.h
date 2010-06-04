@@ -47,6 +47,7 @@ namespace mongo {
         MemberState state() const { return _hbinfo.hbstate; }
         const HostAndPort& h() const { return _h; }
         unsigned id() const { return _hbinfo.id(); }
+        bool hot() const { return _config->hot(); }
 
         void summarizeAsHtml(stringstream& s) const;
         friend class ReplSetImpl;
@@ -128,6 +129,7 @@ namespace mongo {
         /* todo thread */
         void msgUpdateHBInfo(HeartbeatInfo);
         bool isPrimary() const { return _myState == PRIMARY; }
+        bool isSecondary() const { return _myState == SECONDARY; }
 
     private:
         Consensus elect;
