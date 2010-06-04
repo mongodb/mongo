@@ -83,6 +83,9 @@ namespace mongo {
         s << td(config().votes);
         s << td(ReplSet::stateAsStr(state()));
         s << td( red(hbinfo().lastHeartbeatMsg,!ok) );
+        stringstream q;
+        q << "/_replSetOplog?" << id();
+        s << td( a(q.str(), "", "finish") );
         s << _tr();
     }
 
@@ -117,7 +120,9 @@ namespace mongo {
         const char *h[] = {"Member", "Up", 
             "<a title=\"length of time we have been continuously connected to the other member with no reconnects\">cctime</a>", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
-            "Votes", "State", "Status", 0};
+            "Votes", "State", "Status", 
+            "<a title=\"how up to date this server is; write operations are sequentially numbered\">opord</a>", 
+            0};
         s << table(h);
 
         /* this is to sort the member rows by their ordinal _id, so they show up in the same 
@@ -134,6 +139,9 @@ namespace mongo {
                 td(ToString(_self->config().votes)) << 
                 td(stateAsHtml(_myState));
             s << td( _self->lhb() );
+            stringstream q;
+            q << "/_replSetOplog?" << _self->id();
+            s << td( a(q.str(), "", "finish") );
             s << _tr();
 			mp[_self->hbinfo().id()] = s.str();
         }
