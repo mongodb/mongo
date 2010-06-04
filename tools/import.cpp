@@ -41,6 +41,7 @@ class Import : public Tool {
     bool _ignoreBlanks;
     bool _headerLine;
     bool _upsert;
+    bool _doimport;
     
     void _append( BSONObjBuilder& b , const string& fieldName , const string& data ){
         if ( b.appendAsNumber( fieldName , data ) )
@@ -144,11 +145,15 @@ public:
             ("upsert", "insert or update objects that already exist" )
             ("stopOnError", "stop importing at first error rather than continuing" )
             ;
+        add_hidden_options()
+            ("noimport", "don't actually import. useful for benchmarking parser" )
+            ;
         addPositionArg( "file" , 1 );
         _type = JSON;
         _ignoreBlanks = false;
         _headerLine = false;
         _upsert = false;
+        _doimport = true;
     }
     
     int run(){
@@ -192,6 +197,10 @@ public:
 
         if ( hasParam( "upsert" ) ){
             _upsert = true;
+        }
+
+        if ( hasParam( "noimport" ) ){
+            _doimport = false;
         }
 
         if ( hasParam( "type" ) ){
@@ -248,7 +257,7 @@ public:
                 BSONObj o = parseLine( buf );
                 if ( _headerLine ){
                     _headerLine = false;
-                } else {
+                } else if (_doimport) {
                     BSONElement id = o["_id"];
                     if (_upsert && !id.eoo()){
                         conn().update( ns, QUERY("_id" << id), o, true);
