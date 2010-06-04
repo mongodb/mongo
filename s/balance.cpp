@@ -31,6 +31,16 @@ namespace mongo {
     
     Balancer balancer;
 
+    struct Balancer::ChunkInfo {
+        const string ns;
+        const string to;
+        const string from;
+        const BSONObj chunk;
+
+        ChunkInfo( const string& a_ns , const string& a_to , const string& a_from , const BSONObj& a_chunk )
+            : ns( a_ns ) , to( a_to ) , from( a_from ), chunk( a_chunk ){}
+    };
+
     Balancer::Balancer(){
         _balancedLastTime = 0;
     }
@@ -86,10 +96,11 @@ namespace mongo {
         return _myid == x["who"].String() && incarnation == x["x"].OID();
     }
     
-    int Balancer::balance( DBClientBase& conn ){
-        log(1) << "i'm going to do some balancing" << endl;
-        
-        int numBalanced = 0;
+    // TODO: Space-based policy starts here
+    void Balancer::balance( DBClientBase& conn, vector<ChunkInfoPtr>* toBalance ){
+        assert( toBalance );
+
+        log(1) << "i'm going to do some balancing" << endl;        
         
         auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::database , BSON( "partitioned" << true ) );
         while ( cursor->more() ){
@@ -111,16 +122,12 @@ namespace mongo {
                 BSONElement e = i.next();
                 BSONObj data = e.Obj().getOwned();
                 string ns = e.fieldName();
-                bool didAnything = balance( conn , ns , data );
-                if ( didAnything )
-                    numBalanced++;
+                balance( conn , ns , data , toBalance );
             }
         }
-
-        return numBalanced;
     }
 
-    bool Balancer::balance( DBClientBase& conn , const string& ns , const BSONObj& data ){
+    void Balancer::balance( DBClientBase& conn , const string& ns , const BSONObj& data , vector<ChunkInfoPtr>* toBalance ){
         log(3) << "balancer: balance(" << ns << ")" << endl;
 
         map< string,vector<BSONObj> > shards;
@@ -134,7 +141,7 @@ namespace mongo {
         }
         
         if ( shards.size() == 0 )
-            return false;
+            return;
         
         {
             vector<Shard> all;
@@ -152,7 +159,7 @@ namespace mongo {
         for ( map< string,vector<BSONObj> >::iterator i=shards.begin(); i!=shards.end(); ++i ){
             string shard = i->first;
             unsigned size = i->second.size();
-            
+
             if ( size < min.second ){
                 min.first = shard;
                 min.second = size;
@@ -168,42 +175,18 @@ namespace mongo {
         log(4) << "max: " << max.first << "\t" << max.second << endl;
         
         if( (int)( max.second - min.second) < ( _balancedLastTime ? 2 : 8 ) )
-            return false;
+            return;
 
         string from = max.first;
         string to = min.first;
 
         BSONObj chunkToMove = pickChunk( shards[from] , shards[to] );
-        log() << "balancer: move a chunk from [" << from << "] to [" << to << "] " << chunkToMove << endl;        
+        log() << "balancer: chose chunk from [" << from << "] to [" << to << "] " << chunkToMove << endl;        
 
-        DBConfigPtr cfg = grid.getDBConfig( ns );
-        assert( cfg );
-        
-        ChunkManagerPtr cm = cfg->getChunkManager( ns );
-        assert( cm );
-        
-        ChunkPtr c = cm->findChunk( chunkToMove["min"].Obj() );
-        if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
-            // likely a split happened somewhere
-            cm = cfg->getChunkManager( ns , true );
-            assert( cm );
-            c = cm->findChunk( chunkToMove["min"].Obj() );
-            if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
-                log() << "balancer: chunk mismatch after reload, ignoring will retry issue cm: " << c->getMin() << " min: " << chunkToMove["min"].Obj() << endl;
-                return false;
-            }
-        }
-        
-        string errmsg;
-        if ( c->moveAndCommit( Shard::make( to ) , errmsg ) ){
-            return true;
-        }
-
-        log() << "balancer: MOVE FAILED **** " << errmsg << "\n"
-              << "  from: " << from << " to: " << to << " chunk: " << chunkToMove << endl;
-        return false;
+        ChunkInfoPtr p ( new ChunkInfo( ns, to, from, chunkToMove ));
+        toBalance->push_back( p );
     }
-    
+
     BSONObj Balancer::pickChunk( vector<BSONObj>& from, vector<BSONObj>& to ){
         assert( from.size() > to.size() );
         
@@ -217,6 +200,42 @@ namespace mongo {
             return from[from.size()-1];
 
         return from[0];
+    }    
+    // TODO: space-based policy ends here
+
+    void Balancer::_moveChunks( const vector<ChunkInfoPtr>* toBalance ) {
+        for ( vector<ChunkInfoPtr>::const_iterator it = toBalance->begin(); it != toBalance->end(); ++it ){
+            const ChunkInfo& chunkInfo = *it->get();
+
+            DBConfigPtr cfg = grid.getDBConfig( chunkInfo.ns );
+            assert( cfg );
+        
+            ChunkManagerPtr cm = cfg->getChunkManager( chunkInfo.ns );
+            assert( cm );
+        
+            const BSONObj& chunkToMove = chunkInfo.chunk;
+            ChunkPtr c = cm->findChunk( chunkToMove["min"].Obj() );
+            if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
+                // likely a split happened somewhere
+                cm = cfg->getChunkManager( chunkInfo.ns , true );
+                assert( cm );
+
+                c = cm->findChunk( chunkToMove["min"].Obj() );
+                if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
+                    log() << "balancer: chunk mismatch after reload, ignoring will retry issue cm: " 
+                          << c->getMin() << " min: " << chunkToMove["min"].Obj() << endl;
+                    continue;
+                }
+            }
+        
+            string errmsg;
+            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , errmsg ) ){
+                continue;
+            }
+
+            log() << "balancer: MOVE FAILED **** " << errmsg << "\n"
+                  << "  from: " << chunkInfo.from << " to: " << " chunk: " << chunkToMove << endl;
+        }
     }
     
     void Balancer::ping(){
@@ -297,13 +316,16 @@ namespace mongo {
                     uassert( 13258 , "oids broken after resetting!" , checkOIDs() );
                 }
                                     
-                int numBalanced = 0;
+                vector<ChunkInfoPtr> toBalance;
                 if ( shouldIBalance( conn.conn() ) ){
-                    numBalanced = balance( conn.conn() );
+                    balance( conn.conn(), &toBalance );
+                    if ( toBalance.size() > 0 ) {
+                        _moveChunks( &toBalance );
+                    }
                 }
                 
                 conn.done();
-                _balancedLastTime = numBalanced;
+                _balancedLastTime = toBalance.size();
             }
             catch ( std::exception& e ){
                 log() << "caught exception while doing balance: " << e.what() << endl;
