@@ -36,6 +36,8 @@ namespace mongo {
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
 
+    const string rsoplog = "local.oplog.rs";
+
     class Member : public List1<Member>::Base {
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c);
@@ -144,6 +146,7 @@ namespace mongo {
         string name() const { return _name; } /* @return replica set's logical name */
         MemberState state() const { return _myState; }        
         void _fatal();
+        void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
         void _summarizeAsHtml(stringstream&) const;        
         void _summarizeStatus(BSONObjBuilder&) const; // for replSetGetStatus command
 
@@ -188,6 +191,7 @@ namespace mongo {
 
     private:
         Member* head() const { return _members.head(); }
+        Member* findById(unsigned id) const;
         void getTargets(list<Target>&);
         void startThreads();
         friend class FeedbackThread;
@@ -207,6 +211,7 @@ namespace mongo {
         MemberState state() const { return ReplSetImpl::state(); }
         string name() const { return ReplSetImpl::name(); }
         const ReplSetConfig& config() { return ReplSetImpl::config(); }
+        void getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { _getOplogDiagsAsHtml(server_id,ss); }
         void summarizeAsHtml(stringstream& ss) const { _summarizeAsHtml(ss); }
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
         void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }

@@ -40,15 +40,21 @@ namespace mongo {
         bool checkOIDs();
 
         /**
-         * @return number of collections balanced
+         * Execute the chunk migrations described in 'toBalance'
          */
-        int balance( DBClientBase& conn );
-        bool balance( DBClientBase& conn , const string& ns , const BSONObj& data );
-        
+        struct ChunkInfo;
+        typedef shared_ptr<ChunkInfo> ChunkInfoPtr;
+        void _moveChunks( const vector<ChunkInfoPtr>* toBalance );
+
+        /**
+         * TODO: take out space-based policy
+         */
+        void balance( DBClientBase& conn , vector<ChunkInfoPtr>* toBalance );
+        void balance( DBClientBase& conn , const string& ns , const BSONObj& data , vector<ChunkInfoPtr>* toBalance );
+        BSONObj pickChunk( vector<BSONObj>& from, vector<BSONObj>& to );
+
         void ping();
         void ping( DBClientBase& conn );
-
-        BSONObj pickChunk( vector<BSONObj>& from, vector<BSONObj>& to );
 
         string _myid;
         time_t _started;
