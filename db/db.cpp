@@ -508,8 +508,7 @@ namespace mongo {
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
-        while( 1 )
-            sleepsecs( 100 );
+        exitCleanly(EXIT_NET_ERROR);
     }
     void initAndListen(int listenPort, const char *appserverLoc = NULL) {
         try { _initAndListen(listenPort, appserverLoc); }
