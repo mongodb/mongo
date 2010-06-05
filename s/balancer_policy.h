@@ -26,33 +26,27 @@ namespace mongo {
     class BalancerPolicy {
     public:
         struct ChunkInfo;
-        typedef shared_ptr<ChunkInfo> ChunkInfoPtr;
-
-        BalancerPolicy() : _balancedLastTime(0){}
 
         /**
-         * Given a connection to the authoritative config server
-         * 'conn', fill in 'toBalance' with chunks that could be moved
-         * around so to even out storage space across shards.
+         * Returns a suggested chunk to move whithin a collection's shards, given information about
+         * space usage and number of chunks for that collection. If the policy doesn't recommend 
+         * moving, it returns NULL.
+         *
+         * @param ns is the collections namepace.
+         * @param shardLimitMap is a map from shardId to an object that describes (for now) space 
+         * cap and usage. E.g.: { "maxSize" : <size_in_MB> , "usedSize" : <size_in_MB> }.
+         * @param shardToChunksMap is a map from shardId to chunks that live there. A chunk's format
+         * is { }. 
+         * @param balancedLastTime is the number of chunks effectively moved in the last round.
+         * @returns NULL or ChunkInfo of the best move to make towards balacing the collection.
+         *
          */
-        void balance( DBClientBase& conn , vector<ChunkInfoPtr>* toBalance );
-
-        /**
-         * The previous round of balance influences the next one. We
-         * need the chunk moving mechanism to tell us how many chunks
-         * effectivel changed home in the last round.
-         */
-        void setBalancedLastTime( int val ){ _balancedLastTime = val; }
+        static ChunkInfo* balance( const string& ns, const map< string, BSONObj>& shardLimitsMap,  
+                                   const map< string,vector<BSONObj> >& shardToChunksMap, int balancedLastTime );
 
         // below exposed for testing purposes only -- treat it as private --
 
-        void balance( DBClientBase& conn , const string& ns , const BSONObj& data , vector<ChunkInfoPtr>* toBalance );
-
-        BSONObj pickChunk( vector<BSONObj>& from, vector<BSONObj>& to );
-
-
-    private:
-        int _balancedLastTime;
+        static BSONObj pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to );
     };
 
     struct BalancerPolicy::ChunkInfo {
