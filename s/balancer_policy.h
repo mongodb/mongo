@@ -25,7 +25,7 @@ namespace mongo {
 
     class BalancerPolicy {
     public:
-        class ChunkInfo;
+        struct ChunkInfo;
         typedef shared_ptr<ChunkInfo> ChunkInfoPtr;
 
         BalancerPolicy() : _balancedLastTime(0){}

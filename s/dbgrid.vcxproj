@@ -186,8 +186,10 @@
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
+    <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="balance.cpp" />
+    <ClCompile Include="balancer_policy.cpp" />
     <ClCompile Include="chunk.cpp" />
     <ClCompile Include="commands_admin.cpp" />
     <ClCompile Include="commands_public.cpp" />
@@ -506,6 +508,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\util\version.h" />
+    <ClInclude Include="balancer_policy.h" />
     <ClInclude Include="gridconfig.h" />
     <ClInclude Include="griddatabase.h" />
     <ClInclude Include="shard.h" />

@@ -334,6 +334,9 @@
     <ClCompile Include="..\pch.cpp">
       <Filter>db</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\text.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

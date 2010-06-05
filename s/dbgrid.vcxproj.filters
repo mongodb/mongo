@@ -264,6 +264,12 @@
     <ClCompile Include="..\util\version.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\text.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="balancer_policy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gridconfig.h">
@@ -322,6 +328,9 @@
     </ClInclude>
     <ClInclude Include="..\util\version.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="balancer_policy.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
