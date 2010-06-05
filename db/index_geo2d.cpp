@@ -294,11 +294,8 @@ namespace mongo {
         }
       
         void _fix(){
-            if ( ( _hash << ( _bits * 2 ) ) == 0 )
-                return;
-            long long mask = 0;
-            for ( unsigned i=0; i<_bits*2; i++ )
-                mask |= geoBitSets.masks64[i];
+            static long long FULL = 0xFFFFFFFFFFFFFFFFLL;
+            long long mask = FULL << ( 64 - ( _bits * 2 ) );
             _hash &= mask;
         }
         
