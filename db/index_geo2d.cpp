@@ -43,9 +43,21 @@ namespace mongo {
             for ( int i=0; i<64; i++ ){
                 masks64[i] = ( 1LL << ( 63 - i ) );
             }
+            
+            for ( unsigned i=0; i<16; i++ ){
+                unsigned fixed = 0;
+                for ( int j=0; j<4; j++ ){
+                    if ( i & ( 1 << j ) )
+                        fixed |= ( 1 << ( j * 2 ) );
+                }
+                hashedToNormal[fixed] = i;
+            }
+            
         }
         int masks32[32];
         long long masks64[64];
+
+        unsigned hashedToNormal[256];
     } geoBitSets;
 
     
@@ -102,7 +114,20 @@ namespace mongo {
             }
         }
 
-        void unhash( unsigned& x , unsigned& y ) const {
+        void unhash_fast( unsigned& x , unsigned& y ) const {
+            x = 0;
+            y = 0;
+            char * c = (char*)(&_hash);
+            for ( int i=0; i<8; i++ ){
+                unsigned t = (unsigned)(c[i]) & 0x55;
+                y |= ( geoBitSets.hashedToNormal[t] << (4*(i)) );
+
+                t = ( (unsigned)(c[i]) >> 1 ) & 0x55;
+                x |= ( geoBitSets.hashedToNormal[t] << (4*(i)) );
+            }
+        }
+
+        void unhash_slow( unsigned& x , unsigned& y ) const {
             x = 0;
             y = 0;
             for ( unsigned i=0; i<_bits; i++ ){
@@ -111,6 +136,10 @@ namespace mongo {
                 if ( getBitY(i) )
                     y |= geoBitSets.masks32[i];
             }
+        }
+
+        void unhash( unsigned& x , unsigned& y ) const {
+            unhash_fast( x , y );
         }
 
         /**
@@ -803,7 +832,39 @@ namespace mongo {
                 assert( GeoHash( "11" ) == a.commonPrefix( "11" ) );
                 assert( GeoHash( "11" ) == a.commonPrefix( "11110000" ) );
             }
-            
+
+            {
+                int N = 10000;
+                {
+                    Timer t;
+                    for ( int i=0; i<N; i++ ){
+                        unsigned x = (unsigned)rand();
+                        unsigned y = (unsigned)rand();
+                        GeoHash h( x , y );
+                        unsigned a,b;
+                        h.unhash_slow( a,b );
+                        assert( a == x );
+                        assert( b == y );
+                    }
+                    cout << "slow: " << t.millis() << endl;
+                }
+
+                {
+                    Timer t;
+                    for ( int i=0; i<N; i++ ){
+                        unsigned x = (unsigned)rand();
+                        unsigned y = (unsigned)rand();
+                        GeoHash h( x , y );
+                        unsigned a,b;
+                        h.unhash_fast( a,b );
+                        assert( a == x );
+                        assert( b == y );
+                    }
+                    cout << "fast: " << t.millis() << endl;
+                }
+
+            }
+
         }
     } geoUnitTest;
     
