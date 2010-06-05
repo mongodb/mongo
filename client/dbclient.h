@@ -59,7 +59,13 @@ namespace mongo {
         /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while rather 
             than returning no data. After a timeout period, we do return as normal.
         */
-        QueryOption_AwaitData = 1 << 5
+        QueryOption_AwaitData = 1 << 5,
+
+        /** Stream the data down full blast in multiple "more" packages, on the assumption that the client 
+            will fully read all data queried.  Faster when you are pulling a lot of data and know you want to 
+            pull it all down.  Note: it is not allowed to not read all the data unless you close the connection.
+            */
+        QueryOption_Exhaust = 1 << 6
 
     };
 

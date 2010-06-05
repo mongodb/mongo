@@ -792,49 +792,58 @@ namespace mongo {
         }
         curop.setQuery(jsobj);
         
-        BSONObjBuilder cmdResBuf;
-        long long cursorid = 0;
-        
-        int n = 0;
-        
         Client& c = cc();
 
         if ( pq.couldBeCommand() ){
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
-
+            BSONObjBuilder cmdResBuf;
             if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
                 ss << " command: " << jsobj;
                 curop.markCommand();
-                n = 1;
                 auto_ptr< QueryResult > qr;
                 qr.reset( (QueryResult *) bb.buf() );
                 bb.decouple();
                 qr->setResultFlagsToOk();
                 qr->len = bb.len();
                 ss << " reslen:" << bb.len();
-                //	qr->channel = 0;
                 qr->setOperation(opReply);
-                qr->cursorId = cursorid;
+                qr->cursorId = 0;
                 qr->startingFrom = 0;
-                qr->nReturned = n;
+                qr->nReturned = 1;
                 result.setData( qr.release(), true );
             }
             return;
         }
         
-        // regular query
+        /* --- regular query --- */
 
-        mongolock lk(false); // read lock
-        Client::Context ctx( ns , dbpath , &lk );
-
-        replVerifyReadsOk(pq);
-
+        long long cursorid = 0;
+        int n = 0;
         BSONElement hint = useHints ? pq.getHint() : BSONElement();
         bool explain = pq.isExplain();
         bool snapshot = pq.isSnapshot();
-        BSONObj query = pq.getFilter();
         BSONObj order = pq.getOrder();
+        BSONObj query = pq.getFilter();
+
+        /* The ElemIter will not be happy if this isn't really an object. So throw exception
+           here when that is true.
+           (Which may indicate bad data from client.)
+        */
+        if ( query.objsize() == 0 ) {
+            out() << "Bad query object?\n  jsobj:";
+            out() << jsobj.toString() << "\n  query:";
+            out() << query.toString() << endl;
+            uassert( 10110 , "bad query object", false);
+        }
+            
+        /* --- read lock --- */
+
+        mongolock lk(false);
+
+        Client::Context ctx( ns , dbpath , &lk );
+
+        replVerifyReadsOk(pq);
 
         if ( pq.hasOption( QueryOption_CursorTailable ) ) {
             NamespaceDetails *d = nsdetails( ns );
@@ -865,17 +874,6 @@ namespace mongo {
                     hint = snapshotHint.firstElement();
                 }
             }
-        }
-            
-        /* The ElemIter will not be happy if this isn't really an object. So throw exception
-           here when that is true.
-           (Which may indicate bad data from client.)
-        */
-        if ( query.objsize() == 0 ) {
-            out() << "Bad query object?\n  jsobj:";
-            out() << jsobj.toString() << "\n  query:";
-            out() << query.toString() << endl;
-            uassert( 10110 , "bad query object", false);
         }
             
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
