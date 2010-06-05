@@ -37,6 +37,9 @@ namespace mongo {
         virtual string name() { return "Balancer"; }        
 
     private:
+        typedef BalancerPolicy::ChunkInfo CandidateChunk;
+        typedef shared_ptr<CandidateChunk> CandidateChunkPtr;
+
         /**
          * Returns true iff this mongos process gained (or maintained) the
          * reponsibility moving chunks around.
@@ -44,10 +47,16 @@ namespace mongo {
         bool _shouldIBalance( DBClientBase& conn );
         
         /**
-         * Execute the chunk migrations described in 'toBalance' and
+         * Gathers all the necessary information about shards and chunks, and 
+         * decides whether there are candidate chunks to be moved.
+         */
+        void _doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks );
+
+        /**
+         * Execute the chunk migrations described in 'candidateChunks' and
          * returns the number of chunks effectively moved.
          */
-        int _moveChunks( const vector<BalancerPolicy::ChunkInfoPtr>* toBalance );
+        int _moveChunks( const vector<CandidateChunkPtr>* candidateChunks );
 
         /**
          * Check the health of the master configuration server
@@ -62,9 +71,10 @@ namespace mongo {
 
         // internal state
 
-        string          _myid;     // hostname:port of my mongos
-        time_t          _started;  // time Balancer starte running
-        BalancerPolicy* _policy;   // decide which chunks to move; owned here.
+        string          _myid;             // hostname:port of my mongos
+        time_t          _started;          // time Balancer starte running
+        int             _balancedLastTime; // number of moved chunks in last round
+        BalancerPolicy* _policy;           // decide which chunks to move; owned here.
 
         // non-copyable, non-assignable
 
