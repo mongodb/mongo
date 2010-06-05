@@ -36,7 +36,7 @@ namespace mongo {
             const string& shard = i->first;
             unsigned size = i->second.size();
 
-            if ( size < min.second ){
+            if ( isReceiver( shard , shardLimitsMap ) && ( size < min.second ) ){
                 min.first = shard;
                 min.second = size;
             }
@@ -77,6 +77,29 @@ namespace mongo {
             return from[from.size()-1];
 
         return from[0];
-    }    
+    }
+
+    bool BalancerPolicy::isReceiver( const string& shard, const map< string,BSONObj>& shardLimitsMap ){
+
+        // If there's no limit information for the shard, assume it can be a chunk receiver 
+        // (i.e., there's not bound on space utilization)
+        map< string,BSONObj >::const_iterator it = shardLimitsMap.find( shard );
+        if ( it == shardLimitsMap.end() ){
+            return true;
+        }
+
+        BSONObj limits = it->second;
+        long long maxUsage = limits["maxSize"].Long();
+        if ( maxUsage == 0 ){
+            return true;
+        }
+
+        long long currUsage = limits["currSize"].Long();
+        if ( currUsage < maxUsage ){
+            return true;
+        }
+
+        return false;
+    }
 
 }  // namespace mongo
