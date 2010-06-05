@@ -18,7 +18,7 @@ fast = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 } 
 
 slow = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 , start : "11" } );
 
-//printjson( slow.stats );
+printjson( slow.stats );
 
 assert.lt( fast.stats.nscanned * 10 , slow.stats.nscanned , "A1" );
 assert.lt( fast.stats.objectsLoaded , slow.stats.objectsLoaded , "A2" );

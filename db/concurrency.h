@@ -102,16 +102,25 @@ namespace mongo {
         bool atLeastReadLocked() { return _state.get() != 0; }
         void assertAtLeastReadLocked() { assert(atLeastReadLocked()); }
 
-        void lock() { 
+        bool _checkWriteLockAlready(){
             //DEV cout << "LOCK" << endl;
             DEV assert( haveClient() );
                 
             int s = _state.get();
             if( s > 0 ) {
                 _state.set(s+1);
-                return;
+                return true;
             }
+
             massert( 10293 , (string)"internal error: locks are not upgradeable: " + sayClientState() , s == 0 );
+
+            return false;
+        }
+
+        void lock() { 
+            if ( _checkWriteLockAlready() )
+                return;
+            
             _state.set(1);
 
             curopWaitingForLock( 1 );
@@ -120,6 +129,24 @@ namespace mongo {
 
             _minfo.entered();
         }
+
+        bool lock_try( int millis ) { 
+            if ( _checkWriteLockAlready() )
+                return true;
+
+            curopWaitingForLock( 1 );
+            bool got = _m.lock_try( millis ); 
+            curopGotLock();
+            
+            if ( got ){
+                _minfo.entered();
+                _state.set(1);
+            }                
+            
+            return got;
+        }
+
+
         void unlock() { 
             //DEV cout << "UNLOCK" << endl;
             int s = _state.get();
@@ -247,6 +274,22 @@ namespace mongo {
     private:
         bool _got;
     };
+
+    struct writelocktry {
+        writelocktry( const string&ns , int tryms ){
+            _got = dbMutex.lock_try( tryms );
+        }
+        ~writelocktry() {
+            if ( _got ){
+                dbunlocking_read();
+                dbMutex.unlock();
+            }
+        }
+        bool got() const { return _got; }
+    private:
+        bool _got;
+    };
+
 
     struct readlocktryassert : public readlocktry { 
         readlocktryassert(const string& ns, int tryms) : 
