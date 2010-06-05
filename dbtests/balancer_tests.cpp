@@ -1,4 +1,4 @@
-// histogramtests.cpp : histogram.{h,cpp} unit tests
+// balancer_test.cpp : balance/balancer_policy.{h,cpp} unit tests
 
 /**
  *    Copyright (C) 2010 10gen Inc.
