@@ -791,8 +791,6 @@ namespace mongo {
         }
         curop.setQuery(jsobj);
         
-        Client& c = cc();
-
         if ( pq.couldBeCommand() ){
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
@@ -817,8 +815,6 @@ namespace mongo {
         
         /* --- regular query --- */
 
-        long long nscanned = 0;
-        long long cursorid = 0;
         int n = 0;
         BSONElement hint = useHints ? pq.getHint() : BSONElement();
         bool explain = pq.isExplain();
@@ -877,12 +873,11 @@ namespace mongo {
         }
             
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
-            nscanned = 1;
-
             bool nsFound = false;
             bool indexFound = false;
 
             BSONObj resObject;
+            Client& c = cc();
             bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
             if ( nsFound == false || indexFound == true ){
                 BufBuilder bb(sizeof(QueryResult)+resObject.objsize()+32);
@@ -900,7 +895,7 @@ namespace mongo {
                 qr->len = bb.len();
                 ss << " reslen:" << bb.len();
                 qr->setOperation(opReply);
-                qr->cursorId = cursorid;
+                qr->cursorId = 0;
                 qr->startingFrom = 0;
                 qr->nReturned = n;      
                 result.setData( qr.release(), true );
@@ -933,11 +928,13 @@ namespace mongo {
             dqo.finishExplain( explainSuffix );
         }
         n = dqo.n();
-        nscanned = dqo.nscanned();
+        long long nscanned = dqo.nscanned();
         if ( dqo.scanAndOrderRequired() )
             ss << " scanAndOrder ";
         shared_ptr<Cursor> cursor = dqo.cursor();
-        log( 5 ) << "   used cursor: " << cursor.get() << endl;
+        if( logLevel >= 5 )
+            log() << "   used cursor: " << cursor.get() << endl;
+        long long cursorid = 0;
         if ( dqo.saveClientCursor() || mps->mayRunMore() ) {
             ClientCursor *cc;
             bool moreClauses = mps->mayRunMore();
