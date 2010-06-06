@@ -47,6 +47,8 @@ namespace mongo {
         // below exposed for testing purposes only -- treat it as private --
 
         static BSONObj pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to );
+
+        static bool isReceiver( const string& shard, const map< string,BSONObj>& shardLimitsMap );
     };
 
     struct BalancerPolicy::ChunkInfo {

@@ -247,7 +247,7 @@ namespace mongo {
         map< string, BSONObj > shardLimitsMap; 
         for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ){
             const Shard& s = *it;
-            BSONObj limitsObj = BSON( "maxSize" << 0 << "currSize" << 0 /* TODO */);
+            BSONObj limitsObj = BSON( "maxSize" << 0LL << "currSize" << 0LL /* TODO */);
             shardLimitsMap[s.getName()] = limitsObj;
         }
 
