@@ -93,10 +93,12 @@ namespace mongo {
     struct DbResponse {
         Message *response;
         MSGID responseTo;
-        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt) {
+        bool exhaust;
+        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt), exhaust(false) {
         }
         DbResponse() {
             response = 0;
+            exhaust = false;
         }
         ~DbResponse() {
             delete response;

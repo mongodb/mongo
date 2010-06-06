@@ -114,7 +114,7 @@ public:
             return;
         }
 
-        out() << root.string() << endl;
+        log() << root.string() << endl;
 
         string ns;
         if (use_db) {

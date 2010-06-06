@@ -114,7 +114,7 @@ namespace mongo {
 
     long long runCount(const char *ns, const BSONObj& cmd, string& err);
     
-    void runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
+    bool runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
     
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
        [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }

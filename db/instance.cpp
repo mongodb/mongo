@@ -172,7 +172,7 @@ namespace mongo {
         CurOp& op = *(c.curop());
         
         try {
-            runQuery(m, q, op, *resp);
+            dbresponse.exhaust = runQuery(m, q, op, *resp);
             assert( !resp->empty() );
         }
         catch ( AssertionException& e ) {
@@ -282,7 +282,7 @@ namespace mongo {
         bool log = logLevel >= 1;
         
         if ( op == dbQuery ) {
-            receivedQuery(c , dbresponse, m );
+            receivedQuery(c , dbresponse, m ); //zzz
         }
         else if ( op == dbGetMore ) {
             //DEV log = true;
@@ -349,7 +349,7 @@ namespace mongo {
         int ms = currentOp.totalTimeMillis();
         
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);
-        //DEV log = true;
+        //DEV log = true; 
         if ( log || ms > logThreshold ) {
             if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 3000 && !log ) {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */

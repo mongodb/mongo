@@ -193,7 +193,7 @@ namespace mongo {
 
                 DbResponse dbresponse;
                 if ( !assembleResponse( m, dbresponse, dbMsgPort->farEnd ) ) {
-                    out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort->farEnd.toString() << endl;
+                    log() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort->farEnd.toString() << endl;
                     /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
                     if ( dbMsgPort->farEnd.isLocalHost() ) {
                         dbMsgPort->shutdown();
@@ -202,12 +202,18 @@ namespace mongo {
                         dbexit(EXIT_CLEAN);
                     }
                     else {
-                        out() << "  (not from localhost, ignoring end msg)" << endl;
+                        log() << "  (not from localhost, ignoring end msg)" << endl;
                     }
                 }
 
-                if ( dbresponse.response )
+                if ( dbresponse.response ) {
                     dbMsgPort->reply(m, *dbresponse.response, dbresponse.responseTo);
+                    if( dbresponse.exhaust ) { 
+                        while( 1 ) { 
+                            log() << "exhausting" << endl;
+                        }
+                    }
+                }
             }
 
         }

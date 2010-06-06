@@ -769,7 +769,7 @@ namespace mongo {
     };
     
     /* run a query -- includes checking for and running a Command */
-    void runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+    bool runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         StringBuilder& ss = curop.debug().str;
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
@@ -790,7 +790,7 @@ namespace mongo {
         }
         curop.setQuery(jsobj);
         
-        if ( pq.couldBeCommand() ){
+        if ( pq.couldBeCommand() ) {
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
             BSONObjBuilder cmdResBuf;
@@ -809,7 +809,7 @@ namespace mongo {
                 qr->nReturned = 1;
                 result.setData( qr.release(), true );
             }
-            return;
+            return false;
         }
         
         /* --- regular query --- */
@@ -843,10 +843,11 @@ namespace mongo {
         if ( pq.hasOption( QueryOption_CursorTailable ) ) {
             NamespaceDetails *d = nsdetails( ns );
             uassert( 13051, "tailable cursor requested on non capped collection", d && d->capped );
+            const BSONObj nat1 = BSON( "$natural" << 1 );
             if ( order.isEmpty() ) {
-                order = BSON( "$natural" << 1 );
+                order = nat1;
             } else {
-                uassert( 13052, "only {$natural:1} order allowed for tailable cursor", order == BSON( "$natural" << 1 ) );
+                uassert( 13052, "only {$natural:1} order allowed for tailable cursor", order == nat1 );
             }
         }
         
@@ -899,7 +900,7 @@ namespace mongo {
                 qr->startingFrom = 0;
                 qr->nReturned = n;      
                 result.setData( qr.release(), true );
-                return;
+                return false;
             }     
         }
         
@@ -935,6 +936,7 @@ namespace mongo {
         if( logLevel >= 5 )
             log() << "   used cursor: " << cursor.get() << endl;
         long long cursorid = 0;
+        bool exhaust = false;
         if ( dqo.saveClientCursor() || mps->mayRunMore() ) {
             ClientCursor *cc;
             bool moreClauses = mps->mayRunMore();
@@ -947,17 +949,15 @@ namespace mongo {
             }
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
-            DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
+            DEV tlog() << "query has more, cursorid: " << cursorid << endl;
             cc->pos = n;
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();
             cc->originalMessage = m;
             cc->updateLocation();
-            if ( !cc->c->ok() && cc->c->tailable() ) {
-                DEV tlog() << "  query has no more but tailable, cursorid: " << cursorid << endl;
-            } else {
-                DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
-            }
+            if ( !cc->c->ok() && cc->c->tailable() )
+                DEV tlog() << "query has no more but tailable, cursorid: " << cursorid << endl;
+            exhaust = queryOptions & QueryOption_Exhaust;
         }
 
         QueryResult *qr = (QueryResult *) result.header();
@@ -980,7 +980,7 @@ namespace mongo {
             ss << jsobj << ' ';
         }
         ss << " nreturned:" << n;
-        return;
+        return exhaust;
     }    
     
 } // namespace mongo
