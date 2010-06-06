@@ -773,18 +773,17 @@ namespace mongo {
         StringBuilder& ss = curop.debug().str;
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
-        const char *ns = q.ns;
         int ntoskip = q.ntoskip;
         BSONObj jsobj = q.query;
         int queryOptions = q.queryOptions;
-        BSONObj snapshotHint;
+        const char *ns = q.ns;
         
         if( logLevel >= 2 )
             log() << "query: " << ns << jsobj << endl;
         
         ss << ns;
         {
-            // only insert if nonzero. 
+            // only say ntoreturn if nonzero. 
             int n =  pq.getNumToReturn();
             if( n ) 
                 ss << " ntoreturn:" << n;
@@ -851,6 +850,7 @@ namespace mongo {
             }
         }
         
+        BSONObj snapshotHint; // put here to keep the data in scope
         if( snapshot ) { 
             NamespaceDetails *d = nsdetails(ns);
             if ( d ){

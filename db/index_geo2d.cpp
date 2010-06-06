@@ -843,7 +843,7 @@ namespace mongo {
                         assert( a == x );
                         assert( b == y );
                     }
-                    cout << "slow: " << t.millis() << endl;
+                    //cout << "slow: " << t.millis() << endl;
                 }
 
                 {
@@ -857,7 +857,7 @@ namespace mongo {
                         assert( a == x );
                         assert( b == y );
                     }
-                    cout << "fast: " << t.millis() << endl;
+                    //cout << "fast: " << t.millis() << endl;
                 }
 
             }
