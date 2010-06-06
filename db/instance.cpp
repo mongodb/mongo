@@ -490,24 +490,28 @@ namespace mongo {
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
         
-        ss << ns << " cid:" << cursorid << " ntoreturn:" << ntoreturn;;
+        ss << ns << " cid:" << cursorid;
+        if( ntoreturn ) 
+            ss << " ntoreturn:" << ntoreturn;
 
-        int pass = 0;
-        
+        int pass = 0;        
+        bool exhaust = false;
         QueryResult* msgdata;
         while( 1 ) {
             try {
                 mongolock lk(false);
                 Client::Context ctx(ns);
-                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass );
+                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
             catch ( GetMoreWaitException& ) { 
+                exhaust = false;
                 massert(13073, "shutting down", !inShutdown() );
                 pass++;
                 sleepmillis(2);
                 continue;
             }
             catch ( AssertionException& e ) {
+                exhaust = false;
                 ss << " exception " << e.toString();
                 msgdata = emptyMoreResult(cursorid);
                 ok = false;
@@ -521,7 +525,8 @@ namespace mongo {
         ss << " nreturned:" << msgdata->nReturned;
         dbresponse.response = resp;
         dbresponse.responseTo = m.header()->id;
-
+        if( exhaust ) { ss << " exhaust "; 
+        dbresponse.exhaust = ns;}
         return ok;
     }
 

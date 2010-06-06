@@ -183,7 +183,7 @@ namespace mongo {
                     dbMsgPort->shutdown();
                     break;
                 }
-
+sendmore:
                 if ( inShutdown() ) {
                     log() << "got request after shutdown()" << endl;
                     break;
@@ -209,16 +209,36 @@ namespace mongo {
                 if ( dbresponse.response ) {
                     dbMsgPort->reply(m, *dbresponse.response, dbresponse.responseTo);
                     if( dbresponse.exhaust ) { 
-                        while( 1 ) { 
-                            log() << "exhausting" << endl;
+                        MsgData *header = dbresponse.response->header();
+                        QueryResult *qr = (QueryResult *) header;
+                        long long cursorid = qr->cursorId;
+                        if( cursorid ) {
+                            string ns = dbresponse.exhaust; // before reset() free's it...
+                            m.reset();
+                            BufBuilder b(512);
+                            b.append((int) 0 /*size set later in appendData()*/);
+                            b.append(header->id);
+                            b.append(header->responseTo);
+                            b.append((int) dbGetMore);
+                            b.append((int) 0);
+                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
+                            b.append(ns);
+                            b.append((int) 0); // ntoreturn
+                            b.append(cursorid);
+                            m.appendData(b.buf(), b.len());
+                            b.decouple();
+                            DEV log() << "exhaust=true sending more" << endl;
+                            sleepmillis(1);
+                            goto sendmore;
                         }
                     }
                 }
             }
 
         }
-        catch ( AssertionException& ) {
-            problem() << "AssertionException in connThread, closing client connection" << endl;
+        catch ( AssertionException& e ) {
+            log() << "AssertionException in connThread, closing client connection" << endl;
+            log() << ' ' << e.what() << endl;
             dbMsgPort->shutdown();
         }
         catch ( SocketException& ) {

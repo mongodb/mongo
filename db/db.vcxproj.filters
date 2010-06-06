@@ -778,6 +778,9 @@
     <None Include="..\SConstruct">
       <Filter>db</Filter>
     </None>
+    <None Include="ClassDiagram1.cd" />
+    <None Include="ClassDiagram2.cd" />
+    <None Include="ClassDiagram3.cd" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">

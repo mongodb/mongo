@@ -93,16 +93,13 @@ namespace mongo {
     struct DbResponse {
         Message *response;
         MSGID responseTo;
-        bool exhaust;
-        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt), exhaust(false) {
-        }
+        const char *exhaust; /* points to ns if exhaust mode. 0=normal mode*/
+        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt), exhaust(0) { }
         DbResponse() {
             response = 0;
-            exhaust = false;
+            exhaust = 0;
         }
-        ~DbResponse() {
-            delete response;
-        }
+        ~DbResponse() { delete response; }
     };
     
     bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client = unknownAddress );

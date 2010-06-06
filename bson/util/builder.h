@@ -67,10 +67,8 @@ namespace mongo {
         char* buf() { return data; }
         const char* buf() const { return data; }
 
-        /* assume ownership of the buffer - you must then free it */
-        void decouple() {
-            data = 0;
-        }
+        /* assume ownership of the buffer - you must then free() it */
+        void decouple() { data = 0; }
 
         template<class T> void append(T j) {
             *((T*)grow(sizeof(T))) = j;

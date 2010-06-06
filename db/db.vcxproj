@@ -557,6 +557,9 @@
   <ItemGroup>
     <None Include="..\SConstruct" />
     <None Include="..\util\mongoutils\README" />
+    <None Include="ClassDiagram1.cd" />
+    <None Include="ClassDiagram2.cd" />
+    <None Include="ClassDiagram3.cd" />
     <None Include="mongo.ico" />
     <None Include="readme.txt" />
     <None Include="repl\notes.txt" />

@@ -76,7 +76,7 @@ namespace mongo {
     // for an existing query (ie a ClientCursor), send back additional information.
     struct GetMoreWaitException { };
 
-    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass );
+    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 
     struct UpdateResult {
         bool existing;
@@ -114,7 +114,7 @@ namespace mongo {
 
     long long runCount(const char *ns, const BSONObj& cmd, string& err);
     
-    bool runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
+    const char * runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
     
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
        [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }

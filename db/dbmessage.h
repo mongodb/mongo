@@ -75,19 +75,23 @@ namespace mongo {
 
     /* For the database/server protocol, these objects and functions encapsulate
        the various messages transmitted over the connection.
-    */
 
+       See http://www.mongodb.org/display/DOCS/Mongo+Wire+Protocol
+    */
     class DbMessage {
     public:
-        DbMessage(const Message& _m) : m(_m) {
+        DbMessage(const Message& _m) : m(_m)
+        {
             // for received messages, Message has only one buffer
             theEnd = _m.singleData()->_data + _m.header()->dataLen();
-            int *r = (int *) _m.singleData()->_data;
-            reserved = *r;
-            r++;
-            data = (const char *) r;
+            char *r = _m.singleData()->_data;
+            reserved = (int *) r;
+            data = r + 4;
             nextjsobj = data;
         }
+
+        /** the 32 bit field before the ns */
+        int& reservedField() { return *reserved; }
 
         const char * getns() const {
             return data;
@@ -109,13 +113,12 @@ namespace mongo {
             return getInt( 1 );
         }
 
-        void resetPull(){
-            nextjsobj = data;
-        }
-        int pullInt() {
+        void resetPull(){ nextjsobj = data; }
+        int pullInt() const { return pullInt(); }
+        int& pullInt() {
             if ( nextjsobj == data )
                 nextjsobj += strlen(data) + 1; // skip namespace
-            int i = *((int *)nextjsobj);
+            int& i = *((int *)nextjsobj);
             nextjsobj += 4;
             return i;
         }
@@ -164,9 +167,7 @@ namespace mongo {
             return js;
         }
 
-        const Message& msg() const {
-            return m;
-        }
+        const Message& msg() const { return m; }
 
         void markSet(){
             mark = nextjsobj;
@@ -178,7 +179,7 @@ namespace mongo {
 
     private:
         const Message& m;
-        int reserved;
+        int* reserved;
         const char *data;
         const char *nextjsobj;
         const char *theEnd;

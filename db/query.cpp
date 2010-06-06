@@ -256,8 +256,8 @@ namespace mongo {
         return qr;
     }
 
-    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass ) {
-
+    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, bool& exhaust ) {
+        exhaust = false;
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p._c;
         
@@ -323,7 +323,6 @@ namespace mongo {
                 if ( c->matcher() && !c->matcher()->matches(c->currKey(), c->currLoc() ) ) {
                 }
                 else {
-                    //out() << "matches " << c->currLoc().toString() << '\n';
                     if( c->getsetdup(c->currLoc()) ) {
                         //out() << "  but it's a dup \n";
                     }
@@ -349,6 +348,7 @@ namespace mongo {
                 cc->updateLocation();
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
+                exhaust = cc->_queryOptions & QueryOption_Exhaust;
             }
         }
 
@@ -769,7 +769,7 @@ namespace mongo {
     };
     
     /* run a query -- includes checking for and running a Command */
-    bool runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+    const char *runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         StringBuilder& ss = curop.debug().str;
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
@@ -936,7 +936,7 @@ namespace mongo {
         if( logLevel >= 5 )
             log() << "   used cursor: " << cursor.get() << endl;
         long long cursorid = 0;
-        bool exhaust = false;
+        const char * exhaust = 0;
         if ( dqo.saveClientCursor() || mps->mayRunMore() ) {
             ClientCursor *cc;
             bool moreClauses = mps->mayRunMore();
@@ -957,7 +957,10 @@ namespace mongo {
             cc->updateLocation();
             if ( !cc->c->ok() && cc->c->tailable() )
                 DEV tlog() << "query has no more but tailable, cursorid: " << cursorid << endl;
-            exhaust = queryOptions & QueryOption_Exhaust;
+            if( queryOptions & QueryOption_Exhaust ) {
+                exhaust = ns;
+                ss << " exhaust ";
+            }
         }
 
         QueryResult *qr = (QueryResult *) result.header();

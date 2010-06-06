@@ -113,9 +113,6 @@ namespace mongo {
         friend class PiggyBackData;
     };
 
-    //#pragma pack()
-#pragma pack(1)
-
     enum Operations {
         opReply = 1,     /* reply. responseTo is set. */
         dbMsg = 1000,    /* generic msg command followed by a string */
@@ -148,6 +145,27 @@ namespace mongo {
         }
     }
 
+#pragma pack(1)
+/* see http://www.mongodb.org/display/DOCS/Mongo+Wire+Protocol 
+*/
+struct MSGHEADER { 
+    int messageLength; // total message size, including this
+    int requestID;     // identifier for this message
+    int responseTo;    // requestID from the original request
+                       //   (used in reponses from db)
+    int opCode;     
+};
+struct OP_GETMORE : public MSGHEADER {
+    MSGHEADER header;             // standard message header
+    int       ZERO_or_flags;      // 0 - reserved for future use
+    //cstring   fullCollectionName; // "dbname.collectionname"
+    //int32     numberToReturn;     // number of documents to return
+    //int64     cursorID;           // cursorID from the OP_REPLY
+};
+#pragma pack()
+
+#pragma pack(1)
+    /* todo merge this with MSGHEADER (or inherit from it). */
     struct MsgData {
         int len; /* len of the msg, including this field */
         MSGID id; /* request/reply id's match... */
@@ -186,7 +204,6 @@ namespace mongo {
     inline int MsgData::dataLen() {
         return len - MsgDataHeaderSize;
     }
-
 #pragma pack()
 
     class Message {
