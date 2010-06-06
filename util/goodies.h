@@ -623,7 +623,7 @@ namespace mongo {
         }
 
         bool operator!=( const char * str ) const {
-            return strcmp( _buf , str );
+            return strcmp( _buf , str ) != 0;
         }
 
         bool empty() const {

@@ -369,7 +369,7 @@ namespace mongo {
         
         string db = nsGetDB( ns ) + ".system.namespaces";
         BSONObj q = BSON( "name" << ns );
-        return count( db.c_str() , q );
+        return count( db.c_str() , q ) != 0;
     }
 
 

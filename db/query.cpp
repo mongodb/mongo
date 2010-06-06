@@ -782,7 +782,6 @@ namespace mongo {
         if( logLevel >= 2 )
             log() << "query: " << ns << jsobj << endl;
         
-        long long nscanned = 0;
         ss << ns;
         {
             // only insert if nonzero. 
@@ -818,6 +817,7 @@ namespace mongo {
         
         /* --- regular query --- */
 
+        long long nscanned = 0;
         long long cursorid = 0;
         int n = 0;
         BSONElement hint = useHints ? pq.getHint() : BSONElement();

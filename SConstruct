@@ -1209,7 +1209,7 @@ elif not onlyServer:
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
-    coreShellFiles = [ "shell/dbshell.cpp" , "shell/utils.cpp" , "shell/mongo-server.cpp" ]
+    coreShellFiles = [ "shell/dbshell.cpp" , "shell/shell_utils.cpp" , "shell/mongo-server.cpp" ]
 
     if weird:
         shell32BitFiles = coreShellFiles

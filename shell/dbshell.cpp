@@ -15,6 +15,7 @@
  *    limitations under the License.
  */
 
+#include "pch.h"
 
 #include <stdio.h>
 
@@ -48,7 +49,6 @@ static char** my_completion(const char* text , int start ,int end ){
     cout << "YO [" << text << "] " << start << " " << end << endl;
     return 0;
 }
-
 
 void shellHistoryInit(){
 #ifdef USE_READLINE

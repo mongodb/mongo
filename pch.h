@@ -21,22 +21,24 @@
 #pragma once
 
 #if defined(MONGO_EXPOSE_MACROS)
-#define JS_C_STRINGS_ARE_UTF8
-#undef _UNICODE
-#define _UNICODE
-#undef UNICODE
-#define UNICODE
-#undef SUPPORT_UCP
-#define SUPPORT_UCP
-#undef SUPPORT_UTF8
-#define SUPPORT_UTF8
+# define JS_C_STRINGS_ARE_UTF8
+# undef  _UNICODE
+# define _UNICODE
+# undef  UNICODE
+# define UNICODE
+# undef  SUPPORT_UCP
+# define SUPPORT_UCP
+# undef  SUPPORT_UTF8
+# define SUPPORT_UTF8
+# undef  _CRT_SECURE_NO_WARNINGS
+# define _CRT_SECURE_NO_WARNINGS
 #endif
 
 #if defined(_WIN32)
-#  define NOMINMAX
-#  include <winsock2.h> //this must be included before the first windows.h include
-#  include <ws2tcpip.h>
-#  include <windows.h>
+# define NOMINMAX
+# include <winsock2.h> //this must be included before the first windows.h include
+# include <ws2tcpip.h>
+# include <windows.h>
 #endif
 
 #include <ctime>

@@ -106,7 +106,7 @@ namespace mongo {
                 _b._locked--; 
             }
         };
-        bool locked() const { return _locked; }
+        bool locked() const { return _locked != 0; }
     };
 
     /* information about the entire repl set, such as the various servers in the set, and their state */

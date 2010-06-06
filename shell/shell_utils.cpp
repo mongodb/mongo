@@ -15,8 +15,7 @@
  *    limitations under the License.
  */
 
-
-#include "../pch.h"
+#include "pch.h"
 
 #include <boost/thread/xtime.hpp>
 
@@ -51,7 +50,6 @@ namespace mongo {
 #ifdef _WIN32
     inline int close(int fd) { return _close(fd); }
     inline int read(int fd, void* buf, size_t size) { return _read(fd, buf, size); }
-
     inline int pipe(int fds[2]) { return _pipe(fds, 1024, _O_TEXT | _O_NOINHERIT); }
 #endif
 
@@ -337,7 +335,7 @@ namespace mongo {
             void launch_process(int child_stdout){
 #ifdef _WIN32
                 stringstream ss;
-                for (int i=0; i < argv_.size(); i++){
+                for( unsigned i=0; i < argv_.size(); i++ ){
                     if (i) ss << ' ';
                     if (argv_[i].find(' ') == string::npos)
                         ss << argv_[i];
@@ -365,7 +363,7 @@ namespace mongo {
                 PROCESS_INFORMATION pi;
                 ZeroMemory(&pi, sizeof(pi));
 
-                bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi);
+                bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi) != 0;
                 assert(success);
 
                 CloseHandle(pi.hThread);
