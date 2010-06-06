@@ -17,8 +17,10 @@
 */
 
 #include "pch.h"
-#include "../client/dbclient.h"
+
 #include "config.h"
+#include "../client/dbclient.h"
+#include "../util/unittest.h"
 
 #include "balancer_policy.h"
 
@@ -101,5 +103,27 @@ namespace mongo {
 
         return false;
     }
+
+    class PolicyObjUnitTest : public UnitTest {
+    public:
+        void maxSizeForShard(){
+            BSONObj shard0 = BSON( "maxSize" << 0LL << "currSize" << 0LL );
+            BSONObj shard1 = BSON( "maxSize" << 100LL << "currSize" << 80LL );
+            BSONObj shard2 = BSON( "maxSize" << 100LL << "currSize" << 110LL );
+            map< string, BSONObj > shardLimitsMap; 
+            shardLimitsMap["shard0"] = shard0;
+            shardLimitsMap["shard1"] = shard1;
+            shardLimitsMap["shard2"] = shard2;
+
+            assert( BalancerPolicy::isReceiver( "shard0", shardLimitsMap ) );
+            assert( BalancerPolicy::isReceiver( "shard1", shardLimitsMap ) );
+            assert( ! BalancerPolicy::isReceiver( "shard2", shardLimitsMap ) );
+        }
+
+        void run(){
+            maxSizeForShard();
+            log(1) << "policyObjUnitTest passed" << endl;
+        }
+    } policyObjUnitTest;
 
 }  // namespace mongo
