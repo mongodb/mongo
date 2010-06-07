@@ -182,7 +182,7 @@ namespace mongo {
         }
 
         BSONObj removeFile(const BSONObj& args){
-            uassert( 12597 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
+            uassert( 12597 , "need to specify 1 argument" , args.nFields() == 1 );
             
             bool found = false;
             

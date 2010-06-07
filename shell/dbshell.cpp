@@ -198,7 +198,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
     signal( SIGINT , quitNicely );
     return ret;
 #else
-    printf("%s", prompt);
+    printf("%s", prompt); cout.flush();
     char * buf = new char[1024];
     char * l = fgets( buf , 1024 , stdin );
     int len = strlen( buf );
