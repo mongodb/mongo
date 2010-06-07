@@ -94,6 +94,10 @@ assert.throws = function( func , params , msg ){
     doassert( "did not throw exception: " + msg );
 }
 
+assert.throws.automsg = function( func, params ) {
+    assert.throws( func, params, func.toString() );
+}
+
 assert.commandWorked = function( res , msg ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
 

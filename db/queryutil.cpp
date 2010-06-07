@@ -565,28 +565,16 @@ namespace mongo {
                 BSONElement e = i.next();
                 // e could be x:1 or x:{$gt:1}
                 
-                if ( strcmp( e.fieldName(), "$where" ) == 0 )
+                if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
                     continue;
+                }
                 
-                // if only one $or clause, use it - this works with our first cut hack way of rewriting queries
                 if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
-//                    massert( 13272, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
-//                    BSONObjIterator j( e.embeddedObject() );
-//                    if ( j.more() ) { // could be assert instead
-//                        BSONElement f = j.next();
-//                        massert( 13275, "$or array must contain objects", f.type() == Object );
-//                        if ( !j.more() ) { // if only one $or field, subfields are all required
-//                            BSONObjIterator k( f.embeddedObject() );
-//                            while( k.more() ) {
-//                                processQueryField( k.next(), optimize );
-//                            }
-//                        }
-//                    }
                     continue;
                 }
                 
                 if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
-                    continue; // TODO can elim some bounds
+                    continue;
                 }
                 
                 processQueryField( e, optimize );
@@ -600,11 +588,6 @@ namespace mongo {
         
         while( i.more() ) {
             BSONElement e = i.next();
-            // e could be x:1 or x:{$gt:1}
-
-            if ( strcmp( e.fieldName(), "$where" ) == 0 )
-                continue;
-            
             if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
                 massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );                                                                                         
                 BSONObjIterator j( e.embeddedObject() );                                                                                                                                                        
@@ -612,45 +595,11 @@ namespace mongo {
                     BSONElement f = j.next();                                                                                                                                                                   
                     massert( 13263, "$or array must contain objects", f.type() == Object );                                                                                                                     
                     _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
+                    massert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
                 }
                 _orFound = true;
                 continue;
             }
-//
-//            bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
-//            if ( equality && e.type() == Object ) {
-//                equality = ( strcmp( e.embeddedObject().firstElement().fieldName(), "$not" ) != 0 );
-//            }
-//            
-//            if ( equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
-//                _baseSet._ranges[ e.fieldName() ] &= FieldRange( e , false , optimize );
-//            }
-//            if ( !equality ) {
-//                BSONObjIterator j( e.embeddedObject() );
-//                while( j.more() ) {
-//                    BSONElement f = j.next();
-//                    if ( strcmp( f.fieldName(), "$not" ) == 0 ) {
-//                        switch( f.type() ) {
-//                            case Object: {
-//                                BSONObjIterator k( f.embeddedObject() );
-//                                while( k.more() ) {
-//                                    BSONElement g = k.next();
-//                                    uassert( 13264, "invalid use of $not", g.getGtLtOp() != BSONObj::Equality );
-//                                    _baseSet.processOpElement( e.fieldName(), g, true, optimize );
-//                                }
-//                                break;
-//                            }
-//                            case RegEx:
-//                                _baseSet.processOpElement( e.fieldName(), f, true, optimize );
-//                                break;
-//                            default:
-//                                uassert( 13265, "invalid use of $not", false );
-//                        }
-//                    } else {
-//                        _baseSet.processOpElement( e.fieldName(), f, false, optimize );
-//                    }
-//                }                
-//            }
         }
     }
 

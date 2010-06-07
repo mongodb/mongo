@@ -590,14 +590,14 @@ namespace mongo {
     _i(),
     _honorRecordedPlan( honorRecordedPlan ),
     _bestGuessOnly() {
-        // TODO add special/type check
         // eventually implement (some of?) these
-        if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() ) {
+        if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() || !_fros.getSpecial().empty() ) {
             _or = false;
         }
         if ( _or && _fros.uselessOr() ) {
             _or = false;
         }
+        // if _or == false, don't use or clauses for index selection
         if ( !_or ) {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, _query ) );
             _currentQps.reset( new QueryPlanSet( ns, frs, _query, order, hint, honorRecordedPlan, min, max ) );

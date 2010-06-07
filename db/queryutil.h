@@ -258,6 +258,7 @@ namespace mongo {
             *ret &= _orSets.front();
             return ret;
         }
+        string getSpecial() const { return _baseSet.getSpecial(); }
     private:
         FieldRangeSet _baseSet;
         list< FieldRangeSet > _orSets;
