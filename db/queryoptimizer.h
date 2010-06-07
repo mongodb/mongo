@@ -329,11 +329,14 @@ namespace mongo {
         }
         virtual BSONObj currKey() const { return _c->currKey(); }
         virtual DiskLoc refLoc() { return _c->refLoc(); }
-        virtual void noteLocation() { _c->noteLocation(); }
+        virtual void noteLocation() {
+            _c->noteLocation();
+        }
         virtual void checkLocation() {
             _c->checkLocation();
             if ( !ok() ) {
                 advance();
+                _c->noteLocation();
             }
         }        
         virtual bool supportGetMore() { return true; }

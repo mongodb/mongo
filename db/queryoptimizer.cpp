@@ -399,7 +399,7 @@ namespace mongo {
             return;
         }
         
-        bool normalQuery = hint_.isEmpty() && min_.isEmpty() && max_.isEmpty() && _originalQuery.getField( "$or" ).eoo();
+        bool normalQuery = hint_.isEmpty() && min_.isEmpty() && max_.isEmpty();
 
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
