@@ -80,7 +80,9 @@ static char** completionHook(const char* text , int start ,int end ){
     }
     
     if ( all.size() == 0 ){
+#ifdef USE_READLINE
         rl_bind_key('\t',rl_abort);
+#endif
         return 0;
     }
     
