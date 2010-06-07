@@ -764,18 +764,24 @@ shellHelper = function( command , rest , shouldPrint ){
     return res;
 }
 
-help = shellHelper.help = function(){
-    print( "HELP" );
-    print( "\t" + "show dbs                     show database names");
-    print( "\t" + "show collections             show collections in current database");
-    print( "\t" + "show users                   show users in current database");
-    print( "\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
-    print( "\t" + "use <db name>                set curent database to <db name>" );
-    print( "\t" + "db.help()                    help on DB methods");
-    print( "\t" + "db.foo.help()                help on collection methods");
-    print( "\t" + "db.foo.find()                list objects in collection foo" );
-    print( "\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1" );
-    print( "\t" + "it                           result of the last line evaluated; use to further iterate");
+help = shellHelper.help = function (x) {
+    if (x=="more") {
+        print("\tls()");
+        print("\tpwd()");
+        print("\tlistFiles()");
+        return;
+    }
+    print("\t" + "show dbs                     show database names");
+    print("\t" + "show collections             show collections in current database");
+    print("\t" + "show users                   show users in current database");
+    print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+    print("\t" + "use <db name>                set curent database to <db name>");
+    print("\t" + "db.help()                    help on DB methods");
+    print("\t" + "db.foo.help()                help on collection methods");
+    print("\t" + "db.foo.find()                list objects in collection foo");
+    print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
+    print("\t" + "it                           result of the last line evaluated; use to further iterate");
+    print("\t" + "exit                         quit the mongo shell");
 }
 
 shellHelper.use = function( dbname ){

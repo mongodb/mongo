@@ -94,10 +94,11 @@ startMongos = function(){
     return startMongoProgram.apply( null, createMongoArgs( "mongos" , arguments ) );
 }
 
-// Start a mongo program instance (generally mongod or mongos) and return a
-// 'Mongo' object connected to it.  This function's first argument is the
-// program name, and subsequent arguments to this function are passed as
-// command line arguments to the program.
+/* Start mongod or mongos and return a Mongo() object connected to there.
+  This function's first argument is "mongod" or "mongos" program name, \
+  and subsequent arguments to this function are passed as
+  command line arguments to the program.
+*/
 startMongoProgram = function(){
     var port = _parsePort.apply( null, arguments );
 
@@ -132,15 +133,15 @@ myPort = function() {
         return 27017;
 }
 
-ShardingTest = function( testName , numServers , verboseLevel , numMongos , otherParams ){
+ShardingTest = function( testName , numShards , verboseLevel , numMongos , otherParams ){
     if ( ! otherParams )
         otherParams = {}
     this._connections = [];
     
-    if ( otherParams.sync && numServers < 3 )
+    if ( otherParams.sync && numShards < 3 )
         throw "if you want sync, you need at least 3 servers";
 
-    for ( var i=0; i<numServers; i++){
+    for ( var i=0; i<numShards; i++){
         var conn = startMongodTest( 30000 + i , testName + i );
         this._connections.push( conn );
     }
@@ -593,7 +594,6 @@ ToolTest.prototype.runTool = function(){
     runMongoProgram.apply( null , a );
 }
 
-
 ReplTest = function( name, ports ){
     this.name = name;
     this.ports = ports || allocatePorts( 2 );
@@ -613,7 +613,6 @@ ReplTest.prototype.getPath = function( master ){
         p += "slave"
     return p;
 }
-
 
 ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norepl ){
 

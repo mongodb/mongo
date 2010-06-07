@@ -66,7 +66,7 @@ void shellHistoryInit(){
     //rl_attempted_completion_function = my_completion;
         
 #else
-    cout << "type \"exit\" to exit" << endl;
+    //cout << "type \"exit\" to exit" << endl;
 #endif
 }
 void shellHistoryDone(){
@@ -432,7 +432,7 @@ int _main(int argc, char* argv[]) {
     mongo::UnitTest::runTests();
 
     if ( !nodb ) { // connect to db
-        if ( ! mongo::cmdLine.quiet ) cout << "url: " << url << endl;
+        //if ( ! mongo::cmdLine.quiet ) cout << "url: " << url << endl;
         
         stringstream ss;
         if ( mongo::cmdLine.quiet )
