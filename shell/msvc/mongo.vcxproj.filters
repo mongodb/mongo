@@ -33,6 +33,9 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="_js files">
+      <UniqueIdentifier>{473e7192-9f2a-47c5-ad95-e5b75d4f48f9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\dbshell.cpp">
@@ -215,6 +218,27 @@
     <None Include="..\..\SConstruct" />
     <None Include="mongo.ico">
       <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\collection.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\db.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\mongo.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\mr.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\query.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\servers.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\utils.js">
+      <Filter>_js files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

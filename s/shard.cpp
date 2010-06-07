@@ -45,7 +45,14 @@ namespace mongo {
                 BSONObj o = *i;
                 string name = o["_id"].String();
                 string host = o["host"].String();
-                Shard s( name , host );
+
+                long long maxSize = 0;
+                BSONElement maxSizeElem = o["maxSize"];
+                if ( ! maxSizeElem.eoo() ){
+                    maxSize = maxSizeElem.numberLong();
+                }
+
+                Shard s( name , host , maxSize );
                 _lookup[name] = s;
                 _lookup[host] = s;
             }

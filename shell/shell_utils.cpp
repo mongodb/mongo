@@ -115,7 +115,10 @@ namespace mongo {
 
 #ifndef MONGO_SAFE_SHELL
 
-        BSONObj listFiles(const BSONObj& args){
+        BSONObj listFiles(const BSONObj& _args){
+            static BSONObj cd = BSON( "0" << "." );
+            BSONObj args = _args.isEmpty() ? cd : _args;
+
             uassert( 10257 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
             
             BSONObjBuilder lst;
@@ -159,6 +162,24 @@ namespace mongo {
             return ret.obj();
         }
 
+        BSONObj ls(const BSONObj& args) { 
+            BSONObj o = listFiles(args);
+            if( !o.isEmpty() ) {
+                for( BSONObj::iterator i = o.firstElement().Obj().begin(); i.more(); ) { 
+                    BSONObj f = i.next().Obj();
+                    cout << f["name"].String();
+                    if( f["isDirectory"].trueValue() ) cout << '/';
+                    cout << '\n';
+                }
+                cout.flush();
+            }
+            return BSONObj();
+        }
+
+        BSONObj pwd(const BSONObj&) { 
+            boost::filesystem::path p = boost::filesystem::current_path();
+            return BSON( "" << p.string() );
+        }
 
         BSONObj removeFile(const BSONObj& args){
             uassert( 12597 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
@@ -694,6 +715,8 @@ namespace mongo {
             //can't access filesystem
             scope.injectNative( "removeFile" , removeFile );
             scope.injectNative( "listFiles" , listFiles );
+            scope.injectNative( "ls" , ls );
+            scope.injectNative( "pwd", pwd );
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );
 #endif
