@@ -603,7 +603,9 @@ namespace mongo {
             }
             case Code:{
                 JSFunction * func = compileFunction( e.valuestr() );
-                return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
+                if ( func )
+                    return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
+                return JSVAL_NULL;
             }
             case CodeWScope:{
                 JSFunction * func = compileFunction( e.codeWScopeCode() );
