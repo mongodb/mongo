@@ -750,6 +750,13 @@ shellPrintHelper = function( x ){
         print( tojson( x ) );
 }
 
+shellAutocomplete = function( prefix ){
+    var a = [];
+    //a.push( prefix + "z" )
+    //a.push( prefix + "y" )
+    __autocomplete__ = a;
+}
+
 shellHelper = function( command , rest , shouldPrint ){
     command = command.trim();
     var args = rest.trim().replace(/;$/,"").split( "\s+" );
