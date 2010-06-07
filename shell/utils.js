@@ -772,10 +772,10 @@ shellHelper = function( command , rest , shouldPrint ){
 }
 
 help = shellHelper.help = function (x) {
-    if (x=="more") {
-        print("\tls()");
-        print("\tpwd()");
-        print("\tlistFiles()");
+    if (x == "more") {
+        print("\tls(dir)                        print list of files");
+        print("\tpwd()                          returns current directory");
+        print("\tlistFiles(dir)                 returns list of files");
         return;
     }
     print("\t" + "show dbs                     show database names");
