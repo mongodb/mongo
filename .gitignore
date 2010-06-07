@@ -2,6 +2,7 @@
 .dbshell
 .sconsign.dblite
 .sconf_temp
+perf.data
 
 *~
 *.o
