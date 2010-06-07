@@ -196,6 +196,21 @@ namespace mongo {
 #endif
     }
 
+    /* if server is really busy, wait a bit */
+    void beNice() {
+        {
+            /* if we can get a write lock fast, we definitely aren't busy */
+            writelocktry L("local.", 1);
+            if( L.got() ) return;
+        }
+        sleepmillis(1);
+        {
+            writelocktry L("local.", 1);
+            if( L.got() ) return;
+        }
+        sleepmillis(4);
+    }
+
     /* we create one thread for each connection from an app server database.
        app server will open a pool of threads.
        todo: one day, asio...
@@ -272,7 +287,7 @@ sendmore:
                             m.appendData(b.buf(), b.len());
                             b.decouple();
                             DEV log() << "exhaust=true sending more" << endl;
-                            sleepmillis(1);
+                            beNice();
                             goto sendmore;
                         }
                     }

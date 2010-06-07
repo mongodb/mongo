@@ -290,7 +290,6 @@ namespace mongo {
         bool _got;
     };
 
-
     struct readlocktryassert : public readlocktry { 
         readlocktryassert(const string& ns, int tryms) : 
           readlocktry(ns,tryms) { 
