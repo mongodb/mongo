@@ -654,6 +654,24 @@ namespace mongo {
         }
     }
 
+    bool FieldRangeOrSet::uselessOr() const {
+        for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
+            bool useful = false;
+            NamespaceDetails::IndexIterator j = nsdetails( _baseSet.ns() )->ii();
+            while( j.more() ) {
+                IndexDetails &id = j.next();
+                if ( id.getSpec().suitability( i->simplifiedQuery(), BSONObj() ) != USELESS ) {
+                    useful = true;
+                    break;
+                }
+            }
+            if ( !useful ) {
+                return true;
+            }
+        }
+        return false;
+    }    
+    
     FieldRange *FieldRangeSet::trivialRange_ = 0;
     FieldRange &FieldRangeSet::trivialRange() {
         if ( trivialRange_ == 0 )

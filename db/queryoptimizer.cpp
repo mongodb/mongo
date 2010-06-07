@@ -595,6 +595,9 @@ namespace mongo {
         if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
         }
+        if ( _or && _fros.uselessOr() ) {
+            _or = false;
+        }
         if ( !_or ) {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, _query ) );
             _currentQps.reset( new QueryPlanSet( ns, frs, _query, order, hint, honorRecordedPlan, min, max ) );
