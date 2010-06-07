@@ -87,9 +87,17 @@ namespace mongo {
             connector = 0;
             conn.done();
         }
-        
+    }
 
-
+    /** with QueryOption_Exhaust, the server just blasts data at us (marked at end with cursorid==0). */
+    void DBClientCursor::exhaustReceiveMore() {
+        assert( cursorId && pos == nReturned );
+        assert( !haveLimit );
+        auto_ptr<Message> response(new Message());
+        assert( connector );
+        connector->recv(*response);
+        m = response;
+        dataReceived();
     }
 
     void DBClientCursor::dataReceived() {

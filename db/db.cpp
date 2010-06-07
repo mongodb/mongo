@@ -129,6 +129,46 @@ namespace mongo {
 
     void webServerThread();
 
+/* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
+// QueryOption_Exhaust
+#define TESTEXHAUST 0
+#if( TESTEXHAUST )
+    void testExhaust() { 
+        sleepsecs(1);
+        unsigned n = 0;
+        auto f = [&n](const BSONObj& o) { 
+            assert( o.valid() );
+            //cout << o << endl;
+            n++;
+            bool testClosingSocketOnError = false;
+            if( testClosingSocketOnError )
+                assert(false);
+        };
+        DBClientConnection db(false);
+        db.connect("localhost");
+        const char *ns = "local.foo";
+        if( db.count(ns) < 10000 )
+            for( int i = 0; i < 20000; i++ ) 
+                db.insert(ns, BSON("aaa" << 3 << "b" << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+
+        try {
+            db.query(f, ns, Query() );
+        }
+        catch(...) { 
+            cout << "hmmm" << endl;
+        }
+
+        try {
+            db.query(f, ns, Query() );
+        }
+        catch(...) { 
+            cout << "caught" << endl;
+        }
+
+        cout << n << endl;
+    };
+#endif
+
     void listen(int port) {
         //testTheDb();
         log() << "waiting for connections on port " << port << endl;
@@ -136,6 +176,10 @@ namespace mongo {
         startReplication();
         if ( !noHttpInterface )
             boost::thread thr(webServerThread);
+
+#if(TESTEXHAUST)
+        boost::thread thr(testExhaust);
+#endif
         l.initAndListen();
     }
 

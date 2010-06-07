@@ -67,13 +67,13 @@
 #include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/function.hpp>
 #include "boost/bind.hpp"
 #include "boost/function.hpp"
 #include <boost/thread/tss.hpp>
 #include "boost/detail/endian.hpp"
 #define BOOST_SPIRIT_THREADSAFE
 #include <boost/version.hpp>
-
 #include <boost/tuple/tuple.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition.hpp>

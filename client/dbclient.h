@@ -51,7 +51,7 @@ namespace mongo {
         // an extended period of time.
         QueryOption_OplogReplay = 1 << 3,
 
-        /** The server normally times out idle cursors after an inactivy period to prevent excess memory use
+        /** The server normally times out idle cursors after an inactivy period to prevent excess memory uses
             Set this option to prevent that. 
         */
         QueryOption_NoCursorTimeout = 1 << 4,
@@ -214,6 +214,9 @@ namespace mongo {
         virtual void say( Message &toSend ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;
         virtual void checkResponse( const string &data, int nReturned ) {}
+
+        /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
+        virtual void recv( Message& m ) { assert(false); }
     };
 
     /**
@@ -224,6 +227,7 @@ namespace mongo {
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 ) = 0;
 
+        /** don't use this - called automatically by DBClientCursor for you */
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
         
         virtual void insert( const string &ns, BSONObj obj ) = 0;
@@ -561,7 +565,6 @@ namespace mongo {
      abstract class that implements the core db operations
      */
     class DBClientBase : public DBClientWithCommands, public DBConnector {
-
     protected:
         WriteConcern _writeConcern;
 
@@ -590,12 +593,13 @@ namespace mongo {
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );
 
-        /** @param cursorId id of cursor to retrieve
+        /** don't use this - called automatically by DBClientCursor for you
+            @param cursorId id of cursor to retrieve
             @return an handle to a previously allocated cursor
             @throws AssertionException
          */
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 );
-        
+
         /**
            insert an object into the database
          */
@@ -630,7 +634,7 @@ namespace mongo {
                     n++;
             return n;
         }
-    }; // end DBClientBase
+    }; // DBClientBase
     
     class DBClientPaired;
     
@@ -700,6 +704,10 @@ namespace mongo {
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions , batchSize );
         }
 
+        /** uses QueryOption_Exhaust 
+         */
+        unsigned long long query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0);
+
         /**
            @return true if this connection is currently in a failed state.  When autoreconnect is on, 
                    a connection will transition back to an ok state after reconnecting.
@@ -730,6 +738,9 @@ namespace mongo {
         
         virtual void killCursor( long long cursorID );
 
+    protected:
+        friend class SyncClusterConnection;
+        virtual void recv( Message& m );
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend );

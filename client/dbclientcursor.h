@@ -145,6 +145,7 @@ namespace mongo {
         
     private:
         friend class DBClientBase;
+        friend class DBClientConnection;
         bool init();        
         int nextBatchSize();
         DBConnector *connector;
@@ -165,6 +166,7 @@ namespace mongo {
         const char *data;
         void dataReceived();
         void requestMore();
+        void exhaustReceiveMore(); // for exhaust
         bool _ownCursor; // see decouple()
         string _scopedHost;
     };

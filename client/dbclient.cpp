@@ -539,6 +539,40 @@ namespace mongo {
         return auto_ptr< DBClientCursor >( 0 );
     }
 
+    unsigned long long DBClientConnection::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn ) {
+        unsigned long long n = 0;
+
+        try { 
+
+            auto_ptr<DBClientCursor> c(  
+              this->query(ns, query, 0, 0, fieldsToReturn, (int) QueryOption_Exhaust) );
+
+            while( 1 ) { 
+                while( c->moreInCurrentBatch() ) { 
+                    BSONObj o = c->nextSafe();
+                    f(o);
+                    n++;
+                }
+
+                if( c->getCursorId() == 0 ) 
+                    break;
+
+                c->exhaustReceiveMore();
+            }
+
+        }
+        catch(std::exception&) { 
+            /* connection CANNOT be used anymore as more data may be on the way from the server.
+               we have to reconnect.
+               */
+            failed = true;
+            p->shutdown();
+            throw;
+        }
+
+        return n;
+    }
+
     void DBClientBase::insert( const string & ns , BSONObj obj ) {
         Message toSend;
 
@@ -740,6 +774,10 @@ namespace mongo {
 
     void DBClientConnection::sayPiggyBack( Message &toSend ) {
         port().piggyBack( toSend );
+    }
+
+    void DBClientConnection::recv( Message &m ) { 
+        port().recv(m);
     }
 
     bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk ) {
