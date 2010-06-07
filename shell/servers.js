@@ -170,11 +170,13 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     var admin = this.admin = this.s.getDB( "admin" );
     this.config = this.s.getDB( "config" );
 
-    this._connections.forEach(
-        function(z){
-            admin.runCommand( { addshard : z.name , allowLocal : true } );
-        }
-    );
+    if ( ! otherParams.manualAddShard ){
+        this._connections.forEach(
+            function(z){
+                admin.runCommand( { addshard : z.name , allowLocal : true } );
+            }
+        );
+    }
 }
 
 ShardingTest.prototype.getDB = function( name ){
@@ -187,6 +189,14 @@ ShardingTest.prototype.getServerName = function( dbname ){
         return x.primary;
     this.config.databases.find().forEach( printjson );
     throw "couldn't find dbname: " + dbname + " total: " + this.config.databases.count();
+}
+
+ShardingTest.prototype.getConnNames = function(){
+    var names = [];
+    for ( var i=0; i<this._connections.length; i++ ){
+        names.push( this._connections[i].name );
+    }
+    return names; 
 }
 
 ShardingTest.prototype.getServer = function( dbname ){

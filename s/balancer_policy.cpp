@@ -38,9 +38,13 @@ namespace mongo {
             const string& shard = i->first;
             unsigned size = i->second.size();
 
-            if ( isReceiver( shard , shardLimitsMap ) && ( size < min.second ) ){
-                min.first = shard;
-                min.second = size;
+            if ( size < min.second ){
+                if ( isReceiver( shard , shardLimitsMap ) ){
+                    min.first = shard;
+                    min.second = size;
+                } else {
+                    log() << "balancer: shard can't receive any more chunks (" << shard  << ")" << endl;
+                }
             }
             
             if ( size > max.second ){
