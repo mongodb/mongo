@@ -245,15 +245,17 @@ def expandSuites(suites):
 def main():
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
-                      help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests.  (default "files")')
-    parser.add_option('--mongo-repo', dest='mongoRepo', default=None,
-                      help='Top-level directory of mongo checkout to use.  (default: script will make a guess)')
-    parser.add_option('--mongod', dest='mongodExecutable', default='./mongod',
-                      help='Path to mongod to run (default "./mongod" in the mongo repo)')
+                      help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests.  (default "suite")')
+    # Some of our tests hard-code pathnames e.g., to execute, so until
+    # th we don't have the freedom to run from anyplace.
+#    parser.add_option('--mongo-repo', dest='mongoRepo', default=None,
+#                      help='Top-level directory of mongo checkout to use.  (default: script will make a guess)')
+    parser.add_option('--mongod', dest='mongodExecutable', #default='./mongod',
+                      help='Path to mongod to run (default "./mongod")')
     parser.add_option('--port', dest='mongodPort', default="32000",
                       help='Port the mongod will bind to (default 32000)')
-    parser.add_option('--mongo', dest='shellExecutable', default="./mongo",
-                      help='Path to mongo, for .js test files (default "./mongo" in the mongo repo)')
+    parser.add_option('--mongo', dest='shellExecutable', #default="./mongo",
+                      help='Path to mongo, for .js test files (default "./mongo")')
     parser.add_option('--continue-on-failure', dest='continueOnFailure',
                       action="store_true", default=False,
                       help='If supplied, continue testing even after a test fails')
@@ -266,8 +268,9 @@ def main():
     (options, tests) = parser.parse_args()
 
     global mongoRepo
-    if options.mongoRepo:
-        mongoRepo = options.mongoRepo
+    if False: #options.mongoRepo:
+        pass
+        #mongoRepo = options.mongoRepo
     else:
         prefix = ''
         while True:
@@ -282,9 +285,9 @@ def main():
                     raise Exception("couldn't guess the mongo repository path")
 
     global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest
-    mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, mongodExecutable)
+    mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, 'mongod')
     mongodPort = options.mongodPort if options.mongodPort else mongodPort
-    shellExecutable = options.shellExecutable if options.shellExecutable else os.path.join(mongoRepo, shellExecutable)
+    shellExecutable = options.shellExecutable if options.shellExecutable else os.path.join(mongoRepo, 'mongo')
     continueOnFailure = options.continueOnFailure if options.continueOnFailure else continueOnFailure
     oneMongodPerTest = options.oneMongodPerTest if options.oneMongodPerTest else oneMongodPerTest
     
