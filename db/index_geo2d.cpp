@@ -1021,7 +1021,10 @@ namespace mongo {
                 return false;
             bucket = bucket.btree()->advance( bucket , pos , direction , "btreelocation" );
             
-            return checkCur( totalFound , all );
+            if ( all )
+                return checkCur( totalFound , all );
+            
+            return ! bucket.isNull();
         }
 
         bool checkCur( int& totalFound , GeoAccumulator* all ){
@@ -1130,7 +1133,7 @@ namespace mongo {
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
                 while ( _spec->sizeEdge( _prefix ) < boxSize )
                     _prefix = _prefix.up();
-                log(1) << "want: " << want << " found:" << _found << " hash size:" << _spec->sizeEdge( _prefix ) << endl;
+                log(1) << "want: " << want << " found:" << _found << " nscanned: " << _nscanned << " hash size:" << _spec->sizeEdge( _prefix ) << endl;
                 
                 for ( int x=-1; x<=1; x++ ){
                     for ( int y=-1; y<=1; y++ ){
@@ -1148,10 +1151,16 @@ namespace mongo {
 
         void doBox( const IndexDetails& id , const Box& want , const GeoHash& toscan , int depth = 0 ){
             Box testBox( _spec , toscan );
-            if ( logLevel > 0 ) log(1) << "\t doBox: " << testBox << "\t" << toscan.toString() << endl;
-
+            if ( logLevel > 0 ){
+                log(1) << "\t";
+                for ( int i=0; i<depth; i++ ){
+                    log(1) << "\t";
+                    log() << " doBox: " << testBox << "\t" << toscan.toString() << " scanned so far: " << _nscanned << endl;
+                }
+            }
+            
             double intPer = testBox.intersects( want );
-
+            
             if ( intPer <= 0 )
                 return;
             
