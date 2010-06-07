@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import with_statement
 from subprocess import Popen, PIPE, call
 import os
 import sys
@@ -8,6 +9,10 @@ import time
 import socket
 from optparse import OptionParser
 import atexit
+import glob
+
+
+mongoRepo = None
 
 mongodExecutable = "./mongod"
 mongodPort = "32000"
@@ -18,7 +23,9 @@ oneMongodPerTest = False
 tests = []
 winners = []
 losers = {}
-# grumble
+
+# This class just implements the with statement API, for a sneaky
+# purpose below.
 class nothing(object):
     def __enter__(self):
         return self
@@ -36,6 +43,7 @@ class mongod(object):
 
     def __exit__(self, type, value, traceback):
         try:
+            pass
             self.stop()
         except Exception, e:
             print >> sys.stderr, "error shutting down mongod"
@@ -81,17 +89,14 @@ class mongod(object):
         if not self.didMongodStart( mongodPort ):
             raise Exception( "Failed to start mongod" )
 
+        # FIXME: need to support this.
 #    def startMongodSmallOplog(env, target, source):
 #        return startMongodWithArgs("--master", "--oplogSize", "10")
     
     def stop(self):
-        print "FOO"
         if not self.proc:
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
             return
-        # ???
-        #if self.proc.poll() is not None:
-        #    raise Exception( "Failed to start mongod" )
         try:
             # This function not available in Python 2.5
             self.proc.terminate()
@@ -125,12 +130,17 @@ class TestServerFailure(TestFailure):
     def __str__(self):
         return 'mongod not ok after test %s' % self.path
 
-def runTest(path):
+def runTest(test):
+    (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
     if ext == ".js":
-        argv=[shellExecutable, "--port", mongodPort, path]
+        argv=filter(lambda x:x, [shellExecutable, "--port", mongodPort] + [None if usedb else "--nodb"] + [path])
     elif ext in ["", ".exe"]:
-        argv=[path, "--port", mongodPort]
+        # Blech.
+        if os.path.basename(path) in ["test", "test.exe", "perftest", "perftest.exe"]:
+            argv=[path]
+        else:
+            argv=[path, "--port", mongodPort]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
     print " *******************************************"
@@ -150,19 +160,26 @@ def runTest(path):
     print ""
 
 def runTests(tests):
-    with nothing() if oneMongodPerTest else mongod() as nevermind:
+    # If we're in one-mongo-per-test mode, we instantiate a nothing
+    # around the loop, and a mongod inside the loop.  We don't
+    # actually the instance directly.
+
+    # FIXME: some suites of tests start their own mongod, so don't
+    # need this.  (So long as there are no conflicts with port,
+    # dbpath, etc., and so long as we shut ours down properly,
+    # starting this mongod shouldn't break anything, though.)
+    with nothing() if oneMongodPerTest else mongod() as _:
         for test in tests:
             try:
-                with mongod() if oneMongodPerTest else nothing() as nevermind:
+                with mongod() if oneMongodPerTest else nothing() as _:
                     runTest(test)
                 winners.append(test)
             except TestFailure, f:
                 try:
                     print f
+                    # Record the failing test and re-raise.
                     losers[f.path] = f.status
                     raise f
-                # If the server's hosed and we're not in oneMongodPerTest
-                # mode, there's nothing else we can do.
                 except TestServerFailure, f: 
                     if not oneMongodPerTest:
                         return 2
@@ -181,33 +198,99 @@ def report():
         for loser in losers:
             print "%s\t%d" % (loser, losers[loser])
 
+def expandSuites(suites):
+    globstr = None
+    global mongoRepo, tests
+    for suite in suites:
+        if suite == 'smokeAll':
+            tests = []
+            expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlow', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
+            break
+        if suite == 'smoke':
+            (globstr, usedb) = ('test', False)
+        elif suite == 'smokePerf':
+            (globstr, usedb) = ('perftest', False)
+        elif suite == 'smokeClient':
+            tests += [(os.path.join(mongoRepo, path), False) for path in ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]]
+        elif suite == 'smokeJs':
+            # FIXME: _runner.js seems equivalent to "[!_]*.js".
+            #(globstr, usedb) = ('_runner.js', True)
+            (globstr, usedb) = ('[!_]*.js', True)
+        elif suite == 'smokeQuota':
+            (globstr, usedb) = ('quota/*.js', True)
+        elif suite == 'smokeJsPerf':
+            (globstr, usedb) = ('perf/*.js', True)
+        elif suite == 'smokeJsSlow':
+            (globstr, usedb) = ('slow/*.js', True)
+        elif suite == 'smokeParallel':
+            (globstr, usedb) = ('parallel/*', True)
+        elif suite == 'smokeClone':
+            (globstr, usedb) = ('clone/*.js', False)
+        elif suite == 'smokeRepl':
+            (globstr, usedb) = ('repl/*.js', False)
+        elif suite == 'smokeAuth':
+            (globstr, usedb) = ('auth/*.js', False)
+        elif suite == 'smokeSharding':
+            (globstr, usedb) = ('sharding/*.js', False)
+        elif suite == 'smokeTool':
+            (globstr, usedb) = ('tool/*.js', False)
+        else:
+            raise Exception('unknown test suite %s' % suite)
+
+        if globstr:
+            globstr = mongoRepo+('/jstests/' if globstr.endswith('.js') else '/')+globstr
+            tests += [(path, usedb) for path in glob.glob(globstr)]
+    return tests
+
 def main():
-    parser = OptionParser(usage="usage: smoke.py [OPTIONS] FILE*")
-    parser.add_option('--mongod', dest='mongodExecutable', default='./mongod',
+    parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
+    parser.add_option('--mode', dest='mode', default='suite',
+                      help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests.  (default "suite")')
+    # Some of our tests hard-code pathnames e.g., to execute, so until
+    # th we don't have the freedom to run from anyplace.
+#    parser.add_option('--mongo-repo', dest='mongoRepo', default=None,
+#                      help='Top-level directory of mongo checkout to use.  (default: script will make a guess)')
+    parser.add_option('--mongod', dest='mongodExecutable', #default='./mongod',
                       help='Path to mongod to run (default "./mongod")')
     parser.add_option('--port', dest='mongodPort', default="32000",
                       help='Port the mongod will bind to (default 32000)')
-    parser.add_option('--mongo', dest='shellExecutable', default="./mongo",
+    parser.add_option('--mongo', dest='shellExecutable', #default="./mongo",
                       help='Path to mongo, for .js test files (default "./mongo")')
     parser.add_option('--continue-on-failure', dest='continueOnFailure',
                       action="store_true", default=False,
-                      help='If supplied, continue testing even after a failure')
+                      help='If supplied, continue testing even after a test fails')
     parser.add_option('--one-mongod-per-test', dest='oneMongodPerTest',
                       action="store_true", default=False,
                       help='If supplied, run each test in a fresh mongod')
     parser.add_option('--from-file', dest='File',
-                      help="Run tests named in FILE, one test per line, '-' means stdin")
+                      help="Run tests/suites named in FILE, one test per line, '-' means stdin")
+    global tests
     (options, tests) = parser.parse_args()
-    
 
-    global mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest
-    mongodExecutable = options.mongodExecutable if options.mongodExecutable else mongodExecutable
+    global mongoRepo
+    if False: #options.mongoRepo:
+        pass
+        #mongoRepo = options.mongoRepo
+    else:
+        prefix = ''
+        while True:
+            if os.path.exists(prefix+'buildscripts'):
+                mongoRepo = os.path.normpath(prefix)
+                break
+            else:
+                prefix += '../'
+                # FIXME: will this be a device's root directory on
+                # Windows?
+                if os.path.samefile('/', prefix): 
+                    raise Exception("couldn't guess the mongo repository path")
+
+    global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest
+    mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, 'mongod')
     mongodPort = options.mongodPort if options.mongodPort else mongodPort
-    shellExecutable = options.shellExecutable if options.shellExecutable else shellExecutable
+    shellExecutable = options.shellExecutable if options.shellExecutable else os.path.join(mongoRepo, 'mongo')
     continueOnFailure = options.continueOnFailure if options.continueOnFailure else continueOnFailure
     oneMongodPerTest = options.oneMongodPerTest if options.oneMongodPerTest else oneMongodPerTest
     
-    global tests
     if options.File:
         if options.File == '-':
             tests = sys.stdin.readlines()
@@ -215,6 +298,16 @@ def main():
             with open(options.File) as f:
                 tests = f.readlines()
     tests = [t.rstrip('\n') for t in tests]
+
+    # If we're in suite mode, tests is a list of names of sets of tests.
+    if options.mode == 'suite':
+        # Suites: smoke, smokePerf, smokeJs, smokeQuota, smokeJsPerf,
+        # smokeJsSlow, smokeParalell, smokeClone, smokeRepl, smokeDisk
+        suites = tests
+        tests = []
+        expandSuites(suites)
+    elif options.mode == 'files':
+        tests = [(os.path.abspath(test), True) for test in tests]
 
     return runTests(tests)
 

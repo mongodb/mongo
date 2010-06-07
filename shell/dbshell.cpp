@@ -37,6 +37,11 @@ jmp_buf jbuf;
 using namespace std;
 using namespace boost::filesystem;
 
+using mongo::BSONObj;
+using mongo::BSONObjBuilder;
+using mongo::BSONObjIterator;
+using mongo::BSONElement;
+
 string historyFile;
 bool gotInterrupted = 0;
 bool inMultiLine = 0;
@@ -45,9 +50,60 @@ bool inMultiLine = 0;
 #define CTRLC_HANDLE
 #endif
 
-static char** my_completion(const char* text , int start ,int end ){
-    cout << "YO [" << text << "] " << start << " " << end << endl;
-    return 0;
+mongo::Scope * shellMainScope;
+
+void generateCompletions( const string& prefix , vector<string>& all ){
+    if ( prefix.find( '"' ) != string::npos )
+        return;
+    shellMainScope->exec( "shellAutocomplete( \"" + prefix + "\" );" , "autocomplete help" , false , true , false );
+    
+    BSONObjBuilder b;
+    shellMainScope->append( b , "" , "__autocomplete__" );
+    BSONObj res = b.obj();
+    BSONObj arr = res.firstElement().Obj();
+
+    BSONObjIterator i(arr);
+    while ( i.more() ){
+        BSONElement e = i.next();
+        all.push_back( e.String() );
+    }
+
+}
+
+static char** completionHook(const char* text , int start ,int end ){
+    static map<string,string> m;
+    
+    vector<string> all;
+    
+    if ( start == 0 ){
+        generateCompletions( string(text,end) , all );
+    }
+    
+    if ( all.size() == 0 ){
+        rl_bind_key('\t',rl_abort);
+        return 0;
+    }
+    
+    string longest = all[0];
+    for ( vector<string>::iterator i=all.begin(); i!=all.end(); ++i ){
+        string s = *i;
+        for ( unsigned j=0; j<s.size(); j++ ){
+            if ( longest[j] == s[j] )
+                continue;
+            longest = longest.substr(0,j);
+            break;
+        }
+    }
+    
+    char ** matches = (char**)malloc( sizeof(char*) * (all.size()+2) );
+    unsigned x=0;
+    matches[x++] = strdup( longest.c_str() );
+    for ( unsigned i=0; i<all.size(); i++ ){
+        matches[x++] = strdup( all[i].c_str() );
+    }
+    matches[x++] = 0;
+
+    return matches;
 }
 
 void shellHistoryInit(){
@@ -61,9 +117,9 @@ void shellHistoryInit(){
 
     using_history();
     read_history( historyFile.c_str() );
-
+    
     // TODO: do auto-completion
-    //rl_attempted_completion_function = my_completion;
+    rl_attempted_completion_function = completionHook;
         
 #else
     //cout << "type \"exit\" to exit" << endl;
@@ -120,6 +176,9 @@ void quitNicely( int sig ){
 
 char * shellReadline( const char * prompt , int handlesigint = 0 ){
 #ifdef USE_READLINE
+
+    rl_bind_key('\t',rl_complete);
+
 
 #ifdef CTRLC_HANDLE
     if ( ! handlesigint )
@@ -458,6 +517,7 @@ int _main(int argc, char* argv[]) {
     mongo::ScriptEngine::setup();
     mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );    
+    shellMainScope = scope.get();
     
     if ( !script.empty() ) {
         mongo::shellUtils::MongoProgramScope s;
