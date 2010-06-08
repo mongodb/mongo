@@ -97,3 +97,10 @@ c.next();
 c.next();
 t.remove( {b:3} );
 assert.eq.automsg( "2", c.itcount() );
+
+t.drop();
+
+t.save( {a:[1,2]} );
+assert.eq.automsg( "1", "t.find( {$or:[{a:[1,2]}]} ).itcount()" );
+assert.eq.automsg( "1", "t.find( {$or:[{a:{$all:[1,2]}}]} ).itcount()" );
+assert.eq.automsg( "0", "t.find( {$or:[{a:{$all:[1,3]}}]} ).itcount()" );
