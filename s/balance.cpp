@@ -289,6 +289,8 @@ namespace mongo {
             log(1) << "balancer myid: " << _myid << endl;
             
             _started = time(0);
+
+            Shard::reloadShardInfo();
         }
         
         _ping();
