@@ -36,6 +36,9 @@
     <Filter Include="_js files">
       <UniqueIdentifier>{473e7192-9f2a-47c5-ad95-e5b75d4f48f9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shell\generated_from_js">
+      <UniqueIdentifier>{96e4c411-7ab4-4bcd-b7c6-a33059f5d492}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\dbshell.cpp">
@@ -73,9 +76,6 @@
       <Filter>shared source files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\db\nonce.cpp">
-      <Filter>shared source files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\mongo-server.cpp">
       <Filter>shared source files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\pcre-7.4\pcre_xclass.c">
@@ -204,14 +204,17 @@
     <ClCompile Include="..\..\scripting\engine_spidermonkey.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\mongo_vstudio.cpp">
-      <Filter>shell</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\util\password.cpp">
       <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\db\common.cpp">
       <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\mongo.cpp">
+      <Filter>shell\generated_from_js</Filter>
+    </ClCompile>
+    <ClCompile Include="..\mongo-server.cpp">
+      <Filter>shell\generated_from_js</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

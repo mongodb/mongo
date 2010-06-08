@@ -796,10 +796,16 @@ shellHelper = function( command , rest , shouldPrint ){
 }
 
 help = shellHelper.help = function (x) {
-    if (x=="more") {
-        print("\tls()");
-        print("\tpwd()");
-        print("\tlistFiles()");
+    if (x == "admin") {
+        print("\tls([path])                    list files");
+        print("\tpwd()                         returns current directory");
+        print("\tlistFiles([path])             returns file list");
+        print("\tremoveFile(f)                 delete a file");
+        return;
+    }
+    if (x == "test") {
+        print("\tstartMongod(args)             DELETES DATA DIR and then starts mongod");
+        print("\tstartMongodTest(port,dir)     DELETES DATA DIR");
         return;
     }
     print("\t" + "show dbs                     show database names");

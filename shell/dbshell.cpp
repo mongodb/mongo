@@ -16,7 +16,6 @@
  */
 
 #include "pch.h"
-
 #include <stdio.h>
 
 #ifdef USE_READLINE
