@@ -262,7 +262,7 @@ namespace mongo {
         }
 
         bool lock_try(){
-            bool got = boost::detail::thread::lock_ops<boost::recursive_mutex>::trylock(m);
+            bool got = m.try_lock();
             if ( got ){
                 _minfo.entered();
             }
