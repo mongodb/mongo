@@ -442,26 +442,44 @@ namespace mongo {
         return *this;        
     }
     
+    //TODO finish
     const FieldRange &FieldRange::operator-=( const FieldRange &other ) {
-        // TODO implement
-        return *this;
-        
-        vector< FieldInterval > newIntervals;
-        vector< FieldInterval >::const_iterator i = _intervals.begin();
+        vector< FieldInterval >::iterator i = _intervals.begin();
         vector< FieldInterval >::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
+            // TODO endpoints
             int cmp = i->_lower._bound.woCompare( j->_lower._bound, false );
             if ( cmp < 0 ) {
                 int cmp2 = i->_upper._bound.woCompare( j->_lower._bound, false );
-                if ( cmp2 < 0 ) {
-                    
+                if ( cmp2 <= 0 ) {
+                    ++i;
+                } else {
+                    int cmp3 = i->_upper._bound.woCompare( j->_upper._bound, false );
+                    if ( cmp3 <= 0 ) {
+                        i->_upper = j->_lower;
+                        i->_upper.flipInclusive();
+                        ++i;
+                    } else {
+                        ++j;
+                    }
                 }
+            } else {
+                int cmp2 = i->_lower._bound.woCompare( j->_upper._bound, false );
+                if ( cmp2 > 0 ) {
+                    ++j;
+                } else {
+                    int cmp3 = i->_upper._bound.woCompare( j->_upper._bound, false );
+                    if ( cmp3 < 0 ) {
+                        i = _intervals.erase( i );
+                    } else {
+                        i->_lower = j->_upper;
+                        i->_lower.flipInclusive();                        
+                        ++j;
+                    }
+                }                
             }
         }
-        while( i != _intervals.end() ) {
-            newIntervals.push_back( *i );
-        }
-        finishOperation( newIntervals, other );
+        finishOperation( _intervals, other );
         return *this;        
     }
     

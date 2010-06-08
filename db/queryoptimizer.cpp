@@ -590,7 +590,6 @@ namespace mongo {
     _i(),
     _honorRecordedPlan( honorRecordedPlan ),
     _bestGuessOnly() {
-        // eventually implement (some of?) these
         if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() || !_fros.getSpecial().empty() ) {
             _or = false;
         }

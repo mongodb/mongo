@@ -28,6 +28,7 @@ namespace mongo {
             return _bound.woCompare( other._bound ) == 0 &&
             _inclusive == other._inclusive;
         }
+        void flipInclusive() { _inclusive = !_inclusive; }
     };
 
     struct FieldInterval {
@@ -187,11 +188,20 @@ namespace mongo {
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
         string getSpecial() const;
         const FieldRangeSet &operator-=( const FieldRangeSet &other ) {
-            for( map< string, FieldRange >::const_iterator i = other._ranges.begin();
-                i != other._ranges.end(); ++i ) {
-                map< string, FieldRange >::iterator f = _ranges.find( i->first.c_str() );
-                if ( f != _ranges.end() )
-                    f->second -= i->second;
+            map< string, FieldRange >::const_iterator i = _ranges.begin();
+            map< string, FieldRange >::const_iterator j = other._ranges.begin();
+            while( i != _ranges.end() && j != other._ranges.end() ) {
+                int cmp = i->first.compare( j->first );
+                if ( cmp == 0 ) {
+                    // TODO possible to update _ranges using i iterator?
+                    _ranges[ i->first ] -= j->second;
+                    ++i;
+                    ++j;
+                } else if ( cmp < 0 ) {
+                    ++i;
+                } else {
+                    ++j;
+                }
             }
             return *this;
         }
@@ -240,17 +250,18 @@ namespace mongo {
         // this could invalidate the result of the last topFrs()
         void popOrClause() {
             massert( 13274, "no or clause to pop", !orFinished() );
-//            const FieldRangeSet &toPop = _orSets.front();
-//            list< FieldRangeSet >::iterator i = _orSets.begin();
-//            ++i;
-//            while( i != _orSets.end() ) {
-//                *i -= toPop;
-//                if( !i->matchPossible() ) {
-//                    i = _orSets.erase( i );
-//                } else {
-//                    ++i;
-//                }
-//            }
+            const FieldRangeSet &toPop = _orSets.front();
+            list< FieldRangeSet >::iterator i = _orSets.begin();
+            ++i;
+            while( i != _orSets.end() ) {
+                *i -= toPop;
+                if( !i->matchPossible() ) {
+                    i = _orSets.erase( i );
+                } else {
+                    ++i;
+                }
+            }
+            _oldOrSets.push_front( toPop );
             _orSets.pop_front();
         }
         FieldRangeSet *topFrs() const {
@@ -262,6 +273,7 @@ namespace mongo {
     private:
         FieldRangeSet _baseSet;
         list< FieldRangeSet > _orSets;
+        list< FieldRangeSet > _oldOrSets; // make sure memory is owned
         bool _orFound;
     };
     

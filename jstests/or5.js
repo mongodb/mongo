@@ -68,16 +68,16 @@ assert.eq.automsg( "1", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 1 ).itco
 
 c = t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 );
 c.next();
-c.next();
 t.remove( {b:3} );
-assert.eq.automsg( "2", c.itcount() );
+assert.eq.automsg( "3", c.itcount() );
 
 reset();
 
 c = t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 );
 c.next();
+c.next();
 t.remove( {b:3} );
-assert.eq.automsg( "3", c.itcount() );
+assert.eq.automsg( "2", c.itcount() );
 
 reset();
 
