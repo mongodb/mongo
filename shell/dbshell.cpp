@@ -80,7 +80,7 @@ static char** completionHook(const char* text , int start ,int end ){
     
     if ( all.size() == 0 ){
 #ifdef USE_READLINE
-        rl_bind_key('\t',rl_abort);
+        rl_bind_key('\t',0);
 #endif
         return 0;
     }
@@ -119,7 +119,6 @@ void shellHistoryInit(){
     using_history();
     read_history( historyFile.c_str() );
     
-    // TODO: do auto-completion
     rl_attempted_completion_function = completionHook;
         
 #else
