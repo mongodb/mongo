@@ -244,7 +244,6 @@ namespace mongo {
     public:
         FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
         // if there's a useless or clause, we won't use or ranges to help with scanning
-        bool uselessOr() const;
         bool orFinished() const { return _orFound && _orSets.empty(); }
         // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
         // this could invalidate the result of the last topFrs()
@@ -268,6 +267,11 @@ namespace mongo {
             FieldRangeSet *ret = new FieldRangeSet( _baseSet );
             *ret &= _orSets.front();
             return ret;
+        }
+        void allClausesSimplified( vector< BSONObj > &ret ) const {
+            for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
+                ret.push_back( i->simplifiedQuery() );
+            }
         }
         string getSpecial() const { return _baseSet.getSpecial(); }
     private:

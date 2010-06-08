@@ -274,6 +274,7 @@ namespace mongo {
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
         }
+        bool uselessOr() const;
         const char * _ns;
         bool _or;
         BSONObj _query;

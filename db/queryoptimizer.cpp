@@ -593,7 +593,7 @@ namespace mongo {
         if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() || !_fros.getSpecial().empty() ) {
             _or = false;
         }
-        if ( _or && _fros.uselessOr() ) {
+        if ( _or && uselessOr() ) {
             _or = false;
         }
         // if _or == false, don't use or clauses for index selection
@@ -630,7 +630,27 @@ namespace mongo {
             ret = runOpOnce( *ret );
         }
         return ret;
-    }    
+    }
+    
+    bool MultiPlanScanner::uselessOr() const {
+        vector< BSONObj > ret;
+        _fros.allClausesSimplified( ret );
+        for( vector< BSONObj >::const_iterator i = ret.begin(); i != ret.end(); ++i ) {
+            bool useful = false;
+            NamespaceDetails::IndexIterator j = nsdetails( _ns )->ii();
+            while( j.more() ) {
+                IndexDetails &id = j.next();
+                if ( id.getSpec().suitability( *i, BSONObj() ) != USELESS ) {
+                    useful = true;
+                    break;
+                }
+            }
+            if ( !useful ) {
+                return true;
+            }            
+        }
+        return false;
+    }
     
     bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
         BSONObjIterator p( idxPattern );
