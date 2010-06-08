@@ -77,9 +77,11 @@ namespace mongo {
         {
             const char *logns = "local.oplog.rs";
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx("local.", dbpath, 0, false);
+                Client::Context ctx( logns , dbpath, 0, false);
                 localDB = ctx.db();
+                assert( localDB );
                 rsOplogDetails = nsdetails(logns);
+                assert( rsOplogDetails );
             }
             Client::Context ctx( "" , localDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logns, len);
@@ -158,9 +160,11 @@ namespace mongo {
         if( logNS == 0 ) {
             logNS = "local.oplog.$main";
             if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx("local.", dbpath, 0, false);
+                Client::Context ctx( logNS , dbpath, 0, false);
                 localDB = ctx.db();
+                assert( localDB );
                 localOplogMainDetails = nsdetails(logNS);
+                assert( localOplogMainDetails );
             }
             Client::Context ctx( "" , localDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
