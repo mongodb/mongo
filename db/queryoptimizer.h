@@ -263,7 +263,7 @@ namespace mongo {
         shared_ptr< T > runOpOnce( T &op ) {
             return dynamic_pointer_cast< T >( runOpOnce( static_cast< QueryOp& >( op ) ) );
         }       
-        bool mayRunMore() const { return _i < _n; }
+        bool mayRunMore() const { return _or ? !_fros.orFinished() : _i == 0; }
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         // just report this when only one query op
         bool usingPrerecordedPlan() const {
@@ -281,7 +281,6 @@ namespace mongo {
         FieldRangeOrSet _fros;
         auto_ptr< QueryPlanSet > _currentQps;
         int _i;
-        int _n;
         bool _honorRecordedPlan;
         bool _bestGuessOnly;
     };

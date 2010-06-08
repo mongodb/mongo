@@ -600,11 +600,9 @@ namespace mongo {
         if ( !_or ) {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, _query ) );
             _currentQps.reset( new QueryPlanSet( ns, frs, _query, order, hint, honorRecordedPlan, min, max ) );
-            _n = 1; // only one run
         } else {
             BSONElement e = _query.getField( "$or" );
             massert( 13268, "invalid $or spec", e.type() == Array && e.embeddedObject().nFields() > 0 );
-            _n = e.embeddedObject().nFields();
         }
     }
 
@@ -614,11 +612,9 @@ namespace mongo {
             ++_i;
             return _currentQps->runOp( op );
         }
-        if ( _i != 0 ) {
-            _fros.popOrClause();            
-        }
         ++_i;
         auto_ptr< FieldRangeSet > frs( _fros.topFrs() );
+        _fros.popOrClause();            
         _currentQps.reset( new QueryPlanSet( _ns, frs, _query, BSONObj(), 0, _honorRecordedPlan ) );
         shared_ptr< QueryOp > ret( _currentQps->runOp( op ) );
         return ret;
