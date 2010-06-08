@@ -32,6 +32,10 @@ assert = function( b , msg ){
     doassert( "assert failed : " + msg );
 }
 
+assert.automsg = function( b ) {
+    assert( eval( b ), b );
+}
+
 assert._debug = false;
 
 assert.eq = function( a , b , msg ){
