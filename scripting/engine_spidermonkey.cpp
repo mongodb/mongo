@@ -1488,9 +1488,14 @@ namespace mongo {
         
     };
 
+    /* used to make the logging not overly chatty in the mongo shell. */
+    bool isShell = false;
+
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){
         stringstream ss;
-        ss << "JS Error: " << message;
+        if( !isShell ) 
+            ss << "JS Error: ";
+        ss << message;
 
         if ( report && report->filename ){
             ss << " " << report->filename << ":" << report->lineno;

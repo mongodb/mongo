@@ -358,7 +358,12 @@ bool fileExists( string file ){
     }
 }
 
+namespace mongo {
+    extern bool isShell;
+}
+
 int _main(int argc, char* argv[]) {
+    mongo::isShell = true;
     setupSignals();
 
     mongo::shellUtils::RecordMyLocation( argv[ 0 ] );

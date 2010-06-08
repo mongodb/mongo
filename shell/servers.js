@@ -57,7 +57,7 @@ __nextPort = 27000;
 startMongodTest = function (port, dirname, restart) {
     if (!port)
         port = __nextPort++;
-    var f = startMongod;
+    var f = startMongodEmpty;
     if (restart)
         f = startMongodNoReset;
     if (!dirname)
@@ -80,19 +80,18 @@ startMongodTest = function (port, dirname, restart) {
 // Start a mongod instance and return a 'Mongo' object connected to it.
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
-startMongod = function(){
-    // WARNING DELETES DATA DIRECTORY ON STARTUP THIS IS FOR TESTING
-    var args = createMongoArgs( "mongod" , arguments );
+startMongodEmpty = function () {
+    var args = createMongoArgs("mongod", arguments);
 
-    var dbpath = _parsePath.apply( null, args );
-    resetDbpath( dbpath );
+    var dbpath = _parsePath.apply(null, args);
+    resetDbpath(dbpath);
 
-    return startMongoProgram.apply( null, args );
+    return startMongoProgram.apply(null, args);
 }
-// the above name could be dangerous because it deletes everything. 
-// so renaming to this.  but keeping above for a while: 
-startMongodEmpty = startMongod;
-
+startMongod = function () {
+    print("WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING RENAME YOUR INVOCATION");
+    return startMongodEmpty.apply(null, arguments);
+}
 startMongodNoReset = function(){
     var args = createMongoArgs( "mongod" , arguments );
     return startMongoProgram.apply( null, args );
