@@ -42,7 +42,7 @@ namespace mongo {
         // _boundaries store the maximum value falling in that bucket.
         if ( opts.exponential ){
             for ( uint32_t i = 0; i < _numBuckets - 1; i++){
-                _boundaries[i] = _initialValue + opts.bucketSize * pow(2.0 , i);
+                _boundaries[i] = _initialValue + opts.bucketSize * pow(2.0 , static_cast<int>(i) );
             }
         } else {
             _boundaries[0] = _initialValue + opts.bucketSize;
