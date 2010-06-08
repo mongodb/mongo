@@ -58,6 +58,30 @@ assert.neq = function( a , b , msg ){
     doassert( "[" + a + "] != [" + b + "] are equal : " + msg );
 }
 
+assert.repeat = function( f, msg, timeout, interval ) {
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
+    var start = new Date();
+    timeout = timeout || 30000;
+    interval = interval || 200;
+    var last;
+    while( 1 ) {
+        
+        if ( typeof( f ) == "string" ){
+            if ( eval( f ) )
+                return;
+        }
+        else {
+            if ( f() )
+                return;
+        }
+        
+        if ( ( new Date() ).getTime() - start.getTime() > timeout )
+            break;
+        sleep( interval );
+    }
+}
+    
 assert.soon = function( f, msg, timeout, interval ) {
     if ( assert._debug && msg ) print( "in assert for: " + msg );
 
@@ -776,10 +800,21 @@ shellHelper = function( command , rest , shouldPrint ){
 }
 
 help = shellHelper.help = function (x) {
-    if (x=="more") {
-        print("\tls()");
-        print("\tpwd()");
-        print("\tlistFiles()");
+    if (x == "admin") {
+        print("\tls([path])                    list files");
+        print("\tpwd()                         returns current directory");
+        print("\tlistFiles([path])             returns file list");
+        print("\tremoveFile(f)                 delete a file");
+        return;
+    }
+    if (x == "test") {
+        print("\tstartMongodEmpty(args)        DELETES DATA DIR and then starts mongod");
+        print("\t                              returns a connection to the new server");
+        print("\tstartMongodTest()             DELETES DATA DIR");
+        print("\t                              automatically picks port #s starting at 27000 and increasing");
+        print("\t                              or you can specify the port as the first arg");
+        print("\t                              dir is /data/db/<port>/ if not specified as the 2nd arg");
+        print("\t                              returns a connection to the new server");
         return;
     }
     print("\t" + "show dbs                     show database names");

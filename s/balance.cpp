@@ -232,8 +232,6 @@ namespace mongo {
         // along with any maximum allowed quotas and current utilization. We get the
         // latter by issuing db.serverStatus() (mem.mapped) to all shards.
         //
-        // TODO: issue serverStatus() and get the mem.mapped section back. For now, 
-        // let's assume zero usage.
         // TODO: skip unresponsive shards and mark information as stale.
         //
  
@@ -247,7 +245,8 @@ namespace mongo {
         map< string, BSONObj > shardLimitsMap; 
         for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ){
             const Shard& s = *it;
-            BSONObj limitsObj = BSON( "maxSize" << 0LL << "currSize" << 0LL /* TODO */);
+            ShardStatus status = s.getStatus();
+            BSONObj limitsObj = BSON( "maxSize" << s.getMaxSize() << "currSize" << status.mapped() );
             shardLimitsMap[s.getName()] = limitsObj;
         }
 

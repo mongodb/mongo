@@ -16,7 +16,6 @@
  */
 
 #include "pch.h"
-
 #include <stdio.h>
 
 #ifdef USE_READLINE
@@ -80,7 +79,9 @@ static char** completionHook(const char* text , int start ,int end ){
     }
     
     if ( all.size() == 0 ){
+#ifdef USE_READLINE
         rl_bind_key('\t',rl_abort);
+#endif
         return 0;
     }
     
@@ -196,7 +197,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
     signal( SIGINT , quitNicely );
     return ret;
 #else
-    printf("%s", prompt);
+    printf("%s", prompt); cout.flush();
     char * buf = new char[1024];
     char * l = fgets( buf , 1024 , stdin );
     int len = strlen( buf );
@@ -357,7 +358,12 @@ bool fileExists( string file ){
     }
 }
 
+namespace mongo {
+    extern bool isShell;
+}
+
 int _main(int argc, char* argv[]) {
+    mongo::isShell = true;
     setupSignals();
 
     mongo::shellUtils::RecordMyLocation( argv[ 0 ] );

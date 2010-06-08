@@ -31,7 +31,7 @@ namespace mongo {
         Shard()
             : _name(""), _addr(""), _maxSize(0){
         }
-        Shard( const string& name , const string& addr, unsigned long maxSize = 0)
+        Shard( const string& name , const string& addr, long long maxSize = 0)
             : _name(name), _addr( addr ), _maxSize( maxSize ){
         }
 
@@ -70,7 +70,7 @@ namespace mongo {
             return _addr;
         }
 
-        unsigned long getMaxSize() const {
+        long long getMaxSize() const {
             return _maxSize;
         }
 
@@ -132,9 +132,9 @@ namespace mongo {
         static Shard EMPTY;
 
     private:
-        string        _name;
-        string        _addr;
-        unsigned long _maxSize;  // in MBytes, 0 is unlimited 
+        string    _name;
+        string    _addr;
+        long long _maxSize;  // in MBytes, 0 is unlimited 
     };
 
     class ShardStatus {
@@ -159,6 +159,10 @@ namespace mongo {
         
         Shard shard() const {
             return _shard;
+        }
+
+        long long mapped() const {
+            return _mapped;
         }
 
     private:

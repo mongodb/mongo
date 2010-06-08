@@ -34,6 +34,12 @@
 # define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#if defined(WIN32)
+// so you don't have to define this yourself as the code seems to use it...
+#undef _WIN32
+#define _WIN32
+#endif
+
 #if defined(_WIN32)
 # define NOMINMAX
 # include <winsock2.h> //this must be included before the first windows.h include
