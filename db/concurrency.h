@@ -262,9 +262,13 @@ namespace mongo {
         }
 
         bool lock_try(){
-            // old boost doesn't have try_lock :(
-            lock();
-            return true;
+            boost::system_time until = get_system_time();
+            until += boost::posix_time::milliseconds(0);
+            if( m.timed_lock( until ) ) { 
+                _minfo.entered();
+                return true;
+            }
+            return false;
         }
 
         void releaseEarly() {
