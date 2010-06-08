@@ -315,6 +315,10 @@ namespace mongo {
         MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, const shared_ptr< CoveredIndexMatcher > &matcher, const QueryOp &op )
         : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ) {
             _mps->setBestGuessOnly();
+            if ( !ok() ) {
+                // would have been advanced by UserQueryOp if possible
+                advance();
+            }
         }
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }
@@ -334,10 +338,6 @@ namespace mongo {
         }
         virtual void checkLocation() {
             _c->checkLocation();
-            if ( !ok() ) {
-                advance();
-                _c->noteLocation();
-            }
         }        
         virtual bool supportGetMore() { return true; }
         // with update we could potentially get the same document on multiple

@@ -46,3 +46,54 @@ assert.eq.automsg( "'GeoSearchCursor'", "t.find( {z:{$near:[50,50]},$or:[{a:2}]}
 assert.eq.automsg( "'GeoSearchCursor'", "t.find( {$or:[{a:2}],z:{$near:[50,50]}} ).explain().cursor" );
 assert.eq.automsg( "'GeoSearchCursor'", "t.find( {$or:[{a:2},{b:3}],z:{$near:[50,50]}} ).explain().cursor" );
 assert.throws.automsg( function() { return t.find( {$or:[{z:{$near:[50,50]}},{a:2}]} ).toArray(); } );
+
+function reset() {
+    t.drop();
+    
+    t.ensureIndex( {a:1} );
+    t.ensureIndex( {b:1} );
+    t.ensureIndex( {c:1} );
+    
+    t.save( {a:2} );
+    t.save( {a:2} );
+    t.save( {b:3} );
+    t.save( {b:3} );
+    t.save( {c:4} );
+    t.save( {c:4} );
+}
+
+reset();
+
+assert.eq.automsg( "1", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 1 ).itcount()" );
+
+c = t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 );
+c.next();
+c.next();
+t.remove( {b:3} );
+assert.eq.automsg( "2", c.itcount() );
+
+reset();
+
+c = t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 );
+c.next();
+t.remove( {b:3} );
+assert.eq.automsg( "3", c.itcount() );
+
+reset();
+
+c = t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 );
+c.next();
+c.next();
+c.next();
+t.remove( {b:3} );
+assert.eq.automsg( "3", c.itcount() );
+
+reset();
+
+c = t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 );
+c.next();
+c.next();
+c.next();
+c.next();
+t.remove( {b:3} );
+assert.eq.automsg( "2", c.itcount() );
