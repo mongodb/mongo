@@ -800,6 +800,7 @@ namespace mongo {
                     bool ok = conn->runCommand( dbName , cmdObj , res );
                     result.appendElements( res );
                     conn.done();
+                    result.append( "singleShard" , theShard );
                     
                     // hit other machines just to block
                     for ( set<string>::iterator i=client->sinceLastGetError().begin(); i!=client->sinceLastGetError().end(); ++i ){
@@ -815,19 +816,29 @@ namespace mongo {
                     return ok;
                 }
                 
+                BSONArrayBuilder bbb( result.subarrayStart( "shards" ) );
+
+                long long n = 0;
+
                 // hit each shard
                 vector<string> errors;
                 for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
                     string theShard = *i;
+                    bbb.append( theShard );
                     ShardConnection conn( theShard , "" );
                     BSONObj res;
                     bool ok = conn->runCommand( dbName , cmdObj , res );
                     string temp = DBClientWithCommands::getLastErrorString( res );
                     if ( ok == false || temp.size() )
                         errors.push_back( temp );
+                    n += res["n"].numberLong();
                     conn.done();
                 }
                 
+                bbb.done();
+                
+                result.appendNumber( "n" , n );
+
                 // hit other machines just to block
                 for ( set<string>::iterator i=client->sinceLastGetError().begin(); i!=client->sinceLastGetError().end(); ++i ){
                     string temp = *i;

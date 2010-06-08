@@ -620,6 +620,10 @@ if ( typeof _threadInject != "undefined" ){
     }
 }
 
+tojsononeline = function( x ){
+    return tojson( x , " " , true );
+}
+
 tojson = function( x, indent , nolint ){
     if ( x === null )
         return "null";
@@ -741,6 +745,10 @@ shellPrint = function( x ){
 
 printjson = function(x){
     print( tojson( x ) );
+}
+
+printjsononeline = function(x){
+    print( tojsononeline( x ) );
 }
 
 shellPrintHelper = function( x ){
