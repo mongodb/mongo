@@ -1693,6 +1693,7 @@ namespace mongo {
                     }
                 }
                 else {
+                    log(5) << "couldn't logKeepalive" << endl;
                     toSleep = 1;
                 }
             }
