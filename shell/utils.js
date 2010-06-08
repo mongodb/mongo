@@ -804,8 +804,13 @@ help = shellHelper.help = function (x) {
         return;
     }
     if (x == "test") {
-        print("\tstartMongod(args)             DELETES DATA DIR and then starts mongod");
-        print("\tstartMongodTest(port,dir)     DELETES DATA DIR");
+        print("\tstartMongodEmpty(args)        DELETES DATA DIR and then starts mongod");
+        print("\t                              returns a connection to the new server");
+        print("\tstartMongodTest()             DELETES DATA DIR");
+        print("\t                              automatically picks port #s starting at 27000 and increasing");
+        print("\t                              or you can specify the port as the first arg");
+        print("\t                              dir is /data/db/<port>/ if not specified as the 2nd arg");
+        print("\t                              returns a connection to the new server");
         return;
     }
     print("\t" + "show dbs                     show database names");

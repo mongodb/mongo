@@ -53,19 +53,24 @@ createMongoArgs = function( binaryName , args ){
     return fullArgs;
 }
 
-startMongodTest = function( port , dirname , restart ){
+__nextPort = 27000;
+startMongodTest = function (port, dirname, restart) {
+    if (!port)
+        port = __nextPort++;
     var f = startMongod;
-    if ( restart )
+    if (restart)
         f = startMongodNoReset;
-    var conn = f.apply(  null , [
-        { 
-            port : port , 
-            dbpath : "/data/db/" + dirname , 
-            noprealloc : "" , 
-            smallfiles : "" , 
-            oplogSize : "2" , 
-            nohttpinterface : ""
-        } 
+    if (!dirname)
+        dirname = "" + port; // e.g., data/db/27000
+    var conn = f.apply(null, [
+        {
+            port: port,
+            dbpath: "/data/db/" + dirname,
+            noprealloc: "",
+            smallfiles: "",
+            oplogSize: "2",
+            nohttpinterface: ""
+        }
     ]
     );
     conn.name = "localhost:" + port;
@@ -76,7 +81,7 @@ startMongodTest = function( port , dirname , restart ){
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
 startMongod = function(){
-
+    // WARNING DELETES DATA DIRECTORY ON STARTUP THIS IS FOR TESTING
     var args = createMongoArgs( "mongod" , arguments );
 
     var dbpath = _parsePath.apply( null, args );
@@ -84,6 +89,9 @@ startMongod = function(){
 
     return startMongoProgram.apply( null, args );
 }
+// the above name could be dangerous because it deletes everything. 
+// so renaming to this.  but keeping above for a while: 
+startMongodEmpty = startMongod;
 
 startMongodNoReset = function(){
     var args = createMongoArgs( "mongod" , arguments );
