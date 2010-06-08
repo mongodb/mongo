@@ -262,11 +262,9 @@ namespace mongo {
         }
 
         bool lock_try(){
-            bool got = m.try_lock();
-            if ( got ){
-                _minfo.entered();
-            }
-            return got;
+            // old boost doesn't have try_lock :(
+            lock();
+            return true;
         }
 
         void releaseEarly() {
