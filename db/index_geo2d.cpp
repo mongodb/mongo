@@ -369,6 +369,11 @@ namespace mongo {
             _scaling = (1024*1024*1024*4.0)/(_max-_min);
 
             _order = orderBuilder.obj();
+
+            GeoHash a(0, 0, _bits);
+            GeoHash b = a;
+            b.move(1, 1);
+            _error = distance(a, b);
         }
 
         int _configval( const IndexSpec* spec , const string& name , int def ){
@@ -542,6 +547,7 @@ namespace mongo {
         double _scaling;
 
         BSONObj _order;
+        double _error;
     };
 
     class Point {
@@ -918,7 +924,8 @@ namespace mongo {
             if ( ! checkDistance( GeoHash( node.key.firstElement() ) , d ) ){
                 GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << d );
                 return;
-            }
+            } 
+            GEODEBUG( "\t\t\t\t good distance : " << node.recordLoc.obj()  << "\t" << d );
             
             // matcher
             MatchDetails details;
@@ -1356,6 +1363,7 @@ namespace mongo {
             _prefix = _start;
             _maxDistance = i.next().numberDouble();
             uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
+            _maxDistance += g->_error;
 
             _state = START;
             _found = 0;
@@ -1411,7 +1419,7 @@ namespace mongo {
         virtual bool checkDistance( const GeoHash& h , double& d ){
             d = _g->distance( _start , h );
             GEODEBUG( "\t " << h << "\t" << d );
-            return d <= ( _maxDistance + .01 );
+            return d <= _maxDistance;
         }
 
         GeoHash _start;

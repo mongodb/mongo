@@ -8,6 +8,16 @@ placeCheck = function( num ){
     print("shard2 step: " + num );
 }
 
+printAll = function(){
+    print( "****************" );
+    db.foo.find().forEach( printjsononeline )
+    print( "++++++++++++++++++" );
+    primary.foo.find().forEach( printjsononeline )
+    print( "++++++++++++++++++" );
+    secondary.foo.find().forEach( printjsononeline )
+    print( "---------------------" );
+}
+
 s = new ShardingTest( "shard2" , 2 , 2 );
 
 db = s.getDB( "test" );
@@ -187,6 +197,19 @@ placeCheck( 8 );
 // TODO: getLastError
 db.getLastError();
 db.getPrevError();
+
+// more update stuff
+
+printAll();
+total = db.foo.find().count();
+db.foo.update( {} , { $inc : { x : 1 } } , false , true );
+x = db.getLastErrorObj();
+printAll();
+assert.eq( total , x.n , "getLastError n A: " + tojson( x ) );
+
+
+db.foo.update( { num : -1 } , { $inc : { x : 1 } } , false , true );
+assert.eq( 1 , db.getLastErrorObj().n , "getLastErrorObj n B" );
 
 // ---- move all to the secondary
 

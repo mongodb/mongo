@@ -462,8 +462,7 @@
 		938E639B110FC66900A8760A /* auth1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = auth1.js; sourceTree = "<group>"; };
 		938E63D0110FC96B00A8760A /* auth2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = auth2.js; sourceTree = "<group>"; };
 		9391C9DD1120F9D300292B19 /* newcollection.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = newcollection.js; sourceTree = "<group>"; };
-		939691B411BD61450069E3E5 /* or5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or5.js; sourceTree = "<group>"; };
-		9396935D11BE162A0069E3E5 /* or6.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or6.js; sourceTree = "<group>"; };
+		939693B511BEBAAA0069E3E5 /* repair.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = repair.js; sourceTree = "<group>"; };
 		93A13A210F4620A500AF1B0D /* commands.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = commands.cpp; sourceTree = "<group>"; };
 		93A13A230F4620A500AF1B0D /* config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = config.cpp; sourceTree = "<group>"; };
 		93A13A240F4620A500AF1B0D /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
@@ -817,8 +816,6 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
-				9396935D11BE162A0069E3E5 /* or6.js */,
-				939691B411BD61450069E3E5 /* or5.js */,
 				932D854611AB912B002749FB /* array_match1.js */,
 				932D854711AB912B002749FB /* capped5.js */,
 				932D854811AB912B002749FB /* datasize2.js */,
@@ -1120,6 +1117,7 @@
 		934BEC5010DFFA9600178102 /* repl */ = {
 			isa = PBXGroup;
 			children = (
+				939693B511BEBAAA0069E3E5 /* repair.js */,
 				93BDCE92115817210097FE87 /* pair7.js */,
 				93BDCE401157E7280097FE87 /* repl10.js */,
 				93BDCE411157E7280097FE87 /* repl11.js */,

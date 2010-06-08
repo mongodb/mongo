@@ -10,7 +10,7 @@ resetDbpath( repairpath );
 m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 db[ baseName ].save( {} );
-db.runCommand( {repairDatabase:1, backupOriginalFiles:true} );
+assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles:true} ) );
 
 files = listFiles( dbpath );
 for( f in files ) {
