@@ -11,4 +11,4 @@ var c = m.getDB( 'local' ).oplog.$main.count();
 assert.automsg( "c > 0" );
 
 assert.commandWorked( m.getDB( "local" ).repairDatabase() );
-assert.eq.automsg( "c", "m.getDB( 'local' ).oplog.$main.count()" );
+assert.automsg( "c <= m.getDB( 'local' ).oplog.$main.count()" );
