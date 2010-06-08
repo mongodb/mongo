@@ -184,8 +184,6 @@ namespace mongo {
     void Balancer::_doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks ){
         assert( candidateChunks );
 
-        log(1) << "balancer: start balancing round" << endl;        
-
         //
         // 1. Check whether there is any sharded collection to be balanced by querying
         // the ShardsNS::database collection
@@ -309,14 +307,18 @@ namespace mongo {
                                     
                 vector<CandidateChunkPtr> candidateChunks;
                 if ( _shouldIBalance( conn.conn() ) ){
+                    log(1) << "balancer: start balancing round" << endl;        
                     candidateChunks.clear();
                     _doBalanceRound( conn.conn() , &candidateChunks );
 
-                    if ( candidateChunks.size() > 0 ) {
+                    if ( candidateChunks.size() == 0 ) {
+                        log(1) << "balancer: no need to move any chunk" << endl;
+
+                    } else {
                         _balancedLastTime = _moveChunks( &candidateChunks );
+                        log(1) << "balancer: end balancing round" << endl;        
                     }
                 }
-                
                 conn.done();
             }
             catch ( std::exception& e ){
