@@ -16,9 +16,10 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <cmath>
+#include <iomanip>
 #include <limits>
 #include <sstream>
-#include <iomanip>
 
 #include "histogram.h"
 
@@ -39,11 +40,17 @@ namespace mongo {
         // + initialBucket and bucketSize fit within 32 bit ints
 
         // _boundaries store the maximum value falling in that bucket.
-        _boundaries[0] = _initialValue + opts.bucketSize;
-        for ( uint32_t i = 1; i < _numBuckets - 1; i++ ){
-            _boundaries[i] = _boundaries[ i-1 ] + opts.bucketSize;
+        if ( opts.exponential ){
+            for ( uint32_t i = 0; i < _numBuckets - 1; i++){
+                _boundaries[i] = _initialValue + opts.bucketSize * pow(2, i);
+            }
+        } else {
+            _boundaries[0] = _initialValue + opts.bucketSize;
+            for ( uint32_t i = 1; i < _numBuckets - 1; i++ ){
+                _boundaries[i] = _boundaries[ i-1 ] + opts.bucketSize;
+            }
         }
-        _boundaries[ _numBuckets-1 ] = std::numeric_limits<uint32_t>::max();
+        _boundaries[ _numBuckets-1 ] = std::numeric_limits<uint32_t>::max();            
 
         for ( uint32_t i = 0; i < _numBuckets; i++ ) {
             _buckets[i] = 0;
@@ -58,7 +65,7 @@ namespace mongo {
     void Histogram::insert( uint32_t element ){
         if ( element < _initialValue) return;
 
-        _buckets[ findBucket(element) ] += 1;
+        _buckets[ _findBucket(element) ] += 1;
     }
 
     string Histogram::toHTML() const{
@@ -101,7 +108,7 @@ namespace mongo {
         return _numBuckets;
     }
 
-    uint32_t Histogram::findBucket( uint32_t element ) const{
+    uint32_t Histogram::_findBucket( uint32_t element ) const{
         // TODO assert not too small a value?
 
         uint32_t low = 0;

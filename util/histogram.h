@@ -34,16 +34,44 @@ namespace mongo {
     class Histogram {
     public:
         /**
-         * Construct a histogram with 'numBuckets' buckets, each or
-         * which 'bucketSize' wide. Optionally have the first bucket
-         * start at 'initialValue' rather than 0.
+         * Construct a histogram with 'numBuckets' buckets, optionally
+         * having the first bucket start at 'initialValue' rather than
+         * 0. By default, the histogram buckets will be 'bucketSize' wide.
+         *
+         * Usage example:
+         *   Histogram::Options opts;
+         *   opts.numBuckets = 3;
+         *   opts.bucketSize = 10;
+         *   Histogram h( opts );
+         *
+         *   Generates the bucket ranges [0..10],[11..20],[21..max_int]
+         *
+         * Alternatively, the flag 'exponential' could be turned on, in
+         * which case a bucket's maximum value will be
+         *    initialValue + bucketSize * 2 ^ [0..numBuckets-1]
+         *
+         * Usage example:
+         *   Histogram::Options opts;
+         *   opts.numBuckets = 4;
+         *   opts.bucketSize = 125;
+         *   opts.exponential = true;
+         *   Histogram h( opts );
+         *
+         *   Generates the bucket ranges [0..125],[126..250],[251..500],[501..max_int]
          */
         struct Options {
             boost::uint32_t numBuckets;
             boost::uint32_t bucketSize;
             boost::uint32_t initialValue;
 
-            Options() : numBuckets(0), bucketSize(0), initialValue(0){}
+            // use exponential buckets?
+            bool            exponential;
+            
+            Options() 
+                : numBuckets(0)
+                , bucketSize(0)
+                , initialValue(0)
+                , exponential(false){}
         };
         explicit Histogram( const Options& opts );
         ~Histogram();
@@ -83,7 +111,7 @@ namespace mongo {
          * into. Currently assumes that 'element' is greater than the
          * minimum 'inialValue'.
          */
-        boost::uint32_t findBucket( boost::uint32_t element ) const;
+        boost::uint32_t _findBucket( boost::uint32_t element ) const;
 
         boost::uint32_t  _initialValue;  // no value lower than it is recorded
         boost::uint32_t  _numBuckets;    // total buckets in the histogram

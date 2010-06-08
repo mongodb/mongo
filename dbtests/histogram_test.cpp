@@ -45,6 +45,22 @@ namespace mongo {
         }
     };
 
+    class BoundariesExponential{
+    public:
+        void run(){
+            Histogram::Options opts;
+            opts.numBuckets = 4;
+            opts.bucketSize = 125;
+            opts.exponential = true;
+            Histogram h( opts );
+
+            ASSERT_EQUALS( h.getBoundary( 0 ), 125u );
+            ASSERT_EQUALS( h.getBoundary( 1 ), 250u );
+            ASSERT_EQUALS( h.getBoundary( 2 ), 500u );
+            ASSERT_EQUALS( h.getBoundary( 3 ), numeric_limits<uint32_t>::max() );            
+        }
+    };
+
     class BoundariesFind{
     public:
         void run(){
@@ -69,6 +85,7 @@ namespace mongo {
 
         void setupTests(){
             add< BoundariesInit >();
+            add< BoundariesExponential >();
             add< BoundariesFind >();
             // TODO: complete the test suite
         } 
