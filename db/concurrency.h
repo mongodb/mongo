@@ -147,7 +147,10 @@ namespace mongo {
                 return true;            
             
             curopWaitingForLock( 1 );
-            bool got = _m.try_lock(); 
+
+            boost::system_time until = get_system_time();
+            until += boost::posix_time::milliseconds(0);
+            bool got = _m.timed_lock( until );
             curopGotLock();
             
             if ( got ){
@@ -262,13 +265,8 @@ namespace mongo {
         }
 
         bool lock_try(){
-            boost::system_time until = get_system_time();
-            until += boost::posix_time::milliseconds(0);
-            if( m.timed_lock( until ) ) { 
-                _minfo.entered();
-                return true;
-            }
-            return false;
+            lock();
+            return true;
         }
 
         void releaseEarly() {
