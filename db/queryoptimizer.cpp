@@ -263,6 +263,38 @@ namespace mongo {
         plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(id), *fbs_, _originalQuery, order_, min_, max_ ) ) );
     }
     
+    // returns an IndexDetails * for a hint, 0 if hint is $natural.
+    // hint must not be eoo()
+    IndexDetails *parseHint( const BSONElement &hint, NamespaceDetails *d ) {
+        massert( 13292, "hint eoo", !hint.eoo() );
+        if( hint.type() == String ) {
+            string hintstr = hint.valuestr();
+            NamespaceDetails::IndexIterator i = d->ii();
+            while( i.more() ) {
+                IndexDetails& ii = i.next();
+                if ( ii.indexName() == hintstr ) {
+                    return &ii;
+                }
+            }
+        }
+        else if( hint.type() == Object ) { 
+            BSONObj hintobj = hint.embeddedObject();
+            uassert( 10112 ,  "bad hint", !hintobj.isEmpty() );
+            if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
+                return 0;
+            }
+            NamespaceDetails::IndexIterator i = d->ii();
+            while( i.more() ) {
+                IndexDetails& ii = i.next();
+                if( ii.keyPattern().woCompare(hintobj) == 0 ) {
+                    return &ii;
+                }
+            }
+        }        
+        uassert( 10113 ,  "bad hint", false );
+        return 0;
+    }
+    
     void QueryPlanSet::init() {
         DEBUGQO( "QueryPlanSet::init " << ns << "\t" << _originalQuery );
         plans_.clear();
@@ -280,36 +312,15 @@ namespace mongo {
         BSONElement hint = hint_.firstElement();
         if ( !hint.eoo() ) {
             mayRecordPlan_ = false;
-            if( hint.type() == String ) {
-                string hintstr = hint.valuestr();
-                NamespaceDetails::IndexIterator i = d->ii();
-                while( i.more() ) {
-                    IndexDetails& ii = i.next();
-                    if ( ii.indexName() == hintstr ) {
-                        addHint( ii );
-                        return;
-                    }
-                }
+            IndexDetails *id = parseHint( hint, d );
+            if ( id ) {
+                addHint( *id );
+            } else {
+                massert( 10366 ,  "natural order cannot be specified with $min/$max", min_.isEmpty() && max_.isEmpty() );
+                // Table scan plan
+                plans_.push_back( PlanPtr( new QueryPlan( d, -1, *fbs_, _originalQuery, order_ ) ) );                
             }
-            else if( hint.type() == Object ) { 
-                BSONObj hintobj = hint.embeddedObject();
-                uassert( 10112 ,  "bad hint", !hintobj.isEmpty() );
-                if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
-                    massert( 10366 ,  "natural order cannot be specified with $min/$max", min_.isEmpty() && max_.isEmpty() );
-                    // Table scan plan
-                    plans_.push_back( PlanPtr( new QueryPlan( d, -1, *fbs_, _originalQuery, order_ ) ) );
-                    return;
-                }
-                NamespaceDetails::IndexIterator i = d->ii();
-                while( i.more() ) {
-                    IndexDetails& ii = i.next();
-                    if( ii.keyPattern().woCompare(hintobj) == 0 ) {
-                        addHint( ii );
-                        return;
-                    }
-                }
-            }
-            uassert( 10113 ,  "bad hint", false );
+            return;
         }
         
         if ( !min_.isEmpty() || !max_.isEmpty() ) {
@@ -589,11 +600,13 @@ namespace mongo {
     _fros( ns, _query ),
     _i(),
     _honorRecordedPlan( honorRecordedPlan ),
-    _bestGuessOnly() {
-        if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() || !_fros.getSpecial().empty() ) {
+    _bestGuessOnly(),
+    _hint( ( hint && !hint->eoo() ) ? hint->wrap() : BSONObj() )
+    {
+        if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() || !_fros.getSpecial().empty() ) {
             _or = false;
         }
-        if ( _or && uselessOr() ) {
+        if ( _or && uselessOr( _hint.firstElement() ) ) {
             _or = false;
         }
         // if _or == false, don't use or clauses for index selection
@@ -615,7 +628,8 @@ namespace mongo {
         ++_i;
         auto_ptr< FieldRangeSet > frs( _fros.topFrs() );
         _fros.popOrClause();            
-        _currentQps.reset( new QueryPlanSet( _ns, frs, _query, BSONObj(), 0, _honorRecordedPlan ) );
+        BSONElement hintElt = _hint.firstElement();
+        _currentQps.reset( new QueryPlanSet( _ns, frs, _query, BSONObj(), &hintElt, _honorRecordedPlan ) );
         shared_ptr< QueryOp > ret( _currentQps->runOp( op ) );
         return ret;
     }
@@ -628,22 +642,35 @@ namespace mongo {
         return ret;
     }
     
-    bool MultiPlanScanner::uselessOr() const {
+    bool MultiPlanScanner::uselessOr( const BSONElement &hint ) const {
+        IndexDetails *id = 0;
+        if ( !hint.eoo() ) {
+            IndexDetails *id = parseHint( hint, nsdetails( _ns ) );
+            if ( !id ) {
+                return true;
+            }
+        }
         vector< BSONObj > ret;
         _fros.allClausesSimplified( ret );
         for( vector< BSONObj >::const_iterator i = ret.begin(); i != ret.end(); ++i ) {
-            bool useful = false;
-            NamespaceDetails::IndexIterator j = nsdetails( _ns )->ii();
-            while( j.more() ) {
-                IndexDetails &id = j.next();
-                if ( id.getSpec().suitability( *i, BSONObj() ) != USELESS ) {
-                    useful = true;
-                    break;
+            if ( id ) {
+                if ( id->getSpec().suitability( *i, BSONObj() ) == USELESS ) {
+                    return true;
                 }
+            } else {
+                bool useful = false;
+                NamespaceDetails::IndexIterator j = nsdetails( _ns )->ii();
+                while( j.more() ) {
+                    IndexDetails &id = j.next();
+                    if ( id.getSpec().suitability( *i, BSONObj() ) != USELESS ) {
+                        useful = true;
+                        break;
+                    }
+                }
+                if ( !useful ) {
+                    return true;
+                }       
             }
-            if ( !useful ) {
-                return true;
-            }            
         }
         return false;
     }

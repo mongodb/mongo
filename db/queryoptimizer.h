@@ -274,7 +274,7 @@ namespace mongo {
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
         }
-        bool uselessOr() const;
+        bool uselessOr( const BSONElement &hint ) const;
         const char * _ns;
         bool _or;
         BSONObj _query;
@@ -283,6 +283,7 @@ namespace mongo {
         int _i;
         bool _honorRecordedPlan;
         bool _bestGuessOnly;
+        BSONObj _hint;
     };
     
     class MultiCursor : public Cursor {

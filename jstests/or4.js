@@ -93,6 +93,4 @@ assert.eq.automsg( "1", "t.find( {$or:[{b:1}]} ).sort( {b:1} ).explain().indexBo
 
 assert.eq.automsg( "'BtreeCursor b_1'", "t.find( {$or:[{a:1}]} ).hint( {b:1} ).explain().cursor" );
 assert.eq.automsg( "'BtreeCursor b_1'", "t.find( {$or:[{}]} ).hint( {b:1} ).explain().cursor" );
-
-// TODO this could be improved
-assert.eq.automsg( "1", "t.find( {$or:[{b:1}]} ).hint( {b:1} ).explain().indexBounds[ 0 ][ 0 ].b.$minElement" );
+assert.eq.automsg( "1", "t.find( {$or:[{b:1}]} ).hint( {b:1} ).explain().indexBounds[ 0 ][ 0 ].b" );
