@@ -75,6 +75,7 @@ mongoimport
 mongosniff
 mongobridge
 mongostat
+bsondump
 
 *.tgz
 *.zip

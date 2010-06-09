@@ -369,6 +369,11 @@ namespace mongo {
             _scaling = (1024*1024*1024*4.0)/(_max-_min);
 
             _order = orderBuilder.obj();
+
+            GeoHash a(0, 0, _bits);
+            GeoHash b = a;
+            b.move(1, 1);
+            _error = distance(a, b);
         }
 
         int _configval( const IndexSpec* spec , const string& name , int def ){
@@ -542,6 +547,7 @@ namespace mongo {
         double _scaling;
 
         BSONObj _order;
+        double _error;
     };
 
     class Point {
@@ -918,7 +924,8 @@ namespace mongo {
             if ( ! checkDistance( GeoHash( node.key.firstElement() ) , d ) ){
                 GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << d );
                 return;
-            }
+            } 
+            GEODEBUG( "\t\t\t\t good distance : " << node.recordLoc.obj()  << "\t" << d );
             
             // matcher
             MatchDetails details;
@@ -1021,7 +1028,10 @@ namespace mongo {
                 return false;
             bucket = bucket.btree()->advance( bucket , pos , direction , "btreelocation" );
             
-            return checkCur( totalFound , all );
+            if ( all )
+                return checkCur( totalFound , all );
+            
+            return ! bucket.isNull();
         }
 
         bool checkCur( int& totalFound , GeoAccumulator* all ){
@@ -1130,7 +1140,7 @@ namespace mongo {
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
                 while ( _spec->sizeEdge( _prefix ) < boxSize )
                     _prefix = _prefix.up();
-                log(1) << "want: " << want << " found:" << _found << " hash size:" << _spec->sizeEdge( _prefix ) << endl;
+                log(1) << "want: " << want << " found:" << _found << " nscanned: " << _nscanned << " hash size:" << _spec->sizeEdge( _prefix ) << endl;
                 
                 for ( int x=-1; x<=1; x++ ){
                     for ( int y=-1; y<=1; y++ ){
@@ -1148,10 +1158,16 @@ namespace mongo {
 
         void doBox( const IndexDetails& id , const Box& want , const GeoHash& toscan , int depth = 0 ){
             Box testBox( _spec , toscan );
-            if ( logLevel > 0 ) log(1) << "\t doBox: " << testBox << "\t" << toscan.toString() << endl;
-
+            if ( logLevel > 0 ){
+                log(1) << "\t";
+                for ( int i=0; i<depth; i++ ){
+                    log(1) << "\t";
+                    log() << " doBox: " << testBox << "\t" << toscan.toString() << " scanned so far: " << _nscanned << endl;
+                }
+            }
+            
             double intPer = testBox.intersects( want );
-
+            
             if ( intPer <= 0 )
                 return;
             
@@ -1347,6 +1363,7 @@ namespace mongo {
             _prefix = _start;
             _maxDistance = i.next().numberDouble();
             uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
+            _maxDistance += g->_error;
 
             _state = START;
             _found = 0;
@@ -1402,7 +1419,7 @@ namespace mongo {
         virtual bool checkDistance( const GeoHash& h , double& d ){
             d = _g->distance( _start , h );
             GEODEBUG( "\t " << h << "\t" << d );
-            return d <= ( _maxDistance + .01 );
+            return d <= _maxDistance;
         }
 
         GeoHash _start;

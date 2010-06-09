@@ -32,6 +32,10 @@ assert = function( b , msg ){
     doassert( "assert failed : " + msg );
 }
 
+assert.automsg = function( b ) {
+    assert( eval( b ), b );
+}
+
 assert._debug = false;
 
 assert.eq = function( a , b , msg ){
@@ -58,6 +62,30 @@ assert.neq = function( a , b , msg ){
     doassert( "[" + a + "] != [" + b + "] are equal : " + msg );
 }
 
+assert.repeat = function( f, msg, timeout, interval ) {
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
+    var start = new Date();
+    timeout = timeout || 30000;
+    interval = interval || 200;
+    var last;
+    while( 1 ) {
+        
+        if ( typeof( f ) == "string" ){
+            if ( eval( f ) )
+                return;
+        }
+        else {
+            if ( f() )
+                return;
+        }
+        
+        if ( ( new Date() ).getTime() - start.getTime() > timeout )
+            break;
+        sleep( interval );
+    }
+}
+    
 assert.soon = function( f, msg, timeout, interval ) {
     if ( assert._debug && msg ) print( "in assert for: " + msg );
 
@@ -92,6 +120,10 @@ assert.throws = function( func , params , msg ){
     }
 
     doassert( "did not throw exception: " + msg );
+}
+
+assert.throws.automsg = function( func, params ) {
+    assert.throws( func, params, func.toString() );
 }
 
 assert.commandWorked = function( res , msg ){
@@ -592,6 +624,10 @@ if ( typeof _threadInject != "undefined" ){
     }
 }
 
+tojsononeline = function( x ){
+    return tojson( x , " " , true );
+}
+
 tojson = function( x, indent , nolint ){
     if ( x === null )
         return "null";
@@ -715,6 +751,10 @@ printjson = function(x){
     print( tojson( x ) );
 }
 
+printjsononeline = function(x){
+    print( tojsononeline( x ) );
+}
+
 shellPrintHelper = function( x ){
 
     if ( typeof( x ) == "undefined" ){
@@ -772,10 +812,21 @@ shellHelper = function( command , rest , shouldPrint ){
 }
 
 help = shellHelper.help = function (x) {
-    if (x == "more") {
-        print("\tls(dir)                        print list of files");
-        print("\tpwd()                          returns current directory");
-        print("\tlistFiles(dir)                 returns list of files");
+    if (x == "admin") {
+        print("\tls([path])                    list files");
+        print("\tpwd()                         returns current directory");
+        print("\tlistFiles([path])             returns file list");
+        print("\tremoveFile(f)                 delete a file");
+        return;
+    }
+    if (x == "test") {
+        print("\tstartMongodEmpty(args)        DELETES DATA DIR and then starts mongod");
+        print("\t                              returns a connection to the new server");
+        print("\tstartMongodTest()             DELETES DATA DIR");
+        print("\t                              automatically picks port #s starting at 27000 and increasing");
+        print("\t                              or you can specify the port as the first arg");
+        print("\t                              dir is /data/db/<port>/ if not specified as the 2nd arg");
+        print("\t                              returns a connection to the new server");
         return;
     }
     print("\t" + "show dbs                     show database names");
@@ -788,6 +839,7 @@ help = shellHelper.help = function (x) {
     print("\t" + "db.foo.find()                list objects in collection foo");
     print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
     print("\t" + "it                           result of the last line evaluated; use to further iterate");
+    print("\t" + "help admin                   misc shell commands");
     print("\t" + "exit                         quit the mongo shell");
 }
 

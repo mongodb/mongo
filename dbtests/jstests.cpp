@@ -808,7 +808,7 @@ namespace JSTests {
             {
                 BSONObjBuilder b;
                 b.append( "a" , 7 );
-                b.appendBinData( "b" , 12 , ByteArray , foo );
+                b.appendBinData( "b" , 12 , BinDataGeneral , foo );
                 in = b.obj();
                 s->setObject( "x" , in );
             }
@@ -825,11 +825,11 @@ namespace JSTests {
             // check that BinData js class is utilized
             s->invokeSafe( "q = x.b.toString();", BSONObj() );
             stringstream expected;
-            expected << "BinData( type: " << ByteArray << ", base64: \"" << base64 << "\" )";
+            expected << "BinData( type: " << BinDataGeneral << ", base64: \"" << base64 << "\" )";
             ASSERT_EQUALS( expected.str(), s->getString( "q" ) );
             
             stringstream scriptBuilder;
-            scriptBuilder << "z = { c : new BinData( " << ByteArray << ", \"" << base64 << "\" ) };";
+            scriptBuilder << "z = { c : new BinData( " << BinDataGeneral << ", \"" << base64 << "\" ) };";
             string script = scriptBuilder.str();
             s->invokeSafe( script.c_str(), BSONObj() );
             out = s->getObject( "z" );
@@ -879,7 +879,7 @@ namespace JSTests {
                 s->invoke( f , empty );
                 ASSERT_EQUALS( 11 , s->getNumber( "return" ) );
             }
-            cout << "speed1: " << ( n / t.millis() ) << " ops/ms" << endl;
+            //cout << "speed1: " << ( n / t.millis() ) << " ops/ms" << endl;
         }
     };
 

@@ -140,8 +140,10 @@ namespace mongo {
 
         bool matches(const BSONObj& j, MatchDetails * details = 0 );
         
-        // until SERVER-109 $or is opaque to indexes
-        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg && _orMatchers.size() == 0; }
+        // fast rough check to see if we must load the real doc - we also
+        // compare field counts against covereed index matcher; for $or clauses
+        // we just compare field counts
+        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
 
         bool atomic() const { return _atomic; }
         

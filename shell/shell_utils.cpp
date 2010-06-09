@@ -182,7 +182,7 @@ namespace mongo {
         }
 
         BSONObj removeFile(const BSONObj& args){
-            uassert( 12597 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
+            uassert( 12597 , "need to specify 1 argument" , args.nFields() == 1 );
             
             bool found = false;
             
@@ -367,8 +367,10 @@ namespace mongo {
                 string args = ss.str();
                 
                 boost::scoped_array<TCHAR> args_tchar (new TCHAR[args.size() + 1]);
-                for (size_t i=0; i < args.size()+1; i++)
+                size_t i;
+                for(i=0; i < args.size(); i++)
                     args_tchar[i] = args[i];
+                args_tchar[i] = 0;
 
                 HANDLE h = (HANDLE)_get_osfhandle(child_stdout);
                 assert(h != INVALID_HANDLE_VALUE);

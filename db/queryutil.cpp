@@ -443,25 +443,50 @@ namespace mongo {
     }
     
     const FieldRange &FieldRange::operator-=( const FieldRange &other ) {
-        // TODO implement
-        return *this;
-        
-        vector< FieldInterval > newIntervals;
-        vector< FieldInterval >::const_iterator i = _intervals.begin();
+        vector< FieldInterval >::iterator i = _intervals.begin();
         vector< FieldInterval >::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             int cmp = i->_lower._bound.woCompare( j->_lower._bound, false );
-            if ( cmp < 0 ) {
+            if ( cmp < 0 ||
+                ( cmp == 0 && i->_lower._inclusive && !j->_lower._inclusive ) ) {
                 int cmp2 = i->_upper._bound.woCompare( j->_lower._bound, false );
                 if ( cmp2 < 0 ) {
-                    
+                    ++i;
+                } else if ( cmp2 == 0 ) {
+                    if ( i->_upper._inclusive && j->_lower._inclusive ) {
+                        i->_upper._inclusive = false;
+                    }
+                    ++i;
+                } else {
+                    int cmp3 = i->_upper._bound.woCompare( j->_upper._bound, false );
+                    if ( cmp3 < 0 ||
+                        ( cmp3 == 0 && ( !i->_upper._inclusive || j->_upper._inclusive ) ) ) {
+                        i->_upper = j->_lower;
+                        i->_upper.flipInclusive();
+                        ++i;
+                    } else {
+                        ++j;
+                    }
                 }
+            } else {
+                int cmp2 = i->_lower._bound.woCompare( j->_upper._bound, false );
+                if ( cmp2 > 0 ||
+                    ( cmp2 == 0 && ( !i->_lower._inclusive || !j->_lower._inclusive ) ) ) {
+                    ++j;
+                } else {
+                    int cmp3 = i->_upper._bound.woCompare( j->_upper._bound, false );
+                    if ( cmp3 < 0 ||
+                        ( cmp3 == 0 && ( !i->_upper._inclusive || j->_upper._inclusive ) ) ) {
+                        i = _intervals.erase( i );
+                    } else {
+                        i->_lower = j->_upper;
+                        i->_lower.flipInclusive();                        
+                        ++j;
+                    }
+                }                
             }
         }
-        while( i != _intervals.end() ) {
-            newIntervals.push_back( *i );
-        }
-        finishOperation( newIntervals, other );
+        finishOperation( _intervals, other );
         return *this;        
     }
     
@@ -565,28 +590,16 @@ namespace mongo {
                 BSONElement e = i.next();
                 // e could be x:1 or x:{$gt:1}
                 
-                if ( strcmp( e.fieldName(), "$where" ) == 0 )
+                if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
                     continue;
+                }
                 
-                // if only one $or clause, use it - this works with our first cut hack way of rewriting queries
                 if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
-//                    massert( 13272, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
-//                    BSONObjIterator j( e.embeddedObject() );
-//                    if ( j.more() ) { // could be assert instead
-//                        BSONElement f = j.next();
-//                        massert( 13275, "$or array must contain objects", f.type() == Object );
-//                        if ( !j.more() ) { // if only one $or field, subfields are all required
-//                            BSONObjIterator k( f.embeddedObject() );
-//                            while( k.more() ) {
-//                                processQueryField( k.next(), optimize );
-//                            }
-//                        }
-//                    }
                     continue;
                 }
                 
                 if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
-                    continue; // TODO can elim some bounds
+                    continue;
                 }
                 
                 processQueryField( e, optimize );
@@ -600,11 +613,6 @@ namespace mongo {
         
         while( i.more() ) {
             BSONElement e = i.next();
-            // e could be x:1 or x:{$gt:1}
-
-            if ( strcmp( e.fieldName(), "$where" ) == 0 )
-                continue;
-            
             if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
                 massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );                                                                                         
                 BSONObjIterator j( e.embeddedObject() );                                                                                                                                                        
@@ -612,45 +620,11 @@ namespace mongo {
                     BSONElement f = j.next();                                                                                                                                                                   
                     massert( 13263, "$or array must contain objects", f.type() == Object );                                                                                                                     
                     _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
+                    massert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
                 }
                 _orFound = true;
                 continue;
             }
-//
-//            bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
-//            if ( equality && e.type() == Object ) {
-//                equality = ( strcmp( e.embeddedObject().firstElement().fieldName(), "$not" ) != 0 );
-//            }
-//            
-//            if ( equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
-//                _baseSet._ranges[ e.fieldName() ] &= FieldRange( e , false , optimize );
-//            }
-//            if ( !equality ) {
-//                BSONObjIterator j( e.embeddedObject() );
-//                while( j.more() ) {
-//                    BSONElement f = j.next();
-//                    if ( strcmp( f.fieldName(), "$not" ) == 0 ) {
-//                        switch( f.type() ) {
-//                            case Object: {
-//                                BSONObjIterator k( f.embeddedObject() );
-//                                while( k.more() ) {
-//                                    BSONElement g = k.next();
-//                                    uassert( 13264, "invalid use of $not", g.getGtLtOp() != BSONObj::Equality );
-//                                    _baseSet.processOpElement( e.fieldName(), g, true, optimize );
-//                                }
-//                                break;
-//                            }
-//                            case RegEx:
-//                                _baseSet.processOpElement( e.fieldName(), f, true, optimize );
-//                                break;
-//                            default:
-//                                uassert( 13265, "invalid use of $not", false );
-//                        }
-//                    } else {
-//                        _baseSet.processOpElement( e.fieldName(), f, false, optimize );
-//                    }
-//                }                
-//            }
         }
     }
 

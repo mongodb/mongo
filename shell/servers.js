@@ -53,19 +53,24 @@ createMongoArgs = function( binaryName , args ){
     return fullArgs;
 }
 
-startMongodTest = function( port , dirname , restart ){
-    var f = startMongod;
-    if ( restart )
+__nextPort = 27000;
+startMongodTest = function (port, dirname, restart) {
+    if (!port)
+        port = __nextPort++;
+    var f = startMongodEmpty;
+    if (restart)
         f = startMongodNoReset;
-    var conn = f.apply(  null , [
-        { 
-            port : port , 
-            dbpath : "/data/db/" + dirname , 
-            noprealloc : "" , 
-            smallfiles : "" , 
-            oplogSize : "2" , 
-            nohttpinterface : ""
-        } 
+    if (!dirname)
+        dirname = "" + port; // e.g., data/db/27000
+    var conn = f.apply(null, [
+        {
+            port: port,
+            dbpath: "/data/db/" + dirname,
+            noprealloc: "",
+            smallfiles: "",
+            oplogSize: "2",
+            nohttpinterface: ""
+        }
     ]
     );
     conn.name = "localhost:" + port;
@@ -75,16 +80,18 @@ startMongodTest = function( port , dirname , restart ){
 // Start a mongod instance and return a 'Mongo' object connected to it.
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
-startMongod = function(){
+startMongodEmpty = function () {
+    var args = createMongoArgs("mongod", arguments);
 
-    var args = createMongoArgs( "mongod" , arguments );
+    var dbpath = _parsePath.apply(null, args);
+    resetDbpath(dbpath);
 
-    var dbpath = _parsePath.apply( null, args );
-    resetDbpath( dbpath );
-
-    return startMongoProgram.apply( null, args );
+    return startMongoProgram.apply(null, args);
 }
-
+startMongod = function () {
+    print("WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING RENAME YOUR INVOCATION");
+    return startMongodEmpty.apply(null, arguments);
+}
 startMongodNoReset = function(){
     var args = createMongoArgs( "mongod" , arguments );
     return startMongoProgram.apply( null, args );
@@ -170,11 +177,13 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     var admin = this.admin = this.s.getDB( "admin" );
     this.config = this.s.getDB( "config" );
 
-    this._connections.forEach(
-        function(z){
-            admin.runCommand( { addshard : z.name , allowLocal : true } );
-        }
-    );
+    if ( ! otherParams.manualAddShard ){
+        this._connections.forEach(
+            function(z){
+                admin.runCommand( { addshard : z.name , allowLocal : true } );
+            }
+        );
+    }
 }
 
 ShardingTest.prototype.getDB = function( name ){
@@ -187,6 +196,14 @@ ShardingTest.prototype.getServerName = function( dbname ){
         return x.primary;
     this.config.databases.find().forEach( printjson );
     throw "couldn't find dbname: " + dbname + " total: " + this.config.databases.count();
+}
+
+ShardingTest.prototype.getConnNames = function(){
+    var names = [];
+    for ( var i=0; i<this._connections.length; i++ ){
+        names.push( this._connections[i].name );
+    }
+    return names; 
 }
 
 ShardingTest.prototype.getServer = function( dbname ){

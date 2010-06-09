@@ -51,6 +51,8 @@ namespace mongo {
                 ;
 
             addPositionArg( "sleep" , 1 );
+
+            _autoreconnect = true;
         }
 
         virtual void printExtraHelp( ostream & out ){
@@ -210,7 +212,15 @@ namespace mongo {
 
             while ( _rowCount == 0 || _rowNum < _rowCount ){
                 sleepsecs(_sleep);
-                BSONObj now = stats();
+                BSONObj now;
+                try {
+                    now = stats();
+                }
+                catch ( std::exception& e ){
+                    cout << "can't get data: " << e.what() << endl;
+                    continue;
+                }
+
                 if ( now.isEmpty() )
                     return -2;
                 

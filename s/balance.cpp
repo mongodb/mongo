@@ -184,8 +184,6 @@ namespace mongo {
     void Balancer::_doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks ){
         assert( candidateChunks );
 
-        log(1) << "balancer: start balancing round" << endl;        
-
         //
         // 1. Check whether there is any sharded collection to be balanced by querying
         // the ShardsNS::database collection
@@ -232,8 +230,6 @@ namespace mongo {
         // along with any maximum allowed quotas and current utilization. We get the
         // latter by issuing db.serverStatus() (mem.mapped) to all shards.
         //
-        // TODO: issue serverStatus() and get the mem.mapped section back. For now, 
-        // let's assume zero usage.
         // TODO: skip unresponsive shards and mark information as stale.
         //
  
@@ -247,7 +243,8 @@ namespace mongo {
         map< string, BSONObj > shardLimitsMap; 
         for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ){
             const Shard& s = *it;
-            BSONObj limitsObj = BSON( "maxSize" << 0LL << "currSize" << 0LL /* TODO */);
+            ShardStatus status = s.getStatus();
+            BSONObj limitsObj = BSON( "maxSize" << s.getMaxSize() << "currSize" << status.mapped() );
             shardLimitsMap[s.getName()] = limitsObj;
         }
 
@@ -292,6 +289,8 @@ namespace mongo {
             log(1) << "balancer myid: " << _myid << endl;
             
             _started = time(0);
+
+            Shard::reloadShardInfo();
         }
         
         _ping();
@@ -310,14 +309,18 @@ namespace mongo {
                                     
                 vector<CandidateChunkPtr> candidateChunks;
                 if ( _shouldIBalance( conn.conn() ) ){
+                    log(1) << "balancer: start balancing round" << endl;        
                     candidateChunks.clear();
                     _doBalanceRound( conn.conn() , &candidateChunks );
 
-                    if ( candidateChunks.size() > 0 ) {
+                    if ( candidateChunks.size() == 0 ) {
+                        log(1) << "balancer: no need to move any chunk" << endl;
+
+                    } else {
                         _balancedLastTime = _moveChunks( &candidateChunks );
+                        log(1) << "balancer: end balancing round" << endl;        
                     }
                 }
-                
                 conn.done();
             }
             catch ( std::exception& e ){

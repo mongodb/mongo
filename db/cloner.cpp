@@ -234,8 +234,7 @@ namespace mongo {
                         continue;
                     }
                 }
-                if( strchr(from_name, '$') ) {
-                    // don't clone index namespaces -- we take care of those separately below.
+                if( ! nsDollarCheck( from_name ) ){
                     log(2) << "\t\t not cloning because has $ " << endl;
                     continue;
                 }            

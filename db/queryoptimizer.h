@@ -263,7 +263,7 @@ namespace mongo {
         shared_ptr< T > runOpOnce( T &op ) {
             return dynamic_pointer_cast< T >( runOpOnce( static_cast< QueryOp& >( op ) ) );
         }       
-        bool mayRunMore() const { return _i < _n; }
+        bool mayRunMore() const { return _or ? !_fros.orFinished() : _i == 0; }
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         // just report this when only one query op
         bool usingPrerecordedPlan() const {
@@ -274,15 +274,16 @@ namespace mongo {
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
         }
+        bool uselessOr( const BSONElement &hint ) const;
         const char * _ns;
         bool _or;
         BSONObj _query;
         FieldRangeOrSet _fros;
         auto_ptr< QueryPlanSet > _currentQps;
         int _i;
-        int _n;
         bool _honorRecordedPlan;
         bool _bestGuessOnly;
+        BSONObj _hint;
     };
     
     class MultiCursor : public Cursor {
@@ -315,6 +316,10 @@ namespace mongo {
         MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, const shared_ptr< CoveredIndexMatcher > &matcher, const QueryOp &op )
         : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ) {
             _mps->setBestGuessOnly();
+            if ( !ok() ) {
+                // would have been advanced by UserQueryOp if possible
+                advance();
+            }
         }
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }
@@ -329,12 +334,11 @@ namespace mongo {
         }
         virtual BSONObj currKey() const { return _c->currKey(); }
         virtual DiskLoc refLoc() { return _c->refLoc(); }
-        virtual void noteLocation() { _c->noteLocation(); }
+        virtual void noteLocation() {
+            _c->noteLocation();
+        }
         virtual void checkLocation() {
             _c->checkLocation();
-            if ( !ok() ) {
-                advance();
-            }
         }        
         virtual bool supportGetMore() { return true; }
         // with update we could potentially get the same document on multiple

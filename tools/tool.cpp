@@ -38,7 +38,7 @@ namespace mongo {
     Tool::Tool( string name , bool localDBAllowed , string defaultDB , 
                 string defaultCollection , bool usesstdout ) :
         _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , 
-        _usesstdout(usesstdout), _noconnection(false), _conn(0), _paired(false) {
+        _usesstdout(usesstdout), _noconnection(false), _autoreconnect(false), _conn(0), _paired(false) {
         
         _options = new po::options_description( "options" );
         _options->add_options()
@@ -155,7 +155,7 @@ namespace mongo {
                 // do nothing
             }
             else if ( _host.find( "," ) == string::npos ){
-                DBClientConnection * c = new DBClientConnection();
+                DBClientConnection * c = new DBClientConnection( _autoreconnect );
                 _conn = c;
 
                 string errmsg;
@@ -313,6 +313,101 @@ namespace mongo {
 
         throw UserException( 9997 , (string)"auth failed: " + errmsg );
     }
+
+    BSONTool::BSONTool( const char * name , bool objcheck ) 
+        : Tool( name , true , "" , "" ) , _objcheck( objcheck ){
+        
+        add_options()
+            ("objcheck" , "validate object before inserting" )
+            ("filter" , po::value<string>() , "filter to apply before inserting" )
+            ;
+    }
+
+
+    int BSONTool::run(){
+        _objcheck = hasParam( "objcheck" );
+        
+        if ( hasParam( "filter" ) )
+            _matcher.reset( new Matcher( fromjson( getParam( "filter" ) ) ) );
+        
+        return doRun();
+    }
+
+    long long BSONTool::processFile( const path& root ){
+        string fileString = root.string();
+        
+        long long fileLength = file_size( root );
+
+        if ( fileLength == 0 ) {
+            out() << "file " << fileString << " empty, skipping" << endl;
+            return 0;
+        }
+
+
+        ifstream file( fileString.c_str() , ios_base::in | ios_base::binary);
+        if ( ! file.is_open() ){
+            log() << "error opening file: " << fileString << endl;
+            return 0;
+        }
+
+        log(1) << "\t file size: " << fileLength << endl;
+
+        long long read = 0;
+        long long num = 0;
+        long long processed = 0;
+
+        const int BUF_SIZE = 1024 * 1024 * 5;
+        boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
+        char * buf = buf_holder.get();
+
+        ProgressMeter m( fileLength );
+
+        while ( read < fileLength ) {
+            file.read( buf , 4 );
+            int size = ((int*)buf)[0];
+            if ( size >= BUF_SIZE ){
+                cerr << "got an object of size: " << size << "  terminating..." << endl;
+            }
+            uassert( 10264 ,  "invalid object size" , size < BUF_SIZE );
+
+            file.read( buf + 4 , size - 4 );
+
+            BSONObj o( buf );
+            if ( _objcheck && ! o.valid() ){
+                cerr << "INVALID OBJECT - going try and pring out " << endl;
+                cerr << "size: " << size << endl;
+                BSONObjIterator i(o);
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    try {
+                        e.validate();
+                    }
+                    catch ( ... ){
+                        cerr << "\t\t NEXT ONE IS INVALID" << endl;
+                    }
+                    cerr << "\t name : " << e.fieldName() << " " << e.type() << endl;
+                    cerr << "\t " << e << endl;
+                }
+            }
+            
+            if ( _matcher.get() == 0 || _matcher->matches( o ) ){
+                gotObject( o );
+                processed++;
+            }
+
+            read += o.objsize();
+            num++;
+
+            m.hit( o.objsize() );
+        }
+
+        uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
+        out() << "\t "  << m.hits() << " objects found" << endl;
+        if ( _matcher.get() )
+            out() << "\t "  << processed << " objects processed" << endl;
+        return processed;
+    }
+            
 
 
     void setupSignals(){}

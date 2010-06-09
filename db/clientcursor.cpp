@@ -191,13 +191,12 @@ namespace mongo {
         DiskLoc cl = c->refLoc();
         if ( lastLoc() == cl ) {
             //log() << "info: lastloc==curloc " << ns << '\n';
-            return;
-        }
-        {
+        } else {
             recursive_scoped_lock lock(ccmutex);
             setLastLoc_inlock(cl);
-            c->noteLocation();
         }
+        // may be necessary for MultiCursor even when cl hasn't changed
+        c->noteLocation();
     }
     
     bool ClientCursor::yield() {

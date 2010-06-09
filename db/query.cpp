@@ -551,8 +551,6 @@ namespace mongo {
     public:
         
         UserQueryOp( const ParsedQuery& pq, Message &response, ExplainBuilder &eb, CurOp &curop ) :
-        //int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
-        //                   bool explain, FieldMatcher *filter, int queryOptions ) :
             _buf( 32768 ) , // TODO be smarter here
             _pq( pq ) ,
             _ntoskip( pq.getSkip() ) ,
@@ -561,6 +559,7 @@ namespace mongo {
             _oldN(0),
             _inMemSort(false),
             _saveClientCursor(false),
+            _wouldSaveClientCursor(false),
             _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
             _response( response ),
             _eb( eb ),
@@ -665,8 +664,8 @@ namespace mongo {
                             else if ( _pq.enoughForFirstBatch( n() , _buf.len() ) ){
                                 /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                                 if ( mayCreateCursor1 ) {
-                                    _c->advance();
-                                    if ( _c->ok() ) {
+                                    _wouldSaveClientCursor = true;
+                                    if ( _c->advance() ) {
                                         // more...so save a cursor
                                         _saveClientCursor = true;
                                     }
@@ -739,7 +738,8 @@ namespace mongo {
         long long nscanned() const { return _nscanned + _oldNscanned; }
         long long nscannedObjects() const { return _nscannedObjects + _oldNscannedObjects; }
         bool saveClientCursor() const { return _saveClientCursor; }
-
+        bool wouldSaveClientCursor() const { return _wouldSaveClientCursor; }
+        
     private:
         BufBuilder _buf;
         const ParsedQuery& _pq;
@@ -760,6 +760,7 @@ namespace mongo {
         shared_ptr<Cursor> _c;
 
         bool _saveClientCursor;
+        bool _wouldSaveClientCursor;
         bool _oplogReplay;
         auto_ptr< FindingStartCursor > _findingStartCursor;
         
@@ -937,7 +938,7 @@ namespace mongo {
             log() << "   used cursor: " << cursor.get() << endl;
         long long cursorid = 0;
         const char * exhaust = 0;
-        if ( dqo.saveClientCursor() || mps->mayRunMore() ) {
+        if ( dqo.saveClientCursor() || ( dqo.wouldSaveClientCursor() && mps->mayRunMore() ) ) {
             ClientCursor *cc;
             bool moreClauses = mps->mayRunMore();
             if ( moreClauses ) {

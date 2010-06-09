@@ -29,18 +29,15 @@ using namespace mongo;
 
 namespace po = boost::program_options;
 
-class Restore : public Tool {
+class Restore : public BSONTool {
 public:
     
     bool _drop;
-    bool _objcheck;
-    auto_ptr<Matcher> _matcher;
-    
-    Restore() : Tool( "restore" , true , "" , "" ) , _drop(false),_objcheck(false){
+    const char * _curns;
+
+    Restore() : BSONTool( "restore" ) , _drop(false){
         add_options()
             ("drop" , "drop each collection before import" )
-            ("objcheck" , "validate object before inserting" )
-            ("filter" , po::value<string>() , "filter to apply before inserting" )
             ;
         add_hidden_options()
             ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
@@ -52,14 +49,10 @@ public:
         out << "usage: " << _name << " [options] [directory or filename to restore from]" << endl;
     }
 
-    int run(){
+    virtual int doRun(){
         auth();
         path root = getParam("dir");
         _drop = hasParam( "drop" );
-        _objcheck = hasParam( "objcheck" );
-        
-        if ( hasParam( "filter" ) )
-            _matcher.reset( new Matcher( fromjson( getParam( "filter" ) ) ) );
 
         /* If _db is not "" then the user specified a db name to restore as.
          *
@@ -135,84 +128,22 @@ public:
             ns += "." + l;
         }
 
-        long long fileLength = file_size( root );
-
-        if ( fileLength == 0 ) {
-            out() << "file " + root.native_file_string() + " empty, skipping" << endl;
-            return;
-        }
-
         out() << "\t going into namespace [" << ns << "]" << endl;
 
         if ( _drop ){
             out() << "\t dropping" << endl;
             conn().dropCollection( ns );
         }
-
-        string fileString = root.string();
-        ifstream file( fileString.c_str() , ios_base::in | ios_base::binary);
-        if ( ! file.is_open() ){
-            log() << "error opening file: " << fileString << endl;
-            return;
-        }
-
-        log(1) << "\t file size: " << fileLength << endl;
-
-        long long read = 0;
-        long long num = 0;
-        long long inserted = 0;
-
-        const int BUF_SIZE = 1024 * 1024 * 5;
-        boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
-        char * buf = buf_holder.get();
-
-        ProgressMeter m( fileLength );
-
-        while ( read < fileLength ) {
-            file.read( buf , 4 );
-            int size = ((int*)buf)[0];
-            if ( size >= BUF_SIZE ){
-                cerr << "got an object of size: " << size << "  terminating..." << endl;
-            }
-            uassert( 10264 ,  "invalid object size" , size < BUF_SIZE );
-
-            file.read( buf + 4 , size - 4 );
-
-            BSONObj o( buf );
-            if ( _objcheck && ! o.valid() ){
-                cerr << "INVALID OBJECT - going try and pring out " << endl;
-                cerr << "size: " << size << endl;
-                BSONObjIterator i(o);
-                while ( i.more() ){
-                    BSONElement e = i.next();
-                    try {
-                        e.validate();
-                    }
-                    catch ( ... ){
-                        cerr << "\t\t NEXT ONE IS INVALID" << endl;
-                    }
-                    cerr << "\t name : " << e.fieldName() << " " << e.type() << endl;
-                    cerr << "\t " << e << endl;
-                }
-            }
-            
-            if ( _matcher.get() == 0 || _matcher->matches( o ) ){
-                conn().insert( ns.c_str() , o );
-                inserted++;
-            }
-
-            read += o.objsize();
-            num++;
-
-            m.hit( o.objsize() );
-        }
-
-        uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
-        out() << "\t "  << m.hits() << " objects found" << endl;
-        if ( _matcher.get() )
-            out() << "\t "  << inserted << " objects inserted" << endl;
-            
+        
+        _curns = ns.c_str();
+        processFile( root );
     }
+
+    virtual void gotObject( const BSONObj& obj ){
+        conn().insert( _curns , obj );
+    }
+
+    
 };
 
 int main( int argc , char ** argv ) {

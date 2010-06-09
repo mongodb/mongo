@@ -376,8 +376,8 @@ namespace mongo {
         /** Append a binary data element 
             @param fieldName name of the field
             @param len length of the binary data in bytes
-            @param type type information for the data. @see BinDataType.  Use ByteArray if you 
-            don't care about the type.
+            @param subtype subtype information for the data. @see enum BinDataType in bsontypes.h.  
+                   Use BinDataGeneral if you don't care about the type.
             @param data the byte array
         */
         BSONObjBuilder& appendBinData( const char *fieldName, int len, BinDataType type, const char *data ) {
@@ -393,11 +393,12 @@ namespace mongo {
         }
         
         /**
+        Subtype 2 is deprecated.
         Append a BSON bindata bytearray element.
         @param data a byte array
         @param len the length of data
         */
-        BSONObjBuilder& appendBinDataArray( const char * fieldName , const char * data , int len ){
+        BSONObjBuilder& appendBinDataArrayDeprecated( const char * fieldName , const char * data , int len ){
             _b.append( (char) BinData );
             _b.append( fieldName );
             _b.append( len + 4 );
