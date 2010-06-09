@@ -188,13 +188,12 @@ namespace mongo {
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
         string getSpecial() const;
         const FieldRangeSet &operator-=( const FieldRangeSet &other ) {
-            map< string, FieldRange >::const_iterator i = _ranges.begin();
+            map< string, FieldRange >::iterator i = _ranges.begin();
             map< string, FieldRange >::const_iterator j = other._ranges.begin();
             while( i != _ranges.end() && j != other._ranges.end() ) {
                 int cmp = i->first.compare( j->first );
                 if ( cmp == 0 ) {
-                    // TODO possible to update _ranges using i iterator?
-                    _ranges[ i->first ] -= j->second;
+                    i->second -= j->second;
                     ++i;
                     ++j;
                 } else if ( cmp < 0 ) {
@@ -206,13 +205,12 @@ namespace mongo {
             return *this;
         }
         const FieldRangeSet &operator&=( const FieldRangeSet &other ) {
-            map< string, FieldRange >::const_iterator i = _ranges.begin();
+            map< string, FieldRange >::iterator i = _ranges.begin();
             map< string, FieldRange >::const_iterator j = other._ranges.begin();
             while( i != _ranges.end() && j != other._ranges.end() ) {
                 int cmp = i->first.compare( j->first );
                 if ( cmp == 0 ) {
-                    // TODO possible to update _ranges using i iterator?
-                    _ranges[ i->first ] &= j->second;
+                    i->second &= j->second;
                     ++i;
                     ++j;
                 } else if ( cmp < 0 ) {

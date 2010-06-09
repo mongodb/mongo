@@ -442,20 +442,25 @@ namespace mongo {
         return *this;        
     }
     
-    //TODO finish
     const FieldRange &FieldRange::operator-=( const FieldRange &other ) {
         vector< FieldInterval >::iterator i = _intervals.begin();
         vector< FieldInterval >::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
-            // TODO endpoints
             int cmp = i->_lower._bound.woCompare( j->_lower._bound, false );
-            if ( cmp < 0 ) {
+            if ( cmp < 0 ||
+                ( cmp == 0 && i->_lower._inclusive && !j->_lower._inclusive ) ) {
                 int cmp2 = i->_upper._bound.woCompare( j->_lower._bound, false );
-                if ( cmp2 <= 0 ) {
+                if ( cmp2 < 0 ) {
+                    ++i;
+                } else if ( cmp2 == 0 ) {
+                    if ( i->_upper._inclusive && j->_lower._inclusive ) {
+                        i->_upper._inclusive = false;
+                    }
                     ++i;
                 } else {
                     int cmp3 = i->_upper._bound.woCompare( j->_upper._bound, false );
-                    if ( cmp3 <= 0 ) {
+                    if ( cmp3 < 0 ||
+                        ( cmp3 == 0 && ( !i->_upper._inclusive || j->_upper._inclusive ) ) ) {
                         i->_upper = j->_lower;
                         i->_upper.flipInclusive();
                         ++i;
@@ -465,11 +470,13 @@ namespace mongo {
                 }
             } else {
                 int cmp2 = i->_lower._bound.woCompare( j->_upper._bound, false );
-                if ( cmp2 > 0 ) {
+                if ( cmp2 > 0 ||
+                    ( cmp2 == 0 && ( !i->_lower._inclusive || !j->_lower._inclusive ) ) ) {
                     ++j;
                 } else {
                     int cmp3 = i->_upper._bound.woCompare( j->_upper._bound, false );
-                    if ( cmp3 < 0 ) {
+                    if ( cmp3 < 0 ||
+                        ( cmp3 == 0 && ( !i->_upper._inclusive || j->_upper._inclusive ) ) ) {
                         i = _intervals.erase( i );
                     } else {
                         i->_lower = j->_upper;
