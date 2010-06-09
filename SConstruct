@@ -1244,157 +1244,50 @@ elif not onlyServer:
 
 testEnv.Alias( "dummySmokeSideEffect", [], [] )
 
+smokeFlags = []
+
 if GetOption( 'smokedbprefix') is not None:
-    smokeDbPrefix = GetOption( 'smokedbprefix')
-else:
-    smokeDbPrefix = ''
+    smokeFlags += ['--smoke-db-prefix', GetOption( 'smokedbprefix')]
     
-def addSmoketest( name, deps, actions ):
-    if type( actions ) == type( list() ):
-        actions = [ testSetup ] + actions
-    else:
-        actions = [ testSetup, actions ]
+def addTest(name, deps, actions):
     testEnv.Alias( name, deps, actions )
     testEnv.AlwaysBuild( name )
     # Prevent smoke tests from running in parallel
     testEnv.SideEffect( "dummySmokeSideEffect", name )
 
-def ensureDir( name ):
-    d = os.path.dirname( name )
-    if not os.path.exists( d ):
-        print( "Creating dir: " + name );
-        os.makedirs( d )
-        if not os.path.exists( d ):
-            print( "Failed to create dir: " + name );
-            Exit( 1 )
+def addSmoketest( name, deps ):
+    addTest(name, deps, [ "python buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + name ])
 
-def ensureTestDirs():
-    ensureDir( smokeDbPrefix + "/tmp/unittest/" )
-    ensureDir( smokeDbPrefix + "/data/" )
-    ensureDir( smokeDbPrefix + "/data/db/" )
-
-def testSetup( env , target , source ):
-    ensureTestDirs()
-
-if len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "test":
-    ensureDir( smokeDbPrefix + "/tmp/unittest/" );
-
-addSmoketest( "smoke", [ add_exe( "test" ) ] , [ test[ 0 ].abspath ] )
-addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
-
-clientExec = [ x[0].abspath for x in clientTests ]
-def runClientTests( env, target, source ):
-    global clientExec
-    global mongodForTestsPort
-    import subprocess
-    for i in clientExec:
-        if subprocess.call( [ i, "--port", mongodForTestsPort ] ) != 0:
-            return True
-    if subprocess.Popen( [ mongod[0].abspath, "msg", "ping", mongodForTestsPort ], stdout=subprocess.PIPE ).communicate()[ 0 ].count( "****ok" ) == 0:
-        return True
-    if subprocess.call( [ mongod[0].abspath, "msg", "ping", mongodForTestsPort ] ) != 0:
-        return True
-    return False
-addSmoketest( "smokeClient" , clientExec, runClientTests )
-addSmoketest( "mongosTest" , [ mongos[0].abspath ] , [ mongos[0].abspath + " --test" ] )
-
-def jsSpec( suffix ):
-    import os.path
-    args = [ os.path.dirname( mongo[0].abspath ), "jstests" ] + suffix
-    return apply( os.path.join, args )
-
-def jsDirTestSpec( dir ):
-    path = jsSpec( [ dir + '/*.js' ] )
-    paths = [x.abspath for x in Glob( path ) ]
-    return mongo[0].abspath + " --nodb " + ' '.join( paths )
-
-def runShellTest( env, target, source ):
-    global mongodForTestsPort
-    import subprocess
-    target = str( target[0] )
-    if target == "smokeJs":
-        spec = [ jsSpec( [ "_runner.js" ] ) ]
-    elif target == "smokeQuota":
-        g = Glob( jsSpec( [ "quota/*.js" ] ) )
-        spec = [ x.abspath for x in g ]
-    elif target == "smokeJsPerf":
-        g = Glob( jsSpec( [ "perf/*.js" ] ) )
-        spec = [ x.abspath for x in g ]
-    elif target == "smokeJsSlow":
-        spec = [x.abspath for x in Glob(jsSpec(["slow/*"]))]
-    elif target == "smokeParallel":
-        spec = [x.abspath for x in Glob(jsSpec(["parallel/*"]))]
-    else:
-        print( "invalid target for runShellTest()" )
-        Exit( 1 )
-    return subprocess.call( [ mongo[0].abspath, "--port", mongodForTestsPort ] + spec )
+addSmoketest( "smoke", [ add_exe( "test" ) ] )
+addSmoketest( "smokePerf", [ "perftest" ]  )
+addSmoketest( "smokeClient" , clientTests )
+addSmoketest( "mongosTest" , [ mongos[0].abspath ] )
 
 # These tests require the mongo shell
 if not onlyServer and not noshell:
-    addSmoketest( "smokeJs", [add_exe("mongo")], runShellTest )
-    addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
-    addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], [ jsDirTestSpec( "repl" ) ] )
-    addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "disk" ) ] )
-    addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "auth" ) ] )
-    addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ], runShellTest )
-    addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
-    addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
-    addSmoketest("smokeJsSlow", [add_exe("mongo")], runShellTest)
-    addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
-    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [ jsDirTestSpec( "tool" ) ] )
+    addSmoketest( "smokeJs", [add_exe("mongo")] )
+    addSmoketest( "smokeClone", [ "mongo", "mongod" ] )
+    addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ] )
+    addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+    addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+    addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+    addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ] )
+    addSmoketest( "smokeJsPerf", [ "mongo" ] )
+    addSmoketest("smokeJsSlow", [add_exe("mongo")])
+    addSmoketest( "smokeQuota", [ "mongo" ] )
+    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ] )
 
-mongodForTests = None
-mongodForTestsPort = "27017"
-
-def startMongodWithArgs(*args):
-    global mongodForTests
-    global mongodForTestsPort
-    global mongod
-    if mongodForTests:
-        return
-    mongodForTestsPort = "32000"
-    import os
-    ensureTestDirs()
-    dirName = smokeDbPrefix + "/data/db/sconsTests/"
-    ensureDir( dirName )
-    from subprocess import Popen
-    mongodForTests = Popen([mongod[0].abspath, "--port", mongodForTestsPort,
-                            "--dbpath", dirName] + list(args))
-
-    if not utils.didMongodStart( 32000 ):
-        print( "Failed to start mongod" )
-        mongodForTests = None
-        Exit( 1 )
-
-def startMongodForTests( env, target, source ):
-    return startMongodWithArgs()
-
-def startMongodSmallOplog(env, target, source):
-    return startMongodWithArgs("--master", "--oplogSize", "10")
-
-def stopMongodForTests():
-    global mongodForTests
-    if not mongodForTests:
-        return
-    if mongodForTests.poll() is not None:
-        print( "Failed to start mongod" )
-        mongodForTests = None
-        Exit( 1 )
-    try:
-        # This function not available in Python 2.5
-        mongodForTests.terminate()
-    except AttributeError:
-        if windows:
-            import win32process
-            win32process.TerminateProcess(mongodForTests._handle, -1)
-        else:
-            from os import kill
-            kill( mongodForTests.pid, 15 )
-    mongodForTests.wait()
-
-testEnv.Alias( "startMongod", [add_exe("mongod")], [startMongodForTests] );
+# Note: although the test running logic has been moved to
+# buildscripts/smoke.py, the interface to running the tests has been
+# something like 'scons startMongod <suite>'; startMongod is now a
+# no-op, and should go away eventually.
+testEnv.Alias( "startMongod", [add_exe("mongod")]);
 testEnv.AlwaysBuild( "startMongod" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
+
+def startMongodSmallOplog():
+    global smokeFlags
+    smokeFlags += ["--small-oplog"]
 
 testEnv.Alias( "startMongodSmallOplog", [add_exe("mongod")], [startMongodSmallOplog] );
 testEnv.AlwaysBuild( "startMongodSmallOplog" );
@@ -1423,9 +1316,6 @@ testEnv.AlwaysBuild( "addMongodReqNoJsTargets" )
 
 testEnv.Alias( "smokeAllNoJs", [ "smoke", "mongosTest", "addMongodReqNoJsTargets" ] )
 testEnv.AlwaysBuild( "smokeAllNoJs" )
-
-import atexit
-atexit.register( stopMongodForTests )
 
 def recordPerformance( env, target, source ):
     from buildscripts import benchmark_tools
@@ -1456,7 +1346,7 @@ def recordPerformance( env, target, source ):
             print( sys.exc_info() )
     return False
 
-addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
+addTest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
 def run_shell_tests(env, target, source):
     from buildscripts import test_shell
