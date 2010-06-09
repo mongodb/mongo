@@ -1135,6 +1135,8 @@ env.Alias( "tools" , [ add_exe( "mongo" + x ) for x in normalTools ] )
 for x in normalTools:
     env.Program( "mongo" + x , allToolFiles + [ "tools/" + x + ".cpp" ] )
 
+#some special tools
+env.Program( "bsondump" , allToolFiles + [ "tools/bsondump.cpp" ] )
 env.Program( "mongobridge" , allToolFiles + [ "tools/bridge.cpp" ] )
 
 # mongos

@@ -119,4 +119,20 @@ namespace mongo {
 
     };
 
+    class BSONTool : public Tool {
+        bool _objcheck;
+        auto_ptr<Matcher> _matcher;
+        
+    public:
+        BSONTool( const char * name , bool objcheck = false );
+        
+        virtual int doRun() = 0;
+        virtual void gotObject( const BSONObj& obj ) = 0;
+        
+        virtual int run();
+
+        long long processFile( const path& file );
+        
+    };
+
 }
