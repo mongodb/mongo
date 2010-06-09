@@ -637,6 +637,9 @@
     <ClCompile Include="..\util\text.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\gridfs.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

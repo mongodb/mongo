@@ -257,6 +257,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\client\gridfs.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
     <ClCompile Include="..\db\repl\heartbeat.cpp" />
     <ClCompile Include="..\db\repl\manager.cpp" />
