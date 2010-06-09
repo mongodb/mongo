@@ -12,7 +12,7 @@ import atexit
 import glob
 
 
-mongoRepo = None
+mongoRepo = './'
 
 mongodExecutable = "./mongod"
 mongodPort = "32000"
@@ -23,6 +23,9 @@ oneMongodPerTest = False
 tests = []
 winners = []
 losers = {}
+
+smokeDbPrefix = ''
+smallOplog = False
 
 # This class just implements the with statement API, for a sneaky
 # purpose below.
@@ -51,9 +54,9 @@ class mongod(object):
         return not isinstance(value, Exception)
 
     def ensureTestDirs(self):
-        utils.ensureDir( "/tmp/unittest/" )
-        utils.ensureDir( "/data/" )
-        utils.ensureDir( "/data/db/" )
+        utils.ensureDir( smokeDbPrefix + "/tmp/unittest/" )
+        utils.ensureDir( smokeDbPrefix + "/data/" )
+        utils.ensureDir( smokeDbPrefix + "/data/db/" )
 
     def checkMongoPort( self, port=27017 ):
         sock = socket.socket()
@@ -80,19 +83,19 @@ class mongod(object):
             print >> sys.stderr, "probable bug: self.proc already set in start()"
             return
         self.ensureTestDirs()
-        dirName = "/data/db/sconsTests/"
+        dirName = smokeDbPrefix + "/data/db/sconsTests/"
+        print smokeDbPrefix #dirName
         utils.ensureDir( dirName )
         argv = [mongodExecutable, "--port", str(mongodPort),
-                "--dbpath", dirName] + list(self.args)
+                "--dbpath", dirName]
+        if smallOplog:
+            argv += ["--master", "--oplogSize", "10"]
+        argv += list(self.args)
         print argv
         self.proc = Popen(argv)
         if not self.didMongodStart( mongodPort ):
             raise Exception( "Failed to start mongod" )
 
-        # FIXME: need to support this.
-#    def startMongodSmallOplog(env, target, source):
-#        return startMongodWithArgs("--master", "--oplogSize", "10")
-    
     def stop(self):
         if not self.proc:
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
@@ -139,6 +142,9 @@ def runTest(test):
         # Blech.
         if os.path.basename(path) in ["test", "test.exe", "perftest", "perftest.exe"]:
             argv=[path]
+        # more blech
+        elif os.path.basename(path) == 'mongos':
+            argv=[path, "--test"]
         else:
             argv=[path, "--port", mongodPort]
     else:
@@ -210,8 +216,6 @@ def expandSuites(suites):
             (globstr, usedb) = ('test', False)
         elif suite == 'smokePerf':
             (globstr, usedb) = ('perftest', False)
-        elif suite == 'smokeClient':
-            tests += [(os.path.join(mongoRepo, path), False) for path in ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]]
         elif suite == 'smokeJs':
             # FIXME: _runner.js seems equivalent to "[!_]*.js".
             #(globstr, usedb) = ('_runner.js', True)
@@ -234,6 +238,11 @@ def expandSuites(suites):
             (globstr, usedb) = ('sharding/*.js', False)
         elif suite == 'smokeTool':
             (globstr, usedb) = ('tool/*.js', False)
+        # well, the above almost works for everything...
+        elif suite == 'smokeClient':
+            tests += [(os.path.join(mongoRepo, path), False) for path in ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]]
+        elif suite == 'mongosTest':
+            tests += [(os.path.join(mongoRepo, 'mongos'), False)]
         else:
             raise Exception('unknown test suite %s' % suite)
 
@@ -264,32 +273,37 @@ def main():
                       help='If supplied, run each test in a fresh mongod')
     parser.add_option('--from-file', dest='File',
                       help="Run tests/suites named in FILE, one test per line, '-' means stdin")
+    parser.add_option('--smoke-db-prefix', dest='smokeDbPrefix', default='')
+    parser.add_option('--small-oplog', dest='smallOplog', default=False,
+                      action="store_true")
     global tests
     (options, tests) = parser.parse_args()
 
-    global mongoRepo
-    if False: #options.mongoRepo:
-        pass
-        #mongoRepo = options.mongoRepo
-    else:
-        prefix = ''
-        while True:
-            if os.path.exists(prefix+'buildscripts'):
-                mongoRepo = os.path.normpath(prefix)
-                break
-            else:
-                prefix += '../'
-                # FIXME: will this be a device's root directory on
-                # Windows?
-                if os.path.samefile('/', prefix): 
-                    raise Exception("couldn't guess the mongo repository path")
+#    global mongoRepo
+#    if options.mongoRepo:
+#        pass
+#        mongoRepo = options.mongoRepo
+#    else:
+#        prefix = ''
+#        while True:
+#            if os.path.exists(prefix+'buildscripts'):
+#                mongoRepo = os.path.normpath(prefix)
+#                break
+#            else:
+#                prefix += '../'
+#                # FIXME: will this be a device's root directory on
+#                # Windows?
+#                if os.path.samefile('/', prefix): 
+#                    raise Exception("couldn't guess the mongo repository path")
 
-    global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest
+    global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest, smallOplog, smokeDbPrefix
     mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, 'mongod')
     mongodPort = options.mongodPort if options.mongodPort else mongodPort
     shellExecutable = options.shellExecutable if options.shellExecutable else os.path.join(mongoRepo, 'mongo')
     continueOnFailure = options.continueOnFailure if options.continueOnFailure else continueOnFailure
     oneMongodPerTest = options.oneMongodPerTest if options.oneMongodPerTest else oneMongodPerTest
+    smokeDbPrefix = options.smokeDbPrefix
+    smallOplog = options.smallOplog
     
     if options.File:
         if options.File == '-':
