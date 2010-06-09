@@ -224,6 +224,8 @@ def expandSuites(suites):
             (globstr, usedb) = ('quota/*.js', True)
         elif suite == 'smokeJsPerf':
             (globstr, usedb) = ('perf/*.js', True)
+        elif suite == 'smokeDisk':
+            (globstr, usedb) = ('disk/*.js', True)
         elif suite == 'smokeJsSlow':
             (globstr, usedb) = ('slow/*.js', True)
         elif suite == 'smokeParallel':
