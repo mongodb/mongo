@@ -639,7 +639,7 @@ namespace JsobjTests {
                                          "\"seven\": [ \"a\", \"bb\", \"ccc\", 5 ],"
                                          "\"eight\": Dbref( \"rrr\", \"01234567890123456789aaaa\" ),"
                                          "\"_id\": ObjectId( \"deadbeefdeadbeefdeadbeef\" ),"
-                                         "\"nine\": { \"$binary\": \"abc=\", \"$type\": \"02\" },"
+                                         "\"nine\": { \"$binary\": \"abc=\", \"$type\": \"00\" },"
                                          "\"ten\": Date( 44 ), \"eleven\": /foooooo/i }" );
                     fuzz( b );
                     b.valid();

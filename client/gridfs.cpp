@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "../pch.h"
+#include "pch.h"
 #include <fcntl.h>
 #include <utility>
 
@@ -42,7 +42,7 @@ namespace mongo {
         BSONObjBuilder b;
         b.appendAs( fileObject["_id"] , "files_id" );
         b.append( "n" , chunkNumber );
-        b.appendBinDataArray( "data" , data , len );
+        b.appendBinData( "data" , len, BinDataGeneral, data );
         _data = b.obj();
     }
 
