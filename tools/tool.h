@@ -96,6 +96,7 @@ namespace mongo {
         
         bool _usesstdout;
         bool _noconnection;
+        bool _autoreconnect;
 
         void addFieldOptions();
         void needFields();

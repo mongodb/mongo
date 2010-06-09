@@ -38,7 +38,7 @@ namespace mongo {
     Tool::Tool( string name , bool localDBAllowed , string defaultDB , 
                 string defaultCollection , bool usesstdout ) :
         _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , 
-        _usesstdout(usesstdout), _noconnection(false), _conn(0), _paired(false) {
+        _usesstdout(usesstdout), _noconnection(false), _autoreconnect(false), _conn(0), _paired(false) {
         
         _options = new po::options_description( "options" );
         _options->add_options()
@@ -155,7 +155,7 @@ namespace mongo {
                 // do nothing
             }
             else if ( _host.find( "," ) == string::npos ){
-                DBClientConnection * c = new DBClientConnection();
+                DBClientConnection * c = new DBClientConnection( _autoreconnect );
                 _conn = c;
 
                 string errmsg;
