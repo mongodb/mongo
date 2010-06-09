@@ -839,6 +839,7 @@ help = shellHelper.help = function (x) {
     print("\t" + "db.foo.find()                list objects in collection foo");
     print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
     print("\t" + "it                           result of the last line evaluated; use to further iterate");
+    print("\t" + "help admin                   misc shell commands");
     print("\t" + "exit                         quit the mongo shell");
 }
 
