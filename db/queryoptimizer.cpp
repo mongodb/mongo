@@ -631,8 +631,14 @@ namespace mongo {
         _currentQps.reset( new QueryPlanSet( _ns, frs, _query, BSONObj(), &hintElt, _honorRecordedPlan ) );
         shared_ptr< QueryOp > ret( _currentQps->runOp( op ) );
         BSONObj selectedIndexKey = ret->qp().indexKey();
-        // TODO handle compound indexes reasonably
-        _fros.popOrClause( selectedIndexKey.nFields() == 1 ? selectedIndexKey.firstElement().fieldName() : 0 );            
+        const char *first = 0;
+        const char *second = 0;
+        BSONObjIterator i( selectedIndexKey );
+        first = i.next().fieldName();
+        if ( i.more() ) {
+            second = i.next().fieldName();
+        }
+        _fros.popOrClause( first, second );
         return ret;
     }
     

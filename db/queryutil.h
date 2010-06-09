@@ -75,7 +75,12 @@ namespace mongo {
         bool empty() const { return _intervals.empty(); }
 		const vector< FieldInterval > &intervals() const { return _intervals; }
         string getSpecial() const { return _special; }
-
+        void setExclusiveBounds() {
+            for( vector< FieldInterval >::iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+                i->_lower._inclusive = false;
+                i->_upper._inclusive = false;
+            }
+        }        
     private:
         BSONObj addObj( const BSONObj &o );
         void finishOperation( const vector< FieldInterval > &newIntervals, const FieldRange &other );
@@ -254,15 +259,20 @@ namespace mongo {
         bool orFinished() const { return _orFound && _orSets.empty(); }
         // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
         // this could invalidate the result of the last topFrs()
-        void popOrClause( const char *singleChosenField ) {
+        void popOrClause( const char *firstField, const char *secondField ) {
             massert( 13274, "no or clause to pop", !orFinished() );
             const FieldRangeSet &toPop = _orSets.front();
-            if ( singleChosenField ) {
+            if ( toPop.hasRange( firstField ) ) {
+                if ( secondField && toPop.hasRange( secondField ) ) {
+                    // modifying existing front is ok - this is the last time we'll use it
+                    _orSets.front().range( firstField ).setExclusiveBounds();
+                }
+                const FieldRange &r = toPop.range( firstField );
                 list< FieldRangeSet >::iterator i = _orSets.begin();
                 ++i;
                 while( i != _orSets.end() ) {
-                    if ( i->hasRange( singleChosenField ) ) {
-                        i->range( singleChosenField ) -= toPop.range( singleChosenField );
+                    if ( i->hasRange( firstField ) ) {
+                        i->range( firstField ) -= r;
                         if( !i->matchPossible() ) {
                             i = _orSets.erase( i );
                         } else {    
