@@ -80,7 +80,21 @@ namespace mongo {
                 i->_lower._inclusive = false;
                 i->_upper._inclusive = false;
             }
-        }        
+        }
+        // if cannot construct an $in query, BSONObj() is returned
+        BSONObj simplifiedIn() const {
+            BSONObjBuilder b;
+            BSONArrayBuilder a( b.subarrayStart("$in") );
+            for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+                if ( !i->_upper._inclusive || !i->_lower._inclusive ||
+                    i->_upper._bound.woCompare( i->_lower._bound, false ) != 0 ) {
+                    return BSONObj();
+                }
+                a << i->_upper._bound;
+            }
+            a.done();
+            return b.obj();
+        }
     private:
         BSONObj addObj( const BSONObj &o );
         void finishOperation( const vector< FieldInterval > &newIntervals, const FieldRange &other );
@@ -191,7 +205,7 @@ namespace mongo {
         }
         const char *ns() const { return _ns; }
         // if fields is specified, order fields of returned object to match those of 'fields'
-        BSONObj simplifiedQuery( const BSONObj &fields = BSONObj() ) const;
+        BSONObj simplifiedQuery( const BSONObj &fields = BSONObj(), bool expandIn = false ) const;
         bool matchPossible() const {
             for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i )
                 if ( i->second.empty() )

@@ -635,7 +635,7 @@ namespace mongo {
         return *trivialRange_;
     }
     
-    BSONObj FieldRangeSet::simplifiedQuery( const BSONObj &_fields ) const {
+    BSONObj FieldRangeSet::simplifiedQuery( const BSONObj &_fields, bool expandIn ) const {
         BSONObj fields = _fields;
         if ( fields.isEmpty() ) {
             BSONObjBuilder b;
@@ -654,12 +654,19 @@ namespace mongo {
             if ( range.equality() )
                 b.appendAs( range.min(), name );
             else if ( range.nontrivial() ) {
-                BSONObjBuilder c;
-                if ( range.min().type() != MinKey )
-                    c.appendAs( range.min(), range.minInclusive() ? "$gte" : "$gt" );
-                if ( range.max().type() != MaxKey )
-                    c.appendAs( range.max(), range.maxInclusive() ? "$lte" : "$lt" );
-                b.append( name, c.done() );                
+                BSONObj o;
+                if ( range.intervals().size() > 1 ) {
+                    o = range.simplifiedIn();
+                }
+                if ( o.isEmpty() ) {
+                    BSONObjBuilder c;
+                    if ( range.min().type() != MinKey )
+                        c.appendAs( range.min(), range.minInclusive() ? "$gte" : "$gt" );
+                    if ( range.max().type() != MaxKey )
+                        c.appendAs( range.max(), range.maxInclusive() ? "$lte" : "$lt" );
+                    o = c.obj();
+                }
+                b.append( name, o );                
             }
         }
         return b.obj();

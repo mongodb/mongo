@@ -57,7 +57,7 @@ namespace mongo {
         const char *ns() const { return fbs_.ns(); }
         NamespaceDetails *nsd() const { return d; }
         BSONObj originalQuery() const { return _originalQuery; }
-        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return fbs_.simplifiedQuery( fields ); }
+        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj(), bool expandIn = false ) const { return fbs_.simplifiedQuery( fields, expandIn ); }
         const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
         // just for testing
@@ -137,7 +137,7 @@ namespace mongo {
     protected:
         void setComplete() {
             _haveOrConstraint = true;
-            _orConstraint = qp().simplifiedQuery( qp().indexKey() );
+            _orConstraint = qp().simplifiedQuery( qp().indexKey(), true );
             _complete = true;
         }
         void setStop() { setComplete(); _stopRequested = true; }
