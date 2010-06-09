@@ -162,11 +162,20 @@ namespace mongo {
     public:
         friend class FieldRangeOrSet;
         FieldRangeSet( const char *ns, const BSONObj &query , bool optimize=true );
+        bool hasRange( const char *fieldName ) const {
+            map< string, FieldRange >::const_iterator f = _ranges.find( fieldName );
+            return f != _ranges.end();
+        }
         const FieldRange &range( const char *fieldName ) const {
             map< string, FieldRange >::const_iterator f = _ranges.find( fieldName );
             if ( f == _ranges.end() )
                 return trivialRange();
-            return f->second;
+            return f->second;            
+        }
+        FieldRange &range( const char *fieldName ) {
+            map< string, FieldRange >::iterator f = _ranges.find( fieldName );
+            massert( 13293, "no such range", f != _ranges.end() );
+            return f->second;            
         }
         int nNontrivialRanges() const {
             int count = 0;
@@ -245,17 +254,23 @@ namespace mongo {
         bool orFinished() const { return _orFound && _orSets.empty(); }
         // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
         // this could invalidate the result of the last topFrs()
-        void popOrClause() {
+        void popOrClause( const char *singleChosenField ) {
             massert( 13274, "no or clause to pop", !orFinished() );
             const FieldRangeSet &toPop = _orSets.front();
-            list< FieldRangeSet >::iterator i = _orSets.begin();
-            ++i;
-            while( i != _orSets.end() ) {
-                *i -= toPop;
-                if( !i->matchPossible() ) {
-                    i = _orSets.erase( i );
-                } else {
-                    ++i;
+            if ( singleChosenField ) {
+                list< FieldRangeSet >::iterator i = _orSets.begin();
+                ++i;
+                while( i != _orSets.end() ) {
+                    if ( i->hasRange( singleChosenField ) ) {
+                        i->range( singleChosenField ) -= toPop.range( singleChosenField );
+                        if( !i->matchPossible() ) {
+                            i = _orSets.erase( i );
+                        } else {    
+                            ++i;
+                        }
+                    } else {
+                        ++i;
+                    }
                 }
             }
             _oldOrSets.push_front( toPop );

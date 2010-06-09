@@ -627,10 +627,12 @@ namespace mongo {
         }
         ++_i;
         auto_ptr< FieldRangeSet > frs( _fros.topFrs() );
-        _fros.popOrClause();            
         BSONElement hintElt = _hint.firstElement();
         _currentQps.reset( new QueryPlanSet( _ns, frs, _query, BSONObj(), &hintElt, _honorRecordedPlan ) );
         shared_ptr< QueryOp > ret( _currentQps->runOp( op ) );
+        BSONObj selectedIndexKey = ret->qp().indexKey();
+        // TODO handle compound indexes reasonably
+        _fros.popOrClause( selectedIndexKey.nFields() == 1 ? selectedIndexKey.firstElement().fieldName() : 0 );            
         return ret;
     }
     

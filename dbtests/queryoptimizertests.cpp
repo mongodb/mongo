@@ -47,7 +47,7 @@ namespace QueryOptimizerTests {
         public:
             virtual ~Base() {}
             void run() {
-                FieldRangeSet s( "ns", query() );
+                const FieldRangeSet s( "ns", query() );
                 checkElt( lower(), s.range( "a" ).min() );
                 checkElt( upper(), s.range( "a" ).max() );
                 ASSERT_EQUALS( lowerInclusive(), s.range( "a" ).minInclusive() );
