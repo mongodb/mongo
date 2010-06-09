@@ -485,5 +485,15 @@ namespace mongo {
     void ensureHaveIdIndex(const char *ns);
     
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
+
+
+    /**
+     * @return true if ns is ok
+     */
+    inline bool nsDollarCheck( const char* ns ){
+        if ( strchr( ns , '$' ) == 0 )
+            return true;
         
+        return strcmp( ns, "local.oplog.$main" ) == 0;
+    }
 } // namespace mongo

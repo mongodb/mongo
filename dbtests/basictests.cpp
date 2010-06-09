@@ -364,6 +364,10 @@ namespace BasicTests {
             ASSERT( Database::validDBName( "foo" ) );
             ASSERT( ! Database::validDBName( "foo/bar" ) );
             ASSERT( ! Database::validDBName( "foo.bar" ) );
+
+            ASSERT( nsDollarCheck( "asdads" ) );
+            ASSERT( ! nsDollarCheck( "asda$ds" ) );
+            ASSERT( nsDollarCheck( "local.oplog.$main" ) );
         }
     };
     

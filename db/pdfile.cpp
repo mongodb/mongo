@@ -1349,7 +1349,7 @@ namespace mongo {
     */
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
-        massert( 10093 , "cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 || strcmp( ns, "local.oplog.$main" ) == 0 );
+        massert( 10093 , "cannot insert into reserved $ collection", god || nsDollarCheck( ns ) );
         uassert( 10094 , "invalid ns", strchr( ns , '.' ) > 0 );
         const char *sys = strstr(ns, "system.");
         if ( sys ) {

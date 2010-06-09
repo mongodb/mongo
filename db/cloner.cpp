@@ -234,10 +234,7 @@ namespace mongo {
                         continue;
                     }
                 }
-                if( strcmp( from_name, "local.oplog.$main" ) == 0 ) {
-                    // nothing - want to clone this one
-                } else if( strchr(from_name, '$') ) {
-                    // don't clone index namespaces -- we take care of those separately below.
+                if( ! nsDollarCheck( from_name ) ){
                     log(2) << "\t\t not cloning because has $ " << endl;
                     continue;
                 }            
