@@ -112,9 +112,9 @@ namespace mongo {
                 _tests.push_back( new TestHolder1<T,A>(a) );
             }
 
-            Result * run();
+            Result * run( const string& filter );
 
-            static int run( vector<string> suites );
+            static int run( vector<string> suites , const string& filter );
             static int run( int argc , char ** argv , string default_dbpath );
 
 
