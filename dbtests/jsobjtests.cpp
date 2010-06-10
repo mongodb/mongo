@@ -266,7 +266,7 @@ namespace JsobjTests {
                     
                     bb << "b" << 2;
                     BSONObj obj = bb.obj();
-                    ASSERT(obj.objsize() == 4+(1+2+4)+(1+2+4)+1);
+                    ASSERT_EQUALS(obj.objsize() , 4+(1+2+4)+(1+2+4)+1);
                     ASSERT(obj.valid());
                     ASSERT(obj.hasField("a"));
                     ASSERT(obj.hasField("b"));

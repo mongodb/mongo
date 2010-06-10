@@ -127,6 +127,8 @@ namespace mongo {
             return data + oldlen;
         }
 
+        int getSize() const { return size; }
+
     private:
         char *data;
         int l;
