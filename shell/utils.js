@@ -817,6 +817,7 @@ help = shellHelper.help = function (x) {
         print("\tpwd()                         returns current directory");
         print("\tlistFiles([path])             returns file list");
         print("\tremoveFile(f)                 delete a file");
+        print("\tload(jsfilename)              load and execute a .js file");
         return;
     }
     if (x == "test") {
