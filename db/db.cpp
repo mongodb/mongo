@@ -198,18 +198,7 @@ namespace mongo {
 
     /* if server is really busy, wait a bit */
     void beNice() {
-        sleepmillis(1);
-        {
-            /* if we can get a write lock fast, we definitely aren't busy */
-            writelocktry L("local.", 0);
-            if( L.got() ) return;
-        }
-        sleepmillis(1);
-        {
-            writelocktry L("local.", 0);
-            if( L.got() ) return;
-        }
-        sleepmillis(4);
+        sleepmicros( Client::recommendedYieldMicros() );
     }
 
     /* we create one thread for each connection from an app server database.
