@@ -323,6 +323,7 @@ namespace mongo {
                         log() << "\t put [" << database << "] on: " << cc->_primary.toString() << endl;
                     }
                     else {
+                        cc.reset();
                         log() << "\t can't find a shard to put new db on" << endl;
                         uassert( 10185 ,  "can't find a shard to put new db on" , 0 );
                     }
