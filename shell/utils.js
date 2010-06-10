@@ -810,8 +810,10 @@ help = shellHelper.help = function (x) {
         print("\tls([path])                    list files");
         print("\tpwd()                         returns current directory");
         print("\tlistFiles([path])             returns file list");
+        print("\thostname()                    returns name of this host");
         print("\tremoveFile(f)                 delete a file");
         print("\tload(jsfilename)              load and execute a .js file");
+        print("\tsleep(m)                      sleep m milliseconds");
         return;
     }
     if (x == "test") {
@@ -824,6 +826,7 @@ help = shellHelper.help = function (x) {
         print("\t                              returns a connection to the new server");
         return;
     }
+    print("\t" + "help admin                   misc shell commands");
     print("\t" + "show dbs                     show database names");
     print("\t" + "show collections             show collections in current database");
     print("\t" + "show users                   show users in current database");
@@ -834,7 +837,6 @@ help = shellHelper.help = function (x) {
     print("\t" + "db.foo.find()                list objects in collection foo");
     print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
     print("\t" + "it                           result of the last line evaluated; use to further iterate");
-    print("\t" + "help admin                   misc shell commands");
     print("\t" + "exit                         quit the mongo shell");
 }
 

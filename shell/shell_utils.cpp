@@ -73,11 +73,9 @@ namespace mongo {
         BSONObj encapsulate( const BSONObj &obj ) {
             return BSON( "" << obj );
         }
-
         
         // real methods
 
-        
         mongo::BSONObj JSSleep(const mongo::BSONObj &args){
             assert( args.nFields() == 1 );
             assert( args.firstElement().isNumber() );
@@ -179,6 +177,10 @@ namespace mongo {
         BSONObj pwd(const BSONObj&) { 
             boost::filesystem::path p = boost::filesystem::current_path();
             return BSON( "" << p.string() );
+        }
+
+        BSONObj hostname(const BSONObj&) { 
+            return BSON( "" << getHostName() );
         }
 
         BSONObj removeFile(const BSONObj& args){
@@ -719,6 +721,7 @@ namespace mongo {
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "ls" , ls );
             scope.injectNative( "pwd", pwd );
+            scope.injectNative( "hostname", hostname);
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );
 #endif
