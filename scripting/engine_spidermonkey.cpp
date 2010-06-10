@@ -1515,7 +1515,7 @@ namespace mongo {
 
         for ( uintN i=0; i<argc; i++ ){
             string filename = c.toString( argv[i] );
-            cout << "load [" << filename << "]" << endl;
+            //cout << "load [" << filename << "]" << endl;
 
             if ( ! s->execFile( filename , false , true , false ) ){
                 JS_ReportError( cx , ((string)"error loading js file: " + filename ).c_str() );
