@@ -1373,6 +1373,15 @@ namespace mongo {
             JSBool worked = JS_EvaluateScript( _context , _global , code.c_str() , strlen( code.c_str() ) , name.c_str() , 0 , &ret );
             uninstallCheckTimeout( timeoutMs );
 
+            if ( ! worked && _error.size() == 0 ){
+                jsval v;
+                if ( JS_GetPendingException( _context , &v ) ){
+                    _error = _convertor->toString( v );
+                    if ( reportError )
+                        cout << _error << endl;
+                }
+            }
+
             if ( assertOnError )
                 uassert( 10228 ,  name + " exec failed" , worked );
 
