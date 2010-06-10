@@ -129,6 +129,14 @@ namespace ThreadedTests {
         }
     };
 
+    class LockTest {
+    public:
+        void run(){
+            writelocktry lk( "" , 0 );
+            ASSERT( lk.got() );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ){
@@ -138,6 +146,7 @@ namespace ThreadedTests {
             add< IsAtomicUIntAtomic >();
             add< MVarTest >();
             add< ThreadPoolTest >();
+            add< LockTest >();
         }
     } myall;
 }
