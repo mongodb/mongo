@@ -495,6 +495,57 @@ namespace mongo {
         return o;
     }
     
+    BSONObj FieldRange::simplifiedComplex() const {
+        BSONObjBuilder bb;
+        BSONArrayBuilder a;
+        set< string > regexLow;
+        set< string > regexHigh;
+        for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+            // this recovers exact $in fields and regexes - should be everything for equality
+            if ( i->equality() ) {
+                a << i->_upper._bound;
+                // right now btree cursor doesn't do exclusive bounds so we need to match end of the regex range
+                if ( i->_upper._bound.type() == RegEx ) {
+                    string r = simpleRegex( i->_upper._bound );
+                    regexLow.insert( r );
+                    string re = simpleRegexEnd( r );
+                    regexHigh.insert( re );
+                    a << re;
+                }
+            }
+        }
+        BSONArray in = a.arr();
+        if ( !in.isEmpty() ) {
+            bb << "$in" << in;
+        }
+        BSONObj low;
+        BSONObj high;
+        // should only be one non regex ineq range
+        for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+            if ( !i->equality() ) {
+                if ( !i->_lower._inclusive || i->_lower._bound.type() != String || !regexLow.count( i->_lower._bound.valuestr() ) ) {
+                    BSONObjBuilder b;
+                    // in btree impl lower bound always inclusive
+                    b.appendAs( i->_lower._bound, "$gte" );
+                    low = b.obj();
+                }
+                if ( i->_upper._inclusive || i->_upper._bound.type() != String || !regexHigh.count( i->_upper._bound.valuestr() ) ) {
+                    BSONObjBuilder b;
+                    // in btree impl upper bound always
+                    b.appendAs( i->_upper._bound, "$lte" );
+                    high = b.obj();
+                }
+            }
+        }
+        if ( !low.isEmpty() ) {
+            bb.appendElements( low );
+        }
+        if ( !high.isEmpty() ) {
+            bb.appendElements( high );
+        }
+        return bb.obj();        
+    }
+    
     string FieldRangeSet::getSpecial() const {
         string s = "";
         for ( map<string,FieldRange>::iterator i=_ranges.begin(); i!=_ranges.end(); i++ ){
@@ -655,10 +706,9 @@ namespace mongo {
                 b.appendAs( range.min(), name );
             else if ( range.nontrivial() ) {
                 BSONObj o;
-                if ( range.intervals().size() > 1 ) {
-                    o = range.simplifiedIn();
-                }
-                if ( o.isEmpty() ) {
+                if ( expandIn ) {
+                    o = range.simplifiedComplex();
+                } else {
                     BSONObjBuilder c;
                     if ( range.min().type() != MinKey )
                         c.appendAs( range.min(), range.minInclusive() ? "$gte" : "$gt" );
@@ -666,7 +716,7 @@ namespace mongo {
                         c.appendAs( range.max(), range.maxInclusive() ? "$lte" : "$lt" );
                     o = c.obj();
                 }
-                b.append( name, o );                
+                b.append( name, o );
             }
         }
         return b.obj();

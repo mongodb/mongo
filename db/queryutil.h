@@ -43,6 +43,7 @@ namespace mongo {
             int cmp = _lower._bound.woCompare( _upper._bound, false );
             return ( cmp < 0 || ( cmp == 0 && _lower._inclusive && _upper._inclusive ) );
         }
+        bool equality() const { return _lower._inclusive && _upper._inclusive && _lower._bound.woCompare( _upper._bound, false ) == 0; }
     };
 
     // range of a field's value that may be determined from query -- used to
@@ -81,20 +82,9 @@ namespace mongo {
                 i->_upper._inclusive = false;
             }
         }
-        // if cannot construct an $in query, BSONObj() is returned
-        BSONObj simplifiedIn() const {
-            BSONObjBuilder b;
-            BSONArrayBuilder a( b.subarrayStart("$in") );
-            for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
-                if ( !i->_upper._inclusive || !i->_lower._inclusive ||
-                    i->_upper._bound.woCompare( i->_lower._bound, false ) != 0 ) {
-                    return BSONObj();
-                }
-                a << i->_upper._bound;
-            }
-            a.done();
-            return b.obj();
-        }
+        // reconstructs $in, regex, inequality matches
+        // this is a hack - we should submit FieldRange directly to a Matcher instead
+        BSONObj simplifiedComplex() const;
     private:
         BSONObj addObj( const BSONObj &o );
         void finishOperation( const vector< FieldInterval > &newIntervals, const FieldRange &other );
