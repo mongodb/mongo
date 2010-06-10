@@ -638,8 +638,7 @@ tojson = function( x, indent , nolint ){
     if (!indent) 
         indent = "";
 
-    switch ( typeof x ){
-        
+    switch ( typeof x ) {
     case "string": {
         var s = "\"";
         for ( var i=0; i<x.length; i++ ){
@@ -651,11 +650,9 @@ tojson = function( x, indent , nolint ){
         }
         return s + "\"";
     }
-        
     case "number": 
     case "boolean":
         return "" + x;
-            
     case "object":{
         var s = tojsonObject( x, indent , nolint );
         if ( ( nolint == null || nolint == true ) && s.length < 80 && ( indent == null || indent.length == 0 ) ){
@@ -663,11 +660,8 @@ tojson = function( x, indent , nolint ){
         }
         return s;
     }
-        
     case "function":
         return x.toString();
-        
-
     default:
         throw "tojson can't handle type " + ( typeof x );
     }

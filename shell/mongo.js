@@ -56,8 +56,9 @@ Mongo.prototype.getCollection = function(ns){
 }
 
 Mongo.prototype.toString = function(){
-    return "mongo connection to " + this.host;
+    return "connection to " + this.host;
 }
+Mongo.prototype.tojson = Mongo.prototype.toString;
 
 connect = function( url , user , pass ){
     chatty( "connecting to: " + url )
