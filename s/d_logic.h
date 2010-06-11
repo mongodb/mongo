@@ -22,9 +22,13 @@
 
 namespace mongo {
 
-    /* queue a write back on a remote server for a failed write */
-    void queueWriteBack( const string& remote , const BSONObj& o );
+    // -----------------
+    // --- core ---
+    // -----------------
 
+    unsigned long long extractVersion( BSONElement e , string& errmsg );
+
+    
     /**
      * @return true if we have any shard info for the ns
      */
@@ -39,4 +43,21 @@ namespace mongo {
      * @return true if we took care of the message and nothing else should be done
      */
     bool handlePossibleShardedMessage( Message &m, DbResponse &dbresponse );
+
+    // -----------------
+    // --- writeback ---
+    // -----------------
+
+    /* queue a write back on a remote server for a failed write */
+    void queueWriteBack( const string& remote , const BSONObj& o );
+
+
+
+    // TEMP TEMP TEMP
+
+    typedef map<string,unsigned long long> NSVersionMap;
+
+    extern NSVersionMap globalVersions;
+    extern boost::thread_specific_ptr<NSVersionMap> clientShardVersions;
+
 }
