@@ -16,7 +16,7 @@
  */
 
 #include "pch.h"
-#include "engine_spidermonkey.h"5
+#include "engine_spidermonkey.h"
 #include "../client/dbclient.h"
 
 #ifndef _WIN32
@@ -1497,7 +1497,7 @@ namespace mongo {
     };
 
     /* used to make the logging not overly chatty in the mongo shell. */
-    bool isShell = false;
+    extern bool isShell;
 
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){
         stringstream ss;
