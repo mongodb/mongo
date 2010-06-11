@@ -159,6 +159,8 @@ class TestExitFailure(TestFailure):
 class TestServerFailure(TestFailure):
     def __init__(self, *args):
         self.path = args[0]
+        self.status = -1 # this is meaningless as an exit code, but
+                         # that's the point.
     def __str__(self):
         return 'mongod not ok after test %s' % self.path
 
