@@ -46,7 +46,7 @@ namespace mongo {
             commandLine << '"' << buffer << '\\' << argv[0] << "\" ";
         }
         
-        for ( int i = 1; i < argc; i++ ) {
+		for ( int i = 1; i < argc; i++ ) {
 			std::string arg( argv[ i ] );
 			
 			// replace install command to indicate process is being started as a service
@@ -61,14 +61,22 @@ namespace mongo {
 		if ( schSCManager == NULL ) {
 			return false;
 		}
-		
+
+		// Make sure it exists first. TODO: See if GetLastError() is set to something if CreateService fails.
+		SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
+		if ( schService != NULL ) {
+			log() << "There is already a service named " << toUtf8String(serviceName) << ". Aborting" << endl;
+			::CloseServiceHandle( schService );
+			::CloseServiceHandle( schSCManager );
+			return false;
+		}
 		std::basic_ostringstream< TCHAR > commandLineWide;
-        commandLineWide << commandLine.str().c_str();
+ 		commandLineWide << commandLine.str().c_str();
 
 		log() << "Creating service " << toUtf8String(serviceName) << "." << endl;
 
 		// create new service
-		SC_HANDLE schService = ::CreateService( schSCManager, serviceName.c_str(), displayName.c_str(),
+		schService = ::CreateService( schSCManager, serviceName.c_str(), displayName.c_str(),
 												SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
 												SERVICE_AUTO_START, SERVICE_ERROR_NORMAL,
 												commandLineWide.str().c_str(), NULL, NULL, L"\0\0", NULL, NULL );
@@ -116,7 +124,7 @@ namespace mongo {
 
 		SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
 		if ( schService == NULL ) {
-			log() << "Could not get a service handle for " << toUtf8String(serviceName) << "." << endl;
+			log() << "Could not find a service named " << toUtf8String(serviceName) << " to uninstall." << endl;
 			::CloseServiceHandle( schSCManager );
 			return false;
 		}
