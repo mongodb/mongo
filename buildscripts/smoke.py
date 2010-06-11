@@ -423,6 +423,7 @@ def main():
         tests = [(os.path.abspath(test), True) for test in tests]
 
     runTests(tests)
+    global exit_bad
     exit_bad = False
 
 atexit.register(report)
