@@ -51,7 +51,7 @@ namespace mongo {
 
     boost::thread_specific_ptr<OID> clientServerIds;
 
-    unsigned long long getVersion( BSONElement e , string& errmsg ){
+    unsigned long long extractVersion( BSONElement e , string& errmsg ){
         if ( e.eoo() ){
             errmsg = "no version";
             return 0;
@@ -141,7 +141,7 @@ namespace mongo {
                 }
             }
             
-            unsigned long long version = getVersion( cmdObj["version"] , errmsg );
+            unsigned long long version = extractVersion( cmdObj["version"] , errmsg );
             if ( errmsg.size() ){
                 return false;
             }
@@ -342,7 +342,7 @@ namespace mongo {
             }
 
 
-            unsigned long long newVersion = getVersion( cmdObj["newVersion"] , errmsg );
+            unsigned long long newVersion = extractVersion( cmdObj["newVersion"] , errmsg );
             if ( newVersion == 0 ){
                 errmsg = "have to specify new version number";
                 return false;
