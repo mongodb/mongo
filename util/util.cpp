@@ -144,9 +144,10 @@ void setThreadName(const char *name)
 #if defined(_WIN32)
         (std::cout << now << " " << s).flush();
 #else
-        write( STDOUT_FILENO, now, 20 );
-		write( STDOUT_FILENO, " ", 1 );
-        write( STDOUT_FILENO, s.c_str(), s.length() );
+        int ret;  // avoid compiler warning
+        ret = write( STDOUT_FILENO, now, 20 );
+        ret = write( STDOUT_FILENO, " ", 1 );
+        ret = write( STDOUT_FILENO, s.c_str(), s.length() );
         fsync( STDOUT_FILENO );        
 #endif
     }
