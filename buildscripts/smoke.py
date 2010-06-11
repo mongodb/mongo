@@ -26,6 +26,11 @@ tests = []
 winners = []
 losers = {}
 
+# Finally, atexit functions seem to be a little oblivious to whether
+# Python is exiting because of an error, so we'll use this to
+# communicate with the report() function.
+exit_bad = True
+
 # For replication hash checking
 replicated_dbs = []
 lost_in_slave = []
@@ -99,7 +104,7 @@ class mongod(object):
             self.port += 1
             self.slave = True
         if os.path.exists ( dirName ):
-            Popen( ["python", "buildscripts/cleanbb.py", dirName] )
+            call( ["python", "buildscripts/cleanbb.py", dirName] )
         utils.ensureDir( dirName )
         argv = [mongodExecutable, "--port", str(self.port), "--dbpath", dirName]
         if 'smallOplog' in self.kwargs:
@@ -290,7 +295,7 @@ at the end of testing:"""
             print "%s\t %s" % (db, screwy_in_slave[db])
     if smallOplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
         print "replication ok for %d databases" % (len(replicated_dbs))
-    if (losers or lost_in_slave or lost_in_master or screwy_in_slave):
+    if (exit_bad or losers or lost_in_slave or lost_in_master or screwy_in_slave):
         status = 1
     else:
         status = 0
@@ -417,7 +422,8 @@ def main():
     elif options.mode == 'files':
         tests = [(os.path.abspath(test), True) for test in tests]
 
-    return runTests(tests)
+    runTests(tests)
+    exit_bad = False
 
 atexit.register(report)
 
