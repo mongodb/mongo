@@ -1290,10 +1290,6 @@ testEnv.Alias( "startMongod", [add_exe("mongod")]);
 testEnv.AlwaysBuild( "startMongod" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
 
-def startMongodSmallOplog(env, target, source):
-    global smokeFlags
-    smokeFlags += ["--small-oplog"]
-
 testEnv.Alias( "startMongodSmallOplog", [add_exe("mongod")], [] );
 testEnv.AlwaysBuild( "startMongodSmallOplog" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
