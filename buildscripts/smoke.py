@@ -107,7 +107,7 @@ class mongod(object):
             call( ["python", "buildscripts/cleanbb.py", dirName] )
         utils.ensureDir( dirName )
         argv = [mongodExecutable, "--port", str(self.port), "--dbpath", dirName]
-        if 'smallOplog' in self.kwargs:
+        if self.kwargs.get('smallOplog'):
             argv += ["--master", "--oplogSize", "10"]
         if self.slave:
             argv += ['--slave', '--source', 'localhost:'+str(srcport)]
