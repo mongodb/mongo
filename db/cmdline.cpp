@@ -129,7 +129,10 @@ namespace mongo {
                 _exit(0);
             }
 
-            chdir("/");
+            if ( chdir("/") < 0 ){
+                cout << "Cant chdir() while forking server process: " << strerror(errno) << endl;
+                ::exit(-1);
+            }
             setsid();
             
             pid_t c2 = fork();
@@ -143,9 +146,19 @@ namespace mongo {
             //freopen("/dev/null", "w", stdout);
 
             fclose(stderr);
-            freopen("/dev/null", "w", stderr);
             fclose(stdin);
-            freopen("/dev/null", "r", stdin);
+
+            FILE* f = freopen("/dev/null", "w", stderr);
+            if ( f == NULL ){
+                cout << "Cant reassign stderr while forking server process: " << strerror(errno) << endl;
+                ::exit(-1);
+            }
+
+            f = freopen("/dev/null", "r", stdin);
+            if ( f == NULL ){
+                cout << "Cant reassign stdin while forking server process: " << strerror(errno) << endl;
+                ::exit(-1);
+            }
 
             setupCoreSignals();
             setupSignals();
