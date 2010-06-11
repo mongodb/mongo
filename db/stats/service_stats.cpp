@@ -26,21 +26,20 @@ namespace mongo {
     using std::ostringstream;
 
     ServiceStats::ServiceStats(){
-        // TODO exponentially increasing buckets perhaps would be 
-        // better for the following histograms
-
-        // Time histogram covers up to 2.5msec in 250usec intervals
-        // (and lumps anything higher in last bucket)
+        // Time histogram covers up to 128msec in exponential intervals
+        // starting at 125usec.
         Histogram::Options timeOpts;
-        timeOpts.numBuckets = 10;
-        timeOpts.bucketSize = 250;
+        timeOpts.numBuckets = 12;
+        timeOpts.bucketSize = 125;
+        timeOpts.exponential = true;
         _timeHistogram = new Histogram( timeOpts );
 
-        // Space histogram covers up to 4MB in 256k intervals (and
-        // lumps anything higher in last bucket)
+        // Space histogram covers up to 1MB in exponentialintervals starting
+        // at 1K.
         Histogram::Options spaceOpts;
-        spaceOpts.numBuckets = 16;
-        spaceOpts.bucketSize = 2 << 18;
+        spaceOpts.numBuckets = 12;
+        spaceOpts.bucketSize = 1024;
+        spaceOpts.exponential = true;
         _spaceHistogram = new Histogram( spaceOpts );
     }
 
