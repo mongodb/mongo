@@ -22,6 +22,9 @@
 
 namespace mongo {
 
+    /* queue a write back on a remote server for a failed write */
+    void queueWriteBack( const string& remote , const BSONObj& o );
+
     /**
      * @return true if we have any shard info for the ns
      */

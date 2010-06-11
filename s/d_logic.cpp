@@ -36,6 +36,7 @@
 #include "../util/queue.h"
 
 #include "shard.h"
+#include "d_logic.h"
 
 using namespace std;
 
@@ -49,7 +50,6 @@ namespace mongo {
     string shardConfigServer;
 
     boost::thread_specific_ptr<OID> clientServerIds;
-    map< string , BlockingQueue<BSONObj>* > clientQueues;
 
     unsigned long long getVersion( BSONElement e , string& errmsg ){
         if ( e.eoo() ){
@@ -80,32 +80,7 @@ namespace mongo {
         }
     };
     
-    class WriteBackCommand : public MongodShardCommand {
-    public:
-        virtual LockType locktype() const { return NONE; } 
-        WriteBackCommand() : MongodShardCommand( "writebacklisten" ){}
-        void help(stringstream& h) const { h<<"internal"; }
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
 
-            BSONElement e = cmdObj.firstElement();
-            if ( e.type() != jstOID ){
-                errmsg = "need oid as first value";
-                return 0;
-            }
-            
-            const OID id = e.__oid();
-            
-            if ( ! clientQueues[id.str()] )
-                clientQueues[id.str()] = new BlockingQueue<BSONObj>();
-
-            BSONObj z = clientQueues[id.str()]->blockingPop();
-            log(1) << "WriteBackCommand got : " << z << endl;
-            
-            result.append( "data" , z );
-            
-            return true;
-        }
-    } writeBackCommand;
 
     // setShardVersion( ns )
     
@@ -158,9 +133,6 @@ namespace mongo {
                         OID * nid = new OID();
                         nid->init( s );
                         clientServerIds.reset( nid );
-                        
-                        if ( ! clientQueues[s] )
-                            clientQueues[s] = new BlockingQueue<BSONObj>();
                     }
                     else if ( clientId != *clientServerIds.get() ){
                         errmsg = "server id has changed!";
@@ -550,7 +522,7 @@ namespace mongo {
         b.append( "ns" , ns );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
         log() << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
-        clientQueues[clientID->str()]->push( b.obj() );
+        queueWriteBack( clientID->str() , b.obj() );
 
         return true;
     }
