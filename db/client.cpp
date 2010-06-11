@@ -38,7 +38,8 @@ namespace mongo {
       _context(0),
       _shutdown(false),
       _desc(desc),
-      _god(0)
+      _god(0),
+      _lastOp(0)
     {
         _curOp = new CurOp( this );
         scoped_lock bl(clientsMutex);
