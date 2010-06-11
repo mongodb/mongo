@@ -746,3 +746,12 @@ function startParallelShell( jsCode ){
         waitProgram( x );
     };
 }
+
+var testingReplication = false;
+
+function skipIfTestingReplication(){
+    if (testingReplication) {
+	print( "skipping" );
+	quit(0);
+    }
+}

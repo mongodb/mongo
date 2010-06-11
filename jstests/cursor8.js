@@ -1,3 +1,4 @@
+skipIfTestingReplication();
 t = db.cursor8;
 t.drop();
 t.save( {} );

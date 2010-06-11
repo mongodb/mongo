@@ -10,7 +10,9 @@ import socket
 from optparse import OptionParser
 import atexit
 import glob
-
+import shutil
+import re
+import parser
 
 mongoRepo = './'
 
@@ -24,6 +26,12 @@ tests = []
 winners = []
 losers = {}
 
+# For replication hash checking
+replicated_dbs = []
+lost_in_slave = []
+lost_in_master = []
+screwy_in_slave = {}
+
 smokeDbPrefix = ''
 smallOplog = False
 
@@ -36,8 +44,8 @@ class nothing(object):
         return not isinstance(value, Exception)
 
 class mongod(object):
-    def __init__(self, *args):
-        self.args = args
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
         self.proc = None
 
     def __enter__(self):
@@ -46,7 +54,6 @@ class mongod(object):
 
     def __exit__(self, type, value, traceback):
         try:
-            pass
             self.stop()
         except Exception, e:
             print >> sys.stderr, "error shutting down mongod"
@@ -72,7 +79,7 @@ class mongod(object):
                 self.checkMongoPort( int(port) )
                 return True
             except Exception,e:
-                print( e )
+                print >> sys.stderr, e
                 timeout = timeout - 1
         return False
 
@@ -84,18 +91,35 @@ class mongod(object):
             return
         self.ensureTestDirs()
         dirName = smokeDbPrefix + "/data/db/sconsTests/"
-        print smokeDbPrefix #dirName
+        self.port = int(mongodPort)
+        self.slave = False
+        if 'slave' in self.kwargs:
+            dirName = '/data/db/sconsTestsSlave/'
+            srcport = mongodPort
+            self.port += 1
+            self.slave = True
+        if os.path.exists ( dirName ):
+            Popen( ["python", "buildscripts/cleanbb.py", dirName] )
         utils.ensureDir( dirName )
-        argv = [mongodExecutable, "--port", str(mongodPort),
-                "--dbpath", dirName]
-        if smallOplog:
+        argv = [mongodExecutable, "--port", str(self.port), "--dbpath", dirName]
+        if 'smallOplog' in self.kwargs:
             argv += ["--master", "--oplogSize", "10"]
-        argv += list(self.args)
-        print argv
+        if self.slave:
+            argv += ['--slave', '--source', 'localhost:'+str(srcport)]
+        print "running " + " ".join(argv)
         self.proc = Popen(argv)
-        if not self.didMongodStart( mongodPort ):
+        if not self.didMongodStart( self.port ):
             raise Exception( "Failed to start mongod" )
+        
+        if self.slave:
+            while True:
+                argv = [shellExecutable, "--port", str(self.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
+                res = Popen(argv, stdout=PIPE).communicate()[0]
+                if res.find('initial sync') < 0:
+                    break
+            
 
+            
     def stop(self):
         if not self.proc:
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
@@ -133,11 +157,52 @@ class TestServerFailure(TestFailure):
     def __str__(self):
         return 'mongod not ok after test %s' % self.path
 
+def checkDbHashes(master, slave):
+    # Need to pause a bit so a slave might catch up...
+    if not slave.slave:
+        raise(Bug("slave instance doesn't have slave attribute set"))
+
+    print "waiting for slave to catch up..."
+    ARB=10  # ARBITRARY
+    time.sleep(ARB)
+    while True:
+        argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
+        res = Popen(argv, stdout=PIPE).communicate()[0]
+        m = re.search('(\d+)secs ', res)
+        if int(m.group(1)) > ARB: #res.find('initial sync') < 0:
+            break
+        time.sleep(3)
+
+    for mongod in [master, slave]:
+        argv = [shellExecutable, "--port", str(mongod.port), "--quiet", "--eval", "x=db.runCommand('dbhash'); printjson(x.collections)"]
+        hashstr = Popen(argv, stdout=PIPE).communicate()[0]
+        # WARNING FIXME KLUDGE et al.: this is sleazy and unsafe.
+        mongod.dict = eval(hashstr)
+
+    global lost_in_slave, lost_in_master, screwy_in_slave, replicated_dbs
+    
+    for db in replicated_dbs:
+        if db not in slave.dict:
+            lost_in_slave.append(db)
+        mhash = master.dict[db]
+        shash = slave.dict[db]
+        if mhash != shash:
+            screwy_in_slave[db] = mhash + "/" + shash
+    for db in slave.dict.keys():
+        if db not in master.dict:
+            lost_in_master.append(db)
+    replicated_dbs += master.dict.keys()
+
 def runTest(test):
     (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
     if ext == ".js":
-        argv=filter(lambda x:x, [shellExecutable, "--port", mongodPort] + [None if usedb else "--nodb"] + [path])
+        argv=[shellExecutable, "--port", mongodPort]
+        if not usedb:
+            argv += ["--nodb"] 
+        if smallOplog:
+            argv += ["--eval", 'testingReplication = true;']
+        argv += [path]
     elif ext in ["", ".exe"]:
         # Blech.
         if os.path.basename(path) in ["test", "test.exe", "perftest", "perftest.exe"]:
@@ -167,31 +232,37 @@ def runTest(test):
 
 def runTests(tests):
     # If we're in one-mongo-per-test mode, we instantiate a nothing
-    # around the loop, and a mongod inside the loop.  We don't
-    # actually the instance directly.
+    # around the loop, and a mongod inside the loop.
 
     # FIXME: some suites of tests start their own mongod, so don't
     # need this.  (So long as there are no conflicts with port,
     # dbpath, etc., and so long as we shut ours down properly,
     # starting this mongod shouldn't break anything, though.)
-    with nothing() if oneMongodPerTest else mongod() as _:
-        for test in tests:
-            try:
-                with mongod() if oneMongodPerTest else nothing() as _:
-                    runTest(test)
-                winners.append(test)
-            except TestFailure, f:
+    with nothing() if oneMongodPerTest else mongod(smallOplog=smallOplog) as master1:
+        with nothing() if oneMongodPerTest else (mongod(slave=True) if smallOplog else nothing()) as slave1:
+            for test in tests:
                 try:
-                    print f
-                    # Record the failing test and re-raise.
-                    losers[f.path] = f.status
-                    raise f
-                except TestServerFailure, f: 
-                    if not oneMongodPerTest:
-                        return 2
+                    with mongod(smallOplog=smallOplog) if oneMongodPerTest else nothing() as master2: 
+                        with mongod(slave=True) if oneMongodPerTest and smallOplog else nothing() as slave2:
+                            runTest(test)
+                    winners.append(test)
+                    if isinstance(slave2, mongod):
+                        checkDbHashes(master2, slave2)
                 except TestFailure, f:
-                    if not continueOnFailure:
-                        return 1
+                    try:
+                        print f
+                        # Record the failing test and re-raise.
+                        losers[f.path] = f.status
+                        raise f
+                    except TestServerFailure, f: 
+                        if not oneMongodPerTest:
+                            return 2
+                    except TestFailure, f:
+                        if not continueOnFailure:
+                            return 1
+            if isinstance(slave1, mongod):
+                checkDbHashes(master1, slave1)
+
     return 0
 
 def report():
@@ -203,7 +274,27 @@ def report():
         print "The following tests failed (with exit code):"
         for loser in losers:
             print "%s\t%d" % (loser, losers[loser])
-    exit (1 if losers else 0)
+    
+    def missing(lst, src, dst):
+        if lst:
+            print """The following databases were present in the %s but not the %s
+at the end of testing:""" % (src, dst)
+            for db in lst:
+                print db
+    missing(lost_in_slave, "master", "slave")
+    missing(lost_in_master, "slave", "master")
+    if screwy_in_slave:
+        print """The following databases has different hashes in master and slave
+at the end of testing:"""
+        for db in screwy_in_slave.keys():
+            print "%s\t %s" % (db, screwy_in_slave[db])
+    if smallOplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
+        print "replication ok for %d databases" % (len(replicated_dbs))
+    if (losers or lost_in_slave or lost_in_master or screwy_in_slave):
+        status = 1
+    else:
+        status = 0
+    exit (status)
 
 def expandSuites(suites):
     globstr = None
