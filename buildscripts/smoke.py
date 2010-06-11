@@ -203,6 +203,7 @@ def report():
         print "The following tests failed (with exit code):"
         for loser in losers:
             print "%s\t%d" % (loser, losers[loser])
+    exit (1 if losers else 0)
 
 def expandSuites(suites):
     globstr = None

@@ -183,7 +183,8 @@ namespace mongo {
         }
         FieldRange &range( const char *fieldName ) {
             map< string, FieldRange >::iterator f = _ranges.find( fieldName );
-            massert( 13293, "no such range", f != _ranges.end() );
+            if ( f == _ranges.end() )
+                return trivialRange();
             return f->second;            
         }
         int nNontrivialRanges() const {

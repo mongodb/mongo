@@ -832,7 +832,7 @@ help = shellHelper.help = function (x) {
     print("\t" + "show collections             show collections in current database");
     print("\t" + "show users                   show users in current database");
     print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
-    print("\t" + "use <db name>                set curent database to <db name>");
+    print("\t" + "use <db name>                set current database to <db name>");
     print("\t" + "db.help()                    help on DB methods");
     print("\t" + "db.foo.help()                help on collection methods");
     print("\t" + "db.foo.find()                list objects in collection foo");

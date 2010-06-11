@@ -214,8 +214,9 @@ namespace mongo {
 	try { \
 		expression; \
 	} catch ( const std::exception &e ) { \
-		problem() << "caught boost exception: " << e.what() << endl; \
-		assert( false ); \
+        stringstream ss; \
+		ss << "caught boost exception: " << e.what();   \
+        msgasserted( 13294 , ss.str() );        \
 	} catch ( ... ) { \
 		massert( 10437 ,  "unknown boost failed" , false );   \
 	}
