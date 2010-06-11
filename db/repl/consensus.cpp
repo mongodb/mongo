@@ -203,7 +203,6 @@ namespace mongo {
 
         for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
             log() << "replSet TEMP elect res: " << i->result.toString() << rsLog;
-            Target& t = *i;
             if( i->ok ) {
                 int v = i->result["vote"].Int();
                 tally += v;
