@@ -389,7 +389,7 @@ namespace mongo {
                 ZeroMemory(&pi, sizeof(pi));
 
                 bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi) != 0;
-                assert(success);
+                uassert(13294, "couldn't start process", success);
 
                 CloseHandle(pi.hThread);
 
@@ -462,8 +462,6 @@ namespace mongo {
             shells.erase( pid );
             return x;
         }
-
-
 
         BSONObj StartMongoProgram( const BSONObj &a ) {
             _nokillop = true;
@@ -561,8 +559,7 @@ namespace mongo {
             }
 
 #endif
-        }
-            
+        }            
         
         int killDb( int port, pid_t _pid, int signal ) {
             pid_t pid;
@@ -708,6 +705,7 @@ namespace mongo {
             //can't launch programs
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "runProgram", RunProgram );
+            scope.injectNative( "run", RunProgram );
             scope.injectNative( "runMongoProgram", RunMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
             scope.injectNative( "stopMongoProgram", StopMongoProgram );        
@@ -716,7 +714,6 @@ namespace mongo {
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
             scope.injectNative( "waitProgram" , WaitProgram );
 
-            //can't access filesystem
             scope.injectNative( "removeFile" , removeFile );
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "ls" , ls );

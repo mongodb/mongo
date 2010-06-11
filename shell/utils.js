@@ -813,6 +813,7 @@ help = shellHelper.help = function (x) {
         print("\thostname()                    returns name of this host");
         print("\tremoveFile(f)                 delete a file");
         print("\tload(jsfilename)              load and execute a .js file");
+        print("\trun(program[, args...])       spawn a program and wait for its completion");
         print("\tsleep(m)                      sleep m milliseconds");
         return;
     }

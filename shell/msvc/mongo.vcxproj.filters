@@ -248,4 +248,9 @@
     <Library Include="..\..\..\js\js32d.lib" />
     <Library Include="..\..\..\js\js32r.lib" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\db\lasterror.h">
+      <Filter>db</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

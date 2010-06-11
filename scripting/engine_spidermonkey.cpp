@@ -16,8 +16,7 @@
  */
 
 #include "pch.h"
-#include "engine_spidermonkey.h"
-
+#include "engine_spidermonkey.h"5
 #include "../client/dbclient.h"
 
 #ifndef _WIN32

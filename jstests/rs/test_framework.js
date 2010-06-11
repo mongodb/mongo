@@ -18,7 +18,7 @@ function rs_mongod() {
             oplogSize: "2",
             //nohttpinterface: ""
             rest: "", 
-            replSet: "asdf/localhost:" + not_me
+            replSet: "asdf/" + hostname() + ":" + not_me
         }
     ]
     );
