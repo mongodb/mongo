@@ -1,4 +1,4 @@
-// d_logic.cpp
+// d_writeback.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../pch.h"
+#include "pch.h"
 
 #include "../db/commands.h"
 #include "../db/jsobj.h"
