@@ -141,14 +141,8 @@ void setThreadName(const char *name)
         char now[64];
         time_t_to_String(time(0), now);
         now[20] = 0;        
-#if defined(_WIN32)
-        (std::cout << now << " " << s).flush();
-#else
-        write( STDOUT_FILENO, now, 20 );
-		write( STDOUT_FILENO, " ", 1 );
-        write( STDOUT_FILENO, s.c_str(), s.length() );
-        fsync( STDOUT_FILENO );        
-#endif
+
+        std::cout << now << " " << s << std::flush;
     }
 
     ostream& operator<<( ostream &s, const ThreadSafeString &o ){
