@@ -17,6 +17,7 @@
 */
 
 #include "pch.h"
+#include "repl.h"
 #include "repl_block.h"
 #include "instance.h"
 #include "dbhelpers.h"
@@ -135,7 +136,7 @@ namespace mongo {
         }
 
         bool opReplicatedEnough( OpTime op , int w ){
-            if ( w <= 1 )
+            if ( w <= 1 || ! replSettings.master )
                 return true;
             w--; // now this is the # of slaves i need
             scoped_lock mylk(_mutex);
