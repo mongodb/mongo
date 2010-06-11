@@ -348,7 +348,7 @@ def expandSuites(suites):
             raise Exception('unknown test suite %s' % suite)
 
         if globstr:
-            globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '/')+globstr
+            globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '')+globstr
             tests += [(path, usedb) for path in glob.glob(globstr)]
     return tests
 
