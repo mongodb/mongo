@@ -169,8 +169,8 @@ namespace mongo {
             if ( b["extra_info"].type() == Object ){
                 BSONObj ax = a["extra_info"].embeddedObject();
                 BSONObj bx = b["extra_info"].embeddedObject();
-                BSONObjIterator i( bx );
-                cell( ss , "faults/s" , 6 , (int)diff( "page_faults" , ax , bx ) );
+                if ( ax["page_faults"].type() || ax["page_faults"].type() )
+                    cell( ss , "faults/s" , 6 , (int)diff( "page_faults" , ax , bx ) );
             }
             
             cell( ss , "% locked" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
