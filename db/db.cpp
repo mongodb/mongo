@@ -699,8 +699,9 @@ int main(int argc, char* argv[], char *envp[] )
         ;
 	#if defined(_WIN32)
     windows_scm_options.add_options()
-		("install", "install mongodb service")
+        ("install", "install mongodb service")
         ("remove", "remove mongodb service")
+        ("reinstall", "reinstall mongodb service (equivilant of mongod --remove followed by mongod --install)")
         ("service", "start mongodb service")
         ("serviceName", po::value<string>(), "windows service name")
 		;
@@ -765,6 +766,7 @@ int main(int argc, char* argv[], char *envp[] )
     {
         bool installService = false;
         bool removeService = false;
+        bool reinstallService = false;
         bool startService = false;
         po::variables_map params;
         
@@ -868,6 +870,9 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("remove")) {
             removeService = true;
+        }
+        if (params.count("reinstall")) {
+            reinstallService = true;
         }
         if (params.count("service")) {
             startService = true;
@@ -1011,7 +1016,13 @@ int main(int argc, char* argv[], char *envp[] )
         }
 
 #if defined(_WIN32)
-        if ( installService ) {
+        if ( reinstallService ) {
+            ServiceController::removeService( windowsServiceName );
+            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", argc, argv ) )
+                dbexit( EXIT_NTSERVICE_ERROR );
+            dbexit( EXIT_CLEAN );
+        }
+	else if ( installService ) {
             if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );

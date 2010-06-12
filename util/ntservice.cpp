@@ -50,7 +50,7 @@ namespace mongo {
 			std::string arg( argv[ i ] );
 			
 			// replace install command to indicate process is being started as a service
-			if ( arg == "--install" ) {
+			if ( arg == "--install" || arg == "--reinstall" ) {
 				arg = "--service";
 			}
 				
