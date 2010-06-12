@@ -43,6 +43,7 @@
 #include "../client/dbclient.h"
 #include "../util/processinfo.h"
 #include "utils.h"
+#include "../util/text.h"
 
 extern const char * jsconcatcode_server;
 
@@ -54,6 +55,8 @@ namespace mongo {
 #endif
 
     namespace shellUtils {
+
+        Scope* theScope = 0;
         
         std::string _dbConnect;
         std::string _dbAuth;
@@ -174,6 +177,21 @@ namespace mongo {
             return BSONObj();
         }
 
+        BSONObj cd(const BSONObj& args) { 
+#if defined(_WIN32)
+            std::wstring dir = toWideString( args.firstElement().String().c_str() );
+            if( SetCurrentDirectory(dir.c_str()) )
+                return BSONObj();
+#else
+            string dir = args.firstElement().String();
+/*            if( chdir(dir.c_str) ) == 0 )
+                return BSONObj();
+                */
+            if( 1 ) return BSON(""<<"implementation not done for posix");
+#endif
+            return BSON( "" << "change directory failed" );
+        }
+
         BSONObj pwd(const BSONObj&) { 
             boost::filesystem::path p = boost::filesystem::current_path();
             return BSON( "" << p.string() );
@@ -241,13 +259,43 @@ namespace mongo {
             pid_t pid_;
         public:
             pid_t pid() const { return pid_; }
+
+            boost::filesystem::path find(string prog) { 
+                boost::filesystem::path p = prog;
+#ifdef _WIN32
+                p = change_extension(p, ".exe");
+#endif
+
+                if( boost::filesystem::exists(p)  ) return p;
+
+                {
+                    boost::filesystem::path t = boost::filesystem::current_path() / p;
+                    if( boost::filesystem::exists(t)  ) return t;
+                }
+                try {
+                    if( theScope->type("_path") == String ) {
+                        string path = theScope->getString("_path");
+                        if( !path.empty() ) {
+                            boost::filesystem::path t = boost::filesystem::path(path) / p;
+                            if( boost::filesystem::exists(t) ) return t;
+                        }
+                    }
+                } catch(...) { }
+                {
+                    boost::filesystem::path t = boost::filesystem::initial_path() / p;
+                    if( boost::filesystem::exists(t)  ) return t;
+                }
+                massert( 10435, "run: couldn't find " + prog, false );
+                return p;
+            } 
+
             ProgramRunner( const BSONObj &args , bool isMongoProgram=true)
             {
                 assert( !args.isEmpty() );
 
                 string program( args.firstElement().valuestrsafe() );
                 assert( !program.empty() );
-                boost::filesystem::path programPath = program;
+                boost::filesystem::path programPath = find(program);
 
                 if (isMongoProgram){
 #if 0
@@ -260,12 +308,6 @@ namespace mongo {
                         argv_.push_back("--");
                     }
 #endif
-
-                    programPath = boost::filesystem::initial_path() / programPath;
-#ifdef _WIN32
-                    programPath = change_extension(programPath, ".exe");
-#endif
-                    massert( 10435 ,  "couldn't find " + programPath.native_file_string(), boost::filesystem::exists( programPath ) );
                 }
 
                 argv_.push_back( programPath.native_file_string() );
@@ -294,8 +336,10 @@ namespace mongo {
                 
                 if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
                     port_ = 0;
-                else
+                else {
+                    cout << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
                     assert( port_ > 0 );
+                }
                 if ( port_ > 0 && dbs.count( port_ ) != 0 ){
                     cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
                     assert( dbs.count( port_ ) == 0 );        
@@ -309,10 +353,14 @@ namespace mongo {
                 fflush( 0 );
                 launch_process(pipeEnds[1]); //sets pid_
                 
-                cout << "shell: started mongo program";
-                for (unsigned i=0; i < argv_.size(); i++)
-                    cout << " " << argv_[i];
-                cout << endl;
+                {
+                    stringstream ss;
+                    ss << "shell: started program";
+                    for (unsigned i=0; i < argv_.size(); i++)
+                        ss << " " << argv_[i];
+                    ss << '\n';
+                    cout << ss.str(); cout.flush();
+                }
 
                 if ( port_ > 0 )
                     dbs.insert( make_pair( port_, make_pair( pid_, pipeEnds[ 1 ] ) ) );
@@ -694,6 +742,7 @@ namespace mongo {
         }
         
         void installShellUtils( Scope& scope ){
+            theScope = &scope;
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
@@ -718,6 +767,7 @@ namespace mongo {
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "ls" , ls );
             scope.injectNative( "pwd", pwd );
+            scope.injectNative( "cd", cd );
             scope.injectNative( "hostname", hostname);
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );

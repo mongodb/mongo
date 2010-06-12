@@ -1459,7 +1459,6 @@ namespace mongo {
             code << field << "_" << " = { x : " << field << "_ }; ";
             code << field << " = function(){ return nativeHelper.apply( " << field << "_ , arguments ); }";
             exec( code.str().c_str() );
-
         }
 
         virtual void gc(){
