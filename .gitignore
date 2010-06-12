@@ -5,6 +5,7 @@
 perf.data
 
 *~
+*.swp
 *.o
 *.os
 *.obj
