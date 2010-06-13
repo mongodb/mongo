@@ -261,6 +261,7 @@ namespace mongo {
             pid_t pid() const { return pid_; }
 
             boost::filesystem::path find(string prog) { 
+                cout << "ELIOT [" << prog << "]" << endl;
                 boost::filesystem::path p = prog;
 #ifdef _WIN32
                 p = change_extension(p, ".exe");
@@ -290,7 +291,8 @@ namespace mongo {
                     boost::filesystem::path t = boost::filesystem::initial_path() / p;
                     if( boost::filesystem::exists(t)  ) return t;
                 }
-                massert( 10435, "run: couldn't find " + prog, false );
+                // this breaks system programs
+                // massert( 10435, (string)"run: couldn't find " + prog , false );
                 return p;
             } 
 
