@@ -42,7 +42,18 @@ using namespace boost::spirit;
 
 namespace mongo {
 
-    struct ObjectBuilder {
+    struct ObjectBuilder : boost::noncopyable {
+        ~ObjectBuilder(){
+            unsigned i = builders.size();
+            if ( i ){
+                i--;
+                for ( ; i>=1; i-- ){
+                    if ( builders[i] ){
+                        builders[i]->done();
+                    }
+                }
+            }
+        }
         BSONObjBuilder *back() {
             return builders.back().get();
         }
@@ -560,7 +571,9 @@ public:
             ss << "Failure parsing JSON string near: " << string( result.stop, len );
             massert( 10340 ,  ss.str(), false );
         }
-        return b.pop();
+        BSONObj ret = b.pop();
+        assert( b.empty() );
+        return ret;
     }
 
     BSONObj fromjson( const string &str ) {

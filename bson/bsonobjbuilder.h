@@ -53,8 +53,9 @@ namespace mongo {
         }
 
         ~BSONObjBuilder(){
-            if ( _b.buf() && _buf.getSize() == 0 )
+            if ( !_doneCalled && _b.buf() && _buf.getSize() == 0 ){
                 _done();
+            }
         }
 
         /** add all the fields from the object specified to this object */
