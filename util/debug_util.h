@@ -71,11 +71,13 @@ namespace mongo {
     // Noop unless on *NIX and compiled with _DEBUG
     void setupSIGTRAPforGDB();
 
-#if defined(_WIN32)
-    inline void breakpoint() {} //noop
-#else // defined(_WIN32)
-    // code to raise a breakpoint in GDB
+    extern int tlogLevel;
+    
     inline void breakpoint(){
+        if ( tlogLevel < 0 )
+            return;
+#ifndef _WIN32
+        // code to raise a breakpoint in GDB
         ONCE {
             //prevent SIGTRAP from crashing the program if default action is specified and we are not in gdb
             struct sigaction current;
@@ -84,10 +86,11 @@ namespace mongo {
                 signal(SIGTRAP, SIG_IGN);
             }
         }
-
+        
         raise(SIGTRAP);
+#endif
     }
-#endif // defined(_WIN32)
+    
 
     // conditional breakpoint
     inline void breakif(bool test){
