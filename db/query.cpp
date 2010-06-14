@@ -507,14 +507,18 @@ namespace mongo {
             } else {
                 _b.reset( new BSONObjBuilder( _c->subobjStart() ) );
             }
-            *_b << "cursor" << c->toString() << "indexBounds" << c->prettyIndexBounds();
+            *_b << "cursor" << c->toString();
             _b->appendNumber( "nscanned", nscanned );
             _b->appendNumber( "nscannedObjects", nscannedObjects );
             *_b << "n" << n;
-            if ( scanAndOrder ) {
+
+            if ( scanAndOrder )
                 *_b << "scanAndOrder" << true;
-            }
+
             *_b << "millis" << millis;
+
+            *_b << "indexBounds" << c->prettyIndexBounds();
+
             if ( !hint ) {
                 *_b << "allPlans" << _a->arr();
             }
