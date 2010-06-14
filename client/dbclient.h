@@ -325,7 +325,7 @@ namespace mongo {
 
            returns true if successful.
         */
-        bool createCollection(const string &ns, unsigned size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
+        bool createCollection(const string &ns, long long size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
 
         /** Get error result from the last operation on this connection. 
             @return error message text, or empty string if no error.
