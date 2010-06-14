@@ -1,6 +1,6 @@
 // rs_basic.js
 
-load("test_framework.js");
+load("../../jstests/rs/test_framework.js");
 
 function go() {
     a = rs_mongod();
