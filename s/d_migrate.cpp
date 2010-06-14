@@ -161,13 +161,8 @@ namespace mongo {
             }
             
             // now we're locked
-            globalVersions[ns] = newVersion;
-            NSVersionMap * versions = clientShardVersions.get();
-            if ( ! versions ){
-                versions = new NSVersionMap();
-                clientShardVersions.reset( versions );
-            }
-            (*versions)[ns] = newVersion;
+            shardingState.setVersion( ns , newVersion );
+            ShardedConnectionInfo::get(true)->setVersion( ns , newVersion );
             
             BSONObj res;
             bool ok;

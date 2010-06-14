@@ -50,7 +50,7 @@ namespace mongo {
             set<ServerAndQuery> servers;
             for ( vector<shared_ptr<ChunkRange> >::iterator i = shards.begin(); i != shards.end(); i++ ){
                 shared_ptr<ChunkRange> c = *i;
-                //servers.insert( ServerAndQuery( c->getShard() , BSONObj() ) );
+                //servers.insert( ServerAndQuery( c->getShard().getConnString() , BSONObj() ) );
                 servers.insert( ServerAndQuery( c->getShard().getConnString() , c->getFilter() ) );
             }
             
