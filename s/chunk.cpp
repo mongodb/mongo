@@ -230,7 +230,6 @@ namespace mongo {
             return false;
         }
 
-        // update config db
         setShard( to );
         
         // need to increment version # for old server
@@ -240,6 +239,7 @@ namespace mongo {
             randomChunkOnOldServer->_markModified();
         }
 
+        // update config db
         _manager->save();
         
         BSONObj finishRes;
