@@ -50,7 +50,7 @@ namespace mongo {
     GridFS::GridFS( DBClientBase& client , const string& dbName , const string& prefix ) : _client( client ) , _dbName( dbName ) , _prefix( prefix ){
         _filesNS = dbName + "." + prefix + ".files";
         _chunksNS = dbName + "." + prefix + ".chunks";
-
+        _chunkSize = DEFAULT_CHUNK_SIZE;
 
         client.ensureIndex( _filesNS , BSON( "filename" << 1 ) );
         client.ensureIndex( _chunksNS , BSON( "files_id" << 1 << "n" << 1 ) );
@@ -58,6 +58,11 @@ namespace mongo {
 
     GridFS::~GridFS(){
 
+    }
+
+    void GridFS::setChunkSize(unsigned int size) {
+        massert( 13296 , "invalid chunk size is specified", (size == 0));
+        _chunkSize = size;
     }
 
     BSONObj GridFS::storeFile( const char* data , size_t length , const string& remoteName , const string& contentType){
@@ -70,7 +75,7 @@ namespace mongo {
 
         int chunkNumber = 0;
         while (data < end){
-            int chunkLen = MIN(DEFAULT_CHUNK_SIZE, (unsigned)(end-data));
+            int chunkLen = MIN(_chunkSize, (unsigned)(end-data));
             Chunk c(idObj, chunkNumber, data, chunkLen);
             _client.insert( _chunksNS.c_str() , c._data );
 
@@ -99,15 +104,15 @@ namespace mongo {
         int chunkNumber = 0;
         gridfs_offset length = 0;
         while (!feof(fd)){
-            boost::scoped_array<char>buf (new char[DEFAULT_CHUNK_SIZE]);
+            boost::scoped_array<char>buf (new char[_chunkSize]);
             char* bufPos = buf.get();
             unsigned int chunkLen = 0; // how much in the chunk now
-            while(chunkLen != DEFAULT_CHUNK_SIZE && !feof(fd)){
-                int readLen = fread(bufPos, 1, DEFAULT_CHUNK_SIZE - chunkLen, fd);
+            while(chunkLen != _chunkSize && !feof(fd)){
+                int readLen = fread(bufPos, 1, _chunkSize - chunkLen, fd);
                 chunkLen += readLen;
                 bufPos += readLen;
 
-                assert(chunkLen <= DEFAULT_CHUNK_SIZE);
+                assert(chunkLen <= _chunkSize);
             }
 
             Chunk c(idObj, chunkNumber, buf.get(), chunkLen);
@@ -135,7 +140,7 @@ namespace mongo {
         file << "_id" << id
              << "filename" << name
              << "length" << (unsigned) length
-             << "chunkSize" << DEFAULT_CHUNK_SIZE
+             << "chunkSize" << _chunkSize
              << "uploadDate" << DATENOW
              << "md5" << res["md5"]
              ;

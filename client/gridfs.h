@@ -69,6 +69,11 @@ namespace mongo {
         ~GridFS();
 
         /**
+         * @param
+         */
+        void setChunkSize(unsigned int size);
+
+        /**
          * puts the file reference by fileName into the db
          * @param fileName local filename relative to process
          * @param remoteName optional filename to use for file stored in GridFS
@@ -123,6 +128,7 @@ namespace mongo {
         string _prefix;
         string _filesNS;
         string _chunksNS;
+        unsigned int _chunkSize;
 
         // insert fileobject. All chunks must be in DB.
         BSONObj insertFile(const string& name, const OID& id, unsigned length, const string& contentType);
