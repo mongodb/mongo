@@ -252,7 +252,7 @@ namespace mongo {
         return ok;
     }
 
-    bool DBClientWithCommands::createCollection(const string &ns, unsigned size, bool capped, int max, BSONObj *info) {
+    bool DBClientWithCommands::createCollection(const string &ns, long long size, bool capped, int max, BSONObj *info) {
         BSONObj o;
         if ( info == 0 )	info = &o;
         BSONObjBuilder b;

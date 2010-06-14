@@ -6,9 +6,7 @@ var files = listFiles("jstests");
 files.forEach(
     function(x) {
         
-        if ( /_runner/.test(x.name) ||
-             /_lodeRunner/.test(x.name) ||
-             /_fail/.test(x.name) ||
+        if ( /[\/\\]_/.test(x.name) ||
              ! /\.js$/.test(x.name ) ){ 
             print(" >>>>>>>>>>>>>>> skipping " + x.name);
             return;

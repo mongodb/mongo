@@ -179,7 +179,7 @@ namespace mongo {
         long long size = initialExtentSize(128);
         BSONElement e = j.getField("size");
         if ( e.isNumber() ) {
-            size = (long long) e.number();
+            size = e.numberLong();
             size += 256;
             size &= 0xffffffffffffff00LL;
         }
@@ -193,7 +193,7 @@ namespace mongo {
             newCapped = true;
             e = j.getField("max");
             if ( e.isNumber() ) {
-                mx = (int) e.number();
+                mx = e.numberInt();
             }
         }
 
