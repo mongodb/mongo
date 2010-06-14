@@ -912,11 +912,11 @@ namespace mongo {
 
         virtual void add( const KeyNode& node ){
             // when looking at other boxes, don't want to look at some object twice
-            if ( _seen.count( node.recordLoc ) ){
+            pair<set<DiskLoc>::iterator,bool> seenBefore = _seen.insert( node.recordLoc );
+            if ( ! seenBefore.second ){
                 GEODEBUG( "\t\t\t\t already seen : " << node.recordLoc.obj()["_id"] );
                 return;
             }
-            _seen.insert( node.recordLoc );
             _lookedAt++;
             
             // distance check
@@ -969,7 +969,7 @@ namespace mongo {
 
         GeoHopper( const Geo2dType * g , unsigned max , const GeoHash& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() )
             : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ) {
-
+            _farthest = -1;
         }
 
         virtual bool checkDistance( const GeoHash& h , double& d ){
@@ -986,24 +986,23 @@ namespace mongo {
             if ( _points.size() > _max ){
                 _points.erase( --_points.end() );
             }
-        }
 
-        double farthest(){
-            if ( _points.size() == 0 )
-                return -1;
-                
             Holder::iterator i = _points.end();
             i--;
-            return i->_distance;
+            _farthest = i->_distance;
+        }
+
+        double farthest() const {
+            return _farthest;
         }
 
         unsigned _max;
         GeoHash _near;
         Holder _points;
         double _maxDistance;
-
+        double _farthest;
     };
-
+    
     struct BtreeLocation {
         int pos;
         bool found;
@@ -1133,14 +1132,17 @@ namespace mongo {
             if ( _found && _prefix.constrains() ){
                 // 2
                 Point center( _spec , _n );
-                double boxSize = _spec->sizeEdge( _prefix );
                 double farthest = hopper->farthest();
-                if ( farthest > boxSize )
-                    boxSize = farthest;
-                Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
-                while ( _spec->sizeEdge( _prefix ) < boxSize )
+                Box want( center._x - farthest , center._y - farthest , farthest * 2 );
+                _prefix = _n;
+                while ( _spec->sizeEdge( _prefix ) < ( farthest / 2 ) ){
                     _prefix = _prefix.up();
-                log(1) << "want: " << want << " found:" << _found << " nscanned: " << _nscanned << " hash size:" << _spec->sizeEdge( _prefix ) << endl;
+                }
+                
+                if ( logLevel > 0 ){
+                    log(1) << "want: " << want << " found:" << _found << " nscanned: " << _nscanned << " hash size:" << _spec->sizeEdge( _prefix ) 
+                           << " farthest: " << farthest << " using box: " << Box( _spec , _prefix ).toString() << endl;
+                }
                 
                 for ( int x=-1; x<=1; x++ ){
                     for ( int y=-1; y<=1; y++ ){
@@ -1158,34 +1160,37 @@ namespace mongo {
 
         void doBox( const IndexDetails& id , const Box& want , const GeoHash& toscan , int depth = 0 ){
             Box testBox( _spec , toscan );
-            if ( logLevel > 0 ){
-                log(1) << "\t";
-                for ( int i=0; i<depth; i++ ){
-                    log(1) << "\t";
-                    log() << " doBox: " << testBox << "\t" << toscan.toString() << " scanned so far: " << _nscanned << endl;
-                }
+            if ( logLevel > 2 ){
+                cout << "\t";
+                for ( int i=0; i<depth; i++ )
+                    cout << "\t";
+                cout << " doBox: " << testBox.toString() << "\t" << toscan.toString() << " scanned so far: " << _nscanned << endl;
             }
-            
+
             double intPer = testBox.intersects( want );
             
             if ( intPer <= 0 )
                 return;
             
-            if ( intPer < .5 && depth < 3 ){
-                doBox( id , want , toscan + "00" , depth + 1);
-                doBox( id , want , toscan + "01" , depth + 1);
-                doBox( id , want , toscan + "10" , depth + 1);
-                doBox( id , want , toscan + "11" , depth + 1);
-                return;
-            }
+            bool goDeeper = intPer < .5 && depth < 2;
 
+            long long myscanned = 0;
+            
             BtreeLocation loc;
             loc.bucket = id.head.btree()->locate( id , id.head , toscan.wrap() , Ordering::make(_spec->_order) , 
                                                         loc.pos , loc.found , minDiskLoc );
             loc.checkCur( _found , _hopper.get() );
-            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper.get() ) )
+            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper.get() ) ){
                 _nscanned++;
-
+                if ( ++myscanned > 100 && goDeeper ){
+                    doBox( id , want , toscan + "00" , depth + 1);
+                    doBox( id , want , toscan + "01" , depth + 1);
+                    doBox( id , want , toscan + "10" , depth + 1);
+                    doBox( id , want , toscan + "11" , depth + 1);
+                    return;        
+                }
+            }
+            
         }
 
 
@@ -1718,6 +1723,7 @@ namespace mongo {
             stats.appendNumber( "nscanned" , gs._hopper->_lookedAt );
             stats.appendNumber( "objectsLoaded" , gs._hopper->_objectsLoaded );
             stats.append( "avgDistance" , totalDistance / x );
+            stats.append( "maxDistance" , gs._hopper->farthest() );
             stats.done();
             
             return true;

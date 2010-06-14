@@ -42,6 +42,8 @@ class Import : public Tool {
     bool _headerLine;
     bool _upsert;
     bool _doimport;
+    bool _jsonArray;
+    vector<string> _upsertFields;
     
     void _append( BSONObjBuilder& b , const string& fieldName , const string& data ){
         if ( b.appendAsNumber( fieldName , data ) )
@@ -143,7 +145,9 @@ public:
             ("drop", "drop collection first " )
             ("headerline","CSV,TSV only - use first line as headers")
             ("upsert", "insert or update objects that already exist" )
+            ("upsertFields", po::value<string>(), "comma-separated fields for the query part of the upsert. You should make sure this is indexed" )
             ("stopOnError", "stop importing at first error rather than continuing" )
+            ("jsonArray", "load a json array, not one item per line. Currently limited to 4MB." )
             ;
         add_hidden_options()
             ("noimport", "don't actually import. useful for benchmarking parser" )
@@ -154,6 +158,7 @@ public:
         _headerLine = false;
         _upsert = false;
         _doimport = true;
+        _jsonArray = false;
     }
     
     int run(){
@@ -197,6 +202,13 @@ public:
 
         if ( hasParam( "upsert" ) ){
             _upsert = true;
+
+            string uf = getParam("upsertFields");
+            if (uf.empty()){
+                _upsertFields.push_back("_id");
+            } else {
+                StringSplitter(uf.c_str(), ",").split(_upsertFields);
+            }
         }
 
         if ( hasParam( "noimport" ) ){
@@ -227,6 +239,10 @@ public:
                 needFields();
         }
 
+        if (_type == JSON && hasParam("jsonArray")){
+            _jsonArray = true;
+        }
+
         int errors = 0;
         
         int num = 0;
@@ -237,30 +253,70 @@ public:
         ProgressMeter pm( fileSize );
         const int BUF_SIZE = 1024 * 1024 * 4;
         boost::scoped_array<char> line(new char[BUF_SIZE+2]);
-        while ( in->rdstate() == 0 ){
-            char * buf = line.get();
-            in->getline( buf , BUF_SIZE );
+        char * buf = line.get();
+        while ( _jsonArray || in->rdstate() == 0 ){
+            if (_jsonArray){
+                if (buf == line.get()){ //first pass
+                    in->read(buf, BUF_SIZE);
+                    uassert(13295, "JSONArray file too large", (in->rdstate() & ios_base::eofbit));
+                    buf[ in->gcount() ] = '\0';
+                }
+            } else {
+                buf = line.get();
+                in->getline( buf , BUF_SIZE );
+                log(1) << "got line:" << buf << endl;
+            }
             uassert( 10263 ,  "unknown error reading file" ,
                     (!(in->rdstate() & ios_base::badbit)) &&
                     (!(in->rdstate() & ios_base::failbit) || (in->rdstate() & ios_base::eofbit)) );
-            log(1) << "got line:" << buf << endl;
 
-            while( isspace( buf[0] ) ) buf++;
-            
-            int len = strlen( buf );
-            if ( ! len )
-                continue;
-            
-            buf[len+1] = 0;
+            int len = 0;
+            if (_jsonArray){
+                while (buf[0] != '{' && buf[0] != '\0') {
+                    len++;
+                    buf++;
+                }
+                if (buf[0] == '\0')
+                    break;
+            } else {
+                while (isspace( buf[0] )){
+                    len++;
+                    buf++;
+                }
+                if (buf[0] == '\0')
+                    continue;
+                len += strlen( buf );
+            }
 
             try {
-                BSONObj o = parseLine( buf );
+                BSONObj o;
+                if (_jsonArray){
+                    int jslen;
+                    o = fromjson(buf, &jslen);
+                    len += jslen;
+                    buf += jslen;
+                } else {
+                    o = parseLine( buf );
+                }
+
                 if ( _headerLine ){
                     _headerLine = false;
                 } else if (_doimport) {
-                    BSONElement id = o["_id"];
-                    if (_upsert && !id.eoo()){
-                        conn().update( ns, QUERY("_id" << id), o, true);
+                    bool doUpsert = _upsert;
+                    BSONObjBuilder b;
+                    if (_upsert){
+                        for (vector<string>::const_iterator it=_upsertFields.begin(), end=_upsertFields.end(); it!=end; ++it){
+                            BSONElement e = o.getFieldDotted(it->c_str());
+                            if (e.eoo()){
+                                doUpsert = false;
+                                break;
+                            }
+                            b.appendAs(e, *it);
+                        }
+                    }
+
+                    if (doUpsert){
+                        conn().update(ns, Query(b.obj()), o, true);
                     } else {
                         conn().insert( ns.c_str() , o );
                     }
@@ -273,7 +329,7 @@ public:
                 cout << buf << endl;
                 errors++;
                 
-                if (hasParam("stopOnError"))
+                if (hasParam("stopOnError") || _jsonArray)
                     break;
             }
 

@@ -40,7 +40,7 @@ namespace mongo {
 
     // -------  Shard --------
 
-    int Chunk::MaxChunkSize = 1024 * 1204 * 200;
+    int Chunk::MaxChunkSize = 1024 * 1024 * 200;
     
     Chunk::Chunk( ChunkManager * manager ) : _manager( manager ){
         _modified = false;
@@ -230,7 +230,6 @@ namespace mongo {
             return false;
         }
 
-        // update config db
         setShard( to );
         
         // need to increment version # for old server
@@ -240,6 +239,7 @@ namespace mongo {
             randomChunkOnOldServer->_markModified();
         }
 
+        // update config db
         _manager->save();
         
         BSONObj finishRes;
