@@ -557,15 +557,20 @@ public:
         ObjectBuilder &b;
     };
 
-    BSONObj fromjson( const char *str ) {
-        if ( str[0] == '\0' )
+    BSONObj fromjson( const char *str , int* len) {
+        if ( str[0] == '\0' ){
+            if (len) *len = 0;
             return BSONObj();
+        }
+
         ObjectBuilder b;
         JsonGrammar parser( b );
         parse_info<> result = parse( str, parser, space_p );
-        if ( !result.full ) {
-            int len = strnlen(result.stop , 10);
-            massert( 10340 , "Failure parsing JSON string near: " + string( result.stop, len ) , false );
+        if (len) {
+            *len = result.stop - str;
+        } else if ( !result.full ) {
+            int limit = strnlen(result.stop , 10);
+            msgasserted(10340, "Failure parsing JSON string near: " + string( result.stop, limit ));
         }
         BSONObj ret = b.pop();
         assert( b.empty() );
@@ -574,10 +579,6 @@ public:
 
     BSONObj fromjson( const string &str ) {
         return fromjson( str.c_str() );
-    }
-
-    BSONObj fromjson( istream &str ) {
-        return BSONObj();
     }
 
 } // namespace mongo

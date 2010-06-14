@@ -39,6 +39,7 @@ public:
             ("query,q" , po::value<string>() , "query filter, as a JSON string" )
             ("csv","export to csv instead of json")
             ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
+            ("jsonArray", "output to a json array rather than one object per line")
             ;
         _usesstdout = false;
     }
@@ -46,6 +47,7 @@ public:
     int run(){
         string ns;
         const bool csv = hasParam( "csv" );
+        const bool jsonArray = hasParam( "jsonArray" );
         ostream *outPtr = &cout;
         string outfile = getParam( "out" );
         auto_ptr<ofstream> fileStream;
@@ -100,6 +102,9 @@ public:
             out << endl;
         }
         
+        if (jsonArray)
+            out << '[';
+
         long long num = 0;
         while ( cursor->more() ) {
             num++;
@@ -116,10 +121,18 @@ public:
                 out << endl;
             }
             else {
-                out << obj.jsonString() << endl;
+                if (jsonArray && num != 1)
+                    out << ',';
+
+                out << obj.jsonString();
+
+                if (!jsonArray)
+                    out << endl;
             }
         }
 
+        if (jsonArray)
+            out << ']' << endl;
         
         cerr << "exported " << num << " records" << endl;
 
