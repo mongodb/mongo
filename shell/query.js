@@ -22,19 +22,22 @@ if ( typeof DBQuery == "undefined" ){
     print( "DBQuery probably won't have array access " );
 }
 
-DBQuery.prototype.help = function(){
-    print( "DBQuery help" );
-    print( "\t.sort( {...} )" )
-    print( "\t.limit( n )" )
-    print( "\t.skip( n )" )
-    print( "\t.count() - total # of objects matching query, ignores skip,limit" )
-    print( "\t.size() - total # of objects cursor would return skip,limit effect this" )
-    print( "\t.explain()" )
-    print( "\t.forEach( func )" )
-    print( "\t.print() - output to console in full pretty format" )
-    print( "\t.map( func )" )
-    print( "\t.showDiskLoc() - adds a $diskLoc field to each returned object" )
-    
+DBQuery.prototype.help = function () {
+    print("find() modifiers")
+    print("\t.sort( {...} )")
+    print("\t.limit( n )")
+    print("\t.skip( n )")
+    print("\t.count() - total # of objects matching query, ignores skip,limit")
+    print("\t.size() - total # of objects cursor would return, honors skip,limit")
+    print("\t.explain([verbose])")
+    print("\t.hint(...)")
+    print("\t.showDiskLoc() - adds a $diskLoc field to each returned object")
+    print("\nCursor methods");
+    print("\t.forEach( func )")
+    print("\t.print() - output to console in full pretty format")
+    print("\t.map( func )")
+    print("\t.hasNext()")
+    print("\t.next()")
 }
 
 DBQuery.prototype.clone = function(){
@@ -220,12 +223,18 @@ DBQuery.prototype.arrayAccess = function( idx ){
     return this.toArray()[idx];
 }
 
-DBQuery.prototype.explain = function(){
+DBQuery.prototype.explain = function (verbose) {
+    /* verbose=true --> include allPlans, oldPlan fields */
     var n = this.clone();
     n._ensureSpecial();
     n._query.$explain = true;
     n._limit = n._limit * -1;
-    return n.next();
+    var e = n.next();
+    if (!verbose) {
+        delete e.allPlans;
+        delete e.oldPlan;
+    }
+    return e;
 }
 
 DBQuery.prototype.snapshot = function(){

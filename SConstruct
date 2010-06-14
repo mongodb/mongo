@@ -597,7 +597,10 @@ elif "win32" == os.sys.platform:
     env.Append(CPPPATH=["../js/src/"])
     env.Append(LIBPATH=["../js/src"])
     env.Append(LIBPATH=["../js/"])
+
     env.Append( CPPDEFINES=[ "OLDJS" ] )
+    env.Append( CPPDEFINES=[ "_UNICODE" ] )
+    env.Append( CPPDEFINES=[ "UNICODE" ] )
 
     winSDKHome = findVersion( [ "C:/Program Files/Microsoft SDKs/Windows/", "C:/Program Files (x86)/Microsoft SDKs/Windows/" ] ,
                               [ "v6.0" , "v6.0a" , "v6.1", "v7.0A" ] )
@@ -940,13 +943,19 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
         # see http://www.mongodb.org/pages/viewpageattachments.action?pageId=12157032
         J = [ "mozjs" , "js", "js_static" ]
-        if windows and msarch == "amd64":
-            if release:
-                J = [ "js64r", "js", "mozjs" , "js_static" ]
+        if windows:
+            if msarch == "amd64":
+                if release:
+                    J = [ "js64r", "js", "mozjs" , "js_static" ]
+                else:
+                    J = "js64d"
+                    print( "looking for js64d.lib for spidermonkey. (available at mongodb.org prebuilt)" );
             else:
-                J = "js64d"
-                print( "will use js64d.lib for spidermonkey. (available at mongodb.org prebuilt.)" );
-
+                if release:
+                    J = [ "js32r", "js", "mozjs" , "js_static" ]
+                else:
+                    J = [ "js32d", "js", "mozjs" , "js_static" ]
+                
         myCheckLib( J , True )
         mozHeader = "js"
         if bigLibString(myenv).find( "mozjs" ) >= 0:

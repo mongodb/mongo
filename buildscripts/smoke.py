@@ -99,7 +99,7 @@ class mongod(object):
         self.port = int(mongodPort)
         self.slave = False
         if 'slave' in self.kwargs:
-            dirName = '/data/db/sconsTestsSlave/'
+            dirName = smokeDbPrefix + '/data/db/sconsTestsSlave/'
             srcport = mongodPort
             self.port += 1
             self.slave = True
@@ -348,7 +348,7 @@ def expandSuites(suites):
             raise Exception('unknown test suite %s' % suite)
 
         if globstr:
-            globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '/')+globstr
+            globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '')+globstr
             tests += [(path, usedb) for path in glob.glob(globstr)]
     return tests
 

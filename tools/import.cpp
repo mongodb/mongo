@@ -43,6 +43,7 @@ class Import : public Tool {
     bool _upsert;
     bool _doimport;
     bool _jsonArray;
+    vector<string> _upsertFields;
     
     void _append( BSONObjBuilder& b , const string& fieldName , const string& data ){
         if ( b.appendAsNumber( fieldName , data ) )
@@ -144,6 +145,7 @@ public:
             ("drop", "drop collection first " )
             ("headerline","CSV,TSV only - use first line as headers")
             ("upsert", "insert or update objects that already exist" )
+            ("upsertFields", po::value<string>(), "comma-separated fields for the query part of the upsert. You should make sure this is indexed" )
             ("stopOnError", "stop importing at first error rather than continuing" )
             ("jsonArray", "load a json array, not one item per line. Currently limited to 4MB." )
             ;
@@ -200,6 +202,13 @@ public:
 
         if ( hasParam( "upsert" ) ){
             _upsert = true;
+
+            string uf = getParam("upsertFields");
+            if (uf.empty()){
+                _upsertFields.push_back("_id");
+            } else {
+                StringSplitter(uf.c_str(), ",").split(_upsertFields);
+            }
         }
 
         if ( hasParam( "noimport" ) ){
@@ -289,12 +298,25 @@ public:
                 } else {
                     o = parseLine( buf );
                 }
+
                 if ( _headerLine ){
                     _headerLine = false;
                 } else if (_doimport) {
-                    BSONElement id = o["_id"];
-                    if (_upsert && !id.eoo()){
-                        conn().update( ns, QUERY("_id" << id), o, true);
+                    bool doUpsert = _upsert;
+                    BSONObjBuilder b;
+                    if (_upsert){
+                        for (vector<string>::const_iterator it=_upsertFields.begin(), end=_upsertFields.end(); it!=end; ++it){
+                            BSONElement e = o.getFieldDotted(it->c_str());
+                            if (e.eoo()){
+                                doUpsert = false;
+                                break;
+                            }
+                            b.appendAs(e, *it);
+                        }
+                    }
+
+                    if (doUpsert){
+                        conn().update(ns, Query(b.obj()), o, true);
                     } else {
                         conn().insert( ns.c_str() , o );
                     }
