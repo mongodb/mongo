@@ -1166,27 +1166,31 @@ namespace mongo {
                     cout << "\t";
                 cout << " doBox: " << testBox.toString() << "\t" << toscan.toString() << " scanned so far: " << _nscanned << endl;
             }
-            
+
             double intPer = testBox.intersects( want );
             
             if ( intPer <= 0 )
                 return;
             
-            if ( intPer < .5 && depth < 3 ){
-                doBox( id , want , toscan + "00" , depth + 1);
-                doBox( id , want , toscan + "01" , depth + 1);
-                doBox( id , want , toscan + "10" , depth + 1);
-                doBox( id , want , toscan + "11" , depth + 1);
-                return;
-            }
+            bool goDeeper = intPer < .5 && depth < 2;
 
+            long long myscanned = 0;
+            
             BtreeLocation loc;
             loc.bucket = id.head.btree()->locate( id , id.head , toscan.wrap() , Ordering::make(_spec->_order) , 
                                                         loc.pos , loc.found , minDiskLoc );
             loc.checkCur( _found , _hopper.get() );
-            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper.get() ) )
+            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper.get() ) ){
                 _nscanned++;
-
+                if ( ++myscanned > 100 && goDeeper ){
+                    doBox( id , want , toscan + "00" , depth + 1);
+                    doBox( id , want , toscan + "01" , depth + 1);
+                    doBox( id , want , toscan + "10" , depth + 1);
+                    doBox( id , want , toscan + "11" , depth + 1);
+                    return;        
+                }
+            }
+            
         }
 
 
