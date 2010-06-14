@@ -918,8 +918,8 @@ namespace mongo {
                     }
 
                     int len;
-                    const char * data = obj["data"].binData( len );
-                    md5_append( &st , (const md5_byte_t*)(data + 4) , len - 4 );
+                    const char * data = obj["data"].binDataClean( len );
+                    md5_append( &st , (const md5_byte_t*)(data) , len );
 
                     n++;
                 } catch (...) {

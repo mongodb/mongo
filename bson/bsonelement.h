@@ -230,12 +230,23 @@ public:
 
     BSONObj codeWScopeObject() const;
 
-    /** Get binary data.  Element must be of type BinData */
+    /** Get raw binary data.  Element must be of type BinData. Doesn't handle type 2 specially */
     const char *binData(int& len) const { 
         // BinData: <int len> <byte subtype> <byte[len] data>
         assert( type() == BinData );
         len = valuestrsize();
         return value() + 5;
+    }
+    /** Get binary data.  Element must be of type BinData. Handles type 2 */
+    const char *binDataClean(int& len) const { 
+        // BinData: <int len> <byte subtype> <byte[len] data>
+        if (binDataType() != ByteArrayDeprecated){
+            return binData(len);
+        } else {
+            // Skip extra size
+            len = valuestrsize() - 4;
+            return value() + 5 + 4;
+        }
     }
         
     BinDataType binDataType() const {
