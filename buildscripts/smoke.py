@@ -253,8 +253,8 @@ def runTests(tests):
                         with mongod(slave=True) if oneMongodPerTest and smallOplog else nothing() as slave2:
                             runTest(test)
                     winners.append(test)
-#                    if isinstance(slave2, mongod):
-#                        checkDbHashes(master2, slave2)
+                    if isinstance(slave2, mongod):
+                        checkDbHashes(master2, slave2)
                 except TestFailure, f:
                     try:
                         print f
@@ -267,8 +267,8 @@ def runTests(tests):
                     except TestFailure, f:
                         if not continueOnFailure:
                             return 1
-#            if isinstance(slave1, mongod):
-#                checkDbHashes(master1, slave1)
+            if isinstance(slave1, mongod):
+                checkDbHashes(master1, slave1)
 
     return 0
 
@@ -349,7 +349,9 @@ def expandSuites(suites):
 
         if globstr:
             globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '')+globstr
-            tests += [(path, usedb) for path in glob.glob(globstr)]
+            paths = glob.glob(globstr)
+            paths.sort()
+            tests += [(path, usedb) for path in paths]
     return tests
 
 def main():
