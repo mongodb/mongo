@@ -94,11 +94,13 @@ namespace mongo{
 			::GetLastError(), boost::system::system_category);
 	}
 
+#if defined(_UNICODE)
 	std::wstring toWideString(const char *s) {
         std::basic_ostringstream<TCHAR> buf;
         buf << s;
         return buf.str();
     }
+#endif
 
     #endif
 }

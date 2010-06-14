@@ -27,6 +27,8 @@
 #include <windows.h>
 #endif
 
+#include "text.h"
+
 namespace mongo { 
 
 #ifndef __sunos__
@@ -47,7 +49,6 @@ public:
 
 #if defined(_WIN32) 
 #include <io.h>
-std::wstring toWideString(const char *s);
 
 class File : public FileInterface { 
     HANDLE fd;
@@ -68,9 +69,9 @@ public:
         fd = INVALID_HANDLE_VALUE; 
     }
     void open(const char *filename, bool readOnly=false ) {
-        std::wstring filenamew = toWideString(filename);
         fd = CreateFile(
-                 filenamew.c_str(), ( readOnly ? 0 : GENERIC_WRITE ) | GENERIC_READ, FILE_SHARE_READ,
+                 toNativeString(filename).c_str(),
+                 ( readOnly ? 0 : GENERIC_WRITE ) | GENERIC_READ, FILE_SHARE_READ,
                  NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if( !is_open() ) {
             out() << "CreateFile failed " << filename << endl;

@@ -699,6 +699,9 @@
     <ClInclude Include="..\pch.h">
       <Filter>db</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\text.h">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
