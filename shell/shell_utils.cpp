@@ -94,6 +94,7 @@ namespace mongo {
         BSONObj Quit(const BSONObj& args) {
             // If not arguments are given first element will be EOO, which
             // converts to the integer value 0.
+            mongo::goingAway = true;
             int exit_code = int( args.firstElement().number() );
             ::exit(exit_code);
             return undefined_;
@@ -384,6 +385,8 @@ namespace mongo {
                 while( 1 ) {
                     int lenToRead = 1023 - ( start - buf );
                     int ret = read( pipe_, (void *)start, lenToRead );
+                    if( mongo::goingAway )
+                        break;
                     assert( ret != -1 );
                     start[ ret ] = '\0';
                     if ( strlen( start ) != unsigned( ret ) )

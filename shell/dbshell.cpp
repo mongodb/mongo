@@ -32,6 +32,7 @@ jmp_buf jbuf;
 #include "utils.h"
 #include "../util/password.h"
 #include "../util/version.h"
+#include "../util/goodies.h"
 
 using namespace std;
 using namespace boost::filesystem;
@@ -162,6 +163,7 @@ void killOps() {
 }
 
 void quitNicely( int sig ){
+    mongo::goingAway = true;
     if ( sig == SIGINT && inMultiLine ){
         gotInterrupted = 1;
         return;
@@ -625,6 +627,7 @@ int _main(int argc, char* argv[]) {
         shellHistoryDone();
     }
 
+    mongo::goingAway = true;
     return 0;
 }
 
