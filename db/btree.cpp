@@ -510,11 +510,11 @@ namespace mongo {
             assert(false);
         }
 found:
-        deallocBucket( thisLoc );
+        deallocBucket( thisLoc, id );
     }
     
-    void BtreeBucket::deallocBucket(const DiskLoc &thisLoc) {
-#if 1
+    void BtreeBucket::deallocBucket(const DiskLoc &thisLoc, IndexDetails &id) {
+#if 0
         /* as a temporary defensive measure, we zap the whole bucket, AND don't truly delete
            it (meaning it is ineligible for reuse).
            */
@@ -524,11 +524,8 @@ found:
         //defensive:
         n = -1;
         parent.Null();
-        massert( 10284 , "todo: use RecStoreInterface instead", false);
-        // TODO: this was broken anyway as deleteRecord does unindexRecord() call which assumes the data is a BSONObj, 
-        // and it isn't.
-        assert(false);
-//        theDataFileMgr.deleteRecord(id.indexNamespace().c_str(), thisLoc.rec(), thisLoc);
+        string ns = id.indexNamespace();
+        btreeStore->deleteRecord(ns.c_str(), thisLoc);
 #endif
     }
 
@@ -1082,7 +1079,7 @@ namespace mongo {
                 } else {
                     if ( !x->nextChild.isNull() )
                         x->nextChild.btreemod()->parent = upLoc;
-                    x->deallocBucket( xloc );
+                    x->deallocBucket( xloc, idx );
                 }
                 xloc = nextLoc;
             }

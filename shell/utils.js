@@ -526,6 +526,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/indexb.js",
                                    "jstests/profile1.js",
                                    "jstests/mr3.js",
+                                   "jstests/indexh.js",
                                    "jstests/apitest_db.js"] );
         
         // some tests can't be run in parallel with each other
