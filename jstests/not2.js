@@ -88,7 +88,7 @@ t.save( {i:"b"} );
 t.ensureIndex( {i:1} );
 
 indexed = function( query, min, max ) {
-    exp = t.find( query ).explain();
+    exp = t.find( query ).explain( true );
 //    printjson( exp );
     assert( exp.cursor.match( /Btree/ ), tojson( query ) );    
     assert( exp.allPlans.length == 1, tojson( query ) );    
@@ -102,7 +102,7 @@ indexed = function( query, min, max ) {
 }
 
 not = function( query ) {
-    exp = t.find( query ).explain();
+    exp = t.find( query ).explain( true );
 //    printjson( exp );
     assert( !exp.cursor.match( /Btree/ ), tojson( query ) );    
     assert( exp.allPlans.length == 1, tojson( query ) );    
