@@ -33,7 +33,7 @@ namespace mongo {
 	ServiceController::ServiceController() {
     }
     
-    bool ServiceController::installService( const std::wstring& serviceName, const std::wstring& displayName, const std::wstring& serviceDesc, int argc, char* argv[] ) {
+    bool ServiceController::installService( const std::wstring& serviceName, const std::wstring& displayName, const std::wstring& serviceDesc, const std::wstring& serviceUser, const std::wstring& servicePassword, int argc, char* argv[] ) {
         assert(argc >= 1);
 
         stringstream commandLine;
@@ -50,10 +50,14 @@ namespace mongo {
 			std::string arg( argv[ i ] );
 			
 			// replace install command to indicate process is being started as a service
-			if ( arg == "--install" ) {
+			if ( arg == "--install" || arg == "--reinstall" ) {
 				arg = "--service";
 			}
-				
+			
+			// Strip off --service(Name|User|Password) arguments
+			if ( arg.length() > 9 && arg.substr(0, 9) == "--service" ) {
+				continue;
+			}
 			commandLine << arg << "  ";
 		}
 		
@@ -62,7 +66,8 @@ namespace mongo {
 			return false;
 		}
 
-		// Make sure it exists first. TODO: See if GetLastError() is set to something if CreateService fails.
+		// Make sure it exists first. TODO: Use GetLastError() to investigate why CreateService fails.
+		// TODO: Check to see if service is in "Deleting" status, suggest the user close down Services MMC snap-ins.
 		SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
 		if ( schService != NULL ) {
 			log() << "There is already a service named " << toUtf8String(serviceName) << ". Aborting" << endl;
@@ -80,18 +85,39 @@ namespace mongo {
 												SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
 												SERVICE_AUTO_START, SERVICE_ERROR_NORMAL,
 												commandLineWide.str().c_str(), NULL, NULL, L"\0\0", NULL, NULL );
-
 		if ( schService == NULL ) {
 			log() << "Error creating service." << endl;
 			::CloseServiceHandle( schSCManager );
 			return false;
 		}
 
+		log() << "Service creation successful." << endl;
+		log() << "Service can be started from the command line via 'net start \"" << toUtf8String(serviceName) << "\"'." << endl;
+
+		bool serviceInstalled;
+
+		// TODO: If neccessary grant user "Login as a Service" permission.
+		if ( !serviceUser.empty() ) {
+			std::wstring actualServiceUser;
+			if ( serviceUser.find(L"\\") == string::npos ) {
+				actualServiceUser = L".\\" + serviceUser;
+			}
+			else {
+				actualServiceUser = serviceUser;
+			}
+
+			log() << "Setting service login credentials. User: " << toUtf8String(actualServiceUser) << endl;
+			serviceInstalled = ::ChangeServiceConfig( schService, SERVICE_NO_CHANGE, SERVICE_NO_CHANGE, SERVICE_NO_CHANGE, NULL, NULL, NULL, NULL, actualServiceUser.c_str(), servicePassword.c_str(), NULL );
+			if ( !serviceInstalled ) {
+				log() << "Setting service login failed. Service has 'LocalService' permissions." << endl;
+			}
+		}
+		
+		// set the service description
 		SERVICE_DESCRIPTION serviceDescription;
 		serviceDescription.lpDescription = (LPTSTR)serviceDesc.c_str();
-		
-		// set new service description
-		bool serviceInstalled = ::ChangeServiceConfig2( schService, SERVICE_CONFIG_DESCRIPTION, &serviceDescription );
+		serviceInstalled = ::ChangeServiceConfig2( schService, SERVICE_CONFIG_DESCRIPTION, &serviceDescription );
+
 		
 		if ( serviceInstalled ) {
 			SC_ACTION aActions[ 3 ] = { { SC_ACTION_RESTART, 0 }, { SC_ACTION_RESTART, 0 }, { SC_ACTION_RESTART, 0 } };
@@ -104,10 +130,9 @@ namespace mongo {
 			// set service recovery options
 			serviceInstalled = ::ChangeServiceConfig2( schService, SERVICE_CONFIG_FAILURE_ACTIONS, &serviceFailure );
 
-			log() << "Service creation successful." << endl;
 		}
 		else {
-			log() << "Service creation seems to have partially failed. Check the event log for more details." << endl;
+			log() << "Could not set service description. Check the event log for more details." << endl;
 		}
 
 		::CloseServiceHandle( schService );
