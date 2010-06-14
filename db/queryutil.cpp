@@ -507,10 +507,12 @@ namespace mongo {
                 // right now btree cursor doesn't do exclusive bounds so we need to match end of the regex range
                 if ( i->_upper._bound.type() == RegEx ) {
                     string r = simpleRegex( i->_upper._bound );
-                    regexLow.insert( r );
-                    string re = simpleRegexEnd( r );
-                    regexHigh.insert( re );
-                    a << re;
+                    if ( !r.empty() ) {
+                        regexLow.insert( r );
+                        string re = simpleRegexEnd( r );
+                        regexHigh.insert( re );
+                        a << re;
+                    }
                 }
             }
         }
