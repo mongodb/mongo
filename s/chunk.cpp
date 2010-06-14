@@ -40,7 +40,7 @@ namespace mongo {
 
     // -------  Shard --------
 
-    int Chunk::MaxChunkSize = 1024 * 1204 * 200;
+    int Chunk::MaxChunkSize = 1024 * 1024 * 200;
     
     Chunk::Chunk( ChunkManager * manager ) : _manager( manager ){
         _modified = false;
