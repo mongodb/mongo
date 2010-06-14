@@ -99,6 +99,7 @@ namespace mongo {
         time_t asTimeT();
         Date_t asDateT() { return asTimeT() * (long long)1000; }
         
+        bool isSet() const { return a || b; }
     };
 #pragma pack()
 

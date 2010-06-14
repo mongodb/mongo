@@ -94,6 +94,7 @@ namespace mongo {
         BSONObj Quit(const BSONObj& args) {
             // If not arguments are given first element will be EOO, which
             // converts to the integer value 0.
+            mongo::goingAway = true;
             int exit_code = int( args.firstElement().number() );
             ::exit(exit_code);
             return undefined_;
@@ -261,7 +262,6 @@ namespace mongo {
             pid_t pid() const { return pid_; }
 
             boost::filesystem::path find(string prog) { 
-                cout << "ELIOT [" << prog << "]" << endl;
                 boost::filesystem::path p = prog;
 #ifdef _WIN32
                 p = change_extension(p, ".exe");
@@ -291,9 +291,7 @@ namespace mongo {
                     boost::filesystem::path t = boost::filesystem::initial_path() / p;
                     if( boost::filesystem::exists(t)  ) return t;
                 }
-                // this breaks system programs
-                // massert( 10435, (string)"run: couldn't find " + prog , false );
-                return p;
+                return p; // not found; might find via system path
             } 
 
             ProgramRunner( const BSONObj &args , bool isMongoProgram=true)
@@ -387,6 +385,8 @@ namespace mongo {
                 while( 1 ) {
                     int lenToRead = 1023 - ( start - buf );
                     int ret = read( pipe_, (void *)start, lenToRead );
+                    if( mongo::goingAway )
+                        break;
                     assert( ret != -1 );
                     start[ ret ] = '\0';
                     if ( strlen( start ) != unsigned( ret ) )
@@ -445,7 +445,11 @@ namespace mongo {
                 ZeroMemory(&pi, sizeof(pi));
 
                 bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi) != 0;
-                uassert(13294, "couldn't start process", success);
+                {
+                    stringstream ss;
+                    ss << "couldn't start process " << argv_[0];
+                    uassert(13294, ss.str(), success);
+                }
 
                 CloseHandle(pi.hThread);
 
@@ -475,7 +479,7 @@ namespace mongo {
 
                     execvp( argv[ 0 ], const_cast<char**>(argv) );
 
-                    cout << "Unable to start program: " << errnoWithDescription() << endl;
+                    cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
                     ::_Exit(-1);
                 }
 

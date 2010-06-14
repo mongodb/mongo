@@ -784,6 +784,12 @@
     <None Include="..\SConstruct">
       <Filter>db</Filter>
     </None>
+    <None Include="..\jstests\rs\rs_basic.js">
+      <Filter>rs\test stuff</Filter>
+    </None>
+    <None Include="..\jstests\rs\test_framework.js">
+      <Filter>rs\test stuff</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">

@@ -556,6 +556,8 @@
     <ClCompile Include="repl\rs_config.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\jstests\rs\rs_basic.js" />
+    <None Include="..\jstests\rs\test_framework.js" />
     <None Include="..\SConstruct" />
     <None Include="..\util\mongoutils\README" />
     <None Include="mongo.ico" />
