@@ -39,7 +39,6 @@ namespace mongo {
          * is { }. 
          * @param balancedLastTime is the number of chunks effectively moved in the last round.
          * @returns NULL or ChunkInfo of the best move to make towards balacing the collection.
-         *
          */
         static ChunkInfo* balance( const string& ns, const map< string, BSONObj>& shardLimitsMap,  
                                    const map< string,vector<BSONObj> >& shardToChunksMap, int balancedLastTime );
@@ -48,7 +47,17 @@ namespace mongo {
 
         static BSONObj pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to );
 
-        static bool isReceiver( const string& shard, const map< string,BSONObj>& shardLimitsMap );
+        /**
+         * Returns true if a shard can receive new chunks based on that shard's 'shardLimits' information.
+         * Expects the optional fields "maxSize", can in size in MB, and "usedSize", currently used size in MB,
+         * on 'shardLimits'.
+         */
+        static bool isReceiver( BSONObj shardLimits );
+
+        /**
+         * Returns true if 'shardLimist' contains a field "draining".
+         */
+        static bool isDraining( BSONObj shardLimits );
     };
 
     struct BalancerPolicy::ChunkInfo {

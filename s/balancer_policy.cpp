@@ -30,7 +30,6 @@ namespace mongo {
                                                         const map< string, BSONObj>& shardLimitsMap,  
                                                         const map< string,vector<BSONObj> >& shardToChunksMap, 
                                                         int balancedLastTime ){
-        
         pair<string,unsigned> min("",9999999);
         pair<string,unsigned> max("",0);
         
@@ -38,8 +37,14 @@ namespace mongo {
             const string& shard = i->first;
             unsigned size = i->second.size();
 
+            BSONObj shardLimits;
+            map< string,BSONObj >::const_iterator it = shardLimitsMap.find( shard );
+            if ( it != shardLimitsMap.end() ) {
+                shardLimits = it->second;
+            }
+
             if ( size < min.second ){
-                if ( isReceiver( shard , shardLimitsMap ) ){
+                if ( isReceiver( shardLimits ) ){
                     min.first = shard;
                     min.second = size;
                 } else {
@@ -47,7 +52,7 @@ namespace mongo {
                 }
             }
             
-            if ( size > max.second ){
+            if ( isDraining( shardLimits ) || ( size > max.second )){
                 max.first = shard;
                 max.second = size;
             }
@@ -85,16 +90,19 @@ namespace mongo {
         return from[0];
     }
 
-    bool BalancerPolicy::isReceiver( const string& shard, const map< string,BSONObj>& shardLimitsMap ){
+    bool BalancerPolicy::isReceiver( BSONObj limits ){
+
+        // A draining shard can never be a receiver
+        if ( isDraining( limits ) ){
+            return false;
+        }
 
         // If there's no limit information for the shard, assume it can be a chunk receiver 
         // (i.e., there's not bound on space utilization)
-        map< string,BSONObj >::const_iterator it = shardLimitsMap.find( shard );
-        if ( it == shardLimitsMap.end() ){
+        if ( limits.isEmpty() ){
             return true;
         }
 
-        BSONObj limits = it->second;
         long long maxUsage = limits["maxSize"].Long();
         if ( maxUsage == 0 ){
             return true;
@@ -108,20 +116,41 @@ namespace mongo {
         return false;
     }
 
+    bool BalancerPolicy::isDraining( BSONObj limits ){
+
+        // If there's no entry saying it is draining, it isn't.
+        if ( limits.isEmpty() || limits[ "draining" ].eoo() ){
+            return false;
+        }
+
+        return true;
+    }
+
     class PolicyObjUnitTest : public UnitTest {
     public:
         void maxSizeForShard(){
             BSONObj shard0 = BSON( "maxSize" << 0LL << "currSize" << 0LL );
-            BSONObj shard1 = BSON( "maxSize" << 100LL << "currSize" << 80LL );
-            BSONObj shard2 = BSON( "maxSize" << 100LL << "currSize" << 110LL );
-            map< string, BSONObj > shardLimitsMap; 
-            shardLimitsMap["shard0"] = shard0;
-            shardLimitsMap["shard1"] = shard1;
-            shardLimitsMap["shard2"] = shard2;
+            assert( BalancerPolicy::isReceiver( shard0 ) );
 
-            assert( BalancerPolicy::isReceiver( "shard0", shardLimitsMap ) );
-            assert( BalancerPolicy::isReceiver( "shard1", shardLimitsMap ) );
-            assert( ! BalancerPolicy::isReceiver( "shard2", shardLimitsMap ) );
+            BSONObj shard1 = BSON( "maxSize" << 100LL << "currSize" << 80LL );
+            assert( BalancerPolicy::isReceiver( shard1 ) );
+
+            BSONObj shard2 = BSON( "maxSize" << 100LL << "currSize" << 110LL );
+            assert( ! BalancerPolicy::isReceiver( shard2 ) );
+
+            BSONObj shard3 = BSON( "draining" << true );
+            assert( ! BalancerPolicy::isReceiver( shard3 ) );
+
+            BSONObj empty;
+            assert( BalancerPolicy::isReceiver( empty ) );
+        }
+
+        void drainingShard(){
+            BSONObj shard0 = BSON( "draining" << true );
+            assert( BalancerPolicy::isDraining( shard0 ) );
+
+            BSONObj empty;
+            assert( ! BalancerPolicy::isDraining( empty ) );
         }
 
         void run(){
