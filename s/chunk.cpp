@@ -341,7 +341,7 @@ namespace mongo {
             return 0;
         }
 
-        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objcets: " << toMove->countObjects() << endl;
+        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objects: " << toMove->countObjects() << endl;
 
         string errmsg;
         massert( 10412 ,  (string)"moveAndCommit failed: " + errmsg , 

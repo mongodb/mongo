@@ -173,6 +173,8 @@ def checkDbHashes(master, slave):
     ARB=10  # ARBITRARY
     time.sleep(ARB)
     while True:
+        # FIXME: it's probably better to do an empty insert and a
+        # getLastError() to force a sync.
         argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
         res = Popen(argv, stdout=PIPE).communicate()[0]
         m = re.search('(\d+)secs ', res)
@@ -253,8 +255,8 @@ def runTests(tests):
                         with mongod(slave=True) if oneMongodPerTest and smallOplog else nothing() as slave2:
                             runTest(test)
                     winners.append(test)
-#                    if isinstance(slave2, mongod):
-#                        checkDbHashes(master2, slave2)
+                    if isinstance(slave2, mongod):
+                        checkDbHashes(master2, slave2)
                 except TestFailure, f:
                     try:
                         print f
@@ -267,8 +269,8 @@ def runTests(tests):
                     except TestFailure, f:
                         if not continueOnFailure:
                             return 1
-#            if isinstance(slave1, mongod):
-#                checkDbHashes(master1, slave1)
+            if isinstance(slave1, mongod):
+                checkDbHashes(master1, slave1)
 
     return 0
 
@@ -349,7 +351,9 @@ def expandSuites(suites):
 
         if globstr:
             globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '')+globstr
-            tests += [(path, usedb) for path in glob.glob(globstr)]
+            paths = glob.glob(globstr)
+            paths.sort()
+            tests += [(path, usedb) for path in paths]
     return tests
 
 def main():
