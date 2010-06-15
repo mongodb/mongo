@@ -62,7 +62,9 @@ namespace mongo {
     }
 
     bool Database::validDBName( const string& ns ){
-        size_t good = strcspn( ns.c_str() , "/\\." );
+        if ( ns.size() == 0 || ns.size() > 64 )
+            return false;
+        size_t good = strcspn( ns.c_str() , "/\\. " );
         return good == ns.size();
     }
 
