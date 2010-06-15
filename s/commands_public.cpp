@@ -314,9 +314,11 @@ namespace mongo {
                 for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     shared_ptr<ChunkRange> c = *i;
 
+                    BSONObj myCommand = fixCmdObj( cmdObj , c );
+                    cout << "myCommand: " << myCommand << endl;
                     ShardConnection conn( c->getShard() , fullns );
                     BSONObj res;
-                    bool ok = conn->runCommand( conf->getName() , fixCmdObj(cmdObj, c) , res );
+                    bool ok = conn->runCommand( conf->getName() , myCommand , res );
                     conn.done();
 
                     if (ok || (strcmp(res["errmsg"].valuestrsafe(), "No matching object found") != 0)){

@@ -138,6 +138,90 @@ namespace mongo {
 
     }
 
+    ChunkMatcherPtr ShardingState::getChunkMatcher( const string& ns , bool load , ConfigVersion version ){
+        return ChunkMatcherPtr();// ERH ERH ERH
+        
+        if ( ! _enabled )
+            return ChunkMatcherPtr();
+        
+        if ( ! ShardedConnectionInfo::get( false ) )
+            return ChunkMatcherPtr();
+        
+        {
+            scoped_lock lk( _mutex );
+            if ( ! version )
+                version = _versions[ns];
+            if ( ! version )
+                return ChunkMatcherPtr();
+            
+            ChunkMatcherPtr p = _chunks[ns];
+            if ( p ){
+                if ( ! load )
+                    return p;
+                
+                if ( p->_version >= version )
+                    return p;                
+            }
+            else {
+                if ( ! load ){
+                    stringstream ss;
+                    ss << "getChunkMatcher called with load false for ns: " << ns;
+                    msgasserted( 13300 , ss.str() );
+                }
+            }
+
+        }
+
+        BSONObj q;
+        {
+            BSONObjBuilder b;
+            b.append( "ns" , ns.c_str() );
+            b.append( "shard" , BSON( "$in" << BSON_ARRAY( _shardHost << _shardName ) ) );
+            q = b.obj();
+        }
+        
+        ScopedDbConnection conn( _configServer );
+
+        auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
+        if ( ! cursor->more() ){
+            conn.done();
+            return ChunkMatcherPtr();
+        }
+        
+        ChunkMatcherPtr p( new ChunkMatcher( version ) );
+        
+        BSONObj min,max;
+        while ( cursor->more() ){
+            BSONObj d = cursor->next();
+            
+            if ( min.isEmpty() ){
+                min = d["min"].Obj();
+                max = d["max"].Obj();
+                continue;
+            }
+
+            if ( max == d["min"].Obj() ){
+                max = d["max"].Obj();
+                continue;
+            }
+
+            p->gotRange( min.getOwned() , max.getOwned() );
+            min = d["min"].Obj();
+            max = d["max"].Obj();
+        }
+        assert( ! min.isEmpty() );
+        p->gotRange( min.getOwned() , max.getOwned() );
+        
+        conn.done();
+
+        { 
+            scoped_lock lk( _mutex );
+            _chunks[ns] = p;
+        }
+
+        return p;
+    }
+
     ShardingState shardingState;
 
     // -----ShardingState END ----
@@ -334,6 +418,11 @@ namespace mongo {
                 return false;
             }
 
+            {
+                dbtemprelease unlock;
+                shardingState.getChunkMatcher( ns , true , version );
+            }
+
             result.appendTimestamp( "oldVersion" , oldVersion );
             oldVersion = version;
             globalVersion = version;
@@ -431,5 +520,31 @@ namespace mongo {
         return false;
     }
 
+    // --- ChunkMatcher ---
 
+    ChunkMatcher::ChunkMatcher( ConfigVersion version )
+        : _version( version ){
+
+    }
+
+    void ChunkMatcher::gotRange( const BSONObj& min , const BSONObj& max ){
+        assert( min.nFields() == 1 );
+        _field = min.firstElement().fieldName();
+        _map[min] = make_pair(min,max);
+    }
+
+    bool ChunkMatcher::belongsToMe( const BSONObj& key , const DiskLoc& loc ) const {
+        return true; // ERH ERH ERH
+        if ( _map.size() == 0 )
+            return false;
+        
+        BSONObj x = loc.obj().getFieldDotted( _field.c_str() ).wrap(); // TODO: this is slow
+        
+        MyMap::const_iterator a = _map.upper_bound( x );
+        if ( a == _map.end() )
+            a--;
+        
+        return x.woCompare( a->second.first ) >= 0 && x.woCompare( a->second.second ) < 0;
+    }
+    
 }

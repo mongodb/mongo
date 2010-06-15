@@ -26,9 +26,10 @@ for (var i=0; i < numObjs; i++){
     assert.eq(db.stuff.count({a:1}), i, "1 A");
 
     var out = db.stuff.findAndModify({query: {a:null}, update: {$set: {a:1}}, sort: {_id:1}});
+    printjson( out )
 
     assert.eq(db.stuff.count({a:1}), i+1, "1 B");
-    assert.eq(db.stuff.findOne({_id:i}).a, 1, "1 C");
+    assert.eq(db.stuff.findOne({_id:i}).a, 1, "1 C : " + tojson( db.stuff.findOne({_id:i}) ) );
     assert.eq(out._id, i, "1 D");
 }
 

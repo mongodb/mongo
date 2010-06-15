@@ -23,9 +23,36 @@
 
 namespace mongo {
     
+    class ShardingState;
+    
     typedef unsigned long long ConfigVersion;
     typedef map<string,ConfigVersion> NSVersionMap;
 
+    // -----------
+
+    /**
+     * TODO: this only works with single fields at the moment
+     */
+    class ChunkMatcher {
+        typedef map<BSONObj,pair<BSONObj,BSONObj>,BSONObjCmp> MyMap;
+    public:
+        
+        bool belongsToMe( const BSONObj& key , const DiskLoc& loc ) const;
+
+    private:
+        ChunkMatcher( ConfigVersion version );
+        
+        void gotRange( const BSONObj& min , const BSONObj& max );
+        
+        ConfigVersion _version;
+        string _field;
+        MyMap _map;
+        
+        friend class ShardingState;
+    };
+
+    typedef shared_ptr<ChunkMatcher> ChunkMatcherPtr;
+    
     // --------------
     // --- global state ---
     // --------------
@@ -48,6 +75,8 @@ namespace mongo {
         
         void appendInfo( BSONObjBuilder& b );
         
+        ChunkMatcherPtr getChunkMatcher( const string& ns , bool load=false , ConfigVersion version=0 );
+        
     private:
         
         bool _enabled;
@@ -59,6 +88,7 @@ namespace mongo {
 
         mongo::mutex _mutex;
         NSVersionMap _versions;
+        map<string,ChunkMatcherPtr> _chunks;
     };
     
     extern ShardingState shardingState;
@@ -109,9 +139,6 @@ namespace mongo {
      * @return true if we took care of the message and nothing else should be done
      */
     bool handlePossibleShardedMessage( Message &m, DbResponse &dbresponse );
-
-
-    bool objectBelongsToMe( const string& ns , const DiskLoc& loc );
 
     // -----------------
     // --- writeback ---

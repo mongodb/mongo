@@ -34,6 +34,7 @@
 #include "commands.h"
 #include "queryoptimizer.h"
 #include "lasterror.h"
+#include "../s/d_logic.h"
 
 namespace mongo {
 
@@ -322,6 +323,12 @@ namespace mongo {
                 // in some cases (clone collection) there won't be a matcher
                 if ( c->matcher() && !c->matcher()->matches(c->currKey(), c->currLoc() ) ) {
                 }
+                /*
+                  TODO
+                else if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( c->currKey(), c->currLoc() ) ){
+                    cout << "TEMP skipping un-owned chunk: " << c->current() << endl;
+                }
+                */
                 else {
                     if( c->getsetdup(c->currLoc()) ) {
                         //out() << "  but it's a dup \n";
@@ -561,6 +568,7 @@ namespace mongo {
             _nscanned(0), _oldNscanned(0), _nscannedObjects(0), _oldNscannedObjects(0),
             _n(0),
             _oldN(0),
+            _chunkMatcher(shardingState.getChunkMatcher(pq.ns())),
             _inMemSort(false),
             _saveClientCursor(false),
             _wouldSaveClientCursor(false),
@@ -628,7 +636,13 @@ namespace mongo {
             else {
                 _nscannedObjects++;
                 DiskLoc cl = _c->currLoc();
-                if( !_c->getsetdup(cl) ) { 
+                if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( _c->currKey(), _c->currLoc() ) ){
+                    cout << "TEMP skipping un-owned chunk: " << _c->current() << endl;
+                }
+                else if( _c->getsetdup(cl) ) { 
+                    // dup
+                }
+                else {
                     // got a match.
                     
                     if ( _inMemSort ) {
@@ -758,6 +772,8 @@ namespace mongo {
         
         MatchDetails _details;
 
+        ChunkMatcherPtr _chunkMatcher;
+        
         bool _inMemSort;
         auto_ptr< ScanAndOrder > _so;
         

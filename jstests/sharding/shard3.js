@@ -1,6 +1,6 @@
 // shard3.js
 
-s = new ShardingTest( "shard3" , 2 , 50 , 2 );
+s = new ShardingTest( "shard3" , 2 , 1 , 2 );
 
 s2 = s._mongos[1];
 
@@ -34,6 +34,8 @@ assert.eq( 3 , primary.find().itcount() + secondary.find().itcount() , "blah 3" 
 
 assert.eq( 3 , a.find().toArray().length , "normal B" );
 assert.eq( 3 , b.find().toArray().length , "other B" );
+
+printjson( a._db._adminCommand( "shardingState" ) );
 
 // --- filtering ---
 

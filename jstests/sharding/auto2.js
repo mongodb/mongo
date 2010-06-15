@@ -44,6 +44,7 @@ print( "checkpoint B" )
 
 assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
 print( "checkpoint B.a" )
+s.printChunks();
 assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
 
 print( "checkpoint C" )
