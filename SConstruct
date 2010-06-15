@@ -641,6 +641,10 @@ elif "win32" == os.sys.platform:
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
         env.Append( LINKFLAGS=" /debug " )
 
+    if os.path.exists("../readline/lib") :
+        env.Append( LIBPATH=["../readline/lib"] )
+        env.Append( CPPPATH=["../readline/include"] )
+
     if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
         env.Append( LIBPATH=[ boostDir + "/lib/vs2010_64" ] )
     elif not force64 and os.path.exists( boostDir + "/lib/vs2010_32" ):
@@ -988,7 +992,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
             myCheckLib( "ncurses" , staticOnly=release )
             myCheckLib( "tinfo" , staticOnly=release )
         else:
-            print( "warning: no readline, shell will be a bit ugly" )
+            print( "\n*** warning: no readline library, mongo shell will not have nice interactive line editing ***\n" )
 
         if linux:
             myCheckLib( "rt" , True )

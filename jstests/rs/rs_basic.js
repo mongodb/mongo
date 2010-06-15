@@ -9,7 +9,16 @@ function go() {
     x = a.getDB("admin");
     y = b.getDB("admin");
 
-    print("started 2");
+    print("rs_basic: started 2 servers");
+
+    assert(__nextPort == 27000);
+
+    var cfg = { _id: 'asdf', members: [] };
+    var hn = hostname();
+    cfg.members[0] = { _id: 0, host: hn };
+    cfg.members[1] = { _id: 1, host: hn + ":27001" };
+
+    print(tojson(cfg));
 }
 
 print("type go() to run");

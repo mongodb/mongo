@@ -1,12 +1,10 @@
 // test helpers
 // load("test_framework.js")
 
-/* run mongod for a replica set member
-   wipes data dir! 
-*/
 function rs_mongod() {
+    /* run mongod for a replica set member. wipes data dir! */
     var port = __nextPort++;
-    var not_me = (port == 27000 ? port+1 : port-1);
+    var not_me = (port == 27000 ? port + 1 : port - 1);
     var f = startMongodEmpty;
     var dir = "" + port; // e.g., data/db/27000
     var conn = f.apply(null, [
@@ -17,7 +15,7 @@ function rs_mongod() {
             smallfiles: "",
             oplogSize: "2",
             //nohttpinterface: ""
-            rest: "", 
+            rest: "", // --rest is best for replica set administration
             replSet: "asdf/" + hostname() + ":" + not_me
         }
     ]

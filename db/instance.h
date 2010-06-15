@@ -104,7 +104,7 @@ namespace mongo {
     
     bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client = unknownAddress );
 
-    void getDatabaseNames( vector< string > &names );
+    void getDatabaseNames( vector< string > &names , const string& usePath = dbpath );
 
 // --- local client ---
     

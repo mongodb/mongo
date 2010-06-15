@@ -563,8 +563,8 @@ namespace mongo {
         Message & container;
     };
     
-    void getDatabaseNames( vector< string > &names ) {
-        boost::filesystem::path path( dbpath );
+    void getDatabaseNames( vector< string > &names , const string& usePath ) {
+        boost::filesystem::path path( usePath );
         for ( boost::filesystem::directory_iterator i( path );
                 i != boost::filesystem::directory_iterator(); ++i ) {
             if ( directoryperdb ) {
