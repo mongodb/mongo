@@ -173,6 +173,8 @@ def checkDbHashes(master, slave):
     ARB=10  # ARBITRARY
     time.sleep(ARB)
     while True:
+        # FIXME: it's probably better to do an empty insert and a
+        # getLastError() to force a sync.
         argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
         res = Popen(argv, stdout=PIPE).communicate()[0]
         m = re.search('(\d+)secs ', res)
