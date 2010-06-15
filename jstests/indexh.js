@@ -23,9 +23,8 @@ assert.eq.automsg( "s1", "s3" );
 // index node freeing
 t.drop();
 t.ensureIndex( {a:1} );
-var big = new Array( 1000 ).toString();
-for( i = 0; i < 1000; ++i ) {
-    t.save( {a:i,b:big} );
+for( i = 'a'; i.length < 500; i += 'a' ) {
+    t.save( {a:i} );
 }
 var s4 = db.stats().indexSize;
 debug( "s4: " + s4 );
