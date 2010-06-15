@@ -182,6 +182,7 @@ def checkDbHashes(master, slave):
             break
         time.sleep(3)
 
+    # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
         argv = [shellExecutable, "--port", str(mongod.port), "--quiet", "--eval", "x=db.runCommand('dbhash'); printjson(x.collections)"]
         hashstr = Popen(argv, stdout=PIPE).communicate()[0]
@@ -298,7 +299,7 @@ at the end of testing:"""
         for db in screwy_in_slave.keys():
             print "%s\t %s" % (db, screwy_in_slave[db])
     if smallOplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
-        print "replication ok for %d databases" % (len(replicated_dbs))
+        print "replication ok for %d collections" % (len(replicated_dbs))
     if (exit_bad or losers or lost_in_slave or lost_in_master or screwy_in_slave):
         status = 1
     else:
