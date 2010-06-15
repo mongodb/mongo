@@ -210,7 +210,7 @@
     <ClCompile Include="..\..\db\common.cpp">
       <Filter>db</Filter>
     </ClCompile>
-    <ClCompile Include="..\mongo.cpp">
+    <ClCompile Include="..\mongo_vstudio.cpp">
       <Filter>shell\generated_from_js</Filter>
     </ClCompile>
     <ClCompile Include="..\mongo-server.cpp">
@@ -247,6 +247,7 @@
   <ItemGroup>
     <Library Include="..\..\..\js\js32d.lib" />
     <Library Include="..\..\..\js\js32r.lib" />
+    <Library Include="..\..\..\readline\lib\readline.lib" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\db\lasterror.h">

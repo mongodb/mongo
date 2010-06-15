@@ -173,6 +173,8 @@ def checkDbHashes(master, slave):
     ARB=10  # ARBITRARY
     time.sleep(ARB)
     while True:
+        # FIXME: it's probably better to do an empty insert and a
+        # getLastError() to force a sync.
         argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
         res = Popen(argv, stdout=PIPE).communicate()[0]
         m = re.search('(\d+)secs ', res)
@@ -180,6 +182,7 @@ def checkDbHashes(master, slave):
             break
         time.sleep(3)
 
+    # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
         argv = [shellExecutable, "--port", str(mongod.port), "--quiet", "--eval", "x=db.runCommand('dbhash'); printjson(x.collections)"]
         hashstr = Popen(argv, stdout=PIPE).communicate()[0]
@@ -253,8 +256,8 @@ def runTests(tests):
                         with mongod(slave=True) if oneMongodPerTest and smallOplog else nothing() as slave2:
                             runTest(test)
                     winners.append(test)
-#                    if isinstance(slave2, mongod):
-#                        checkDbHashes(master2, slave2)
+                    if isinstance(slave2, mongod):
+                        checkDbHashes(master2, slave2)
                 except TestFailure, f:
                     try:
                         print f
@@ -267,8 +270,8 @@ def runTests(tests):
                     except TestFailure, f:
                         if not continueOnFailure:
                             return 1
-#            if isinstance(slave1, mongod):
-#                checkDbHashes(master1, slave1)
+            if isinstance(slave1, mongod):
+                checkDbHashes(master1, slave1)
 
     return 0
 
@@ -296,7 +299,7 @@ at the end of testing:"""
         for db in screwy_in_slave.keys():
             print "%s\t %s" % (db, screwy_in_slave[db])
     if smallOplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
-        print "replication ok for %d databases" % (len(replicated_dbs))
+        print "replication ok for %d collections" % (len(replicated_dbs))
     if (exit_bad or losers or lost_in_slave or lost_in_master or screwy_in_slave):
         status = 1
     else:
@@ -349,7 +352,9 @@ def expandSuites(suites):
 
         if globstr:
             globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '')+globstr
-            tests += [(path, usedb) for path in glob.glob(globstr)]
+            paths = glob.glob(globstr)
+            paths.sort()
+            tests += [(path, usedb) for path in paths]
     return tests
 
 def main():

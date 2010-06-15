@@ -11,6 +11,8 @@ function go() {
 
     print("rs_basic: started 2 servers");
 
+    assert(__nextPort == 27000);
+
     var cfg = { _id: 'asdf', members: [] };
     var hn = hostname();
     cfg.members[0] = { _id: 0, host: hn };
