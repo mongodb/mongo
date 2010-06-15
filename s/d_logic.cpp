@@ -42,7 +42,12 @@ using namespace std;
 
 namespace mongo {
 
-
+    bool objectBelongsToMe( const string& ns , const DiskLoc& loc ){
+        if ( ! shardingState.enabled() )
+            return true;
+        
+        return true;
+    }
 
 
     bool handlePossibleShardedMessage( Message &m, DbResponse &dbresponse ){

@@ -44,8 +44,8 @@ namespace mongo {
 
     // -----ShardingState START ----
     
-    ShardingState::ShardingState(){
-        _enabled = false;
+    ShardingState::ShardingState()
+        : _enabled(false) , _mutex( "ShardingState" ){
     }
     
     void ShardingState::enable( const string& server ){
@@ -58,13 +58,48 @@ namespace mongo {
         }
     }
     
+    void ShardingState::gotShardName( const string& name ){
+        if ( _shardName.size() == 0 ){
+            _shardName = name;
+            return;
+        }
+        
+        if ( _shardName == name )
+            return;
+
+        stringstream ss;
+        ss << "gotShardName different than what i had before " 
+           << " before [" << _shardName << "] " 
+           << " got [" << name << "] " 
+            ;
+        uasserted( 13298 , ss.str() );
+    }
     
-    bool ShardingState::hasVersion( const string& ns ) const {
+    void ShardingState::gotShardHost( const string& host ){
+        if ( _shardHost.size() == 0 ){
+            _shardHost = host;
+            return;
+        }
+        
+        if ( _shardHost == host )
+            return;
+
+        stringstream ss;
+        ss << "gotShardHost different than what i had before " 
+           << " before [" << _shardHost << "] " 
+           << " got [" << host << "] " 
+            ;
+        uasserted( 13299 , ss.str() );
+    }
+    
+    bool ShardingState::hasVersion( const string& ns ){
+        scoped_lock lk(_mutex);
         NSVersionMap::const_iterator i = _versions.find(ns);
         return i != _versions.end();
     }
     
-    bool ShardingState::hasVersion( const string& ns , ConfigVersion& version ) const {
+    bool ShardingState::hasVersion( const string& ns , ConfigVersion& version ){
+        scoped_lock lk(_mutex);
         NSVersionMap::const_iterator i = _versions.find(ns);
         if ( i == _versions.end() )
             return false;
@@ -73,11 +108,34 @@ namespace mongo {
     }
     
     ConfigVersion& ShardingState::getVersion( const string& ns ){
+        scoped_lock lk(_mutex);
         return _versions[ns];
     }
     
     void ShardingState::setVersion( const string& ns , const ConfigVersion& version ){
+        scoped_lock lk(_mutex);
         _versions[ns] = version;
+    }
+
+    void ShardingState::appendInfo( BSONObjBuilder& b ){
+        b.appendBool( "enabled" , _enabled );
+        if ( ! _enabled )
+            return;
+
+        b.append( "configServer" , _configServer );
+        b.append( "shardName" , _shardName );
+        b.append( "shardHost" , _shardHost );
+
+        {
+            BSONObjBuilder bb( b.subobjStart( "versions" ) );
+            
+            scoped_lock lk(_mutex);
+            for ( NSVersionMap::iterator i=_versions.begin(); i!=_versions.end(); ++i ){
+                bb.appendTimestamp( i->first.c_str() , i->second );
+            }
+            bb.done();
+        }
+
     }
 
     ShardingState shardingState;
@@ -196,6 +254,11 @@ namespace mongo {
                 }
             }
             
+            if ( cmdObj["shard"].type() == String ){
+                shardingState.gotShardName( cmdObj["shard"].String() );
+                shardingState.gotShardHost( cmdObj["shardHost"].String() );
+            }
+
             { // setting up ids
                 if ( cmdObj["serverID"].type() != jstOID ){
                     // TODO: fix this
@@ -289,7 +352,7 @@ namespace mongo {
             help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
         }
         
-        virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
+        virtual LockType locktype() const { return NONE; } 
 
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             string ns = cmdObj["getShardVersion"].valuestrsafe();
@@ -312,7 +375,19 @@ namespace mongo {
         }
         
     } getShardVersion;
-    
+
+    class ShardingStateCmd : public MongodShardCommand {
+    public:
+        ShardingStateCmd() : MongodShardCommand( "shardingState" ){}
+
+        virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){        
+            shardingState.appendInfo( result );
+            return true;
+        }
+        
+    } shardingStateCmd;
 
     /**
      * @ return true if not in sharded mode

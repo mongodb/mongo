@@ -38,16 +38,26 @@ namespace mongo {
         const string& getConfigServer() const { return _configServer; }
         void enable( const string& server );
 
+        void gotShardName( const string& name );
+        void gotShardHost( const string& host );
         
-        bool hasVersion( const string& ns ) const;
-        bool hasVersion( const string& ns , ConfigVersion& version ) const;
+        bool hasVersion( const string& ns );
+        bool hasVersion( const string& ns , ConfigVersion& version );
         ConfigVersion& getVersion( const string& ns ); // TODO: this is dangeroues
         void setVersion( const string& ns , const ConfigVersion& version );
+        
+        void appendInfo( BSONObjBuilder& b );
         
     private:
         
         bool _enabled;
+        
         string _configServer;
+        
+        string _shardName;
+        string _shardHost;
+
+        mongo::mutex _mutex;
         NSVersionMap _versions;
     };
     
@@ -99,6 +109,9 @@ namespace mongo {
      * @return true if we took care of the message and nothing else should be done
      */
     bool handlePossibleShardedMessage( Message &m, DbResponse &dbresponse );
+
+
+    bool objectBelongsToMe( const string& ns , const DiskLoc& loc );
 
     // -----------------
     // --- writeback ---
