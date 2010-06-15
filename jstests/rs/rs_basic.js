@@ -10,6 +10,13 @@ function go() {
     y = b.getDB("admin");
 
     print("rs_basic: started 2 servers");
+
+    var cfg = { _id: 'asdf', members: [] };
+    var hn = hostname();
+    cfg.members[0] = { _id: 0, host: hn };
+    cfg.members[1] = { _id: 1, host: hn + ":27001" };
+
+    print(tojson(cfg));
 }
 
 print("type go() to run");
