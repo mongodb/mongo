@@ -18,6 +18,11 @@
 #include "pch.h"
 #include <stdio.h>
 
+#if defined(_WIN32)
+//#define READLINE_STATIC
+//#define USE_READLINE
+#endif
+
 #ifdef USE_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -171,6 +176,13 @@ void quitNicely( int sig ){
     if ( sig == SIGPIPE )
         mongo::rawOut( "mongo got signal SIGPIPE\n" );
     killOps();
+    shellHistoryDone();
+    exit(0);
+}
+#else
+void quitNicely( int sig ){
+    mongo::goingAway = true;
+    //killOps();
     shellHistoryDone();
     exit(0);
 }

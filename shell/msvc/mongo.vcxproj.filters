@@ -210,7 +210,7 @@
     <ClCompile Include="..\..\db\common.cpp">
       <Filter>db</Filter>
     </ClCompile>
-    <ClCompile Include="..\mongo.cpp">
+    <ClCompile Include="..\mongo_vstudio.cpp">
       <Filter>shell\generated_from_js</Filter>
     </ClCompile>
     <ClCompile Include="..\mongo-server.cpp">
