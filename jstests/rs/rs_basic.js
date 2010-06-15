@@ -9,7 +9,7 @@ function go() {
     x = a.getDB("admin");
     y = b.getDB("admin");
 
-    print("started 2");
+    print("rs_basic: started 2 servers");
 }
 
 print("type go() to run");
