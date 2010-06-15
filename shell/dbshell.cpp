@@ -19,8 +19,9 @@
 #include <stdio.h>
 
 #if defined(_WIN32)
-//#define READLINE_STATIC
-//#define USE_READLINE
+# if defined(USE_READLINE)
+# define USE_READLINE_STATIC
+# endif
 #endif
 
 #ifdef USE_READLINE
@@ -207,7 +208,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
 #endif
 
     char * ret = readline( prompt );
-    signal( SIGINT , quitNicely );
+        signal( SIGINT , quitNicely );
     return ret;
 #else
     printf("%s", prompt); cout.flush();

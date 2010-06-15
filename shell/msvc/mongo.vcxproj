@@ -53,7 +53,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>XP_WIN;PCRE_STATIC;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_READLINE;XP_WIN;PCRE_STATIC;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>\boost\</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <DisableSpecificWarnings>4355;4800;4267;4244;%(DisableSpecificWarnings)</DisableSpecificWarnings>
@@ -71,7 +71,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>XP_WIN;_WIN32;PCRE_STATIC;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_READLINE;XP_WIN;_WIN32;PCRE_STATIC;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>\boost\</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -239,6 +239,7 @@
     <Library Include="..\..\..\js\js32r.lib">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </Library>
+    <Library Include="..\..\..\readline\lib\readline.lib" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\db\lasterror.h" />
