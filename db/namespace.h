@@ -640,8 +640,9 @@ namespace mongo {
 
         NamespaceDetails::Extra* newExtra(const char *ns, int n, NamespaceDetails *d);
 
-    private:
         boost::filesystem::path path() const;
+    private:
+
         void maybeMkdir() const;
         
         MMF f;
