@@ -651,9 +651,13 @@ namespace mongo {
     }
     
     bool MultiPlanScanner::uselessOr( const BSONElement &hint ) const {
+        NamespaceDetails *nsd = nsdetails( _ns );
+        if ( !nsd ) {
+            return true;
+        }
         IndexDetails *id = 0;
         if ( !hint.eoo() ) {
-            IndexDetails *id = parseHint( hint, nsdetails( _ns ) );
+            IndexDetails *id = parseHint( hint, nsd );
             if ( !id ) {
                 return true;
             }
@@ -667,7 +671,7 @@ namespace mongo {
                 }
             } else {
                 bool useful = false;
-                NamespaceDetails::IndexIterator j = nsdetails( _ns )->ii();
+                NamespaceDetails::IndexIterator j = nsd->ii();
                 while( j.more() ) {
                     IndexDetails &id = j.next();
                     if ( id.getSpec().suitability( *i, BSONObj() ) != USELESS ) {
