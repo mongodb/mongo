@@ -340,6 +340,9 @@
     <ClCompile Include="..\s\d_writeback.cpp">
       <Filter>db\sharding</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\d_state.cpp">
+      <Filter>db\sharding</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

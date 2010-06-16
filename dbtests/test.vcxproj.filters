@@ -643,6 +643,9 @@
     <ClCompile Include="..\s\d_writeback.cpp">
       <Filter>shard</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\d_state.cpp">
+      <Filter>shard</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

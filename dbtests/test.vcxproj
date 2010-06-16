@@ -536,6 +536,7 @@
     <ClCompile Include="..\db\json.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
     <ClCompile Include="..\db\matcher.cpp" />
+    <ClCompile Include="..\s\d_state.cpp" />
     <ClCompile Include="..\s\d_util.cpp" />
     <ClCompile Include="..\s\d_writeback.cpp" />
     <ClCompile Include="..\s\shardconnection.cpp" />
