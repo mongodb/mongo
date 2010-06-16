@@ -233,7 +233,7 @@ namespace mongo {
 
         void writeMongoProgramOutputLine( int port, int pid, const char *line ) {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
-            if( mongo::goingAway ) throw std::exception("program is terminating");
+            if( mongo::goingAway ) throw "program is terminating";
             stringstream buf;
             if ( port > 0 )
                 buf << "m" << port << "| " << line;
