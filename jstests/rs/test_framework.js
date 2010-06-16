@@ -1,6 +1,11 @@
 // test helpers
 // load("test_framework.js")
 
+DB.prototype.isMaster = function() { 
+    return this.runCommand("isMaster");
+}
+DB.prototype.ismaster = function () { return this.isMaster().ismaster; }
+
 function rs_mongod() {
     /* run mongod for a replica set member. wipes data dir! */
     var port = __nextPort++;
@@ -23,5 +28,3 @@ function rs_mongod() {
     conn.name = "localhost:" + port;
     return conn;
 }
-
-

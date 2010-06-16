@@ -3,25 +3,49 @@
 load("../../jstests/rs/test_framework.js");
 
 function go() {
+
+    try {
+        var z = connect("localhost:27000/test");
+        print("error: mongod already running?");
+        zz = z;
+        return;
+    }
+    catch (e) {
+        ; 
+    }
+
+    assert(__nextPort == 27000, "_nextPort==27000");
+
     a = rs_mongod();
     b = rs_mongod();
 
     x = a.getDB("admin");
     y = b.getDB("admin");
+    memb = [];
+    memb[0] = x;
+    memb[1] = y;
 
-    print("rs_basic: started 2 servers");
 
-    assert(__nextPort == 27000);
+    print("rs_basic.js go(): started 2 servers");
 
-    var cfg = { _id: 'asdf', members: [] };
+    cfg = { _id: 'asdf', members: [] };
     var hn = hostname();
-    cfg.members[0] = { _id: 0, host: hn };
+    cfg.members[0] = { _id: 0, host: hn + ":27000" };
     cfg.members[1] = { _id: 1, host: hn + ":27001" };
 
-    print(tojson(cfg));
+    print("cfg=" + tojson(cfg));
 }
 
-print("type go() to run");
+function init() {
+    var i = Random.randInt(2); // a random member of the set
+    var m = memb[i];
+    assert(!m.ismaster(), "not ismaster");
+    var res = m.runCommand({ replSetInitiate: cfg });
+    return res;
+}
+
+print("go() to run");
+print("init() to initiate");
 
 
 /*
