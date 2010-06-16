@@ -18,8 +18,11 @@ friendlyEqual = function( a , b ){
 }
 
 
-doassert = function( msg ){
-    print( "assert: " + msg );
+doassert = function (msg) {
+    if (msg.indexOf("assert") == 0)
+        print(msg);
+    else
+        print("assert: " + msg);
     throw msg;
 }
 
@@ -29,7 +32,7 @@ assert = function( b , msg ){
     if ( b )
         return;
     
-    doassert( "assert failed : " + msg );
+    doassert( msg == undefined ? "assert failed" : "assert failed : " + msg );
 }
 
 assert.automsg = function( b ) {
