@@ -315,7 +315,6 @@ namespace mongo {
                     shared_ptr<ChunkRange> c = *i;
 
                     BSONObj myCommand = fixCmdObj( cmdObj , c );
-                    cout << "myCommand: " << myCommand << endl;
                     ShardConnection conn( c->getShard() , fullns );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , myCommand , res );

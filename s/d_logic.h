@@ -75,7 +75,7 @@ namespace mongo {
         
         void appendInfo( BSONObjBuilder& b );
         
-        ChunkMatcherPtr getChunkMatcher( const string& ns , bool load=false , ConfigVersion version=0 );
+        ChunkMatcherPtr getChunkMatcher( const string& ns );
         
     private:
         

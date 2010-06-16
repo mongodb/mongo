@@ -50,8 +50,8 @@ namespace mongo {
             set<ServerAndQuery> servers;
             for ( vector<shared_ptr<ChunkRange> >::iterator i = shards.begin(); i != shards.end(); i++ ){
                 shared_ptr<ChunkRange> c = *i;
-                //servers.insert( ServerAndQuery( c->getShard().getConnString() , BSONObj() ) ); // ERH ERH ERH 
-                servers.insert( ServerAndQuery( c->getShard().getConnString() , c->getFilter() ) );
+                servers.insert( ServerAndQuery( c->getShard().getConnString() , BSONObj() ) ); 
+                //servers.insert( ServerAndQuery( c->getShard().getConnString() , c->getFilter() ) ); // this is what does mongod size filtering, TODO: clean up apis
             }
             
             if ( logLevel > 4 ){

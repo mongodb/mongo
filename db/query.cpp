@@ -637,7 +637,7 @@ namespace mongo {
                 _nscannedObjects++;
                 DiskLoc cl = _c->currLoc();
                 if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( _c->currKey(), _c->currLoc() ) ){
-                    cout << "TEMP skipping un-owned chunk: " << _c->current() << endl;
+                    // cout << "TEMP skipping un-owned chunk: " << _c->current() << endl;
                 }
                 else if( _c->getsetdup(cl) ) { 
                     // dup

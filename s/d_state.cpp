@@ -138,38 +138,24 @@ namespace mongo {
 
     }
 
-    ChunkMatcherPtr ShardingState::getChunkMatcher( const string& ns , bool load , ConfigVersion version ){
-        return ChunkMatcherPtr();// ERH ERH ERH
-        
+    ChunkMatcherPtr ShardingState::getChunkMatcher( const string& ns ){
         if ( ! _enabled )
             return ChunkMatcherPtr();
         
         if ( ! ShardedConnectionInfo::get( false ) )
             return ChunkMatcherPtr();
-        
+
+        ConfigVersion version;
         {
             scoped_lock lk( _mutex );
-            if ( ! version )
-                version = _versions[ns];
+            version = _versions[ns];
+            
             if ( ! version )
                 return ChunkMatcherPtr();
             
             ChunkMatcherPtr p = _chunks[ns];
-            if ( p ){
-                if ( ! load )
-                    return p;
-                
-                if ( p->_version >= version )
-                    return p;                
-            }
-            else {
-                if ( ! load ){
-                    stringstream ss;
-                    ss << "getChunkMatcher called with load false for ns: " << ns;
-                    msgasserted( 13300 , ss.str() );
-                }
-            }
-
+            if ( p && p->_version >= version )
+                return p;                
         }
 
         BSONObj q;
@@ -179,12 +165,25 @@ namespace mongo {
             b.append( "shard" , BSON( "$in" << BSON_ARRAY( _shardHost << _shardName ) ) );
             q = b.obj();
         }
+
+        auto_ptr<ScopedDbConnection> scoped;
+        auto_ptr<DBDirectClient> direct;
         
-        ScopedDbConnection conn( _configServer );
+        DBClientBase * conn;
+
+        if ( _configServer == _shardHost ){
+            direct.reset( new DBDirectClient() );
+            conn = direct.get();
+        }
+        else {
+            scoped.reset( new ScopedDbConnection( _configServer ) );
+            conn = scoped->get();
+        }
 
         auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
         if ( ! cursor->more() ){
-            conn.done();
+            if ( scoped.get() )
+                scoped->done();
             return ChunkMatcherPtr();
         }
         
@@ -212,7 +211,8 @@ namespace mongo {
         assert( ! min.isEmpty() );
         p->gotRange( min.getOwned() , max.getOwned() );
         
-        conn.done();
+        if ( scoped.get() )
+            scoped->done();
 
         { 
             scoped_lock lk( _mutex );
@@ -420,7 +420,7 @@ namespace mongo {
 
             {
                 dbtemprelease unlock;
-                shardingState.getChunkMatcher( ns , true , version );
+                shardingState.getChunkMatcher( ns );
             }
 
             result.appendTimestamp( "oldVersion" , oldVersion );
@@ -534,17 +534,24 @@ namespace mongo {
     }
 
     bool ChunkMatcher::belongsToMe( const BSONObj& key , const DiskLoc& loc ) const {
-        return true; // ERH ERH ERH
         if ( _map.size() == 0 )
             return false;
         
-        BSONObj x = loc.obj().getFieldDotted( _field.c_str() ).wrap(); // TODO: this is slow
+        BSONObj x = loc.obj().getFieldDotted( _field.c_str() ).wrap( _field.c_str() ); // TODO: this is slow
         
         MyMap::const_iterator a = _map.upper_bound( x );
-        if ( a == _map.end() )
-            a--;
+        a--;
         
-        return x.woCompare( a->second.first ) >= 0 && x.woCompare( a->second.second ) < 0;
+        bool good = x.woCompare( a->second.first ) >= 0 && x.woCompare( a->second.second ) < 0;
+#if 0
+        if ( ! good ){
+            cout << "bad: " << x << "\t" << a->second.first << "\t" << x.woCompare( a->second.first ) << "\t" << x.woCompare( a->second.second ) << endl;
+            for ( MyMap::const_iterator i=_map.begin(); i!=_map.end(); ++i ){
+                cout << "\t" << i->first << "\t" << i->second.first << "\t" << i->second.second << endl;
+            }
+        }
+#endif
+        return good;
     }
     
 }
