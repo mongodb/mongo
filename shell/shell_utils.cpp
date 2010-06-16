@@ -90,11 +90,11 @@ namespace mongo {
             return undefined_;
         }
 
-        
+        void goingAwaySoon();
         BSONObj Quit(const BSONObj& args) {
             // If not arguments are given first element will be EOO, which
             // converts to the integer value 0.
-            mongo::goingAway = true;
+            goingAwaySoon();
             int exit_code = int( args.firstElement().number() );
             ::exit(exit_code);
             return undefined_;
@@ -226,8 +226,14 @@ namespace mongo {
         mongo::mutex mongoProgramOutputMutex("mongoProgramOutputMutex");
         stringstream mongoProgramOutput_;
 
+        void goingAwaySoon() { 
+            mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            mongo::goingAway = true;
+        }
+
         void writeMongoProgramOutputLine( int port, int pid, const char *line ) {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            if( mongo::goingAway ) throw std::exception("program is terminating");
             stringstream buf;
             if ( port > 0 )
                 buf << "m" << port << "| " << line;
@@ -377,6 +383,7 @@ namespace mongo {
             
             // Continue reading output
             void operator()() {
+                try {
                 // This assumes there aren't any 0's in the mongo program output.
                 // Hope that's ok.
                 char buf[ 1024 ];
@@ -409,7 +416,9 @@ namespace mongo {
                         assert( strlen( buf ) <= 1023 );
                     }
                     start = buf + strlen( buf );
-                }        
+                }    
+                } catch(...) { 
+                }
             }
             void launch_process(int child_stdout){
 #ifdef _WIN32
