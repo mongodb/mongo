@@ -28,6 +28,7 @@
 */
 
 #include <string>
+#include <sstream>
 
 namespace mongoutils {
 

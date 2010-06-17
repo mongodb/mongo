@@ -65,12 +65,8 @@ namespace mongo {
         {
             const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );
-            if ( ( 2 * ( bar / 2 ) ) != bar ){
-                log() << "****\n";
-                log() << "WARNING: This is development a version (" << versionString << ") of MongoDB.  Not recommended for production.\n";
-                log() << "****" << endl;
-            }
-                
+            if ( ( 2 * ( bar / 2 ) ) != bar )
+                log() << "***** WARNING: This is a development version (" << versionString << ") of MongoDB.  Not recommended for production. *****" << endl;
         }
 
         if ( sizeof(int*) != 4 )

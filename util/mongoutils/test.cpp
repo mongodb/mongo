@@ -1,4 +1,7 @@
-// @file test.cpp
+/* @file test.cpp
+  utils/mongoutils/test.cpp
+  unit tests for mongoutils
+*/
 
 /*
  *    Copyright 2010 10gen Inc.
@@ -16,13 +19,8 @@
  *    limitations under the License.
  */
 
-/* unit tests for mongoutils 
-*/
-
 #include "str.h"
-
 #include "html.h"
-
 #include <assert.h>
 
 using namespace std;
@@ -32,5 +30,5 @@ int main() {
     string x = str::after("abcde", 'c');
     assert( x == "de" );
     assert( str::after("abcde", 'x') == "" );
+    return 0;
 }
-
