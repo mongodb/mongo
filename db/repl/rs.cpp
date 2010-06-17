@@ -193,7 +193,7 @@ namespace mongo {
                 _members.push(mi);
             }
         }
-        assert( me == 1 );
+        uassert( 13302, "replSet : can't find self in the repl set configuration", me == 1 );
 
 /*        if( save ) { 
             _cfg->save();
