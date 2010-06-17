@@ -211,7 +211,7 @@ namespace mongo {
             BSONElement e = oneArg(args);
             stringstream ss;
             ifstream f(e.valuestrsafe());
-            uassert(10000, "couldn't open file", f.is_open() );
+            uassert(13300, "couldn't open file", f.is_open() );
 
             streamsize sz = 0;
             while( 1 ) {
@@ -221,7 +221,7 @@ namespace mongo {
                 if( ch == 0 ) break;
                 ss << ch;
                 sz += 1;
-                uassert(10000, "cat() : file to big to load as a variable", sz < 1024 * 1024 * 16);
+                uassert(13301, "cat() : file to big to load as a variable", sz < 1024 * 1024 * 16);
             }
             return BSON( "" << ss.str() );
         }
