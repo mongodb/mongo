@@ -819,6 +819,7 @@ help = shellHelper.help = function (x) {
         print("\tpwd()                         returns current directory");
         print("\tlistFiles([path])             returns file list");
         print("\thostname()                    returns name of this host");
+        print("\tcat(fname)                    returns contents of text file as a string");
         print("\tremoveFile(f)                 delete a file");
         print("\tload(jsfilename)              load and execute a .js file");
         print("\trun(program[, args...])       spawn a program and wait for its completion");
