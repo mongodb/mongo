@@ -1126,7 +1126,6 @@ testEnv.Append( CPPPATH=["../"] )
 testEnv.Prepend( LIBS=[ "mongotestfiles" ] )
 testEnv.Prepend( LIBPATH=["."] )
 
-
 # ----- TARGETS ------
 
 def checkErrorCodes():
@@ -1255,7 +1254,9 @@ elif not onlyServer:
 
 #  ---- RUNNING TESTS ----
 
-testEnv.Alias( "dummySmokeSideEffect", [], [] )
+smokeEnv = testEnv.Clone()
+smokeEnv['ENV']['PATH']=os.environ['PATH']
+smokeEnv.Alias( "dummySmokeSideEffect", [], [] )
 
 smokeFlags = []
 
@@ -1268,10 +1269,10 @@ if 'startMongodSmallOplog' in COMMAND_LINE_TARGETS:
     smokeFlags += ["--small-oplog"]
 
 def addTest(name, deps, actions):
-    testEnv.Alias( name, deps, actions )
-    testEnv.AlwaysBuild( name )
+    smokeEnv.Alias( name, deps, actions )
+    smokeEnv.AlwaysBuild( name )
     # Prevent smoke tests from running in parallel
-    testEnv.SideEffect( "dummySmokeSideEffect", name )
+    smokeEnv.SideEffect( "dummySmokeSideEffect", name )
 
 def addSmoketest( name, deps ):
     addTest(name, deps, [ "python buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + name ])
@@ -1299,37 +1300,37 @@ if not onlyServer and not noshell:
 # buildscripts/smoke.py, the interface to running the tests has been
 # something like 'scons startMongod <suite>'; startMongod is now a
 # no-op, and should go away eventually.
-testEnv.Alias( "startMongod", [add_exe("mongod")]);
-testEnv.AlwaysBuild( "startMongod" );
-testEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
+smokeEnv.Alias( "startMongod", [add_exe("mongod")]);
+smokeEnv.AlwaysBuild( "startMongod" );
+smokeEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
 
-testEnv.Alias( "startMongodSmallOplog", [add_exe("mongod")], [] );
-testEnv.AlwaysBuild( "startMongodSmallOplog" );
-testEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
+smokeEnv.Alias( "startMongodSmallOplog", [add_exe("mongod")], [] );
+smokeEnv.AlwaysBuild( "startMongodSmallOplog" );
+smokeEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
 
 def addMongodReqTargets( env, target, source ):
     mongodReqTargets = [ "smokeClient", "smokeJs" ]
     for target in mongodReqTargets:
-        testEnv.Depends( target, "startMongod" )
-        testEnv.Depends( "smokeAll", target )
+        smokeEnv.Depends( target, "startMongod" )
+        smokeEnv.Depends( "smokeAll", target )
 
-testEnv.Alias( "addMongodReqTargets", [], [addMongodReqTargets] )
-testEnv.AlwaysBuild( "addMongodReqTargets" )
+smokeEnv.Alias( "addMongodReqTargets", [], [addMongodReqTargets] )
+smokeEnv.AlwaysBuild( "addMongodReqTargets" )
 
-testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeAuth", "smokeSharding", "smokeTool" ] )
-testEnv.AlwaysBuild( "smokeAll" )
+smokeEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeAuth", "smokeSharding", "smokeTool" ] )
+smokeEnv.AlwaysBuild( "smokeAll" )
 
 def addMongodReqNoJsTargets( env, target, source ):
     mongodReqTargets = [ "smokeClient" ]
     for target in mongodReqTargets:
-        testEnv.Depends( target, "startMongod" )
-        testEnv.Depends( "smokeAllNoJs", target )
+        smokeEnv.Depends( target, "startMongod" )
+        smokeEnv.Depends( "smokeAllNoJs", target )
 
-testEnv.Alias( "addMongodReqNoJsTargets", [], [addMongodReqNoJsTargets] )
-testEnv.AlwaysBuild( "addMongodReqNoJsTargets" )
+smokeEnv.Alias( "addMongodReqNoJsTargets", [], [addMongodReqNoJsTargets] )
+smokeEnv.AlwaysBuild( "addMongodReqNoJsTargets" )
 
-testEnv.Alias( "smokeAllNoJs", [ "smoke", "mongosTest", "addMongodReqNoJsTargets" ] )
-testEnv.AlwaysBuild( "smokeAllNoJs" )
+smokeEnv.Alias( "smokeAllNoJs", [ "smoke", "mongosTest", "addMongodReqNoJsTargets" ] )
+smokeEnv.AlwaysBuild( "smokeAllNoJs" )
 
 def recordPerformance( env, target, source ):
     from buildscripts import benchmark_tools

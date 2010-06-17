@@ -21,7 +21,6 @@
 
 #include "../pch.h"
 
-#include <stdint.h>
 #include <string>
 
 namespace mongo {
