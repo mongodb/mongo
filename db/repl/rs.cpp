@@ -269,7 +269,7 @@ namespace mongo {
                 startupStatus = BADCONFIG;
                 startupStatusMsg = "replSet error loading set config (BADCONFIG)";
                 log() << "replSet error loading configurations " << e.toString() << rsLog;
-                log() << "replSet replication will not start" << rsLog;
+                log() << "replSet error replication will not start" << rsLog;
                 _fatal();
                 throw;
             }
