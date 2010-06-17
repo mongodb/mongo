@@ -538,6 +538,9 @@ int _main(int argc, char* argv[]) {
     mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );    
     shellMainScope = scope.get();
+
+    if( runShell )
+        cout << "type \"help\" for help" << endl;
     
     if ( !script.empty() ) {
         mongo::shellUtils::MongoProgramScope s;
@@ -566,8 +569,6 @@ int _main(int argc, char* argv[]) {
         mongo::shellUtils::MongoProgramScope s;
 
         shellHistoryInit();
-
-        cout << "type \"help\" for help" << endl;
 
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
