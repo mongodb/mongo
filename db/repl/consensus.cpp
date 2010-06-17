@@ -21,6 +21,8 @@
 
 namespace mongo { 
 
+
+
     class CmdReplSetFresh : public ReplSetCommand { 
     public:
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
@@ -138,13 +140,28 @@ namespace mongo {
         b.append("round", round);
     }
 
-    void ReplSetImpl::getTargets(list<Target>& L) { 
+    void ReplSetImpl::_getTargets(list<Target>& L, int& configVersion) {
+        configVersion = config().version;
         for( Member *m = head(); m; m=m->next() )
             if( m->hbinfo().up() )
                 L.push_back( Target(m->fullName()) );
     }
 
-    /* allUp only meaningful when true returned! */
+    /* config version is returned as it is ok to use this unlocked.  BUT, if unlocked, you would need 
+       to check later that the config didn't change. */
+    void ReplSetImpl::getTargets(list<Target>& L, int& configVersion) {
+        if( lockedByMe() ) { 
+            _getTargets(L, configVersion);
+            return;
+        }
+        lock lk(this);
+        _getTargets(L, configVersion);
+    }
+
+    /* Do we have the newest data of them all?
+       @param allUp - set to true if all members are up.  Only set if true returned.
+       @return true if we are freshest.  Note we may tie.
+    */
     bool Consensus::weAreFreshest(bool& allUp) {
         BSONObj cmd = BSON(
                "replSetFresh" << 1 <<
@@ -152,7 +169,8 @@ namespace mongo {
                "who" << rs._self->fullName() << 
                "cfgver" << rs._cfg->version );
         list<Target> L;
-        rs.getTargets(L);
+        int ver;
+        rs.getTargets(L, ver);
         multiCommand(cmd, L);
         int nok = 0;
         allUp = true;
@@ -163,15 +181,20 @@ namespace mongo {
                     return false;
             }
             else {
-                log() << "replSet TEMP freshest returns " << i->result.toString() << rsLog;
+                DEV log() << "replSet freshest returns " << i->result.toString() << rsLog;
                 allUp = false;
             }
         }
-        log() << "replSet TEMP we are freshest of up nodes, nok:" << nok << rsLog; 
+        DEV log() << "replSet we are freshest of up nodes, nok:" << nok << rsLog; 
         return true;
     }
 
     extern time_t started;
+
+    void Consensus::multiCommand(BSONObj cmd, list<Target>& L) { 
+        assert( !rs.lockedByMe() );
+        mongo::multiCommand(cmd, L);
+    }
 
     void Consensus::_electSelf() {
         bool allUp;
@@ -180,11 +203,14 @@ namespace mongo {
             return;
         }
         if( !allUp && time(0) - started < 60 * 5 ) { 
+            /* the idea here is that if a bunch of nodes bounce all at once, we don't want to drop data 
+               if we don't have to -- we'd rather be offline and wait a little longer instead */
             log() << "replSet info not electing self, not all members up and we have been up less than 5 minutes" << rsLog;
+            return;
         }
 
         time_t start = time(0);
-        Member& me = *rs._self;        
+        Member& me = *rs._self;
         int tally = yea( me.id() );
         log() << "replSet info electSelf" << rsLog;
 
@@ -197,33 +223,40 @@ namespace mongo {
                "round" << OID::gen() /* this is just for diagnostics */
             );
 
+        int configVersion;
         list<Target> L;
-        rs.getTargets(L);
+        rs.getTargets(L, configVersion);
         multiCommand(electCmd, L);
 
-        for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
-            log() << "replSet TEMP elect res: " << i->result.toString() << rsLog;
-            if( i->ok ) {
-                int v = i->result["vote"].Int();
-                tally += v;
+        {
+            RSBase::lock lk(&rs);
+            for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
+                DEV log() << "replSet elect res: " << i->result.toString() << rsLog;
+                if( i->ok ) {
+                    int v = i->result["vote"].Int();
+                    tally += v;
+                }
             }
-        }
-        if( tally*2 > totalVotes() ) {
-            if( time(0) - start > 30 ) {
+            if( tally*2 <= totalVotes() ) {
+                log() << "replSet couldn't elect self, only received " << tally << " votes" << rsLog;
+            }
+            else if( time(0) - start > 30 ) {
                 // defensive; should never happen as we have timeouts on connection and operation for our conn
-                log() << "replSet too much time passed during election, ignoring result" << rsLog;
+                log() << "replSet too much time passed during our election, ignoring result" << rsLog;
             }
-            /* succeeded. */
-            log() << "replSet election succeeded assuming primary role" << rsLog;
-            rs.assumePrimary();
-            return;
-        } 
-        else { 
-            log() << "replSet couldn't elect self, only received " << tally << " votes" << rsLog;
+            else if( configVersion != rs.config().version ) { 
+                log() << "replSet config version changed during our election, ignoring result" << rsLog;
+            }
+            else {
+                /* succeeded. */
+                log() << "replSet election succeeded, assuming primary role" << rsLog;
+                rs.assumePrimary();
+            } 
         }
     }
 
     void Consensus::electSelf() {
+        assert( !rs.lockedByMe() );
         try { 
             _electSelf(); 
         } 

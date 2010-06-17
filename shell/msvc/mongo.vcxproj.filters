@@ -240,9 +240,6 @@
     <None Include="..\utils.js">
       <Filter>_js files</Filter>
     </None>
-    <None Include="mongo.ico">
-      <Filter>Resource Files</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\js\js32d.lib" />
@@ -253,7 +250,10 @@
     <ClInclude Include="..\..\db\lasterror.h">
       <Filter>db</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h" />
-    <ClInclude Include="resource1.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\db\db.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

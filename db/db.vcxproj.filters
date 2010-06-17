@@ -764,6 +764,9 @@
     <Filter Include="util\core">
       <UniqueIdentifier>{9775f24c-3a29-4e0d-b5de-991c592cf376}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{9aea1b83-cdcb-48a8-97e6-47805cacdc29}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="repl\notes.txt">
@@ -781,9 +784,6 @@
     <None Include="readme.txt">
       <Filter>util\concurrency</Filter>
     </None>
-    <None Include="mongo.ico">
-      <Filter>libs</Filter>
-    </None>
     <None Include="..\SConstruct">
       <Filter>db</Filter>
     </None>
@@ -792,6 +792,9 @@
     </None>
     <None Include="..\jstests\rs\test_framework.js">
       <Filter>rs\test stuff</Filter>
+    </None>
+    <None Include="mongo.ico">
+      <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -810,7 +813,7 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc">
-      <Filter>db\core</Filter>
+      <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
 </Project>

@@ -31,9 +31,6 @@ namespace mongo {
         BSONObj result;
     };
 
-    /** send a command in parallel to many servers, and collect the results. */
-    void multiCommand(BSONObj cmd, list<Target>& L);
-
     /* -- implementation ------------- */
 
     class _MultiCommandJob : public BackgroundJob { 

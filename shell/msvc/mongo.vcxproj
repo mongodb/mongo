@@ -230,7 +230,6 @@
     <None Include="..\query.js" />
     <None Include="..\servers.js" />
     <None Include="..\utils.js" />
-    <None Include="mongo.ico" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\js\js32d.lib">
@@ -243,8 +242,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\db\lasterror.h" />
-    <ClInclude Include="resource.h" />
-    <ClInclude Include="resource1.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\db\db.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

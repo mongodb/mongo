@@ -240,11 +240,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\db\db.rc">
-      <Filter>misc and third party</Filter>
-    </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
       <Filter>misc and third party</Filter>
     </Library>
