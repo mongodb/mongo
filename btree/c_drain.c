@@ -402,13 +402,16 @@ __wt_drain_evict(ENV *env)
 		    "cache evicting element/page/addr %p/%p/%lu",
 		    e, e->page, (u_long)e->addr));
 
-		/* Copy a page reference, then clean up the entry. */
+		/*
+		 * Copy a page reference, then make the cache entry available
+		 * for re-use.
+		 */
 		page = e->page;
 		WT_CACHE_ENTRY_CLR(e);
 
 		WT_CACHE_PAGE_OUT(cache, page->size);
 
-		/* Free the memory. */
+		/* The page can no longer be found, free the memory. */
 		__wt_bt_page_discard(env, page);
 	}
 }
