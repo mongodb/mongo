@@ -657,7 +657,7 @@ elif "win32" == os.sys.platform:
     else:
         env.Append( LIBPATH=[ winSDKHome + "/Lib" ] )
 
-    env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT " )
+    env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT /NODEFAULTLIB:MSVCRTD " )
 
     def pcreFilter(x):
         name = x.name
