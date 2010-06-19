@@ -80,7 +80,7 @@ namespace mongo {
             return false;
         }
 
-        bool lock_try( int millis ){
+        bool lock_try( int millis = 0 ){
             boost::system_time until = get_system_time();
             until += boost::posix_time::milliseconds(millis);
             if( _m.timed_lock( until ) ) { 
@@ -146,7 +146,7 @@ namespace mongo {
             return _try( millis , false );
         }
 
-        bool lock_try( int millis ){
+        bool lock_try( int millis = 0 ){
             if( _try( millis , true ) ) { 
 #if defined(_DEBUG)
                 mutexDebugger.entering(_name);
