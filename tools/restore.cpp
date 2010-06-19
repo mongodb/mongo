@@ -112,13 +112,19 @@ public:
         string ns;
         if (use_db) {
             ns += _db;
-        } else {
+        } 
+        else {
             string dir = root.branch_path().string();
             if ( dir.find( "/" ) == string::npos )
                 ns += dir;
             else
                 ns += dir.substr( dir.find_last_of( "/" ) + 1 );
+            
+            if ( ns.size() == 0 )
+                ns = "test";
         }
+        
+        assert( ns.size() );
 
         if (use_coll) {
             ns += "." + _coll;
