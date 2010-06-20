@@ -595,3 +595,5 @@ flags['ienv'] = [
 	'WORKQ_RUN' ]
 flags['wt_page'] = [
 	'PINNED' ]
+flags['wt_toc'] = [
+	'READ_DRAIN' ]
