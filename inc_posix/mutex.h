@@ -33,14 +33,25 @@ typedef u_int32_t wt_atomic_t;
 
 /*
  * Atomic writes are often associated with memory barriers, implemented by the
- * WT_MEMORY_FLUSH macro.   The WT_MEMORY_FLUSH macro ensures memory stores by
+ * WT_MEMORY_FLUSH macro.  WiredTiger's requirement as described by the Solaris
+ * membar_enter description:
+ *
+ *	No stores from after the memory barrier will reach visibility and
+ *	no loads from after the barrier will be resolved before the lock
+ *	acquisition reaches global visibility
+ *
+ * In other words, the WT_MEMORY_FLUSH macro must ensure that memory stores by
  * the processor, made before the WT_MEMORY_FLUSH call, be visible to all
- * processors in the system, before any memory stores by this processor, made
- * after the WT_MEMORY_FLUSH call, are visible to any processor.  That is, it
- * guarantees write ordering.  Note that the WT_MEMORY_FLUSH macro makes no
- * requirement with respect to loads by any processor, so any memory reference
- * which might cause a problem if cached by a processor needs to be declared
- * volatile.
+ * processors in the system before any memory stores by the processor, made
+ * after the WT_MEMORY_FLUSH call, are visible to any processor.  In addition,
+ * the processor will discard registers across WT_MEMORY_FLUSH calls.  The
+ * WT_MEMORY_FLUSH macro makes no requirement with respect to loads by any
+ * other processor than the processor making the call.
+ *
+ * Code handling shared data has two choices: either mark the data location
+ * volatile, forcing the compiler to re-load the data on each access, or, use
+ * a memory barrier instruction at appropriate points in order to force an
+ * explicit re-load of the memory location.
  */
 extern void *__wt_addr;
 
