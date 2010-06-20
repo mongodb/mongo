@@ -23,11 +23,6 @@ serial['bt_del'] = Serial(
 	['WT_PAGE */page',
 	 'WT_REPL */new'])
 
-serial['bt_rec'] = Serial(
-	'bt_rec',
-	'WT_WORKQ_SPIN',
-	['WT_PAGE */page'])
-
 serial['bt_repl'] = Serial(
 	'bt_repl',
 	'WT_WORKQ_SPIN',
