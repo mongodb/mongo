@@ -52,22 +52,23 @@ cache_stats['CACHE_READ_RESTARTS'] = Stat([], 'cache read restarts')
 # IDB handle statistics
 ##########################################
 idb_stats = {}
-idb_stats['BULK_DUP_DATA_READ'] = Stat([], 'bulk duplicate data pairs read')
-idb_stats['BULK_HUFFMAN_DATA'] = Stat([], 'bulk insert huffman data compression')
-idb_stats['BULK_HUFFMAN_KEY'] = Stat([], 'bulk insert huffman key compression')
-idb_stats['BULK_OVERFLOW_DATA'] = Stat([], 'bulk overflow data items read')
-idb_stats['BULK_OVERFLOW_KEY'] = Stat([], 'bulk overflow key items read')
-idb_stats['BULK_PAIRS_READ'] = Stat([], 'bulk key/data pairs inserted')
-idb_stats['BULK_REPEAT_COUNT'] = Stat([], 'bulk insert repeat count compression')
-idb_stats['DB_CACHE_ALLOC'] = Stat([], 'pages allocated in the cache')
+idb_stats['DB_CACHE_ALLOC'] = Stat([], 'cache: pages allocated in the cache')
 idb_stats['DB_CACHE_HIT'] = Stat([], 'cache hit: reads found in the cache')
 idb_stats['DB_CACHE_MISS'] = Stat([], 'cache miss: reads not found in the cache')
+idb_stats['DUPLICATE_ITEMS_INSERTED'] = Stat([], 'duplicate key/data pairs inserted')
+idb_stats['HUFFMAN_DATA'] = Stat([], 'huffman data compression in bytes')
+idb_stats['HUFFMAN_KEY'] = Stat([], 'huffman key compression in bytes')
+idb_stats['ITEMS_INSERTED'] = Stat([], 'key/data pairs inserted')
+idb_stats['OVERFLOW_DATA'] = Stat([], 'overflow data items inserted')
+idb_stats['OVERFLOW_KEY'] = Stat([], 'overflow key items inserted')
+idb_stats['REPEAT_COUNT'] = Stat([], 'repeat value compression count')
 
 ##########################################
 # IDB database statistics
 ##########################################
 idb_dstats = {}
 idb_dstats['BASE_RECNO'] = Stat([], 'base record number')
+idb_dstats['DUP_TREE'] = Stat([], 'duplicate data off-page trees')
 idb_dstats['FIXED_LEN'] = Stat([], 'database fixed-record size')
 idb_dstats['INTLMAX'] = Stat([], 'maximum internal page size')
 idb_dstats['INTLMIN'] = Stat([], 'minimum internal page size')

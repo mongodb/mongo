@@ -50,9 +50,10 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 25, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 26, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
+	stats[WT_STAT_DUP_TREE].desc = "duplicate data off-page trees";
 	stats[WT_STAT_FIXED_LEN].desc = "database fixed-record size";
 	stats[WT_STAT_INTLMAX].desc = "maximum internal page size";
 	stats[WT_STAT_INTLMIN].desc = "minimum internal page size";
@@ -87,6 +88,7 @@ void
 __wt_stat_clear_database_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
+	stats[WT_STAT_DUP_TREE].v = 0;
 	stats[WT_STAT_FIXED_LEN].v = 0;
 	stats[WT_STAT_INTLMAX].v = 0;
 	stats[WT_STAT_INTLMIN].v = 0;
@@ -119,23 +121,20 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 
 	WT_RET(__wt_calloc(env, 11, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_BULK_DUP_DATA_READ].desc =
-	    "bulk duplicate data pairs read";
-	stats[WT_STAT_BULK_HUFFMAN_DATA].desc =
-	    "bulk insert huffman data compression";
-	stats[WT_STAT_BULK_HUFFMAN_KEY].desc =
-	    "bulk insert huffman key compression";
-	stats[WT_STAT_BULK_OVERFLOW_DATA].desc =
-	    "bulk overflow data items read";
-	stats[WT_STAT_BULK_OVERFLOW_KEY].desc = "bulk overflow key items read";
-	stats[WT_STAT_BULK_PAIRS_READ].desc = "bulk key/data pairs inserted";
-	stats[WT_STAT_BULK_REPEAT_COUNT].desc =
-	    "bulk insert repeat count compression";
-	stats[WT_STAT_DB_CACHE_ALLOC].desc = "pages allocated in the cache";
+	stats[WT_STAT_DB_CACHE_ALLOC].desc =
+	    "cache: pages allocated in the cache";
 	stats[WT_STAT_DB_CACHE_HIT].desc =
 	    "cache hit: reads found in the cache";
 	stats[WT_STAT_DB_CACHE_MISS].desc =
 	    "cache miss: reads not found in the cache";
+	stats[WT_STAT_DUPLICATE_ITEMS_INSERTED].desc =
+	    "duplicate key/data pairs inserted";
+	stats[WT_STAT_HUFFMAN_DATA].desc = "huffman data compression in bytes";
+	stats[WT_STAT_HUFFMAN_KEY].desc = "huffman key compression in bytes";
+	stats[WT_STAT_ITEMS_INSERTED].desc = "key/data pairs inserted";
+	stats[WT_STAT_OVERFLOW_DATA].desc = "overflow data items inserted";
+	stats[WT_STAT_OVERFLOW_KEY].desc = "overflow key items inserted";
+	stats[WT_STAT_REPEAT_COUNT].desc = "repeat value compression count";
 
 	*statsp = stats;
 	return (0);
@@ -144,16 +143,16 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 void
 __wt_stat_clear_db_stats(WT_STATS *stats)
 {
-	stats[WT_STAT_BULK_DUP_DATA_READ].v = 0;
-	stats[WT_STAT_BULK_HUFFMAN_DATA].v = 0;
-	stats[WT_STAT_BULK_HUFFMAN_KEY].v = 0;
-	stats[WT_STAT_BULK_OVERFLOW_DATA].v = 0;
-	stats[WT_STAT_BULK_OVERFLOW_KEY].v = 0;
-	stats[WT_STAT_BULK_PAIRS_READ].v = 0;
-	stats[WT_STAT_BULK_REPEAT_COUNT].v = 0;
 	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;
+	stats[WT_STAT_DUPLICATE_ITEMS_INSERTED].v = 0;
+	stats[WT_STAT_HUFFMAN_DATA].v = 0;
+	stats[WT_STAT_HUFFMAN_KEY].v = 0;
+	stats[WT_STAT_ITEMS_INSERTED].v = 0;
+	stats[WT_STAT_OVERFLOW_DATA].v = 0;
+	stats[WT_STAT_OVERFLOW_KEY].v = 0;
+	stats[WT_STAT_REPEAT_COUNT].v = 0;
 }
 
 int
