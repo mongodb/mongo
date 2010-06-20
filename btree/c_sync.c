@@ -84,6 +84,9 @@ __wt_cache_sync_drain(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	fcnt = 0;
 	ret = 0;
 
+	/* Single-thread reconciliation. */
+	__wt_lock(env, cache->mtx_reconcile);
+
 	drain_base = NULL;
 	drain_elem = drain_len = 0;
 	for (i = 0; i < cache->hb_size; ++i)
@@ -102,7 +105,7 @@ __wt_cache_sync_drain(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 			 * about it.
 			 */
 			if (!__wt_hazard_set(toc, e, NULL))
-				goto loop;;
+				goto loop;
 
 			/* Ignore clean pages. */
 			page = e->page;
@@ -185,6 +188,8 @@ done:	/* Wrap up reporting. */
 	if (f != NULL)
 		f(toc->name, fcnt);
 
-err:	__wt_free(env, drain_base, drain_len);
+err:	__wt_unlock(env, cache->mtx_reconcile);
+
+	__wt_free(env, drain_base, drain_len);
 	return (ret);
 }

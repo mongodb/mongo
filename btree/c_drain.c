@@ -108,7 +108,13 @@ __wt_cache_drain_server(void *arg)
 			 * in order to be a good thread citizen.
 			 */
 			WT_TOC_GEN_SET(toc);
-			WT_ERR(__wt_drain_trickle(toc));
+
+			/* Single-thread reconciliation. */
+			__wt_lock(env, cache->mtx_reconcile);
+			ret = __wt_drain_trickle(toc);
+			__wt_unlock(env, cache->mtx_reconcile);
+
+			WT_ERR(ret);
 			WT_TOC_GEN_CLR(toc);
 
 			/*

@@ -29,6 +29,7 @@ __wt_cache_create(ENV *env)
 
 	WT_ERR(__wt_mtx_alloc(env, "cache drain server", 1, &cache->mtx_drain));
 	WT_ERR(__wt_mtx_alloc(env, "cache read server", 1, &cache->mtx_read));
+	WT_ERR(__wt_mtx_alloc(env, "reconciliation", 0, &cache->mtx_reconcile));
 
 	/*
 	 * Initialize the cache hash buckets.
@@ -168,11 +169,13 @@ __wt_cache_destroy(ENV *env)
 		} while ((e = etmp) != NULL);
 	}
 
-	/* Discard and destroy mutexes. */
+	/* Discard mutexes. */
 	if (cache->mtx_drain != NULL)
 		(void)__wt_mtx_destroy(env, cache->mtx_drain);
 	if (cache->mtx_read != NULL)
 		__wt_mtx_destroy(env, cache->mtx_read);
+	if (cache->mtx_reconcile != NULL)
+		__wt_mtx_destroy(env, cache->mtx_reconcile);
 
 	/* Discard allocated memory, and clear. */
 	__wt_free(env, cache->stats, 0);

@@ -28,6 +28,7 @@ __wt_workq_read_server(ENV *env)
 	if (!cache->read_sleeping)
 		return;
 
+#if 0
 	/*
 	 * If we're 10% over the maximum cache, shut out reads (which include
 	 * page allocations) until we drain to at least 5% under the maximum
@@ -48,6 +49,7 @@ __wt_workq_read_server(ENV *env)
 	}
 	if (cache->read_lockout)
 		return;
+#endif
 
 	WT_VERBOSE(env, WT_VERB_SERVERS, (env, "waking cache read server"));
 	cache->read_sleeping = 0;

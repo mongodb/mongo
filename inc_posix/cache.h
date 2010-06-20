@@ -62,6 +62,18 @@ struct __wt_cache {
 					   slot available if toc is NULL */
 
 	/*
+	 * The Db.sync method and the cache drain server both want to reconcile
+	 * pages, and there are two problems: first, reconciliation updates
+	 * parent pages, which means the Db.sync method and the cache drain
+	 * server might update the same parent page at the same time.  Second,
+	 * the Db.sync method and cache drain server might attempt to reconcile
+	 * the same page at the same time which implies serialization anyway.
+	 * We could probably handle that, but for now, I'm going to make page
+	 * reconciliation single-threaded.
+	 */
+	WT_MTX *mtx_reconcile;		/* Single-thread page reconciliation */
+
+	/*
 	 * In-memory database pages are in a hash bucket based on their file
 	 * address; the hash bucket references an array of WT_CACHE_ENTRY
 	 * structures, each of which references a single database page.
