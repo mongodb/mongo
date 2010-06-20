@@ -59,6 +59,7 @@ namespace mongo {
     class Manager : public task::Server {
         bool got(const any&);
         ReplSetImpl *rs;
+        bool busy;
         int _primary;
         const Member* findOtherPrimary();
         void noteARemoteIsPrimary(const Member *);
@@ -68,6 +69,7 @@ namespace mongo {
         void msgCheckNewState();
     };
 
+    struct Target;
     class Consensus {
         ReplSetImpl &rs;
         struct LastYea { 
@@ -85,6 +87,8 @@ namespace mongo {
         bool aMajoritySeemsToBeUp() const;
         void electSelf();
         void electCmdReceived(BSONObj, BSONObjBuilder*);
+
+        void multiCommand(BSONObj cmd, list<Target>& L);
     };
 
     /** most operations on a ReplSet object should be done while locked. */
@@ -92,21 +96,32 @@ namespace mongo {
     private:
         mutex m;
         int _locked;
+        ThreadLocalValue<bool> _lockedByMe;
     protected:
         RSBase() : m("RSBase"), _locked(0) { }
         class lock : scoped_lock { 
             RSBase& _b;
         public:
             lock(RSBase* b) : scoped_lock(b->m), _b(*b) { 
-                DEV assert(b->_locked == 0);
-                b->_locked++; 
+                DEV assert(_b._locked == 0);
+                _b._locked++; 
+                _b._lockedByMe.set(true);
             }
             ~lock() { 
+                assert( _b._lockedByMe.get() );
                 DEV assert(_b._locked == 1);
+                _b._lockedByMe.set(false);
                 _b._locked--; 
             }
         };
+    public:
+        /* for asserts */
         bool locked() const { return _locked != 0; }
+
+        /* if true, is locked, and was locked by this thread. note if false, it could be in the lock or not for another 
+           just for asserts & such so we can make the contracts clear on who locks what when.
+        */
+        bool lockedByMe() { return _lockedByMe.get(); } 
     };
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
@@ -185,7 +200,8 @@ namespace mongo {
     private:
         Member* head() const { return _members.head(); }
         Member* findById(unsigned id) const;
-        void getTargets(list<Target>&);
+        void _getTargets(list<Target>&, int &configVersion);
+        void getTargets(list<Target>&, int &configVersion);
         void startThreads();
         friend class FeedbackThread;
         friend class CmdReplSetElect;

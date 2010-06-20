@@ -193,7 +193,10 @@ namespace mongo {
                 _members.push(mi);
             }
         }
-        assert( me == 1 );
+        if( me != 1 ) {
+            log() << "replSet config : " << _cfg->toString() << rsLog;
+            uassert( 13302, "replSet : can't find self in the repl set configuration", me == 1 );
+        }
 
 /*        if( save ) { 
             _cfg->save();
@@ -266,7 +269,7 @@ namespace mongo {
                 startupStatus = BADCONFIG;
                 startupStatusMsg = "replSet error loading set config (BADCONFIG)";
                 log() << "replSet error loading configurations " << e.toString() << rsLog;
-                log() << "replSet replication will not start" << rsLog;
+                log() << "replSet error replication will not start" << rsLog;
                 _fatal();
                 throw;
             }

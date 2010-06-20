@@ -13,6 +13,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{7B84584E-92BC-4DB9-971B-A1A8F93E5053}</ProjectGuid>
     <RootNamespace>mongoutils</RootNamespace>
+    <ProjectName>mongoutils test program</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

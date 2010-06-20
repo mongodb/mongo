@@ -1,5 +1,5 @@
 Name: mongo
-Version: 1.5.2
+Version: 1.5.3
 Release: mongodb_1%{?dist}
 Summary: mongo client shell and tools
 License: AGPL 3.0

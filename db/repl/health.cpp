@@ -85,7 +85,7 @@ namespace mongo {
         s << td( red(hbinfo().lastHeartbeatMsg,!ok) );
         stringstream q;
         q << "/_replSetOplog?" << id();
-        s << td( a(q.str(), "", "finish") );
+        s << td( a(q.str(), "", hbinfo().opTime.toString()) );
         s << _tr();
     }
 
@@ -121,6 +121,8 @@ namespace mongo {
             ss << "Error : can't find a member with id: " << server_id << '\n';
             return;
         }
+
+        ss << p("Server : " + m->fullName() );
 
         const bo fields = BSON( "o" << -1 << "o2" << -1 );
 

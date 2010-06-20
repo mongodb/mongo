@@ -267,7 +267,7 @@ namespace mongo {
 
         string _replSetOplog(string parms) { 
             stringstream s;
-            string t = "Replica Set oplog for host : " + hostname();
+            string t = "View replica set member oplog";
             s << start(t);
             s << p(t);
 

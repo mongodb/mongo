@@ -12,11 +12,11 @@ COMPONENTS
 
 BUILDING
       
-  see docs/building.md
+  See docs/building.md, also www.mongodb.org search for "Building".
 
 RUNNING
 
-  To see command line options invoke:
+  For command line options invoke:
 
     $ ./mongod --help
 
@@ -25,9 +25,13 @@ RUNNING
     $ mkdir /data/db
     $ ./mongod
     $
-    $ # mongo shell connects to localhost and test database by default:
+    $ # The mongo javascript shell connects to localhost and test database by default:
     $ ./mongo 
     > help
+
+DRIVERS
+
+  Client drivers for most programming languages are available at mongodb.org.
 
 NOTES
 
@@ -35,12 +39,13 @@ NOTES
   not be able to work with large (multi-gigabyte) databases.  However, 32 bit
   builds work fine with small development databases.
 
-LICENSING
+LICENSE
 
   Most MongoDB source files are made available under the terms of the
   GNU Affero General Public License (AGPL).  See individual files for
   details.
 
-  As an exception, the files in the debian/ directory, the rpm/
-  directory, and all subdirectories thereof are made available under
+  As an exception, the files in the client/, debian/, rpm/,
+  utils/mongoutils, and all subdirectories thereof are made available under
   the terms of the Apache License, version 2.0.
+

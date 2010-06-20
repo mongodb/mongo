@@ -1,5 +1,6 @@
-// collection.js
-
+// collection.js - DBCollection support in the mongo shell
+// db.colName is a DBCollection object
+// or db["colName"]
 
 if ( ( typeof  DBCollection ) == "undefined" ){
     DBCollection = function( mongo , db , shortName , fullName ){
@@ -575,6 +576,3 @@ DBCollection.prototype.toString = function(){
 DBCollection.prototype.tojson = DBCollection.prototype.toString;
 
 DBCollection.prototype.shellPrint = DBCollection.prototype.toString;
-
-
-

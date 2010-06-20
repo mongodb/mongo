@@ -202,9 +202,32 @@ namespace mongo {
             return BSON( "" << getHostName() );
         }
 
-        BSONObj removeFile(const BSONObj& args){
+        static BSONElement oneArg(const BSONObj& args) { 
             uassert( 12597 , "need to specify 1 argument" , args.nFields() == 1 );
-            
+            return args.firstElement();
+        }
+
+        BSONObj cat(const BSONObj& args){
+            BSONElement e = oneArg(args);
+            stringstream ss;
+            ifstream f(e.valuestrsafe());
+            uassert(13300, "couldn't open file", f.is_open() );
+
+            streamsize sz = 0;
+            while( 1 ) {
+                char ch = 0;
+                // slow...maybe change one day
+                f.get(ch);
+                if( ch == 0 ) break;
+                ss << ch;
+                sz += 1;
+                uassert(13301, "cat() : file to big to load as a variable", sz < 1024 * 1024 * 16);
+            }
+            return BSON( "" << ss.str() );
+        }
+
+        BSONObj removeFile(const BSONObj& args){
+            BSONElement e = oneArg(args);
             bool found = false;
             
             path root( args.firstElement().valuestrsafe() );
@@ -789,6 +812,7 @@ namespace mongo {
             scope.injectNative( "ls" , ls );
             scope.injectNative( "pwd", pwd );
             scope.injectNative( "cd", cd );
+            scope.injectNative( "cat", cat );
             scope.injectNative( "hostname", hostname);
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );

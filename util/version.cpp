@@ -14,7 +14,7 @@ namespace mongo {
     // mongo processes version support
     //
 
-    const char versionString[] = "1.5.3-pre-";
+    const char versionString[] = "1.5.4-pre-";
 
     string mongodVersion() {
         stringstream ss;
@@ -62,22 +62,24 @@ namespace mongo {
     //
 
     void show_32_warning(){
+        bool warned = false;
         {
             const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );
-            if ( ( 2 * ( bar / 2 ) ) != bar ){
-                log() << "****\n";
-                log() << "WARNING: This is development a version (" << versionString << ") of MongoDB.  Not recommended for production.\n";
-                log() << "****" << endl;
+            if ( ( 2 * ( bar / 2 ) ) != bar ) {
+                cout << "\n** NOTE: This is a development version (" << versionString << ") of MongoDB.";
+                cout << "\n**       Not recommended for production. \n" << endl;
+                warned = true;
             }
-                
         }
 
         if ( sizeof(int*) != 4 )
             return;
-        cout << endl;
+
+        if( !warned ) // prettier this way 
+            cout << endl;
         cout << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
-        cout << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations for more" << endl;
+        cout << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations" << endl;
         cout << endl;
     }
 

@@ -253,9 +253,6 @@
     <ClInclude Include="..\util\unittest.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\db\db.rc" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\gridfs.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
