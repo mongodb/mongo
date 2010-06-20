@@ -34,7 +34,10 @@ __wt_hazard_set(WT_TOC *toc, WT_CACHE_ENTRY *e, WT_PAGE *page)
 		 * If page is NULL, we raced (that is, we were looking at a
 		 * cache entry, everything matched, and as we retrieved the
 		 * page address from memory for a hazard reference, the page
-		 * disappeared).   That makes us done.
+		 * disappeared).   That makes us done.  Note we can't USE the
+		 * page for anything until we finish the WT_CACHE_ENTRY dance,
+		 * this test is only to avoid using a NULL address as part of
+		 * that dance.
 		 */
 		if ((page = e->page) == NULL)
 			return (0);
@@ -43,29 +46,50 @@ __wt_hazard_set(WT_TOC *toc, WT_CACHE_ENTRY *e, WT_PAGE *page)
 	WT_VERBOSE(env,
 	    WT_VERB_HAZARD, (env, "toc %p hazard %p: set", toc, page));
 
-	/* Set the caller's hazard pointer. */
-	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
-		if (*hp == NULL) {
-			*hp = page;
-			/*
-			 * Memory flush needed; the hazard array isn't declared
-			 * volatile, so an explicit memory flush is necessary.
-			 */
-			WT_MEMORY_FLUSH;
+	/*
+	 * Dance:
+	 * The memory location making a page "real" is the WT_CACHE_ENTRY's
+	 * state field, which can be reset from WT_OK to WT_DRAIN at any time
+	 * by the cache drain server.
+	 *
+	 * Add the page to the WT_TOC's hazard list (which flushes the write),
+	 * then see if the state field is still WT_OK.  If it's still WT_OK,
+	 * we know we can use the page because the cache drain server will see
+	 * our hazard reference before it discards the buffer (the drain server
+	 * sets the WT_DRAIN state, flushes memory, and then checks the hazard
+	 * references).
+	 */
+	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp) {
+		if (*hp != NULL)
+			continue;
 
-			/*
-			 * Check to see if the cache entry is still valid.  If
-			 * it is, we're good to go, the cache server won't take
-			 * this block.   Else, the cache server did take this
-			 * block, we can't have it.
-			 */
-			if (e != NULL && e->state != WT_OK) {
-				*hp = NULL;
-				return (0);
-			}
+		/*
+		 * Memory flush needed; the hazard array isn't declared volatile
+		 * and an explicit memory flush is necessary.
+		 */
+		*hp = page;
+		WT_MEMORY_FLUSH;
 
+		/*
+		 * If the cache entry isn't set, it's an allocation and we're
+		 * done.
+		 */
+		if (e == NULL)
 			return (1);
-		}
+
+		/*
+		 * If the cache entry is set, check to see if it's still valid.
+		 * Valid means the state is WT_OK, or the state is WT_DRAIN and
+		 * this thread is allowed to see pages flagged for draining.
+		 */
+		if (e->state == WT_OK ||
+		    (e->state == WT_DRAIN && F_ISSET(toc, WT_READ_DRAIN)))
+			return (1);
+
+		/* The cache drain server owns this page, we can't have it. */
+		*hp = NULL;
+		return (0);
+	}
 	__wt_api_env_errx(env, "WT_TOC has no more hazard reference slots");
 	WT_ASSERT(env, hp < toc->hazard + env->hazard_size);
 	return (0);
