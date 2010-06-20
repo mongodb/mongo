@@ -59,43 +59,44 @@ struct __wt_stats {
  * Statistics entries for DB/IDB database.
  */
 #define	WT_STAT_BASE_RECNO			    0
-#define	WT_STAT_FIXED_LEN			    1
-#define	WT_STAT_INTLMAX				    2
-#define	WT_STAT_INTLMIN				    3
-#define	WT_STAT_ITEM_DATA_OVFL			    4
-#define	WT_STAT_ITEM_DUP_DATA			    5
-#define	WT_STAT_ITEM_KEY_OVFL			    6
-#define	WT_STAT_ITEM_TOTAL_DATA			    7
-#define	WT_STAT_ITEM_TOTAL_KEY			    8
-#define	WT_STAT_LEAFMAX				    9
-#define	WT_STAT_LEAFMIN				   10
-#define	WT_STAT_MAGIC				   11
-#define	WT_STAT_MAJOR				   12
-#define	WT_STAT_MINOR				   13
-#define	WT_STAT_PAGE_COL_FIXED			   14
-#define	WT_STAT_PAGE_COL_INTERNAL		   15
-#define	WT_STAT_PAGE_COL_VARIABLE		   16
-#define	WT_STAT_PAGE_DUP_INTERNAL		   17
-#define	WT_STAT_PAGE_DUP_LEAF			   18
-#define	WT_STAT_PAGE_FREE			   19
-#define	WT_STAT_PAGE_INTERNAL			   20
-#define	WT_STAT_PAGE_LEAF			   21
-#define	WT_STAT_PAGE_OVERFLOW			   22
-#define	WT_STAT_TREE_LEVEL			   23
+#define	WT_STAT_DUP_TREE			    1
+#define	WT_STAT_FIXED_LEN			    2
+#define	WT_STAT_INTLMAX				    3
+#define	WT_STAT_INTLMIN				    4
+#define	WT_STAT_ITEM_DATA_OVFL			    5
+#define	WT_STAT_ITEM_DUP_DATA			    6
+#define	WT_STAT_ITEM_KEY_OVFL			    7
+#define	WT_STAT_ITEM_TOTAL_DATA			    8
+#define	WT_STAT_ITEM_TOTAL_KEY			    9
+#define	WT_STAT_LEAFMAX				   10
+#define	WT_STAT_LEAFMIN				   11
+#define	WT_STAT_MAGIC				   12
+#define	WT_STAT_MAJOR				   13
+#define	WT_STAT_MINOR				   14
+#define	WT_STAT_PAGE_COL_FIXED			   15
+#define	WT_STAT_PAGE_COL_INTERNAL		   16
+#define	WT_STAT_PAGE_COL_VARIABLE		   17
+#define	WT_STAT_PAGE_DUP_INTERNAL		   18
+#define	WT_STAT_PAGE_DUP_LEAF			   19
+#define	WT_STAT_PAGE_FREE			   20
+#define	WT_STAT_PAGE_INTERNAL			   21
+#define	WT_STAT_PAGE_LEAF			   22
+#define	WT_STAT_PAGE_OVERFLOW			   23
+#define	WT_STAT_TREE_LEVEL			   24
 
 /*
  * Statistics entries for DB/IDB handle.
  */
-#define	WT_STAT_BULK_DUP_DATA_READ		    0
-#define	WT_STAT_BULK_HUFFMAN_DATA		    1
-#define	WT_STAT_BULK_HUFFMAN_KEY		    2
-#define	WT_STAT_BULK_OVERFLOW_DATA		    3
-#define	WT_STAT_BULK_OVERFLOW_KEY		    4
-#define	WT_STAT_BULK_PAIRS_READ			    5
-#define	WT_STAT_BULK_REPEAT_COUNT		    6
-#define	WT_STAT_DB_CACHE_ALLOC			    7
-#define	WT_STAT_DB_CACHE_HIT			    8
-#define	WT_STAT_DB_CACHE_MISS			    9
+#define	WT_STAT_DB_CACHE_ALLOC			    0
+#define	WT_STAT_DB_CACHE_HIT			    1
+#define	WT_STAT_DB_CACHE_MISS			    2
+#define	WT_STAT_DUPLICATE_ITEMS_INSERTED	    3
+#define	WT_STAT_HUFFMAN_DATA			    4
+#define	WT_STAT_HUFFMAN_KEY			    5
+#define	WT_STAT_ITEMS_INSERTED			    6
+#define	WT_STAT_OVERFLOW_DATA			    7
+#define	WT_STAT_OVERFLOW_KEY			    8
+#define	WT_STAT_REPEAT_COUNT			    9
 
 /*
  * Statistics entries for ENV/IENV handle.

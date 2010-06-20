@@ -3,6 +3,10 @@ int
 __wt_db_bulk_load(WT_TOC *toc, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **));
 int
+__wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl);
+int
+__wt_bt_build_data_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl);
+int
 __wt_bt_close(WT_TOC *toc);
 int
 __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
@@ -47,7 +51,7 @@ __wt_bt_open(WT_TOC *toc, int ok_create);
 int
 __wt_bt_root_pin(WT_TOC *toc, int pin);
 int
-__wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep);
+__wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep);
 int
 __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp);
 int
@@ -65,18 +69,19 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
-__wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt);
+__wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *rip, DBT *dbt);
 int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page);
-int
-__wt_bt_rec_serial_func(WT_TOC *toc);
 void
 __wt_bt_page_discard(ENV *env, WT_PAGE *page);
 int
 __wt_bt_dbt_return(WT_TOC *toc,
     DBT *key, DBT *data, WT_PAGE *page, void *ip, int key_return);
 int
-__wt_bt_stat(WT_TOC *toc, u_int32_t addr, u_int32_t size);
+__wt_bt_tree_walk(WT_TOC *toc, u_int32_t addr,
+    u_int32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg);
+int
+__wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg);
 int
 __wt_bt_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
 int
