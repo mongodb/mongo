@@ -199,6 +199,12 @@ namespace mongo {
         c->noteLocation();
     }
     
+    bool ClientCursor::yieldSometimes(){
+        if ( ( ++_yieldSometimesCalls % 128 ) == 0 )
+            return yield();
+        return true;
+    }
+
     bool ClientCursor::yield() {
         // need to store on the stack in case this gets deleted
         CursorId id = cursorid;
