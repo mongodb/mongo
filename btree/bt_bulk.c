@@ -28,7 +28,7 @@ static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
 static int  __wt_bt_promote(
 	WT_TOC *, WT_PAGE *, u_int64_t, WT_STACK *, u_int, u_int32_t *);
 static int  __wt_bt_promote_col_indx(WT_TOC *, WT_PAGE *, void *);
-static int  __wt_bt_promote_row_indx(WT_TOC *, WT_PAGE *, WT_ITEM *, void *);
+static int  __wt_bt_promote_row_indx(WT_TOC *, WT_PAGE *, WT_ITEM *, WT_ITEM *);
 static void __wt_bt_promote_col_rec(WT_PAGE *, u_int64_t);
 static void __wt_bt_promote_row_rec(WT_PAGE *, u_int64_t);
 
@@ -123,7 +123,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(toc->name, insert_cnt);
-		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);
+		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
 
 		/*
 		 * Bulk load is a long-running operation, update the generation
@@ -143,7 +143,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 				++*last_repeat;
 				++page->records;
 				++page->hdr->u.entries;
-				WT_STAT_INCR(idb->stats, BULK_REPEAT_COUNT);
+				WT_STAT_INCR(idb->stats, REPEAT_COUNT);
 				continue;
 			}
 		}
@@ -223,7 +223,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
-	DBT *key, *data, key_copy, data_copy, key_comp, data_comp;
+	DBT *key, *data, key_copy, data_copy;
 	DBT *lastkey, lastkey_std, lastkey_ovfl;
 	ENV *env;
 	IDB *idb;
@@ -247,10 +247,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	type = F_ISSET(idb, WT_COLUMN) ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
 
 	lastkey = &lastkey_std;
-	WT_CLEAR(data_comp);
 	WT_CLEAR(data_copy);
-	WT_CLEAR(data_item);
-	WT_CLEAR(key_comp);
 	WT_CLEAR(key_copy);
 	WT_CLEAR(key_item);
 	WT_CLEAR(lastkey_ovfl);
@@ -278,8 +275,8 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 		} else {
 			if (key == NULL && !LF_ISSET(WT_DUPLICATES)) {
 				__wt_api_db_errx(db,
-				    "keys must be set unless duplicadtes are "
-				    "configured");
+				    "keys must be specified unless duplicates "
+				    "are configured");
 				ret = WT_ERROR;
 				goto err;
 			}
@@ -294,7 +291,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(toc->name, insert_cnt);
-		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);
+		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
 
 		/*
 		 * Bulk load is a long-running operation, update the generation
@@ -303,50 +300,40 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 		WT_TOC_GEN_SET(toc);
 
 		/*
-		 * Copy the caller's DBTs, we don't want to modify them.  But,
-		 * copy them carefully, all we want is a pointer and a length.
-		 * Then, optionally compress using a Huffman engine.
-		 *
 		 * We don't have a key to store on the page if we're building a
 		 * column-store, and we don't store the key on the page in the
 		 * case of a row-store duplicate data item.  The check from here
 		 * on is if "key == NULL" for both cases, that is, there's no
 		 * key to store.
 		 */
+
+		/*
+		 * Copy the caller's DBTs, we don't want to modify them.  But,
+		 * copy them carefully, all we want is a pointer and a length.
+		 */
 		if (key != NULL) {
 			key_copy.data = key->data;
 			key_copy.size = key->size;
 			key = &key_copy;
-
-			if (idb->huffman_key != NULL) {
-				WT_RET(__wt_huffman_encode(idb->huffman_key,
-				    key->data, key->size, &key_comp.data,
-				    &key_comp.mem_size, &key_comp.size));
-				if (key->size > key_comp.size)
-					WT_STAT_INCRV(
-					    idb->stats, BULK_HUFFMAN_KEY,
-					    key->size - key_comp.size);
-				key = &key_comp;
-			}
 		}
-
 		data_copy.data = data->data;
 		data_copy.size = data->size;
 		data = &data_copy;
-		if (idb->huffman_data != NULL) {
-			WT_RET(__wt_huffman_encode(idb->huffman_data,
-			    data->data, data->size, &data_comp.data,
-			    &data_comp.mem_size, &data_comp.size));
-			if (data->size > data_comp.size)
-				WT_STAT_INCRV(idb->stats, BULK_HUFFMAN_DATA,
-				    data->size - data_comp.size);
-			data = &data_comp;
-		}
 
 skip_read:	/*
 		 * We pushed a set of duplicates off-page, and that routine
 		 * returned an ending key/data pair to us.
 		 */
+
+		/*
+		 * Process the key/data pairs and build the items we're going
+		 * to store on the page.
+		 */
+		if (key != NULL)
+			WT_ERR(__wt_bt_build_key_item(
+			    toc, key, &key_item, &key_ovfl));
+		WT_ERR(__wt_bt_build_data_item(
+		    toc, data, &data_item, &data_ovfl));
 
 		/*
 		 * Check for duplicate data; we don't store the key on the page
@@ -373,52 +360,28 @@ skip_read:	/*
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
 			}
 
-			WT_STAT_INCR(idb->stats, BULK_DUP_DATA_READ);
+			/* Reset the type of the current item to a duplicate. */
+			WT_ITEM_TYPE_SET(&data_item,
+			    WT_ITEM_TYPE(&data_item) == WT_ITEM_DATA ?
+			    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
+
+			WT_STAT_INCR(idb->stats, DUPLICATE_ITEMS_INSERTED);
 
 			key = NULL;
 		} else
 			dup_count = 0;
 
-		/* Create overflow objects if the key or data won't fit. */
-		if (key != NULL && key->size > db->leafitemsize) {
-			/*
-			 * If duplicates: we'll need a copy of the key for
-			 * comparison with the next key.  It's an overflow
-			 * object, so we can't just use the on-page memory.
-			 * Save a copy.
-			 */
-			if (LF_ISSET(WT_DUPLICATES)) {
-				lastkey = &lastkey_ovfl;
-				WT_ERR(__wt_bt_dbt_copy(env, key, lastkey));
-			}
-
-			key_ovfl.size = key->size;
-			WT_ERR(__wt_bt_ovfl_write(toc, key, &key_ovfl.addr));
-			key_copy.data = &key_ovfl;
-			key_copy.size = sizeof(key_ovfl);
-			key = &key_copy;
-
-			WT_ITEM_TYPE_SET(&key_item, WT_ITEM_KEY_OVFL);
-			WT_STAT_INCR(idb->stats, BULK_OVERFLOW_KEY);
-		} else
-			WT_ITEM_TYPE_SET(&key_item, WT_ITEM_KEY);
-
-		if (data->size > db->leafitemsize) {
-			data_ovfl.size = data->size;
-			WT_ERR(__wt_bt_ovfl_write(toc, data, &data_ovfl.addr));
-			data_copy.data = &data_ovfl;
-			data_copy.size = sizeof(data_ovfl);
-			data = &data_copy;
-
-			WT_ITEM_TYPE_SET(&data_item,
-			    key == NULL && !F_ISSET(idb, WT_COLUMN) ?
-			    WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL);
-
-			WT_STAT_INCR(idb->stats, BULK_OVERFLOW_DATA);
-		} else
-			WT_ITEM_TYPE_SET(&data_item,
-			    key == NULL && !F_ISSET(idb, WT_COLUMN) ?
-			    WT_ITEM_DUP : WT_ITEM_DATA);
+		/*
+		 * If duplicates: we'll need a copy of the key for comparison
+		 * with the next key.  If the key is an overflow object, we
+		 * can't just use the on-page version, we have to save a copy.
+		 */
+		if (key != NULL &&
+		    LF_ISSET(WT_DUPLICATES) &&
+		    WT_ITEM_TYPE(&key_item) == WT_ITEM_KEY_OVFL) {
+			lastkey = &lastkey_ovfl;
+			WT_ERR(__wt_bt_dbt_copy(env, key, lastkey));
+		}
 
 		/*
 		 * We now have the key/data items to store on the page.  If
@@ -514,7 +477,6 @@ skip_read:	/*
 		if (key != NULL) {
 			++page->hdr->u.entries;
 
-			WT_ITEM_LEN_SET(&key_item, key->size);
 			memcpy(page->first_free, &key_item, sizeof(key_item));
 			memcpy(page->first_free +
 			    sizeof(key_item), key->data, key->size);
@@ -546,7 +508,6 @@ skip_read:	/*
 
 		/* Copy the data item onto the page. */
 		++page->hdr->u.entries;
-		WT_ITEM_LEN_SET(&data_item, data->size);
 		memcpy(page->first_free, &data_item, sizeof(data_item));
 		memcpy(page->first_free +
 		    sizeof(data_item), data->data, data->size);
@@ -618,8 +579,6 @@ err:	if (page != NULL)
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
 
-	__wt_free(env, data_comp.data, data_comp.mem_size);
-	__wt_free(env, key_comp.data, key_comp.mem_size);
 	__wt_free(env, lastkey_ovfl.data, lastkey_ovfl.mem_size);
 
 	return (ret);
@@ -719,8 +678,8 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			    db, "zero-length keys are not supported");
 			return (WT_ERROR);
 		}
-		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);
-		WT_STAT_INCR(idb->stats, BULK_DUP_DATA_READ);
+		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
+		WT_STAT_INCR(idb->stats, DUPLICATE_ITEMS_INSERTED);
 
 		/* Loading duplicates, so a key change means we're done. */
 		if (lastkey->size != key->size ||
@@ -737,7 +696,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			data->data = &data_local;
 			data->size = sizeof(data_local);
 			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DUP_OVFL);
-			WT_STAT_INCR(idb->stats, BULK_OVERFLOW_DATA);
+			WT_STAT_INCR(idb->stats, OVERFLOW_DATA);
 		} else
 			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DUP);
 
@@ -939,7 +898,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	 *    -> P2 -> L
 	 */
 #ifdef HAVE_DIAGNOSTIC
-#define	WT_STACK_ALLOC_INCR	1
+#define	WT_STACK_ALLOC_INCR	2
 #else
 #define	WT_STACK_ALLOC_INCR	20
 #endif
@@ -947,7 +906,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	 * To simplify the rest of the code, check to see if there's room for
 	 * another entry in our stack structure.  Allocate the stack in groups
 	 * of 20, which is probably big enough for any tree we'll ever see in
-	 * the field.
+	 * the field, we'll never test the realloc code unless we work at it.
 	 */
 	if (stack->size == 0 || level == stack->size - 1) {
 		u_int32_t bytes_allocated = stack->size * sizeof(WT_PAGE *);
@@ -1140,7 +1099,7 @@ err:	if (next != NULL)
  *	Append a new WT_OFF to an internal page's in-memory information.
  */
 static int
-__wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *page_data)
+__wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
 {
 	ENV *env;
 	WT_COL_INDX *ip;
@@ -1168,7 +1127,7 @@ __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *page_data)
 	++page->indx_count;
 
 	/* Fill in the on-page data. */
-	ip->page_data = page_data;
+	ip->data = data;
 
 	return (0);
 }
@@ -1180,7 +1139,7 @@ __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *page_data)
  */
 static int
 __wt_bt_promote_row_indx(
-    WT_TOC *toc, WT_PAGE *page, WT_ITEM *key, void *page_data)
+    WT_TOC *toc, WT_PAGE *page, WT_ITEM *key, WT_ITEM *data)
 {
 	DB *db;
 	ENV *env;
@@ -1220,20 +1179,19 @@ __wt_bt_promote_row_indx(
 		switch (WT_ITEM_TYPE(key)) {
 		case WT_ITEM_KEY:
 			if (idb->huffman_key == NULL) {
-				ip->data = WT_ITEM_BYTE(key);
-				ip->size = WT_ITEM_LEN(key);
+				WT_KEY_SET(ip,
+				    WT_ITEM_BYTE(key), WT_ITEM_LEN(key));
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-			ip->data = key;
-			ip->size = 0;
+			WT_KEY_SET_PROCESS(ip, key);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
 
 	/* Fill in the on-page data. */
-	ip->page_data = page_data;
+	ip->data = data;
 
 	return (0);
 }
@@ -1270,6 +1228,110 @@ __wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t incr)
 	 */
 	ip = parent->u.r_indx + (parent->indx_count - 1);
 	WT_ROW_OFF_RECORDS(ip) += incr;
+}
+
+/*
+ * __wt_bt_build_key_item --
+ *	Process an inserted key item and return an WT_ITEM structure and byte
+ *	string to be stored on the page.
+ */
+int
+__wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
+{
+	DB *db;
+	IDB *idb;
+	WT_STATS *stats;
+
+	db = toc->db;
+	idb = db->idb;
+	stats = idb->stats;
+
+	/*
+	 * We're called with a DBT that references a data/size pair.  We can
+	 * re-point that DBT's data and size fields to other memory, but we
+	 * cannot allocate memory in that DBT -- all we can do is re-point it.
+	 */
+
+	/* Optionally compress the data using the Huffman engine. */
+	if (idb->huffman_key != NULL) {
+		WT_RET(__wt_huffman_encode(
+		    idb->huffman_key, dbt->data, dbt->size,
+		    &toc->key.data, &toc->key.mem_size, &toc->key.size));
+		if (toc->key.size > dbt->size)
+			WT_STAT_INCRV(stats,
+			    HUFFMAN_KEY, toc->key.size - dbt->size);
+		dbt->data = toc->key.data;
+		dbt->size = toc->key.size;
+	}
+
+	/* Create an overflow object if the data won't fit. */
+	if (dbt->size > db->leafitemsize) {
+		WT_CLEAR(*ovfl);
+		ovfl->size = dbt->size;
+		WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
+
+		dbt->data = ovfl;
+		dbt->size = sizeof(*ovfl);
+		WT_ITEM_TYPE_SET(item, WT_ITEM_KEY_OVFL);
+		WT_STAT_INCR(stats, OVERFLOW_KEY);
+	} else
+		WT_ITEM_TYPE_SET(item, WT_ITEM_KEY);
+
+	WT_ITEM_LEN_SET(item, dbt->size);
+	return (0);
+}
+
+/*
+ * __wt_bt_build_data_item --
+ *	Process an inserted data item and return an WT_ITEM structure and byte
+ *	string to be stored on the page.
+ */
+int
+__wt_bt_build_data_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
+{
+	DB *db;
+	IDB *idb;
+	WT_STATS *stats;
+
+	db = toc->db;
+	idb = db->idb;
+	stats = idb->stats;
+
+	WT_CLEAR(*item);
+
+	/*
+	 * We're called with a DBT that references a data/size pair.  We can
+	 * re-point that DBT's data and size fields to other memory, but we
+	 * cannot allocate memory in that DBT -- all we can do is re-point it.
+	 */
+
+	/* Optionally compress the data using the Huffman engine. */
+	if (idb->huffman_data != NULL) {
+		WT_RET(__wt_huffman_encode(
+		    idb->huffman_data, dbt->data, dbt->size,
+		    &toc->data.data, &toc->data.mem_size, &toc->data.size));
+		if (toc->data.size > dbt->size)
+			WT_STAT_INCRV(stats,
+			    HUFFMAN_DATA, toc->data.size - dbt->size);
+		dbt->data = toc->data.data;
+		dbt->size = toc->data.size;
+	}
+
+	/* Create an overflow object if the data won't fit. */
+	if (dbt->size > db->leafitemsize) {
+		WT_CLEAR(*ovfl);
+		ovfl->size = dbt->size;
+		WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
+
+		dbt->data = ovfl;
+		dbt->size = sizeof(*ovfl);
+		WT_ITEM_TYPE_SET(item, WT_ITEM_DATA_OVFL);
+		WT_STAT_INCR(stats, OVERFLOW_DATA);
+	} else
+		WT_ITEM_TYPE_SET(item, WT_ITEM_DATA);
+
+	WT_ITEM_LEN_SET(item, dbt->size);
+	return (0);
 }
 
 /*
