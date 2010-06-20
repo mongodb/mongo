@@ -32,7 +32,14 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 	WT_STAT_SET(
 	    idb->dstats, TREE_LEVEL, idb->root_page->hdr->level);
 	WT_RET(__wt_bt_stat_desc(toc));
-	WT_RET(__wt_bt_stat(toc, idb->root_addr, idb->root_size));
+
+	/*
+	 * Note we do not have a hazard reference for the root page, and that's
+	 * safe -- root pages are pinned into memory when a database is opened,
+	 * and never re-written until the database is closed.
+	 */
+	WT_RET(__wt_bt_tree_walk(
+	    toc, idb->root_addr, idb->root_size, __wt_bt_stat_page, NULL));
 
 	fprintf(stream, "Database statistics: %s\n", idb->name);
 	__wt_stat_print(env, idb->dstats, stream);

@@ -20,7 +20,7 @@ typedef struct {
 	DBT *dupkey;				/* Key for offpage duplicates */
 } WT_DSTUFF;
 
-static int __wt_bt_dump(WT_TOC *, u_int32_t, u_int32_t, WT_DSTUFF *);
+static int  __wt_bt_dump_page(WT_TOC *, WT_PAGE *, void *);
 static int  __wt_bt_dump_page_fixed(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_bt_dump_page_item(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
@@ -47,7 +47,7 @@ __wt_db_dump(WT_TOC *toc,
 		/*
 		 * We use the verification code to do debugging dumps because
 		 * if we're dumping in debugging mode, we want to confirm the
-		 * page is OK before walking it.
+		 * page is OK before blindly reading it.
 		 */
 		return (__wt_bt_verify(toc, f, stream));
 #else
@@ -61,7 +61,14 @@ __wt_db_dump(WT_TOC *toc,
 	dstuff.f = f;
 	dstuff.fcnt = 0;
 	dstuff.dupkey = NULL;
-	ret = __wt_bt_dump(toc, idb->root_addr, idb->root_size, &dstuff);
+
+	/*
+	 * Note we do not have a hazard reference for the root page, and that's
+	 * safe -- root pages are pinned into memory when a database is opened,
+	 * and never re-written until the database is closed.
+	 */
+	ret = __wt_bt_tree_walk(
+	    toc, idb->root_addr, idb->root_size, __wt_bt_dump_page, &dstuff);
 
 	/* Wrap up reporting. */
 	if (f != NULL)
@@ -71,60 +78,39 @@ __wt_db_dump(WT_TOC *toc,
 }
 
 /*
- * __wt_bt_dump --
+ * __wt_bt_dump_page --
  *	Depth-first recursive walk of a btree.
  */
 static int
-__wt_bt_dump(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_DSTUFF *dp)
+__wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
-	WT_COL_INDX *page_cip;
-	WT_OFF *off;
-	WT_PAGE *page;
-	WT_ROW_INDX *page_rip;
-	u_int32_t i;
-	int ret;
+	WT_DSTUFF *dp;
 
 	db = toc->db;
-	ret = 0;
-
-	WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
+	dp = arg;
 
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(page, page_cip, i) {
-			off = (WT_OFF *)page_cip->data;
-			WT_ERR(__wt_bt_dump(toc, off->addr, off->size, dp));
-		}
-		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(page, page_rip, i) {
-			off = WT_ITEM_BYTE_OFF(page_rip->data);
-			WT_ERR(__wt_bt_dump(toc, off->addr, off->size, dp));
-		}
 		break;
 	case WT_PAGE_COL_FIX:
-		WT_ERR(__wt_bt_dump_page_fixed(toc, page, dp));
+		WT_RET(__wt_bt_dump_page_fixed(toc, page, dp));
 		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_bt_dump_page_item(toc, page, dp));
+		WT_RET(__wt_bt_dump_page_item(toc, page, dp));
 		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	WT_ILLEGAL_FORMAT(db);
 	}
-
-	__wt_bt_page_out(toc, &page, 0);
 
 	/* Report progress every 10 pages. */
 	if (dp->f != NULL && ++dp->fcnt % 10 == 0)
 		dp->f(toc->name, dp->fcnt);
 
-err:	if (page != NULL)
-		__wt_bt_page_out(toc, &page, 0);
-
-	return (ret);
+	return (0);
 }
 
 /* Check if the next page entry is part of a duplicate data set. */
@@ -199,8 +185,7 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
 			ovfl = WT_ITEM_BYTE_OVFL(item);
-			WT_ERR(__wt_bt_ovfl_in(
-			    toc, ovfl->addr, ovfl->size, &ovfl_page));
+			WT_ERR(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
 
 			/* If we're already in a duplicate set, dump the key. */
 			if (WT_ITEM_TYPE(item) == WT_ITEM_DUP_OVFL)
@@ -231,7 +216,8 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			 */
 			dp->dupkey = last_key;
 			off = WT_ITEM_BYTE_OFF(item);
-			WT_RET(__wt_bt_dump(toc, off->addr, off->size, dp));
+			WT_RET_RESTART(__wt_bt_tree_walk(toc,
+			    off->addr, off->size, __wt_bt_stat_page, dp));
 			dp->dupkey = NULL;
 			break;
 		WT_ILLEGAL_FORMAT(db);

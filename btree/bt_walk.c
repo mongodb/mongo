@@ -9,14 +9,14 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_stat_page(WT_TOC *, WT_PAGE *);
-
 /*
- * __wt_bt_stat --
- *	Depth-first recursive walk of a btree, calculating statistics.
+ * __wt_bt_tree_walk --
+ *	Depth-first recursive walk of a btree, calling a worker function on
+ *	each page.
  */
 int
-__wt_bt_stat(WT_TOC *toc, u_int32_t addr, u_int32_t size)
+__wt_bt_tree_walk(WT_TOC *toc, u_int32_t addr,
+    u_int32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
 {
 	DB *db;
 	WT_COL_INDX *cip;
@@ -28,29 +28,55 @@ __wt_bt_stat(WT_TOC *toc, u_int32_t addr, u_int32_t size)
 	db = toc->db;
 	ret = 0;
 
+	/*
+	 * If we can't get the page, including if WT_RESTART is returned, fail
+	 * because we don't know the source of the addr/size pair; our caller
+	 * will have to deal with it.  (In almost all cases, however, our caller
+	 * is a previous incarnation of this function -- which means our caller
+	 * has a pinned page it's reading through.)
+	 */
 	WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
 
-	WT_ERR(__wt_bt_stat_page(toc, page));
+	/* Call the worker function for the page. */
+	WT_ERR(work(toc, page, arg));
 
+	/*
+	 * Walk any internal pages, descending through any off-page reference
+	 * in the local tree (that is, NOT including off-page duplicate trees).
+	 * We could handle off-page duplicate trees by walking the page in this
+	 * function, but that would be slower than recursively calling this
+	 * function from the worker function, which is already walking the page.
+	 *
+	 * If the page were to be rewritten/discarded from the cache while
+	 * we're getting it, we can re-try -- re-trying is safe because our
+	 * addr/size information is from a page which can't be discarded
+	 * because of our hazard reference.  If the page was re-written, our
+	 * on-page overflow information will have been updated to the overflow
+	 * page's new address.
+	 *
+	 * XXX
+	 * Do we need a memory flush here?   That is, if the memory referenced
+	 * by ovfl is in our cache, I think we have to flush so we re-acquire
+	 * the information set by the thread which discarded/re-wrote the page.
+	 */
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_INT:
 		WT_INDX_FOREACH(page, cip, i)
-			WT_ERR(__wt_bt_stat(toc,
-			    WT_COL_OFF_ADDR(cip), WT_COL_OFF_SIZE(cip)));
+			WT_ERR_RESTART(__wt_bt_tree_walk(toc,
+			    WT_COL_OFF_ADDR(cip),
+			    WT_COL_OFF_SIZE(cip), work, arg));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_INDX_FOREACH(page, rip, i)
-			WT_ERR(__wt_bt_stat(toc,
-			    WT_ROW_OFF_ADDR(rip), WT_ROW_OFF_SIZE(rip)));
+			WT_ERR_RESTART(__wt_bt_tree_walk(toc,
+			    WT_ROW_OFF_ADDR(rip),
+			    WT_ROW_OFF_SIZE(rip), work, arg));
 		break;
 	case WT_PAGE_COL_FIX:
-		WT_ERR(__wt_bt_stat_page(toc, page));
-		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_bt_stat_page(toc, page));
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
@@ -65,8 +91,8 @@ err: if (page != NULL)
  * __wt_bt_stat_page --
  *	Stat a single Btree page.
  */
-static int
-__wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
+int
+__wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
 	IDB *idb;
@@ -141,8 +167,14 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 			break;
 		case WT_ITEM_OFF:
 			WT_ASSERT(toc->env, hdr->type == WT_PAGE_ROW_LEAF);
+			WT_STAT_INCR(idb->dstats, DUP_TREE);
+			/*
+			 * Recursively call the tree-walk function for the
+			 * off-page duplicate tree.
+			 */
 			off = WT_ITEM_BYTE_OFF(item);
-			WT_RET(__wt_bt_stat(toc, off->addr, off->size));
+			WT_RET_RESTART(__wt_bt_tree_walk(toc,
+			    off->addr, off->size, __wt_bt_stat_page, arg));
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
