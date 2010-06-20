@@ -94,8 +94,11 @@ extern "C" {
 		goto err
 
 /*
- * Standard macros to handle simple return values and optionally branch to
- * an error label.
+ * Macros to handle standard return values and optionally branch to an error
+ * label.  One pair returns WT_RESTART, one set retries WT_RESTART: if you
+ * have valid information, that is, if you know your addr/size pair is good
+ * (for example, because it's taken from a pinned page), you can retry, else
+ * you have to return the failure.
  */
 #define	WT_ERR(a) do {							\
 	if ((ret = (a)) != 0)						\
