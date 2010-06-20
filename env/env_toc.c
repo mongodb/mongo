@@ -74,10 +74,14 @@ __wt_wt_toc_close(WT_TOC *toc)
 	ienv = env->ienv;
 	ret = 0;
 
+	WT_ENV_FCHK_RET(
+	    env, "WT_TOC.close", toc->flags, WT_APIMASK_WT_TOC, ret);
+
 	/* Discard DBT memory. */
 	__wt_free(env, toc->key.data, toc->key.mem_size);
 	__wt_free(env, toc->data.data, toc->data.mem_size);
-	__wt_free(env, toc->scratch.data, toc->scratch.mem_size);
+	__wt_free(env, toc->tmp1.data, toc->tmp1.mem_size);
+	__wt_free(env, toc->tmp2.data, toc->tmp2.mem_size);
 
 	/* Free any memory we've been accumulating. */
 	if (toc->flist != NULL)
