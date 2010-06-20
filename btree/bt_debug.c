@@ -81,7 +81,12 @@ __wt_bt_debug_addr(
 	WT_PAGE *page;
 	int ret;
 
-	WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
+	/*
+	 * Addr/size were set by our caller (probably via some debugger).   If
+	 * WT_RESTART is returned, retry, presumably addr/size are valid and
+	 * the page was only discarded, not re-written.
+	 */
+	WT_RET_RESTART(__wt_bt_page_in(toc, addr, size, 1, &page));
 	ret = __wt_bt_debug_page(toc, page, ofile, fp);
 	__wt_bt_page_out(toc, &page, 0);
 	return (ret);
@@ -453,7 +458,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
 		ovfl = WT_ITEM_BYTE_OVFL(item);
-		WT_ERR(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->size, &page));
+		WT_ERR(__wt_bt_ovfl_in(toc, ovfl, &page));
 		hp = idb->huffman_data;
 		p = WT_PAGE_BYTE(page);
 		size = ovfl->size;
@@ -465,11 +470,10 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 
 	/* Uncompress the item as necessary. */
 	if (hp != NULL) {
-		WT_ERR(__wt_huffman_decode(
-		    hp, p, size, &toc->scratch.data,
-		    &toc->scratch.mem_size, &toc->scratch.size));
-		p = toc->scratch.data;
-		size = toc->scratch.size;
+		WT_ERR(__wt_huffman_decode(hp, p, size,
+		    &toc->tmp1.data, &toc->tmp1.mem_size, &toc->tmp1.size));
+		p = toc->tmp1.data;
+		size = toc->tmp1.size;
 	}
 
 	__wt_bt_print(p, size, fp);

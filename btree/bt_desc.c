@@ -22,8 +22,11 @@ __wt_bt_stat_desc(WT_TOC *toc)
 
 	stats = toc->db->idb->dstats;
 
-	/* Read the database's description page. */
-	WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
+	/*
+	 * Read the database's description page.  The description page doesn't
+	 * move, so simply retry any WT_RESTART return.
+	 */
+	WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
 	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
 
 	WT_STAT_SET(stats, MAGIC, desc->magic);
@@ -53,8 +56,11 @@ __wt_bt_desc_read(WT_TOC *toc)
 
 	db = toc->db;
 
-	/* Read the database's description page. */
-	WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
+	/*
+	 * Read the database's description page.  The description page doesn't
+	 * move, so simply retry any WT_RESTART return.
+	 */
+	WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
 	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
 
 	db->intlmax = desc->intlmax;		/* Update DB handle */
@@ -84,7 +90,11 @@ __wt_bt_desc_write_root(WT_TOC *toc, u_int32_t root_addr, u_int32_t root_size)
 
 	idb = toc->db->idb;
 
-	WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
+	/*
+	 * Read the database's description page.  The description page doesn't
+	 * move, so simply retry any WT_RESTART return.
+	 */
+	WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
 	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
 	desc->root_addr = idb->root_addr = root_addr;
 	desc->root_size = idb->root_size = root_size;
@@ -109,12 +119,16 @@ __wt_bt_desc_write(WT_TOC *toc)
 	idb = db->idb;
 	fh = idb->fh;
 
-	/* If the file size is 0, allocate a new page. */
+	/*
+	 * If the file size is 0, allocate a new page, else read the database's
+	 * description page.  The description page doesn't move, so simply retry
+	 * any WT_RESTART return.
+	 */
 	if (fh->file_size == 0)
 		WT_RET(__wt_bt_page_alloc(
 		    toc, WT_PAGE_DESCRIPT, WT_LDESC, 512, &page));
 	else
-		WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
+		WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
 
 	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
 	desc->magic = WT_BTREE_MAGIC;

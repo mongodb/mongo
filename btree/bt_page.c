@@ -57,7 +57,11 @@ __wt_bt_page_in(
 
 	db = toc->db;
 
-	WT_RET((__wt_page_in(toc, addr, size, &page, 0)));
+	/*
+	 * We don't know the source of the addr/size pair, so we pass back any
+	 * WT_RESTART failures; the caller has to handle them.
+	 */
+	WT_RET(__wt_page_in(toc, addr, size, &page, 0));
 
 	/* Optionally build the in-memory version of the page. */
 	if (inmem && page->indx_count == 0)
@@ -495,7 +499,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *rip, DBT *dbt)
 	/* We only get called when there's a key to process. */
 	WT_ASSERT(env, WT_KEY_PROCESS(rip));
 
-	/* We only need a  WT_PAGE when instantiating a key in the tree. */
+	/* We only need a WT_PAGE when instantiating a key in the tree. */
 	WT_ASSERT(env,
 	    (page == NULL && dbt != NULL) || (page != NULL && dbt == NULL));
 
@@ -514,8 +518,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *rip, DBT *dbt)
 	item = rip->key;
 	if (WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL) {
 		ovfl = WT_ITEM_BYTE_OVFL(item);
-		WT_RET(
-		    __wt_bt_ovfl_in(toc, ovfl->addr, ovfl->size, &ovfl_page));
+		WT_RET(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
 		orig = WT_PAGE_BYTE(ovfl_page);
 		size = ovfl->size;
 	} else {

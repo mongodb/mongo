@@ -173,8 +173,7 @@ item_set:	if (callback != NULL &&
 	}
 
 	if (ovfl != NULL) {
-		WT_RET(
-		    __wt_bt_ovfl_in(toc, ovfl->addr, ovfl->size, &ovfl_page));
+		WT_RET(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
 		orig = WT_PAGE_BYTE(ovfl_page);
 		size = ovfl->size;
 	}

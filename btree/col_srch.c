@@ -31,6 +31,7 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	db = toc->db;
 	idb = db->idb;
 
+restart:
 	/* Check for a record past the end of the database. */
 	page = idb->root_page;
 	if (page->records < recno)
@@ -59,7 +60,14 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 		/* Walk down to the next page. */
 		if (page != idb->root_page)
 			__wt_bt_page_out(toc, &page, 0);
-		WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
+		switch (ret = __wt_bt_page_in(toc, addr, size, 1, &page)) {
+		case 0:
+			break;
+		case WT_RESTART:
+			goto restart;
+		default:
+			return (ret);
+		}
 	}
 
 	/* Check for deleted items. */

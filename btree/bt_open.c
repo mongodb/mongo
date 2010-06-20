@@ -236,7 +236,11 @@ __wt_bt_root_pin(WT_TOC *toc, int pin)
 
 	idb = toc->db->idb;
 
-	WT_RET(__wt_bt_page_in(
+	/*
+	 * Read the root page; the page could be discarded, but not re-written,
+	 * so simply retry any WT_RESTART returns.
+	 */
+	WT_RET_RESTART(__wt_bt_page_in(
 	    toc, idb->root_addr, idb->root_size, 1, &root_page));
 	if (pin) {
 		F_SET(root_page, WT_PINNED);
