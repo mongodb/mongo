@@ -58,8 +58,8 @@ __wt_bt_verify(
 	ENV *env;
 	IDB *idb;
 	WT_OFF off;
-	WT_VSTUFF vstuff;
 	WT_PAGE *page;
+	WT_VSTUFF vstuff;
 	int ret;
 
 	env = toc->env;
@@ -94,11 +94,24 @@ __wt_bt_verify(
 	}
 	WT_ERR(bit_alloc(env, vstuff.frags, &vstuff.fragbits));
 
-	/* Verify the descriptor page. */
-	WT_ERR(__wt_bt_page_in(toc, 0, 512, 0, &page));
+	/*
+	 * Verify the descriptor page; the descriptor page can't move, so simply
+	 * retry any WT_RESTART returns.
+	 *
+	 * We have to keep our hazard reference on the descriptor page while we
+	 * walk the tree.  The problem we're solving is if the root page
+	 * were to be re-written between the time we read the descriptor page
+	 * and when we read the root page, we'd read an out-of-date root page.
+	 * (Other methods don't have to worry about this because they only work
+	 * when the database is opened and the root page is pinned into memory.
+	 * Db.verify works on both opened and unopened databases, so it has to
+	 * ensure the root page doesn't move.   This is a wildly unlikely race,
+	 * of course, but it's easy to handle.)
+	 */
+	WT_ERR_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
 	WT_ERR(__wt_bt_verify_page(toc, page, &vstuff));
-	__wt_bt_page_out(toc, &page, 0);
 
+	/* Verify the tree, starting at the root from the descriptor page. */
 	WT_RECORDS(&off) = 0;
 	off.addr = idb->root_addr;
 	off.size = idb->root_size;
@@ -121,7 +134,7 @@ err:	if (page != NULL)
 }
 
 /*
- * Callers pass us a page addr/size pair, and a reference to the internal node
+ * Callers pass us a WT_OFF structure, and a reference to the internal node
  * key that referenced that page (if any -- the root node doesn't have one).
  *
  * The plan is simple.  We recursively descend the tree, in depth-first fashion.
@@ -161,8 +174,22 @@ __wt_bt_verify_tree(WT_TOC *toc,
 	page = NULL;
 	ret = 0;
 
-	/* Read and verify the page. */
-	WT_RET(__wt_bt_page_in(toc, off->addr, off->size, 0, &page));
+	/*
+	 * Read and verify the page.
+	 *
+	 * If the page were to be rewritten/discarded from the cache while
+	 * we're getting it, we can re-try -- re-trying is safe because our
+	 * addr/size information is from a page which can't be discarded
+	 * because of our hazard reference.  If the page was re-written, our
+	 * on-page overflow information will have been updated to the overflow
+	 * page's new address.
+	 *
+	 * XXX
+	 * Do we need a memory flush here?   That is, if the memory referenced
+	 * by ovfl is in our cache, I think we have to flush so we re-acquire
+	 * the information set by the thread which discarded/re-wrote the page.
+	 */
+	WT_RET_RESTART(__wt_bt_page_in(toc, off->addr, off->size, 0, &page));
 	WT_ERR(__wt_bt_verify_page(toc, page, vs));
 
 	/*
@@ -280,12 +307,10 @@ __wt_bt_verify_cmp(
 {
 	DB *db;
 	DBT *cd_ref, *pd_ref;
-	ENV *env;
 	WT_ROW_INDX *child_rip;
 	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
-	env = toc->env;
 
 	/* Set the comparison function. */
 	switch (child->hdr->type) {
@@ -304,20 +329,16 @@ __wt_bt_verify_cmp(
 	 * The two keys we're going to compare may be overflow keys -- don't
 	 * bother instantiating the keys in the tree, there's no reason to
 	 * believe we're going to be working in this database.
-	 *
-	 * !!!
-	 * Use DBT's from the WT_TOC instead of repeatedly instantiating new
-	 * memory.
 	 */
 	child_rip = first_entry ?
 	    child->u.r_indx : child->u.r_indx + (child->indx_count - 1);
 	if (WT_KEY_PROCESS(child_rip)) {
-		cd_ref = &toc->key;			/* Ugly, but fast. */
+		cd_ref = &toc->tmp1;
 		WT_RET(__wt_bt_key_process(toc, NULL, child_rip, cd_ref));
 	} else
 		cd_ref = (DBT *)child_rip;
 	if (WT_KEY_PROCESS(parent_rip)) {
-		pd_ref = &toc->data;			/* Ugly, but fast. */
+		pd_ref = &toc->tmp2;
 		WT_RET(__wt_bt_key_process(toc, NULL, parent_rip, pd_ref));
 	} else
 		pd_ref = (DBT *)parent_rip;
@@ -966,12 +987,12 @@ unused_not_clear:	__wt_api_db_errx(db,
  *	Verify an overflow item.
  */
 static int
-__wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, WT_VSTUFF *vs)
+__wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovfl, WT_VSTUFF *vs)
 {
 	WT_PAGE *page;
 	int ret;
 
-	WT_RET(__wt_bt_ovfl_in(toc, ovflp->addr, ovflp->size, &page));
+	WT_RET(__wt_bt_ovfl_in(toc, ovfl, &page));
 
 	ret = __wt_bt_verify_page(toc, page, vs);
 
