@@ -140,14 +140,12 @@ namespace mongo {
             
         CursorId id = cc->cursorid;
             
-        unsigned long long nScanned = 0;
         bool justOne = justOneOrig;
+        bool canYield = !god && !creal->matcher()->docMatcher().atomic();
         do {
-            if ( ++nScanned % 128 == 0 && !god && !creal->matcher()->docMatcher().atomic() ) {
-                if ( ! cc->yield() ){
-                    cc.release(); // has already been deleted elsewhere
-                    break;
-                }
+            if ( canYield && ! cc->yieldSometimes() ){
+                cc.release(); // has already been deleted elsewhere
+                break;
             }
                 
             // this way we can avoid calling updateLocation() every time (expensive)

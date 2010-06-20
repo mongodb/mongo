@@ -19,6 +19,7 @@
 #include "../pch.h"
 #include "../client/dbclient.h"
 #include "../util/mmap.h"
+#include "../util/text.h"
 #include "tool.h"
 
 #include <boost/program_options.hpp>
@@ -92,6 +93,13 @@ public:
                         if ( ! debug( e.Obj() , depth + 1 ) )
                             return false;
                     }
+                    else if ( e.type() == String && ! isValidUTF8( e.valuestr() ) ){
+                        cout << prefix << "\t\t\t" << "bad utf8 String!" << endl;
+                    }
+                    else if ( logLevel > 0 ){
+                        cout << prefix << "\t\t\t" << e << endl;
+                    }
+                
                 }
                 catch ( std::exception& e ){
                     cout << prefix << "\t\t\t bad value: " << e.what() << endl;

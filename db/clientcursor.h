@@ -61,6 +61,7 @@ namespace mongo {
         unsigned _pinValue;
 
         bool _doingDeletes;
+        int _yieldSometimesCalls;
 
         static CCById clientCursorsById;
         static CCByLoc byLoc;
@@ -68,6 +69,8 @@ namespace mongo {
         
         static CursorId allocCursorId_inlock();
 
+
+        
     public:
         /* use this to assure we don't in the background time out cursor while it is under use.
            if you are using noTimeout() already, there is no risk anyway.
@@ -111,7 +114,7 @@ namespace mongo {
 
         ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const char *_ns) :
             _idleAgeMillis(0), _pinValue(0), 
-            _doingDeletes(false), 
+            _doingDeletes(false), _yieldSometimesCalls(0),
             ns(_ns), c(_c), 
             pos(0), _queryOptions(queryOptions)
         {
@@ -147,6 +150,11 @@ namespace mongo {
          */
         bool yield();
 
+        /**
+         * @return same as yield()
+         */
+        bool yieldSometimes();
+
         struct YieldLock : boost::noncopyable {
             explicit YieldLock( ptr<ClientCursor> cc )
                 : _cc( cc ) , _id( cc->cursorid ) , _doingDeletes( cc->_doingDeletes ) {
@@ -177,7 +185,7 @@ namespace mongo {
             ClientCursor * _cc;
             CursorId _id;
             bool _doingDeletes;
-
+            
             scoped_ptr<dbtempreleasecond> _unlock;
 
         };
