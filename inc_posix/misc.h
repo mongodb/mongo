@@ -101,8 +101,8 @@ extern "C" {
  * you have to return the failure.
  *
  * Generally, addr/size pair locations are not declared volatile, they live
- * on random Btree pages; for that reason, we use a memory barrier before
- * re-trying the access.
+ * on random Btree pages; for that reason, use a memory barrier instruction
+ * before retrying the call.
  */
 #define	WT_ERR(a) do {							\
 	if ((ret = (a)) != 0)						\
