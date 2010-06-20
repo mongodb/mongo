@@ -24,7 +24,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	ENV *env;
-	WT_PAGE *rp;
+	WT_PAGE *new;
 	WT_PAGE_HDR *hdr;
 	u_int32_t max;
 	int ret;
@@ -33,21 +33,30 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	env = toc->env;
 	hdr = page->hdr;
 
+	/* If the page isn't dirty, we're done. */
+	WT_ASSERT(toc->env, WT_PAGE_MODIFY_ISSET(page));
+
 	/*
-	 * It's possible (albeit unlikely) for a page to be reconciled by two
-	 * different threads at the same time -- it happens when Db.sync and
-	 * the cache thread's trickle processing select the same buffer.  We
-	 * could fix that by changing the Db.sync call to "schedule" the sync
-	 * with the cache thread, but I'd rather keep the possibility of having
-	 * more than one reconciliation thread running, I don't know if a single
-	 * reconciliation thread is going to be sufficient in the long term.
-	 *
-	 * Serialize reconciliation -- make sure we're the only thread working
-	 * this page.  A non-zero return means we didn't get the page.
+	 * Multiple pages are marked for "draining" by the cache drain server,
+	 * which means nobody can read them -- but, this thread of control has
+	 * to update higher pages in the tree when it writes this page, which
+	 * requires reading other pages, which might themselves be marked for
+	 * draining.   Set a flag to allow this thread of control to see pages
+	 * marked for draining -- we know it's safe, because only this thread
+	 * is writing pages.
 	 */
-	__wt_bt_rec_serial(toc, page, ret);
-	if (ret != 0)
-		return (0);
+	F_SET(toc, WT_READ_DRAIN);
+
+	/*
+	 * Pages allocated by bulk load, but never subsequently modified don't
+	 * need to be reconciled, they can simply be written to their allocated
+	 * file blocks.   Those pages are "modified", but don't have in-memory
+	 * versions.
+	 */
+	if (page->indx_count == 0) {
+		ret = __wt_page_write(db, page);
+		goto done;
+	}
 
 	switch (hdr->type) {
 	case WT_PAGE_DESCRIPT:
@@ -67,68 +76,58 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		/* We'll potentially need a new internal page. */
 		max = db->intlmax;
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
-	/* Make sure the TOC's buffer is big enough. */
-	if (toc->scratch.mem_size < max)
-		WT_RET(__wt_realloc(
-		    env, &toc->scratch.mem_size, max, &toc->scratch.data));
+	/* Make sure the TOC's scratch buffer is big enough. */
+	if (toc->tmp1.mem_size < sizeof(WT_PAGE) + max)
+		WT_ERR(__wt_realloc(env, &toc->tmp1.mem_size,
+		    sizeof(WT_PAGE) + max, &toc->tmp1.data));
+	memset(toc->tmp1.data, 0, sizeof(WT_PAGE) + max);
 
 	/* Initialize the reconciliation buffer as a replacement page. */
-	rp = (WT_PAGE *)toc->scratch.data;
-	rp->size = max;
-	memcpy(toc->scratch.data, page->hdr, WT_PAGE_HDR_SIZE);
-	__wt_bt_set_ff_and_sa_from_addr(rp, WT_PAGE_BYTE(rp));
+	new = toc->tmp1.data;
+	new->hdr =
+	    (WT_PAGE_HDR *)((u_int8_t *)toc->tmp1.data + sizeof(WT_PAGE));
+	new->size = max;
+	new->addr = page->addr;
+	__wt_bt_set_ff_and_sa_from_offset(new, WT_PAGE_BYTE(new));
+	new->hdr->type = page->hdr->type;
+	new->hdr->level = page->hdr->level;
 
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		WT_RET(__wt_bt_rec_col_fix(toc, page, rp));
+		WT_ERR(__wt_bt_rec_col_fix(toc, page, new));
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_bt_rec_col_var(toc, page, rp));
+		WT_ERR(__wt_bt_rec_col_var(toc, page, new));
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_bt_rec_int(toc, page, rp));
+		WT_ERR(__wt_bt_rec_int(toc, page, new));
 		break;
 	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_DUP_LEAF:
-		WT_RET(__wt_bt_rec_row(toc, page, rp));
+		WT_ERR(__wt_bt_rec_row(toc, page, new));
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
+err:
 done:
-	return (0);
-}
-
-/*
- * __wt_bt_rec_serial_func --
- *	Serialize page reconciliation.
- */
-int
-__wt_bt_rec_serial_func(WT_TOC *toc)
-{
-	WT_PAGE *page;
-
-	__wt_bt_rec_unpack(toc, page);
-
-	/* If the page isn't dirty, we're done. */
-	if (!WT_PAGE_MODIFY_ISSET(page))
-		return (1);
-
 	/*
 	 * Clear the modification flag.  This doesn't sound safe, because the
 	 * cache thread might decide to discard this page as "clean".  That's
-	 * not correct, because we're either holding a hazard reference and we
-	 * finish our write before releasing our hazard reference, or, we're
-	 * the cache drain server, and there's no other thread that can discard
-	 * the page.
+	 * not correct, because we're either the Db.sync method and holding a
+	 * hazard reference and we finish our write before releasing our hazard
+	 * reference, or we're the cache drain server and no other thread can
+	 * discard the page.
 	 */
 	WT_PAGE_MODIFY_CLR_AND_FLUSH(page);
-	return (0);
+
+	F_CLR(toc, WT_READ_DRAIN);
+	return (ret);
 }
 
 /*
@@ -179,40 +178,162 @@ rp = NULL;
  *	Reconcile a row-store leaf page.
  */
 static int
-__wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
+__wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-rp = NULL;
-#if 0
+	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
+	enum { KEY_ON_PAGE, KEY_OFF_PAGE, KEY_NONE } key_loc;
+	DB *db;
+	DBT *key, key_dbt, *data, data_dbt;
 	ENV *env;
+	WT_ITEM key_item, data_item;
+	WT_OVFL key_ovfl, data_ovfl;
+	WT_PAGE_HDR *hdr;
 	WT_ROW_INDX *rip;
-	u_int32_t i, len;
-	u_int8_t *acc;
+	WT_SDBT *sdbt;
+	u_int32_t i, len, type;
 
-	env = db->env;
+	db = toc->db;
+	env = toc->env;
+	hdr = new->hdr;
 
-	acc = NULL;
+	WT_CLEAR(data_dbt);
+	WT_CLEAR(key_dbt);
+	WT_CLEAR(data_item);
+	WT_CLEAR(key_item);
+
+	key = &key_dbt;
+	data = &data_dbt;
+
+	/*
+	 * Walk the page, accumulating key/data groups (groups, because a key
+	 * can reference a duplicate data set).
+	 */
 	WT_INDX_FOREACH(page, rip, i) {
 		/*
-		 * If the item is unchanged, we can take it off the page.  We
-		 * accumulate items for as long as possible, then copy them in
-		 * one shot.
+		 * Get a reference to the data.  We get the data first because
+		 * it may have been deleted, in which case we ignore the pair.
 		 */
-		if (rip->repl == NULL) {
-			if (acc == NULL)
-				acc = rip->page_data;
-			continue;
+		if (rip->repl != NULL) {
+			sdbt = rip->repl->data;
+			if (sdbt->data == WT_DATA_DELETED)
+				continue;
+
+			/*
+			 * Build the data's WT_ITEM chunk from the most recent
+			 * replacement value.
+			 */
+			data->data = sdbt->data;
+			data->size = sdbt->size;
+			WT_RET(__wt_bt_build_data_item(
+			    toc, data, &data_item, &data_ovfl));
+			data_loc = DATA_OFF_PAGE;
+		} else {
+			/* Copy the item off the page. */
+			data->data = rip->data;
+			data->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->data));
+			data_loc = DATA_ON_PAGE;
 		}
-		if (acc != NULL) {
-			len = (u_int8_t *)rip->page_data - acc;
-			memcpy(rp, acc, len);
-			rp += len;
+
+		/*
+		 * Check if the key is a duplicate (the key preceding it on the
+		 * page references the same information).  We don't store the
+		 * key for the second and subsequent data items in duplicated
+		 * groups.
+		 */
+		if (i > 0 && rip->key == (rip - 1)->key) {
+			type = data_loc == DATA_ON_PAGE ?
+			    WT_ITEM_TYPE(rip->data) : WT_ITEM_TYPE(&data_item);
+			switch (type) {
+				case WT_ITEM_DATA:
+				case WT_ITEM_DUP:
+					type = WT_ITEM_DUP;
+					break;
+				case WT_ITEM_DATA_OVFL:
+				case WT_ITEM_DUP_OVFL:
+					type = WT_ITEM_DUP_OVFL;
+					break;
+				WT_ILLEGAL_FORMAT(db);
+				}
+			if (data_loc == DATA_ON_PAGE)
+				WT_ITEM_TYPE_SET(rip->data, type);
+			else
+				WT_ITEM_TYPE_SET(&data_item, type);
+			key_loc = KEY_NONE;
+		} else if (WT_KEY_PROCESS(rip)) {
+			key->data = rip->key;
+			key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->key));
+			key_loc = KEY_ON_PAGE;
+		} else {
+			key->data = rip->key;
+			key->size = rip->size;
+			WT_RET(__wt_bt_build_key_item(
+			    toc, key, &key_item, &key_ovfl));
+			key_loc = KEY_OFF_PAGE;
 		}
+
+		len = 0;
+		switch (key_loc) {
+		case KEY_OFF_PAGE:
+			len = WT_ITEM_SPACE_REQ(key->size);
+			break;
+		case KEY_ON_PAGE:
+			len = key->size;
+			break;
+		case KEY_NONE:
+			break;
+		}
+		switch (data_loc) {
+		case DATA_OFF_PAGE:
+			len += WT_ITEM_SPACE_REQ(data->size);
+			break;
+		case DATA_ON_PAGE:
+			len += data->size;
+			break;
+		}
+		if (len > new->space_avail) {
+			fprintf(stderr, "PAGE GREW, SPLIT\n");
+			__wt_abort(env);
+		}
+
+		switch (key_loc) {
+		case KEY_ON_PAGE:
+			memcpy(new->first_free, key->data, key->size);
+			new->first_free += key->size;
+			new->space_avail -= key->size;
+			++hdr->u.entries;
+			break;
+		case KEY_OFF_PAGE:
+			memcpy(new->first_free, &key_item, sizeof(key_item));
+			memcpy(new->first_free +
+			    sizeof(key_item), key->data, key->size);
+			new->first_free += WT_ITEM_SPACE_REQ(key->size);
+			new->space_avail -= WT_ITEM_SPACE_REQ(key->size);
+			++hdr->u.entries;
+			break;
+		case KEY_NONE:
+			break;
+		}
+		switch (data_loc) {
+		case DATA_ON_PAGE:
+			memcpy(new->first_free, data->data, data->size);
+			new->first_free += data->size;
+			new->space_avail -= data->size;
+			++hdr->u.entries;
+			break;
+		case DATA_OFF_PAGE:
+			memcpy(new->first_free, &data_item, sizeof(data_item));
+			memcpy(new->first_free +
+			    sizeof(data_item), data->data, data->size);
+			new->first_free += WT_ITEM_SPACE_REQ(data->size);
+			new->space_avail -= WT_ITEM_SPACE_REQ(data->size);
+			++hdr->u.entries;
+		}
+		new->records += 1;
 	}
 
-	return (__wt_page_write(db, rp));
-#else
-	return (__wt_page_write(toc->db, page));
-#endif
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
+
+	return (__wt_page_write(db, new));
 }
 
 /*
@@ -225,7 +346,7 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	WT_COL_INDX *cip;
 	WT_ROW_INDX *rip;
 	u_int32_t i;
-	void *bp, *ep;
+	void *bp, *ep, *last_key;
 
 	WT_ASSERT(env, page->modified == 0);
 	WT_ENV_FCHK_ASSERT(
@@ -245,17 +366,26 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	case WT_PAGE_ROW_LEAF:
 		bp = (u_int8_t *)page->hdr;
 		ep = (u_int8_t *)bp + page->size;
+		last_key = NULL;
 		WT_INDX_FOREACH(page, rip, i) {
 			/*
-			 * For each entry, see if the data was an allocation,
+			 * For each entry, see if the key was an allocation,
 			 * that is, if it points somewhere other than the
 			 * original page.  If it's an allocation, free it.
 			 *
-			 * For each entry, see if replacements were made -- if
-			 * so, free them.
+			 * Only handle the first entry for a duplicate, the
+			 * others simply point to the same chunk of memory.
 			 */
-			if (rip->data < bp || rip->data >= ep)
-				__wt_free(env, rip->data, rip->size);
+			if (rip->key != last_key &&
+			    (rip->key < bp || rip->key >= ep)) {
+				last_key = rip->key;
+				__wt_free(env, rip->key, rip->size);
+			}
+
+			/*
+			 * For each entry, see if data replacement was made,
+			 * if so, free the replacements.
+			 */
 			if (rip->repl != NULL)
 				__wt_bt_page_discard_repl(env, rip->repl);
 		}
