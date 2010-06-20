@@ -53,11 +53,6 @@ __wt_bt_tree_walk(WT_TOC *toc, u_int32_t addr,
 	 * because of our hazard reference.  If the page was re-written, our
 	 * on-page overflow information will have been updated to the overflow
 	 * page's new address.
-	 *
-	 * XXX
-	 * Do we need a memory flush here?   That is, if the memory referenced
-	 * by ovfl is in our cache, I think we have to flush so we re-acquire
-	 * the information set by the thread which discarded/re-wrote the page.
 	 */
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_INT:

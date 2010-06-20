@@ -99,6 +99,10 @@ extern "C" {
  * have valid information, that is, if you know your addr/size pair is good
  * (for example, because it's taken from a pinned page), you can retry, else
  * you have to return the failure.
+ *
+ * Generally, addr/size pair locations are not declared volatile, they live
+ * on random Btree pages; for that reason, we use a memory barrier before
+ * re-trying the access.
  */
 #define	WT_ERR(a) do {							\
 	if ((ret = (a)) != 0)						\
@@ -107,7 +111,7 @@ extern "C" {
 #define	WT_ERR_RESTART(a) do {						\
 	int __ret;							\
 	while ((__ret = (a)) != 0 && __ret == WT_RESTART)		\
-		;							\
+		WT_MEMORY_FLUSH;					\
 	if (__ret != 0)							\
 		goto err;						\
 } while (0)
@@ -119,7 +123,7 @@ extern "C" {
 #define	WT_RET_RESTART(a) do {						\
 	int __ret;							\
 	while ((__ret = (a)) != 0 && __ret == WT_RESTART)		\
-		;							\
+		WT_MEMORY_FLUSH;					\
 	if (__ret != 0)							\
 		return (__ret);						\
 } while (0)

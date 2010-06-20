@@ -29,10 +29,6 @@ __wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep)
 	 * a page which can't be discarded because of our hazard reference.  If
 	 * the page was re-written, our on-page overflow information will have
 	 * been updated to the overflow page's new address.
-	 *
-	 * XXX
-	 * Do we need a memory flush here?   That is, if the memory referenced
-	 * by ovfl is in our cache, I think we have to flush.
 	 */
 	WT_RET_RESTART(__wt_page_in(
 	    toc, ovfl->addr, WT_HDR_BYTES_TO_ALLOC(db, ovfl->size), &page, 0));
