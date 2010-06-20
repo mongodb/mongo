@@ -18,7 +18,7 @@
 #include "../pch.h"
 #include <fcntl.h>
 #include <errno.h>
-#if defined(__freebsd__)
+#if defined(__freebsd__) || defined(__openbsd__)
 #include <sys/stat.h>
 #endif
 

@@ -32,7 +32,7 @@ namespace mongo {
         return s.str();
     }
 
-#if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__sun__)
+#if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(__sun__)
 
 } // namespace mongo
 

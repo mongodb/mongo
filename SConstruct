@@ -270,6 +270,7 @@ linux64  = False
 darwin = False
 windows = False
 freebsd = False
+openbsd = False
 solaris = False
 force64 = not GetOption( "force64" ) is None
 if not force64 and os.getcwd().endswith( "mongo-64" ):
@@ -554,6 +555,13 @@ elif os.sys.platform.startswith( "freebsd" ):
     env.Append( CPPPATH=[ "/usr/local/include" ] )
     env.Append( LIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__freebsd__" ] )
+
+elif os.sys.platform.startswith( "openbsd" ):
+    nix = True
+    openbsd = True
+    env.Append( CPPPATH=[ "/usr/local/include" ] )
+    env.Append( LIBPATH=[ "/usr/local/lib" ] )
+    env.Append( CPPDEFINES=[ "__openbsd__" ] )
 
 elif "win32" == os.sys.platform:
     windows = True
@@ -991,6 +999,10 @@ def doConfigure( myenv , needPcre=True , shell=False ):
                 myCheckLib( "ncurses" , True )
             else:
                 myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
+        elif openbsd:
+            myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
+            myCheckLib( "termcap" , True )
+            myCheckLib( "readline" , True )
         elif myCheckLib( "readline" , release and nix , staticOnly=release ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
             myCheckLib( "ncurses" , staticOnly=release )
@@ -1002,7 +1014,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
             myCheckLib( "rt" , True )
 
     # requires ports devel/libexecinfo to be installed
-    if freebsd:
+    if freebsd or openbsd:
         myCheckLib( "execinfo", True )
         env.Append( LIBS=[ "execinfo" ] )
 
