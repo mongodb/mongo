@@ -101,9 +101,23 @@ extern "C" {
 	if ((ret = (a)) != 0)						\
 		goto err;						\
 } while (0)
+#define	WT_ERR_RESTART(a) do {						\
+	int __ret;							\
+	while ((__ret = (a)) != 0 && __ret == WT_RESTART)		\
+		;							\
+	if (__ret != 0)							\
+		goto err;						\
+} while (0)
 #define	WT_RET(a) do {							\
 	int __ret;							\
 	if ((__ret = (a)) != 0)						\
+		return (__ret);						\
+} while (0)
+#define	WT_RET_RESTART(a) do {						\
+	int __ret;							\
+	while ((__ret = (a)) != 0 && __ret == WT_RESTART)		\
+		;							\
+	if (__ret != 0)							\
 		return (__ret);						\
 } while (0)
 #define	WT_TRET(a) do {							\
