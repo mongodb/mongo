@@ -57,33 +57,20 @@ __wt_page_in(WT_TOC *toc,
 	WT_ASSERT(env, size % WT_FRAGMENT == 0);
 	WT_ENV_FCHK_ASSERT(env, "__wt_page_in", flags, WT_APIMASK_WT_PAGE_IN);
 
-retry:	/* Search the cache for the page. */
+	/* Search the cache for the page. */
 	found = ret = 0;
 	for (i = WT_CACHE_ENTRY_CHUNK,
 	    e = cache->hb[WT_ADDR_HASH(cache, addr)];;) {
-		if (e->db == db && e->addr == addr && e->state == WT_OK) {
+		if (e->db == db && e->addr == addr &&
+		    (e->state == WT_OK ||
+		    (e->state == WT_DRAIN && F_ISSET(toc, WT_READ_DRAIN)))) {
 			found = 1;
 			break;
 		}
 		WT_CACHE_ENTRY_NEXT(e, i);
 	}
 
-	/*
-	 * The memory location making this page "real" is the WT_CACHE_ENTRY's
-	 * state field, which can be reset from WT_OK to WT_DRAIN at any time
-	 * by the cache drain server.
-	 *
-	 * Add the page to the WT_TOC's hazard list (which flushes the write),
-	 * then see if the state field is still WT_OK.  If it's still WT_OK,
-	 * we know we can use the page because the cache drain server will see
-	 * our hazard reference before it discards the buffer (the drain server
-	 * sets the WT_DRAIN state, flushes memory, and then checks the hazard
-	 * references).
-	 *
-	 * If for any reason, we can't get the page we want, ask the read server
-	 * to get it for us and go to sleep.  The read server is expensive, but
-	 * serializes all the hard cases.
-	 */
+	/* Get a hazard reference -- if that fails, the page isn't available. */
 	if (found && __wt_hazard_set(toc, e, NULL)) {
 		/* Update the generation number. */
 		page = e->page;
@@ -95,15 +82,18 @@ retry:	/* Search the cache for the page. */
 		return (0);
 	}
 
-	/* Optionally, only return existing cache entries. */
+	/* Optionally, only return in-cache entries. */
 	if (LF_ISSET(WT_CACHE_ONLY))
 		return (WT_NOTFOUND);
 
+	/*
+	 * If for any reason, we can't get the page we want, ask the read server
+	 * to get it for us and go to sleep.  The read server is expensive, but
+	 * serializes all the hard cases.
+	 */
 	__wt_cache_in_serial(toc, addr, size, pagep, ret);
-	if (ret == WT_RESTART) {
+	if (ret == WT_RESTART)
 		WT_STAT_INCR(cache->stats, CACHE_READ_RESTARTS);
-		goto retry;
-	}
 	return (ret);
 }
 
