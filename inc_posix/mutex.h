@@ -36,10 +36,11 @@ typedef u_int32_t wt_atomic_t;
  * WT_MEMORY_FLUSH macro.   The WT_MEMORY_FLUSH macro ensures memory stores by
  * the processor, made before the WT_MEMORY_FLUSH call, be visible to all
  * processors in the system, before any memory stores by this processor, made
- * after the WT_MEMORY_FLUSH call, are visible to any processor.  Note that the
- * WT_MEMORY_FLUSH macro makes no requirement with respect to loads by any
- * processor, so any memory reference which might cause a problem if cached by
- * a processor needs to be declared volatile.
+ * after the WT_MEMORY_FLUSH call, are visible to any processor.  That is, it
+ * guarantees write ordering.  Note that the WT_MEMORY_FLUSH macro makes no
+ * requirement with respect to loads by any processor, so any memory reference
+ * which might cause a problem if cached by a processor needs to be declared
+ * volatile.
  */
 extern void *__wt_addr;
 
