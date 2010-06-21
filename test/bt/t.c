@@ -16,7 +16,7 @@ static void	usage(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, log;
+	int ch, log, reps;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -100,24 +100,26 @@ main(int argc, char *argv[])
 		if (g.c_duplicates_pct != 0)
 			goto skip_ops;
 
-		switch (g.c_database_type) {	/* Scan through some records */
-		case ROW:
-			if (wts_read_row_scan())
+		for (reps = 0; reps < 3; ++reps) {		
+			switch (g.c_database_type) {
+			case ROW:		/* Scan some records */
+				if (wts_read_row_scan())
+					goto err;
+				break;
+			case FIX:
+			case VAR:
+				if (wts_read_col_scan())
+					goto err;
+				break;
+			}
+
+			track("flushing & re-opening WT", 0);
+			wts_teardown();		/* Re-open the WT database */
+			wts_setup(1, log);
+
+			if (wts_ops())		/* Random operations */
 				goto err;
-			break;
-		case FIX:
-		case VAR:
-			if (wts_read_col_scan())
-				goto err;
-			break;
 		}
-
-		track("flushing & re-opening WT", 0);
-		wts_teardown();			/* Re-open the WT database */
-		wts_setup(1, log);
-
-		if (wts_ops())			/* Random operations */
-			goto err;
 
 skip_ops:	if (g.stats && wts_stats())	/* Optional statistics */
 			goto err;
