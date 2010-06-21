@@ -32,16 +32,13 @@ namespace mongo {
      */
     class StaleConfigException : public AssertionException {
     public:
-        StaleConfigException( const string& ns , const string& raw){
-            code = 9996;
-            stringstream s;
-            s << "StaleConfigException ns: " << ns << " " << raw;
-            msg = s.str();
-            log(1) << msg << endl;
+        StaleConfigException( const string& ns , const string& raw)
+            : AssertionException( (string)"ns: " + ns + " " + raw , 9996 ){
         }
         
         virtual ~StaleConfigException() throw(){}
 
+        virtual void appendPrefix( stringstream& ss ) const { ss << "StaleConfigException: "; }
     private:
     };
 

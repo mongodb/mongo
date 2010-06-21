@@ -60,8 +60,7 @@ namespace mongo {
         }
         catch ( AssertionException& e ) {
             BSONObjBuilder err;
-            err.append("$err", string("mongos: ") + (e.msg.empty() ? "assertion during query" : e.msg));
-            err.append("code",e.getCode());
+            e.getInfo().append( err );
             BSONObj errObj = err.done();
             replyToQuery(QueryResult::ResultFlag_ErrSet, r.p() , r.m() , errObj);
         }

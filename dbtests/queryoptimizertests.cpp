@@ -1196,7 +1196,7 @@ namespace QueryOptimizerTests {
                 boost::shared_ptr< TestOp > done = s.runOp( *t );
                 ASSERT( threw );
                 ASSERT( done->complete() );
-                ASSERT( done->exceptionMessage().empty() );
+                ASSERT( done->exception().empty() );
                 ASSERT( !done->error() );
             }
         private:
@@ -1236,7 +1236,7 @@ namespace QueryOptimizerTests {
                 auto_ptr< TestOp > t( new TestOp() );
                 boost::shared_ptr< TestOp > done = s.runOp( *t );
                 ASSERT( !done->complete() );
-                ASSERT_EQUALS( "throw", done->exceptionMessage() );
+                ASSERT_EQUALS( "throw", done->exception().msg );
                 ASSERT( done->error() );
             }
         private:

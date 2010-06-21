@@ -81,16 +81,16 @@ namespace mongo {
         public:
             Context(const string& ns, string path=dbpath, mongolock * lock = 0 , bool doauth=true ) 
                 : _client( currentClient.get() ) , _oldContext( _client->_context ) , 
-                  _path( path ) , _lock( lock ) ,
-                  _ns( ns ){
+                  _path( path ) , _lock( lock ) , 
+                  _ns( ns ), _db(0){
                 _finishInit( doauth );
             }
             
             /* this version saves the context but doesn't yet set the new one: */
-
+            
             Context() 
                 : _client( currentClient.get() ) , _oldContext( _client->_context ), 
-                  _path( dbpath ) , _lock(0) , _justCreated(false){
+                  _path( dbpath ) , _lock(0) , _justCreated(false), _db(0){
                 _client->_context = this;
                 clear();
             }

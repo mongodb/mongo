@@ -569,10 +569,15 @@ namespace mongo {
     void QueryPlanSet::Runner::initOp( QueryOp &op ) {
         try {
             op.init();
-        } catch ( const std::exception &e ) {
-            op.setExceptionMessage( e.what() );
-        } catch ( ... ) {
-            op.setExceptionMessage( "Caught unknown exception" );
+        } 
+        catch ( DBException& e ){
+            op.setException( e.getInfo() );
+        }
+        catch ( const std::exception &e ) {
+            op.setException( ExceptionInfo( e.what() , 0 ) );
+        } 
+        catch ( ... ) {
+            op.setException( ExceptionInfo( "Caught unknown exception" , 0 ) );
         }        
     }
 
@@ -580,11 +585,16 @@ namespace mongo {
         try {
             if ( !op.error() )
                 op.next();
-        } catch ( const std::exception &e ) {
-            op.setExceptionMessage( e.what() );
-        } catch ( ... ) {
-            op.setExceptionMessage( "Caught unknown exception" );
-        }        
+        } 
+        catch ( DBException& e ){
+            op.setException( e.getInfo() );
+        }
+        catch ( const std::exception &e ) {
+            op.setException( ExceptionInfo( e.what() , 0 ) );
+        } 
+        catch ( ... ) {
+            op.setException( ExceptionInfo( "Caught unknown exception" , 0 ) );
+        } 
     }
     
     MultiPlanScanner::MultiPlanScanner( const char *ns,

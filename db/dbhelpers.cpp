@@ -129,7 +129,8 @@ namespace mongo {
         MultiPlanScanner s( ns, query, BSONObj(), 0, !requireIndex );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );
-        massert( 10302 ,  res->exceptionMessage(), res->complete() );
+        if ( ! res->complete() )
+            throw MsgAssertionException( res->exception() );
         if ( res->one().isEmpty() )
             return false;
         result = res->one();

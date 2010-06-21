@@ -27,6 +27,8 @@ using namespace std;
 #include <sys/file.h>
 #endif
 
+#include "../bson/bson.h"
+
 namespace mongo {
 
     AssertionCount assertionCount;
@@ -48,6 +50,17 @@ namespace mongo {
         if ( newvalue >= max )
             rollover();
     }
+
+    void ExceptionInfo::append( BSONObjBuilder& b , const char * m , const char * c ) const {
+        if ( msg.empty() )
+            b.append( m , "unknown assertion" );
+        else
+            b.append( m , msg );
+        
+        if ( code )
+            b.append( c , code );
+    }
+
     
 	string getDbContext();
 	
@@ -70,8 +83,7 @@ namespace mongo {
         lastAssert[0].set(msg, getDbContext().c_str(), file, line);
         stringstream temp;
         temp << "assertion " << file << ":" << line;
-        AssertionException e;
-        e.msg = temp.str();
+        AssertionException e(temp.str(),0);
         breakpoint();
         throw e;
     }

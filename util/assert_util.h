@@ -81,72 +81,86 @@ namespace mongo {
     };
     
     extern AssertionCount assertionCount;
+    
+    struct ExceptionInfo {
+        ExceptionInfo() : msg(""),code(-1){}
+        ExceptionInfo( const char * m , int c )
+            : msg( m ) , code( c ){
+        }
+        ExceptionInfo( const string& m , int c )
+            : msg( m ) , code( c ){
+        }
+
+        void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;
+        
+        operator string() const { stringstream ss; ss << "exception: " << code << " " << msg; return ss.str(); }
+
+        bool empty() const { return msg.empty(); }
+                
+
+        string msg;
+        int code;
+    };
 
     class DBException : public std::exception {
     public:
-        virtual const char* what() const throw() = 0;
+        DBException( const ExceptionInfo& ei ) : _ei(ei){}
+        DBException( const char * msg , int code ) : _ei(msg,code){}
+        DBException( const string& msg , int code ) : _ei(msg,code){}
+        virtual ~DBException() throw() { }
+        
+        virtual const char* what() const throw(){ return _ei.msg.c_str(); }
+        virtual int getCode() const { return _ei.code; }
+        
+        virtual void appendPrefix( stringstream& ss ) const { }
+        
         virtual string toString() const {
-            return what();
+            stringstream ss; ss << getCode() << " " << what(); return ss.str();
+            return ss.str();
         }
-        virtual int getCode() const = 0;
-        operator string() const { stringstream ss; ss << getCode() << " " << what(); return ss.str(); }
+        
+        operator string() const { return toString(); }
+        
+        const ExceptionInfo& getInfo() const { return _ei; }
+
+    protected:
+        ExceptionInfo _ei;
     };
     
     class AssertionException : public DBException {
     public:
-        int code;
-        string msg;
-        AssertionException() { code = 0; }
+
+        AssertionException( const ExceptionInfo& ei ) : DBException(ei){}
+        AssertionException( const char * msg , int code ) : DBException(msg,code){}
+        AssertionException( const string& msg , int code ) : DBException(msg,code){}
+
         virtual ~AssertionException() throw() { }
-        virtual bool severe() {
-            return true;
-        }
-        virtual bool isUserAssertion() {
-            return false;
-        }
-        virtual int getCode() const { return code; }
-        virtual const char* what() const throw() { return msg.c_str(); }
+        
+        virtual bool severe() { return true; }
+        virtual bool isUserAssertion() { return false; }
 
         /* true if an interrupted exception - see KillCurrentOp */
         bool interrupted() { 
-            return code == 11600 || code == 11601;
+            return _ei.code == 11600 || _ei.code == 11601;
         }
     };
-
+    
     /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */
     class UserException : public AssertionException {
     public:
-        UserException(int c , const string& m) {
-            code = c;
-            msg = m;
-        }
-        virtual bool severe() {
-            return false;
-        }
-        virtual bool isUserAssertion() {
-            return true;
-        }
-        virtual string toString() const {
-            return "userassert:" + msg;
-        }
-    };
+        UserException(int c , const string& m) : AssertionException( m , c ){}
 
+        virtual bool severe() { return false; }
+        virtual bool isUserAssertion() { return true; }
+        virtual void appendPrefix( stringstream& ss ) const { ss << "userassert:"; }
+    };
+    
     class MsgAssertionException : public AssertionException {
     public:
-        MsgAssertionException(int c, const char *m) {
-            code = c;
-            msg = m;
-        }
-        MsgAssertionException(int c, const string& m) {
-            code = c;
-            msg = m;
-        }
-        virtual bool severe() {
-            return false;
-        }
-        virtual string toString() const {
-            return "massert:" + msg;
-        }
+        MsgAssertionException( const ExceptionInfo& ei ) : AssertionException( ei ){}
+        MsgAssertionException(int c, const string& m) : AssertionException( m , c ){}
+        virtual bool severe() { return false; }
+        virtual void appendPrefix( stringstream& ss ) const { ss << "massert:"; }
     };
 
     void asserted(const char *msg, const char *file, unsigned line);

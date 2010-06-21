@@ -211,8 +211,7 @@ namespace mongo {
             return _runCommands(ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
         }
         catch ( AssertionException& e ) {
-            if ( !e.msg.empty() )
-                anObjBuilder.append("assertion", e.msg);
+            e.getInfo().append( anObjBuilder , "assertion" , "assertionCode" );
         }
         curop.debug().str << " assertion ";
         anObjBuilder.append("errmsg", "db assertion failure");
@@ -482,7 +481,7 @@ namespace mongo {
         shared_ptr< CountOp > res = mps.runOp( original );
         if ( !res->complete() ) {
             log() << "Count with ns: " << ns << " and query: " << query
-                  << " failed with exception: " << res->exceptionMessage()
+                  << " failed with exception: " << res->exception()
                   << endl;
             return 0;
         }
@@ -776,6 +775,7 @@ namespace mongo {
         auto_ptr< ScanAndOrder > _so;
         
         shared_ptr<Cursor> _c;
+        shared_ptr<ClientCursor> _cc;
 
         bool _saveClientCursor;
         bool _wouldSaveClientCursor;
@@ -943,7 +943,8 @@ namespace mongo {
         UserQueryOp original( pq, result, eb, curop );
         shared_ptr< UserQueryOp > o = mps->runOp( original );
         UserQueryOp &dqo = *o;
-        massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
+        if ( ! dqo.complete() )
+            throw MsgAssertionException( dqo.exception() );
         if ( explain ) {
             dqo.finishExplain( explainSuffix );
         }

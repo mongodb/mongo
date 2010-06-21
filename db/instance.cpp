@@ -186,7 +186,7 @@ namespace mongo {
             }
 
             BSONObjBuilder err;
-            err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
+            e.getInfo().append( err );
             BSONObj errObj = err.done();
 
             BufBuilder b;

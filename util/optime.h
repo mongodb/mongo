@@ -23,8 +23,7 @@ namespace mongo {
     void exitCleanly( ExitCode code );
     
     struct ClockSkewException : public DBException {
-        virtual const char* what() const throw() { return "clock skew exception"; }
-        virtual int getCode() const { return 20001; }
+        ClockSkewException() : DBException( "clock skew exception" , 20001 ){}
     };
 
     /* replsets use RSOpTime.  

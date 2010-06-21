@@ -125,13 +125,13 @@ namespace mongo {
         bool complete() const { return _complete; }
         bool error() const { return _error; }
         bool stopRequested() const { return _stopRequested; }
-        string exceptionMessage() const { return _exceptionMessage; }
+        ExceptionInfo exception() const { return _exception; }
         const QueryPlan &qp() const { return *_qp; }
         // To be called by QueryPlanSet::Runner only.
         void setQueryPlan( const QueryPlan *qp ) { _qp = qp; }
-        void setExceptionMessage( const string &exceptionMessage ) {
+        void setException( const DBException &e ) {
             _error = true;
-            _exceptionMessage = exceptionMessage;
+            _exception = e.getInfo();
         }
         shared_ptr< CoveredIndexMatcher > matcher() const { return _matcher; }
     protected:
@@ -151,7 +151,7 @@ namespace mongo {
     private:
         bool _complete;
         bool _stopRequested;
-        string _exceptionMessage;
+        ExceptionInfo _exception;
         const QueryPlan *_qp;
         bool _error;
         shared_ptr< CoveredIndexMatcher > _matcher;
@@ -364,7 +364,8 @@ namespace mongo {
         };
         void nextClause() {
             shared_ptr< CursorOp > best = _mps->runOpOnce( *_op );
-            massert( 10401 , best->exceptionMessage(), best->complete() );
+            if ( ! best->complete() )
+                throw MsgAssertionException( best->exception() );
             _c = best->newCursor();
             _matcher = best->matcher();
             _op = best;

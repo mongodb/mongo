@@ -61,7 +61,7 @@ namespace mongo {
         log(4) << "min: " << min.first << "\t" << min.second << endl;
         log(4) << "max: " << max.first << "\t" << max.second << endl;
         
-        if( (int)( max.second - min.second) < ( balancedLastTime ? 2 : 8 ) )
+        if( (int)( max.second - min.second) < ( balancedLastTime ? 1 : 1 ) )
             return NULL;
 
         const string from = max.first;

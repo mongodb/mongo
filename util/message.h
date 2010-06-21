@@ -367,8 +367,7 @@ struct OP_GETMORE : public MSGHEADER {
 
     class SocketException : public DBException {
     public:
-        virtual const char* what() const throw() { return "socket exception"; }
-        virtual int getCode() const { return 9001; }
+        SocketException() : DBException( "socket exception" , 9001 ){}
     };
 
     MSGID nextMessageId();
