@@ -37,15 +37,18 @@ namespace mongo {
             }
             string who = cmdObj["who"].String();
             int cfgver = cmdObj["cfgver"].Int();
+			unsigned long long ord = (unsigned long long) cmdObj["opTime"].Long();
 
             bool weAreFresher = false;
             if( theReplSet->config().version > cfgver ) { 
                 log() << "replSet member " << who << " is not yet aware its cfg version " << cfgver << " is stale" << rsLog;
+				result.append("info", "config version stale");
                 weAreFresher = true;
             }
+			else if( ord > rsOpTime.ord )  { 
+				weAreFresher = true;
+			}
             result.append("fresher", weAreFresher);
-
-            log() << "replSet error: replSetFresh command not implemented yet." << rsLog;
             return true;
         }
     } cmdReplSetFresh;
@@ -163,9 +166,12 @@ namespace mongo {
        @return true if we are freshest.  Note we may tie.
     */
     bool Consensus::weAreFreshest(bool& allUp) {
+		const unsigned long long ord = rsOpTime.ord;
+		assert( ord > 0 );
         BSONObj cmd = BSON(
                "replSetFresh" << 1 <<
                "set" << rs.name() << 
+			   "opTime" << (long long) rsOpTime.ord <<
                "who" << rs._self->fullName() << 
                "cfgver" << rs._cfg->version );
         list<Target> L;
@@ -185,7 +191,8 @@ namespace mongo {
                 allUp = false;
             }
         }
-        DEV log() << "replSet we are freshest of up nodes, nok:" << nok << rsLog; 
+        DEV log() << "replSet dev we are freshest of up nodes, nok:" << nok << rsLog; 
+		assert( ord == rsOpTime.ord );
         return true;
     }
 
