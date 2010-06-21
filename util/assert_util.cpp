@@ -27,7 +27,8 @@ using namespace std;
 #include <sys/file.h>
 #endif
 
-#include "../bson/bson.h"
+//#include "../bson/bson.h"
+#include "../db/jsobj.h"
 
 namespace mongo {
 

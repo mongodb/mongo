@@ -35,6 +35,13 @@
 
 #pragma once
 
+#if defined(MONGO_EXPOSE_MACROS)
+#error this header is for client programs, not the mongo database itself. include jsobj.h instead.
+/* because we define simplistic assert helpers here that don't pull in a bunch of util -- so that
+   BSON can be used header only.
+   */
+#endif
+
 #include <iostream>
 #include <sstream>
 #include <boost/utility.hpp>
