@@ -572,4 +572,11 @@ namespace mongo {
     }
 
     inline void BSONElement::Val(BSONObj& v) const { v = Obj(); }
+
+    template<typename T>
+    inline BSONFieldValue<BSONObj> BSONField<T>::query( const char * q , const T& t ) const {
+        BSONObjBuilder b;
+        b.append( q , t );
+        return BSONFieldValue<BSONObj>( _name , b.obj() );
+    }
 }

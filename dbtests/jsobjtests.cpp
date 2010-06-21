@@ -1512,6 +1512,33 @@ namespace JsobjTests {
         }
     };
 
+    class BSONFieldTests {
+    public:
+        void run(){
+            {
+                BSONField<int> x("x");
+                BSONObj o = BSON( x << 5 );
+                ASSERT_EQUALS( BSON( "x" << 5 ) , o );
+            }
+
+            {
+                BSONField<int> x("x");
+                BSONObj o = BSON( x.make(5) );
+                ASSERT_EQUALS( BSON( "x" << 5 ) , o );
+            }
+
+            {
+                BSONField<int> x("x");
+                BSONObj o = BSON( x(5) );
+                ASSERT_EQUALS( BSON( "x" << 5 ) , o );
+
+                o = BSON( x.gt(5) );
+                ASSERT_EQUALS( BSON( "x" << BSON( "$gt" << 5 ) ) , o );
+            }
+
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1607,6 +1634,7 @@ namespace JsobjTests {
             add< ElementSetTest >();
             add< EmbeddedNumbers >();
             add< BuilderPartialItearte >();
+            add< BSONFieldTests >();
         }
     } myall;
     
