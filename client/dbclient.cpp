@@ -804,6 +804,7 @@ namespace mongo {
         /* check for errors.  the only one we really care about at
          this stage is "not master" */
         if ( clientPaired && nReturned ) {
+            assert(data);
             BSONObj o(data);
             BSONElement e = o.firstElement();
             if ( strcmp(e.fieldName(), "$err") == 0 &&
