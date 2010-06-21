@@ -213,7 +213,7 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) = 0;
         virtual void say( Message &toSend ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;
-        virtual void checkResponse( const string &data, int nReturned ) {}
+        virtual void checkResponse( const char* data, int nReturned ) {}
 
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
         virtual void recv( Message& m ) { assert(false); }
