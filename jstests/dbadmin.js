@@ -16,6 +16,6 @@ else {
 t.save( { x : 1 } );
 
 res = db._adminCommand( "listDatabases" );
-assert( res.databases.length > 0 , "listDatabases 1" );
+assert( res.databases && res.databases.length > 0 , "listDatabases 1 " + tojson(res) );
 
 // TODO: add more tests here

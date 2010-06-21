@@ -3,6 +3,8 @@
 //
 var files = listFiles("jstests");
 
+var runnerStart = new Date()
+
 files.forEach(
     function(x) {
         
@@ -21,3 +23,6 @@ files.forEach(
 );
 
 
+var runnerEnd = new Date()
+
+print( "total runner time: " + ( ( runnerEnd.getTime() - runnerStart.getTime() ) / 1000 ) + "secs" )

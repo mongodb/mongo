@@ -966,7 +966,7 @@ namespace mongo {
                                             *i, ordering, dupsAllowed, idx);
             }
             catch (AssertionException& e) {
-                if( e.code == 10287 && idxNo == d->nIndexes ) { 
+                if( e.getCode() == 10287 && idxNo == d->nIndexes ) { 
                     DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
                     continue;
                 }
@@ -1831,6 +1831,8 @@ namespace mongo {
             dbs.insert( i->first );
         }
         
+        currentClient.get()->getContext()->clear();
+
         BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
         int n = 0;
         int nNotClosed = 0;
