@@ -395,6 +395,17 @@ wts_read_row_scan()
 	return (0);
 }
 
+#define	NTF_CHK(a) do {							\
+	switch (a) {							\
+	case 0:								\
+		break;							\
+	case 1:								\
+		return (1);						\
+	case 2:								\
+		return (0);						\
+	}								\
+} while (0)
+
 /*
  * wts_read_row --
  *	Read and verify a single element in a row database.
@@ -426,8 +437,7 @@ wts_read_row(u_int64_t keyno)
 	}
 
 	/* Check for not-found status. */
-	if (wts_notfound_chk(env, "wts_read_row", ret, notfound, keyno))
-		return (1);
+	NTF_CHK(wts_notfound_chk(env, "wts_read_row", ret, notfound, keyno));
 
 	/* Compare the two. */
 	if (data.size != bdb_data.size ||
@@ -496,8 +506,7 @@ wts_read_col(u_int64_t keyno)
 	}
 
 	/* Check for not-found status. */
-	if (wts_notfound_chk(env, "wts_read_col", ret, notfound, keyno))
-		return (1);
+	NTF_CHK(wts_notfound_chk(env, "wts_read_col", ret, notfound, keyno));
 
 	/* Compare the two. */
 	if (data.size != bdb_data.size ||
@@ -538,7 +547,8 @@ wts_del_row(u_int64_t keyno)
 		    env, ret, "wts_del_row: delete row %llu by key", keyno);
 		return (1);
 	}
-	return (wts_notfound_chk(env, "wts_del_row", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk(env, "wts_del_row", ret, notfound, keyno));
+	return (0);
 }
 
 /*
@@ -568,7 +578,8 @@ wts_del_col(u_int64_t keyno)
 		return (1);
 	}
 
-	return (wts_notfound_chk(env, "wts_del_col", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk(env, "wts_del_col", ret, notfound, keyno));
+	return (0);
 }
 
 /*
@@ -582,7 +593,7 @@ wts_notfound_chk(
 	/* Check for not found status. */
 	if (bdb_notfound) {
 		if (wt_ret == WT_NOTFOUND)
-			return (0);
+			return (2);
 
 		env->errx(env,
 		    "%s: row %llu: deleted in Berkeley DB, found in WiredTiger",
