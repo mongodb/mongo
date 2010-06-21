@@ -297,7 +297,7 @@ namespace mongo {
         _checkOIDs();
 
         while ( ! inShutdown() ){
-            sleepsecs( 1 );
+            sleepsecs( 10 );
             
             try {
                 ScopedDbConnection conn( configServer.getPrimary() );
