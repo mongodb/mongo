@@ -481,7 +481,8 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_PINNED					0x00000001
 #define	WT_PRINTABLES					0x00000001
 #define	WT_RDONLY					0x00000002
-#define	WT_READ_DRAIN					0x00000001
+#define	WT_READ_DRAIN					0x00000002
+#define	WT_READ_PRIORITY				0x00000001
 #define	WT_REPEAT_COMP					0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_TELEPHONE					0x00000001
@@ -525,7 +526,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000001
 #define	WT_APIMASK_WT_PAGE				0x00000001
 #define	WT_APIMASK_WT_PAGE_IN				0x00000001
-#define	WT_APIMASK_WT_TOC				0x00000001
+#define	WT_APIMASK_WT_TOC				0x00000003
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*
  * API flags section: END

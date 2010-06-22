@@ -141,7 +141,7 @@ __wt_page_read(DB *db, WT_PAGE *page);
 int
 __wt_page_write(DB *db, WT_PAGE *page);
 void
-__wt_workq_read_server(ENV *env);
+__wt_workq_read_server(ENV *env, int read_priority);
 void *
 __wt_cache_read_server(void *arg);
 int

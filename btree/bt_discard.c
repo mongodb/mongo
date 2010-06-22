@@ -44,8 +44,11 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	 * draining.   Set a flag to allow this thread of control to see pages
 	 * marked for draining -- we know it's safe, because only this thread
 	 * is writing pages.
+	 *
+	 * Reconciliation is probably running because the cache is full, which
+	 * means reads are locked out -- reconciliation can read, regardless.
 	 */
-	F_SET(toc, WT_READ_DRAIN);
+	F_SET(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
 
 	/*
 	 * Pages allocated by bulk load, but never subsequently modified don't
@@ -115,8 +118,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	}
 
 err:
-done:
-	/*
+done:	/*
 	 * Clear the modification flag.  This doesn't sound safe, because the
 	 * cache thread might decide to discard this page as "clean".  That's
 	 * not correct, because we're either the Db.sync method and holding a
@@ -126,7 +128,7 @@ done:
 	 */
 	WT_PAGE_MODIFY_CLR_AND_FLUSH(page);
 
-	F_CLR(toc, WT_READ_DRAIN);
+	F_CLR(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
 	return (ret);
 }
 

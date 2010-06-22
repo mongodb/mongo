@@ -17,18 +17,13 @@ static int __wt_cache_read(WT_READ_REQ *);
  *	See if the read server thread needs to be awakened.
  */
 void
-__wt_workq_read_server(ENV *env)
+__wt_workq_read_server(ENV *env, int read_priority)
 {
 	WT_CACHE *cache;
 	u_int64_t bytes_inuse, bytes_max;
 
 	cache = env->ienv->cache;
 
-	/* If the read server is running, there's nothing to do. */
-	if (!cache->read_sleeping)
-		return;
-
-#if 0
 	/*
 	 * If we're 10% over the maximum cache, shut out reads (which include
 	 * page allocations) until we drain to at least 5% under the maximum
@@ -47,9 +42,13 @@ __wt_workq_read_server(ENV *env)
 		    (u_quad)bytes_inuse, (u_quad)bytes_max));
 		cache->read_lockout = 1;
 	}
-	if (cache->read_lockout)
+
+	/*
+	 * If the read server is already running, or there's no read of a high
+	 * enough priority to over-ride any cache read lockout, we're done.
+	 */
+	if (!cache->read_sleeping || (cache->read_lockout && !read_priority))
 		return;
-#endif
 
 	WT_VERBOSE(env, WT_VERB_SERVERS, (env, "waking cache read server"));
 	cache->read_sleeping = 0;
@@ -96,6 +95,9 @@ __wt_cache_read_server(void *arg)
 			didwork = 0;
 			for (rr = cache->read_request; rr < rr_end; ++rr) {
 				if ((toc = rr->toc) == NULL)
+					continue;
+				if (cache->read_lockout &&
+				    !F_ISSET(toc, WT_READ_PRIORITY))
 					continue;
 
 				toc->wq_ret = __wt_cache_read(rr);

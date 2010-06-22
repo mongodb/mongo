@@ -596,4 +596,5 @@ flags['ienv'] = [
 flags['wt_page'] = [
 	'PINNED' ]
 flags['wt_toc'] = [
-	'READ_DRAIN' ]
+	'READ_DRAIN',
+	'READ_PRIORITY' ]

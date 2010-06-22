@@ -21,7 +21,7 @@ __wt_workq_srvr(void *arg)
 	WT_FLIST *fp;
 	WT_TOC **tp, *toc;
 	u_int32_t low_gen;
-	int chk_read, nowork;
+	int chk_read, nowork, read_priority;
 
 	env = (ENV *)arg;
 	ienv = env->ienv;
@@ -33,7 +33,7 @@ __wt_workq_srvr(void *arg)
 		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
 
 		low_gen = UINT32_MAX;
-		chk_read = 0;
+		chk_read = read_priority = 0;
 		for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 			if (toc->gen < low_gen)
 				low_gen = toc->gen;
@@ -66,12 +66,12 @@ __wt_workq_srvr(void *arg)
 					break;
 				}
 				toc->wq_state = WT_WORKQ_READ_SCHED;
-
 				nowork = 0;
-				chk_read = 1;
-				break;
+				/* FALLTHROUGH */
 			case WT_WORKQ_READ_SCHED:
 				chk_read = 1;
+				read_priority =
+				    F_ISSET(toc, WT_READ_PRIORITY) ? 1 : 0;
 				break;
 			}
 		}
@@ -83,7 +83,7 @@ __wt_workq_srvr(void *arg)
 
 		/* If a read is scheduled, check on the read server. */
 		if (chk_read)
-			__wt_workq_read_server(env);
+			__wt_workq_read_server(env, read_priority);
 
 		/* Check on the cache drain server. */
 		__wt_workq_drain_server(env);
