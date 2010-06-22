@@ -320,16 +320,15 @@ namespace mongo {
         int num = 0;
         {
             scoped_lock bl(clientsMutex);
-            num = clients.size();
+            for ( set<Client*>::iterator i=clients.begin(); i!=clients.end(); ++i ){
+                Client* c = *i;
+                if ( c->curop()->isWaitingForLock() ){
+                    if ( ++num > 50 )
+                        break;
+                }
+            }
         }
-        
-        if ( --num <= 0 ) // -- is for myself
-            return 0;
-        
-        if ( num > 50 )
-            num = 50;
 
-        num *= 100;
-        return num;
+        return num * 100;
     }
 }
