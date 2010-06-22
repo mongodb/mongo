@@ -612,7 +612,19 @@ namespace mongo {
                 finish( false );
                 return;
             }
-            
+
+            if ( _nscanned > 128 ){
+                if ( ! _cc )
+                    _cc.reset( new ClientCursor( _pq.getOptions() | QueryOption_NoCursorTimeout , _c , _pq.ns() ) );
+                
+                if ( ! _cc->yieldSometimes() ){
+                    _c.reset();
+                    _cc.reset();
+                    finish(false);
+                    return;
+                }
+            }
+
             bool mayCreateCursor1 = _pq.wantMore() && ! _inMemSort && _pq.getNumToReturn() != 1 && useCursors;
             
             if( 0 ) { 

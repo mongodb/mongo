@@ -200,8 +200,9 @@ namespace mongo {
     }
     
     bool ClientCursor::yieldSometimes(){
-        if ( ( ++_yieldSometimesCalls % 128 ) == 0 )
+        if ( ( ++_yieldSometimesCalls % 128 ) == 0 ){
             return yield();
+        }
         return true;
     }
 
@@ -238,12 +239,16 @@ namespace mongo {
             
         {
             dbtempreleasecond unlock;
-            if ( unlock.unlocked() )
-                sleepmicros( Client::recommendedYieldMicros() );
-            else
+            if ( unlock.unlocked() ){
+                int micros = Client::recommendedYieldMicros();
+                if ( micros > 0 )
+                    sleepmicros( micros ); 
+            }
+            else {
                 log() << "ClientCursor::yield can't unlock b/c of recursive lock" << endl;
+            }
         }
-
+        
         if ( ClientCursor::find( id , false ) == 0 ){
             // i was deleted
             return false;
