@@ -814,6 +814,16 @@ shellHelper = function( command , rest , shouldPrint ){
 }
 
 help = shellHelper.help = function (x) {
+    if (x == "connect") {
+        print("\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
+        print("Additional connections may be opened:\n");
+        print("    var x = new Mongo('host[:port]');");
+        print("    var mydb = x.getDB('mydb');");
+        print("  or");
+        print("    var mydb = connect('host[:port]/mydb');");
+        print("\nNote: the REPL prompt only auto-reports getLastError() for the shell command line connection.\n");
+        return;
+    }
     if (x == "admin") {
         print("\tls([path])                    list files");
         print("\tpwd()                         returns current directory");
@@ -837,13 +847,14 @@ help = shellHelper.help = function (x) {
         print("\t                              returns a connection to the new server");
         return;
     }
+    print("\t" + "help connect                 connecting to a db");
     print("\t" + "help admin                   misc shell commands");
     print("\t" + "show dbs                     show database names");
     print("\t" + "show collections             show collections in current database");
     print("\t" + "show users                   show users in current database");
     print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
     print("\t" + "use <db name>                set current database to <db name>");
-    print("\t" + "db.help()                    help on DB methods");
+    print("\t" + "db.help()                    help on db methods");
     print("\t" + "db.foo.help()                help on collection methods");
     print("\t" + "db.foo.find()                list objects in collection foo");
     print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
