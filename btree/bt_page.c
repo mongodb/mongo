@@ -96,10 +96,8 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags)
 		page->lru = 0;
 
 	/* The caller may have dirtied the page. */
-	if (LF_ISSET(WT_MODIFIED)) {
+	if (LF_ISSET(WT_MODIFIED))
 		WT_PAGE_MODIFY_SET_AND_FLUSH(page);
-		WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
-	}
 
 	__wt_page_out(toc, page);
 }

@@ -3,45 +3,45 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_bulk.c (C)
                                                                           _
 			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  142  Warning 530: Symbol 'last_repeat' (line 81) not
+../btree/bt_bulk.c  157  Warning 530: Symbol 'last_repeat' (line 96) not
     initialized
-../btree/bt_bulk.c  81  Info 830: Location cited in prior message
+../btree/bt_bulk.c  96  Info 830: Location cited in prior message
                                                                           _
 			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  142  Warning 530: Symbol 'last_data' (line 82) not
+../btree/bt_bulk.c  157  Warning 530: Symbol 'last_data' (line 97) not
     initialized
-../btree/bt_bulk.c  82  Info 830: Location cited in prior message
+../btree/bt_bulk.c  97  Info 830: Location cited in prior message
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/bt_bulk.c  360  Warning 530: Symbol 'dup_data' (line 230) not
+../btree/bt_bulk.c  375  Warning 530: Symbol 'dup_data' (line 245) not
     initialized
-../btree/bt_bulk.c  230  Info 830: Location cited in prior message
+../btree/bt_bulk.c  245  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/bt_bulk.c  431  Warning 530: Symbol 'dup_key' (line 230) not
+../btree/bt_bulk.c  446  Warning 530: Symbol 'dup_key' (line 245) not
     initialized
-../btree/bt_bulk.c  230  Info 830: Location cited in prior message
+../btree/bt_bulk.c  245  Info 830: Location cited in prior message
                        _
 	WT_RECORDS(&off) = dup_count;
-../btree/bt_bulk.c  754  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  769  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1009  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1024  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1041  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1056  Info 740: Unusual pointer cast (incompatible indirect
     types)
                              _
 #... S((WT_OFF *)((ip)->data))
 	WT_COL_OFF_RECORDS(ip) += incr;
-../btree/bt_bulk.c  1213  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1228  Info 740: Unusual pointer cast (incompatible indirect
     types)
                              _
 #... WT_ITEM_BYTE((ip)->data))
 	WT_ROW_OFF_RECORDS(ip) += incr;
-../btree/bt_bulk.c  1230  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1245  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_close.c (C)
@@ -81,16 +81,16 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_page.c (C)
                                                  _
 			records += WT_RECORDS(off);
-../btree/bt_page.c  240  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  238  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                         _
 #...       WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->data))
 			records += WT_ROW_OFF_RECORDS(ip);
-../btree/bt_page.c  311  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  309  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                          _
 		records += WT_RECORDS(off);
-../btree/bt_page.c  347  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  345  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_reconcile.c (C)

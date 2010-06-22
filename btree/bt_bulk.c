@@ -18,6 +18,21 @@ typedef struct {
 	u_int size;				/* stack size */
 } WT_STACK;
 
+/*
+ * Bulk-load builds physical pages, and we want to verify them as soon as they
+ * are created (when running in diagnostic mode).
+ */
+#ifdef HAVE_DIAGNOSTIC
+#define	WT_BULK_PAGE_OUT(toc, pagep, flags) do {			\
+	WT_ASSERT(							\
+	    (toc)->env, __wt_bt_verify_page(toc, *(pagep), NULL) == 0);	\
+	__wt_bt_page_out(toc, pagep, flags);				\
+} while (0)
+#else
+#define	WT_BULK_PAGE_OUT(toc, pagep, flags)				\
+	__wt_bt_page_out(toc, pagep, flags)
+#endif
+
 static int  __wt_bt_bulk_fix(WT_TOC *,
 	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
 static int  __wt_bt_bulk_var(WT_TOC *, u_int32_t,
@@ -161,7 +176,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			 */
 			WT_ERR(__wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL));
-			__wt_bt_page_out(toc, &page, WT_DISCARD | WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 			WT_ERR(__wt_bt_page_alloc(toc,
 			    WT_PAGE_COL_FIX, WT_LLEAF, db->leafmin, &page));
 		}
@@ -193,7 +208,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		if (page != NULL) {
 			ret = __wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL);
-			__wt_bt_page_out(toc, &page, WT_DISCARD | WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 		}
 	}
 
@@ -204,11 +219,11 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 err:	if (stack.page != NULL) {
 		u_int i;
 		for (i = 0; stack.page[i] != NULL; ++i)
-			__wt_bt_page_out(toc, &stack.page[i], WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &stack.page[i], WT_MODIFIED);
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
 	if (page != NULL)
-		__wt_bt_page_out(toc, &page, WT_DISCARD | WT_MODIFIED);
+		WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 
 	return (ret);
 }
@@ -467,7 +482,7 @@ skip_read:	/*
 			 */
 			WT_ERR(__wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL));
-			__wt_bt_page_out(toc, &page, WT_DISCARD | WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 			page = next;
 		}
 
@@ -562,7 +577,7 @@ skip_read:	/*
 		if (page != NULL) {
 			ret = __wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL);
-			__wt_bt_page_out(toc, &page, WT_DISCARD | WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 		}
 	}
 
@@ -571,11 +586,11 @@ skip_read:	/*
 		f(toc->name, insert_cnt);
 
 err:	if (page != NULL)
-		__wt_bt_page_out(toc, &page, WT_DISCARD | WT_MODIFIED);
+		WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 	if (stack.page != NULL) {
 		u_int i;
 		for (i = 0; stack.page[i] != NULL; ++i)
-			__wt_bt_page_out(toc, &stack.page[i], WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &stack.page[i], WT_MODIFIED);
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
 
@@ -715,7 +730,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			 */
 			WT_RET(__wt_bt_promote(toc,
 			    page, page->records, &stack, 0, &root_addr));
-			__wt_bt_page_out(toc, &page, WT_DISCARD | WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 			WT_RET(__wt_bt_page_alloc(toc,
 			    WT_PAGE_DUP_LEAF, WT_LLEAF, db->leafmin, &page));
 		}
@@ -743,7 +758,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	if ((tret = __wt_bt_promote(toc, page, page->records,
 	    &stack, 0, &root_addr)) != 0 && (ret == 0 || ret == 1))
 		ret = tret;
-	__wt_bt_page_out(toc, &page, WT_DISCARD | WT_MODIFIED);
+	WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 
 	/*
 	 * Replace the caller's duplicate set with a WT_OFF structure, and
@@ -764,7 +779,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	if (stack.page != NULL) {
 		u_int i;
 		for (i = 0; stack.page[i] != NULL; ++i)
-			__wt_bt_page_out(toc, &stack.page[i], WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &stack.page[i], WT_MODIFIED);
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
 
@@ -982,7 +997,7 @@ split:		switch (page->hdr->type) {
 				    incr, stack, level + 1, dup_root_addrp));
 
 			/* Discard the old parent page, we have a new one. */
-			__wt_bt_page_out(toc, &parent, WT_MODIFIED);
+			WT_BULK_PAGE_OUT(toc, &parent, WT_MODIFIED);
 			need_promotion = 1;
 		}
 
@@ -1089,7 +1104,7 @@ split:		switch (page->hdr->type) {
 	}
 
 err:	if (next != NULL)
-		__wt_bt_page_out(toc, &next, WT_MODIFIED);
+		WT_BULK_PAGE_OUT(toc, &next, WT_MODIFIED);
 
 	return (ret);
 }
