@@ -289,6 +289,7 @@ namespace mongo {
             pid_t pid_;
         public:
             pid_t pid() const { return pid_; }
+            int port() const { return port_; }
 
             boost::filesystem::path find(string prog) { 
                 boost::filesystem::path p = prog;
@@ -567,9 +568,14 @@ namespace mongo {
             ProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            wait_for_pid(r.pid());
-            shells.erase( r.pid() );
-            return BSON( string( "" ) << int( r.pid() ) );
+            int exit_code;
+            wait_for_pid( r.pid(), true, &exit_code );
+            if ( r.port() > 0 ) {
+                dbs.erase( r.port() );
+            } else {
+                shells.erase( r.pid() );
+            }
+            return BSON( string( "" ) << exit_code );
         }
 
         BSONObj RunProgram(const BSONObj &a) {
