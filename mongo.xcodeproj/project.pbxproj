@@ -451,6 +451,7 @@
 		937D0E340F28CB070071FFA9 /* repltests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = repltests.cpp; sourceTree = "<group>"; };
 		937D14AB0F2A225F0071FFA9 /* nonce.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nonce.h; sourceTree = "<group>"; };
 		937D14AC0F2A226E0071FFA9 /* nonce.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nonce.cpp; sourceTree = "<group>"; };
+		938A748A11D140EC005265E1 /* in4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = in4.js; sourceTree = "<group>"; };
 		938A7A420F54871000FB7A07 /* storage.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = storage.cpp; sourceTree = "<group>"; };
 		938A7A430F54873600FB7A07 /* concurrency.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = concurrency.h; sourceTree = "<group>"; };
 		938A7A440F54873600FB7A07 /* queryutil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = queryutil.cpp; sourceTree = "<group>"; };
@@ -821,6 +822,7 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				938A748A11D140EC005265E1 /* in4.js */,
 				93C529C511D047CF00CF42F7 /* repair2.js */,
 				937884E811C80B22007E85F5 /* or8.js */,
 				937884C311C80276007E85F5 /* indexi.js */,

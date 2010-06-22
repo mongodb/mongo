@@ -67,6 +67,17 @@ namespace mongo {
                 maxInclusive() &&
                 minInclusive();
         }
+        bool inQuery() const {
+            if ( equality() ) {
+                return true;
+            }
+            for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {            
+                if ( !i->equality() ) {
+                    return false;
+                }
+            }
+            return true;
+        }
         bool nontrivial() const {
             return
                 ! empty() && 

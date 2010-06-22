@@ -746,38 +746,50 @@ namespace mongo {
     }
     
     BoundList FieldRangeSet::indexBounds( const BSONObj &keyPattern, int direction ) const {
-        BSONObjBuilder equalityBuilder;
         typedef vector< pair< shared_ptr< BSONObjBuilder >, shared_ptr< BSONObjBuilder > > > BoundBuilders;
         BoundBuilders builders;
+        builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );        
         BSONObjIterator i( keyPattern );
+        bool ineq = false; // until ineq is true, we are just dealing with equality and $in bounds
         while( i.more() ) {
             BSONElement e = i.next();
             const FieldRange &fr = range( e.fieldName() );
             int number = (int) e.number(); // returns 0.0 if not numeric
             bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
-            if ( builders.empty() ) {
+            if ( !ineq ) {
                 if ( fr.equality() ) {
-                    equalityBuilder.appendAs( fr.min(), "" );
-                } else {
-                    BSONObj equalityObj = equalityBuilder.done();
-                    const vector< FieldInterval > &intervals = fr.intervals();
-                    if ( forward ) {
-                        for( vector< FieldInterval >::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
-                            builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
-                            builders.back().first->appendElements( equalityObj );
-                            builders.back().second->appendElements( equalityObj );
-                            builders.back().first->appendAs( j->_lower._bound, "" );
-                            builders.back().second->appendAs( j->_upper._bound, "" );
-                        }
-                    } else {
-                        for( vector< FieldInterval >::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
-                            builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
-                            builders.back().first->appendElements( equalityObj );
-                            builders.back().second->appendElements( equalityObj );
-                            builders.back().first->appendAs( j->_upper._bound, "" );
-                            builders.back().second->appendAs( j->_lower._bound, "" );
-                        }                       
+                    for( BoundBuilders::const_iterator j = builders.begin(); j != builders.end(); ++j ) {
+                        j->first->appendAs( fr.min(), "" );
+                        j->second->appendAs( fr.min(), "" );
                     }
+                } else {
+                    if ( !fr.inQuery() ) {
+                        ineq = true;
+                    }
+                    BoundBuilders newBuilders;
+                    const vector< FieldInterval > &intervals = fr.intervals();
+                    for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i ) {
+                        BSONObj first = i->first->obj();
+                        BSONObj second = i->second->obj();
+                        if ( forward ) {
+                            for( vector< FieldInterval >::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
+                                newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+                                newBuilders.back().first->appendElements( first );
+                                newBuilders.back().second->appendElements( second );
+                                newBuilders.back().first->appendAs( j->_lower._bound, "" );
+                                newBuilders.back().second->appendAs( j->_upper._bound, "" );
+                            }
+                        } else {
+                            for( vector< FieldInterval >::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
+                                newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+                                newBuilders.back().first->appendElements( first );
+                                newBuilders.back().second->appendElements( second );
+                                newBuilders.back().first->appendAs( j->_upper._bound, "" );
+                                newBuilders.back().second->appendAs( j->_lower._bound, "" );
+                            }
+                        }
+                    }
+                    builders = newBuilders;
                 }
             } else {
                 for( BoundBuilders::const_iterator j = builders.begin(); j != builders.end(); ++j ) {
@@ -785,13 +797,6 @@ namespace mongo {
                     j->second->appendAs( forward ? fr.max() : fr.min(), "" );
                 }
             }
-        }
-        if ( builders.empty() ) {
-            BSONObj equalityObj = equalityBuilder.done();
-            assert( !equalityObj.isEmpty() );
-            builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
-            builders.back().first->appendElements( equalityObj );
-            builders.back().second->appendElements( equalityObj );            
         }
         BoundList ret;
         for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i )
