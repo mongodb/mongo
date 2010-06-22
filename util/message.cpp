@@ -142,8 +142,6 @@ namespace mongo {
 
         static long connNumber = 0;
         struct timeval maxSelectTime;
-        maxSelectTime.tv_sec = 0;
-        maxSelectTime.tv_usec = 10000;
         while ( ! inShutdown() ) {
             fd_set fds[1];
             FD_ZERO(fds);
@@ -152,6 +150,8 @@ namespace mongo {
                 FD_SET(*it, fds);
             }
 
+	    maxSelectTime.tv_sec = 0;
+	    maxSelectTime.tv_usec = 10000;
             const int ret = select(maxfd+1, fds, NULL, NULL, &maxSelectTime);
             
             if (ret == 0){
