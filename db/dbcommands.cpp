@@ -339,6 +339,7 @@ namespace mongo {
 
             result.append("version", versionString);
             result.append("uptime",(double) (time(0)-started));
+            result.append("uptimeEstimate",(double) (Listener::getElapsedTimeMillis()/1000));
             result.appendDate( "localTime" , jsTime() );
 
             {

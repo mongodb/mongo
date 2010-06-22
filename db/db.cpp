@@ -175,6 +175,7 @@ namespace mongo {
         //testTheDb();
         log() << "waiting for connections on port " << port << endl;
         OurListener l(bind_ip, port);
+        l.setAsTimeTracker();
         startReplication();
         if ( !noHttpInterface )
             boost::thread thr(webServerThread);

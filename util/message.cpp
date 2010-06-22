@@ -45,6 +45,8 @@ namespace mongo {
     const int portRecvFlags = 0;
 #endif
 
+    extern const Listener* Listener::_timeTracker;
+
     vector<SockAddr> ipToAddrs(const char* ips, int port){
         vector<SockAddr> out;
         if (*ips == '\0'){

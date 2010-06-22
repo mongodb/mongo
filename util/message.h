@@ -33,7 +33,10 @@ namespace mongo {
     class Listener {
     public:
         Listener(const string &ip, int p, bool logConnect=true ) : _port(p), _ip(ip), _logConnect(logConnect), _elapsedTime(0){ }
-        virtual ~Listener() {}
+        virtual ~Listener() {
+            if ( _timeTracker == this )
+                _timeTracker = 0;
+        }
         void initAndListen(); // never returns unless error (start a thread)
 
         /* spawn a thread, etc., then return */
@@ -47,12 +50,28 @@ namespace mongo {
         /**
          * @return a rough estimate of elepased time since the server started
          */
-        long long getElapsedTimeMillis() const { return _elapsedTime; }
+        long long getMyElapsedTimeMillis() const { return _elapsedTime; }
+
+        void setAsTimeTracker(){
+            _timeTracker = this;
+        }
+
+        static const Listener* getTimeTracker(){
+            return _timeTracker;
+        }
+        
+        static long long getElapsedTimeMillis() { 
+            if ( _timeTracker )
+                return _timeTracker->getMyElapsedTimeMillis();
+            return 0;
+        }
 
     private:
         string _ip;
         bool _logConnect;
         long long _elapsedTime;
+
+        static const Listener* _timeTracker;
     };
 
     class AbstractMessagingPort {
