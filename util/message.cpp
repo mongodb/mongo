@@ -139,6 +139,9 @@ namespace mongo {
         }
 
         static long connNumber = 0;
+        struct timeval maxSelectTime;
+        maxSelectTime.tv_sec = 0;
+        maxSelectTime.tv_usec = 10000;
         while ( ! inShutdown() ) {
             fd_set fds[1];
             FD_ZERO(fds);
@@ -147,12 +150,15 @@ namespace mongo {
                 FD_SET(*it, fds);
             }
 
-            const int ret = select(maxfd+1, fds, NULL, NULL, NULL);
+            const int ret = select(maxfd+1, fds, NULL, NULL, &maxSelectTime);
+            
             if (ret == 0){
-                log() << "select() returned 0" << endl;
+                _elapsedTime += maxSelectTime.tv_usec / 1000;
                 continue;
             }
-            else if (ret < 0){
+            _elapsedTime += ret; // assume 1ms to grab connection. very rough
+            
+            if (ret < 0){
                 int x = errno;
 #ifdef EINTR
                 if ( x == EINTR ){
