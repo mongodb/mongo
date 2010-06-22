@@ -46,7 +46,7 @@ namespace mongo {
         static mongo::mutex clientsMutex;
         static set<Client*> clients; // always be in clientsMutex when manipulating this
 
-        static int recommendedYieldMicros();
+        static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
 
         class GodScope {
             bool _prev;

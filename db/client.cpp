@@ -316,18 +316,31 @@ namespace mongo {
     } handshakeCmd;
 
 
-    int Client::recommendedYieldMicros(){
+    int Client::recommendedYieldMicros( int * writers , int * readers ){
         int num = 0;
+        int w = 0;
+        int r = 0;
         {
             scoped_lock bl(clientsMutex);
             for ( set<Client*>::iterator i=clients.begin(); i!=clients.end(); ++i ){
                 Client* c = *i;
                 if ( c->curop()->isWaitingForLock() ){
-                    if ( ++num > 50 )
-                        break;
+                    num++;
+                    if ( c->curop()->getLockType() > 0 )
+                        w++;
+                    else
+                        r++;
                 }
             }
         }
+        
+        if ( writers )
+            *writers = w;
+        if ( readers )
+            *readers = r;
+
+        if ( num > 50 )
+            num = 50;
 
         return num * 100;
     }

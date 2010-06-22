@@ -200,13 +200,25 @@ namespace mongo {
     }
     
     bool ClientCursor::yieldSometimes(){
-        if ( ( ++_yieldSometimesCalls % 128 ) == 0 ){
-            return yield();
+        if ( ++_yieldSometimesCalls % 128 )
+            return true;
+
+        int writers = 0;
+        int readers = 0;
+
+        int micros = Client::recommendedYieldMicros( &writers , &readers );
+        if ( micros == 0 )
+            return true;
+        
+        if ( writers == 0 && dbMutex.getState() <= 0 ){
+            // we have a read lock, and only reads are coming on, so why bother unlocking
+            return true;
         }
-        return true;
+        
+        return yield( micros );
     }
 
-    bool ClientCursor::yield() {
+    bool ClientCursor::yield( int micros ) {
         // need to store on the stack in case this gets deleted
         CursorId id = cursorid;
 
@@ -240,7 +252,8 @@ namespace mongo {
         {
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ){
-                int micros = Client::recommendedYieldMicros();
+                if ( micros == -1 )
+                    micros = Client::recommendedYieldMicros();
                 if ( micros > 0 )
                     sleepmicros( micros ); 
             }
