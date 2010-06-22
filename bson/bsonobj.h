@@ -91,7 +91,7 @@ namespace mongo {
         operator string() const { return toString(); }
         
         /** Properly formatted JSON string. 
-            @param pretty if tru1 we try to add some lf's and indentation
+            @param pretty if true we try to add some lf's and indentation
         */
         string jsonString( JsonStringFormat format = Strict, int pretty = 0 ) const;
 

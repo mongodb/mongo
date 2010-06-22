@@ -52,7 +52,7 @@ string historyFile;
 bool gotInterrupted = 0;
 bool inMultiLine = 0;
 
-#if defined(USE_READLINE) && !defined(__freebsd__) && !defined(_WIN32)
+#if defined(USE_READLINE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
 #define CTRLC_HANDLE
 #endif
 
