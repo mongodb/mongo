@@ -596,6 +596,8 @@ elif "win32" == os.sys.platform:
     if boostDir is None:
         print( "can't find boost" )
         Exit(1)
+    else:
+        print( "boost found at '" + boostDir + "'" )
 
     serverOnlyFiles += [ "util/ntservice.cpp" ]
 
@@ -922,7 +924,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
         else:
             print( "WARNING: old version of boost - you should consider upgrading" )
 
-    # this will add it iff it exists and works
+    # this will add it if it exists and works
     myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
                   "boost_system" + boostCompiler + boostVersion ] )
 
