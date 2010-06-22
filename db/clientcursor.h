@@ -61,7 +61,7 @@ namespace mongo {
         unsigned _pinValue;
 
         bool _doingDeletes;
-        int _yieldSometimesCalls;
+        ElapsedTracker _yieldSometimesTracker;
 
         static CCById clientCursorsById;
         static CCByLoc byLoc;
@@ -114,7 +114,7 @@ namespace mongo {
 
         ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const char *_ns) :
             _idleAgeMillis(0), _pinValue(0), 
-            _doingDeletes(false), _yieldSometimesCalls(0),
+            _doingDeletes(false), _yieldSometimesTracker(128,10),
             ns(_ns), c(_c), 
             pos(0), _queryOptions(queryOptions)
         {

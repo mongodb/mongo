@@ -567,6 +567,7 @@ namespace mongo {
             _oldN(0),
             _chunkMatcher(shardingState.getChunkMatcher(pq.ns())),
             _inMemSort(false),
+            _yieldTracker(256,20),
             _saveClientCursor(false),
             _wouldSaveClientCursor(false),
             _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
@@ -613,7 +614,7 @@ namespace mongo {
                 return;
             }
 
-            if ( _nscanned > 128 ){
+            if ( _cc || _yieldTracker.ping() ){
                 if ( ! _cc )
                     _cc.reset( new ClientCursor( _pq.getOptions() | QueryOption_NoCursorTimeout , _c , _pq.ns() ) );
                 
@@ -788,6 +789,7 @@ namespace mongo {
         
         shared_ptr<Cursor> _c;
         shared_ptr<ClientCursor> _cc;
+        ElapsedTracker _yieldTracker;
 
         bool _saveClientCursor;
         bool _wouldSaveClientCursor;

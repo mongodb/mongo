@@ -200,7 +200,7 @@ namespace mongo {
     }
     
     bool ClientCursor::yieldSometimes(){
-        if ( ++_yieldSometimesCalls % 128 )
+        if ( ! _yieldSometimesTracker.ping() )
             return true;
 
         int writers = 0;

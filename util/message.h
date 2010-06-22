@@ -402,4 +402,40 @@ struct OP_GETMORE : public MSGHEADER {
 
     extern TicketHolder connTicketHolder;
 
+    class ElapsedTracker {
+    public:
+        ElapsedTracker( int hitsBetweenMarks , int msBetweenMarks )
+            : _h( hitsBetweenMarks ) , _ms( msBetweenMarks ) , _pings(0){
+            _last = Listener::getElapsedTimeMillis();
+        }
+
+        /**
+         * call this for every iteration
+         * returns true if one of the triggers has gone off
+         */
+        bool ping(){
+            if ( ( ++_pings % _h ) == 0 ){
+                _last = Listener::getElapsedTimeMillis();
+                return true;
+            }
+            
+            long long now = Listener::getElapsedTimeMillis();
+            if ( now - _last > _ms ){
+                _last = now;
+                return true;
+            }
+                
+            return false;
+        }
+
+    private:
+        int _h;
+        int _ms;
+
+        unsigned long long _pings;
+
+        long long _last;
+        
+    };
+        
 } // namespace mongo
