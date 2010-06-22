@@ -167,7 +167,9 @@ namespace mongo {
         
         assert( strstr( ns , "local.oplog.$" ) == ns );
         
-        BSONObj rid = curop.getClient()->getRemoteID();
+        Client * c = curop.getClient();
+        assert(c);
+        BSONObj rid = c->getRemoteID();
         if ( rid.isEmpty() )
             return;
 
