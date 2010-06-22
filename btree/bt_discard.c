@@ -186,7 +186,6 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	enum { KEY_ON_PAGE, KEY_OFF_PAGE, KEY_NONE } key_loc;
 	DB *db;
 	DBT *key, key_dbt, *data, data_dbt;
-	ENV *env;
 	WT_ITEM key_item, data_item;
 	WT_OVFL key_ovfl, data_ovfl;
 	WT_PAGE_HDR *hdr;
@@ -195,7 +194,6 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	u_int32_t i, len, type;
 
 	db = toc->db;
-	env = toc->env;
 	hdr = new->hdr;
 
 	WT_CLEAR(data_dbt);
@@ -294,7 +292,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 		if (len > new->space_avail) {
 			fprintf(stderr, "PAGE GREW, SPLIT\n");
-			__wt_abort(env);
+			__wt_abort(toc->env);
 		}
 
 		switch (key_loc) {
