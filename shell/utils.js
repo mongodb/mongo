@@ -825,6 +825,7 @@ help = shellHelper.help = function (x) {
         print("\trun(program[, args...])       spawn a program and wait for its completion");
         print("\tsleep(m)                      sleep m milliseconds");
         print("\tgetMemInfo()                  diagnostic");
+        return;
     }
     if (x == "test") {
         print("\tstartMongodEmpty(args)        DELETES DATA DIR and then starts mongod");
