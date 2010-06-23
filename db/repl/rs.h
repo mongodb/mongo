@@ -23,6 +23,7 @@
 #include "../../util/concurrency/msg.h"
 #include "../../util/hostandport.h"
 #include "../commands.h"
+#include "rs_exception.h"
 #include "rs_optime.h"
 #include "rsmember.h"
 #include "rs_config.h"
@@ -59,7 +60,7 @@ namespace mongo {
     class Manager : public task::Server {
         bool got(const any&);
         ReplSetImpl *rs;
-        bool busy;
+        bool busyWithElectSelf;
         int _primary;
         const Member* findOtherPrimary();
         void noteARemoteIsPrimary(const Member *);
@@ -80,7 +81,7 @@ namespace mongo {
         Atomic<LastYea> ly;
         unsigned yea(unsigned memberId); // throws VoteException
         void _electSelf();
-        bool weAreFreshest(bool& allUp);
+        bool weAreFreshest(bool& allUp, int& nTies);
     public:
         Consensus(ReplSetImpl *t) : rs(*t) { }
         int totalVotes() const;

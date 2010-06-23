@@ -3,20 +3,18 @@
 load("../../jstests/rs/test_framework.js");
 
 function go() {
-
-    try {
-        var z = connect("localhost:27000/test");
-        print("error: mongod already running?");
-        zz = z;
-        return;
-    }
-    catch (e) {
-        ; 
-    }
-
     assert(__nextPort == 27000, "_nextPort==27000");
 
-    a = rs_mongod();
+    a = null;
+    try {
+        a = new Mongo("localhost:27000");
+        print("using already open mongod on port 27000 -- presume you are debugging or something. should start empty.");
+        __nextPort++;
+    }
+    catch (e) {
+        a = rs_mongod();
+    }
+
     b = rs_mongod();
 
     x = a.getDB("admin");
@@ -24,7 +22,6 @@ function go() {
     memb = [];
     memb[0] = x;
     memb[1] = y;
-
 
     print("rs_basic.js go(): started 2 servers");
 

@@ -42,6 +42,7 @@ namespace mongo {
             void call(const lam&);
 
         private:
+            virtual bool initClient() { return true; }
             virtual string name() { return _name; }
             void doWork();
             deque<lam> d;

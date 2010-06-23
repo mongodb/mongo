@@ -30,8 +30,8 @@ namespace mongo {
         */
         class Task : private BackgroundJob {
         protected:
-            virtual void doWork() = 0;   // implement the task here.
-            virtual string name() = 0;   // name the thread
+            virtual void doWork() = 0;                  // implement the task here.
+            virtual string name() = 0;                  // name the threada
         public:
             Task();
 

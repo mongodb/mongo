@@ -37,7 +37,7 @@ namespace mongo {
             }
             string who = cmdObj["who"].String();
             int cfgver = cmdObj["cfgver"].Int();
-			unsigned long long ord = (unsigned long long) cmdObj["opTime"].Long();
+			unsigned long long ord = (unsigned long long) cmdObj["ord"].Long();
 
             bool weAreFresher = false;
             if( theReplSet->config().version > cfgver ) { 
@@ -48,6 +48,7 @@ namespace mongo {
 			else if( ord > rsOpTime.ord )  { 
 				weAreFresher = true;
 			}
+            result.append("ord", (long long) ord);
             result.append("fresher", weAreFresher);
             return true;
         }
@@ -85,9 +86,6 @@ namespace mongo {
     }
 
     static const int VETO = -10000;
-
-    class VoteException : public std::exception {
-    };
 
     const time_t LeaseTime = 30;
 
@@ -165,9 +163,11 @@ namespace mongo {
        @param allUp - set to true if all members are up.  Only set if true returned.
        @return true if we are freshest.  Note we may tie.
     */
-    bool Consensus::weAreFreshest(bool& allUp) {
+    bool Consensus::weAreFreshest(bool& allUp, int& nTies) {
 		const unsigned long long ord = rsOpTime.ord;
-		assert( ord > 0 );
+        nTies = 0;
+        cout << "TEMP COMMENTED OUT LINE IN consensus.cpp" << endl;
+		//assert( ord > 0 );
         BSONObj cmd = BSON(
                "replSetFresh" << 1 <<
                "set" << rs.name() << 
@@ -185,13 +185,17 @@ namespace mongo {
                 nok++;
                 if( i->result["fresher"].trueValue() )
                     return false;
+                unsigned long long remoteOrd = (unsigned long long) i->result["ord"].Long();
+                if( remoteOrd == ord )
+                    nTies++;
+                assert( remoteOrd <= ord );
             }
             else {
                 DEV log() << "replSet freshest returns " << i->result.toString() << rsLog;
                 allUp = false;
             }
         }
-        DEV log() << "replSet dev we are freshest of up nodes, nok:" << nok << rsLog; 
+        DEV log() << "replSet dev we are freshest of up nodes, nok:" << nok << " nTies:" << nTies << rsLog; 
 		assert( ord == rsOpTime.ord );
         return true;
     }
@@ -205,19 +209,37 @@ namespace mongo {
 
     void Consensus::_electSelf() {
         bool allUp;
-        if( !weAreFreshest(allUp) ) { 
+        int nTies;
+        if( !weAreFreshest(allUp, nTies) ) { 
             log() << "replSet info not electing self, we are not freshest" << rsLog;
             return;
         }
         if( !allUp && time(0) - started < 60 * 5 ) { 
             /* the idea here is that if a bunch of nodes bounce all at once, we don't want to drop data 
-               if we don't have to -- we'd rather be offline and wait a little longer instead */
+               if we don't have to -- we'd rather be offline and wait a little longer instead 
+               todo: make this configurable.
+               */
             log() << "replSet info not electing self, not all members up and we have been up less than 5 minutes" << rsLog;
             return;
         }
 
-        time_t start = time(0);
         Member& me = *rs._self;
+
+        if( nTies ) {
+            /* tie?  we then randomly sleep to try to not collide on our voting. */
+            /* todo: smarter. */
+            DEV log() << "replSet tie " << nTies << " sleeping a little" << rsLog;
+            if( me.id() == 0 ) {
+                // would be fine for one node not to sleep 
+                // todo: biggest / highest priority nodes should be the ones that get to not sleep
+            } else {
+                assert( !rs.lockedByMe() ); // would be bad to go to sleep locked
+                sleepmillis( ((unsigned) rand()) * 1000 + 50 );
+                throw RetryAfterSleepException();
+            }
+        }
+
+        time_t start = time(0);
         int tally = yea( me.id() );
         log() << "replSet info electSelf" << rsLog;
 
