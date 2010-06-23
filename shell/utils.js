@@ -369,6 +369,10 @@ ObjectId.prototype.getTimestamp = function(){
     return new Date(parseInt(this.toString().slice(0,8), 16)*1000);
 }
 
+ObjectId.prototype.equals = function( other){
+    return this.str == other.str;
+}
+
 if ( typeof( DBPointer ) != "undefined" ){
     DBPointer.prototype.fetch = function(){
         assert( this.ns , "need a ns" );
