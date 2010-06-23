@@ -1109,8 +1109,14 @@ namespace mongo {
             result.append( "ns" , ns.c_str() );
             
             int scale = 1;
-            if ( jsobj["scale"].isNumber() )
+            if ( jsobj["scale"].isNumber() ){
                 scale = jsobj["scale"].numberInt();
+                if ( scale <= 0 ){
+                    errmsg = "scale has to be > 0";
+                    return false;
+                }
+                    
+            }
 
             result.appendNumber( "count" , nsd->nrecords );
             result.appendNumber( "size" , nsd->datasize / scale );
