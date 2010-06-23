@@ -118,6 +118,7 @@ namespace mongo {
     // NOTE win version hasn't been tested directly
     inline long long parseLL( const char *n ) {
         long long ret;
+        uassert( 13307, "cannot convert empty string to long long", *n != 0 );
 #if !defined(_WIN32)
         char *endPtr = 0;
         errno = 0;
