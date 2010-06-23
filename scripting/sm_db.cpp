@@ -735,11 +735,11 @@ namespace mongo {
     JSBool numberlong_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
         stringstream ss;
-        long long val = c.toNumberLongUnsafe( obj );
-        if ( val == (long long)(double)( val ) ) {
-            ss << "NumberLong( " << double( val ) << " )";
-        } else {
+        if ( c.hasProperty( obj, "top" ) ) {
+            long long val = c.toNumberLongUnsafe( obj );
             ss << "NumberLong( \"" << val << "\" )";            
+        } else {
+            ss << "NumberLong( " << c.getNumber( obj, "floatApprox" ) << " )";            
         }
         string ret = ss.str();
         return *rval = c.toval( ret.c_str() );

@@ -712,13 +712,11 @@ namespace mongo {
         
         v8::Handle<v8::Object> it = args.This();
         
-        long long val = numberLongVal( it );
-        
         stringstream ss;
-        if ( val == (long long)(double)( val ) ) {
-            ss << "NumberLong( " << double( val ) << " )";
+        if ( !it->Has( v8::String::New( "top" ) ) ) {
+            ss << "NumberLong( " << it->Get( v8::String::New( "floatApprox" ) )->NumberValue() << " )";
         } else {
-            ss << "NumberLong( \"" << val << "\" )";            
+            ss << "NumberLong( \"" << numberLongVal( it ) << "\" )";
         }
         string ret = ss.str();
         return v8::String::New( ret.c_str() );
