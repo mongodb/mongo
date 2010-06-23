@@ -713,9 +713,6 @@
     <Filter Include="util">
       <UniqueIdentifier>{d2c3db88-7fb7-4365-a63b-b7ad45d316ae}</UniqueIdentifier>
     </Filter>
-    <Filter Include="bson">
-      <UniqueIdentifier>{aff20a87-2efe-4861-930f-8780c08cbea5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="util\concurrency">
       <UniqueIdentifier>{8e6fe846-2833-45bb-b13b-c0f0d4d38593}</UniqueIdentifier>
     </Filter>
@@ -766,6 +763,9 @@
     </Filter>
     <Filter Include="Resource Files">
       <UniqueIdentifier>{9aea1b83-cdcb-48a8-97e6-47805cacdc29}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="bson">
+      <UniqueIdentifier>{aff20a87-2efe-4861-930f-8780c08cbea5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
