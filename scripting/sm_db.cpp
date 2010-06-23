@@ -713,7 +713,7 @@ namespace mongo {
             char *endPtr = 0;
             errno = 0;
             long long n = strtoll( numStr, &endPtr, 10 );
-            smuassert( cx , "could not convert numeric representation of string to long" , *endPtr == 0 && errno != ERANGE );
+            smuassert( cx , "could not convert string to long long" , *endPtr == 0 && errno != ERANGE );
             c.makeLongObj( n, obj );
         }
         
