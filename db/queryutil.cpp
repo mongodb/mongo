@@ -773,6 +773,7 @@ namespace mongo {
                         BSONObj second = i->second->obj();
                         if ( forward ) {
                             for( vector< FieldInterval >::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
+                                uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < 1000000 );
                                 newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
                                 newBuilders.back().first->appendElements( first );
                                 newBuilders.back().second->appendElements( second );
@@ -781,6 +782,7 @@ namespace mongo {
                             }
                         } else {
                             for( vector< FieldInterval >::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
+                                uassert( 13304, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < 1000000 );
                                 newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
                                 newBuilders.back().first->appendElements( first );
                                 newBuilders.back().second->appendElements( second );
