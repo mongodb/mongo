@@ -532,6 +532,24 @@ namespace mongo {
             return OBJECT_TO_JSVAL( o );
         }
 
+        void makeLongObj( long long n, JSObject * o ) {
+            boost::uint64_t val = (boost::uint64_t)n;
+            CHECKNEWOBJECT(o,_context,"NumberLong1");
+            setProperty( o , "floatApprox" , toval( (double)(boost::int64_t)( val ) ) );                    
+            if ( (boost::int64_t)val != (boost::int64_t)(double)(boost::int64_t)( val ) ) {
+                // using 2 doubles here instead of a single double because certain double
+                // bit patterns represent undefined values and sm might trash them
+                setProperty( o , "top" , toval( (double)(boost::uint32_t)( val >> 32 ) ) );
+                setProperty( o , "bottom" , toval( (double)(boost::uint32_t)( val & 0x00000000ffffffff ) ) );
+            }
+        }
+        
+        jsval toval( long long n ) {
+            JSObject * o = JS_NewObject( _context , &numberlong_class , 0 , 0 );
+            makeLongObj( n, o );
+            return OBJECT_TO_JSVAL( o );
+        }
+        
         jsval toval( const BSONElement& e ){
 
             switch( e.type() ){
@@ -633,17 +651,7 @@ namespace mongo {
                 return OBJECT_TO_JSVAL( o );
             }
             case NumberLong: {
-                boost::uint64_t val = (boost::uint64_t)e.numberLong();
-                JSObject * o = JS_NewObject( _context , &numberlong_class , 0 , 0 );
-                CHECKNEWOBJECT(o,_context,"NumberLong1");
-                setProperty( o , "floatApprox" , toval( (double)(boost::int64_t)( val ) ) );                    
-                if ( (boost::int64_t)val != (boost::int64_t)(double)(boost::int64_t)( val ) ) {
-                    // using 2 doubles here instead of a single double because certain double
-                    // bit patterns represent undefined values and sm might trash them
-                    setProperty( o , "top" , toval( (double)(boost::uint32_t)( val >> 32 ) ) );
-                    setProperty( o , "bottom" , toval( (double)(boost::uint32_t)( val & 0x00000000ffffffff ) ) );
-                }
-                return OBJECT_TO_JSVAL( o );                
+                return toval( e.numberLong() );
             }
             case DBRef: {
                 JSObject * o = JS_NewObject( _context , &dbpointer_class , 0 , 0 );
@@ -664,8 +672,8 @@ namespace mongo {
                 const char * data = e.binData( len );
                 assert( JS_SetPrivate( _context , o , new BinDataHolder( data ) ) );
 
-                setProperty( o , "len" , toval( len ) );
-                setProperty( o , "type" , toval( (int)e.binDataType() ) );
+                setProperty( o , "len" , toval( (double)len ) );
+                setProperty( o , "type" , toval( (double)e.binDataType() ) );
                 return OBJECT_TO_JSVAL( o );
             }
             }

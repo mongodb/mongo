@@ -593,8 +593,8 @@ namespace mongo {
             string decoded = base64::decode( encoded );
 
             assert( JS_SetPrivate( cx, obj, new BinDataHolder( decoded.data(), decoded.length() ) ) );
-            c.setProperty( obj, "len", c.toval( decoded.length() ) );
-            c.setProperty( obj, "type", c.toval( type ) );
+            c.setProperty( obj, "len", c.toval( (double)decoded.length() ) );
+            c.setProperty( obj, "type", c.toval( (double)type ) );
 
             return JS_TRUE;
         }
@@ -699,6 +699,27 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
     
+    JSBool numberlong_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        smuassert( cx , "NumberLong needs 0 or 1 args" , argc == 0 || argc == 1 );
+        
+        Convertor c( cx );
+        if ( argc == 0 ) {
+            c.setProperty( obj, "floatApprox", c.toval( 0.0 ) );
+        } else if ( JSVAL_IS_NUMBER( argv[ 0 ] ) ) {
+            c.setProperty( obj, "floatApprox", argv[ 0 ] );
+        } else {
+            string num = c.toString( argv[ 0 ] );
+            const char *numStr = num.c_str();
+            char *endPtr = 0;
+            errno = 0;
+            long long n = strtoll( numStr, &endPtr, 10 );
+            smuassert( cx , "could not convert numeric representation of string to long" , *endPtr == 0 && errno != ERANGE );
+            c.makeLongObj( n, obj );
+        }
+        
+        return JS_TRUE;
+    }
+    
     JSBool numberlong_valueof(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
         return *rval = c.toval( double( c.toNumberLongUnsafe( obj ) ) );        
@@ -711,7 +732,12 @@ namespace mongo {
     JSBool numberlong_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
         stringstream ss;
-        ss <<  c.toNumberLongUnsafe( obj );
+        long long val = c.toNumberLongUnsafe( obj );
+        if ( val == (long long)(double)( val ) ) {
+            ss << "NumberLong( " << double( val ) << " )";
+        } else {
+            ss << "NumberLong( \"" << val << "\" )";            
+        }
         string ret = ss.str();
         return *rval = c.toval( ret.c_str() );
     }
@@ -821,7 +847,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &numberlong_class , 0 , 0 , 0 , numberlong_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
 
