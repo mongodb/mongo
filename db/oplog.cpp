@@ -34,6 +34,7 @@ namespace mongo {
         localDB = 0;
         localOplogMainDetails = 0;
         rsOplogDetails = 0;
+        resetSlaveCache();
     }
 
     static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
