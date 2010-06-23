@@ -712,7 +712,11 @@ namespace mongo {
             const char *numStr = num.c_str();
             char *endPtr = 0;
             errno = 0;
+#if !defined(_WIN32)
             long long n = strtoll( numStr, &endPtr, 10 );
+#else
+            long long n = stoll( numStr, &endPtr, 10 );
+#endif
             smuassert( cx , "could not convert string to long long" , *endPtr == 0 && errno != ERANGE );
             c.makeLongObj( n, obj );
         }

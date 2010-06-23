@@ -654,7 +654,11 @@ namespace mongo {
                 const char *numStr = num.c_str();
                 char *endPtr = 0;
                 errno = 0;
+#if !defined(_WIN32)
                 long long n = strtoll( numStr, &endPtr, 10 );
+#else
+                long long n = stoll( numStr, &endPtr, 10 );
+#endif
                 if ( !( *endPtr == 0 && errno != ERANGE ) ) {
                     return v8::ThrowException( v8::String::New( "could not convert string to long long" ) );
                 }
