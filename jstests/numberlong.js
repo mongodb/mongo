@@ -50,5 +50,6 @@ p = tojson( a );
 assert.eq.automsg( "'{ \"a\" : NumberLong( \"-11111111111111111\" ) }'", "p" );
 
 // parsing
+assert.throws.automsg( function() { new NumberLong( "" ); } );
 assert.throws.automsg( function() { new NumberLong( "y" ); } );
 assert.throws.automsg( function() { new NumberLong( "11111111111111111111" ); } );

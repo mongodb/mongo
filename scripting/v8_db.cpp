@@ -20,6 +20,7 @@
 #include "v8_db.h"
 #include "engine.h"
 #include "util/base64.h"
+#include "util/text.h"
 #include "../client/syncclusterconnection.h"
 #include <iostream>
 
@@ -652,14 +653,10 @@ namespace mongo {
                 v8::String::Utf8Value data( args[ 0 ] );
                 string num = *data;
                 const char *numStr = num.c_str();
-                char *endPtr = 0;
-                errno = 0;
-#if !defined(_WIN32)
-                long long n = strtoll( numStr, &endPtr, 10 );
-#else
-                long long n = stoll( numStr, &endPtr, 10 );
-#endif
-                if ( !( *endPtr == 0 && errno != ERANGE ) ) {
+                long long n;
+                try {
+                    n = parseLL( numStr );
+                } catch ( const AssertionException & ) {
                     return v8::ThrowException( v8::String::New( "could not convert string to long long" ) );
                 }
                 unsigned long long val = n;

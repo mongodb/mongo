@@ -19,6 +19,7 @@
 
 #include "../client/syncclusterconnection.h"
 #include "../util/base64.h"
+#include "../util/text.h"
 
 namespace mongo {
 
@@ -710,14 +711,12 @@ namespace mongo {
         } else {
             string num = c.toString( argv[ 0 ] );
             const char *numStr = num.c_str();
-            char *endPtr = 0;
-            errno = 0;
-#if !defined(_WIN32)
-            long long n = strtoll( numStr, &endPtr, 10 );
-#else
-            long long n = stoll( numStr, &endPtr, 10 );
-#endif
-            smuassert( cx , "could not convert string to long long" , *endPtr == 0 && errno != ERANGE );
+            long long n;
+            try {
+                n = parseLL( numStr );
+            } catch ( const AssertionException & ) {
+                smuassert( cx , "could not convert string to long long" , false );                
+            }
             c.makeLongObj( n, obj );
         }
         

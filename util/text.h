@@ -111,7 +111,27 @@ namespace mongo {
 # else
     inline std::wstring toNativeString(const char *s) { return toWideString(s); }
 # endif
-
+    
 #endif
-
+        
+    // expect that n contains a base ten number and nothing else after it
+    // NOTE win version hasn't been tested directly
+    inline long long parseLL( const char *n ) {
+        long long ret;
+#if !defined(_WIN32)
+        char *endPtr = 0;
+        errno = 0;
+        ret = strtoll( n, &endPtr, 10 );
+        uassert( 13305, "could not convert string to long long", *endPtr == 0 && errno == 0 );
+#else
+        size_t endLen = 0;
+        try {
+            ret = stoll( n, &endLen, 10 );
+        } catch ( ... ) {
+            endLen = 0;
+        }
+        uassert( 13306, "could not convert string to long long", endLen != 0 && n[ endLen ] == 0 );
+#endif
+        return ret;
+    }
 }
