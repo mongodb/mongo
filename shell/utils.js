@@ -344,6 +344,14 @@ Object.keySet = function( o ) {
     return ret;
 }
 
+if ( ! NumberLong.prototype ) {
+    NumberLong.prototype = {}
+}
+
+NumberLong.prototype.tojson = function() {
+    return this.toString();
+}
+
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
 
