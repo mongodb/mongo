@@ -20,7 +20,6 @@ __wt_bt_build_verify(void)
 		u_int s, c, align;
 		char *name;
 	} list[] = {
-		{ sizeof(WT_BIN_INDX), WT_BIN_INDX_SIZE, 0, "WT_BIN_INDX" },
 		{ sizeof(WT_COL_INDX), WT_COL_INDX_SIZE, 0, "WT_COL_INDX" },
 		{ sizeof(WT_ITEM), WT_ITEM_SIZE, 0, "WT_ITEM" },
 		{ sizeof(WT_OFF), WT_OFF_SIZE, sizeof(u_int32_t), "WT_OFF" },

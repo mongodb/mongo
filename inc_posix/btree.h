@@ -14,7 +14,6 @@ extern "C" {
 /*******************************************
  * Internal forward declarations.
  *******************************************/
-struct __wt_bin_indx;		typedef struct __wt_bin_indx WT_BIN_INDX;
 struct __wt_col_indx;		typedef struct __wt_col_indx WT_COL_INDX;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_off;		typedef struct __wt_off WT_OFF;
@@ -363,23 +362,6 @@ struct __wt_col_indx {
 	(((WT_OFF *)WT_ITEM_BYTE((ip)->data))->addr)
 #define	WT_ROW_OFF_SIZE(ip)						\
 	(((WT_OFF *)WT_ITEM_BYTE((ip)->data))->size)
-
-/*
- * WT_BIN_INDX --
- *	Binary tree node.
- */
-struct __wt_bin_indx {
-	void *indx;			/* Underlying WT_{COL,ROW}_INDX */
-	WT_BIN_INDX *left;		/* Left/right nodes */
-	WT_BIN_INDX *right;
-};
-/*
- * WT_BIN_INDX is the expected structure size --  we check at startup to ensure
- * the compiler hasn't inserted padding.  The WT_BIN_INDX structure is in-memory
- * so padding it won't break the world, but we don't want to waste space, and
- * there are a lot of these structures.
- */
-#define	WT_BIN_INDX_SIZE	12
 
 /*
  * WT_SDBT --
