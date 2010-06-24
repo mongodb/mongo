@@ -110,6 +110,13 @@ namespace mongo {
            supports "." notation to reach into embedded objects
         */
         BSONElement getFieldDotted(const char *name) const;
+        /** return has eoo() true if no match
+           supports "." notation to reach into embedded objects
+        */
+        BSONElement getFieldDotted(const string& name) const {
+            return getFieldDotted( name.c_str() );
+        }
+
         /** Like getFieldDotted(), but expands multikey arrays and returns all matching objects
          */
         void getFieldsDotted(const char *name, BSONElementSet &ret ) const;
