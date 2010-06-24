@@ -39,6 +39,11 @@ namespace mongo {
     string ShardNS::mongos = "config.mongos";
     string ShardNS::settings = "config.settings";
 
+    BSONField<bool>      ShardFields::draining("draining");
+    BSONField<long long> ShardFields::maxSize ("maxSize");
+    BSONField<long long> ShardFields::currSize("currSize");
+
+
     /* --- DBConfig --- */
 
     string DBConfig::modelServer() {

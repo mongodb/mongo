@@ -39,7 +39,15 @@ namespace mongo {
         static string settings;
     };
 
-    
+    /**
+     * Field names used in the 'shards' collection.
+     */
+    struct ShardFields {
+        static BSONField<bool> draining;
+        static BSONField<long long> maxSize;
+        static BSONField<long long> currSize;
+    };
+        
     class Grid;
     class ConfigServer;
 
@@ -65,7 +73,7 @@ namespace mongo {
     /**
      * top level grid configuration for an entire database
      * TODO: use shared_ptr for ChunkManager
-    */
+     */
     class DBConfig : public Model {
     public:
 
@@ -223,5 +231,5 @@ namespace mongo {
     private:
         string getHost( string name , bool withPort );
     };
-    
+
 } // namespace mongo

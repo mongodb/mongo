@@ -44,6 +44,11 @@ function diff(){
     return Math.max( x.shard0 , x.shard1 ) - Math.min( x.shard0 , x.shard1 );
 }
 
+function sum(){
+    var x = dist();
+    return x.shard0 + x.shard1;
+}
+
 assert.lt( 20 , diff() );
 print( diff() )
 
@@ -52,5 +57,14 @@ assert.soon( function(){
     return d < 5;
 } , "balance didn't happen" , 1000 * 60 * 3 , 5000 );
     
+var chunkCount = sum();
+host = s.config.shards.findOne({_id : "shard0" }).host;
+s.adminCommand( { removeshard: host , forTestingOnly : true } );
+
+assert.soon( function(){
+    printjson(dist());
+    s.config.shards.find().forEach(function(z){printjson(z);});
+    return chunkCount == s.config.chunks.count({shard: "shard1"});
+} , "removeshard didn't happen" , 1000 * 60 * 3 , 5000 );
 
 s.stop();

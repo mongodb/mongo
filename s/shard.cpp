@@ -47,13 +47,13 @@ namespace mongo {
                 string host = o["host"].String();
 
                 long long maxSize = 0;
-                BSONElement maxSizeElem = o["maxSize"];
+                BSONElement maxSizeElem = o[ ShardFields::maxSize.name() ];
                 if ( ! maxSizeElem.eoo() ){
                     maxSize = maxSizeElem.numberLong();
                 }
 
                 bool isDraining = false;
-                BSONElement isDrainingElem = o["isDraining"];
+                BSONElement isDrainingElem = o[ ShardFields::draining.name() ];
                 if ( ! isDrainingElem.eoo() ){
                     isDraining = isDrainingElem.Bool();
                 }

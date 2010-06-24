@@ -589,7 +589,6 @@ namespace mongo {
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
                 
-                
                 string host = cmdObj["addshard"].valuestrsafe();
                 
                 if ( host == "localhost" || host.find( "localhost:" ) == 0 ||
@@ -624,8 +623,8 @@ namespace mongo {
                     BSONObjBuilder b;
                     b.append( "_id" , name );
                     b.append( "host" , host );
-                    if ( cmdObj["maxSize"].isNumber() )
-                        b.append( cmdObj["maxSize"] );
+                    if ( cmdObj[ ShardFields::maxSize.name() ].isNumber() )
+                        b.append( cmdObj[ ShardFields::maxSize.name() ] );
                     shard = b.obj();
                 }
 
@@ -669,20 +668,47 @@ namespace mongo {
         public:
             RemoveShardCmd() : GridAdminCmd("removeshard") { }
             virtual void help( stringstream& help ) const {
-                help << "remove a shard to the system.\nshard must be empty or command will return an error.";
+                help << "remove a shard to the system.";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                if ( 1 ){
+                if ( ! cmdObj["forTestingOnly"].trueValue() ){
                     errmsg = "removeshard not yet implemented";
-                    return 0;
+                    return false;
+                }
+
+                string shard = cmdObj["removeshard"].valuestrsafe();
+                if ( ! grid.knowAboutShard( shard ) ){
+                    errmsg = "that server isn't known to me";
+                    return false;
                 }
 
                 ScopedDbConnection conn( configServer.getPrimary() );
 
-                BSONObj server = BSON( "host" << cmdObj["removeshard"].valuestrsafe() );
-                conn->remove( "config.shards" , server );
+                BSONObj drainingDoc = BSON( "host" << shard << ShardFields::draining(true) );
+                BSONObj old = conn->findOne( "config.shards", drainingDoc );
+                if ( ! old.isEmpty() ){
+                    result.append( "msg" , "shard already being removed" );
+                    conn.done();
+                    return false;
+                }
 
+                // TODO prevent move chunks to this shard.
+
+                log() << "going to start draining shard: " << shard << endl;
+                BSONObj shardDoc = BSON( "host" << shard );
+                BSONObj newStatus = BSON( "$set" << BSON( ShardFields::draining(true) ) );
+                conn->update( "config.shards" , shardDoc , newStatus, false /* do no upsert */);
+                errmsg = conn->getLastError();
+                if ( errmsg.size() ){
+                    log() << "error removing shard at: " << shard << " err: " << errmsg << endl;
+                    return false;
+                }
+
+                result.append( "started draining" , shard );
                 conn.done();
+
+                Shard::reloadShardInfo();
+
                 return true;
             }
         } removeShardCmd;

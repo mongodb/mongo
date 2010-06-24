@@ -244,8 +244,12 @@ namespace mongo {
         for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ){
             const Shard& s = *it;
             ShardStatus status = s.getStatus();
-            BSONObj limitsObj = BSON( "maxSize" << s.getMaxSize() << "currSize" << status.mapped() );
-            shardLimitsMap[s.getName()] = limitsObj;
+
+            BSONObj limitsObj = BSON( ShardFields::maxSize( s.getMaxSize() ) << 
+                                      ShardFields::currSize( status.mapped() ) <<
+                                      ShardFields::draining( s.isDraining()) );
+
+            shardLimitsMap[ s.getName() ] = limitsObj;
         }
 
         //
