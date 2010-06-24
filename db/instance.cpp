@@ -453,7 +453,7 @@ namespace mongo {
         Client::Context ctx( ns );
 
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
-        recordUpdate( res.existing , (int) res.num ); // for getlasterror
+        lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted ); // for getlasterror
     }
 
     void receivedDelete(Message& m, CurOp& op) {
@@ -475,7 +475,7 @@ namespace mongo {
         Client::Context ctx(ns);
 
         long long n = deleteObjects(ns, pattern, justOne, true);
-        recordDelete( (int) n );
+        lastError.getSafe()->recordDelete( n );
     }
     
     QueryResult* emptyMoreResult(long long);

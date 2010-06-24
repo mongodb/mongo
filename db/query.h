@@ -82,24 +82,18 @@ namespace mongo {
         bool existing;
         bool mod;
         long long num;
+        OID upserted;
 
-        UpdateResult( bool e, bool m, unsigned long long n )
-            : existing(e) , mod(m), num(n ){}
+        UpdateResult( bool e, bool m, unsigned long long n , const BSONObj& upsertedObject = BSONObj() )
+            : existing(e) , mod(m), num(n){
+            upserted.clear();
 
-        int oldCode(){
-            if ( ! num )
-                return 0;
-            
-            if ( existing ){
-                if ( mod )
-                    return 2;
-                return 1;
+            BSONElement id = upsertedObject["_id"];
+            if ( ! e && n == 1 && id.type() == jstOID ){
+                upserted = id.OID();
             }
-            
-            if ( mod )
-                return 3;
-            return 4;
         }
+        
     };
     
     /* returns true if an existing object was updated, false if no existing object was found.

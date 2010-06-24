@@ -978,11 +978,10 @@ namespace mongo {
                 if ( profile )
                     ss << " fastmodinsert ";
                 theDataFileMgr.insertWithObjMod(ns, newObj, god);
-                if ( profile )
-                    ss << " fastmodinsert ";
                 if ( logop )
                     logOp( "i", ns, newObj );
-                return UpdateResult( 0 , 1 , 1 );
+                
+                return UpdateResult( 0 , 1 , 1 , newObj );
             }
             uassert( 10159 ,  "multi update only works with $ operators" , ! multi );
             checkNoMods( updateobj );
@@ -992,7 +991,7 @@ namespace mongo {
             theDataFileMgr.insertWithObjMod(ns, no, god);
             if ( logop )
                 logOp( "i", ns, no );
-            return UpdateResult( 0 , 0 , 1 );
+            return UpdateResult( 0 , 0 , 1 , no );
         }
         return UpdateResult( 0 , 0 , 0 );
     }
