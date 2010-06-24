@@ -119,9 +119,6 @@ namespace mongo {
         JS
     };
 
-    /* l and r MUST have same type when called: check that first. */
-    int compareElementValues(const BSONElement& l, const BSONElement& r);
-
     inline ostream& operator<<( ostream &s, const OID &o ) {
         s << o.str();
         return s;

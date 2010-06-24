@@ -28,6 +28,11 @@ namespace bson {
 namespace mongo {
 
     class OpTime;
+    class BSONElement;
+
+    /* l and r MUST have same type when called: check that first. */
+    int compareElementValues(const BSONElement& l, const BSONElement& r);
+
 
 /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
     'a : 3' is the first element (key+value).
