@@ -389,6 +389,14 @@ namespace mongo {
             }
             return -1;
         }
+        
+        void findIndexByType( const string& name , vector<int>& matches ) {
+            IndexIterator i = ii();
+            while ( i.more() ){
+                if ( i.next().getSpec().getTypeName() == name )
+                    matches.push_back( i.pos() - 1 );
+            }
+        }
 
         /* @return -1 = not found 
            generally id is first index, so not that expensive an operation (assuming present).

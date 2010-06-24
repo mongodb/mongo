@@ -1644,25 +1644,20 @@ namespace mongo {
                 return false;
             }
 
-            int geoIdx = -1;
-            {
-                NamespaceDetails::IndexIterator ii = d->ii();
-                while ( ii.more() ){
-                    IndexDetails& id = ii.next();
-                    if ( id.getSpec().getTypeName() == GEO2DNAME ){
-                        if ( geoIdx >= 0 ){
-                            errmsg = "2 geo indexes :(";
-                            return false;
-                        }
-                        geoIdx = ii.pos() - 1;
-                    }
-                }
+            vector<int> idxs;
+            d->findIndexByType( GEO2DNAME , idxs );
+            
+            if ( idxs.size() > 1 ){
+                errmsg = "more than 1 geo indexes :(";
+                return false;
             }
             
-            if ( geoIdx < 0 ){
+            if ( idxs.size() == 0 ){
                 errmsg = "no geo index :(";
                 return false;
             }
+
+            int geoIdx = idxs[0];
             
             result.append( "ns" , ns );
 
