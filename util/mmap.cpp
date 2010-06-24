@@ -113,4 +113,23 @@ namespace mongo {
         mmfiles.insert(this);
     }
 
+#ifdef _DEBUG
+
+    void MongoFile::lockAll() {
+        rwlock lk( mmmutex , false );
+        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
+            MongoFile * mmf = *i;
+            if (mmf) mmf->_lock();
+        }
+    }
+
+    void MongoFile::unlockAll() {
+        rwlock lk( mmmutex , false );
+        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
+            MongoFile * mmf = *i;
+            if (mmf) mmf->_lock();
+        }
+    }
+#endif
+
 } // namespace mongo
