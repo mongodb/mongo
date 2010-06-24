@@ -164,10 +164,10 @@ __wt_bt_verify_tree(WT_TOC *toc,
     WT_ROW_INDX *parent_rip, u_int32_t level, WT_OFF *off, WT_VSTUFF *vs)
 {
 	DB *db;
-	WT_COL_INDX *page_cip;
+	WT_COL_INDX *cip;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	WT_ROW_INDX *page_rip;
+	WT_ROW_INDX *rip;
 	int ret;
 
 	db = toc->db;
@@ -253,13 +253,13 @@ __wt_bt_verify_tree(WT_TOC *toc,
 	switch (hdr->type) {
 	u_int32_t i;
 	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(page, page_cip, i)
+		WT_INDX_FOREACH(page, cip, i)
 			WT_ERR(__wt_bt_verify_tree(
-			    toc, NULL, level - 1, page_cip->data, vs));
+			    toc, NULL, level - 1, cip->data, vs));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(page, page_rip, i) {
+		WT_INDX_FOREACH(page, rip, i) {
 			/*
 			 * At each off-page entry, we compare the current entry
 			 * against the largest key in the subtree rooted to the
@@ -270,13 +270,13 @@ __wt_bt_verify_tree(WT_TOC *toc,
 			 * we've used it in a comparison.
 			 */
 			if (vs->leaf != NULL) {
-				WT_ERR(__wt_bt_verify_cmp(
-				    toc, page_rip, vs->leaf, 0));
+				WT_ERR(
+				    __wt_bt_verify_cmp(toc, rip, vs->leaf, 0));
 				__wt_bt_page_out(toc, &vs->leaf, 0);
 			}
 
-			WT_ERR(__wt_bt_verify_tree(toc, page_rip,
-			    level - 1, WT_ITEM_BYTE_OFF(page_rip->data), vs));
+			WT_ERR(__wt_bt_verify_tree(toc, rip,
+			    level - 1, WT_ITEM_BYTE_OFF(rip->data), vs));
 		}
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
