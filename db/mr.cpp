@@ -568,7 +568,9 @@ namespace mongo {
                         }
 
                         {
-                            dbtemprelease tl;
+                            dbtempreleasecond tl;
+                            if ( ! tl.unlocked() )
+                                log() << "warning: map/reduce can't temp release" << endl;
                             state.finalReduce( all );
                         }
 
