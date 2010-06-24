@@ -18,7 +18,7 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 {
 	DB *db;
 	IDB *idb;
-	WT_COL_INDX *ip;
+	WT_COL_INDX *cip;
 	WT_PAGE *page;
 	WT_SDBT *rdbt;
 	u_int64_t record_cnt;
@@ -42,20 +42,20 @@ restart:
 		/* If it's a leaf page, return the page and index. */
 		if (page->hdr->type == WT_PAGE_COL_FIX ||
 		    page->hdr->type == WT_PAGE_COL_VAR) {
-			ip = page->u.c_indx + ((recno - record_cnt) - 1);
+			cip = page->u.c_indx + ((recno - record_cnt) - 1);
 			break;
 		}
 
 		/* Walk the page, counting records. */
-		WT_INDX_FOREACH(page, ip, i) {
-			if (record_cnt + WT_COL_OFF_RECORDS(ip) >= recno)
+		WT_INDX_FOREACH(page, cip, i) {
+			if (record_cnt + WT_COL_OFF_RECORDS(cip) >= recno)
 				break;
-			record_cnt += WT_COL_OFF_RECORDS(ip);
+			record_cnt += WT_COL_OFF_RECORDS(cip);
 		}
 
-		/* ip references the subtree containing the record. */
-		addr = WT_COL_OFF_ADDR(ip);
-		size = WT_COL_OFF_SIZE(ip);
+		/* cip references the subtree containing the record. */
+		addr = WT_COL_OFF_ADDR(cip);
+		size = WT_COL_OFF_SIZE(cip);
 
 		/* Walk down to the next page. */
 		if (page != idb->root_page)
@@ -72,13 +72,13 @@ restart:
 
 	/* Check for deleted items. */
 	if ((rdbt =
-	    WT_REPL_CURRENT(ip)) != NULL && rdbt->data == WT_DATA_DELETED) {
+	    WT_REPL_CURRENT(cip)) != NULL && rdbt->data == WT_DATA_DELETED) {
 		ret = WT_NOTFOUND;
 		goto err;
 	}
 
 	toc->srch_page = page;
-	toc->srch_ip = ip;
+	toc->srch_ip = cip;
 	return (0);
 
 err:	if (page != idb->root_page)

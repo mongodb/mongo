@@ -19,7 +19,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_ROW_INDX *ip;
+	WT_ROW_INDX *rip;
 	WT_SDBT *rdbt;
 	u_int32_t addr, base, indx, limit, size;
 	int cmp, isleaf, ret;
@@ -45,10 +45,10 @@ restart:
 			 * If the key is compressed or an overflow, it may not
 			 * have been instantiated yet.
 			 */
-			ip = page->u.r_indx + indx;
-			if (WT_KEY_PROCESS(ip))
+			rip = page->u.r_indx + indx;
+			if (WT_KEY_PROCESS(rip))
 				WT_ERR(
-				    __wt_bt_key_process(toc, page, ip, NULL));
+				    __wt_bt_key_process(toc, page, rip, NULL));
 
 			/*
 			 * If we're about to compare an application key with the
@@ -63,7 +63,7 @@ restart:
 			 * to know about this hack.
 			 */
 			if (indx != 0 || isleaf) {
-				cmp = db->btree_compare(db, key, (DBT *)ip);
+				cmp = db->btree_compare(db, key, (DBT *)rip);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -77,7 +77,7 @@ restart:
 		 * Reference the slot used for next step down the tree.  We do
 		 * this on leaf pages too, because it's simpler to code, and we
 		 * only care if there's an exact match on leaf pages; setting
-		 * ip doesn't matter for leaf pages because we always return
+		 * rip doesn't matter for leaf pages because we always return
 		 * WT_NOTFOUND if there's no match.
 		 *
 		 * Base is the smallest index greater than key and may be the
@@ -87,15 +87,15 @@ restart:
 		 * than or equal to key.
 		 */
 		if (cmp != 0)
-			ip = page->u.r_indx + (base == 0 ? 0 : base - 1);
+			rip = page->u.r_indx + (base == 0 ? 0 : base - 1);
 
 		/* If we've reached the leaf page, we're done. */
 		if (isleaf)
 			break;
 
 		/* Get the address for the child page. */
-		addr = WT_ROW_OFF_ADDR(ip);
-		size = WT_ROW_OFF_SIZE(ip);
+		addr = WT_ROW_OFF_ADDR(rip);
+		size = WT_ROW_OFF_SIZE(rip);
 
 		/* Walk down to the next page. */
 		if (page != idb->root_page)
@@ -122,14 +122,14 @@ restart:
 		}
 
 		/* Return the match unless it's been deleted. */
-		if ((rdbt = WT_REPL_CURRENT(ip)) != NULL &&
+		if ((rdbt = WT_REPL_CURRENT(rip)) != NULL &&
 		     rdbt->data == WT_DATA_DELETED) {
 			ret = WT_NOTFOUND;
 			goto err;
 		}
 	}
 	toc->srch_page = page;
-	toc->srch_ip = ip;
+	toc->srch_ip = rip;
 	return (0);
 
 err:	if (page != idb->root_page)
