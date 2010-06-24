@@ -85,7 +85,7 @@ namespace mongo {
             to = min.first;
 
         } else if ( ! drainingShards.empty() ){
-            from = drainingShards[ random() % drainingShards.size() ];
+            from = drainingShards[ rand() % drainingShards.size() ];
             to = min.first;
 
         } else {
