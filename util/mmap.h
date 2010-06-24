@@ -27,6 +27,11 @@ namespace mongo {
 
         void created(); /* subclass must call after create */
         void destroyed(); /* subclass must call in destructor */
+
+        // only supporting on posix mmap
+        virtual void _lock() {}
+        virtual void _unlock() {}
+
     public:
         virtual ~MongoFile() {}
         virtual long length() = 0;
@@ -39,11 +44,22 @@ namespace mongo {
         static long long totalMappedLength();
         static void closeAllFiles( stringstream &message );
 
+        // Locking allows writes. Reads are always allowed
+        static void lockAll();
+        static void unlockAll();
+
         /* can be "overriden" if necessary */
         static bool exists(boost::filesystem::path p) {
             return boost::filesystem::exists(p);
         }
     };
+
+#ifndef _DEBUG
+    // no-ops in production
+    inline void MongoFile::lockAll() {}
+    inline void MongoFile::unlockAll() {}
+#endif
+
 
     /** template for what a new storage engine's class definition must implement 
         PRELIMINARY - subject to change.
@@ -137,6 +153,12 @@ namespace mongo {
         void *view;
         long len;
         string _filename;
+
+    protected:
+        // only posix mmap implementations will support this
+        virtual void _lock();
+        virtual void _unlock();
+
     };
 
     void printMemInfo( const char * where );    

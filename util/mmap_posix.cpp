@@ -18,6 +18,7 @@
 #include "pch.h"
 #include "mmap.h"
 #include "file_allocator.h"
+#include "../db/concurrency.h"
 
 #include <errno.h>
 #include <sys/mman.h>
@@ -90,6 +91,11 @@ namespace mongo {
             }
         }
 #endif
+
+        DEV if (! dbMutex.info().isLocked()){
+            _unlock();
+        }
+
         return view;
     }
     
@@ -100,6 +106,13 @@ namespace mongo {
             problem() << "msync " << errnoWithDescription() << endl;
     }
     
+    void MemoryMappedFile::_lock() {
+        if (view) assert(mprotect(view, len, PROT_READ | PROT_WRITE) == 0);
+    }
+
+    void MemoryMappedFile::_unlock() {
+        if (view) assert(mprotect(view, len, PROT_READ) == 0);
+    }
 
 } // namespace mongo
 

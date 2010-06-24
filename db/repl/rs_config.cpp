@@ -117,11 +117,9 @@ namespace mongo {
         uassert(13132,
             "nonmatching repl set name in _id field; check --replSet command line",
             startsWith(cmdLine.replSet, _id + '/'));
-        uassert(13133, 
-                "replSet config value is not valid",
-                members.size() >= 1 && members.size() <= 64 && 
-                version > 0);
-
+        uassert(13308, "replSet bad config version #", version > 0);
+        uassert(13133, "replSet bad config no members", members.size() >= 1);
+        uassert(13309, "replSet bad config maximum number of members is 7 (for now)", members.size() <= 7);
     }
 
     void ReplSetConfig::from(BSONObj o) {

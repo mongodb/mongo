@@ -112,4 +112,8 @@ namespace mongo {
             out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
         }
     }
+
+    void MemoryMappedFile::_lock() {}
+    void MemoryMappedFile::_unlock() {}
+
 } 

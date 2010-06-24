@@ -30,6 +30,7 @@
 #pragma once
 
 #include "../util/concurrency/locks.h"
+#include "../util/mmap.h"
 
 namespace mongo {
 
@@ -128,6 +129,8 @@ namespace mongo {
             curopGotLock();
 
             _minfo.entered();
+
+            MongoFile::lockAll();
         }
 
         bool lock_try( int millis ) { 
@@ -141,6 +144,7 @@ namespace mongo {
             if ( got ){
                 _minfo.entered();
                 _state.set(1);
+                MongoFile::lockAll();
             }                
             
             return got;
@@ -161,6 +165,9 @@ namespace mongo {
                 }
                 massert( 12599, "internal error: attempt to unlock when wasn't in a write lock", false);
             }
+
+            MongoFile::unlockAll();
+
             _state.set(0);
             _minfo.leaving();
             _m.unlock(); 
