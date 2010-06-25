@@ -28,4 +28,17 @@ for ( i=0; i<100; i++ ){
     assert.eq( i , temp[i].num , "B2" )
 }
 
+
+db.data.find().sort( { num : 1 } ).toArray();
+s.getServer("test").getDB( "test" ).data.find().sort( { num : 1 } ).toArray();
+
+a = Date.timeFunc( function(){ z = db.data.find().sort( { num : 1 } ).toArray(); } , 200 );
+assert.eq( 100 , z.length , "C1" )
+b = 1.5 * Date.timeFunc( function(){ z = s.getServer("test").getDB( "test" ).data.find().sort( { num : 1 } ).toArray(); } , 200 );
+assert.eq( 67 , z.length , "C2" )
+
+print( "a: " + a + " b:" + b + " mongos slow down: " + Math.ceil( 100 * ( ( a - b ) / b ) ) + "%" )
+
+assert.lt( a , b * 1.3 , "C3 - speed test" );
+
 s.stop();
