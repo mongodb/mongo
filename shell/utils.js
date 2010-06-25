@@ -662,11 +662,24 @@ tojson = function( x, indent , nolint ){
     case "string": {
         var s = "\"";
         for ( var i=0; i<x.length; i++ ){
-            if ( x[i] == '"' ){
-                s += "\\\"";
+            switch (x[i]){
+                case '"': s += '\\"'; break;
+                case '\\': s += '\\\\'; break;
+                case '\b': s += '\\b'; break;
+                case '\f': s += '\\f'; break;
+                case '\n': s += '\\n'; break;
+                case '\r': s += '\\r'; break;
+                case '\t': s += '\\t'; break;
+
+                default: {
+                    var code = x.charCodeAt(i);
+                    if (code < 0x20){
+                        s += (code < 0x10 ? '\\u000' : '\\u00') + code.toString(16);
+                    } else {
+                        s += x[i];
+                    }
+                }
             }
-            else
-                s += x[i];
         }
         return s + "\"";
     }
