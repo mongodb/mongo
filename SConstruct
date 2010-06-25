@@ -1521,6 +1521,9 @@ if installSetup.clientSrc:
 #lib
 if installSetup.binaries:
     env.Install( installDir + "/" + nixLibPrefix, clientLibName )
+    if GetOption( "sharedclient" ): 
+        env.Install( installDir + "/" + nixLibPrefix, sharedClientLibName )
+
 
 #textfiles
 if installSetup.bannerDir:
