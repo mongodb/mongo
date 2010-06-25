@@ -21,7 +21,7 @@ tags: ${SRCS}
 	ctags -w *.h *.c ../*/*.c ../*/*.h
 
 bdb.o:
-	${CC} -DBDB ${CFLAGS} -I${BDB} -c $< -o $@
+	${CC} ${CFLAGS} -I${BDB} -c $< -o $@
 
 config.o t.o util.o wts.o:
 	${CC} ${CFLAGS} -I${WT} -c $< -o $@
