@@ -48,9 +48,9 @@ namespace mongo {
         switch( type() ){
         case mongo::String:
         case Code:
-            return valuestr();
+            return string(valuestr(), valuestrsize()-1);
         case CodeWScope:
-            return codeWScopeCode();
+            return string(codeWScopeCode(), *(int*)(valuestr())-1);
         default:
             log() << "can't convert type: " << (int)(type()) << " to code" << endl;
         }

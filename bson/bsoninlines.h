@@ -423,18 +423,22 @@ namespace mongo {
                 << codeWScopeCode() << ", " << codeWScopeObject().toString() << ")";
             break;
         case Code:
-            if ( valuestrsize() > 80 )
-                s << string(valuestr()).substr(0, 70) << "...";
-            else {
-                s << valuestr();
+            if ( valuestrsize() > 80 ) {
+                s.write(valuestr(), 70);
+                s << "...";
+            } else {
+                s.write(valuestr(), valuestrsize()-1);
             }
             break;
         case Symbol:
         case mongo::String:
-            if ( valuestrsize() > 80 )
-                s << '"' << string(valuestr()).substr(0, 70) << "...\"";
-            else {
-                s << '"' << valuestr() << '"';
+            s << '"';
+            if ( valuestrsize() > 80 ) {
+                s.write(valuestr(), 70);
+                s << "...\"";
+            } else {
+                s.write(valuestr(), valuestrsize()-1);
+                s << '"';
             }
             break;
         case DBRef:

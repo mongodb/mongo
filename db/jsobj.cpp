@@ -102,7 +102,7 @@ namespace mongo {
         switch ( type() ) {
         case mongo::String:
         case Symbol:
-            s << '"' << escape( valuestr() ) << '"';
+            s << '"' << escape( string(valuestr(), valuestrsize()-1) ) << '"';
             break;
         case NumberLong:
             s << _numberLong();

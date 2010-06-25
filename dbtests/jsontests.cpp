@@ -347,6 +347,16 @@ namespace JsonTests {
             }
         };
 
+        class NullString {
+        public:
+            void run(){
+                BSONObjBuilder b;
+                b.append( "x" , "a\0b" , 4 );
+                BSONObj o = b.obj();
+                ASSERT_EQUALS( "{ \"x\" : \"a\\u0000b\" }" , o.jsonString() );
+            }
+        };
+
         class AllTypes {
         public:
             void run(){
@@ -1056,7 +1066,17 @@ namespace JsonTests {
                 return "{ \"time.valid\" : { $gt : new Date(1257829200000) , $lt : new Date( 1257829200100 ) } }";
             }
         };
-        
+
+        class NullString : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "x" , "a\0b" , 4 );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"x\" : \"a\\u0000b\" }";
+            }
+        };
 
     } // namespace FromJsonTests
 
@@ -1094,6 +1114,7 @@ namespace JsonTests {
             add< JsonStringTests::RegexManyOptions >();
             add< JsonStringTests::CodeTests >();
             add< JsonStringTests::TimestampTests >();
+            add< JsonStringTests::NullString >();
             add< JsonStringTests::AllTypes >();
             
             add< FromJsonTests::Empty >();
@@ -1146,6 +1167,7 @@ namespace JsonTests {
             add< FromJsonTests::EmbeddedDatesFormat1 >();
             add< FromJsonTests::EmbeddedDatesFormat2 >();
             add< FromJsonTests::EmbeddedDatesFormat3 >();
+            add< FromJsonTests::NullString >();
         }
     } myall;
 

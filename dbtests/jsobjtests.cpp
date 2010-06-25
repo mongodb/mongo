@@ -386,6 +386,30 @@ namespace JsobjTests {
             }
         };
 
+        class NullString {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", "a\0b", 4);
+                b.append("b", string("a\0b", 3));
+                b.appendAs(b.asTempObj()["a"], "c");
+                BSONObj o = b.obj();
+
+                stringstream ss;
+                ss << 'a' << '\0' << 'b';
+
+                ASSERT_EQUALS(o["a"].valuestrsize(), 3+1);
+                ASSERT_EQUALS(o["a"].str(), ss.str());
+
+                ASSERT_EQUALS(o["b"].valuestrsize(), 3+1);
+                ASSERT_EQUALS(o["b"].str(), ss.str());
+
+                ASSERT_EQUALS(o["c"].valuestrsize(), 3+1);
+                ASSERT_EQUALS(o["c"].str(), ss.str());
+            }
+
+        };
+
         namespace Validation {
 
             class Base {
@@ -1562,6 +1586,7 @@ namespace JsobjTests {
             add< BSONObjTests::AppendIntOrLL >();
             add< BSONObjTests::AppendNumber >();
             add< BSONObjTests::ToStringArray >();
+            add< BSONObjTests::NullString >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();

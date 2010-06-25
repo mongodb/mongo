@@ -352,17 +352,21 @@ namespace mongo {
             _b.append(code);
             return *this;
         }
-        /** Append a string element */
-        BSONObjBuilder& append(const char *fieldName, const char *str) {
+        /** Append a string element. len DOES include terminating nul */
+        BSONObjBuilder& append(const char *fieldName, const char *str, int len) {
             _b.append((char) String);
             _b.append(fieldName);
-            _b.append((int) strlen(str)+1);
-            _b.append(str);
+            _b.append((int)len);
+            _b.append(str, len);
             return *this;
         }
         /** Append a string element */
+        BSONObjBuilder& append(const char *fieldName, const char *str) {
+            return append(fieldName, str, strlen(str)+1);
+        }
+        /** Append a string element */
         BSONObjBuilder& append(const char *fieldName, string str) {
-            return append(fieldName, str.c_str());
+            return append(fieldName, str.c_str(), str.size()+1);
         }
         BSONObjBuilder& appendSymbol(const char *fieldName, const char *symbol) {
             _b.append((char) Symbol);

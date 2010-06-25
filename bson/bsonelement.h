@@ -215,7 +215,9 @@ public:
         return type() == mongo::String ? valuestr() : "";
     }
     /** Get the string value of the element.  If not a string returns "". */
-    string str() const { return valuestrsafe(); }
+    string str() const {
+        return type() == mongo::String ? string(valuestr(), valuestrsize()-1) : string();
+    }
 
     /** Get javascript code of a CodeWScope data element. */
     const char * codeWScopeCode() const {
