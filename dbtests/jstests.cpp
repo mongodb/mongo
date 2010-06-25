@@ -883,6 +883,33 @@ namespace JSTests {
         }
     };
 
+    class ScopeOut {
+    public:
+        void run(){
+            auto_ptr<Scope> s;
+            s.reset( globalScriptEngine->newScope() );
+            
+            s->invokeSafe( "x = 5;" , BSONObj() );
+            {
+                BSONObjBuilder b;
+                s->append( b , "z" , "x" );
+                ASSERT_EQUALS( BSON( "z" << 5 ) , b.obj() );
+            }
+
+            s->invokeSafe( "x = function(){ return 17; }" , BSONObj() );
+            BSONObj temp;
+            {
+                BSONObjBuilder b;
+                s->append( b , "z" , "x" );
+                temp = b.obj();
+                s->setThis( &temp );
+            }
+
+            s->invokeSafe( "foo = this.z();" , BSONObj() );
+            ASSERT_EQUALS( 17 , s->getNumber( "foo" ) );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "js" ) {
@@ -918,6 +945,8 @@ namespace JSTests {
             add< InvalidUTF8Check >();
             add< Utf8Check >();
             add< LongUtf8String >();
+
+            add< ScopeOut >();
         }
     } myall;
     

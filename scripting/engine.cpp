@@ -73,6 +73,9 @@ namespace mongo {
             // TODO: make signed
             builder.appendDate( fieldName , Date_t((unsigned long long)getNumber( scopeName )) );
             break;
+        case Code:
+            builder.appendCode( fieldName , getString( scopeName ).c_str() );
+            break;
         default:
             stringstream temp;
             temp << "can't append type from:";
