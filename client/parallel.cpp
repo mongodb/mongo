@@ -347,7 +347,7 @@ namespace mongo {
                 continue;
             }
                 
-            int comp = best.woSortOrder( me , _sortKey );
+            int comp = best.woSortOrder( me , _sortKey , true );
             if ( comp < 0 )
                 continue;
                 
