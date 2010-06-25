@@ -197,7 +197,8 @@ namespace mongo {
         public:
             MoveDatabasePrimaryCommand() : GridAdminCmd("moveprimary") { }
             virtual void help( stringstream& help ) const {
-                help << " example: { moveprimary : 'foo' , to : 'localhost:9999' } TODO: locking? ";
+                help << " example: { moveprimary : 'foo' , to : 'localhost:9999' }";
+                // TODO: locking?
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string dbname = cmdObj["moveprimary"].valuestrsafe();
@@ -684,31 +685,65 @@ namespace mongo {
 
                 ScopedDbConnection conn( configServer.getPrimary() );
 
+                // If the server is not yet draining chunks, put it in draining mode.
+                BSONObj searchDoc = BSON( "host" << shard );
                 BSONObj drainingDoc = BSON( "host" << shard << ShardFields::draining(true) );
-                BSONObj old = conn->findOne( "config.shards", drainingDoc );
-                if ( ! old.isEmpty() ){
-                    result.append( "msg" , "shard already being removed" );
+                BSONObj shardDoc = conn->findOne( "config.shards", drainingDoc );
+                if ( shardDoc.isEmpty() ){
+
+                    // TODO prevent move chunks to this shard.
+
+                    log() << "going to start draining shard: " << shard << endl;
+                    BSONObj newStatus = BSON( "$set" << BSON( ShardFields::draining(true) ) );
+                    conn->update( "config.shards" , searchDoc , newStatus, false /* do no upsert */);
+
+                    errmsg = conn->getLastError();
+                    if ( errmsg.size() ){
+                        log() << "error starting remove shard: " << shard << " err: " << errmsg << endl;
+                        return false;
+                    }
+
+                    result.append( "started draining" , shard );
                     conn.done();
-                    return false;
+                    Shard::reloadShardInfo();
+                    return true;
                 }
 
-                // TODO prevent move chunks to this shard.
+                // If the server has been completely drained, remove it from the ConfigDB.
+                // Check not only for chunks but also databases.
+                BSONObj shardIDDoc = BSON( "shard" << shardDoc[ "_id" ].str() );
+                unsigned long long chunkCount = conn->count( "config.chunks" , shardIDDoc );
+                BSONObj primaryDoc = BSON( "primary" << shardDoc[ "_id" ].str() );
+                unsigned long long dbCount = conn->count( "config.databases" , primaryDoc );
+                if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ){
+                    log() << "going to remove shard: " << shard << endl;                    
+                    conn->remove( "config.shards" , searchDoc );
 
-                log() << "going to start draining shard: " << shard << endl;
-                BSONObj shardDoc = BSON( "host" << shard );
-                BSONObj newStatus = BSON( "$set" << BSON( ShardFields::draining(true) ) );
-                conn->update( "config.shards" , shardDoc , newStatus, false /* do no upsert */);
-                errmsg = conn->getLastError();
-                if ( errmsg.size() ){
-                    log() << "error removing shard at: " << shard << " err: " << errmsg << endl;
-                    return false;
+                    errmsg = conn->getLastError();
+                    if ( errmsg.size() ){
+                        log() << "error concluding remove shard: " << shard << " err: " << errmsg << endl;
+                        return false;
+                    }
+
+                    result.append( "shard removed" , shard );
+                    conn.done();
+                    Shard::reloadShardInfo();
+                    return true;
                 }
 
-                result.append( "started draining" , shard );
+                // If the server is already in draining mode, just report on its progress.
+                // Report on databases (not just chunks) that are left too.
+                ostringstream os;
+                os << "already draining. ";
+                if ( chunkCount > 0 ){
+                    os << chunkCount << " chunks left. ";
+                }
+                if ( dbCount > 0 ){
+                    os << dbCount << " databases left." << endl;
+                    os << " Use the 'moveprimary' command to remove those." << endl;
+                } 
+                result.append( "msg" , os.str() );
                 conn.done();
-
-                Shard::reloadShardInfo();
-
                 return true;
             }
         } removeShardCmd;
