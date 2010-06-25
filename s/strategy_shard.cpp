@@ -51,7 +51,6 @@ namespace mongo {
             for ( vector<shared_ptr<ChunkRange> >::iterator i = shards.begin(); i != shards.end(); i++ ){
                 shared_ptr<ChunkRange> c = *i;
                 servers.insert( ServerAndQuery( c->getShard().getConnString() , BSONObj() ) ); 
-                //servers.insert( ServerAndQuery( c->getShard().getConnString() , c->getFilter() ) ); // this is what does mongod size filtering, TODO: clean up apis
             }
             
             if ( logLevel > 4 ){
@@ -69,24 +68,10 @@ namespace mongo {
             BSONObj sort = query.getSort();
             
             if ( sort.isEmpty() ){
-                // 1. no sort, can just hit them in serial
                 cursor = new SerialServerClusteredCursor( servers , q );
             }
             else {
-                int shardKeyOrder = info->getShardKey().canOrder( sort );
-                if ( shardKeyOrder ){
-                    // 2. sort on shard key, can do in serial intelligently
-                    set<ServerAndQuery> buckets;
-                    for ( vector<shared_ptr<ChunkRange> >::iterator i = shards.begin(); i != shards.end(); i++ ){
-                        shared_ptr<ChunkRange> s = *i;
-                        buckets.insert( ServerAndQuery( s->getShard().getConnString() , s->getFilter() , s->getMin() ) );
-                    }
-                    cursor = new SerialServerClusteredCursor( buckets , q , shardKeyOrder );
-                }
-                else {
-                    // 3. sort on non-sharded key, pull back a portion from each server and iterate slowly
-                    cursor = new ParallelSortClusteredCursor( servers , q , sort );
-                }
+                cursor = new ParallelSortClusteredCursor( servers , q , sort );
             }
 
             assert( cursor );
