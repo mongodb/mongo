@@ -237,7 +237,11 @@ namespace mongo {
         int woCompare(const BSONObj& r, const BSONObj &ordering = BSONObj(),
                       bool considerFieldName=true) const;
         
-        int woSortOrder( const BSONObj& r , const BSONObj& sortKey ) const;
+
+        /**
+         * @param useDotted whether to treat sort key fields as possibly dotted and expand into them
+         */
+        int woSortOrder( const BSONObj& r , const BSONObj& sortKey , bool useDotted=false ) const;
 
         /** This is "shallow equality" -- ints and doubles won't match.  for a
            deep equality test use woCompare (which is slower).
