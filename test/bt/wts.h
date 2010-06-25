@@ -31,7 +31,7 @@
 #define	MB(v)	((v) * 1024 * 1024)		/* Megabytes */
 
 /* Get a random value between a min/max pair. */
-#define	MMRAND(min, max)	(rand() % ((max + 1) - (min)) + (min))
+#define	MMRAND(min, max)	(wts_rand() % ((max + 1) - (min)) + (min))
 
 #define	FIX		1			/* Database types */
 #define	ROW		2
@@ -50,6 +50,7 @@ typedef struct {
 	FILE *wts_log;				/* WT log file stream */
 
 	FILE *op_log;				/* Operations log */
+	FILE *rand_log;				/* Random number log */
 
 	u_int8_t *b1;				/* Scratch buffers for replay */
 	size_t	  b1_size;
@@ -82,7 +83,6 @@ typedef struct {
 	u_int32_t c_key_min;
 	u_int32_t c_leaf_node;
 	u_int32_t c_ops;
-	u_int32_t c_rand_seed;
 	u_int32_t c_read_pct;
 	u_int32_t c_repeat_comp;
 	u_int32_t c_repeat_comp_pct;
@@ -107,14 +107,14 @@ void	 config_single(char *);
 void	 data_gen(DBT *);
 char	*fname(const char *, const char *);
 void	 key_gen(DBT *, u_int64_t);
-void	 replay(u_int8_t **, size_t *, size_t *);
 void	 track(const char *, u_int64_t);
 int	 wts_bulk_load(void);
 int	 wts_del(u_int64_t);
 int	 wts_dump(void);
 int	 wts_ops(void);
-int	 wts_read_row_scan(void);
+int	 wts_rand(void);
 int	 wts_read_col_scan(void);
+int	 wts_read_row_scan(void);
 int	 wts_setup(int, int);
 int	 wts_stats(void);
 void	 wts_teardown(void);

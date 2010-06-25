@@ -35,7 +35,6 @@ static CONFIG c[] = {
 	{ "key_min",		0,		0,		10,	32,		&g.c_key_min },
 	{ "leaf_node",		0,		0,		9,	17,		&g.c_leaf_node },
 	{ "ops",		0,		0,		0,	M(2),		&g.c_ops },
-	{ "rand_seed",		0,		0,		0,	INT_MAX,	&g.c_rand_seed },
 	{ "read_pct",		0,		0,		0,	100,		&g.c_read_pct },
 	{ "repeat_comp",	C_FIX,		0,		0,	1,		&g.c_repeat_comp },
 	{ "repeat_comp_pct",	C_FIX,		0,		10,	90,		&g.c_repeat_comp_pct },

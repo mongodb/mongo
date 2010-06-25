@@ -51,11 +51,9 @@ config(void)
 		exit(EXIT_FAILURE);
 	}
 
-	/* Pick a random number seed. */
-	cp = config_find("rand_seed");
-	if (!(cp->flags & C_FIXED))
-		*cp->v = (0xdeadbeef ^ (u_int)time(NULL));
-	srand((int)g.c_rand_seed);
+	/* Seed the random number generator. */
+	if (!g.replay)
+		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 
 	/* Pick a database type next, other items depend on it. */
 	cp = config_find("database_type");
@@ -130,13 +128,13 @@ config_dump(int logfile)
  *	Read configuration values from a file.
  */
 void
-config_file(char *fname)
+config_file(char *name)
 {
 	FILE *fp;
 	char *p, buf[256];
 
-	if ((fp = fopen(fname, "r")) == NULL) {
-		fprintf(stderr, "%s: %s\n", fname, strerror(errno));
+	if ((fp = fopen(name, "r")) == NULL) {
+		fprintf(stderr, "%s: %s\n", name, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
@@ -213,6 +211,8 @@ config_dtype()
 		return ("variable-length column store");
 	case ROW:
 		return ("row store");
+	default:
+		break;
 	}
 	return ("error: UNKNOWN DATABASE TYPE");
 }

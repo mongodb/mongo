@@ -109,8 +109,8 @@ data_gen(DBT *data)
 	case FIX:
 		p = buf;
 		if (g.c_repeat_comp != 0 ||
-		    (u_int)rand() % 100 <= g.c_repeat_comp_pct)
-			p += rand() % 7;
+		    (u_int)wts_rand() % 100 <= g.c_repeat_comp_pct)
+			p += wts_rand() % 7;
 		len = g.c_data_min;
 		break;
 	case VAR:
@@ -122,34 +122,6 @@ data_gen(DBT *data)
 
 	data->data = p;
 	data->size = len;
-}
-
-void
-replay(u_int8_t **bufp, size_t *sizep, size_t *lenp)
-{
-	static u_int8_t buf[6 * 1024];
-	size_t len;
-
-	if (fgets(buf, sizeof(buf), g.op_log) == NULL) {
-		if (feof(g.op_log)) {
-			printf("end of replay log reached, exiting\n");
-			exit(EXIT_SUCCESS);
-		}
-		fprintf(stderr, ": %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	len = strlen(buf);
-	buf[--len] = '\0';
-
-	if (len > *lenp) {
-		if ((*bufp = realloc(*bufp, len + 10)) == NULL) {
-			fprintf(stderr, "realloc: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		*lenp = len + 10;
-	}
-	*sizep = len;
-	memcpy(*bufp, buf, len);
 }
 
 void
@@ -178,4 +150,49 @@ track(const char *s, u_int64_t i)
 	*p = '\0';
 	(void)printf("%s", msg);
 	(void)fflush(stdout);
+}
+
+/*
+ * wts_rand --
+ *	Return a random number.
+ */
+int
+wts_rand(void)
+{
+	char *p, buf[64];
+	u_int r;
+
+	/*
+	 * We can entirely reproduce a run based on the random numbers used
+	 * in the initial run, plus the configuration files.  It would be
+	 * nice to just log the initial RNG seed, rather than logging every
+	 * random number generated, but we can't -- Berkeley DB calls rand()
+	 * internally, and so that messes up the pattern of random numbers
+	 * (and WT might call rand() in the future, who knows?)
+	 */
+	if (g.rand_log == NULL) {
+		p = fname(NULL, "rand");
+		if ((g.rand_log = fopen(p, g.replay ? "r" : "w")) == NULL) {
+			fprintf(stderr, p, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+	if (g.replay) {
+		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
+			if (feof(g.rand_log)) {
+				fprintf(stderr,
+				    "end of random number log reached, "
+				    "exiting\n");
+			} else
+				fprintf(stderr,
+				    "random number log: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		r = (u_int)strtoul(buf, NULL, 10);
+	} else {
+		r = (u_int)rand();
+		fprintf(g.rand_log, "%u\n", r);
+	}
+	return ((int)r);
 }

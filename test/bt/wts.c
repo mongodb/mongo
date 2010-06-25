@@ -38,8 +38,8 @@ wts_setup(int reopen, int logfile)
 	}
 	env = db->env;
 
-	env->errpfx_set(env, g.progname);
-	env->errfile_set(env, stderr);
+	(void)env->errpfx_set(env, g.progname);
+	(void)env->errfile_set(env, stderr);
 
 	/* Open the log file. */
 	if (logfile) {
@@ -56,18 +56,18 @@ wts_setup(int reopen, int logfile)
 		fprintf(g.wts_log,
 		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
 
-		env->verbose_set(env,
+		(void)env->verbose_set(env,
 		    WT_VERB_CACHE |
 		    // WT_VERB_HAZARD |
 		    // WT_VERB_MUTEX |
 		    // WT_VERB_SERVERS |
 		    // WT_VERB_FILEOPS |
 		    0);
-		env->msgfile_set(env, g.wts_log);
+		(void)env->msgfile_set(env, g.wts_log);
 	}
 
-	intl_size = 1 << g.c_internal_node;
-	leaf_size = 1 << g.c_leaf_node;
+	intl_size = (u_int)1 << g.c_internal_node;
+	leaf_size = (u_int)1 << g.c_leaf_node;
 	if ((ret = db->btree_pagesize_set(
 	    db, 0, intl_size, intl_size, leaf_size, leaf_size)) != 0) {
 		db->err(db, ret, "Db.btree_pagesize_set");
@@ -176,7 +176,7 @@ wts_dump()
 
 	db = g.wts_db;
 
-	track("dump", 0);
+	track("dump", (u_int64_t)0);
 	p = fname(WT_PREFIX, "dump");
 	if ((fp = fopen(p, "w")) == NULL) {
 		db->err(db, errno, "fopen: %s", p);
@@ -236,7 +236,7 @@ wts_stats()
 
 	db = g.wts_db;
 
-	track("stat", 0);
+	track("stat", (u_int64_t)0);
 	p = fname(NULL, "stats");
 	if ((fp = fopen(p, "w")) == NULL) {
 		db->err(db, errno, "fopen: %s", p);
@@ -260,58 +260,40 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 {
 	static DBT key, data;
 
-	db = NULL;
+	db = NULL;					/* Lint */
+	++g.key_cnt;
 
-	if (++g.key_cnt > g.c_total) {
+	if (g.key_cnt > g.c_total) {
 		g.key_cnt = g.c_total;
 		return (1);
 	}
 
-	if (g.replay) {
-		switch (g.c_database_type) {
-		case FIX:
-		case VAR:
-			*keyp = NULL;
-			break;
-		case ROW:
-			replay(&g.b1, &g.b1_size, &g.b1_len);
-			key.data = g.b1;
-			key.size = g.b1_size;
-			*keyp = &key;
-			break;
-		}
-		replay(&g.b2, &g.b2_size, &g.b2_len);
-		data.data = g.b2;
-		data.size = g.b2_size;
-		*datap = &data;
-	} else {
-		/*
-		 * Generate a set of duplicates for each key if duplicates have
-		 * been configured.  The duplicate_pct configuration is a
-		 * percentage, which defines the number of keys that get
-		 * duplicate data items, and the number of duplicate data items
-		 * for each such key is a random value in-between 2 and the
-		 * value of duplicate_cnt.
-		 */
-		if (g.key_cnt == 1 || g.c_duplicates_pct == 0 ||
-		    (u_int32_t)rand() % 100 > g.c_duplicates_pct)
-			key_gen(&key, g.key_cnt);
-		data_gen(&data);
+	/*
+	 * Generate a set of duplicates for each key if duplicates have
+	 * been configured.  The duplicate_pct configuration is a
+	 * percentage, which defines the number of keys that get
+	 * duplicate data items, and the number of duplicate data items
+	 * for each such key is a random value in-between 2 and the
+	 * value of duplicate_cnt.
+	 */
+	if (g.key_cnt == 1 || g.c_duplicates_pct == 0 ||
+	    (u_int32_t)wts_rand() % 100 > g.c_duplicates_pct)
+		key_gen(&key, g.key_cnt);
+	data_gen(&data);
 
-		switch (g.c_database_type) {
-		case FIX:
-		case VAR:
-			*keyp = NULL;
-			break;
-		case ROW:
-			*keyp = &key;
-			fprintf(g.op_log,
-			    "%.*s\n", (int)key.size, (char *)key.data);
-			break;
-		}
-		*datap = &data;
-		fprintf(g.op_log, "%.*s\n", (int)data.size, (char *)data.data);
+	switch (g.c_database_type) {
+	case FIX:
+	case VAR:
+		*keyp = NULL;
+		break;
+	case ROW:
+		*keyp = &key;
+		fprintf(g.op_log,
+		    "%.*s\n", (int)key.size, (char *)key.data);
+		break;
 	}
+	*datap = &data;
+	fprintf(g.op_log, "%.*s\n", (int)data.size, (char *)data.data);
 
 	/* Insert the item into BDB. */
 	bdb_insert(key.data, key.size, data.data, data.size);
@@ -336,7 +318,7 @@ wts_ops()
 		 * not separately configured, they're a fixed percent of write
 		 * operations.
 		 */
-		op = rand() % 100;
+		op = wts_rand() % 100;
 		keyno = MMRAND(1, g.c_total);
 		if ((u_int32_t)op > g.c_read_pct) {
 			switch (g.c_database_type) {
@@ -365,7 +347,7 @@ wts_ops()
 		}
 
 		if (cnt % 1000 == 0)
-			track("read/write ops", cnt);
+			track("read/write ops", (u_int64_t)cnt);
 	}
 	return (0);
 }
@@ -381,7 +363,7 @@ wts_read_row_scan()
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
-		cnt += rand() % 17 + 1;
+		cnt += wts_rand() % 17 + 1;
 		if (cnt > g.c_total)
 			cnt = g.c_total;
 		if (cnt - last_cnt > 1000) {
@@ -423,6 +405,10 @@ wts_read_row(u_int64_t keyno)
 	toc = g.wts_toc;
 	env = db->env;
 
+	/* Log the operation */
+	if (!g.replay)
+		fprintf(g.op_log, "R %llu\n", keyno);
+
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
 		return (1);
@@ -462,7 +448,7 @@ wts_read_col_scan()
 
 	/* Check a random subset of the records using the record number. */
 	for (last_cnt = cnt = 0; cnt < g.c_total;) {
-		cnt += rand() % 17 + 1;
+		cnt += wts_rand() % 17 + 1;
 		if (cnt > g.c_total)
 			cnt = g.c_total;
 		if (cnt - last_cnt > 1000) {
@@ -492,6 +478,10 @@ wts_read_col(u_int64_t keyno)
 	db = g.wts_db;
 	toc = g.wts_toc;
 	env = db->env;
+
+	/* Log the operation */
+	if (!g.replay)
+		fprintf(g.op_log, "R %llu\n", keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
@@ -538,6 +528,10 @@ wts_del_row(u_int64_t keyno)
 	toc = g.wts_toc;
 	env = db->env;
 
+	/* Log the operation */
+	if (!g.replay)
+		fprintf(g.op_log, "D %llu\n", keyno);
+
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
@@ -567,6 +561,10 @@ wts_del_col(u_int64_t keyno)
 	db = g.wts_db;
 	toc = g.wts_toc;
 	env = db->env;
+
+	/* Log the operation */
+	if (!g.replay)
+		fprintf(g.op_log, "D %llu\n", keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);

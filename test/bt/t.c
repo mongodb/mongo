@@ -56,6 +56,7 @@ main(int argc, char *argv[])
 			default:
 				usage();
 			}
+			break;
 		case 'l':
 			log = 1;
 			break;
@@ -83,7 +84,8 @@ main(int argc, char *argv[])
 		config();
 
 		bdb_setup(0);			/* Open the databases */
-		wts_setup(0, log);
+		if (wts_setup(0, log))
+			goto err;
 
 		config_dump(1);
 
@@ -101,8 +103,9 @@ main(int argc, char *argv[])
 			goto skip_ops;
 
 		for (reps = 0; reps < 3; ++reps) {		
+						/* Read random records */
 			switch (g.c_database_type) {
-			case ROW:		/* Scan some records */
+			case ROW:
 				if (wts_read_row_scan())
 					goto err;
 				break;
@@ -112,10 +115,11 @@ main(int argc, char *argv[])
 					goto err;
 				break;
 			}
-
-			track("flushing & re-opening WT", 0);
-			wts_teardown();		/* Re-open the WT database */
-			wts_setup(1, log);
+						/* Close/re-open database */
+			track("flushing & re-opening WT", (u_int64_t)0);
+			wts_teardown();
+			if (wts_setup(1, log))
+				goto err;
 
 			if (wts_ops())		/* Random operations */
 				goto err;
@@ -124,12 +128,12 @@ main(int argc, char *argv[])
 skip_ops:	if (g.stats && wts_stats())	/* Optional statistics */
 			goto err;
 						/* Close the databases */
-		track("shutting down BDB", 0);
+		track("shutting down BDB", (u_int64_t)0);
 		bdb_teardown();	
-		track("shutting down WT", 0);
+		track("shutting down WT", (u_int64_t)0);
 		wts_teardown();
 
-		track("done", 0);
+		track("done", (u_int64_t)0);
 		printf("\n");
 	}
 
