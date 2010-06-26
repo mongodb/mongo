@@ -107,6 +107,11 @@ namespace mongo {
 
     void getDatabaseNames( vector< string > &names , const string& usePath = dbpath );
 
+    /* returns true if there is no data on this server.  useful when starting replication. 
+       local database does NOT count. 
+    */
+    bool haveDatabases();
+
 // --- local client ---
     
     class DBDirectClient : public DBClientBase {
