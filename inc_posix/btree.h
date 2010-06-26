@@ -326,6 +326,8 @@ struct __wt_col_indx {
 	 * The on-page data is untyped for column-store pages -- if the page
 	 * has variable-length objects, it's a WT_ITEM layout, like row-store
 	 * pages.  If the page has fixed-length objects, it's untyped data.
+	 *
+	 * If data is NULL, the data was deleted.
 	 */
 	void	 *data;			/* On-page data */
 	WT_REPL	 *repl;			/* Replacement data array */
@@ -338,7 +340,10 @@ struct __wt_col_indx {
  */
 #define	WT_COL_INDX_SIZE	8
 
-/* Macro to walk the indexes of an in-memory page. */
+/*
+ * Macro to walk the indexes of an in-memory page: works for both WT_ROW_INDX
+ * and WT_COL_INDX, based on the type of ip.
+ */
 #define	WT_INDX_FOREACH(page, ip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
@@ -392,15 +397,15 @@ struct __wt_repl {
 };
 
 /*
- * WT_REPL_CURRENT --
+ * WT_SDBT_CURRENT --
  *	Return the last replacement entry referenced by either a WT_ROW_INDX
  *	or WT_COL_INDX structure; the repl_next field makes entries visible,
  *	so we have to test for both a non-zero repl_next field as well as a
  *	NULL repl field.
  */
-#define	WT_REPL_CURRENT(i)						\
-	((i)->repl == NULL || (i)->repl->repl_next == 0 ?		\
-	    NULL : &((i)->repl->data[(i)->repl->repl_next - 1]))
+#define	WT_SDBT_CURRENT(ip)						\
+	((ip)->repl == NULL || (ip)->repl->repl_next == 0 ?		\
+	    NULL : &((ip)->repl->data[(ip)->repl->repl_next - 1]))
 
 /*
  * WT_ITEM --
@@ -473,7 +478,7 @@ struct __wt_item {
  * Variable-length data items (WT_ITEM_DUP/DUP_OVFL).
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length items):
- * Variable-length data items (WT_ITEM_DATA/DATA_OVFL).
+ * Variable-length data items (WT_ITEM_DATA/DATA_OVFL/DEL).
  *
  * WT_PAGE_COL_INT (Column-store internal page):
  * WT_PAGE_COL_FIX (Column-store leaf page storing fixed-length items):
@@ -486,9 +491,10 @@ struct __wt_item {
 #define	WT_ITEM_KEY_OVFL	0x02000000 /* Overflow key */
 #define	WT_ITEM_DATA		0x03000000 /* Data */
 #define	WT_ITEM_DATA_OVFL	0x04000000 /* Overflow data */
-#define	WT_ITEM_DUP		0x05000000 /* Duplicate data */
-#define	WT_ITEM_DUP_OVFL	0x06000000 /* Overflow duplicate data */
-#define	WT_ITEM_OFF		0x07000000 /* Offpage-tree reference */
+#define	WT_ITEM_DEL		0x05000000 /* Deleted */
+#define	WT_ITEM_DUP		0x06000000 /* Duplicate data */
+#define	WT_ITEM_DUP_OVFL	0x07000000 /* Overflow duplicate data */
+#define	WT_ITEM_OFF		0x08000000 /* Offpage-tree reference */
 
 #define	WT_ITEM_LEN(addr)						\
 	(((WT_ITEM *)(addr))->__item_chunk & 0x00ffffff)

@@ -170,6 +170,8 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		case WT_ITEM_DATA:
 			dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);
 			break;
+		case WT_ITEM_DEL:
+			break;
 		case WT_ITEM_DUP:
 			dp->p(last_key->data, last_key->size, dp->stream);
 			dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);

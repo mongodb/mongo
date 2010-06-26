@@ -165,6 +165,12 @@ A column store's leaf page keys are record numbers.   The leaf page data items
 are fixed- or variable-length byte strings.
 
 <p>
+Because column store keys do not disappear on delete, there needs to be an
+on-page, permanent "deleted" data value; for variable-length byte strings,
+this is a specific item type.  For fixed-length byte strings, an additional
+byte is placed on the page that flags the data as deleted.
+
+<p>
 Column store notes:
 <ul>
 

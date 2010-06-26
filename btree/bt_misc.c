@@ -146,6 +146,8 @@ __wt_bt_item_type(WT_ITEM *item)
 		return ("data");
 	case WT_ITEM_DATA_OVFL:
 		return ("data-overflow");
+	case WT_ITEM_DEL:
+		return ("deleted");
 	case WT_ITEM_DUP:
 		return ("duplicate");
 	case WT_ITEM_DUP_OVFL:

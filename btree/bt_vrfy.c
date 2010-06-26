@@ -574,6 +574,10 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 			    hdr->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
+		case WT_ITEM_DEL:
+			if (hdr->type != WT_PAGE_COL_VAR)
+				goto item_vs_page;
+			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
 			if (hdr->type != WT_PAGE_COL_VAR &&
@@ -613,7 +617,11 @@ item_vs_page:			__wt_api_db_errx(db,
 		case WT_ITEM_KEY:
 		case WT_ITEM_DATA:
 		case WT_ITEM_DUP:
-			/* The length is variable, so we can't check it. */
+			/* The length is variable, we can't check it. */
+			break;
+		case WT_ITEM_DEL:
+			if (item_len != 0)
+				goto item_len;
 			break;
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
@@ -704,6 +712,7 @@ eof:				__wt_api_db_errx(db,
 		 * compare it with the last item.
 		 */
 		switch (item_type) {
+		case WT_ITEM_DEL:
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_OFF:

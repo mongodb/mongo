@@ -152,6 +152,9 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 		case WT_ITEM_KEY_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_TOTAL_KEY);
 			break;
+		case WT_ITEM_DEL:
+			WT_STAT_INCR(idb->dstats, ITEM_TOTAL_DELETED);
+			break;
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_DUP_DATA);

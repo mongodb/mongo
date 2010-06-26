@@ -20,7 +20,7 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 	IDB *idb;
 	WT_PAGE *page;
 	WT_REPL *new, *repl;
-	WT_ROW_INDX *ip;
+	WT_COL_INDX *cip;
 	int ret;
 
 	env = toc->env;
@@ -31,10 +31,10 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 	/* Search the btree for the key. */
 	WT_ERR(__wt_bt_search_col(toc, recno));
 	page = toc->srch_page;
-	ip = toc->srch_ip;
+	cip = toc->srch_ip;
 
 	/* Grow or allocate the replacement array if necessary. */
-	repl = ip->repl;
+	repl = cip->repl;
 	if (repl == NULL || repl->repl_next == repl->repl_size)
 		WT_ERR(__wt_bt_repl_alloc(env, repl, &new));
 	else
