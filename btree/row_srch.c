@@ -20,7 +20,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	IDB *idb;
 	WT_PAGE *page;
 	WT_ROW_INDX *rip;
-	WT_SDBT *rdbt;
+	WT_SDBT *sdbt;
 	u_int32_t addr, base, indx, limit, size;
 	int cmp, isleaf, ret;
 
@@ -122,8 +122,8 @@ restart:
 		}
 
 		/* Return the match unless it's been deleted. */
-		if ((rdbt = WT_REPL_CURRENT(rip)) != NULL &&
-		     rdbt->data == WT_DATA_DELETED) {
+		if ((sdbt = WT_SDBT_CURRENT(rip)) != NULL &&
+		     sdbt->data == WT_DATA_DELETED) {
 			ret = WT_NOTFOUND;
 			goto err;
 		}
