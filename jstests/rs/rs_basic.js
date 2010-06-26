@@ -41,6 +41,9 @@ function init() {
     return res;
 }
 
+_path = '../../db/Debug/';
+print("_path var set to " + _path);
+
 print("go() to run");
 print("init() to initiate");
 
