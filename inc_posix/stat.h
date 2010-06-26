@@ -67,22 +67,23 @@ struct __wt_stats {
 #define	WT_STAT_ITEM_DUP_DATA			    6
 #define	WT_STAT_ITEM_KEY_OVFL			    7
 #define	WT_STAT_ITEM_TOTAL_DATA			    8
-#define	WT_STAT_ITEM_TOTAL_KEY			    9
-#define	WT_STAT_LEAFMAX				   10
-#define	WT_STAT_LEAFMIN				   11
-#define	WT_STAT_MAGIC				   12
-#define	WT_STAT_MAJOR				   13
-#define	WT_STAT_MINOR				   14
-#define	WT_STAT_PAGE_COL_FIXED			   15
-#define	WT_STAT_PAGE_COL_INTERNAL		   16
-#define	WT_STAT_PAGE_COL_VARIABLE		   17
-#define	WT_STAT_PAGE_DUP_INTERNAL		   18
-#define	WT_STAT_PAGE_DUP_LEAF			   19
-#define	WT_STAT_PAGE_FREE			   20
-#define	WT_STAT_PAGE_INTERNAL			   21
-#define	WT_STAT_PAGE_LEAF			   22
-#define	WT_STAT_PAGE_OVERFLOW			   23
-#define	WT_STAT_TREE_LEVEL			   24
+#define	WT_STAT_ITEM_TOTAL_DELETED		    9
+#define	WT_STAT_ITEM_TOTAL_KEY			   10
+#define	WT_STAT_LEAFMAX				   11
+#define	WT_STAT_LEAFMIN				   12
+#define	WT_STAT_MAGIC				   13
+#define	WT_STAT_MAJOR				   14
+#define	WT_STAT_MINOR				   15
+#define	WT_STAT_PAGE_COL_FIXED			   16
+#define	WT_STAT_PAGE_COL_INTERNAL		   17
+#define	WT_STAT_PAGE_COL_VARIABLE		   18
+#define	WT_STAT_PAGE_DUP_INTERNAL		   19
+#define	WT_STAT_PAGE_DUP_LEAF			   20
+#define	WT_STAT_PAGE_FREE			   21
+#define	WT_STAT_PAGE_INTERNAL			   22
+#define	WT_STAT_PAGE_LEAF			   23
+#define	WT_STAT_PAGE_OVERFLOW			   24
+#define	WT_STAT_TREE_LEVEL			   25
 
 /*
  * Statistics entries for DB/IDB handle.
