@@ -17,8 +17,10 @@
 
 #include "pch.h"
 #include "text.h"
+#include "unittest.h"
 
 namespace mongo{
+
     inline int leadingOnes(unsigned char c){
         if (c < 0x80) return 0;
         static const char _leadingOnes[128] = {
@@ -103,4 +105,13 @@ namespace mongo{
 #endif
 
     #endif
+
+    struct TextUnitTest : public UnitTest {
+        void run() { 
+            assert( parseLL("123") == 123 );
+            assert( parseLL("-123000000000") == -123000000000LL );
+        }
+    } textUnitTest;
+
 }
+
