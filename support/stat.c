@@ -50,7 +50,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 26, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 27, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_DUP_TREE].desc = "duplicate data off-page trees";
@@ -61,6 +61,8 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_ITEM_DUP_DATA].desc = "duplicate data items";
 	stats[WT_STAT_ITEM_KEY_OVFL].desc = "overflow keys";
 	stats[WT_STAT_ITEM_TOTAL_DATA].desc = "total database data items";
+	stats[WT_STAT_ITEM_TOTAL_DELETED].desc =
+	    "total database deleted items";
 	stats[WT_STAT_ITEM_TOTAL_KEY].desc = "total database keys";
 	stats[WT_STAT_LEAFMAX].desc = "maximum leaf page size";
 	stats[WT_STAT_LEAFMIN].desc = "minimum leaf page size";
@@ -96,6 +98,7 @@ __wt_stat_clear_database_stats(WT_STATS *stats)
 	stats[WT_STAT_ITEM_DUP_DATA].v = 0;
 	stats[WT_STAT_ITEM_KEY_OVFL].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_DATA].v = 0;
+	stats[WT_STAT_ITEM_TOTAL_DELETED].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_KEY].v = 0;
 	stats[WT_STAT_LEAFMAX].v = 0;
 	stats[WT_STAT_LEAFMIN].v = 0;
