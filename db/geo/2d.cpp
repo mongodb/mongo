@@ -16,16 +16,16 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "namespace.h"
-#include "jsobj.h"
-#include "index.h"
-#include "../util/unittest.h"
-#include "commands.h"
-#include "pdfile.h"
-#include "btree.h"
-#include "curop.h"
-#include "matcher.h"
+#include "../../pch.h"
+#include "../namespace.h"
+#include "../jsobj.h"
+#include "../index.h"
+#include "../../util/unittest.h"
+#include "../commands.h"
+#include "../pdfile.h"
+#include "../btree.h"
+#include "../curop.h"
+#include "../matcher.h"
 
 //#define GEODEBUG(x) cout << x << endl;
 #define GEODEBUG(x) 
