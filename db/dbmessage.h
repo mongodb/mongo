@@ -241,6 +241,7 @@ namespace mongo {
 } // namespace mongo
 
 //#include "bsonobj.h"
+
 #include "instance.h"
 
 namespace mongo {

@@ -21,6 +21,7 @@
 #include "repl_block.h"
 #include "repl.h"
 #include "commands.h"
+#include "repl/rs.h"
 
 namespace mongo {
 

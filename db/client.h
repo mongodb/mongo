@@ -29,9 +29,11 @@
 #include "namespace.h"
 #include "lasterror.h"
 #include "stats/top.h"
-#include "repl/rs.h"
+//#include "repl/rs.h"
 
 namespace mongo { 
+
+    extern class ReplSet *theReplSet;
 
     class AuthenticationInfo;
     class Database;

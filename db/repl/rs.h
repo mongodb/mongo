@@ -58,12 +58,12 @@ namespace mongo {
     };
 
     class Manager : public task::Server {
-        bool got(const any&);
         ReplSetImpl *rs;
         bool busyWithElectSelf;
         int _primary;
         const Member* findOtherPrimary();
         void noteARemoteIsPrimary(const Member *);
+        virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
         void msgReceivedNewConfig(BSONObj) { assert(false); }
