@@ -10,7 +10,8 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_bt_debug_col_indx(WT_TOC *, WT_COL_INDX *, FILE *);
+static void __wt_bt_debug_col_fix_indx(WT_TOC *, WT_COL_INDX *, FILE *);
+static int  __wt_bt_debug_col_var_indx(WT_TOC *, WT_COL_INDX *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
@@ -222,10 +223,13 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 			WT_RET(__wt_bt_debug_row_indx(toc, rip, fp));
 		break;
 	case WT_PAGE_COL_FIX:
+		WT_INDX_FOREACH(page, cip, i)
+			__wt_bt_debug_col_fix_indx(toc, cip, fp);
+		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
 		WT_INDX_FOREACH(page, cip, i)
-			__wt_bt_debug_col_indx(toc, cip, fp);
+			WT_RET(__wt_bt_debug_col_var_indx(toc, cip, fp));
 		break;
 	case WT_PAGE_OVFL:
 		break;
@@ -241,21 +245,44 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_bt_debug_col_indx --
- *	Dump a single WT_COL_INDX structure.
+ * __wt_bt_debug_col_var_indx --
+ *	Dump a single WT_COL_INDX structure for a WT_PAGE_COL_{INT,VAR} page.
+ */
+static int
+__wt_bt_debug_col_var_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
+{
+	if (fp == NULL)				/* Default to stderr */
+		fp = stderr;
+
+	if (cip->repl != NULL)
+		__wt_bt_debug_repl(cip->repl, fp);
+	else
+		WT_RET(__wt_bt_debug_item_data(toc, cip->data, fp));
+	fprintf(fp, "\n");
+	return (0);
+}
+
+/*
+ * __wt_bt_debug_col_fix_indx --
+ *	Dump a single WT_COL_INDX structure for a WT_PAGE_COL_FIX page.
  */
 static void
-__wt_bt_debug_col_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
+__wt_bt_debug_col_fix_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
 {
-	WT_CC_QUIET(toc, NULL);
+	DBT dbt;
+
+	WT_CLEAR(dbt);
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	if (cip->data != NULL)
-		fprintf(fp, "\tdata: %p", cip->data);
 	if (cip->repl != NULL)
 		__wt_bt_debug_repl(cip->repl, fp);
+	else {
+		dbt.data = cip->data;
+		dbt.size = toc->db->fixed_len;
+		__wt_bt_debug_dbt("\tdata", &dbt, fp);
+	}
 	fprintf(fp, "\n");
 }
 
@@ -275,7 +302,7 @@ __wt_bt_debug_row_indx(WT_TOC *toc, WT_ROW_INDX *rip, FILE *fp)
 		__wt_bt_debug_dbt("\tkey", rip, fp);
 	if (rip->repl != NULL)
 		__wt_bt_debug_repl(rip->repl, fp);
-	if (rip->data != NULL) {
+	else {
 		fprintf(fp, "\tdata: {");
 		WT_RET(__wt_bt_debug_item_data(toc, rip->data, fp));
 		fprintf(fp, "}");
@@ -300,7 +327,7 @@ __wt_bt_debug_repl(WT_REPL *repl, FILE *fp)
 	for (sdbt = repl->data, repl_cnt = 0;
 	    repl_cnt < repl->repl_next; ++sdbt, ++repl_cnt)
 		if (sdbt->data == WT_DATA_DELETED)
-			fprintf(fp, "\trepl: deleted\n");
+			fprintf(fp, "\trepl: [deleted]");
 		else
 			__wt_bt_debug_dbt("\trepl", sdbt, fp);
 }
@@ -345,6 +372,7 @@ __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
 	case WT_ITEM_DATA:
+	case WT_ITEM_DEL:
 	case WT_ITEM_DUP:
 		break;
 	case WT_ITEM_KEY_OVFL:
@@ -453,6 +481,11 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		hp = idb->huffman_data;
 		p = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
+		break;
+	case WT_ITEM_DEL:
+		hp = NULL;
+		p = "[deleted]";
+		size = sizeof("[deleted]" - 1);
 		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
