@@ -19,7 +19,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_ROW_INDX *ip;
+	WT_ROW_INDX *rip;
 	u_int32_t type;
 	int ret;
 
@@ -30,7 +30,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	/* Search the btree for the key. */
 	WT_ERR(__wt_bt_search_row(toc, key, 0));
 	page = toc->srch_page;
-	ip = toc->srch_ip;
+	rip = toc->srch_ip;
 
 	/*
 	 * The Db.get method can only return single key/data pairs.
@@ -41,8 +41,8 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	 * here.   Re-visit this when we figure out how we handle
 	 * dup inserts into the tree.
 	 */
-	if (ip->data != NULL) {
-		type = WT_ITEM_TYPE(ip->data);
+	if (rip->data != NULL) {
+		type = WT_ITEM_TYPE(rip->data);
 		if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
 			__wt_api_db_errx(db,
 			    "the Db.get method cannot return keys with "
@@ -52,7 +52,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 			goto err;
 		}
 	}
-	ret = __wt_bt_dbt_return(toc, key, data, page, ip, 0);
+	ret = __wt_bt_dbt_return(toc, key, data, page, rip, 0);
 
 err:	if (page != NULL && page != idb->root_page)
 		__wt_bt_page_out(toc, &page, 0);

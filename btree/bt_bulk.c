@@ -1117,7 +1117,7 @@ static int
 __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
 {
 	ENV *env;
-	WT_COL_INDX *ip;
+	WT_COL_INDX *cip;
 	u_int32_t allocated;
 
 	env = toc->env;
@@ -1138,11 +1138,11 @@ __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
 	}
 
 	/* Add in the new index entry. */
-	ip = page->u.c_indx + page->indx_count;
+	cip = page->u.c_indx + page->indx_count;
 	++page->indx_count;
 
 	/* Fill in the on-page data. */
-	ip->data = data;
+	cip->data = data;
 
 	return (0);
 }
@@ -1159,7 +1159,7 @@ __wt_bt_promote_row_indx(
 	DB *db;
 	ENV *env;
 	IDB *idb;
-	WT_ROW_INDX *ip;
+	WT_ROW_INDX *rip;
 	u_int32_t allocated;
 
 	env = toc->env;
@@ -1182,7 +1182,7 @@ __wt_bt_promote_row_indx(
 	}
 
 	/* Add in the new index entry. */
-	ip = page->u.r_indx + page->indx_count;
+	rip = page->u.r_indx + page->indx_count;
 	++page->indx_count;
 
 	/*
@@ -1194,19 +1194,19 @@ __wt_bt_promote_row_indx(
 		switch (WT_ITEM_TYPE(key)) {
 		case WT_ITEM_KEY:
 			if (idb->huffman_key == NULL) {
-				WT_KEY_SET(ip,
+				WT_KEY_SET(rip,
 				    WT_ITEM_BYTE(key), WT_ITEM_LEN(key));
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-			WT_KEY_SET_PROCESS(ip, key);
+			WT_KEY_SET_PROCESS(rip, key);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
 
 	/* Fill in the on-page data. */
-	ip->data = data;
+	rip->data = data;
 
 	return (0);
 }
@@ -1218,14 +1218,14 @@ __wt_bt_promote_row_indx(
 static void
 __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
 {
-	WT_COL_INDX *ip;
+	WT_COL_INDX *cip;
 
 	/*
 	 * Because of the bulk load pattern, we're always adding records to
 	 * the subtree referenced by the last entry in each parent page.
 	 */
-	ip = parent->u.c_indx + (parent->indx_count - 1);
-	WT_COL_OFF_RECORDS(ip) += incr;
+	cip = parent->u.c_indx + (parent->indx_count - 1);
+	WT_COL_OFF_RECORDS(cip) += incr;
 }
 
 /*
@@ -1235,14 +1235,14 @@ __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
 static void
 __wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t incr)
 {
-	WT_ROW_INDX *ip;
+	WT_ROW_INDX *rip;
 
 	/*
 	 * Because of the bulk load pattern, we're always adding records to
 	 * the subtree referenced by the last entry in each parent page.
 	 */
-	ip = parent->u.r_indx + (parent->indx_count - 1);
-	WT_ROW_OFF_RECORDS(ip) += incr;
+	rip = parent->u.r_indx + (parent->indx_count - 1);
+	WT_ROW_OFF_RECORDS(rip) += incr;
 }
 
 /*
