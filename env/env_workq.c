@@ -70,8 +70,8 @@ __wt_workq_srvr(void *arg)
 				/* FALLTHROUGH */
 			case WT_WORKQ_READ_SCHED:
 				chk_read = 1;
-				read_priority =
-				    F_ISSET(toc, WT_READ_PRIORITY) ? 1 : 0;
+				if (F_ISSET(toc, WT_READ_PRIORITY))
+					read_priority = 1;
 				break;
 			}
 		}
