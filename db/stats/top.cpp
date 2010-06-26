@@ -99,7 +99,7 @@ namespace mongo {
         case opReply: 
         case dbMsg:
         case dbKillCursors:
-            log() << "unexpected op in Top::record: " << op << endl;
+            //log() << "unexpected op in Top::record: " << op << endl;
             break;
         default:
             log() << "unknown op in Top::record: " << op << endl;
