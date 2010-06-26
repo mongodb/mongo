@@ -29,7 +29,7 @@
 #include "../helpers/dblogger.h"
 #include "connections.h"
 #include "../../util/unittest.h"
-
+#include "../instance.h"
 
 namespace mongo { 
 
@@ -77,13 +77,16 @@ namespace mongo {
             result.append("v", v);
             if( v > cmdObj["v"].Int() )
                 result << "config" << theReplSet->config().asBson();
+            if( cmdObj["checkEmpty"].trueValue() ) { 
+                result.append("hasData", haveDatabases());
+            }
             return true;
         }
     } cmdReplSetHeartbeat;
 
     /* throws dbexception */
-    bool requestHeartbeat(string setName, string memberFullName, BSONObj& result, int myCfgVersion, int& theirCfgVersion) { 
-        BSONObj cmd = BSON( "replSetHeartbeat" << setName << "v" << myCfgVersion << "pv" << 1 );
+    bool requestHeartbeat(string setName, string memberFullName, BSONObj& result, int myCfgVersion, int& theirCfgVersion, bool checkEmpty) { 
+        BSONObj cmd = BSON( "replSetHeartbeat" << setName << "v" << myCfgVersion << "pv" << 1 << "checkEmpty" << checkEmpty );
         ScopedConn conn(memberFullName);
         return conn->runCommand("admin", cmd, result);
     }
