@@ -153,15 +153,89 @@ rp = NULL;
  *	Reconcile a variable-width column-store leaf page.
  */
 static int
-__wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
+__wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
+	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
+	DB *db;
+	DBT *data, data_dbt;
 	WT_COL_INDX *cip;
-	u_int32_t i;
+	WT_ITEM data_item;
+	WT_OVFL data_ovfl;
+	WT_PAGE_HDR *hdr;
+	WT_SDBT *sdbt;
+	u_int32_t i, len;
 
-rp = NULL;
-	WT_INDX_FOREACH(page, cip, i)
-		;
-	return (__wt_page_write(toc->db, page));
+	db = toc->db;
+	hdr = new->hdr;
+
+	WT_CLEAR(data_dbt);
+	WT_CLEAR(data_item);
+
+	data = &data_dbt;
+
+	WT_INDX_FOREACH(page, cip, i) {
+		/*
+		 * Get a reference to the data, on- or off- page, and see if
+		 * it's been deleted.
+		 */
+		if ((sdbt = WT_SDBT_CURRENT(cip)) != NULL) {
+			if (sdbt->data == WT_DATA_DELETED)
+				goto deleted;
+
+			/*
+			 * Build the data's WT_ITEM chunk from the most recent
+			 * replacement value.
+			 */
+			data->data = sdbt->data;
+			data->size = sdbt->size;
+			WT_RET(__wt_bt_build_data_item(
+			    toc, data, &data_item, &data_ovfl));
+			data_loc = DATA_OFF_PAGE;
+		} else if (cip->data == NULL) {
+deleted:		data->data = NULL;
+			data->size = 0;
+			WT_RET(__wt_bt_build_data_item(
+			    toc, data, &data_item, &data_ovfl));
+			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DEL);
+			data_loc = DATA_OFF_PAGE;
+		} else {
+			data->data = cip->data;
+			data->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(cip->data));
+			data_loc = DATA_ON_PAGE;
+		}
+
+		switch (data_loc) {
+		case DATA_OFF_PAGE:
+			len = WT_ITEM_SPACE_REQ(data->size);
+			break;
+		case DATA_ON_PAGE:
+			len = data->size;
+			break;
+		}
+		if (len > new->space_avail) {
+			fprintf(stderr, "PAGE GREW, SPLIT\n");
+			__wt_abort(toc->env);
+		}
+		switch (data_loc) {
+		case DATA_ON_PAGE:
+			memcpy(new->first_free, data->data, data->size);
+			new->first_free += data->size;
+			new->space_avail -= data->size;
+			break;
+		case DATA_OFF_PAGE:
+			memcpy(new->first_free, &data_item, sizeof(data_item));
+			memcpy(new->first_free +
+			    sizeof(data_item), data->data, data->size);
+			new->first_free += WT_ITEM_SPACE_REQ(data->size);
+			new->space_avail -= WT_ITEM_SPACE_REQ(data->size);
+		}
+		++hdr->u.entries;
+		new->records += 1;
+	}
+
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
+
+	return (__wt_page_write(toc->db, new));
 }
 
 /*
@@ -213,8 +287,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data.  We get the data first because
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
-		if (rip->repl != NULL) {
-			sdbt = rip->repl->data;
+		if ((sdbt = WT_SDBT_CURRENT(rip)) != NULL) {
 			if (sdbt->data == WT_DATA_DELETED)
 				continue;
 
