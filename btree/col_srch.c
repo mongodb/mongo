@@ -20,7 +20,7 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	IDB *idb;
 	WT_COL_INDX *cip;
 	WT_PAGE *page;
-	WT_SDBT *rdbt;
+	WT_SDBT *sdbt;
 	u_int64_t record_cnt;
 	u_int32_t addr, size, i;
 	int ret;
@@ -71,8 +71,12 @@ restart:
 	}
 
 	/* Check for deleted items. */
-	if ((rdbt =
-	    WT_REPL_CURRENT(cip)) != NULL && rdbt->data == WT_DATA_DELETED) {
+	if ((sdbt = WT_SDBT_CURRENT(cip)) == NULL) {
+		if (cip->data == NULL) {
+			ret = WT_NOTFOUND;
+			goto err;
+		}
+	} else if (sdbt->data == WT_DATA_DELETED) {
 		ret = WT_NOTFOUND;
 		goto err;
 	}
