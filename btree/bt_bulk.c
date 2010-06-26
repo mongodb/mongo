@@ -1312,13 +1312,22 @@ __wt_bt_build_data_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	idb = db->idb;
 	stats = idb->stats;
 
-	WT_CLEAR(*item);
-
 	/*
 	 * We're called with a DBT that references a data/size pair.  We can
 	 * re-point that DBT's data and size fields to other memory, but we
 	 * cannot allocate memory in that DBT -- all we can do is re-point it.
 	 */
+	WT_CLEAR(*item);
+	WT_ITEM_TYPE_SET(item, WT_ITEM_DATA);
+
+	/*
+	 * Handle zero-length items quickly -- this is a common value, it's
+	 * a deleted column-store variable length item.
+	 */
+	if (dbt->size == 0) {
+		WT_ITEM_LEN_SET(item, 0);
+		return (0);
+	}
 
 	/* Optionally compress the data using the Huffman engine. */
 	if (idb->huffman_data != NULL) {
@@ -1342,8 +1351,7 @@ __wt_bt_build_data_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 		dbt->size = sizeof(*ovfl);
 		WT_ITEM_TYPE_SET(item, WT_ITEM_DATA_OVFL);
 		WT_STAT_INCR(stats, OVERFLOW_DATA);
-	} else
-		WT_ITEM_TYPE_SET(item, WT_ITEM_DATA);
+	}
 
 	WT_ITEM_LEN_SET(item, dbt->size);
 	return (0);
