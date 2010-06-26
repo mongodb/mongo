@@ -11,7 +11,7 @@
 
 static int  __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_col_int(WT_PAGE *);
-static int  __wt_bt_page_inmem_col_leaf(WT_PAGE *);
+static int  __wt_bt_page_inmem_col_var(WT_PAGE *);
 static int  __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_item_int(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
@@ -176,7 +176,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 		ret = __wt_bt_page_inmem_col_int(page);
 		break;
 	case WT_PAGE_COL_VAR:
-		ret = __wt_bt_page_inmem_col_leaf(page);
+		ret = __wt_bt_page_inmem_col_var(page);
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -205,13 +205,13 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 	WT_ITEM *item;
 	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
-	WT_ROW_INDX *ip;
+	WT_ROW_INDX *rip;
 	u_int64_t records;
 	u_int32_t i;
 
 	idb = db->idb;
 	hdr = page->hdr;
-	ip = page->u.r_indx;
+	rip = page->u.r_indx;
 	records = 0;
 
 	/*
@@ -225,19 +225,19 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 			if (idb->huffman_key == NULL) {
-				WT_KEY_SET(ip,
+				WT_KEY_SET(rip,
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-			WT_KEY_SET_PROCESS(ip, item);
+			WT_KEY_SET_PROCESS(rip, item);
 			break;
 		case WT_ITEM_OFF:
 			off = WT_ITEM_BYTE_OFF(item);
 			records += WT_RECORDS(off);
-			ip->data = item;
-			++ip;
+			rip->data = item;
+			++rip;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -258,7 +258,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_ITEM *item;
-	WT_ROW_INDX *ip;
+	WT_ROW_INDX *rip;
 	u_int32_t i, indx_count;
 	u_int64_t records;
 
@@ -276,37 +276,37 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	 * (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL) item; or an offpage
 	 * reference (WT_ITEM_OFF).
 	 */
-	ip = NULL;
+	rip = NULL;
 	indx_count = 0;
 	WT_ITEM_FOREACH(page, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
-			if (ip == NULL)
-				ip = page->u.r_indx;
+			if (rip == NULL)
+				rip = page->u.r_indx;
 			else
-				++ip;
+				++rip;
 			if (idb->huffman_key != NULL ||
 			    WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL)
-				WT_KEY_SET_PROCESS(ip, item);
+				WT_KEY_SET_PROCESS(rip, item);
 			else
-				WT_KEY_SET(ip,
+				WT_KEY_SET(rip,
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			++indx_count;
 			break;
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
 			/* Duplicate the previous key. */
-			WT_KEY_SET(ip, ip[-1].key, ip[-1].size);
+			WT_KEY_SET(rip, rip[-1].key, rip[-1].size);
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
-			ip->data = item;
+			rip->data = item;
 			++records;
 			break;
 		case WT_ITEM_OFF:
-			ip->data = item;
-			records += WT_ROW_OFF_RECORDS(ip);
+			rip->data = item;
+			records += WT_ROW_OFF_RECORDS(rip);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -325,14 +325,14 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 static int
 __wt_bt_page_inmem_col_int(WT_PAGE *page)
 {
-	WT_COL_INDX *ip;
+	WT_COL_INDX *cip;
 	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
 	u_int32_t i;
 
 	hdr = page->hdr;
-	ip = page->u.c_indx;
+	cip = page->u.c_indx;
 	records = 0;
 
 	/*
@@ -340,8 +340,8 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 	 * The page contains WT_OFF structures.
 	 */
 	WT_OFF_FOREACH(page, off, i) {
-		ip->data = off;
-		++ip;
+		cip->data = off;
+		++cip;
 		records += WT_RECORDS(off);
 	}
 
@@ -353,14 +353,14 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_col_leaf --
+ * __wt_bt_page_inmem_col_var --
  *	Build in-memory index for variable-length, data-only leaf pages in
  *	column-store trees.
  */
 static int
-__wt_bt_page_inmem_col_leaf(WT_PAGE *page)
+__wt_bt_page_inmem_col_var(WT_PAGE *page)
 {
-	WT_COL_INDX *ip;
+	WT_COL_INDX *cip;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
@@ -370,12 +370,13 @@ __wt_bt_page_inmem_col_leaf(WT_PAGE *page)
 	/*
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains unsorted data items.  The data items are on-page
-	 * (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) items.
+	 * data (WT_ITEM_DATA), overflow (WT_ITEM_DATA_OVFL) or deleted
+	 * (WT_ITEM_DEL) items.
 	 */
-	ip = page->u.c_indx;
+	cip = page->u.c_indx;
 	WT_ITEM_FOREACH(page, item, i) {
-		ip->data = item;
-		++ip;
+		cip->data = WT_ITEM_TYPE(item) == WT_ITEM_DEL ? NULL : item;
+		++cip;
 	}
 
 	page->indx_count = hdr->u.entries;
@@ -393,7 +394,7 @@ __wt_bt_page_inmem_col_leaf(WT_PAGE *page)
 static int
 __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 {
-	WT_ROW_INDX *ip;
+	WT_ROW_INDX *rip;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
@@ -405,20 +406,20 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	 * The page contains sorted data items.  The data items are on-page
 	 * (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL) items.
 	 */
-	ip = page->u.r_indx;
+	rip = page->u.r_indx;
 	WT_ITEM_FOREACH(page, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DUP:
-			WT_KEY_SET(ip,
+			WT_KEY_SET(rip,
 			    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			break;
 		case WT_ITEM_DUP_OVFL:
-			WT_KEY_SET_PROCESS(ip, WT_ITEM_BYTE(item));
+			WT_KEY_SET_PROCESS(rip, WT_ITEM_BYTE(item));
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
-		ip->data = item;
-		++ip;
+		rip->data = item;
+		++rip;
 	}
 
 	page->indx_count = hdr->u.entries;
@@ -436,7 +437,7 @@ static int
 __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
-	WT_COL_INDX *ip;
+	WT_COL_INDX *cip;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
 	u_int32_t i, j;
@@ -444,7 +445,7 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 
 	idb = db->idb;
 	hdr = page->hdr;
-	ip = page->u.c_indx;
+	cip = page->u.c_indx;
 	records = 0;
 
 	/*
@@ -453,14 +454,14 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	 */
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		WT_FIX_REPEAT_ITERATE(db, page, p, i, j) {
-			ip->data = p;
-			++ip;
+			cip->data = p;
+			++cip;
 			++records;
 		}
 	else
 		WT_FIX_FOREACH(db, page, p, i) {
-			ip->data = p;
-			++ip;
+			cip->data = p;
+			++cip;
 			++records;
 		}
 
