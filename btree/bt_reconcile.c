@@ -226,8 +226,8 @@ deleted:		data->data = NULL;
 			memcpy(new->first_free, &data_item, sizeof(data_item));
 			memcpy(new->first_free +
 			    sizeof(data_item), data->data, data->size);
-			new->first_free += WT_ITEM_SPACE_REQ(data->size);
-			new->space_avail -= WT_ITEM_SPACE_REQ(data->size);
+			new->first_free += len;
+			new->space_avail -= len;
 		}
 		++hdr->u.entries;
 		new->records += 1;
@@ -235,7 +235,7 @@ deleted:		data->data = NULL;
 
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
-	return (__wt_page_write(toc->db, new));
+	return (__wt_page_write(db, new));
 }
 
 /*

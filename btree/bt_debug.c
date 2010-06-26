@@ -484,7 +484,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		break;
 	case WT_ITEM_DEL:
 		hp = NULL;
-		p = "[deleted]";
+		p = (u_int8_t *)"[deleted]";
 		size = sizeof("[deleted]" - 1);
 		break;
 	case WT_ITEM_KEY_OVFL:
