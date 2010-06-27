@@ -45,8 +45,9 @@ namespace mongo {
         long long masks64[64];
 
         unsigned hashedToNormal[256];
-    } geoBitSets;
+    };
 
+    extern GeoBitSets geoBitSets;
     
     class GeoHash {
     public:
@@ -337,6 +338,18 @@ namespace mongo {
         Point( const GeoConvert * g , const GeoHash& hash ){
             g->unhash( hash , _x , _y );
         }
+        
+        Point( const BSONElement& e ){
+            BSONObjIterator i(e.Obj());
+            _x = i.next().number();
+            _y = i.next().number();
+        }
+
+        Point( const BSONObj& o ){
+            BSONObjIterator i(o);
+            _x = i.next().number();
+            _y = i.next().number();
+        }
 
         Point( double x , double y )
             : _x( x ) , _y( y ){
@@ -347,6 +360,12 @@ namespace mongo {
 
         GeoHash hash( const GeoConvert * g ){
             return g->hash( _x , _y );
+        }
+
+        double distance( Point& p ) const {
+            double a = _x - p._x;
+            double b = _y - p._y;
+            return sqrt( ( a * a ) + ( b * b ) );
         }
         
         string toString() const {

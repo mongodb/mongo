@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    GeoBitSets geoBitSets;
+
     const string GEO2DNAME = "2d";
 
     class Geo2dType : public IndexType , public GeoConvert {
