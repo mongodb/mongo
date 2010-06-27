@@ -413,7 +413,7 @@ namespace mongo {
         {
             if ( url.size() > 1 ) {
 
-                if ( ! allowed( rq , headers, from ) ){
+                if ( ! allowed( rq , headers, from ) || url == "/favicon.ico" ) {
                     responseCode = 401;
                     headers.push_back( "Content-Type: text/plain" );
                     responseMsg = "not allowed\n";
@@ -438,12 +438,14 @@ namespace mongo {
                 }
 
                 if( startsWith(url, "/_replSet") ) {
+                    DEV log() << "TEMP /_replSet" << endl;
                     string s = str::after(url, "/_replSetOplog?");
                     if( !s.empty() )
                         responseMsg = _replSetOplog(s);
                     else
                         responseMsg = _replSet();
                     responseCode = 200;
+                    DEV log() << "TEMP /_replSet done" << endl;
                     return;
                 }
 
@@ -485,6 +487,7 @@ namespace mongo {
                     }
                 }
 
+                DEV log() << "handle REST request " << url << endl;
                 handleRESTRequest( rq , url , responseMsg , responseCode , headers );
                 return;
             }
