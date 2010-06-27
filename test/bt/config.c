@@ -46,7 +46,7 @@ config(void)
 		g.op_log = NULL;
 	}
 	p = fname(NULL, "ops");
-	if ((g.op_log = fopen(p, g.replay ? "r" : "w")) == NULL) {
+	if ((g.op_log = fopen(p, "w")) == NULL) {
 		fprintf(stderr, "%s: %s\n", p, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
