@@ -256,7 +256,7 @@ namespace mongo {
         }
         catch( DBException& e) { 
             version = v;
-            log(level) << "replSet load config couldn't load " << h.toString() << ' ' << e.what() << rsLog;
+            log(level) << "replSet load config couldn't get from " << h.toString() << ' ' << e.what() << rsLog;
             return;
         }
 
