@@ -24,9 +24,9 @@
 #include "goodies.h"
 #include "../db/jsobj.h"
 
-#define SOCK_FAMILY_UNKNOWN_ERROR 13078
-
 namespace mongo {
+
+    const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
 
 #if defined(_WIN32)
 
@@ -119,10 +119,12 @@ namespace mongo {
         struct timeval tv;
         tv.tv_sec = secs;
         tv.tv_usec = 0;
-        massert( 13083, "unable to set SO_RCVTIMEO",
-                setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0 );
-        massert( 13084, "unable to set SO_SNDTIMEO",
-                setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0 );
+        bool report = logLevel > 3; // solaris doesn't provide these
+        DEV report = true;
+        bool ok = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
+        ok = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        DEV if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
     }
 
     // If an ip address is passed in, just return that.  If a hostname is passed
@@ -288,7 +290,5 @@ namespace mongo {
         set<int>* _sockets;
         static ListeningSockets* _instance;
     };
-
-#undef SOCK_FAMILY_UNKNOWN_ERROR
 
 } // namespace mongo

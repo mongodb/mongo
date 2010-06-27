@@ -334,14 +334,14 @@
     <ClCompile Include="..\pch.cpp">
       <Filter>db</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\text.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\d_writeback.cpp">
       <Filter>db\sharding</Filter>
     </ClCompile>
     <ClCompile Include="..\s\d_state.cpp">
       <Filter>db\sharding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\text.cpp">
+      <Filter>util\core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -703,7 +703,7 @@
       <Filter>db</Filter>
     </ClInclude>
     <ClInclude Include="..\util\text.h">
-      <Filter>util</Filter>
+      <Filter>util\core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -815,5 +815,10 @@
     <ResourceCompile Include="db.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="index_geo2d.obj">
+      <Filter>db\core</Filter>
+    </Object>
   </ItemGroup>
 </Project>
