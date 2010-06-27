@@ -44,7 +44,10 @@ namespace mongo {
         MemoryMappedFile::flushAll(true);
         { 
             writelock lk("");
-            rsOpTime.initiate();
+            // todo: set optime here.
+            cout << "todo set optime here" << endl;
+            //theReplSet->lastOpTimeWritten = ??;
+            //rather than above, do a logOp()? probably
             BSONObj o = asBson();
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
             logOpComment(BSON("msg"<<"initiating"));

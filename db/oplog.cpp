@@ -54,16 +54,16 @@ namespace mongo {
             return;
         }
 
+        const OpTime ts = OpTime::now();
+
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
         */
 
         bufbuilder.reset();
         BSONObjBuilder b(bufbuilder);
-        DEV assert( theReplSet->isPrimary() );
-        DEV assert( rsOpTime.initiated() );
-        const ReplTime ts = rsOpTime.inc();
-        b.append("t", (long long) ts);
+        massert(10000, "replSet error : logOp() but not primary?", theReplSet->isPrimary());
+        b.appendTimestamp("ts", ts.asDate());
         b.append("op", opstr);
         b.append("ns", ns);
         if ( bb )
@@ -77,7 +77,7 @@ namespace mongo {
         Record *r;
         DEV assert( logNS == 0 );
         {
-            const char *logns = "local.oplog.rs";
+            const char *logns = rsoplog.c_str();
             if ( rsOplogDetails == 0 ) {
                 Client::Context ctx( logns , dbpath, 0, false);
                 localDB = ctx.db();
@@ -87,7 +87,8 @@ namespace mongo {
             }
             Client::Context ctx( "" , localDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logns, len);
-            ctx.getClient()->setLastOp( ts );
+            theReplSet->lastOpTimeWritten = ts;
+            ctx.getClient()->setLastOp( ts.asDate() );
         }
 
         char *p = r->data;

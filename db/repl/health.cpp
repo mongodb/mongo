@@ -189,7 +189,7 @@ namespace mongo {
             s << td( _self->lhb() );
             stringstream q;
             q << "/_replSetOplog?" << _self->id();
-            s << td( a(q.str(), "", rsOpTime.toString()) );
+            s << td( a(q.str(), "", theReplSet->lastOpTimeWritten.toString()) );
             s << _tr();
 			mp[_self->hbinfo().id()] = s.str();
         }

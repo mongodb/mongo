@@ -72,7 +72,7 @@ namespace mongo {
             }
             result.append("set", theReplSet->name());
             result.append("state", theReplSet->state());
-            result.append("opTime", (long long) rsOpTime.ord);
+            result.append("opTime", theReplSet->lastOpTimeWritten);
             int v = theReplSet->config().version;
             result.append("v", v);
             if( v > cmdObj["v"].Int() )
@@ -119,7 +119,7 @@ namespace mongo {
                     }
                     mem.health = 1.0;
                     mem.lastHeartbeatMsg = "";
-                    mem.opTime.ord = info["opTime"].Long();
+                    mem.opTime = info["opTime"].Date();
 
                     be cfg = info["config"];
                     if( cfg.ok() ) {

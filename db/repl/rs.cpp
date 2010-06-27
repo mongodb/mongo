@@ -26,7 +26,6 @@ namespace mongo {
 
     bool replSet = false;
     ReplSet *theReplSet = 0;
-    RSOpTime rsOpTime;
 
     void ReplSetImpl::assumePrimary() { 
         writelock lk("admin."); // so we are synchronized with _logOp() 
@@ -143,20 +142,20 @@ namespace mongo {
 
     void newReplUp();
 
-    void RSOpTime::load() { 
-        ord = 0;
+    void ReplSetImpl::loadLastOpTimeWritten() { 
+        assert( lastOpTimeWritten.isNull() );
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog.c_str(), o) ) { 
-            ord = (unsigned long long) o["t"].Long();
-            uassert(13290, "bad replSet oplog entry?", ord > 0);
+            lastOpTimeWritten = o["ts"].Date();
+            uassert(13290, "bad replSet oplog entry?", !lastOpTimeWritten.isNull());
         }
     }
 
     /* call after constructing to start - returns fairly quickly after launching its threads */
     void ReplSetImpl::_go() { 
         try { 
-            rsOpTime.load();
+            loadLastOpTimeWritten();
         }
         catch(std::exception& e) { 
             log() << "replSet ERROR FATAL couldn't query the local " << rsoplog << " collection.  Terminating mongod after 30 seconds." << rsLog;
