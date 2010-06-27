@@ -44,7 +44,10 @@ namespace mongo {
         MemoryMappedFile::flushAll(true);
         { 
             writelock lk("");
-            rsOpTime.initiate();
+            // todo: set optime here.
+            cout << "todo set optime here" << endl;
+            //theReplSet->lastOpTimeWritten = ??;
+            //rather than above, do a logOp()? probably
             BSONObj o = asBson();
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
             logOpComment(BSON("msg"<<"initiating"));
@@ -256,7 +259,7 @@ namespace mongo {
         }
         catch( DBException& e) { 
             version = v;
-            log(level) << "replSet load config couldn't load " << h.toString() << ' ' << e.what() << rsLog;
+            log(level) << "replSet load config couldn't get from " << h.toString() << ' ' << e.what() << rsLog;
             return;
         }
 

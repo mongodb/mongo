@@ -581,6 +581,17 @@ namespace mongo {
         }
     }
 
+    /* returns true if there is data on this server.  useful when starting replication. 
+       local database does NOT count. 
+    */
+    bool haveDatabases() { 
+        vector<string> names;
+        getDatabaseNames(names);
+        if( names.size() >= 2 ) return true;
+        if( names.size() == 1 && names[0] != "local" ) return true;
+        return false;
+    }
+
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );

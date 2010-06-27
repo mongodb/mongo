@@ -45,7 +45,7 @@ namespace mongo {
         time_t upSince;
         time_t lastHeartbeat;
         string lastHeartbeatMsg;
-        RSOpTime opTime;
+        OpTime opTime;
         bool changed(const HeartbeatInfo& old) const;
     };
 

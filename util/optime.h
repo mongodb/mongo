@@ -26,7 +26,7 @@ namespace mongo {
         ClockSkewException() : DBException( "clock skew exception" , 20001 ){}
     };
 
-    /* replsets use RSOpTime.  
+    /* replsets use RSOpTime.
        M/S uses OpTime.
        But this is useable from both.
        */
@@ -125,6 +125,9 @@ namespace mongo {
             if ( secs != r.secs )
                 return secs < r.secs;
             return i < r.i;
+        }
+        bool operator<=(const OpTime& r) const { 
+            return *this < r || *this == r;
         }
     };
 #pragma pack()

@@ -18,11 +18,19 @@
 
 #pragma once
 
+#include "../../util/optime.h"
+
 namespace mongo {
 
     const string rsoplog = "local.oplog.rs";
 
-    struct RSOpTime { 
+    /*
+    class RSOpTime : public OpTime { 
+    public:
+        bool initiated() const { return getSecs() != 0; }
+    };*/
+
+    /*struct RSOpTime { 
         unsigned long long ord;
 
         RSOpTime() : ord(0) { }
@@ -41,10 +49,10 @@ namespace mongo {
 
         string toString() const { return str::stream() << ord; }
 
-        /* query the oplog and set the highest value herein.  acquires a db read lock. throws. */
+        // query the oplog and set the highest value herein.  acquires a db read lock. throws.
         void load();
     };
 
-    extern RSOpTime rsOpTime;
+    extern RSOpTime rsOpTime;*/
 
 }

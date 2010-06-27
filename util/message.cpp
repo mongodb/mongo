@@ -109,7 +109,7 @@ namespace mongo {
                     }
                 }
 #endif
-            }else if (me.getType() == AF_INET6){
+            } else if (me.getType() == AF_INET6) {
                 // IPv6 can also accept IPv4 connections as mapped addresses (::ffff:127.0.0.1)
                 // That causes a conflict if we don't do set it to IPV6_ONLY
                 const int one = 1;

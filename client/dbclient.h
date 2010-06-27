@@ -64,7 +64,10 @@ namespace mongo {
         /** Stream the data down full blast in multiple "more" packages, on the assumption that the client 
             will fully read all data queried.  Faster when you are pulling a lot of data and know you want to 
             pull it all down.  Note: it is not allowed to not read all the data unless you close the connection.
-            */
+
+            Use the query( boost::function<void(const BSONObj&)> f, ... ) version of the connection's query() 
+            method, and it will take care of all the details for you.
+        */
         QueryOption_Exhaust = 1 << 6
 
     };

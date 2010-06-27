@@ -19,6 +19,7 @@
 
 #include "pch.h"
 #include "rs.h"
+#include "../client.h"
 
 namespace mongo {
 
@@ -44,10 +45,14 @@ namespace mongo {
     }
 
     Manager::Manager(ReplSetImpl *_rs) : 
-      task::Server("Manager"), rs(_rs), busyWithElectSelf(false), _primary(NOPRIMARY)
+    task::Server("rs Manager"), rs(_rs), busyWithElectSelf(false), _primary(NOPRIMARY)
     { 
     }
  
+    void Manager::starting() { 
+        Client::initThread("rs Manager");
+    }
+
     void Manager::noteARemoteIsPrimary(const Member *m) { 
         rs->_currentPrimary = m;
         rs->_self->lhb() = "";

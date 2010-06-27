@@ -58,12 +58,12 @@ namespace mongo {
     };
 
     class Manager : public task::Server {
-        bool got(const any&);
         ReplSetImpl *rs;
         bool busyWithElectSelf;
         int _primary;
         const Member* findOtherPrimary();
         void noteARemoteIsPrimary(const Member *);
+        virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
         void msgReceivedNewConfig(BSONObj) { assert(false); }
@@ -107,8 +107,10 @@ namespace mongo {
                 DEV assert(_b._locked == 0);
                 _b._locked++; 
                 _b._lockedByMe.set(true);
+                cout << "RSLOCKED" << endl;
             }
             ~lock() { 
+                cout << "RSUNLOCKED" << endl;
                 assert( _b._lockedByMe.get() );
                 DEV assert(_b._locked == 1);
                 _b._lockedByMe.set(false);
@@ -121,6 +123,7 @@ namespace mongo {
 
         /* if true, is locked, and was locked by this thread. note if false, it could be in the lock or not for another 
            just for asserts & such so we can make the contracts clear on who locks what when.
+           we don't use these locks that frequently, so the little bit of overhead is fine.
         */
         bool lockedByMe() { return _lockedByMe.get(); } 
     };
@@ -146,12 +149,17 @@ namespace mongo {
         bool isPrimary() const { return _myState == PRIMARY; }
         bool isSecondary() const { return _myState == SECONDARY; }
 
+        //bool initiated() const { return curOpTime.initiated(); }
+
+        OpTime lastOpTimeWritten;
+
     private:
         Consensus elect;
         bool ok() const { return _myState != FATAL; }
 
         void relinquish();
         void assumePrimary();
+        void loadLastOpTimeWritten();
 
     protected:
         void _fillIsMaster(BSONObjBuilder&);

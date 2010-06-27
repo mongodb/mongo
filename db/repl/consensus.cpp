@@ -37,7 +37,7 @@ namespace mongo {
             }
             string who = cmdObj["who"].String();
             int cfgver = cmdObj["cfgver"].Int();
-			unsigned long long ord = (unsigned long long) cmdObj["ord"].Long();
+			OpTime ts(cmdObj["ord"].Date());
 
             bool weAreFresher = false;
             if( theReplSet->config().version > cfgver ) { 
@@ -45,10 +45,10 @@ namespace mongo {
 				result.append("info", "config version stale");
                 weAreFresher = true;
             }
-			else if( ord > rsOpTime.ord )  { 
+            else if( ts < theReplSet->lastOpTimeWritten )  { 
 				weAreFresher = true;
 			}
-            result.append("ord", (long long) ord);
+            result.append("ord", theReplSet->lastOpTimeWritten);
             result.append("fresher", weAreFresher);
             return true;
         }
@@ -164,14 +164,15 @@ namespace mongo {
        @return true if we are freshest.  Note we may tie.
     */
     bool Consensus::weAreFreshest(bool& allUp, int& nTies) {
-		const unsigned long long ord = rsOpTime.ord;
+        const OpTime ord = theReplSet->lastOpTimeWritten;
         nTies = 0;
         cout << "TEMP COMMENTED OUT LINE IN consensus.cpp" << endl;
+        cout << "ord: " << ord.toString() << endl;
 		//assert( ord > 0 );
         BSONObj cmd = BSON(
                "replSetFresh" << 1 <<
                "set" << rs.name() << 
-			   "opTime" << (long long) rsOpTime.ord <<
+			   "opTime" << ord <<
                "who" << rs._self->fullName() << 
                "cfgver" << rs._cfg->version );
         list<Target> L;
@@ -185,7 +186,7 @@ namespace mongo {
                 nok++;
                 if( i->result["fresher"].trueValue() )
                     return false;
-                unsigned long long remoteOrd = (unsigned long long) i->result["ord"].Long();
+                OpTime remoteOrd( i->result["ord"].Date() );
                 if( remoteOrd == ord )
                     nTies++;
                 assert( remoteOrd <= ord );
@@ -196,7 +197,7 @@ namespace mongo {
             }
         }
         DEV log() << "replSet dev we are freshest of up nodes, nok:" << nok << " nTies:" << nTies << rsLog; 
-		assert( ord == rsOpTime.ord );
+        assert( ord == theReplSet->lastOpTimeWritten );
         return true;
     }
 

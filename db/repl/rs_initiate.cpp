@@ -46,7 +46,7 @@ namespace mongo {
                 bool ok = false;
                 try { 
                     int theirVersion = -1000;
-                    ok = requestHeartbeat(cfg._id, i->h.toString(), res, -1, theirVersion); 
+                    ok = requestHeartbeat(cfg._id, i->h.toString(), res, -1, theirVersion, true); 
                     if( theirVersion >= cfg.version ) { 
                         stringstream ss;
                         ss << "replSet member " << i->h.toString() << " has too new a config version (" << theirVersion << ") to reconfigure";
@@ -64,6 +64,8 @@ namespace mongo {
                 uasserted(13145, "set names do not match with: " + i->h.toString());
             if( *res.getStringField("set") )
                 uasserted(13256, "member " + i->h.toString() + " is already initiated");
+            bool hasData = res["hasData"].Bool();
+            uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.", !hasData);
         }
     }
 

@@ -109,17 +109,23 @@ namespace mongo {
     }
 
     void MiniWebServer::accepted(int s, const SockAddr &from) {
+        setSockTimeouts(s, 8);
         char buf[4096];
         int len = 0;
         while ( 1 ) {
-            int x = ::recv(s, buf + len, sizeof(buf) - 1 - len, 0);
+            int left = sizeof(buf) - 1 - len;
+            if( left == 0 )
+                break;
+            int x = ::recv(s, buf + len, left, 0);
             if ( x <= 0 ) {
+                closesocket(s);
                 return;
             }
             len += x;
             buf[ len ] = 0;
-            if ( fullReceive( buf ) )
+            if ( fullReceive( buf ) ) {
                 break;
+            }
         }
         buf[len] = 0;
 
