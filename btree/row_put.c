@@ -95,7 +95,7 @@ __wt_bt_del_serial_func(WT_TOC *toc)
 	 * it so it's never valid without supporting information.
 	 */
 	repl->data[repl->repl_next].size = 0;
-	repl->data[repl->repl_next].data = WT_DATA_DELETED;
+	WT_SDBT_DELETED_SET(repl->data[repl->repl_next].data);
 	WT_MEMORY_FLUSH;
 	++repl->repl_next;
 	WT_PAGE_MODIFY_SET_AND_FLUSH(page);

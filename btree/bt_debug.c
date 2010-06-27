@@ -256,9 +256,11 @@ __wt_bt_debug_col_var_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
 
 	if (cip->repl != NULL)
 		__wt_bt_debug_repl(cip->repl, fp);
-	else
+	else {
+		fprintf(fp, "\tdata: {");
 		WT_RET(__wt_bt_debug_item_data(toc, cip->data, fp));
-	fprintf(fp, "\n");
+		fprintf(fp, "}\n");
+	}
 	return (0);
 }
 
@@ -269,21 +271,27 @@ __wt_bt_debug_col_var_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
 static void
 __wt_bt_debug_col_fix_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
 {
-	DBT dbt;
+	DB *db;
+	IDB *idb;
 
-	WT_CLEAR(dbt);
+	db = toc->db;
+	idb = db->idb;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	if (cip->repl != NULL)
 		__wt_bt_debug_repl(cip->repl, fp);
-	else {
-		dbt.data = cip->data;
-		dbt.size = toc->db->fixed_len;
-		__wt_bt_debug_dbt("\tdata", &dbt, fp);
+	else if (F_ISSET(idb, WT_REPEAT_COMP)) {
+		fprintf(fp,
+		    "\trepeat %lu {", (u_long)WT_FIX_REPEAT_COUNT(cip->data));
+		__wt_bt_print(WT_FIX_REPEAT_DATA(cip->data), db->fixed_len, fp);
+		fprintf(fp, "}\n");
+	} else {
+		fprintf(fp, "\tdata {");
+		__wt_bt_print(cip->data, db->fixed_len, fp);
+		fprintf(fp, "}\n");
 	}
-	fprintf(fp, "\n");
 }
 
 /*
@@ -305,9 +313,8 @@ __wt_bt_debug_row_indx(WT_TOC *toc, WT_ROW_INDX *rip, FILE *fp)
 	else {
 		fprintf(fp, "\tdata: {");
 		WT_RET(__wt_bt_debug_item_data(toc, rip->data, fp));
-		fprintf(fp, "}");
+		fprintf(fp, "}\n");
 	}
-	fprintf(fp, "\n");
 	return (0);
 }
 
@@ -326,8 +333,8 @@ __wt_bt_debug_repl(WT_REPL *repl, FILE *fp)
 
 	for (sdbt = repl->data, repl_cnt = 0;
 	    repl_cnt < repl->repl_next; ++sdbt, ++repl_cnt)
-		if (sdbt->data == WT_DATA_DELETED)
-			fprintf(fp, "\trepl: [deleted]");
+		if (WT_SDBT_DELETED_ISSET(sdbt->data))
+			fprintf(fp, "\trepl: {deleted}\n");
 		else
 			__wt_bt_debug_dbt("\trepl", sdbt, fp);
 }
@@ -433,14 +440,22 @@ __wt_bt_debug_page_col_fix(DB *db, WT_PAGE *page, FILE *fp)
 
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		WT_FIX_REPEAT_FOREACH(db, page, p, i) {
-			fprintf(fp, "\trepeat %lu {", (u_long)*(u_int16_t *)p);
-			__wt_bt_print(p + sizeof(u_int16_t), db->fixed_len, fp);
+			fprintf(fp, "\trepeat %lu {",
+			    (u_long)WT_FIX_REPEAT_COUNT(p));
+			if (WT_FIX_DELETE_ISSET(WT_FIX_REPEAT_DATA(p)))
+				fprintf(fp, "deleted");
+			else
+				__wt_bt_print(
+				    WT_FIX_REPEAT_DATA(p), db->fixed_len, fp);
 			fprintf(fp, "}\n");
 		}
 	else
 		WT_FIX_FOREACH(db, page, p, i) {
 			fprintf(fp, "\t{");
-			__wt_bt_print(p, db->fixed_len, fp);
+			if (WT_FIX_DELETE_ISSET(p))
+				fprintf(fp, "deleted");
+			else
+				__wt_bt_print(p, db->fixed_len, fp);
 			fprintf(fp, "}\n");
 		}
 }
@@ -484,8 +499,8 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		break;
 	case WT_ITEM_DEL:
 		hp = NULL;
-		p = (u_int8_t *)"[deleted]";
-		size = sizeof("[deleted]" - 1);
+		p = (u_int8_t *)"deleted";
+		size = sizeof("deleted" - 1);
 		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:

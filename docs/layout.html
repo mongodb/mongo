@@ -167,8 +167,9 @@ are fixed- or variable-length byte strings.
 <p>
 Because column store keys do not disappear on delete, there needs to be an
 on-page, permanent "deleted" data value; for variable-length byte strings,
-this is a specific item type.  For fixed-length byte strings, an additional
-byte is placed on the page that flags the data as deleted.
+this is a specific item type.  For fixed-length byte strings, the top bit
+of the field is the deleted flag (which means that the user-specified data
+length is off by a single bit).
 
 <p>
 Column store notes:

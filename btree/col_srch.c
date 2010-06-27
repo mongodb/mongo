@@ -76,7 +76,7 @@ restart:
 			ret = WT_NOTFOUND;
 			goto err;
 		}
-	} else if (sdbt->data == WT_DATA_DELETED) {
+	} else if (WT_SDBT_DELETED_ISSET(sdbt->data)) {
 		ret = WT_NOTFOUND;
 		goto err;
 	}

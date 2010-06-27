@@ -454,13 +454,14 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	 */
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		WT_FIX_REPEAT_ITERATE(db, page, p, i, j) {
-			cip->data = p;
+			cip->data = WT_FIX_DELETE_ISSET(
+			    WT_FIX_REPEAT_DATA(p)) ? NULL : p;
 			++cip;
 			++records;
 		}
 	else
 		WT_FIX_FOREACH(db, page, p, i) {
-			cip->data = p;
+			cip->data = WT_FIX_DELETE_ISSET(p) ? NULL : p;
 			++cip;
 			++records;
 		}

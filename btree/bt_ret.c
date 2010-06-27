@@ -106,7 +106,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	case WT_PAGE_COL_VAR:
 		if (cip->repl != NULL) {
 			sdbt = cip->repl->data + (cip->repl->repl_next - 1);
-repl:			if (sdbt->data == WT_DATA_DELETED)
+repl:			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				return (WT_NOTFOUND);
 			data->data = sdbt->data;
 			data->size = sdbt->size;

@@ -388,8 +388,11 @@ struct __wt_repl {
 	 * don't block readers when updating it, which means it may be in
 	 * use during updates, and second because we'll need history when we
 	 * add MVCC to the system.
+	 *
+	 * In-memory deletes are flagged by a special (illegal) pointer value.
 	 */
-#define	WT_DATA_DELETED	((void *)0x01)	/* Data item was deleted */
+#define	WT_SDBT_DELETED_ISSET(p)	((p) == (void *)0x01)
+#define	WT_SDBT_DELETED_SET(p)		((p)  = (void *)0x01)
 	WT_SDBT  *data;			/* Data array */
 
 	u_int16_t repl_size;		/* Data array size */
@@ -581,34 +584,43 @@ struct __wt_ovfl {
  */
 #define	WT_OVFL_SIZE	8
 
+/*
+ * On-page "deleted" flags for fixed-length column store data items -- steal
+ * the top bit of the data.
+ */
+#define	WT_FIX_DELETE_BYTE	0x80
+#define	WT_FIX_DELETE_ISSET(b)	(((u_int8_t *)(b))[0] & WT_FIX_DELETE_BYTE)
+#define	WT_FIX_DELETE_SET(b)	(((u_int8_t *)(b))[0] = WT_FIX_DELETE_BYTE)
+
 /* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
 #define	WT_FIX_FOREACH(db, page, p, i)					\
 	for ((p) = WT_PAGE_BYTE(page),					\
-	    (i) = (page)->hdr->u.entries;				\
-	    (i) > 0; --(i), p = (u_int8_t *)p + (db)->fixed_len)
+	    (i) = (page)->hdr->u.entries; (i) > 0; --(i),		\
+	    (p) = (u_int8_t *)(p) + (db)->fixed_len)
+
 /*
  * WT_FIX_REPEAT_FOREACH is a loop that walks fixed-length, repeat-counted
- * references on a page.
+ * entries on a page.
  */
 #define	WT_FIX_REPEAT_FOREACH(db, page, p, i)				\
 	for ((p) = WT_PAGE_BYTE(page),					\
-	    (i) = (page)->hdr->u.entries; (i) > 0;			\
-	    (i) -= *(u_int16_t *)p,					\
-	    p = (u_int8_t *)p + (db)->fixed_len + sizeof(u_int16_t))
+	    (i) = (page)->hdr->u.entries; (i) > 0; --(i),		\
+	    (p) = (u_int8_t *)(p) + (db)->fixed_len + sizeof(u_int16_t))
+
+/*
+ * WT_FIX_REPEAT_COUNT and WT_FIX_REPEAT_DATA reference the data and count
+ * values for repeat-compressed, fixed-length page entries.
+ */
+#define	WT_FIX_REPEAT_COUNT(p)	(*(u_int16_t *)(p))
+#define	WT_FIX_REPEAT_DATA(p)	((u_int8_t *)(p) + sizeof(u_int16_t))
+
 /*
  * WT_FIX_REPEAT_ITERATE is a loop that walks fixed-length, repeat-counted
  * references on a page, visiting each entry the appropriate number of times.
  */
 #define	WT_FIX_REPEAT_ITERATE(db, page, p, i, j)			\
 	WT_FIX_REPEAT_FOREACH(db, page, p, i)				\
-		for ((j) = *(u_int16_t *)p; (j) > 0; --(j))
-
-/*
- * WT_FIX_REPEAT_DATA points to the data value for a repeat-compressed,
- * fixed-length entry.
- */
-#define	WT_FIX_REPEAT_DATA(p)						\
-	((u_int8_t *)p + sizeof(u_int16_t))
+		for ((j) = WT_FIX_REPEAT_COUNT(p); (j) > 0; --(j))
 
 #if defined(__cplusplus)
 }

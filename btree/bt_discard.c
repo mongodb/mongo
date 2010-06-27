@@ -11,9 +11,10 @@
 
 static void __wt_bt_page_discard_repl(ENV *, WT_REPL *);
 static int  __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int  __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int  __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 
 /*
  * __wt_bt_rec_page --
@@ -106,9 +107,11 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		WT_ERR(__wt_bt_rec_col_var(toc, page, new));
 		break;
 	case WT_PAGE_COL_INT:
+		WT_ERR(__wt_bt_rec_col_int(toc, page, new));
+		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_bt_rec_int(toc, page, new));
+		WT_ERR(__wt_bt_rec_row_int(toc, page, new));
 		break;
 	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_DUP_LEAF:
@@ -133,19 +136,116 @@ done:	/*
 }
 
 /*
+ * __wt_bt_rec_col_int --
+ *	Reconcile a column store internal page.
+ */
+static int
+__wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
+{
+	rp = NULL;
+	return (__wt_page_write(toc->db, page));
+}
+
+/*
+ * __wt_bt_rec_row_int --
+ *	Reconcile a row store internal page.
+ */
+static int
+__wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
+{
+	rp = NULL;
+	return (__wt_page_write(toc->db, page));
+}
+
+/*
  * __wt_bt_rec_col_fix --
  *	Reconcile a fixed-width column-store leaf page.
  */
 static int
-__wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
+__wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
+	DB *db;
+	ENV *env;
+	IDB *idb;
 	WT_COL_INDX *cip;
-	u_int32_t i;
+	WT_PAGE_HDR *hdr;
+	WT_SDBT *sdbt;
+	u_int32_t i, len;
+	u_int16_t repeat_count;
+	u_int8_t *data, *last_data;
 
-rp = NULL;
-	WT_INDX_FOREACH(page, cip, i)
-		;
-	return (__wt_page_write(toc->db, page));
+	db = toc->db;
+	env = toc->env;
+	idb = db->idb;
+	hdr = new->hdr;
+	last_data = NULL;
+
+	/*
+	 * We need a "deleted" data item to store on the page.  Make sure the
+	 * WT_TOC's scratch buffer is big enough (our caller is using tmp1 so
+	 * we use tmp2).   Clear the buffer's contents, and set the delete flag.
+	 */
+	len = db->fixed_len + sizeof(u_int16_t);
+	if (toc->tmp2.mem_size < len)
+		WT_RET(__wt_realloc(
+		    env, &toc->tmp2.mem_size, len, &toc->tmp2.data));
+	memset(toc->tmp2.data, 0, len);
+	if (F_ISSET(idb, WT_REPEAT_COMP)) {
+		WT_FIX_REPEAT_COUNT(toc->tmp2.data) = 1;
+		WT_FIX_DELETE_SET(WT_FIX_REPEAT_DATA(toc->tmp2.data));
+	} else {
+		len = db->fixed_len;		/* No compression, fix len */
+		WT_FIX_DELETE_SET(toc->tmp2.data);
+	}
+
+	WT_INDX_FOREACH(page, cip, i) {
+		/*
+		 * Get a reference to the data, on- or off- page, and see if
+		 * it's been deleted.
+		 */
+		repeat_count = 1;
+		if ((sdbt = WT_SDBT_CURRENT(cip)) != NULL) {
+			if (WT_SDBT_DELETED_ISSET(sdbt->data))
+				data = toc->tmp2.data;
+			else
+				data = sdbt->data;
+		} else if (cip->data == NULL) {
+			data = toc->tmp2.data;
+		} else {
+			data = cip->data;
+			repeat_count = WT_FIX_REPEAT_COUNT(cip->data);
+		}
+		new->records += repeat_count;
+
+		/*
+		 * If the database supports repeat compression, check to see
+		 * if we can fold this item into the previous one.
+		 */
+		if (last_data != NULL &&
+		    memcmp(WT_FIX_REPEAT_DATA(last_data),
+		    WT_FIX_REPEAT_DATA(data), db->fixed_len) == 0 &&
+		    WT_FIX_REPEAT_COUNT(last_data) < UINT16_MAX) {
+			WT_FIX_REPEAT_COUNT(last_data) += repeat_count;
+			continue;
+		}
+
+		if (len > new->space_avail) {
+			fprintf(stderr, "PAGE GREW, SPLIT\n");
+			__wt_abort(toc->env);
+		}
+
+		if (F_ISSET(idb, WT_REPEAT_COMP))
+			last_data = new->first_free;
+		memcpy(new->first_free, data, len);
+		new->first_free += len;
+		new->space_avail -= len;
+
+		++hdr->u.entries;
+	}
+
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
+
+	return (__wt_page_write(db, new));
 }
 
 /*
@@ -179,7 +279,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * it's been deleted.
 		 */
 		if ((sdbt = WT_SDBT_CURRENT(cip)) != NULL) {
-			if (sdbt->data == WT_DATA_DELETED)
+			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				goto deleted;
 
 			/*
@@ -229,24 +329,13 @@ deleted:		data->data = NULL;
 			new->first_free += len;
 			new->space_avail -= len;
 		}
+		++new->records;
 		++hdr->u.entries;
-		new->records += 1;
 	}
 
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
 	return (__wt_page_write(db, new));
-}
-
-/*
- * __wt_bt_rec_int --
- *	Reconcile an internal page.
- */
-static int
-__wt_bt_rec_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
-{
-rp = NULL;
-	return (__wt_page_write(toc->db, page));
 }
 
 /*
@@ -288,7 +377,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
 		if ((sdbt = WT_SDBT_CURRENT(rip)) != NULL) {
-			if (sdbt->data == WT_DATA_DELETED)
+			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				continue;
 
 			/*
@@ -401,7 +490,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			new->space_avail -= WT_ITEM_SPACE_REQ(data->size);
 			++hdr->u.entries;
 		}
-		new->records += 1;
+		++new->records;
 	}
 
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
@@ -487,7 +576,7 @@ __wt_bt_page_discard_repl(ENV *env, WT_REPL *repl)
 
 	/* Free the data pointers and then the WT_REPL structure itself. */
 	for (i = 0; i < repl->repl_next; ++i)
-		if (repl->data[i].data != WT_DATA_DELETED)
+		if (!WT_SDBT_DELETED_ISSET(repl->data[i].data))
 			__wt_free(env, repl->data[i].data, repl->data[i].size);
 	__wt_free(env, repl->data, repl->repl_size * sizeof(WT_SDBT));
 	__wt_free(env, repl, sizeof(WT_REPL));

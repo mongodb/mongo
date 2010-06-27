@@ -123,7 +123,7 @@ restart:
 
 		/* Return the match unless it's been deleted. */
 		if ((sdbt = WT_SDBT_CURRENT(rip)) != NULL &&
-		     sdbt->data == WT_DATA_DELETED) {
+		     WT_SDBT_DELETED_ISSET(sdbt->data)) {
 			ret = WT_NOTFOUND;
 			goto err;
 		}

@@ -249,7 +249,7 @@ __wt_bt_dump_page_fixed(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		WT_FIX_REPEAT_ITERATE(db, page, p, i, j)
-			dp->p(p + sizeof(u_int16_t), db->fixed_len, dp->stream);
+			dp->p(WT_FIX_REPEAT_DATA(p), db->fixed_len, dp->stream);
 	else
 		WT_FIX_FOREACH(db, page, p, i)
 			dp->p(p, db->fixed_len, dp->stream);

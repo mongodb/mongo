@@ -853,52 +853,98 @@ __wt_bt_verify_page_col_fix(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	u_int len;
-	u_int32_t addr, i, entry_num;
-	u_int8_t *end, *p;
+	u_int32_t addr, i, j, entry_num;
+	u_int8_t *data, *end, *last_data, *p;
 
 	idb = db->idb;
 	end = (u_int8_t *)page->hdr + page->size;
 	addr = page->addr;
 
 	if (F_ISSET(idb, WT_REPEAT_COMP)) {
+		last_data = NULL;
 		len = db->fixed_len + sizeof(u_int16_t);
 
 		entry_num = 0;
-		WT_FIX_REPEAT_FOREACH(db, page, p, i) {
+		WT_FIX_REPEAT_FOREACH(db, page, data, i) {
 			++entry_num;
 
 			/* Check if this entry is entirely on the page. */
-			if (p + len > end)
+			if (data + len > end)
 				goto eop;
 
 			/* Count must be non-zero. */
-			if (*(u_int16_t *)p == 0) {
+			if (WT_FIX_REPEAT_COUNT(data) == 0) {
 				__wt_api_db_errx(db,
 				    "fixed-length entry %lu on page at addr "
 				    "%lu has a repeat count of 0",
 				    (u_long)entry_num, (u_long)addr);
 				return (WT_ERROR);
 			}
+
+			/* Deleted items are entirely nul bytes. */
+			p = WT_FIX_REPEAT_DATA(data);
+			if (WT_FIX_DELETE_ISSET(p)) {
+				if (*p != WT_FIX_DELETE_BYTE)
+					goto delfmt;
+				for (j = 1; j < db->fixed_len; ++j)
+					if (*++p != '\0')
+						goto delfmt;
+			}
+
+			/*
+			 * If the previous data is the same as this data, we
+			 * missed an opportunity for compression -- complain.
+			 */
+			if (last_data != NULL &&
+			    memcmp(WT_FIX_REPEAT_DATA(last_data),
+			    WT_FIX_REPEAT_DATA(data), db->fixed_len) == 0 &&
+			    WT_FIX_REPEAT_COUNT(last_data) < UINT16_MAX) {
+				__wt_api_db_errx(db,
+				    "fixed-length entries %lu and %lu on page "
+				    "at addr %lu are identical and should have "
+				    "been compressed",
+				    (u_long)entry_num,
+				    (u_long)entry_num - 1, (u_long)addr);
+				return (WT_ERROR);
+			}
+			last_data = data;
 		}
 	} else {
 		len = db->fixed_len;
 
 		entry_num = 0;
-		WT_FIX_FOREACH(db, page, p, i) {
+		WT_FIX_FOREACH(db, page, data, i) {
 			++entry_num;
 
 			/* Check if this entry is entirely on the page. */
-			if (p + len > end) {
-eop:				__wt_api_db_errx(db,
-				    "fixed-length entry %lu on page at addr "
-				    "%lu extends past the end of the page",
-				    (u_long)entry_num, (u_long)addr);
-				return (WT_ERROR);
+			if (data + len > end)
+				goto eop;
+
+			/* Deleted items are entirely nul bytes. */
+			p = data;
+			if (WT_FIX_DELETE_ISSET(data)) {
+				if (*p != WT_FIX_DELETE_BYTE)
+					goto delfmt;
+				for (j = 1; j < db->fixed_len; ++j)
+					if (*++p != '\0')
+						goto delfmt;
 			}
 		}
 	}
 
 	return (0);
+
+eop:	__wt_api_db_errx(db,
+	    "fixed-length entry %lu on page at addr %lu extends past the end "
+	    "of the page",
+	    (u_long)entry_num, (u_long)addr);
+	return (WT_ERROR);
+
+delfmt:	__wt_api_db_errx(db,
+	    "deleted fixed-length entry %lu on page at addr %lu has non-nul "
+	    "bytes",
+	    (u_long)entry_num, (u_long)addr);
+	return (WT_ERROR);
 }
 
 /*

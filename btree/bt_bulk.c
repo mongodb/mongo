@@ -134,6 +134,17 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			ret = WT_ERROR;
 			goto err;
 		}
+		/*
+		 * We use the high bit of the data field as a "deleted" value,
+		 * make sure the user's data doesn't set it.
+		 */
+		if (WT_FIX_DELETE_ISSET(data->data)) {
+			__wt_api_db_errx(db,
+			    "the first bit may not be stored in fixed-length "
+			    "column-store database items");
+			ret = WT_ERROR;
+			goto err;
+		}
 
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
