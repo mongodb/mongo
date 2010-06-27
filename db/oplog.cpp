@@ -62,7 +62,7 @@ namespace mongo {
 
         bufbuilder.reset();
         BSONObjBuilder b(bufbuilder);
-        massert(10000, "replSet error : logOp() but not primary?", theReplSet->isPrimary());
+        massert(13312, "replSet error : logOp() but not primary?", theReplSet->isPrimary());
         b.appendTimestamp("ts", ts.asDate());
         b.append("op", opstr);
         b.append("ns", ns);
