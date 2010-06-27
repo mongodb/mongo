@@ -109,6 +109,7 @@ namespace mongo {
     }
 
     void MiniWebServer::accepted(int s, const SockAddr &from) {
+        setSockTimeouts(s, 8);
         char buf[4096];
         int len = 0;
         while ( 1 ) {
@@ -117,6 +118,7 @@ namespace mongo {
                 break;
             int x = ::recv(s, buf + len, left, 0);
             if ( x <= 0 ) {
+                closesocket(s);
                 return;
             }
             len += x;
