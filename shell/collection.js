@@ -53,7 +53,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".mapReduce( mapFunction , reduceFunction , <optional params> )");
     print("\tdb." + shortName + ".remove(query)");
     print("\tdb." + shortName + ".renameCollection( newName , <dropTarget> ) renames the collection.");
-    print("\tdb." + shortName + ".runCommand( name , <options> ) runs a db command with the given name where the 1st param is the colleciton name");
+    print("\tdb." + shortName + ".runCommand( name , <options> ) runs a db command with the given name where the first param is the collection name");
     print("\tdb." + shortName + ".save(obj)");
     print("\tdb." + shortName + ".stats()");
     print("\tdb." + shortName + ".storageSize() - includes free space allocated to this collection");
