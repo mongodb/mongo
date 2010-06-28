@@ -27,8 +27,6 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
-    
     enum LogLevel {  LL_DEBUG , LL_INFO , LL_NOTICE , LL_WARNING , LL_ERROR , LL_SEVERE };
     
     inline const char * logLevelToString( LogLevel l ){
