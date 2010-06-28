@@ -271,6 +271,11 @@ public:
                     (!(in->rdstate() & ios_base::failbit) || (in->rdstate() & ios_base::eofbit)) );
 
             int len = 0;
+            if (strncmp("\xEF\xBB\xBF", buf, 3) == 0){ // UTF-8 BOM (notepad is stupid)
+                buf += 3;
+                len += 3;
+            }
+
             if (_jsonArray){
                 while (buf[0] != '{' && buf[0] != '\0') {
                     len++;

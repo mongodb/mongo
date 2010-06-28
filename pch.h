@@ -88,6 +88,7 @@
 namespace mongo {
 
     using namespace std;
+    using boost::shared_ptr;
 
 #if defined(_DEBUG)
     const bool debug=true;

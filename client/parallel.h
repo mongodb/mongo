@@ -16,7 +16,7 @@
  */
 
 /**
-   tools for wokring in parallel/sharded/clustered environment
+   tools for working in parallel/sharded/clustered environment
  */
 
 #include "../pch.h"

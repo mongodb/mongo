@@ -46,8 +46,3 @@ assert.automsg( "ib[ 0 ][ 0 ].b > ib[ 1 ][ 0 ].b" );
 ib = t.find( {a:2,b:{$in:[3,4]}} ).sort( {a:-1,b:1} ).explain().indexBounds;
 checkRanges( 2, ib );
 assert.automsg( "ib[ 0 ][ 0 ].b < ib[ 1 ][ 0 ].b" );
-
-t.drop();
-t.ensureIndex( {a:1,b:1,c:1,d:1,e:1,f:1} );
-i = {$in:[ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ]};
-assert.throws.automsg( function() { t.count( {a:i,b:i,c:i,d:i,e:i,f:i} ); } );
