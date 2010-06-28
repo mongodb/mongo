@@ -440,6 +440,8 @@
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
+    <ClCompile Include="geo\2d.cpp" />
+    <ClCompile Include="geo\quadrant_search.cpp" />
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
@@ -473,7 +475,6 @@
     <ClCompile Include="dbwebserver.cpp" />
     <ClCompile Include="extsort.cpp" />
     <ClCompile Include="index.cpp" />
-    <ClCompile Include="index_geo2d.cpp" />
     <ClCompile Include="indexkey.cpp" />
     <ClCompile Include="instance.cpp" />
     <ClCompile Include="introspect.cpp" />
@@ -581,6 +582,7 @@
     <ClInclude Include="..\util\mongoutils\str.h" />
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="..\util\text.h" />
+    <ClInclude Include="geo\core.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="repl.h" />
     <ClInclude Include="replpair.h" />
@@ -714,9 +716,6 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Object Include="index_geo2d.obj" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
