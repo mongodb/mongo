@@ -665,6 +665,9 @@ namespace mongo {
             }
         } addServer;
         
+        /* See usage docs at:
+         * http://www.mongodb.org/display/DOCS/Configuring+Sharding#ConfiguringSharding-Removingashard
+         */
         class RemoveShardCmd : public GridAdminCmd {
         public:
             RemoveShardCmd() : GridAdminCmd("removeshard") { }
@@ -740,7 +743,7 @@ namespace mongo {
                 }
                 if ( dbCount > 0 ){
                     os << dbCount << " databases left." << endl;
-                    os << " Use the 'moveprimary' command to remove those." << endl;
+                    os << " ( Use the 'moveprimary' command to remove databases)." << endl;
                 } 
                 result.append( "msg" , os.str() );
                 conn.done();
