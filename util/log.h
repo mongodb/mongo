@@ -29,19 +29,19 @@ namespace mongo {
 
     using boost::shared_ptr;
     
-    enum LogLevel {  DEBUG , INFO , NOTICE , WARNING , ERROR , SEVERE };
+    enum LogLevel {  LL_DEBUG , LL_INFO , LL_NOTICE , LL_WARNING , LL_ERROR , LL_SEVERE };
     
     inline const char * logLevelToString( LogLevel l ){
         switch ( l ){
-        case DEBUG:
-        case INFO: 
-        case NOTICE:
+        case LL_DEBUG:
+        case LL_INFO: 
+        case LL_NOTICE:
             return "";
-        case WARNING: 
+        case LL_WARNING: 
             return "warning" ; 
-        case ERROR: 
+        case LL_ERROR: 
             return "ERROR";
-        case SEVERE: 
+        case LL_SEVERE: 
             return "SEVERE";
         default:
             return "UNKNOWN";
@@ -241,7 +241,7 @@ namespace mongo {
         }
         void _init(){
             ss.str("");
-            logLevel = INFO;
+            logLevel = LL_INFO;
         }
     public:
         static Logstream& get() {
