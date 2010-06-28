@@ -1546,6 +1546,55 @@ namespace QueryOptimizerTests {
 
     } // namespace QueryPlanSetTests
     
+    class Base {
+    public:
+        Base() : _ctx( ns() ) {
+            string err;
+            userCreateNS( ns(), BSONObj(), err, false );
+        }
+        ~Base() {
+            if ( !nsd() )
+                return;
+            string s( ns() );
+            dropNS( s );
+        }
+    protected:
+        static const char *ns() { return "unittests.BaseTests"; }
+        static NamespaceDetails *nsd() { return nsdetails( ns() ); }
+    private:
+        dblock lk_;
+        Client::Context _ctx;
+    };
+        
+    class BestGuess : public Base {
+    public:
+        void run() {
+            Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+            Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
+            BSONObj temp = BSON( "a" << 1 );
+            theDataFileMgr.insertWithObjMod( ns(), temp );
+            temp = BSON( "b" << 1 );
+            theDataFileMgr.insertWithObjMod( ns(), temp );
+            
+            shared_ptr< Cursor > c = bestGuessCursor( ns(), BSON( "b" << 1 ), BSON( "a" << 1 ) );
+            ASSERT_EQUALS( string( "a" ), c->indexKeyPattern().firstElement().fieldName() );
+            c = bestGuessCursor( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ) );
+            ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElement().fieldName() );
+            shared_ptr< MultiCursor > m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ), BSON( "a" << 1 ) ) );
+            ASSERT_EQUALS( string( "a" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
+            m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) ) );
+            ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
+            
+            FieldRangeSet frs( "ns", BSON( "a" << 1 ) );
+            {
+                scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+                NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( frs.pattern( BSON( "b" << 1 ) ), BSON( "a" << 1 ), 0 );  
+            }
+            m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) ) );
+            ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "queryoptimizer" ){}
@@ -1678,6 +1727,7 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::InQueryIntervals >();
             add< QueryPlanSetTests::EqualityThenIn >();
             add< QueryPlanSetTests::NotEqualityThenIn >();
+            add< BestGuess >();
         }
     } myall;
     
