@@ -557,6 +557,7 @@
 		93C8ECED1147820C00F28017 /* top.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = top.h; sourceTree = "<group>"; };
 		93C8ED001147824B00F28017 /* thread_pool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = thread_pool.cpp; sourceTree = "<group>"; };
 		93C8ED041147828F00F28017 /* index.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = index.cpp; sourceTree = "<group>"; };
+		93C9236B11D9427B00BA617F /* in1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = in1.js; sourceTree = "<group>"; };
 		93CC40C2113C407A00734218 /* insert1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = insert1.js; sourceTree = "<group>"; };
 		93CC441A113DE6BA00734218 /* indexg.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = indexg.js; sourceTree = "<group>"; };
 		93CC4484113E602400734218 /* in3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = in3.js; sourceTree = "<group>"; };
@@ -654,6 +655,7 @@
 		9307500B114EA14700272A70 /* slow */ = {
 			isa = PBXGroup;
 			children = (
+				93C9236B11D9427B00BA617F /* in1.js */,
 				9307500C114EA14700272A70 /* indexbg1.js */,
 				9307500D114EA14700272A70 /* indexbg2.js */,
 				9307500E114EA14700272A70 /* ns1.js */,
