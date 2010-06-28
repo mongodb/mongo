@@ -258,7 +258,7 @@ namespace mongo {
                     sleepmicros( micros ); 
             }
             else {
-                log() << "ClientCursor::yield can't unlock b/c of recursive lock" << endl;
+                log( WARNING ) << "ClientCursor::yield can't unlock b/c of recursive lock" << endl;
             }
         }
         

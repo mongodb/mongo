@@ -35,7 +35,7 @@ namespace mongo {
             for( int i = 0; i < N; i++ )
                 lines[i][C-1] = 0;
         }
-        virtual void write(const string& str) {
+        virtual void write(LogLevel ll, const string& str) {
             char *p = lines[(h+n)%N];
             if( str.size() < C )
                 strcpy(p, str.c_str());

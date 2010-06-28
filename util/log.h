@@ -28,8 +28,26 @@
 namespace mongo {
 
     using boost::shared_ptr;
-
-    // Utility interface for stringifying object only when val() called.
+    
+    enum LogLevel {  DEBUG , INFO , NOTICE , WARNING , ERROR , SEVERE };
+    
+    inline const char * logLevelToString( LogLevel l ){
+        switch ( l ){
+        case DEBUG:
+        case INFO: 
+        case NOTICE:
+            return "";
+        case WARNING: 
+            return "warning" ; 
+        case ERROR: 
+            return "ERROR";
+        case SEVERE: 
+            return "SEVERE";
+        default:
+            return "UNKNOWN";
+        }
+    }
+    
     class LazyString {
     public:
         virtual ~LazyString() {}
@@ -49,7 +67,7 @@ namespace mongo {
     class Tee { 
     public:
         virtual ~Tee(){}
-        virtual void write(const string& str) = 0;
+        virtual void write(LogLevel level , const string& str) = 0;
     };
 
     class Nullstream {
@@ -133,6 +151,7 @@ namespace mongo {
         static mongo::mutex mutex;
         static int doneSetup;
         stringstream ss;
+        LogLevel logLevel;
     public:
         static int magicNumber(){
             return 1717;
@@ -144,17 +163,26 @@ namespace mongo {
                 time_t_to_String( time(0) , b.grow(20) );
                 b.append( ss.str() );
                 const char *s = b.buf();
+                
+                const char * type = logLevelToString(logLevel);
 
                 scoped_lock lk(mutex);
-
-                if( t ) t->write(s);
+                
+                if( t ) t->write(logLevel,s);
+                
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
 #endif
-                cout << s;
+                
+                cout << type << ( type[0] ? ": " : "" ) << s;
                 cout.flush();
             }
             _init();
+        }
+        
+        Nullstream& setLogLevel(LogLevel l){
+            logLevel = l;
+            return *this;
         }
 
         /** note these are virtual */
@@ -213,6 +241,7 @@ namespace mongo {
         }
         void _init(){
             ss.str("");
+            logLevel = INFO;
         }
     public:
         static Logstream& get() {
@@ -259,6 +288,11 @@ namespace mongo {
             return nullstream;
         return Logstream::get().prolog();
     }
+
+    inline Nullstream& log( LogLevel l ) {
+        return Logstream::get().prolog().setLogLevel( l );
+    }
+
 
     inline Nullstream& log() {
         return Logstream::get().prolog();
