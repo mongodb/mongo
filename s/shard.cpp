@@ -65,6 +65,12 @@ namespace mongo {
 
         }
         
+        bool isMember( const string& addr ){
+            scoped_lock lk( _mutex );
+            map<string,Shard>::iterator i = _lookup.find( addr );
+            return i != _lookup.end();
+        }
+
         const Shard& find( const string& ident ){
             {
                 scoped_lock lk( _mutex );
@@ -165,7 +171,12 @@ namespace mongo {
     void Shard::reloadShardInfo(){
         staticShardInfo.reload();
     }
-    
+
+
+    bool Shard::isMember( const string& addr ){
+        return staticShardInfo.isMember( addr );
+    }
+  
     void Shard::removeShard( const string& name ){
         staticShardInfo.remove( name );
     }
