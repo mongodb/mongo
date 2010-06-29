@@ -1,7 +1,8 @@
 // test --repairpath on aother partition
 
 var baseName = "jstests_disk_repair3";
-repairpath = "/data/db/repairpartitiontest"
+var repairbase = "/data/db/repairpartitiontest"
+var repairpath = repairbase + "/dir"
 
 doIt = false;
 files = listFiles( "/data/db" );
@@ -11,11 +12,8 @@ for ( i in files ) {
     }
 }
 
-// SERVER-1217 disable test
-doIt = false;
-
 if ( !doIt ) {
-    print( "path /data/db/repairpartitiontest/ missing, skipping repair3 test" );
+    print( "path " + repairpath + " missing, skipping repair3 test" );
     doIt = false;
 }
 
