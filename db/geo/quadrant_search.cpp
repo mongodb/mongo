@@ -95,7 +95,7 @@ namespace mongo {
             
             uassert( 13316 , "no geo field specified" , _geo.size() );
             uassert( 13317 , "no other fields specified" , _other.size() );
-            uassert( 13324 , "quadrant search can only have 1 other field for now" , _other.size() == 1 );
+            uassert( 13326 , "quadrant search can only have 1 other field for now" , _other.size() == 1 );
             _order = orderBuilder.obj();
         }
         
