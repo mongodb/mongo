@@ -6,7 +6,7 @@ function go() {
     assert(__nextPort == 27000, "_nextPort==27000");
 
     a = null;
-    try {
+    try {init
         a = new Mongo("localhost:27000");
         print("using already open mongod on port 27000 -- presume you are debugging or something. should start empty.");
         __nextPort++;
@@ -33,8 +33,9 @@ function go() {
     print("cfg=" + tojson(cfg));
 }
 
-function init() {
-    var i = Random.randInt(2); // a random member of the set
+function init(server) {
+    var i = server;
+    //i = Random.randInt(2); // a random member of the set
     var m = memb[i];
     assert(!m.ismaster(), "not ismaster");
     var res = m.runCommand({ replSetInitiate: cfg });

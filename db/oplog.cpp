@@ -45,7 +45,6 @@ namespace mongo {
 
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
-        DEV assert( theReplSet );
         static BufBuilder bufbuilder(8*1024);
         
         if ( strncmp(ns, "local.", 6) == 0 ){
@@ -56,16 +55,25 @@ namespace mongo {
 
         const OpTime ts = OpTime::now();
 
+        long long hNew;
+        if( theReplSet ) { 
+            massert(13312, "replSet error : logOp() but not primary?", theReplSet->isPrimary());
+            hNew = (theReplSet->h * 131 + ts.asLL()) * 17 + theReplSet->selfId();
+        }
+        else { 
+            // must be initiation
+            assert( *ns == 0 );
+            hNew = 0;
+        }
+
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
         */
 
         bufbuilder.reset();
         BSONObjBuilder b(bufbuilder);
-        massert(13312, "replSet error : logOp() but not primary?", theReplSet->isPrimary());
 
         b.appendTimestamp("ts", ts.asDate());
-        long long hNew = (theReplSet->h * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         b.append("h", hNew);
 
         b.append("op", opstr);
@@ -90,14 +98,16 @@ namespace mongo {
                 assert( rsOplogDetails );
             }
             Client::Context ctx( "" , localDB, false );
-            r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logns, len);
+            r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
                      */
-            massert(13324, "rs error possible failover clock skew issue?", theReplSet->lastOpTimeWritten < ts);
-            theReplSet->lastOpTimeWritten = ts;
-            theReplSet->h = hNew;
-            ctx.getClient()->setLastOp( ts.asDate() );
+            if( theReplSet ) {
+                massert(13324, "rs error possible failover clock skew issue?", theReplSet->lastOpTimeWritten < ts);
+                theReplSet->lastOpTimeWritten = ts;
+                theReplSet->h = hNew;
+                ctx.getClient()->setLastOp( ts.asDate() );
+            }
         }
 
         char *p = r->data;
@@ -216,7 +226,17 @@ namespace mongo {
     void logOpComment(const BSONObj& obj) {
         _logOp("n", "", 0, obj, 0, 0);
     }
+    void logOpInitiate(const BSONObj& obj) {
+        _logOpRS("n", "", 0, obj, 0, 0);
+    }
 
+    /*@ @param opstr:
+          c userCreateNs
+          i insert
+          n no-op / keepalive
+          d delete / remove
+          u update
+    */
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( replSettings.master ) {
             _logOp(opstr, ns, 0, obj, patt, b);
@@ -238,9 +258,15 @@ namespace mongo {
         dblock lk;
 
         const char * ns = "local.oplog.$main";
+
+        bool rs = !cmdLine.replSet.empty();
+        if( rs )
+            ns = rsoplog.c_str();
+
         Client::Context ctx(ns);
         
         NamespaceDetails * nsd = nsdetails( ns );
+
         if ( nsd ) {
             
             if ( cmdLine.oplogSize != 0 ){
@@ -253,6 +279,8 @@ namespace mongo {
                     throw UserException( 13257 , ss.str() );
                 }
             }
+
+            if( rs ) return;
 
             DBDirectClient c;
             BSONObj lastOp = c.findOne( ns, Query().sort( BSON( "$natural" << -1 ) ) );
@@ -295,7 +323,8 @@ namespace mongo {
         string err;
         BSONObj o = b.done();
         userCreateNS(ns, o, err, false);
-        logOp( "n", "dummy", BSONObj() );
+        if( !rs )
+            logOp( "n", "dummy", BSONObj() );
     }
 
     class CmdLogCollection : public Command {

@@ -29,6 +29,8 @@ using namespace bson;
 
 namespace mongo { 
 
+    void logOpInitiate(const bo&);
+
     list<HostAndPort> ReplSetConfig::otherMemberHostnames() const { 
         list<HostAndPort> L;
         for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++ ) {
@@ -38,7 +40,8 @@ namespace mongo {
         return L;
     }
 
-    void ReplSetConfig::saveConfigLocally() { 
+    /* comment MUST only be set when initiating the set by the initiator */
+    void ReplSetConfig::saveConfigLocally(bo comment) { 
         check();
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
         MemoryMappedFile::flushAll(true);
@@ -50,7 +53,8 @@ namespace mongo {
             //rather than above, do a logOp()? probably
             BSONObj o = asBson();
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
-            logOpComment(BSON("msg"<<"initiating"));
+            if( !comment.isEmpty() )
+                logOpInitiate(comment);
             MemoryMappedFile::flushAll(true);
         }
     }
@@ -66,7 +70,7 @@ namespace mongo {
         writelock lk("admin.");
         if( theReplSet ) 
             return;
-        c.saveConfigLocally();
+        c.saveConfigLocally(bo());
     }
 
     bo ReplSetConfig::MemberCfg::asBson() const { 

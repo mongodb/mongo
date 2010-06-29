@@ -128,7 +128,8 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
-                newConfig.saveConfigLocally();
+                bo comment = BSON( "msg" << "initiating set");
+                newConfig.saveConfigLocally(comment);
             }
             catch( DBException& e ) { 
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;

@@ -148,7 +148,8 @@ namespace mongo {
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog.c_str(), o) ) { 
-            lastOpTimeWritten = o["ts"].Date();
+            cout << "TEMP " << o.toString() << endl;
+            lastOpTimeWritten = o["ts"]._opTime();
             uassert(13290, "bad replSet oplog entry?", !lastOpTimeWritten.isNull());
         }
     }
@@ -223,7 +224,7 @@ namespace mongo {
         if( highest->version > myVersion && highest->version >= 0 ) { 
             log() << "replSet got config version " << highest->version << " from a remote, saving locally" << rsLog;
             writelock lk("admin.");
-            highest->saveConfigLocally();
+            highest->saveConfigLocally(BSONObj());
         }
     }
 

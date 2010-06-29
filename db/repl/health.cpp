@@ -124,17 +124,17 @@ namespace mongo {
 
         ss << p("Server : " + m->fullName() );
 
-        const bo fields = BSON( "o" << -1 << "o2" << -1 );
+        const bo fields = BSON( "o" << false << "o2" << false );
 
         ScopedConn conn(m->fullName());        
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
         ss << "<pre>\n";
         int n = 0;
-        long long lastOrd = 0;
+        OpTime otLast;
         while( c->more() ) {
             bo o = c->next();
-            lastOrd = o["t"].Long();
+            otLast = o["ts"]._opTime();
             say(ss, o);
             n++;            
         }
@@ -147,7 +147,7 @@ namespace mongo {
             while( c->more() ) {
                 stringstream z;
                 bo o = c->next();
-                if( o["t"].Long() == lastOrd ) 
+                if( o["ts"]._opTime() == otLast ) 
                     break;
                 say(z, o);
                 x = z.str() + x;

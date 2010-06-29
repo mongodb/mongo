@@ -71,7 +71,7 @@ namespace mongo {
         void check() const;
 
         static void receivedNewConfig(BSONObj);
-        void saveConfigLocally(); // to local db
+        void saveConfigLocally(BSONObj comment); // to local db
         string saveConfigEverywhere(); // returns textual info on what happened
 
         BSONObj asBson() const;

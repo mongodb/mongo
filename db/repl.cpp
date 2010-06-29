@@ -1691,6 +1691,7 @@ namespace mongo {
                 log() << "ERROR: can't use --slave or --master replication options with --replSet" << endl;
                 log() << "***" << endl;
             }
+            createOplog();
             newRepl();
             return;
         }
