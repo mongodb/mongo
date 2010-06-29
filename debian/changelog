@@ -1,3 +1,9 @@
+mongodb (1.4.4) unstable; urgency=low
+
+  * bug fixes, see http://jira.mongodb.org/browse/SERVER/fixforversion/10166
+
+ -- Richard Kreuter <richard@10gen.com>  Tue, 29 Jun 2010 16:56:28 -0500
+
 mongodb (1.4.3) unstable; urgency=low
 
   * bug fixes, see http://jira.mongodb.org/browse/SERVER/fixforversion/10156
