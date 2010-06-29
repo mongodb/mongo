@@ -219,7 +219,6 @@ namespace mongo {
     }
     
     bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result ){
-
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append( "setShardVersion" , ns.c_str() );
         cmdBuilder.append( "configdb" , configServer.modelServer() );
@@ -246,8 +245,10 @@ namespace mongo {
     }
 
     bool lockNamespaceOnServer( DBClientBase& conn , const string& ns ){
-        BSONObj lockResult;
-        return setShardVersion( conn , ns , grid.getNextOpTime() , true , lockResult );
+        // TODO: replace this
+        //BSONObj lockResult;
+        //return setShardVersion( conn , ns , grid.getNextOpTime() , true , lockResult );
+        return true;
     }
 
     
