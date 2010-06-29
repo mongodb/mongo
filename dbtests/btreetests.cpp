@@ -26,47 +26,47 @@
 
 namespace BtreeTests {
 
-    class Base {
+    const char* ns() {
+        return "unittests.btreetests";
+    }
+    
+    class Ensure {
+    public:
+        Ensure() {
+            _c.ensureIndex( ns(), BSON( "a" << 1 ), false, "testIndex" );
+        }
+        ~Ensure() {
+            _c.dropIndexes( ns() );
+        }
+    private:
+        DBDirectClient _c;
+    };
+    
+    class Base : public Ensure {
     public:
         Base() : 
-            _context( ns() ) {
-            
+            _context( ns() ) {            
             {
                 bool f = false;
                 assert( f = true );
                 massert( 10402 , "assert is misdefined", f);
             }
-            BSONObjBuilder builder;
-            builder.append( "ns", ns() );
-            builder.append( "name", "testIndex" );
-            BSONObj bobj = builder.done();
-            idx_.info =
-                theDataFileMgr.insert( ns(), bobj.objdata(), bobj.objsize() );
-            idx_.head = BtreeBucket::addBucket( idx_ );
-        }
-        ~Base() {
-            // FIXME cleanup all btree buckets.
-            theDataFileMgr.deleteRecord( ns(), idx_.info.rec(), idx_.info );
-            ASSERT( theDataFileMgr.findAll( ns() )->eof() );
         }
     protected:
-        BtreeBucket* bt() const {
-            return idx_.head.btree();
+        BtreeBucket* bt() {
+            return id().head.btree();
         }
-        DiskLoc dl() const {
-            return idx_.head;
+        DiskLoc dl() {
+            return id().head;
         }
         IndexDetails& id() {
-            return idx_;
-        }
-        static const char* ns() {
-            return "unittests.btreetests";
+            return nsdetails( ns() )->idx( 1 );
         }
         // dummy, valid record loc
         static DiskLoc recordLoc() {
             return DiskLoc( 0, 2 );
         }
-        void checkValid( int nKeys ) const {
+        void checkValid( int nKeys ) {
             ASSERT( bt() );
             ASSERT( bt()->isHead() );
             bt()->assertValid( order(), true );
@@ -98,13 +98,12 @@ namespace BtreeTests {
             ASSERT( location == expectedLocation );
             ASSERT_EQUALS( expectedPos, pos );
         }
-        BSONObj order() const {
-            return idx_.keyPattern();
+        BSONObj order() {
+            return id().keyPattern();
         }
     private:
         dblock lk_;
         Client::Context _context;
-        IndexDetails idx_;
     };
 
     class Create : public Base {
@@ -251,7 +250,93 @@ namespace BtreeTests {
             Base::insert( k );            
         }        
     };
+
+    class ReuseUnused : public Base {
+    public:
+        void run() {
+            for ( int i = 0; i < 10; ++i ) {
+                insert( i );
+            }
+            BSONObj root = key( 'p' );
+            unindex( root );
+            Base::insert( root );
+            locate( root, 0, true, dl(), 1 );
+        }
+    private:
+        BSONObj key( char c ) {
+            return simpleKey( c, 800 );
+        }
+        void insert( int i ) {
+            BSONObj k = key( 'b' + 2 * i );
+            Base::insert( k );            
+        }        
+    };
     
+    class PackUnused : public Base {
+    public:
+        void run() {
+            for ( long long i = 0; i < 1000000; i += 1000 ) {
+                insert( i );
+            }
+            string orig, after;
+            {
+                stringstream ss;
+                bt()->shape( ss );
+                orig = ss.str();
+            }
+            vector< string > toDel;
+            vector< string > other;
+            BSONObjBuilder start;
+            start.appendMinKey( "a" );
+            BSONObjBuilder end;
+            end.appendMaxKey( "a" );
+            auto_ptr< BtreeCursor > c( new BtreeCursor( nsdetails( ns() ), 1, id(), start.done(), end.done(), false, 1 ) );
+            while( c->ok() ) {
+                if ( !c->currKeyNode().prevChildBucket.isNull() ) {
+                    toDel.push_back( c->currKey().firstElement().valuestr() );
+                } else {
+                    other.push_back( c->currKey().firstElement().valuestr() );                    
+                }
+                c->advance();
+            }
+            ASSERT( toDel.size() > 0 );
+            for( vector< string >::const_iterator i = toDel.begin(); i != toDel.end(); ++i ) {
+                BSONObj o = BSON( "a" << *i );
+                unindex( o );
+            }
+            ASSERT( other.size() > 0 );
+            for( vector< string >::const_iterator i = other.begin(); i != other.end(); ++i ) {
+                BSONObj o = BSON( "a" << *i );
+                unindex( o );
+            }
+
+            int unused = 0;
+            ASSERT_EQUALS( 0, bt()->fullValidate( dl(), order(), &unused ) );
+
+            for ( long long i = 50000; i < 50100; ++i ) {
+                insert( i );
+            }            
+
+            int unused2 = 0;
+            ASSERT_EQUALS( 100, bt()->fullValidate( dl(), order(), &unused2 ) );
+
+            ASSERT( unused2 < unused );
+        }
+    private:
+        void insert( long long n ) {
+            string val( 800, ' ' );
+            for( int i = 0; i < 800; i += 8 ) {
+                for( int j = 0; j < 8; ++j ) {
+                    // probably we won't get > 56 bits
+                    unsigned char v = 0x80 | ( n >> ( ( 8 - j - 1 ) * 7 ) & 0x000000000000007f );
+                    val[ i + j ] = v;
+                }
+            }
+            BSONObj k = BSON( "a" << val );
+            Base::insert( k );            
+        }        
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "btree" ){
@@ -265,6 +350,8 @@ namespace BtreeTests {
             add< MissingLocate >();
             add< MissingLocateMultiBucket >();
             add< SERVER983 >();
+            add< ReuseUnused >();
+            add< PackUnused >();
         }
     } myall;
 }

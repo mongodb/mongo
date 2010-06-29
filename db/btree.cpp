@@ -84,7 +84,7 @@ namespace mongo {
         bt_dmp=0;
     }
 
-    int BucketBasics::fullValidate(const DiskLoc& thisLoc, const BSONObj &order) {
+    int BucketBasics::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount) {
         {
             bool f = false;
             assert( f = true );
@@ -107,18 +107,24 @@ namespace mongo {
         for ( int i = 0; i < n; i++ ) {
             _KeyNode& kn = k(i);
 
-            if ( kn.isUsed() ) kc++;
+            if ( kn.isUsed() ) {
+                kc++;
+            } else {
+                if ( unusedCount ) {
+                    ++( *unusedCount );
+                }
+            }
             if ( !kn.prevChildBucket.isNull() ) {
                 DiskLoc left = kn.prevChildBucket;
                 BtreeBucket *b = left.btree();
                 wassert( b->parent == thisLoc );
-                kc += b->fullValidate(kn.prevChildBucket, order);
+                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount);
             }
         }
         if ( !nextChild.isNull() ) {
             BtreeBucket *b = nextChild.btree();
             wassert( b->parent == thisLoc );
-            kc += b->fullValidate(nextChild, order);
+            kc += b->fullValidate(nextChild, order, unusedCount);
         }
 
         return kc;
@@ -269,12 +275,12 @@ namespace mongo {
     }*/
 
     /* insert a key in a bucket with no complexity -- no splits required */
-    bool BucketBasics::basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, const BSONObj& key, const Ordering &order) {
+    bool BucketBasics::basicInsert(const DiskLoc& thisLoc, int &keypos, const DiskLoc& recordLoc, const BSONObj& key, const Ordering &order) {
         modified(thisLoc);
         assert( keypos >= 0 && keypos <= n );
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
         if ( bytesNeeded > emptySize ) {
-            pack( order );
+            pack( order, keypos );
             if ( bytesNeeded > emptySize )
                 return false;
         }
@@ -294,7 +300,7 @@ namespace mongo {
     /* when we delete things we just leave empty space until the node is
        full and then we repack it.
     */
-    void BucketBasics::pack( const Ordering &order ) {
+    void BucketBasics::pack( const Ordering &order, int &refPos ) {
         if ( flags & Packed )
             return;
 
@@ -302,14 +308,26 @@ namespace mongo {
         char temp[BucketSize];
         int ofs = tdz;
         topSize = 0;
+        int i = 0;
         for ( int j = 0; j < n; j++ ) {
-            short ofsold = k(j).keyDataOfs();
-            int sz = keyNode(j).key.objsize();
+            if( j > 0 && k( j ).isUnused() && k( j ).prevChildBucket.isNull() ) {
+                if ( i < refPos ) {
+                    --refPos;
+                }
+                continue; // key is unused and has no children - drop it
+            }
+            if( i != j ) {
+                k( i ) = k( j );
+            }
+            short ofsold = k(i).keyDataOfs();
+            int sz = keyNode(i).key.objsize();
             ofs -= sz;
             topSize += sz;
             memcpy(temp+ofs, dataAt(ofsold), sz);
-            k(j).setKeyDataOfsSavingUse( ofs );
+            k(i).setKeyDataOfsSavingUse( ofs );
+            ++i;
         }
+        n = i;
         int dataUsed = tdz - ofs;
         memcpy(data + ofs, temp + ofs, dataUsed);
         emptySize = tdz - dataUsed - n * sizeof(_KeyNode);
@@ -319,10 +337,10 @@ namespace mongo {
         assertValid( order );
     }
 
-    inline void BucketBasics::truncateTo(int N, const Ordering &order) {
+    inline void BucketBasics::truncateTo(int N, const Ordering &order, int &refPos) {
         n = N;
         setNotPacked();
-        pack( order );
+        pack( order, refPos );
     }
 
     /* - BtreeBucket --------------------------------------------------- */
@@ -596,6 +614,8 @@ found:
 
     /* insert a key in this bucket, splitting if necessary.
        keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
+       NOTE this function may free some data, and as a result the value passed for keypos may
+       be invalid after calling insertHere()
     */
     void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
                                  DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
@@ -716,7 +736,8 @@ found:
             }
         }
 
-        truncateTo(split, order);  // note this may trash splitkey.key.  thus we had to promote it before finishing up here.
+        int newpos = keypos;
+        truncateTo(split, order, newpos);  // note this may trash splitkey.key.  thus we had to promote it before finishing up here.
 
         // add our new key, there is room now
         {
@@ -724,7 +745,7 @@ found:
             if ( keypos <= split ) {
                 if ( split_debug )
                     out() << "  keypos<split, insertHere() the new key" << endl;
-                insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
+                insertHere(thisLoc, newpos, recordLoc, key, order, lchild, rchild, idx);
             } else {
                 int kp = keypos-split-1;
                 assert(kp>=0);
