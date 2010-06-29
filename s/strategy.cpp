@@ -125,6 +125,9 @@ namespace mongo {
                 }
                 catch ( std::exception e ){
                     log() << "WriteBackListener exception : " << e.what() << endl;
+
+                    // It's possible this shard was removed
+                    Shard::reloadShardInfo();                    
                 }
                 catch ( ... ){
                     log() << "WriteBackListener uncaught exception!" << endl;

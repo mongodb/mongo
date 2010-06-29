@@ -41,6 +41,20 @@ namespace mongo {
             
             scoped_lock lk( _mutex );
             
+            // We use the _lookup table for all shards and for the primary config DB. The config DB info,
+            // however, does not come from the ShardNS::shard. So when cleaning the _lookup table we leave
+            // the config state intact. The rationale is that this way we could drop shards that
+            // were removed without reinitializing the config DB information.
+
+            map<string,Shard>::iterator i = _lookup.find( "config" );
+            if ( i != _lookup.end() ){
+                Shard config = i->second;
+                _lookup.clear();
+                _lookup[ "config" ] = config;
+            } else {
+                _lookup.clear();
+            }
+
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); ++i ){
                 BSONObj o = *i;
                 string name = o["_id"].String();
