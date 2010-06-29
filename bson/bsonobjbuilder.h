@@ -362,11 +362,11 @@ namespace mongo {
         }
         /** Append a string element */
         BSONObjBuilder& append(const char *fieldName, const char *str) {
-            return append(fieldName, str, strlen(str)+1);
+            return append(fieldName, str, (int) strlen(str)+1);
         }
         /** Append a string element */
         BSONObjBuilder& append(const char *fieldName, string str) {
-            return append(fieldName, str.c_str(), str.size()+1);
+            return append(fieldName, str.c_str(), (int) str.size()+1);
         }
         BSONObjBuilder& appendSymbol(const char *fieldName, const char *symbol) {
             _b.append((char) Symbol);
