@@ -171,8 +171,13 @@ namespace mongo {
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
 #endif
-                
+
+#if BOOST_VERSION >= 103500
+                boost::thread::id tid = boost::this_thread::get_id();
+                cout << type << ( type[0] ? ": " : "" ) << tid << " " << s;
+#else
                 cout << type << ( type[0] ? ": " : "" ) << s;
+#endif
                 cout.flush();
             }
             _init();

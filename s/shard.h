@@ -134,6 +134,10 @@ namespace mongo {
         
         static void reloadShardInfo();
 
+        static void removeShard( const string& name );
+
+        static bool isMember( const string& addr );
+
         static Shard EMPTY;
 
     private:
