@@ -431,5 +431,50 @@ namespace mongo {
         }
         
     }
+    
+    class ApplyOpsCmd : public Command {
+    public:
+        virtual bool slaveOk() const { return false; }
+        virtual LockType locktype() const { return WRITE; }
+        ApplyOpsCmd() : Command( "applyOps" ) {}
+        virtual void help( stringstream &help ) const {
+            help << "examples: { applyOps : [ ] , query : {} , queryMatcher : {} } ";
+        }
+        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            
+            if ( cmdObj.firstElement().type() != Array ){
+                errmsg = "ops has to be an array";
+                return false;
+            }
+            
+            BSONObj ops = cmdObj.firstElement().Obj();
+            
+            { // check input
+                BSONObjIterator i( ops );
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    if ( e.type() == Object )
+                        continue;
+                    errmsg = "op not an object: ";
+                    errmsg += e.fieldName();
+                    return false;
+                }
+            }
+            
+            // apply
+            int num = 0;
+            BSONObjIterator i( ops );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                applyOperation_inlock( e.Obj() );
+                num++;
+            }
+
+            result.append( "applied" , num );
+
+            return true;
+        }
+        
+    } applyOpsCmd;
 
 }
