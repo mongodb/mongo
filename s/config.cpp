@@ -522,12 +522,11 @@ namespace mongo {
         stringstream id;
         id << ourHostname << "-" << terseCurrentTime() << "-" << num++;
 
-        conn->insert( "config.changelog" , BSON( "_id" << id.str() << 
-                                                 "server" << ourHostname <<
-                                                 "time" << DATENOW <<
-                                                 "what" << what <<
-                                                 "ns" << ns << 
-                                                 "details" << detail ) );
+        BSONObj msg = BSON( "_id" << id.str() << "server" << ourHostname << "time" << DATENOW <<
+                            "what" << what << "ns" << ns << "details" << detail );
+        log() << msg << endl;
+        conn->insert( "config.changelog" , msg );
+        
         conn.done();
     }
 
