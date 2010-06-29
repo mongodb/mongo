@@ -141,6 +141,8 @@ myPort = function() {
 }
 
 ShardingTest = function( testName , numShards , verboseLevel , numMongos , otherParams ){
+    this._testName = testName;
+
     if ( ! otherParams )
         otherParams = {}
     this._connections = [];
@@ -254,6 +256,8 @@ ShardingTest.prototype.stop = function(){
     for ( var i=0; i<this._connections.length; i++){
         stopMongod( 30000 + i );
     }
+
+    print('*** ' + this._testName + " completed successfully ***");
 }
 
 ShardingTest.prototype.adminCommand = function(cmd){
@@ -590,6 +594,8 @@ ToolTest.prototype.stop = function(){
     stopMongod( this.port );
     this.m = null;
     this.db = null;
+
+    print('*** ' + this.name + " completed successfully ***");
 }
 
 ToolTest.prototype.runTool = function(){
@@ -688,6 +694,8 @@ ReplTest.prototype.stop = function( master , signal ){
         this.stop( false );
         return;
     }
+
+    print('*** ' + this.name + " completed successfully ***");
     return stopMongod( this.getPort( master ) , signal || 15 );
 }
 
@@ -715,6 +723,8 @@ SyncCCTest.prototype.stop = function(){
     for ( var i=0; i<this._connections.length; i++){
         stopMongod( 30000 + i );
     }
+
+    print('*** ' + this._testName + " completed successfully ***");
 }
 
 SyncCCTest.prototype.checkHashes = function( dbname , msg ){
