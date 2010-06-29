@@ -92,6 +92,18 @@ namespace mongo {
                 _lookup[addr] = s;
         }
         
+        void remove( const string& name ){
+            scoped_lock lk( _mutex );
+            for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ){
+                Shard s = i->second;
+                if ( s.getName() == name ){
+                    _lookup.erase(i++);
+                } else {
+                    ++i;
+                }
+            }
+        }
+
         void getAllShards( vector<Shard>& all ){
             scoped_lock lk( _mutex );
             std::set<string> seen;
@@ -154,6 +166,10 @@ namespace mongo {
         staticShardInfo.reload();
     }
     
+    void Shard::removeShard( const string& name ){
+        staticShardInfo.remove( name );
+    }
+
     Shard Shard::pick(){
         vector<Shard> all;
         staticShardInfo.getAllShards( all );
