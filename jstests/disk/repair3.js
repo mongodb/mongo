@@ -11,6 +11,9 @@ for ( i in files ) {
     }
 }
 
+// SERVER-1217 disable test
+doIt = false;
+
 if ( !doIt ) {
     print( "path /data/db/repairpartitiontest/ missing, skipping repair3 test" );
     doIt = false;
