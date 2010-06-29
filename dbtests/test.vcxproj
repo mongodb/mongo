@@ -255,6 +255,8 @@
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\gridfs.cpp" />
+    <ClCompile Include="..\db\geo\2d.cpp" />
+    <ClCompile Include="..\db\geo\quadrant_search.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
     <ClCompile Include="..\db\repl\heartbeat.cpp" />
     <ClCompile Include="..\db\repl\manager.cpp" />
@@ -525,7 +527,6 @@
     <ClCompile Include="..\db\dbwebserver.cpp" />
     <ClCompile Include="..\db\extsort.cpp" />
     <ClCompile Include="..\db\index.cpp" />
-    <ClCompile Include="..\db\index_geo2d.cpp" />
     <ClCompile Include="..\db\indexkey.cpp" />
     <ClCompile Include="..\db\instance.cpp" />
     <ClCompile Include="..\db\introspect.cpp" />

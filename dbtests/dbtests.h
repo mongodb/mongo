@@ -21,4 +21,5 @@
 
 using namespace mongo;
 using namespace mongo::regression;
+using boost::shared_ptr;
 

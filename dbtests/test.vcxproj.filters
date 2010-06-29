@@ -383,9 +383,6 @@
     <ClCompile Include="..\db\index.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\index_geo2d.cpp">
-      <Filter>db\cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\indexkey.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
@@ -640,6 +637,12 @@
     </ClCompile>
     <ClCompile Include="..\s\d_state.cpp">
       <Filter>shard</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\2d.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\quadrant_search.cpp">
+      <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

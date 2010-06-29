@@ -87,6 +87,7 @@ namespace mongo {
         _self(0), 
         mgr( new Manager(this) )
     {
+        h = 0;
         _myState = STARTUP;
         _currentPrimary = 0;
 
@@ -187,6 +188,7 @@ namespace mongo {
                 me++;
                 assert( _self == 0 );
                 _self = new Member(m.h, m._id, &m);
+                _selfId = m._id;
             } else {
                 Member *mi = new Member(m.h, m._id, &m);
                 _members.push(mi);

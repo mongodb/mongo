@@ -152,6 +152,9 @@ namespace mongo {
         //bool initiated() const { return curOpTime.initiated(); }
 
         OpTime lastOpTimeWritten;
+        long long h;
+    private:
+        unsigned _selfId; // stored redundantly we hit this a lot
 
     private:
         Consensus elect;
@@ -204,6 +207,7 @@ namespace mongo {
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
+        unsigned selfId() const { return _selfId; }
         shared_ptr<Manager> mgr;
 
     private:

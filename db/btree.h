@@ -84,7 +84,7 @@ namespace mongo {
         void assertValid(const BSONObj &orderObj, bool force = false) { 
             return assertValid(Ordering::make(orderObj),force); 
         }
-        int fullValidate(const DiskLoc& thisLoc, const BSONObj &order); /* traverses everything */
+        int fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount = 0); /* traverses everything */
 
         KeyNode keyNode(int i) const {
             if ( i >= n ){
@@ -106,7 +106,7 @@ namespace mongo {
         /* returns false if node is full and must be split
            keypos is where to insert -- inserted after that key #.  so keypos=0 is the leftmost one.
         */
-        bool basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, const BSONObj& key, const Ordering &order);
+        bool basicInsert(const DiskLoc& thisLoc, int &keypos, const DiskLoc& recordLoc, const BSONObj& key, const Ordering &order);
         
         /**
          * @return true if works, false if not enough space
@@ -130,12 +130,12 @@ namespace mongo {
         }
 
         int totalDataSize() const;
-        void pack( const Ordering &order );
+        void pack( const Ordering &order, int &refPos);
         void setNotPacked();
         void setPacked();
         int _alloc(int bytes);
         void _unalloc(int bytes);
-        void truncateTo(int N, const Ordering &order);
+        void truncateTo(int N, const Ordering &order, int &refPos);
         void markUnused(int keypos);
 
         /* BtreeBuilder uses the parent var as a temp place to maintain a linked list chain. 
@@ -361,6 +361,9 @@ namespace mongo {
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
             _matcher = matcher;
         }
+
+        // for debugging only
+        DiskLoc getBucket() const { return bucket; }
         
     private:
         /* Our btrees may (rarely) have "unused" keys when items are deleted.
