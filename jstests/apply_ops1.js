@@ -21,3 +21,31 @@ assert.eq( 1 , t.find().count() , "A3" );
 assert.eq( o , t.findOne() , "A4" );
 
 
+res = db.runCommand( { applyOps : 
+                       [ 
+                           { "op" : "u" , "ns" : t.getFullName() , "o2" : { _id : 5 } , "o" : { $inc : { x : 1 } } } ,
+                           { "op" : "u" , "ns" : t.getFullName() , "o2" : { _id : 5 } , "o" : { $inc : { x : 1 } } } 
+                       ]
+                       , 
+                       queries : [ { ns : t.getFullName() , q : { _id : 5 } , res : { x : 19 } } ]
+                     }  );
+
+o.x++;
+o.x++;
+
+assert.eq( 1 , t.find().count() , "B1" );
+assert.eq( o , t.findOne() , "B2" );
+
+
+res = db.runCommand( { applyOps : 
+                       [ 
+                           { "op" : "u" , "ns" : t.getFullName() , "o2" : { _id : 5 } , "o" : { $inc : { x : 1 } } } ,
+                           { "op" : "u" , "ns" : t.getFullName() , "o2" : { _id : 5 } , "o" : { $inc : { x : 1 } } } 
+                       ]
+                       , 
+                       queries : [ { ns : t.getFullName() , q : { _id : 5 } , res : { x : 19 } } ]
+                     }  );
+
+assert.eq( 1 , t.find().count() , "B3" );
+assert.eq( o , t.findOne() , "B4" );
+
