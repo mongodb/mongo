@@ -117,6 +117,7 @@ namespace mongo {
 
         void Server::doWork() { 
             starting();
+            rq = false;
             while( 1 ) { 
                 lam f;
                 {
@@ -128,6 +129,10 @@ namespace mongo {
                 }
                 try {
                     f();
+                    if( rq ) {
+                        rq = false;
+                        send(f);
+                    }
                 } catch(std::exception& e) { 
                     log() << "Server::doWork() exception " << e.what() << endl;
                 }

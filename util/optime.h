@@ -99,9 +99,7 @@ namespace mongo {
         }
         //	  unsigned long long& asDate() { return *((unsigned long long *) &i); }
         
-        bool isNull() {
-            return secs == 0;
-        }
+        bool isNull() const { return secs == 0; }
         
         string toStringLong() const {
             char buf[64];

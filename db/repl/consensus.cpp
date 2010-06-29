@@ -21,8 +21,6 @@
 
 namespace mongo { 
 
-
-
     class CmdReplSetFresh : public ReplSetCommand { 
     public:
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
@@ -166,9 +164,7 @@ namespace mongo {
     bool Consensus::weAreFreshest(bool& allUp, int& nTies) {
         const OpTime ord = theReplSet->lastOpTimeWritten;
         nTies = 0;
-        cout << "TEMP COMMENTED OUT LINE IN consensus.cpp" << endl;
-        cout << "ord: " << ord.toString() << endl;
-		//assert( ord > 0 );
+		assert( ord.isNull() );
         BSONObj cmd = BSON(
                "replSetFresh" << 1 <<
                "set" << rs.name() << 
@@ -209,6 +205,14 @@ namespace mongo {
     }
 
     void Consensus::_electSelf() {
+        {
+            const OpTime ord = theReplSet->lastOpTimeWritten;
+            if( ord == 0 ) { 
+                log() << "replSet info not trying to elect self, do not yet have a complete set of data from any point in time" << rsLog;
+                return;
+            }
+        }
+
         bool allUp;
         int nTies;
         if( !weAreFreshest(allUp, nTies) ) { 
@@ -229,17 +233,19 @@ namespace mongo {
         if( nTies ) {
             /* tie?  we then randomly sleep to try to not collide on our voting. */
             /* todo: smarter. */
-            if( me.id() == 0 ) {
+            if( me.id() == 0 || sleptLast ) {
                 // would be fine for one node not to sleep 
                 // todo: biggest / highest priority nodes should be the ones that get to not sleep
             } else {
                 assert( !rs.lockedByMe() ); // bad to go to sleep locked
                 unsigned ms = ((unsigned) rand()) % 1000 + 50;
                 DEV log() << "replSet tie " << nTies << " sleeping a little " << ms << rsLog;
+                sleptLast = true;
                 sleepmillis(ms);
                 throw RetryAfterSleepException();
             }
         }
+        sleptLast = false;
 
         time_t start = time(0);
         int tally = yea( me.id() );
@@ -287,7 +293,6 @@ namespace mongo {
     }
 
     void Consensus::electSelf() {
-        cout << "TEMP ENTER electSelf" << endl;
         assert( !rs.lockedByMe() );
         try { 
             _electSelf(); 
@@ -304,7 +309,6 @@ namespace mongo {
         catch(...) { 
             log() << "replSet warning caught unexpected exception in electSelf()" << rsLog;
         }
-        cout << "TEMP EXIT electSelf" << endl;
     }
 
 }

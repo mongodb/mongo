@@ -91,6 +91,12 @@ namespace mongoutils {
             ss << "<span style=\"color:#A00;\">" << contentHtml << "</span>";
             return ss.str();
         }
+        inline string grey(string contentHtml, bool color=true) {
+            if( !color ) return contentHtml;
+            stringstream ss;
+            ss << "<span style=\"color:#888;\">" << contentHtml << "</span>";
+            return ss.str();
+        }
         inline string blue(string contentHtml, bool color=true) {
             if( !color ) return contentHtml;
             stringstream ss;

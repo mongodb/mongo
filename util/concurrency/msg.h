@@ -41,6 +41,8 @@ namespace mongo {
             /** send message but block until function completes */
             void call(const lam&);
 
+            void requeue() { rq = true; }
+
         protected:
             /* this needn't be abstract; i left it that way for now so i remember 
                to call Client::initThread() when using in mongo... */
@@ -54,6 +56,7 @@ namespace mongo {
             boost::mutex m;
             boost::condition c;
             string _name;
+            bool rq;
         };
 
     }

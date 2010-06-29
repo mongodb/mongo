@@ -81,8 +81,8 @@ namespace mongo {
             s << td(h);
         }
         s << td(config().votes);
-        s << td(ReplSet::stateAsStr(state()));
-        s << td( red(hbinfo().lastHeartbeatMsg,!ok) );
+        s << td( grey(ReplSet::stateAsStr(state()), !ok) );
+        s << td( grey(hbinfo().lastHeartbeatMsg,!ok) );
         stringstream q;
         q << "/_replSetOplog?" << id();
         s << td( a(q.str(), "", hbinfo().opTime.toString()) );
