@@ -19,12 +19,10 @@
 
 #include "pch.h"
 #include "../db/queryoptimizer.h"
-
 #include "../db/db.h"
 #include "../db/dbhelpers.h"
 #include "../db/instance.h"
 #include "../db/query.h"
-
 #include "dbtests.h"
 
 namespace mongo {
@@ -1576,11 +1574,11 @@ namespace QueryOptimizerTests {
             temp = BSON( "b" << 1 );
             theDataFileMgr.insertWithObjMod( ns(), temp );
             
-            shared_ptr< Cursor > c = bestGuessCursor( ns(), BSON( "b" << 1 ), BSON( "a" << 1 ) );
+            boost::shared_ptr< Cursor > c = bestGuessCursor( ns(), BSON( "b" << 1 ), BSON( "a" << 1 ) );
             ASSERT_EQUALS( string( "a" ), c->indexKeyPattern().firstElement().fieldName() );
             c = bestGuessCursor( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ) );
             ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElement().fieldName() );
-            shared_ptr< MultiCursor > m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ), BSON( "a" << 1 ) ) );
+            boost::shared_ptr< MultiCursor > m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ), BSON( "a" << 1 ) ) );
             ASSERT_EQUALS( string( "a" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
             m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) ) );
             ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );

@@ -193,9 +193,6 @@
     <ClCompile Include="index.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
-    <ClCompile Include="index_geo2d.cpp">
-      <Filter>db\core</Filter>
-    </ClCompile>
     <ClCompile Include="indexkey.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
@@ -342,6 +339,12 @@
     </ClCompile>
     <ClCompile Include="..\util\text.cpp">
       <Filter>util\core</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\2d.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\quadrant_search.cpp">
+      <Filter>db\geo</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -705,6 +708,9 @@
     <ClInclude Include="..\util\text.h">
       <Filter>util\core</Filter>
     </ClInclude>
+    <ClInclude Include="geo\core.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
@@ -767,6 +773,9 @@
     <Filter Include="bson">
       <UniqueIdentifier>{aff20a87-2efe-4861-930f-8780c08cbea5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\geo">
+      <UniqueIdentifier>{2a0924a5-9bd9-4c86-a149-0df09dcb5548}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="repl\notes.txt">
@@ -815,10 +824,5 @@
     <ResourceCompile Include="db.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Object Include="index_geo2d.obj">
-      <Filter>db\core</Filter>
-    </Object>
   </ItemGroup>
 </Project>
