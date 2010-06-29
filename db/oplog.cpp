@@ -366,4 +366,70 @@ namespace mongo {
         }
     } testoptime;
 
+    void applyOperation_inlock(const BSONObj& op){
+        log( 6 ) << "applying op: " << op << endl;
+        
+        assertInWriteLock();
+
+        OpDebug debug;
+        BSONObj o = op.getObjectField("o");
+        const char *ns = op.getStringField("ns");
+        // operation type -- see logOp() comments for types
+        const char *opType = op.getStringField("op");
+
+        if ( *opType == 'i' ) {
+            const char *p = strchr(ns, '.');
+            if ( p && strcmp(p, ".system.indexes") == 0 ) {
+                // updates aren't allowed for indexes -- so we will do a regular insert. if index already
+                // exists, that is ok.
+                theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
+            }
+            else {
+                // do upserts for inserts as we might get replayed more than once
+                BSONElement _id;
+                if( !o.getObjectID(_id) ) {
+                    /* No _id.  This will be very slow. */
+                    Timer t;
+                    updateObjects(ns, o, o, true, false, false , debug );
+                    if( t.millis() >= 2 ) {
+                        RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
+                    }
+                }
+                else {
+                    BSONObjBuilder b;
+                    b.append(_id);
+                    
+                    /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
+                    RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow 
+                    
+                    updateObjects(ns, o, b.done(), true, false, false , debug );
+                }
+            }
+        }
+        else if ( *opType == 'u' ) {
+            RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
+            updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), false, false , debug );
+        }
+        else if ( *opType == 'd' ) {
+            if ( opType[1] == 0 )
+                deleteObjects(ns, o, op.getBoolField("b"));
+            else
+                assert( opType[1] == 'b' ); // "db" advertisement
+        }
+        else if ( *opType == 'n' ) {
+            // no op
+        }
+        else if ( *opType == 'c' ){
+            BufBuilder bb;
+            BSONObjBuilder ob;
+            _runCommands(ns, o, bb, ob, true, 0);
+        }
+        else {
+            stringstream ss;
+            ss << "unknown opType [" << opType << "]";
+            throw MsgAssertionException( 13141 , ss.str() );
+        }
+        
+    }
+
 }

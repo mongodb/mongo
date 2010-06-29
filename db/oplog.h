@@ -199,5 +199,5 @@ namespace mongo {
         }
     };
 
-
+    void applyOperation_inlock(const BSONObj& op);
 }
