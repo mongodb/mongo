@@ -488,7 +488,7 @@ namespace mongo {
 
                 pid_ = pi.dwProcessId;
                 handles.insert( make_pair( pid_, pi.hProcess ) );
-
+                
 #else
 
                 pid_ = fork();

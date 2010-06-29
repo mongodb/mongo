@@ -80,7 +80,7 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
-            if( 0 ) {
+            if( 1 ) {
                 // just make sure we can get a write lock before doing anything else.  we'll reacquire one 
                 // later.  of course it could be stuck then, but this check lowers the risk if weird things 
                 // are up.
@@ -108,7 +108,7 @@ namespace mongo {
             }
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
                 result.append("startupStatus", ReplSet::startupStatus);
-                result.append("startupStatusMsg", ReplSet::startupStatusMsg);
+                //result.append("startupStatusMsg", ReplSet::startupStatusMsg);
                 errmsg = "all members and seeds must be reachable to initiate set";
                 result.append("info", cmdLine.replSet);
                 return false;

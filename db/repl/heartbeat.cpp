@@ -59,7 +59,11 @@ namespace mongo {
                 result.append("mismatch", true);
                 return false;
             }
+
             result.append("rs", true);
+            if( cmdObj["checkEmpty"].trueValue() ) { 
+                result.append("hasData", haveDatabases());
+            }
             if( theReplSet == 0 ) { 
                 errmsg = "still initializing";
                 return false;
@@ -77,9 +81,7 @@ namespace mongo {
             result.append("v", v);
             if( v > cmdObj["v"].Int() )
                 result << "config" << theReplSet->config().asBson();
-            if( cmdObj["checkEmpty"].trueValue() ) { 
-                result.append("hasData", haveDatabases());
-            }
+
             return true;
         }
     } cmdReplSetHeartbeat;

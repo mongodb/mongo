@@ -168,8 +168,10 @@ namespace mongo {
                 }
                 catch(...) { throw "bad or missing host field?"; }
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");
-                try { m.priority = mobj["priority"].Number(); } catch(...) { }
-                try { m.votes = (unsigned) mobj["votes"].Number(); } catch(...) { }
+                if( mobj.hasElement("priority") )
+                    m.priority = mobj["priority"].Number();
+                if( mobj.hasElement("votes") )
+                    m.votes = (unsigned) mobj["votes"].Number();
                 m.check();
             }
             catch( const char * p ) { 
@@ -237,7 +239,6 @@ namespace mongo {
                     { 
                         stringstream ss;
                         ss << "replSet error: member " << h.toString() << " is not in --replSet mode";
-                        cout << "TEMP " << info.toString() << endl;
                         msgassertedNoTrace(13260, ss.str().c_str()); // not caught as not a user exception - we want it not caught
                         //for python err# checker: uassert(13260, "", false);
                     }
