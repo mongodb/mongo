@@ -706,11 +706,12 @@ namespace mongo {
                         return false;
                     }
 
+                    Shard::reloadShardInfo();
+
                     result.append( "msg"   , "draining started successfully" );
                     result.append( "state" , "started" ); 
                     result.append( "shard" , shard );
                     conn.done();
-                    Shard::reloadShardInfo();
                     return true;
                 }
 
@@ -730,11 +731,13 @@ namespace mongo {
                         return false;
                     }
 
+                    Shard::removeShard( shardDoc[ "_id" ].str() );
+                    Shard::reloadShardInfo();
+
                     result.append( "msg"   , "removeshard completed successfully" );
                     result.append( "state" , "completed" );
                     result.append( "shard" , shard );
                     conn.done();
-                    Shard::reloadShardInfo();
                     return true;
                 }
 
