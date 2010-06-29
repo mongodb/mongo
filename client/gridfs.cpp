@@ -227,6 +227,7 @@ namespace mongo {
             return write( cout );
         } else {
             ofstream out(where.c_str() , ios::out | ios::binary );
+            uassert(13325, "couldn't open file: " + where, out.is_open() );
             return write( out );
         }
     }
