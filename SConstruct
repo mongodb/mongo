@@ -556,12 +556,25 @@ elif "win32" == os.sys.platform:
 		            boostDir = "C:/Program Files" + x + "/Boost/boost_1_" + str(bv) + extra
 		            if os.path.exists( boostDir ):
 		                return boostDir
+        if os.path.exists( "C:/boost" ):
+            return "C:/boost"
+        if os.path.exists( "/boost" ):
+            return "/boost"
         return None
+
 
     boostDir = find_boost()
     if boostDir is None:
         print( "can't find boost" )
         Exit(1)
+
+    if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
+        env.Append( LIBPATH=[ boostDir + "/lib/vs2010_64" ] )
+    elif not force64 and os.path.exists( boostDir + "/lib/vs2010_32" ):
+        env.Append( LIBPATH=[ boostDir + "/lib/vs2010_32" ] )
+    else:
+        env.Append( LIBPATH=[ boostDir + "/Lib" ] )
+
 
     serverOnlyFiles += [ "util/ntservice.cpp" ]
 
