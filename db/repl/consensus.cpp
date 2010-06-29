@@ -37,7 +37,7 @@ namespace mongo {
             }
             string who = cmdObj["who"].String();
             int cfgver = cmdObj["cfgver"].Int();
-			OpTime ts(cmdObj["ord"].Date());
+			OpTime opTime(cmdObj["opTime"].Date());
 
             bool weAreFresher = false;
             if( theReplSet->config().version > cfgver ) { 
@@ -45,10 +45,10 @@ namespace mongo {
 				result.append("info", "config version stale");
                 weAreFresher = true;
             }
-            else if( ts < theReplSet->lastOpTimeWritten )  { 
+            else if( opTime < theReplSet->lastOpTimeWritten )  { 
 				weAreFresher = true;
 			}
-            result.append("ord", theReplSet->lastOpTimeWritten);
+            result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             result.append("fresher", weAreFresher);
             return true;
         }
@@ -172,7 +172,7 @@ namespace mongo {
         BSONObj cmd = BSON(
                "replSetFresh" << 1 <<
                "set" << rs.name() << 
-			   "opTime" << ord <<
+			   "opTime" << Date_t(ord.asDate()) <<
                "who" << rs._self->fullName() << 
                "cfgver" << rs._cfg->version );
         list<Target> L;
@@ -186,7 +186,7 @@ namespace mongo {
                 nok++;
                 if( i->result["fresher"].trueValue() )
                     return false;
-                OpTime remoteOrd( i->result["ord"].Date() );
+                OpTime remoteOrd( i->result["opTime"].Date() );
                 if( remoteOrd == ord )
                     nTies++;
                 assert( remoteOrd <= ord );
@@ -293,7 +293,9 @@ namespace mongo {
         catch(VoteException& ) { 
             log() << "replSet not trying to elect self as responded yea to someone else recently" << rsLog;
         }
-        catch(...) { }
+        catch(...) { 
+            log() << "replSet warning caught unexpected exception in electSelf()" << rsLog;
+        }
     }
 
 }

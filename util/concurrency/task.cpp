@@ -81,6 +81,7 @@ namespace mongo {
 namespace mongo {
     namespace task {
 
+        /* to get back a return value */
         struct Ret {
             Ret() : done(false) { }
             bool done;
@@ -115,6 +116,7 @@ namespace mongo {
         }
 
         void Server::doWork() { 
+            starting();
             while( 1 ) { 
                 lam f;
                 {

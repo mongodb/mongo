@@ -59,7 +59,11 @@ namespace mongo {
                 result.append("mismatch", true);
                 return false;
             }
+
             result.append("rs", true);
+            if( cmdObj["checkEmpty"].trueValue() ) { 
+                result.append("hasData", haveDatabases());
+            }
             if( theReplSet == 0 ) { 
                 errmsg = "still initializing";
                 return false;
@@ -72,14 +76,12 @@ namespace mongo {
             }
             result.append("set", theReplSet->name());
             result.append("state", theReplSet->state());
-            result.append("opTime", theReplSet->lastOpTimeWritten);
+            result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             int v = theReplSet->config().version;
             result.append("v", v);
             if( v > cmdObj["v"].Int() )
                 result << "config" << theReplSet->config().asBson();
-            if( cmdObj["checkEmpty"].trueValue() ) { 
-                result.append("hasData", haveDatabases());
-            }
+
             return true;
         }
     } cmdReplSetHeartbeat;
@@ -119,7 +121,8 @@ namespace mongo {
                     }
                     mem.health = 1.0;
                     mem.lastHeartbeatMsg = "";
-                    mem.opTime = info["opTime"].Date();
+                    if( info.hasElement("opTime") )
+                        mem.opTime = info["opTime"].Date();
 
                     be cfg = info["config"];
                     if( cfg.ok() ) {

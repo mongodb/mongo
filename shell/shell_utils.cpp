@@ -44,6 +44,7 @@
 #include "../util/processinfo.h"
 #include "utils.h"
 #include "../util/text.h"
+#include "../util/md5.hpp"
 
 extern const char * jsconcatcode_server;
 
@@ -207,11 +208,13 @@ namespace mongo {
             return args.firstElement();
         }
 
+        const int CANT_OPEN_FILE = 13300;
+
         BSONObj cat(const BSONObj& args){
             BSONElement e = oneArg(args);
             stringstream ss;
             ifstream f(e.valuestrsafe());
-            uassert(13300, "couldn't open file", f.is_open() );
+            uassert(CANT_OPEN_FILE, "couldn't open file", f.is_open() );
 
             streamsize sz = 0;
             while( 1 ) {
@@ -224,6 +227,27 @@ namespace mongo {
                 uassert(13301, "cat() : file to big to load as a variable", sz < 1024 * 1024 * 16);
             }
             return BSON( "" << ss.str() );
+        }
+
+        BSONObj md5sumFile(const BSONObj& args){
+            BSONElement e = oneArg(args);
+            stringstream ss;
+            FILE* f = fopen(e.valuestrsafe(), "rb");
+            uassert(CANT_OPEN_FILE, "couldn't open file", f );
+
+            md5digest d;
+            md5_state_t st;
+            md5_init(&st);
+
+            enum {BUFLEN = 4*1024};
+            char buffer[BUFLEN];
+            int bytes_read;
+            while( (bytes_read = fread(buffer, 1, BUFLEN, f)) ) {
+                md5_append( &st , (const md5_byte_t*)(buffer) , bytes_read );
+            }
+
+            md5_finish(&st, d);
+            return BSON( "" << digestToString( d ) );
         }
 
         BSONObj removeFile(const BSONObj& args){
@@ -488,7 +512,7 @@ namespace mongo {
 
                 pid_ = pi.dwProcessId;
                 handles.insert( make_pair( pid_, pi.hProcess ) );
-
+                
 #else
 
                 pid_ = fork();
@@ -822,6 +846,7 @@ namespace mongo {
             scope.injectNative( "hostname", hostname);
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );
+            scope.injectNative( "md5sumFile", md5sumFile );
 #endif
         }
 

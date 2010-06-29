@@ -438,14 +438,12 @@ namespace mongo {
                 }
 
                 if( startsWith(url, "/_replSet") ) {
-                    DEV log() << "TEMP /_replSet" << endl;
                     string s = str::after(url, "/_replSetOplog?");
                     if( !s.empty() )
                         responseMsg = _replSetOplog(s);
                     else
                         responseMsg = _replSet();
                     responseCode = 200;
-                    DEV log() << "TEMP /_replSet done" << endl;
                     return;
                 }
 
