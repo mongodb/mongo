@@ -54,7 +54,7 @@ namespace mongo {
        x is in a shard iff
        min <= x < max
      */    
-    class Chunk : public Model , boost::noncopyable, public boost::enable_shared_from_this<Chunk>  {
+    class Chunk : boost::noncopyable, public boost::enable_shared_from_this<Chunk>  {
     public:
 
         Chunk( ChunkManager * info );
@@ -120,21 +120,20 @@ namespace mongo {
 
         bool moveAndCommit( const Shard& to , string& errmsg );
 
-        virtual const char * getNS(){ return "config.chunks"; }
-        virtual void serialize(BSONObjBuilder& to);
-        virtual void unserialize(const BSONObj& from);
-        virtual string modelServer();
+        const char * getNS(){ return "config.chunks"; }
+        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
+        void unserialize(const BSONObj& from);
+        string modelServer();
         
         void appendShortVersion( const char * name , BSONObjBuilder& b );
 
-        virtual void save( bool check=false );
-        
         void ensureIndex();
         
         void _markModified();
         
         static int MaxChunkSize;
 
+        string genID(){ return genID( _ns , _min ); }
         static string genID( const string& ns , const BSONObj& min );
 
         const ChunkManager* getManager() const { return _manager; }
@@ -310,6 +309,9 @@ namespace mongo {
         void _reload();
         void _reload_inlock();
         void _load();
+
+        void save_inlock();
+        ShardChunkVersion getVersion_inlock() const;
         
         DBConfig * _config;
         string _ns;

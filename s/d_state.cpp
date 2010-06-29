@@ -362,6 +362,7 @@ namespace mongo {
             }
             
             unsigned long long version = extractVersion( cmdObj["version"] , errmsg );
+
             if ( errmsg.size() ){
                 return false;
             }
@@ -407,6 +408,8 @@ namespace mongo {
             
             if ( version < globalVersion ){
                 errmsg = "going to older version for global";
+                result.appendTimestamp( "version" , version );
+                result.appendTimestamp( "globalVersion" , globalVersion );
                 return false;
             }
             

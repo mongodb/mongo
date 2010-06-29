@@ -27,7 +27,7 @@ res = db.runCommand( { applyOps :
                            { "op" : "u" , "ns" : t.getFullName() , "o2" : { _id : 5 } , "o" : { $inc : { x : 1 } } } 
                        ]
                        , 
-                       queries : [ { ns : t.getFullName() , q : { _id : 5 } , res : { x : 19 } } ]
+                       preCondition : [ { ns : t.getFullName() , q : { _id : 5 } , res : { x : 19 } } ]
                      }  );
 
 o.x++;
@@ -43,7 +43,7 @@ res = db.runCommand( { applyOps :
                            { "op" : "u" , "ns" : t.getFullName() , "o2" : { _id : 5 } , "o" : { $inc : { x : 1 } } } 
                        ]
                        , 
-                       queries : [ { ns : t.getFullName() , q : { _id : 5 } , res : { x : 19 } } ]
+                       preCondition : [ { ns : t.getFullName() , q : { _id : 5 } , res : { x : 19 } } ]
                      }  );
 
 assert.eq( 1 , t.find().count() , "B3" );

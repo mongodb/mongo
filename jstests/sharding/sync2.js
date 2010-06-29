@@ -55,4 +55,8 @@ for ( i=0; i<3; i++ ){
 
 printjson( hashes );
 
+for ( i=1; i<hashes.length; i++ ){
+    assert.eq( hashes[0].md5  , hashes[i].md5 , "hashes different" );
+}
+
 s.stop();

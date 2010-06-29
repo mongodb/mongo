@@ -467,7 +467,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         ApplyOpsCmd() : Command( "applyOps" ) {}
         virtual void help( stringstream &help ) const {
-            help << "examples: { applyOps : [ ] , queries : [ { ns : ... , q : ... , res : ... } ] }";
+            help << "examples: { applyOps : [ ] , preCondition : [ { ns : ... , q : ... , res : ... } ] }";
         }
         virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             
@@ -490,23 +490,23 @@ namespace mongo {
                 }
             }
             
-            if ( cmdObj["queries"].type() == Array ){
-                BSONObjIterator i( cmdObj["queries"].Obj() );
+            if ( cmdObj["preCondition"].type() == Array ){
+                BSONObjIterator i( cmdObj["preCondition"].Obj() );
                 while ( i.more() ){
                     BSONObj f = i.next().Obj();
                     
-                    BSONObj result = db.findOne( f["ns"].String() , f["q"].Obj() );
+                    BSONObj realres = db.findOne( f["ns"].String() , f["q"].Obj() );
                     
                     Matcher m( f["res"].Obj() );
-                    if ( ! m.matches( result ) ){
-                        stringstream ss;
-                        ss << "pre req failed [" << f << "] got: " << result;
-                        errmsg = ss.str();
+                    if ( ! m.matches( realres ) ){
+                        result.append( "got" , realres );
+                        result.append( "whatFailed" , f );
+                        errmsg = "pre-condition failed";
                         return false;
                     }
                 }
             }
-
+            
             // apply
             int num = 0;
             BSONObjIterator i( ops );
