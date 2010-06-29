@@ -584,5 +584,18 @@ namespace mongo {
                 return 1;
             }
         } mrCmd;
+        
+        class ApplyOpsCmd : public PublicGridCommand {
+        public:
+            ApplyOpsCmd() : PublicGridCommand( "applyOps" ){}
+            
+            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                errmsg = "applyOps not allowed through mongos";
+                return false;
+            }
+            
+        } applyOpsCmd;
+        
     }
+
 }
