@@ -91,6 +91,10 @@ namespace mongo {
             }
             Client::Context ctx( "" , localDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logns, len);
+            /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
+                     this code (or code in now() maybe) should be improved.
+                     */
+            massert(13324, "rs error possible failover clock skew issue?", theReplSet->lastOpTimeWritten < ts);
             theReplSet->lastOpTimeWritten = ts;
             theReplSet->h = hNew;
             ctx.getClient()->setLastOp( ts.asDate() );
