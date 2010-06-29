@@ -474,7 +474,12 @@ sendmore:
     public:
         string name() { return "DataFileSync"; }
         void run(){
-            log(1) << "will flush memory every: " << _sleepsecs << " seconds" << endl;
+            if( _sleepsecs == 0 )
+                log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
+            else if( _sleepsecs == 1 ) 
+                log() << "--syncdelay 1" << endl;
+            else if( _sleepsecs != 60 )
+                log(1) << "--syncdelay " << _sleepsecs << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ){
                 if ( _sleepsecs == 0 ){
@@ -691,7 +696,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("upgrade", "upgrade db if needed")
         ("repair", "run repair on all dbs")
         ("notablescan", "do not allow table scans")
-        ("syncdelay",po::value<double>(&dataFileSync._sleepsecs)->default_value(60), "seconds between disk syncs (0 for never)")
+        ("syncdelay",po::value<double>(&dataFileSync._sleepsecs)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
         ("profile",po::value<int>(), "0=off 1=slow, 2=all")
         ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
         ("maxConns",po::value<int>(), "max number of simultaneous connections")

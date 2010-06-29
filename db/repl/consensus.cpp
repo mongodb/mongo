@@ -229,13 +229,14 @@ namespace mongo {
         if( nTies ) {
             /* tie?  we then randomly sleep to try to not collide on our voting. */
             /* todo: smarter. */
-            DEV log() << "replSet tie " << nTies << " sleeping a little" << rsLog;
             if( me.id() == 0 ) {
                 // would be fine for one node not to sleep 
                 // todo: biggest / highest priority nodes should be the ones that get to not sleep
             } else {
-                assert( !rs.lockedByMe() ); // would be bad to go to sleep locked
-                sleepmillis( ((unsigned) rand()) * 1000 + 50 );
+                assert( !rs.lockedByMe() ); // bad to go to sleep locked
+                unsigned ms = ((unsigned) rand()) % 1000 + 50;
+                DEV log() << "replSet tie " << nTies << " sleeping a little " << ms << rsLog;
+                sleepmillis(ms);
                 throw RetryAfterSleepException();
             }
         }
@@ -286,16 +287,24 @@ namespace mongo {
     }
 
     void Consensus::electSelf() {
+        cout << "TEMP ENTER electSelf" << endl;
         assert( !rs.lockedByMe() );
         try { 
             _electSelf(); 
         } 
+        catch(RetryAfterSleepException&) { 
+            throw;
+        }
         catch(VoteException& ) { 
             log() << "replSet not trying to elect self as responded yea to someone else recently" << rsLog;
+        }
+        catch(DBException& e) { 
+            log() << "replSet warning caught unexpected exception in electSelf() " << e.toString() << rsLog;
         }
         catch(...) { 
             log() << "replSet warning caught unexpected exception in electSelf()" << rsLog;
         }
+        cout << "TEMP EXIT electSelf" << endl;
     }
 
 }

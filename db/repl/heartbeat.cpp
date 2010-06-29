@@ -102,6 +102,8 @@ namespace mongo {
 
         string name() { return "ReplSetHealthPoll"; }
         void doWork() { 
+            cout << "TEMP healthpool dowork " << endl;
+
             HeartbeatInfo mem = m;
             HeartbeatInfo old = mem;
             try { 
@@ -140,6 +142,7 @@ namespace mongo {
                 down(mem, "connect/transport error");             
             }
             m = mem;
+            cout << "TEMP sending msgupdatehbinfo" << mem.hbstate << endl;
             theReplSet->mgr->send( boost::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
 
             static time_t last = 0;
@@ -171,6 +174,7 @@ namespace mongo {
         Member* m = _members.head();
         while( m ) {
             ReplSetHealthPoll *task = new ReplSetHealthPoll(m->h(), m->hbinfo());
+            cout << "TEMP starting hb thread " << m->h().toString() << endl;
             task::repeat(shared_ptr<task::Task>(task), 2000);
             m = m->next();
         }

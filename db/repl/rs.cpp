@@ -262,6 +262,7 @@ namespace mongo {
                     }
 
                     sleepsecs(20);
+                    cout << "TEMP END SLEEP 20" << endl;
                     continue;
                 }
                 _loadConfigFinish(configs);

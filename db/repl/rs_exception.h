@@ -4,11 +4,14 @@
 
 namespace mongo { 
 
-    class VoteException : public std::exception { };
+    class VoteException : public std::exception { 
+    public:
+        const char * what() const { return "VoteException"; }
+    };
 
-    class RetryAfterSleepException : public std::exception { };
+    class RetryAfterSleepException : public std::exception { 
+    public:
+        const char * what() const { return "RetryAfterSleepException"; }
+    };
 
 }
-
-
-
