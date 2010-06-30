@@ -898,7 +898,7 @@ namespace mongo {
         ScopedDbConnection conn( Chunk(0).modelServer() );
         BSONObj res;
         bool ok = conn->runCommand( "config" , cmd , res );
-        conn.done();
+        //conn.done();
         if ( ! ok ){
             stringstream ss;
             ss << "saving chunks failed.  cmd: " << cmd << " result: " << res;
