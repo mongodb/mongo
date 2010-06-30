@@ -123,7 +123,7 @@ namespace mongo {
     void ensureIdIndexForNewNs(const char *ns) {
         if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
              strstr( ns, ".$freelist" ) == 0 ){
-            log( 1 ) << "adding _id index for new collection" << endl;
+            log( 1 ) << "adding _id index for collection " << ns << endl;
             ensureHaveIdIndex( ns );
         }        
     }
@@ -161,7 +161,7 @@ namespace mongo {
         return z;
     }
 
-    bool _userCreateNS(const char *ns, const BSONObj& options, string& err) {
+    bool _userCreateNS(const char *ns, const BSONObj& options, string& err, bool *deferIdIndex) {
         if ( nsdetails(ns) ) {
             err = "collection already exists";
             return false;
@@ -223,14 +223,21 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
 
+        bool ensure = false;
         if ( options.getField( "autoIndexId" ).type() ) {
             if ( options["autoIndexId"].trueValue() ){
-                ensureIdIndexForNewNs( ns );
+                ensure = true;
             }
         } else {
             if ( !newCapped ) {
-                ensureIdIndexForNewNs( ns );
+                ensure=true;
             }
+        }
+        if( ensure ) { 
+            if( deferIdIndex )
+                *deferIdIndex = true;
+            else
+                ensureIdIndexForNewNs( ns );
         }
 
         if ( mx > 0 )
@@ -239,14 +246,16 @@ namespace mongo {
         return true;
     }
 
-    // { ..., capped: true, size: ..., max: ... }
-    // returns true if successful
-    bool userCreateNS(const char *ns, BSONObj options, string& err, bool logForReplication) {
+    /** { ..., capped: true, size: ..., max: ... }
+        @param deferIdIndex - if not not, defers id index creation.  sets the bool value to true if we wanted to create the id index.
+        @return true if successful
+    */
+    bool userCreateNS(const char *ns, BSONObj options, string& err, bool logForReplication, bool *deferIdIndex) {
         const char *coll = strchr( ns, '.' ) + 1;
         massert( 10356 ,  "invalid ns", coll && *coll );
         char cl[ 256 ];
         nsToDatabase( ns, cl );
-        bool ok = _userCreateNS(ns, options, err);
+        bool ok = _userCreateNS(ns, options, err, deferIdIndex);
         if ( logForReplication && ok ) {
             if ( options.getField( "create" ).eoo() ) {
                 BSONObjBuilder b;
@@ -679,7 +688,7 @@ namespace mongo {
             NamespaceDetails *freeExtents = nsdetails(s.c_str());
             if( freeExtents == 0 ) { 
                 string err;
-                _userCreateNS(s.c_str(), BSONObj(), err);
+                _userCreateNS(s.c_str(), BSONObj(), err, 0);
                 freeExtents = nsdetails(s.c_str());
                 massert( 10361 , "can't create .$freelist", freeExtents);
             }

@@ -165,6 +165,9 @@ namespace mongo {
         }
     }
     
+    extern bool inDBRepair;
+    void ensureIdIndexForNewNs(const char *ns);
+
     bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot) {
 
 		massert( 10289 ,  "useReplAuth is not written to replication log", !useReplAuth || !logForRepl );
@@ -256,19 +259,37 @@ namespace mongo {
             assert(p);
             string to_name = todb + p;
 
+            bool wantIdIndex = false;
             {
                 string err;
                 const char *toname = to_name.c_str();
-                userCreateNS(toname, options, err, logForRepl);
+                /* we defer building id index for performance - building it in batch is much faster */ 
+                userCreateNS(toname, options, err, logForRepl, &wantIdIndex);
             }
             log(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
             if( snapshot ) 
                 q.snapshot();
             copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk, q);
+
+            if( wantIdIndex ) {
+                /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations 
+                   that occur during the initial sync.  inDBRepair makes dropDups be true.
+                   */
+                bool old = inDBRepair;
+                try {
+                    inDBRepair = true;
+                    ensureIdIndexForNewNs(to_name.c_str());
+                }
+                catch(...) { 
+                    inDBRepair = old;
+                    throw;
+                }
+            }
         }
 
         // now build the indexes
+
         string system_indexes_from = fromdb + ".system.indexes";
         string system_indexes_to = todb + ".system.indexes";
         /* [dm]: is the ID index sometimes not called "_id_"?  There is other code in the system that looks for a "_id" prefix 

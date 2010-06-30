@@ -231,7 +231,7 @@ namespace mongo {
     }
 
     /*@ @param opstr:
-          c userCreateNs
+          c userCreateNS
           i insert
           n no-op / keepalive
           d delete / remove
