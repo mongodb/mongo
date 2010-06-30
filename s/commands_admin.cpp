@@ -183,7 +183,7 @@ namespace mongo {
                     string s = BSONObjBuilder::numStr( num++ );
 
                     BSONObj o = cursor->next();
-                    list.append( s.c_str() , o["name"].valuestrsafe() );
+                    list.append( s.c_str() , o["_id"].valuestrsafe() );
                 }
 
                 result.appendArray("databases" , list.obj() );
