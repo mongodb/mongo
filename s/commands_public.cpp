@@ -126,7 +126,7 @@ namespace mongo {
                 
                 log() << "DROP DATABASE: " << dbName << endl;
 
-                if ( ! conf || ! conf->isShardingEnabled() ){
+                if ( ! conf ){
                     log(1) << "  passing though drop database for: " << dbName << endl;
                     return passthrough( conf , cmdObj , result );
                 }
