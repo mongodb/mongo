@@ -111,8 +111,11 @@ namespace mongo {
 
                         ChunkManagerPtr cm = r.getConfig()->getChunkManager( ns );
                         assert( cm );
-                        for ( int i=0; i<cm->numChunks();i++)
-                            doWrite( op , r , cm->getChunk(i)->getShard() );
+
+                        set<Shard> shards;
+                        cm->getAllShards(shards);
+                        for (set<Shard>::const_iterator it=shards.begin(), end=shards.end(); it != end; ++it)
+                            doWrite( op , r , *it );
                     }
                     else {
                         doWrite( op , r , r.primaryShard() );
