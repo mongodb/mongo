@@ -408,7 +408,7 @@ namespace mongo {
                     return false;
                 }
                 
-                result.appendTimestamp( "version" , cm->getVersion() );
+                result.appendTimestamp( "version" , cm->getVersion().toLong() );
 
                 return 1;
             }

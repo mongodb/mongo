@@ -222,7 +222,7 @@ namespace mongo {
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append( "setShardVersion" , ns.c_str() );
         cmdBuilder.append( "configdb" , configServer.modelServer() );
-        cmdBuilder.appendTimestamp( "version" , version );
+        cmdBuilder.appendTimestamp( "version" , version.toLong() );
         cmdBuilder.appendOID( "serverID" , &serverID );
         if ( authoritative )
             cmdBuilder.appendBool( "authoritative" , 1 );

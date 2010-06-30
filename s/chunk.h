@@ -32,7 +32,7 @@
 #include "config.h"
 
 namespace mongo {
-
+    
     class DBConfig;
     class Chunk;
     class ChunkRange;
@@ -40,7 +40,50 @@ namespace mongo {
     class ChunkRangeMangager;
     class ChunkObjUnitTest;
 
-    typedef unsigned long long ShardChunkVersion;
+    struct ShardChunkVersion {
+        union {
+            struct {
+                int _minor;
+                int _major;
+            };
+            long long _combined;
+        };
+        
+        ShardChunkVersion( int major=0, int minor=0 )
+            : _minor(minor),_major(major){
+        }
+        
+        ShardChunkVersion( long long ll )
+            : _combined( ll ){
+        }
+        
+        ShardChunkVersion incMajor() const {
+            return ShardChunkVersion( _major + 1 , 0 );
+        }
+
+        void operator++(){
+            _minor++;
+        }
+
+        long long toLong() const {
+            return _combined;
+        }
+
+        bool isSet() const {
+            return _combined > 0;
+        }
+
+        string toString() const { 
+            stringstream ss; 
+            ss << _major << "|" << _minor; 
+            return ss.str(); 
+        }
+        
+        operator long long() const { return _combined; }
+        operator string() const { return toString(); }
+    };
+    //typedef unsigned long long ShardChunkVersion;
+
     typedef shared_ptr<Chunk> ChunkPtr;
 
     // key is max for each Chunk or ChunkRange
