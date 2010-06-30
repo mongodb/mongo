@@ -81,6 +81,60 @@ namespace mongo {
         UpdateOption_Multi = 1 << 1
     };
 
+
+    class ConnectionString {
+    public:
+        enum ConnectionType { MASTER , SET , SYNC };
+        
+        ConnectionString( const HostAndPort& server ){
+            _type = MASTER;
+            _servers.push_back( server );
+        }
+
+        ConnectionString( ConnectionType type , const vector<HostAndPort>& servers )
+            : _type( type ) , _servers( servers ){
+        }
+        
+        ConnectionString( ConnectionType type , const string& s ){
+            _type = type;
+            _fillServers( s );
+            
+            switch ( _type ){
+            case MASTER:
+                assert( _servers.size() == 1 );
+                break;
+            default:
+                assert( _servers.size() > 0 );
+            }
+            
+        }
+
+        ConnectionString( const string& s , ConnectionType favoredMultipleType ){
+            _fillServers( s );
+            if ( _servers.size() == 1 ){
+                _type = MASTER;
+            }
+            else {
+                _type = favoredMultipleType;
+                assert( _type != MASTER );
+            }
+        }
+        
+    private:
+        
+        void _fillServers( string s ){
+            string::size_type idx;
+            while ( ( idx = s.find( ',' ) ) != string::npos ){
+                _servers.push_back( s.substr( 0 , idx ) );
+                s = s.substr( idx + 1 );
+            }
+            _servers.push_back( s );
+        }
+
+        ConnectionType _type;
+        vector<HostAndPort> _servers;
+    };
+
     /**
      * controls how much a clients cares about writes
      * default is NORMAL

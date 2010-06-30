@@ -109,6 +109,11 @@ public:
 
         log() << root.string() << endl;
 
+        if ( root.leaf() == "system.profile.bson" ){
+            log() << "\t skipping" << endl;
+            return;
+        }
+
         string ns;
         if (use_db) {
             ns += _db;
