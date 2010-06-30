@@ -34,10 +34,6 @@
 
 namespace mongo {
 
-    inline bool readLockSupported(){
-        return true;
-    }
-
     string sayClientState();
     bool haveClient();
     
