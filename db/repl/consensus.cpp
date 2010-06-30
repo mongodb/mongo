@@ -164,7 +164,7 @@ namespace mongo {
     bool Consensus::weAreFreshest(bool& allUp, int& nTies) {
         const OpTime ord = theReplSet->lastOpTimeWritten;
         nTies = 0;
-		assert( ord.isNull() );
+		assert( !ord.isNull() );
         BSONObj cmd = BSON(
                "replSetFresh" << 1 <<
                "set" << rs.name() << 
