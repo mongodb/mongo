@@ -399,38 +399,31 @@ namespace mongo {
         if( dbMutex.isWriteLocked() )
             return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
 
+        const char *which = "o";
+        const char *opType = op.getStringField("op");
+        if ( *opType == 'i' )
+            ;
+        else if( *opType == 'u' )
+            which = "o2";
+        else
+            return;
+        /* todo : other operations */
+
         try { 
-            const char *opType = op.getStringField("op");
-            if ( *opType == 'i' ) {
-                BSONObj o = op.getObjectField("o");
-                BSONElement _id;
-                if( o.getObjectID(_id) ) {
-                    const char *ns = op.getStringField("ns");
-                    BSONObjBuilder b;
-                    b.append(_id);
-                    BSONObj result;
-                    readlock lk(ns);
-                    Client::Context ctx( ns );
-                    Helpers::findById(cc(), ns, b.done(), result);
-                }
+            BSONObj o = op.getObjectField(which);
+            BSONElement _id;
+            if( o.getObjectID(_id) ) {
+                const char *ns = op.getStringField("ns");
+                BSONObjBuilder b;
+                b.append(_id);
+                BSONObj result;
+                readlock lk(ns);
+                Client::Context ctx( ns );
+                Helpers::findById(cc(), ns, b.done(), result);
             }
-            else if ( *opType == 'u' ) {
-                BSONObj o2 = op.getObjectField("o2");
-                BSONElement _id;
-                if( o2.getObjectID(_id) ) {
-                    const char *ns = op.getStringField("ns");
-                    BSONObjBuilder b;
-                    b.append(_id);
-                    BSONObj result;
-                    readlock lk(ns);
-                    Client::Context ctx( ns );
-                    Helpers::findById(cc(), ns, b.done(), result);
-                }
-            }
-            /* todo : other operations */
         }
         catch( DBException& ) { 
-            log() << "ignoring assertion in pretouchOperation() " << endl;
+            log() << "ignoring assertion in pretouchOperation()" << endl;
         }
     }
 
