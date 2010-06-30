@@ -515,6 +515,8 @@ namespace mongo {
             _chunkMap[c->getMax()] = c;
             _chunkRanges.reloadAll(_chunkMap);
 
+            _shards.insert(c->getShard());
+
             save_inlock();
             log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
             
@@ -526,6 +528,7 @@ namespace mongo {
         _chunks.clear();
         _chunkMap.clear();
         _chunkRanges.clear();
+        _shards.clear();
     }
     
     void ChunkManager::_reload(){
@@ -539,6 +542,7 @@ namespace mongo {
             _chunks.clear();
             _chunkMap.clear();
             _chunkRanges.clear();
+            _shards.clear();
             _load();
 
             if (_isValid()){
@@ -571,6 +575,7 @@ namespace mongo {
 
             _chunks.push_back( c );
             _chunkMap[c->getMax()] = c;
+            _shards.insert(c->getShard());
 
         }
         conn.done();
@@ -740,11 +745,7 @@ namespace mongo {
 
     void ChunkManager::getAllShards( set<Shard>& all ){
         rwlock lk( _lock , false ); 
-        
-        // TODO: cache this
-        for ( vector<ChunkPtr>::iterator i=_chunks.begin(); i != _chunks.end(); i++  ){
-            all.insert( (*i)->getShard() );
-        }        
+        all = _shards;
     }
     
     void ChunkManager::ensureIndex(){
@@ -790,6 +791,7 @@ namespace mongo {
         _chunks.clear();
         _chunkMap.clear();
         _chunkRanges.clear();
+        _shards.clear();
 
         
         // delete data from mongod
@@ -964,6 +966,7 @@ namespace mongo {
 
     void ChunkManager::_migrationNotification(Chunk* c){
         _chunkRanges.reloadRange(_chunkMap, c->getMin(), c->getMax());
+        _shards.insert(c->getShard());
     }
 
     
