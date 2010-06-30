@@ -324,6 +324,8 @@ namespace mongo {
         ChunkMap _chunkMap;
         ChunkRangeManager _chunkRanges;
 
+        set<Shard> _shards;
+
         unsigned long long _sequenceNumber;
         
         RWLock _lock;

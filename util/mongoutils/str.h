@@ -58,9 +58,13 @@ namespace mongoutils {
         };
 
         inline bool startsWith(const char *str, const char *prefix) {
-            size_t l = strlen(prefix);
-            if ( strlen(str) < l ) return false;
-            return strncmp(str, prefix, l) == 0;
+            const char *s = str;
+            const char *p = prefix;
+            while( *p ) { 
+                if( *p != *s ) return false;
+                p++; s++;
+            }
+            return true;
         }
         inline bool startsWith(string s, string p) { return startsWith(s.c_str(), p.c_str()); }
 

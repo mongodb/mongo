@@ -728,7 +728,7 @@ namespace mongo {
         BSONElement sub = getField(left.c_str());
         if ( sub.eoo() )
             return nullElement;
-        else if ( sub.type() == Array || strlen( name ) == 0 )
+        else if ( sub.type() == Array || name[0] == '\0')
             return sub;
         else if ( sub.type() == Object )
             return sub.embeddedObject().getFieldDottedOrArray( name );

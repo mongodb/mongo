@@ -128,7 +128,6 @@ namespace mongo {
         virtual bool readOnly(){ return true; }
         virtual LockType locktype() const { return READ; } 
         virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            result.append( "readlock" , readLockSupported() );
             if ( globalScriptEngine ){
                 BSONObjBuilder bb( result.subobjStart( "js" ) );
                 result.append( "utf8" , globalScriptEngine->utf8Ok() );

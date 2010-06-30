@@ -131,10 +131,14 @@ namespace mongo {
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
         ss << "<pre>\n";
         int n = 0;
+        OpTime otFirst;
         OpTime otLast;
+        OpTime otEnd;
         while( c->more() ) {
             bo o = c->next();
             otLast = o["ts"]._opTime();
+            if( otFirst.isNull() ) 
+                otFirst = otLast;
             say(ss, o);
             n++;            
         }
@@ -144,19 +148,25 @@ namespace mongo {
         else { 
             auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
             string x;
-            while( c->more() ) {
+            bo o = c->next();
+            otEnd = o["ts"]._opTime();
+            while( 1 ) {
                 stringstream z;
-                bo o = c->next();
                 if( o["ts"]._opTime() == otLast ) 
                     break;
                 say(z, o);
                 x = z.str() + x;
+                if( !c->more() )
+                    break;
+                bo o = c->next();
             }
             if( !x.empty() ) {
                 ss << "\n...\n\n" << x;
             }
         }
         ss << "</pre>\n";
+        if( !otEnd.isNull() )
+            ss << "<p>Log length in time: " << otEnd.getSecs() - otFirst.getSecs() << " secs</p>\n";
     }
 
     void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 

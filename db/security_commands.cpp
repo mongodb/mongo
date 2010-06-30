@@ -174,13 +174,7 @@ namespace mongo {
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
             
             if ( userObj[ "readOnly" ].isBoolean() && userObj[ "readOnly" ].boolean() ) {
-                if ( readLockSupported() ){
-                    ai->authorizeReadOnly( cc().database()->name.c_str() );
-                }
-                else {
-                    log() << "warning: old version of boost, read-only users not supported" << endl;
-                    ai->authorize( cc().database()->name.c_str() );
-                }
+                ai->authorizeReadOnly( cc().database()->name.c_str() );
             } else {
                 ai->authorize( cc().database()->name.c_str() );
             }

@@ -138,9 +138,16 @@ void shellHistoryDone(){
 #endif
 }
 void shellHistoryAdd( const char * line ){
-    if ( strlen(line) == 0 )
-        return;
 #ifdef USE_READLINE
+    if ( line[0] == '\0' )
+        return;
+
+    // dont record duplicate lines
+    static string lastLine;
+    if (lastLine == line)
+        return;
+    lastLine = line;
+
     if ((strstr(line, ".auth")) == NULL)
         add_history( line );
 #endif

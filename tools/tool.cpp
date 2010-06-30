@@ -282,7 +282,7 @@ namespace mongo {
                 file.getline( line , BUF_SIZE );
                 const char * cur = line;
                 while ( isspace( cur[0] ) ) cur++;
-                if ( strlen( cur ) == 0 )
+                if ( cur[0] == '\0' )
                     continue;
 
                 _fields.push_back( cur );
