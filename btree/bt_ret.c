@@ -97,15 +97,14 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	switch (page->hdr->type) {
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
-		if (rip->repl != NULL) {
-			sdbt = rip->repl->data + (rip->repl->repl_next - 1);
+		WT_SDBT_CURRENT_SET(rip, sdbt);
+		if (sdbt != NULL)
 			goto repl;
-		}
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		if (cip->repl != NULL) {
-			sdbt = cip->repl->data + (cip->repl->repl_next - 1);
+		WT_SDBT_CURRENT_SET(cip, sdbt);
+		if (sdbt != NULL) {
 repl:			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				return (WT_NOTFOUND);
 			data->data = sdbt->data;

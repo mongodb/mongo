@@ -74,7 +74,7 @@ struct __dbt {
 	void	 *data;			/* returned/specified data */
 	u_int32_t size;			/* returned/specified data length */
 
-	u_int32_t mem_size;		/* associated memory size */
+	u_int32_t mem_size;		/* associated allocated memory size */
 
 					/* callback return */
 	int (*callback)(DB *, DBT *, DBT *);
@@ -129,6 +129,8 @@ struct __wt_toc {
 
 	WT_PAGE *srch_page;		/* Search page */
 	void	*srch_ip;		/* Search WT_{COL,ROW}_INDX */
+
+	void	*repl_spare;		/* Cached, spare replacement array. */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.

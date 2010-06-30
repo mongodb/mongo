@@ -51,11 +51,11 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_debug.c (C)
                                                                         _
 		    (u_long)off->addr, (u_long)off->size, WT_RECORDS(off));
-../btree/bt_debug.c  395  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  404  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                              _
 		    (u_long)off->size, (u_quad)WT_RECORDS(off));
-../btree/bt_debug.c  422  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  431  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
@@ -81,16 +81,16 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_page.c (C)
                                                  _
 			records += WT_RECORDS(off);
-../btree/bt_page.c  238  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  232  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                          _
 #...       WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((rip)->data))
 			records += WT_ROW_OFF_RECORDS(rip);
-../btree/bt_page.c  309  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  303  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                          _
 		records += WT_RECORDS(off);
-../btree/bt_page.c  345  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  339  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_reconcile.c (C)
@@ -104,19 +104,19 @@ _
 ../btree/bt_reconcile.c  154  Info 830: Location cited in prior message
                                           _
 		if (len > new->space_avail) {
-../btree/bt_reconcile.c  315  Warning 644: Variable 'len' (line 266) may not
+../btree/bt_reconcile.c  317  Warning 644: Variable 'len' (line 267) may not
     have been initialized
-../btree/bt_reconcile.c  266  Info 830: Location cited in prior message
+../btree/bt_reconcile.c  267  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_ret.c (C)
                                              _
 		if (toc->data.mem_size < size)
-../btree/bt_ret.c  182  Warning 644: Variable 'size' (line 31) may not have
+../btree/bt_ret.c  181  Warning 644: Variable 'size' (line 31) may not have
     been initialized
 ../btree/bt_ret.c  31  Info 830: Location cited in prior message
                                                   _
 		memcpy(toc->data.data, orig, size);
-../btree/bt_ret.c  185  Warning 644: Variable 'orig' (line 30) may not have
+../btree/bt_ret.c  184  Warning 644: Variable 'orig' (line 30) may not have
     been initialized
 ../btree/bt_ret.c  30  Info 830: Location cited in prior message
 
@@ -204,15 +204,15 @@ _
 ../btree/col_put.c  17  Info 830: Location cited in prior message
 
 --- Module:   ../btree/col_srch.c (C)
-                                                               _
-#...                         WT_RECORDS((WT_OFF *)((cip)->data))
-			if (record_cnt + WT_COL_OFF_RECORDS(cip) >= recno)
-../btree/col_srch.c  51  Info 740: Unusual pointer cast (incompatible indirect
+                                                          _
+#...                    WT_RECORDS((WT_OFF *)((cip)->data))
+				    WT_COL_OFF_RECORDS(cip) >= recno)
+../btree/col_srch.c  62  Info 740: Unusual pointer cast (incompatible indirect
     types)
-                                                            _
-#...                      WT_RECORDS((WT_OFF *)((cip)->data))
-			record_cnt += WT_COL_OFF_RECORDS(cip);
-../btree/col_srch.c  53  Info 740: Unusual pointer cast (incompatible indirect
+                                                                    _
+#...                              WT_RECORDS((WT_OFF *)((cip)->data))
+				record_cnt += WT_COL_OFF_RECORDS(cip);
+../btree/col_srch.c  64  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/row_del.c (C)

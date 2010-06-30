@@ -19,32 +19,25 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_REPL *new, *repl;
-	WT_COL_INDX *cip;
 	int ret;
 
 	env = toc->env;
 	idb = toc->db->idb;
-	page = NULL;
-	ret = 0;
+
+	/* Make sure we have a spare replacement array in the WT_TOC. */
+	if (toc->repl_spare == NULL)
+		WT_RET(__wt_calloc(
+		    env, WT_SDBT_CHUNK + 1, sizeof(WT_SDBT), &toc->repl_spare));
 
 	/* Search the btree for the key. */
-	WT_ERR(__wt_bt_search_col(toc, recno));
+	WT_RET(__wt_bt_search_col(toc, recno));
 	page = toc->srch_page;
-	cip = toc->srch_ip;
-
-	/* Grow or allocate the replacement array if necessary. */
-	repl = cip->repl;
-	if (repl == NULL || repl->repl_next == repl->repl_size)
-		WT_ERR(__wt_bt_repl_alloc(env, repl, &new));
-	else
-		new = NULL;
 
 	/* Delete the item. */
-	__wt_bt_del_serial(toc, page, new, ret);
+	__wt_bt_delete_serial(toc, page, ret);
 
-err:	if (page != NULL && page != idb->root_page)
+	if (page != NULL && page != idb->root_page)
 		__wt_bt_page_out(toc, &page, ret == 0 ? WT_MODIFIED : 0);
 
-	return (ret);
+	return (0);
 }

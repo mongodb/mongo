@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static void __wt_bt_page_discard_repl(ENV *, WT_REPL *);
+static void __wt_bt_page_discard_repl(ENV *, WT_SDBT *);
 static int  __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int  __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int  __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -204,7 +204,8 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * it's been deleted.
 		 */
 		repeat_count = 1;
-		if ((sdbt = WT_SDBT_CURRENT(cip)) != NULL) {
+		WT_SDBT_CURRENT_SET(cip, sdbt);
+		if (sdbt != NULL) {
 			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				data = toc->tmp2.data;
 			else
@@ -278,7 +279,8 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data, on- or off- page, and see if
 		 * it's been deleted.
 		 */
-		if ((sdbt = WT_SDBT_CURRENT(cip)) != NULL) {
+		WT_SDBT_CURRENT_SET(cip, sdbt);
+		if (sdbt != NULL) {
 			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				goto deleted;
 
@@ -376,7 +378,8 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data.  We get the data first because
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
-		if ((sdbt = WT_SDBT_CURRENT(rip)) != NULL) {
+		WT_SDBT_CURRENT_SET(rip, sdbt);
+		if (sdbt != NULL) {
 			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				continue;
 
@@ -570,14 +573,23 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
  *	Discard the replacement array.
  */
 static void
-__wt_bt_page_discard_repl(ENV *env, WT_REPL *repl)
+__wt_bt_page_discard_repl(ENV *env, WT_SDBT *repl)
 {
-	u_int16_t i;
+	WT_SDBT *trepl;
+	u_int i;
 
 	/* Free the data pointers and then the WT_REPL structure itself. */
-	for (i = 0; i < repl->repl_next; ++i)
-		if (!WT_SDBT_DELETED_ISSET(repl->data[i].data))
-			__wt_free(env, repl->data[i].data, repl->data[i].size);
-	__wt_free(env, repl->data, repl->repl_size * sizeof(WT_SDBT));
-	__wt_free(env, repl, sizeof(WT_REPL));
+	while ((trepl = repl) != NULL) {
+		for (i = 0; i < WT_SDBT_CHUNK; ++i, ++repl)
+			if (repl->data != NULL &&
+			    !WT_SDBT_DELETED_ISSET(repl->data))
+				__wt_free(env, repl->data, repl->size);
+
+		/*
+		 * The last slot in the array is fake -- if it's non-NULL,
+		 * it points to a previous array which we also walk.
+		 */
+		repl = repl->data == NULL ? NULL : (WT_SDBT *)repl->data;
+		__wt_free(env, trepl, sizeof(WT_SDBT));
+	}
 }

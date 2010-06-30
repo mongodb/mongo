@@ -108,8 +108,6 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
 int
 __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
 int
-__wt_bt_repl_alloc(ENV *env, WT_REPL *repl, WT_REPL **newp);
-int
 __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags);
 void
 __wt_workq_drain_server(ENV *env);
@@ -238,8 +236,6 @@ int
 __wt_toc_dump(ENV *env);
 void *
 __wt_workq_srvr(void *arg);
-int
-__wt_workq_repl(WT_TOC *toc, WT_REPL *orig, WT_REPL *new, WT_REPL **rp);
 void
 __wt_abort(ENV *env);
 int

@@ -20,7 +20,6 @@ struct __wt_off;		typedef struct __wt_off WT_OFF;
 struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
-struct __wt_repl;		typedef struct __wt_repl WT_REPL;
 struct __wt_row_indx;		typedef struct __wt_row_indx WT_ROW_INDX;
 struct __wt_sdbt;		typedef struct __wt_sdbt WT_SDBT;
 
@@ -157,15 +156,27 @@ struct __wt_page {
 	u_int64_t records;		/* Records in this page and below */
 
 	/*
-	 * Each item on a page is referenced by a the indx field, which points
-	 * to a WT_ROW_INDX or WT_COL_INDX structure.  (This is where the
-	 * on-page index array found in DB 1.85 and Berkeley DB moved.)  The
-	 * indx field initially references an array of WT_{ROW,COL}_INDX
-	 * structures.
+	 * Each item on a page is referenced by a indx field, which points to a
+	 * WT_{ROW,COL}_INDX structure.  (This is where the on-page index array
+	 * found in DB 1.85 and Berkeley DB moved.)
 	 *
 	 * We use a union so you can increment the address and have the right
 	 * thing happen (and so you're forced to think about what exactly you
 	 * are dereferencing when you write the code).
+	 *
+	 * Further complications:
+	 *
+	 * In row store leaf pages there may be duplicate data items; in those
+	 * cases, there is a single indx entry per key/data pair, but multiple
+	 * indx entries may reference the same key.
+	 *
+	 * In column store repeat-count compressed fixed-length pages, a single
+	 * indx entry may reference a large number of records, because there's
+	 * a single on-page entry that represents many identical records.   (We
+	 * can't expand those entries when the page comes into memory because
+	 * that requires unacceptable resources when pages are moved to/from the
+	 * cache, including for read-only databases.)  Instead, a single indx
+	 * entry represents all of the identical records.
 	 */
 	union {				/* Entry index */
 		WT_COL_INDX *c_indx;	/* Array of WT_COL_INDX structures */
@@ -273,6 +284,18 @@ struct __wt_page_hdr {
 #define	WT_PAGE_BYTE(page)	(((u_int8_t *)(page)->hdr) + WT_PAGE_HDR_SIZE)
 
 /*
+ * WT_SDBT --
+ *	Minimal version of the DBT structure -- just the data & size fields.
+ */
+struct __wt_sdbt {
+	/* In-memory deletes are flagged by an illegal data pointer value. */
+#define	WT_SDBT_DELETED_VALUE		((void *)0x01)
+#define	WT_SDBT_DELETED_ISSET(p)	((p) == WT_SDBT_DELETED_VALUE)
+	void	 *data;			/* data */
+	u_int32_t size;			/* data length */
+};
+
+/*
  * WT_ROW_INDX --
  * The WT_ROW_INDX structure describes the in-memory information about a single
  * key/data pair on a row-store database page.
@@ -306,10 +329,42 @@ struct __wt_row_indx {
 
 	WT_ITEM	 *data;			/* Key's on-page data item */
 
-	WT_REPL	 *repl;			/* Replacement data array */
+	/*
+	 * Data items on leaf pages may be updated with new data, stored in the
+	 * WT_SDBT repl aarray.  It's an array for two reasons: first, we don't
+	 * block readers when updating it, which means it may be in use during
+	 * updates, and second because we'll need transactional history when we
+	 * add MVCC to the system.  The second reason is the array has to grow
+	 * while other threads are reading it, and we don't want to acquire a
+	 * a lock.  To make this work, the last element of the repl array is a
+	 * fake entry pointing to a previous repl array (it's an odd sort of
+	 * forward-linked list, allowing the array to grow without replacement.
+	 *
+	 * We can potentially allocate lots of these little arrays, so make an
+	 * effort to play nicely with power-of-two allocators.
+	 */
+#define	WT_SDBT_CHUNK	(64 / sizeof(WT_SDBT))
+
+	/*
+	 * We do not list how many entries in the array are used (it's only a
+	 * few slots per chunk, so it's cheap to find the first non-NULL entry).
+	 * Readers are safe because The entry is filled in and flushed, before
+	 * the repl field is updated.
+	 *
+	 * WT_SDBT_CURRENT --
+	 * Set sdbt to the most recent replacement entry referenced by a ROW/COL
+	 * structure, or NULL if there's been no replacement.
+	 */
+#define	WT_SDBT_CURRENT_SET(ip, sdbt) do {				\
+	if ((sdbt = (ip)->repl) != NULL)				\
+		for (; (sdbt)->data == NULL; ++(sdbt))			\
+			;						\
+} while (0)
+
+	WT_SDBT  *repl;			/* Replacement data array */
 };
 /*
- * WT_ROW_SIZE is the expected structure size --  we check at startup to ensure
+ * WT_ROW_SIZE is the expected structure size -- we check at startup to ensure
  * the compiler hasn't inserted padding.  The WT_ROW structure is in-memory, so
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
@@ -326,11 +381,14 @@ struct __wt_col_indx {
 	 * The on-page data is untyped for column-store pages -- if the page
 	 * has variable-length objects, it's a WT_ITEM layout, like row-store
 	 * pages.  If the page has fixed-length objects, it's untyped data.
-	 *
-	 * If data is NULL, the data was deleted.
 	 */
 	void	 *data;			/* On-page data */
-	WT_REPL	 *repl;			/* Replacement data array */
+
+	/*
+	 * Data items on leaf pages may be updated with new data -- see the
+	 * comment for the WT_ROW_INDX repl field.
+	 */
+	WT_SDBT	 *repl;			/* Replacement data array */
 };
 /*
  * WT_COL_SIZE is the expected structure size --  we check at startup to ensure
@@ -367,48 +425,6 @@ struct __wt_col_indx {
 	(((WT_OFF *)WT_ITEM_BYTE((ip)->data))->addr)
 #define	WT_ROW_OFF_SIZE(ip)						\
 	(((WT_OFF *)WT_ITEM_BYTE((ip)->data))->size)
-
-/*
- * WT_SDBT --
- *	A minimal version of the DBT structure -- just the data & size fields.
- */
-struct __wt_sdbt {
-	void	 *data;			/* DBT: data */
-	u_int32_t size;			/* DBT: data length */
-};
-
-/*
- * WT_REPL --
- *	A data replacement structure.
- */
-struct __wt_repl {
-	/*
-	 * Data items on leaf pages may be updated with new data, stored in
-	 * the WT_REPL structure.  It's an array for two reasons: first, we
-	 * don't block readers when updating it, which means it may be in
-	 * use during updates, and second because we'll need history when we
-	 * add MVCC to the system.
-	 *
-	 * In-memory deletes are flagged by a special (illegal) pointer value.
-	 */
-#define	WT_SDBT_DELETED_ISSET(p)	((p) == (void *)0x01)
-#define	WT_SDBT_DELETED_SET(p)		((p)  = (void *)0x01)
-	WT_SDBT  *data;			/* Data array */
-
-	u_int16_t repl_size;		/* Data array size */
-	u_int16_t repl_next;		/* Next available slot */
-};
-
-/*
- * WT_SDBT_CURRENT --
- *	Return the last replacement entry referenced by either a WT_ROW_INDX
- *	or WT_COL_INDX structure; the repl_next field makes entries visible,
- *	so we have to test for both a non-zero repl_next field as well as a
- *	NULL repl field.
- */
-#define	WT_SDBT_CURRENT(ip)						\
-	((ip)->repl == NULL || (ip)->repl->repl_next == 0 ?		\
-	    NULL : &((ip)->repl->data[(ip)->repl->repl_next - 1]))
 
 /*
  * WT_ITEM --

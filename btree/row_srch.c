@@ -122,8 +122,8 @@ restart:
 		}
 
 		/* Return the match unless it's been deleted. */
-		if ((sdbt = WT_SDBT_CURRENT(rip)) != NULL &&
-		     WT_SDBT_DELETED_ISSET(sdbt->data)) {
+		WT_SDBT_CURRENT_SET(rip, sdbt);
+		if (sdbt != NULL && WT_SDBT_DELETED_ISSET(sdbt->data)) {
 			ret = WT_NOTFOUND;
 			goto err;
 		}

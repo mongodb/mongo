@@ -18,7 +18,7 @@ static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_int(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *);
-static void __wt_bt_debug_repl(WT_REPL *, FILE *);
+static void __wt_bt_debug_repl(WT_SDBT *, FILE *);
 static int  __wt_bt_debug_row_indx(WT_TOC *, WT_ROW_INDX *, FILE *);
 static int  __wt_bt_debug_set_fp(const char *, FILE **, int *);
 
@@ -257,7 +257,7 @@ __wt_bt_debug_col_var_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
 	if (cip->repl != NULL)
 		__wt_bt_debug_repl(cip->repl, fp);
 	else {
-		fprintf(fp, "\tdata: {");
+		fprintf(fp, "\tdata {");
 		WT_RET(__wt_bt_debug_item_data(toc, cip->data, fp));
 		fprintf(fp, "}\n");
 	}
@@ -305,13 +305,13 @@ __wt_bt_debug_row_indx(WT_TOC *toc, WT_ROW_INDX *rip, FILE *fp)
 		fp = stderr;
 
 	if (WT_KEY_PROCESS(rip))
-		fprintf(fp, "\tkey: requires processing\n");
+		fprintf(fp, "\tkey {requires processing}\n");
 	else
 		__wt_bt_debug_dbt("\tkey", rip, fp);
 	if (rip->repl != NULL)
 		__wt_bt_debug_repl(rip->repl, fp);
 	else {
-		fprintf(fp, "\tdata: {");
+		fprintf(fp, "\tdata {");
 		WT_RET(__wt_bt_debug_item_data(toc, rip->data, fp));
 		fprintf(fp, "}\n");
 	}
@@ -320,23 +320,32 @@ __wt_bt_debug_row_indx(WT_TOC *toc, WT_ROW_INDX *rip, FILE *fp)
 
 /*
  * __wt_bt_debug_repl --
- *	Dump a single WT_REPL array.
+ *	Dump a replacement array.
  */
 static void
-__wt_bt_debug_repl(WT_REPL *repl, FILE *fp)
+__wt_bt_debug_repl(WT_SDBT *repl, FILE *fp)
 {
-	WT_SDBT *sdbt;
-	u_int32_t repl_cnt;
+	u_int i;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	for (sdbt = repl->data, repl_cnt = 0;
-	    repl_cnt < repl->repl_next; ++sdbt, ++repl_cnt)
-		if (WT_SDBT_DELETED_ISSET(sdbt->data))
-			fprintf(fp, "\trepl: {deleted}\n");
-		else
-			__wt_bt_debug_dbt("\trepl", sdbt, fp);
+	while (repl != NULL) {
+		for (i = 0; i < WT_SDBT_CHUNK; ++i, ++repl) {
+			if (repl->data == NULL)
+				continue;
+			if (WT_SDBT_DELETED_ISSET(repl->data)) {
+				fprintf(fp, "\trepl: {deleted}\n");
+				continue;
+			}
+			__wt_bt_debug_dbt("\trepl", repl, fp);
+		}
+		/*
+		 * The last slot in the array is fake -- if it's non-NULL,
+		 * it points to a previous array which we also walk.
+		 */
+		repl = repl->data == NULL ? NULL : (WT_SDBT *)repl->data;
+	}
 }
 
 /*

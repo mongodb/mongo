@@ -39,18 +39,31 @@ restart:
 
 	/* Search the tree. */
 	for (record_cnt = 0;;) {
-		/* If it's a leaf page, return the page and index. */
-		if (page->hdr->type == WT_PAGE_COL_FIX ||
-		    page->hdr->type == WT_PAGE_COL_VAR) {
+		/* Walk the page looking for the record. */
+		switch (page->hdr->type) {
+		case WT_PAGE_COL_FIX:
+			if (F_ISSET(idb, WT_REPEAT_COMP)) {
+				WT_INDX_FOREACH(page, cip, i) {
+					record_cnt +=
+					    WT_FIX_REPEAT_COUNT(cip->data);
+					if (record_cnt >= recno)
+						break;
+				}
+				goto done;
+			}
+			/* FALLTHROUGH */
+		case WT_PAGE_COL_VAR:
 			cip = page->u.c_indx + ((recno - record_cnt) - 1);
+			goto done;
+		default:
+			/* Walk the page, counting records. */
+			WT_INDX_FOREACH(page, cip, i) {
+				if (record_cnt +
+				    WT_COL_OFF_RECORDS(cip) >= recno)
+					break;
+				record_cnt += WT_COL_OFF_RECORDS(cip);
+			}
 			break;
-		}
-
-		/* Walk the page, counting records. */
-		WT_INDX_FOREACH(page, cip, i) {
-			if (record_cnt + WT_COL_OFF_RECORDS(cip) >= recno)
-				break;
-			record_cnt += WT_COL_OFF_RECORDS(cip);
 		}
 
 		/* cip references the subtree containing the record. */
@@ -70,8 +83,10 @@ restart:
 		}
 	}
 
+done:
 	/* Check for deleted items. */
-	if ((sdbt = WT_SDBT_CURRENT(cip)) == NULL) {
+	WT_SDBT_CURRENT_SET(cip, sdbt);
+	if (sdbt == NULL) {
 		if (cip->data == NULL) {
 			ret = WT_NOTFOUND;
 			goto err;

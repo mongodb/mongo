@@ -120,13 +120,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 
 	WT_ASSERT(env, page->u.indx == NULL);
 
-	/*
-	 * Determine the maximum number of indexes we'll need for this page.
-	 * The value is correct for page types other than WT_PAGE_ROW_LEAF --
-	 * entries on that page includes the number of duplicate items, so the
-	 * number of entries in the header is potentially more than actually
-	 * needed.
-	 */
+	/* Determine the maximum number of indexes we'll need for this page. */
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
@@ -440,7 +434,7 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	WT_COL_INDX *cip;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
-	u_int32_t i, j;
+	u_int32_t i;
 	u_int8_t *p;
 
 	idb = db->idb;
@@ -453,15 +447,14 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	 * The page contains fixed-length objects.
 	 */
 	if (F_ISSET(idb, WT_REPEAT_COMP))
-		WT_FIX_REPEAT_ITERATE(db, page, p, i, j) {
-			cip->data = WT_FIX_DELETE_ISSET(
-			    WT_FIX_REPEAT_DATA(p)) ? NULL : p;
+		WT_FIX_REPEAT_FOREACH(db, page, p, i) {
+			cip->data = p;
 			++cip;
 			++records;
 		}
 	else
 		WT_FIX_FOREACH(db, page, p, i) {
-			cip->data = WT_FIX_DELETE_ISSET(p) ? NULL : p;
+			cip->data = p;
 			++cip;
 			++records;
 		}

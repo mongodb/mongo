@@ -17,17 +17,15 @@ class Serial:
 		self.op = op
 		self.args = args
 
-serial['bt_del'] = Serial(
+serial['bt_delete'] = Serial(
 	'bt_del',
 	'WT_WORKQ_SPIN',
-	['WT_PAGE */page',
-	 'WT_REPL */new'])
+	['WT_PAGE */page'])
 
-serial['bt_repl'] = Serial(
+serial['bt_replace'] = Serial(
 	'bt_repl',
 	'WT_WORKQ_SPIN',
 	['WT_ROW_INDX */indx',
-	 'WT_REPL */repl',
 	 'void */data',
 	 'u_int32_t/size'])
 

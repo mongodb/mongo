@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static void __wt_workq_repl(WT_TOC *, WT_SDBT **, void *, u_int32_t);
+
 /*
  * __wt_db_row_del --
  *	Db.row_del method.
@@ -19,34 +21,27 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_REPL *new, *repl;
-	WT_ROW_INDX *rip;
 	int ret;
 
 	env = toc->env;
 	idb = toc->db->idb;
-	page = NULL;
-	ret = 0;
+
+	/* Make sure we have a spare replacement array in the WT_TOC. */
+	if (toc->repl_spare == NULL)
+		WT_RET(__wt_calloc(
+		    env, WT_SDBT_CHUNK + 1, sizeof(WT_SDBT), &toc->repl_spare));
 
 	/* Search the btree for the key. */
-	WT_ERR(__wt_bt_search_row(toc, key, 0));
+	WT_RET(__wt_bt_search_row(toc, key, 0));
 	page = toc->srch_page;
-	rip = toc->srch_ip;
-
-	/* Grow or allocate the replacement array if necessary. */
-	repl = rip->repl;
-	if (repl == NULL || repl->repl_next == repl->repl_size)
-		WT_ERR(__wt_bt_repl_alloc(env, repl, &new));
-	else
-		new = NULL;
 
 	/* Delete the item. */
-	__wt_bt_del_serial(toc, page, new, ret);
+	__wt_bt_delete_serial(toc, page, ret);
 
-err:	if (page != NULL && page != idb->root_page)
+	if (page != NULL && page != idb->root_page)
 		__wt_bt_page_out(toc, &page, ret == 0 ? WT_MODIFIED : 0);
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -56,49 +51,75 @@ err:	if (page != NULL && page != idb->root_page)
 int
 __wt_bt_del_serial_func(WT_TOC *toc)
 {
-	WT_PAGE *page;
-	WT_REPL *new, *repl;
+	DB *db;
 	WT_COL_INDX *cip;
+	WT_PAGE *page;
 	WT_ROW_INDX *rip;
 
-	__wt_bt_del_unpack(toc, page, new);
+	__wt_bt_delete_unpack(toc, page);
+	db = toc->db;
 
 	/*
 	 * The entry we're updating is the last one pushed on the stack.
 	 *
-	 * If our caller thought we'd need to install a new replacement array,
-	 * check on that.
+	 * If we need a new replacement array, check on that.
 	 */
 	switch (page->hdr->type) {
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
 		rip = toc->srch_ip;
-		if (new != NULL)
-			WT_RET(
-			    __wt_workq_repl(toc, rip->repl, new, &rip->repl));
-		repl = rip->repl;
+		__wt_workq_repl(toc, &rip->repl, WT_SDBT_DELETED_VALUE, 0);
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 		cip = toc->srch_ip;
-		if (new != NULL)
-			WT_RET(
-			    __wt_workq_repl(toc, cip->repl, new, &cip->repl));
-		repl = cip->repl;
+		__wt_workq_repl(toc, &cip->repl, WT_SDBT_DELETED_VALUE, 0);
 		break;
-	WT_ILLEGAL_FORMAT(toc->db);
+	WT_ILLEGAL_FORMAT(db);
 	}
+	return (0);
+}
+
+/*
+ * __wt_workq_repl --
+ *	Update a WT_{ROW,COL}_INDX replacement array.
+ */
+static void
+__wt_workq_repl(WT_TOC *toc, WT_SDBT **replp, void *data, u_int32_t size)
+{
+	WT_SDBT *repl;
 
 	/*
-	 * Update the entry.  Incrementing the repl_next field makes this entry
-	 * visible to the rest of the system; flush memory before incrementing
-	 * it so it's never valid without supporting information.
+	 * The WorkQ thread updates the WT_{ROW,COL}_INDX replacement arrays,
+	 * serializing changes or deletions of existing key/data items.
+	 *
+	 * The caller's WT_TOC structure has a cache, spare WT_SDBT array if we
+	 * need one.  Update the replacement entry before making any new
+	 * replacement array visible to anyone, the rest of the code depends on
+	 * there being a replacement item if the replacement array exists.
+	 *
+	 * First, check if we're entering in a new replacment array -- if we
+	 * are, enter the information into the new replacement array (including
+	 * linking it into the list of replacement arrays), flush memory, and
+	 * then update the WT_{ROW,COL}_INDX's replacement array reference.
 	 */
-	repl->data[repl->repl_next].size = 0;
-	WT_SDBT_DELETED_SET(repl->data[repl->repl_next].data);
+	if ((repl = *replp) == NULL || repl->data != NULL) {
+		repl = toc->repl_spare;
+		repl[WT_SDBT_CHUNK - 1].data = data;
+		repl[WT_SDBT_CHUNK - 1].size = size;
+		repl[WT_SDBT_CHUNK].data = *replp;
+		WT_MEMORY_FLUSH;
+		*replp = repl;
+		toc->repl_spare = NULL;
+	} else {
+		/*
+		 * There's an existing replacement array with at least one empty
+		 * slot: find the first available empty slot and update it.
+		 */
+		for (; repl[1].data == NULL; ++repl)
+			;
+		repl->data = data;
+		repl->size = size;
+	}
 	WT_MEMORY_FLUSH;
-	++repl->repl_next;
-	WT_PAGE_MODIFY_SET_AND_FLUSH(page);
-
-	return (0);
 }
