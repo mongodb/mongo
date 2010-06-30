@@ -172,7 +172,6 @@ namespace mongo {
         
         {
             rwlock lk( _manager->_lock , true );
-            _manager->_chunks.push_back( s );
             _manager->_chunkMap[s->getMax()] = s;
             
             setMax(m.getOwned());
@@ -505,11 +504,10 @@ namespace mongo {
     {
         _reload_inlock();
         
-        if ( _chunks.size() == 0 ){
+        if ( _chunkMap.empty() ){
             ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), config->getPrimary()) );
             c->_markModified();
             
-            _chunks.push_back( c );
             _chunkMap[c->getMax()] = c;
             _chunkRanges.reloadAll(_chunkMap);
 
@@ -521,7 +519,6 @@ namespace mongo {
     }
     
     ChunkManager::~ChunkManager(){
-        _chunks.clear();
         _chunkMap.clear();
         _chunkRanges.clear();
         _shards.clear();
@@ -535,7 +532,6 @@ namespace mongo {
     void ChunkManager::_reload_inlock(){
         int tries = 3;
         while (tries--){
-            _chunks.clear();
             _chunkMap.clear();
             _chunkRanges.clear();
             _shards.clear();
@@ -569,7 +565,6 @@ namespace mongo {
             ChunkPtr c( new Chunk( this ) );
             c->unserialize( d );
 
-            _chunks.push_back( c );
             _chunkMap[c->getMax()] = c;
             _shards.insert(c->getShard());
 
@@ -580,9 +575,7 @@ namespace mongo {
     bool ChunkManager::_isValid() const {
 #define ENSURE(x) do { if(!(x)) { log() << "ChunkManager::_isValid failed: " #x << endl; return false; } } while(0)
 
-        ENSURE(_chunks.size() == _chunkMap.size());
-
-        if (_chunks.empty())
+        if (_chunkMap.empty())
             return true;
 
         // Check endpoints
@@ -652,8 +645,8 @@ namespace mongo {
     ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {
         rwlock lk( _lock , false ); 
  
-        for ( vector<ChunkPtr>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
-            ChunkPtr c = *i;
+        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
+            ChunkPtr c = i->second;
             if ( c->getShard() == shard )
                 return c;
         }
@@ -749,8 +742,8 @@ namespace mongo {
  
         set<Shard> seen;
         
-        for ( vector<ChunkPtr>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
-            ChunkPtr c = *i;
+        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
+            ChunkPtr c = i->second;
             if ( seen.count( c->getShard() ) )
                 continue;
             seen.insert( c->getShard() );
@@ -768,8 +761,8 @@ namespace mongo {
         log(1) << "ChunkManager::drop : " << _ns << endl;
 
         // lock all shards so no one can do a split/migrate
-        for ( vector<ChunkPtr>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
-            ChunkPtr c = *i;
+        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
+            ChunkPtr c = i->second;
             ShardChunkVersion& version = seen[ c->getShard() ];
             if ( version.isSet() ) 
                 continue;
@@ -784,7 +777,6 @@ namespace mongo {
         log(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;        
 
         // wipe my meta-data
-        _chunks.clear();
         _chunkMap.clear();
         _chunkRanges.clear();
         _shards.clear();
@@ -831,7 +823,7 @@ namespace mongo {
     void ChunkManager::save_inlock(){
         
         ShardChunkVersion a = getVersion_inlock();
-        assert( a > 0 || _chunks.size() <= 1 );
+        assert( a > 0 || _chunkMap.size() <= 1 );
         ShardChunkVersion nextChunkVersion = a.incMajor();
         vector<ChunkPtr> toFix;
         vector<ShardChunkVersion> newVersions;
@@ -841,8 +833,8 @@ namespace mongo {
         
         
         int numOps = 0;
-        for ( vector<ChunkPtr>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
-            ChunkPtr c = *i;
+        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
+            ChunkPtr c = i->second;
             if ( ! c->_modified )
                 continue;
 
@@ -875,7 +867,7 @@ namespace mongo {
         
         updates.done();
         
-        if ( a > 0 || _chunks.size() > 1 ){
+        if ( a > 0 || _chunkMap.size() > 1 ){
             BSONArrayBuilder temp( cmdBuilder.subarrayStart( "preCondition" ) );
             BSONObjBuilder b;
             b.append( "ns" , ShardNS::chunk );
@@ -917,8 +909,8 @@ namespace mongo {
         
         ShardChunkVersion max = 0;
 
-        for ( vector<ChunkPtr>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
-            ChunkPtr c = *i;
+        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
+            ChunkPtr c = i->second;
             DEV assert( c );
             if ( c->getShard() != shard )
                 continue;
@@ -938,8 +930,8 @@ namespace mongo {
         
         ShardChunkVersion max = 0;
         
-        for ( vector<ChunkPtr>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
-            ChunkPtr c = *i;
+        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
+            ChunkPtr c = i->second;
             if ( c->_lastmod > max )
                 max = c->_lastmod;
         }        
@@ -952,8 +944,8 @@ namespace mongo {
 
         stringstream ss;
         ss << "ChunkManager: " << _ns << " key:" << _key.toString() << '\n';
-        for ( vector<ChunkPtr>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
-            const ChunkPtr c = *i;
+        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
+            const ChunkPtr c = i->second;
             ss << "\t" << c->toString() << '\n';
         }
         return ss.str();
@@ -991,9 +983,9 @@ namespace mongo {
             }
 
             // Make sure we match the original chunks
-            const vector<ChunkPtr> chunks = _ranges.begin()->second->getManager()->_chunks;
-            for (vector<ChunkPtr>::const_iterator it=chunks.begin(), end=chunks.end(); it != end; ++it){
-                const ChunkPtr chunk = *it;
+            const ChunkMap chunks = _ranges.begin()->second->getManager()->_chunkMap;
+            for ( ChunkMap::const_iterator i=chunks.begin(); i!=chunks.end(); ++i ){
+                const ChunkPtr chunk = i->second;
 
                 ChunkRangeMap::const_iterator min = _ranges.upper_bound(chunk->getMin());
                 ChunkRangeMap::const_iterator max = _ranges.lower_bound(chunk->getMax());

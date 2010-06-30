@@ -300,8 +300,7 @@ namespace mongo {
             return _ns;
         }
         
-        int numChunks(){ rwlock lk( _lock , false ); return _chunks.size(); }
-        ChunkPtr getChunk( int i ){ rwlock lk( _lock , false ); return _chunks[i]; }
+        int numChunks(){ rwlock lk( _lock , false ); return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj );
 
         ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
@@ -362,7 +361,6 @@ namespace mongo {
         ShardKeyPattern _key;
         bool _unique;
         
-        vector<ChunkPtr> _chunks;
         map<string,unsigned long long> _maxMarkers;
 
         ChunkMap _chunkMap;
