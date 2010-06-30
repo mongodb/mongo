@@ -176,11 +176,12 @@ namespace mongo {
         
         static int MaxChunkSize;
 
-        string genID(){ return genID( _ns , _min ); }
+        string genID();
         static string genID( const string& ns , const BSONObj& min );
 
         const ChunkManager* getManager() const { return _manager; }
         
+        bool modified();
     private:
         
         // main shard info
@@ -188,7 +189,6 @@ namespace mongo {
         ChunkManager * _manager;
         ShardKeyPattern skey() const;
 
-        string _ns;
         BSONObj _min;
         BSONObj _max;
         Shard _shard;
@@ -413,5 +413,6 @@ namespace mongo {
     };
 
 
+    inline string Chunk::genID(){ return genID(_manager->getns(), _min); }
 
 } // namespace mongo
