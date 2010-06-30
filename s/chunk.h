@@ -101,6 +101,7 @@ namespace mongo {
     public:
 
         Chunk( ChunkManager * info );
+        Chunk( ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
         
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }

@@ -42,11 +42,16 @@ namespace mongo {
 
     int Chunk::MaxChunkSize = 1024 * 1024 * 200;
     
-    Chunk::Chunk( ChunkManager * manager ) : _manager( manager ){
-        _modified = false;
-        _lastmod = 0;
-        _dataWritten = 0;
-    }
+    Chunk::Chunk( ChunkManager * manager )
+      : _manager(manager),
+        _lastmod(0), _modified(false), _dataWritten(0)
+    {}
+
+    Chunk::Chunk(ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
+      : _manager(info), _min(min), _max(max), _shard(shard),
+        _lastmod(0), _modified(false), _dataWritten(0)
+    {}
+
 
     void Chunk::setShard( const Shard& s ){
         _shard = s;
@@ -160,11 +165,8 @@ namespace mongo {
         uassert( 13003 ,  "can't split chunk. does it have only one distinct value?" ,
                           !m.isEmpty() && _min.woCompare(m) && _max.woCompare(m)); 
 
-        ChunkPtr s( new Chunk( _manager ) );
-        s->_shard = _shard;
-        s->setMin(m.getOwned());
-        s->setMax(_max);
-        
+        ChunkPtr s( new Chunk( _manager, m.getOwned(), _max , _shard) );
+
         s->_markModified();
         _markModified();
         
@@ -501,14 +503,10 @@ namespace mongo {
         _key( pattern ) , _unique( unique ) , 
         _sequenceNumber(  ++NextSequenceNumber ), _lock("rw:ChunkManager")
     {
-        
         _reload_inlock();
         
         if ( _chunks.size() == 0 ){
-            ChunkPtr c( new Chunk( this ) );
-            c->setMin(_key.globalMin());
-            c->setMax(_key.globalMax());
-            c->_shard = config->getPrimary();
+            ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), config->getPrimary()) );
             c->_markModified();
             
             _chunks.push_back( c );
@@ -519,9 +517,7 @@ namespace mongo {
 
             save_inlock();
             log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
-            
         }
-
     }
     
     ChunkManager::~ChunkManager(){
@@ -559,7 +555,7 @@ namespace mongo {
     }
 
     void ChunkManager::_load(){
-        Chunk temp(0);
+        static Chunk temp(0);
         
         ScopedDbConnection conn( temp.modelServer() );
 
@@ -809,7 +805,7 @@ namespace mongo {
         
         
         // remove chunk data
-        Chunk temp(0);
+        static Chunk temp(0);
         ScopedDbConnection conn( temp.modelServer() );
         conn->remove( temp.getNS() , BSON( "ns" << _ns ) );
         conn.done();
