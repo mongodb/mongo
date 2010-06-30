@@ -675,11 +675,6 @@ namespace mongo {
                 help << "remove a shard to the system.";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                if ( ! cmdObj["forTestingOnly"].trueValue() ){
-                    errmsg = "removeshard not yet implemented";
-                    return false;
-                }
-
                 string shard = cmdObj["removeshard"].valuestrsafe();
                 if ( ! grid.knowAboutShard( shard ) ){
                     errmsg = "unknown shard";

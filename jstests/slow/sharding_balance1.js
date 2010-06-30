@@ -59,7 +59,7 @@ assert.soon( function(){
     
 var chunkCount = sum();
 host = s.config.shards.findOne({_id : "shard0" }).host;
-s.adminCommand( { removeshard: host , forTestingOnly : true } );
+s.adminCommand( { removeshard: host } );
 
 assert.soon( function(){
     printjson(dist());
