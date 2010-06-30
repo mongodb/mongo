@@ -329,6 +329,10 @@ namespace mongo {
             }
             catch ( std::exception& e ){
                 log() << "caught exception while doing balance: " << e.what() << endl;
+
+                // It's possible this shard was removed
+                Shard::reloadShardInfo(); 
+          
                 continue;
             }
         }
