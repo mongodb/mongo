@@ -161,23 +161,23 @@ namespace mongo {
         return z;
     }
 
-    bool _userCreateNS(const char *ns, const BSONObj& j, string& err) {
+    bool _userCreateNS(const char *ns, const BSONObj& options, string& err) {
         if ( nsdetails(ns) ) {
             err = "collection already exists";
             return false;
         }
 
-        log(1) << "create collection " << ns << ' ' << j << '\n';
+        log(1) << "create collection " << ns << ' ' << options << '\n';
 
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
            and then go back and set to ok : 1 after we are done.
         */
         bool isFreeList = strstr(ns, ".$freelist") != 0;
         if( !isFreeList )
-            addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
+            addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
 
         long long size = initialExtentSize(128);
-        BSONElement e = j.getField("size");
+        BSONElement e = options.getField("size");
         if ( e.isNumber() ) {
             size = e.numberLong();
             size += 256;
@@ -188,10 +188,10 @@ namespace mongo {
 
         bool newCapped = false;
         int mx = 0;
-        e = j.getField("capped");
+        e = options.getField("capped");
         if ( e.type() == Bool && e.boolean() ) {
             newCapped = true;
-            e = j.getField("max");
+            e = options.getField("max");
             if ( e.isNumber() ) {
                 mx = e.numberInt();
             }
@@ -199,7 +199,7 @@ namespace mongo {
 
         // $nExtents just for debug/testing.  We create '$nExtents' extents,
         // each of size 'size'.
-        e = j.getField( "$nExtents" );
+        e = options.getField( "$nExtents" );
         int nExtents = int( e.number() );
         Database *database = cc().database();
         if ( nExtents > 0 ) {
@@ -223,8 +223,8 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
 
-        if ( j.getField( "autoIndexId" ).type() ) {
-            if ( j["autoIndexId"].trueValue() ){
+        if ( options.getField( "autoIndexId" ).type() ) {
+            if ( options["autoIndexId"].trueValue() ){
                 ensureIdIndexForNewNs( ns );
             }
         } else {
@@ -241,21 +241,21 @@ namespace mongo {
 
     // { ..., capped: true, size: ..., max: ... }
     // returns true if successful
-    bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication) {
+    bool userCreateNS(const char *ns, BSONObj options, string& err, bool logForReplication) {
         const char *coll = strchr( ns, '.' ) + 1;
         massert( 10356 ,  "invalid ns", coll && *coll );
         char cl[ 256 ];
         nsToDatabase( ns, cl );
-        bool ok = _userCreateNS(ns, j, err);
+        bool ok = _userCreateNS(ns, options, err);
         if ( logForReplication && ok ) {
-            if ( j.getField( "create" ).eoo() ) {
+            if ( options.getField( "create" ).eoo() ) {
                 BSONObjBuilder b;
                 b << "create" << coll;
-                b.appendElements( j );
-                j = b.obj();
+                b.appendElements( options );
+                options = b.obj();
             }
             string logNs = string( cl ) + ".$cmd";
-            logOp("c", logNs.c_str(), j);
+            logOp("c", logNs.c_str(), options);
         }
         return ok;
     }
