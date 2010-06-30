@@ -927,7 +927,7 @@ namespace mongo {
         dblock lk;
 
         if ( localLogTail && replPair && replPair->state == ReplPair::State_Master ) {
-            updateSetsWithLocalOps( *localLogTail, true ); // allow unlocking
+            while( updateSetsWithLocalOps( *localLogTail, true ) > 0 ); // allow unlocking
             updateSetsWithLocalOps( *localLogTail, false ); // don't allow unlocking or conversion to db backed storage
         }
 
@@ -1086,7 +1086,8 @@ namespace mongo {
         }
     }
     
-    bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock ) {
+    int ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock ) {
+        int ret = 0;
         Client::Context ctx( "local.oplog.$main" );
         auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         OpTime newTail;
@@ -1098,6 +1099,7 @@ namespace mongo {
             }
             if ( !( localLogTail < ts ) )
                 break;
+            ++ret;
             updateSetsWithOp( op, mayUnlock );
             if ( mayUnlock ) {
                 RARELY {
@@ -1114,7 +1116,7 @@ namespace mongo {
         }        
         if ( !newTail.isNull() )
             localLogTail = newTail;
-        return true;
+        return ret;
     }
     
     /* slave: pull some data from the master's oplog

@@ -130,8 +130,7 @@ namespace mongo {
         // call without the db mutex
         void resetSlave();
         // call with the db mutex
-        // returns false if the slave has been reset
-        bool updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock );
+        int updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock );
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
         unsigned _sleepAdviceTime;
         
