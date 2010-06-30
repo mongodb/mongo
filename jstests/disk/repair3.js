@@ -7,7 +7,7 @@ var repairpath = repairbase + "/dir"
 doIt = false;
 files = listFiles( "/data/db" );
 for ( i in files ) {
-    if ( files[ i ].name == repairpath ) {
+    if ( files[ i ].name == repairbase ) {
         doIt = true;
     }
 }
