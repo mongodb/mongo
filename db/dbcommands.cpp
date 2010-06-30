@@ -335,11 +335,15 @@ namespace mongo {
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             
+            long long start = Listener::getElapsedTimeMillis();
+            BSONObjBuilder timeBuilder(128);
+
+
 			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
 
             result.append("version", versionString);
             result.append("uptime",(double) (time(0)-started));
-            result.append("uptimeEstimate",(double) (Listener::getElapsedTimeMillis()/1000));
+            result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );
 
             {
@@ -356,7 +360,8 @@ namespace mongo {
                 
                 result.append( "globalLock" , t.obj() );
             }
-            
+            timeBuilder.appendNumber( "after basic" , Listener::getElapsedTimeMillis() - start );
+
             if ( authed ){
                 
                 BSONObjBuilder t( result.subobjStart( "mem" ) );
@@ -379,6 +384,7 @@ namespace mongo {
                 t.done();
                     
             }
+            timeBuilder.appendNumber( "after is authed" , Listener::getElapsedTimeMillis() - start );
             
             {
                 BSONObjBuilder bb( result.subobjStart( "connections" ) );
@@ -386,6 +392,7 @@ namespace mongo {
                 bb.append( "available" , connTicketHolder.available() );
                 bb.done();
             }
+            timeBuilder.appendNumber( "after connections" , Listener::getElapsedTimeMillis() - start );
             
             if ( authed ){
                 BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
@@ -393,26 +400,31 @@ namespace mongo {
                 ProcessInfo p;
                 p.getExtraInfo(bb);
                 bb.done();
+                timeBuilder.appendNumber( "after extra info" , Listener::getElapsedTimeMillis() - start );
+            
             }
-
 
             {
                 BSONObjBuilder bb( result.subobjStart( "indexCounters" ) );
                 globalIndexCounters.append( bb );
                 bb.done();
             }
-
+            
             {
                 BSONObjBuilder bb( result.subobjStart( "backgroundFlushing" ) );
                 globalFlushCounters.append( bb );
                 bb.done();
             }
-            
+
+            timeBuilder.appendNumber( "after counters" , Listener::getElapsedTimeMillis() - start );            
+
             if ( anyReplEnabled() ){
                 BSONObjBuilder bb( result.subobjStart( "repl" ) );
                 appendReplicationInfo( bb , authed , cmdObj["repl"].numberInt() );
                 bb.done();
             }
+
+            timeBuilder.appendNumber( "after repl" , Listener::getElapsedTimeMillis() - start );            
             
             result.append( "opcounters" , globalOpCounters.getObj() );
             
@@ -426,8 +438,13 @@ namespace mongo {
                 asserts.done();
             }
 
+            timeBuilder.appendNumber( "after asserts" , Listener::getElapsedTimeMillis() - start );            
+
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
+            
+            if ( Listener::getElapsedTimeMillis() - start > 1000 )
+                result.append( "timing" , timeBuilder.obj() );
 
             return true;
         }
