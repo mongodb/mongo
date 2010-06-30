@@ -91,7 +91,8 @@ namespace mongo {
          *    = 0  no lock
          *    < 0  read lock
          */
-        int getState(){ return _state.get(); }
+        int getState() { return _state.get(); }
+        bool isWriteLocked() { return getState() > 0; }
         void assertWriteLocked() { 
             assert( getState() > 0 ); 
             DEV assert( !_releasedEarly.get() );
