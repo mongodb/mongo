@@ -395,8 +395,48 @@ namespace mongo {
         }
     } testoptime;
 
+    void pretouchOperation(const BSONObj& op) {
+        if( dbMutex.isWriteLocked() )
+            return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
+
+        try { 
+            OpDebug debug;
+            const char *ns = op.getStringField("ns");
+            const char *opType = op.getStringField("op");
+            if ( *opType == 'i' ) {
+                BSONObj o = op.getObjectField("o");
+                BSONElement _id;
+                if( o.getObjectID(_id) ) {
+                    BSONObjBuilder b;
+                    b.append(_id);
+                    BSONObj result;
+                    readlock lk(ns);
+                    Client::Context ctx( ns );
+                    Helpers::findById(cc(), ns, b.done(), result);
+                }
+            }
+            else if ( *opType == 'u' ) {
+                BSONObj o2 = op.getObjectField("o2");
+                BSONElement _id;
+                if( o2.getObjectID(_id) ) {
+                    BSONObjBuilder b;
+                    b.append(_id);
+                    BSONObj result;
+                    readlock lk(ns);
+                    Client::Context ctx( ns );
+                    Helpers::findById(cc(), ns, b.done(), result);
+                }
+            }
+            /* todo : other operations */
+        }
+        catch( DBException& ) { 
+            log() << "ignoring assertion in pretouchOperation() " << endl;
+        }
+    }
+
     void applyOperation_inlock(const BSONObj& op){
-        log( 6 ) << "applying op: " << op << endl;
+        if( logLevel >= 6 ) 
+            log() << "applying op: " << op << endl;
         
         assertInWriteLock();
 

@@ -849,7 +849,9 @@ namespace mongo {
         }
 
     }
-    
+
+    const bool preTouch = true;
+
     /* local.$oplog.main is of the form:
          { ts: ..., op: <optype>, ns: ..., o: <obj> , o2: <extraobj>, b: <boolflag> }
          ...
@@ -877,6 +879,10 @@ namespace mongo {
 
         if ( !only.empty() && only != clientName )
             return;
+
+        if( preTouch ) {
+            pretouchOperation(op);
+        }
 
         dblock lk;
 
