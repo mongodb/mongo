@@ -400,13 +400,12 @@ namespace mongo {
             return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
 
         try { 
-            OpDebug debug;
-            const char *ns = op.getStringField("ns");
             const char *opType = op.getStringField("op");
             if ( *opType == 'i' ) {
                 BSONObj o = op.getObjectField("o");
                 BSONElement _id;
                 if( o.getObjectID(_id) ) {
+                    const char *ns = op.getStringField("ns");
                     BSONObjBuilder b;
                     b.append(_id);
                     BSONObj result;
@@ -419,6 +418,7 @@ namespace mongo {
                 BSONObj o2 = op.getObjectField("o2");
                 BSONElement _id;
                 if( o2.getObjectID(_id) ) {
+                    const char *ns = op.getStringField("ns");
                     BSONObjBuilder b;
                     b.append(_id);
                     BSONObj result;
