@@ -25,7 +25,7 @@ if ( doIt ) {
     resetDbpath( dbpath );
     resetDbpath( repairpath );
 
-    m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    m = startMongoProgram( "mongod", "--noprealloc", "--smallfiles", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
     db = m.getDB( baseName );
     db[ baseName ].save( {} );
     assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles:true} ) );
@@ -42,9 +42,9 @@ if ( doIt ) {
     stopMongod( port );
 
     resetDbpath( repairpath );
-    rc = runMongoProgram( "mongod", "--repair", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    rc = runMongoProgram( "mongod", "--noprealloc", "--smallfiles", "--repair", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
     assert.eq.automsg( "0", "rc" );
-    m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    m = startMongoProgram( "mongod", "--noprealloc", "--smallfiles", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
     db = m.getDB( baseName );
     check();
     stopMongod( port );
