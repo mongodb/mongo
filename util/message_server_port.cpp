@@ -32,6 +32,7 @@ namespace mongo {
         MessageHandler * handler;
         
         void threadRun(){
+            setThreadName( "conn" );
             TicketHolderReleaser connTicketReleaser( &connTicketHolder );
         
             assert( grab );

@@ -174,7 +174,7 @@ namespace mongo {
 #endif
 
                 if ( ! threadName.empty() ){
-                    cout << threadName << " ";
+                    cout << "[" << threadName << "] ";
                 }
                 cout << type << ( type[0] ? ": " : "" );
                 cout << s;
