@@ -313,8 +313,7 @@ namespace mongo {
         }
 
         log() << "******\n";
-        log() << "creating replication oplog of size: " << (int)( sz / ( 1024 * 1024 ) ) << "MB (use --oplogSize to change)\n";
-        log() << "******" << endl;
+        log() << "creating replication oplog of size: " << (int)( sz / ( 1024 * 1024 ) ) << "MB... (use --oplogSize to change)" << endl;
 
         b.append("size", sz);
         b.appendBool("capped", 1);
@@ -325,6 +324,10 @@ namespace mongo {
         userCreateNS(ns, o, err, false);
         if( !rs )
             logOp( "n", "dummy", BSONObj() );
+
+        /* sync here so we don't get any surprising lag later when we try to sync */
+        MemoryMappedFile::flushAll(true);
+        log() << "******" << endl;
     }
 
     class CmdLogCollection : public Command {

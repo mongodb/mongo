@@ -104,7 +104,9 @@ namespace mongo {
         while( 1 ) {
             const char *comma = strchr(p, ',');
             if( comma == 0 ) comma = strchr(p,0);
-            uassert(13094, "bad --replSet config string", p != comma);
+            if( p == comma )
+                break;
+            //uassert(13094, "bad --replSet config string", p != comma);
             {
                 HostAndPort m;
                 try {
@@ -263,7 +265,6 @@ namespace mongo {
                     }
 
                     sleepsecs(20);
-                    cout << "TEMP END SLEEP 20" << endl;
                     continue;
                 }
                 _loadConfigFinish(configs);
