@@ -47,8 +47,6 @@ namespace mongo {
         MemoryMappedFile::flushAll(true);
         { 
             writelock lk("");
-            // todo: set optime here.
-            cout << "todo set optime here" << endl;
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably
             BSONObj o = asBson();
@@ -57,8 +55,8 @@ namespace mongo {
                 logOpInitiate(comment);
             MemoryMappedFile::flushAll(true);
         }
+        DEV log() << "replSet saveConfigLocally done" << rsLog;
     }
-
     
     /*static*/ 
     void ReplSetConfig::receivedNewConfig(BSONObj cfg) { 

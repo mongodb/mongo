@@ -308,11 +308,13 @@ namespace mongo {
         class ShardCollectionCmd : public GridAdminCmd {
         public:
             ShardCollectionCmd() : GridAdminCmd( "shardcollection" ){}
+
             virtual void help( stringstream& help ) const {
                 help
                     << "Shard a collection.  Requires key.  Optional unique. Sharding must already be enabled for the database.\n"
                     << "  { enablesharding : \"<dbname>\" }\n";
             }
+
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string ns = cmdObj["shardcollection"].valuestrsafe();
                 if ( ns.size() == 0 ){
@@ -344,19 +346,46 @@ namespace mongo {
                     errmsg = "can't shard system namespaces";
                     return false;
                 }
-                
-                ShardKeyPattern proposedKey( key );
+
+                // Sharding interacts with indexing in at least two ways:
+                //
+                // 1. A unique index must have the sharding key as its prefix. Otherwise maintainig uniqueness would
+                // require coordinated access to all shards. Trying to shard a collection with such an index is not
+                // allowed.
+                // 
+                // 2. Sharding a collection requires an index over the sharding key. That index must be create upfront.
+                // The rationale is that sharding a non-empty collection would need to create the index and that could
+                // be slow. Requiring the index upfront allows the admin to plan before sharding and perhaps use 
+                // background index construction. One exception to the rule: empty collections. It's fairly easy to
+                // create the index as part of the sharding process.
+                //
+                // We enforce both these conditions in what comes next.
+
                 {
+                    ShardKeyPattern proposedKey( key );
+                    bool hasShardIndex = false;
+
                     ScopedDbConnection conn( config->getPrimary() );
                     BSONObjBuilder b; 
                     b.append( "ns" , ns ); 
-                    b.appendBool( "unique" , true ); 
 
                     auto_ptr<DBClientCursor> cursor = conn->query( config->getName() + ".system.indexes" , b.obj() );
                     while ( cursor->more() ){
                         BSONObj idx = cursor->next();
+
+                        // Is index key over the sharding key? Remember that.
+                        if ( key.woCompare( idx["key"].embeddedObjectUserCheck() ) == 0 ){
+                            hasShardIndex = true;
+                        }
+
+                        // Not a unique index? Move on.
+                        if ( idx["unique"].eoo() || ! idx["unique"].Bool() )
+                            continue;
+
+                        // Shard key is prefix of unique index? Move on.
                         if ( proposedKey.isPrefixOf( idx["key"].embeddedObjectUserCheck() ) )
                             continue;
+
                         errmsg = (string)"can't shard collection with unique index on: " + idx.toString();
                         conn.done();
                         return false;
@@ -369,9 +398,14 @@ namespace mongo {
                         return false;
                     }
 
+                    if ( ! hasShardIndex && ( conn->count( ns ) != 0 ) ){
+                        errmsg = "please create an index over the sharding key before sharding.";
+                        return false;
+                    }
+                
                     conn.done();
                 }
-                
+
                 tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
                 config->shardCollection( ns , key , cmdObj["unique"].trueValue() );

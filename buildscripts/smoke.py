@@ -144,7 +144,8 @@ class mongod(object):
         sys.stdout.flush()
     
 class Bug(Exception):
-    pass
+    def __str__(self):
+        return 'bug in smoke.py: ' + super(Bug, self).__str__()
 
 class TestFailure(Exception):
     pass
@@ -162,7 +163,7 @@ class TestServerFailure(TestFailure):
         self.status = -1 # this is meaningless as an exit code, but
                          # that's the point.
     def __str__(self):
-        return 'mongod not ok after test %s' % self.path
+        return 'mongod not running after executing test %s' % self.path
 
 def checkDbHashes(master, slave):
     # Need to pause a bit so a slave might catch up...
