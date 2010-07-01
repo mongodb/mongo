@@ -8,6 +8,7 @@ db = s.getDB( "test" );
 db.foo.insert( { num : 1 , name : "eliot" } );
 db.foo.insert( { num : 2 , name : "sara" } );
 db.foo.insert( { num : -1 , name : "joe" } );
+db.foo.ensureIndex( { num : 1 } );
 assert.eq( 3 , db.foo.find().length() , "A" );
 
 shardCommand = { shardcollection : "test.foo" , key : { num : 1 } };
