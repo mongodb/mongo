@@ -27,7 +27,7 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 	/* Make sure we have a spare replacement array in the WT_TOC. */
 	if (toc->repl_spare == NULL)
 		WT_RET(__wt_calloc(
-		    env, WT_SDBT_CHUNK + 1, sizeof(WT_SDBT), &toc->repl_spare));
+		    env, WT_REPL_CHUNK + 1, sizeof(WT_SDBT), &toc->repl_spare));
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_bt_search_col(toc, recno));

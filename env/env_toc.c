@@ -89,7 +89,7 @@ __wt_wt_toc_close(WT_TOC *toc)
 
 	if (toc->repl_spare != NULL)
 		__wt_free(env,
-		    toc->repl_spare, (WT_SDBT_CHUNK + 1) * sizeof(WT_SDBT));
+		    toc->repl_spare, (WT_REPL_CHUNK + 1) * sizeof(WT_SDBT));
 
 	/* Unlock and destroy the thread's mutex. */
 	if (toc->mtx != NULL) {

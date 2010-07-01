@@ -85,7 +85,7 @@ restart:
 
 done:
 	/* Check for deleted items. */
-	WT_SDBT_CURRENT_SET(cip, sdbt);
+	WT_REPL_CURRENT_SET(cip, sdbt);
 	if (sdbt == NULL) {
 		if (cip->data == NULL) {
 			ret = WT_NOTFOUND;

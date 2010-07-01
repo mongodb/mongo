@@ -343,7 +343,7 @@ struct __wt_row_indx {
 	 * We can potentially allocate lots of these little arrays, so make an
 	 * effort to play nicely with power-of-two allocators.
 	 */
-#define	WT_SDBT_CHUNK	(64 / sizeof(WT_SDBT))
+#define	WT_REPL_CHUNK	(64 / sizeof(WT_SDBT))
 
 	/*
 	 * We do not list how many entries in the array are used (it's only a
@@ -355,7 +355,7 @@ struct __wt_row_indx {
 	 * Set sdbt to the most recent replacement entry referenced by a ROW/COL
 	 * structure, or NULL if there's been no replacement.
 	 */
-#define	WT_SDBT_CURRENT_SET(ip, sdbt) do {				\
+#define	WT_REPL_CURRENT_SET(ip, sdbt) do {				\
 	if ((sdbt = (ip)->repl) != NULL)				\
 		for (; (sdbt)->data == NULL; ++(sdbt))			\
 			;						\

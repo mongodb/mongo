@@ -29,7 +29,7 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 	/* Make sure we have a spare replacement array in the WT_TOC. */
 	if (toc->repl_spare == NULL)
 		WT_RET(__wt_calloc(
-		    env, WT_SDBT_CHUNK + 1, sizeof(WT_SDBT), &toc->repl_spare));
+		    env, WT_REPL_CHUNK + 1, sizeof(WT_SDBT), &toc->repl_spare));
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_bt_search_row(toc, key, 0));
@@ -105,9 +105,9 @@ __wt_workq_repl(WT_TOC *toc, WT_SDBT **replp, void *data, u_int32_t size)
 	 */
 	if ((repl = *replp) == NULL || repl->data != NULL) {
 		repl = toc->repl_spare;
-		repl[WT_SDBT_CHUNK - 1].data = data;
-		repl[WT_SDBT_CHUNK - 1].size = size;
-		repl[WT_SDBT_CHUNK].data = *replp;
+		repl[WT_REPL_CHUNK - 1].data = data;
+		repl[WT_REPL_CHUNK - 1].size = size;
+		repl[WT_REPL_CHUNK].data = *replp;
 		WT_MEMORY_FLUSH;
 		*replp = repl;
 		toc->repl_spare = NULL;

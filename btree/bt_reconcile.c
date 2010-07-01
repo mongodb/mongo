@@ -204,7 +204,7 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * it's been deleted.
 		 */
 		repeat_count = 1;
-		WT_SDBT_CURRENT_SET(cip, sdbt);
+		WT_REPL_CURRENT_SET(cip, sdbt);
 		if (sdbt != NULL) {
 			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				data = toc->tmp2.data;
@@ -279,7 +279,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data, on- or off- page, and see if
 		 * it's been deleted.
 		 */
-		WT_SDBT_CURRENT_SET(cip, sdbt);
+		WT_REPL_CURRENT_SET(cip, sdbt);
 		if (sdbt != NULL) {
 			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				goto deleted;
@@ -378,7 +378,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data.  We get the data first because
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
-		WT_SDBT_CURRENT_SET(rip, sdbt);
+		WT_REPL_CURRENT_SET(rip, sdbt);
 		if (sdbt != NULL) {
 			if (WT_SDBT_DELETED_ISSET(sdbt->data))
 				continue;
@@ -580,7 +580,7 @@ __wt_bt_page_discard_repl(ENV *env, WT_SDBT *repl)
 
 	/* Free the data pointers and then the WT_REPL structure itself. */
 	while ((trepl = repl) != NULL) {
-		for (i = 0; i < WT_SDBT_CHUNK; ++i, ++repl)
+		for (i = 0; i < WT_REPL_CHUNK; ++i, ++repl)
 			if (repl->data != NULL &&
 			    !WT_SDBT_DELETED_ISSET(repl->data))
 				__wt_free(env, repl->data, repl->size);

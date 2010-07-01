@@ -331,7 +331,7 @@ __wt_bt_debug_repl(WT_SDBT *repl, FILE *fp)
 		fp = stderr;
 
 	while (repl != NULL) {
-		for (i = 0; i < WT_SDBT_CHUNK; ++i, ++repl) {
+		for (i = 0; i < WT_REPL_CHUNK; ++i, ++repl) {
 			if (repl->data == NULL)
 				continue;
 			if (WT_SDBT_DELETED_ISSET(repl->data)) {
