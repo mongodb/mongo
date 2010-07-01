@@ -953,7 +953,7 @@ namespace mongo {
             for ( vector<Shard>::iterator i=shards.begin(); i!=shards.end(); i++ ){
                 Shard s = *i;
                 BSONObj x = s.runCommand( "admin" , "listDatabases" );
-                cout << s.toString() << "\t" << x.jsonString() << endl;
+
                 BSONObjIterator j( x["databases"].Obj() );
                 while ( j.more() ){
                     BSONObj theDB = j.next().Obj();

@@ -43,6 +43,8 @@ namespace mongo {
     BSONField<long long> ShardFields::maxSize ("maxSize");
     BSONField<long long> ShardFields::currSize("currSize");
 
+    string ourHostname;
+    OID serverID;
 
     /* --- DBConfig --- */
 
@@ -362,12 +364,27 @@ namespace mongo {
 
     /* --- ConfigServer ---- */
 
-    ConfigServer::ConfigServer() {
+    ConfigServer::ConfigServer() : DBConfig( "config" ){
         _shardingEnabled = false;
-        _name = "grid";
     }
     
     ConfigServer::~ConfigServer() {
+    }
+
+    bool ConfigServer::init( string s ){
+        vector<string> configdbs;
+
+        while ( true ){
+            size_t idx = s.find( ',' );
+            if ( idx == string::npos ){
+                configdbs.push_back( s );
+                break;
+            }
+            configdbs.push_back( s.substr( 0 , idx ) );
+            s = s.substr( idx + 1 );
+        }
+        
+        return init( configdbs );
     }
 
     bool ConfigServer::init( vector<string> configHosts ){

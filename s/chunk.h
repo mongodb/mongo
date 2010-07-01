@@ -46,14 +46,14 @@ namespace mongo {
                 int _minor;
                 int _major;
             };
-            long long _combined;
+            unsigned long long _combined;
         };
         
         ShardChunkVersion( int major=0, int minor=0 )
             : _minor(minor),_major(major){
         }
         
-        ShardChunkVersion( long long ll )
+        ShardChunkVersion( unsigned long long ll )
             : _combined( ll ){
         }
         
@@ -65,7 +65,7 @@ namespace mongo {
             _minor++;
         }
 
-        long long toLong() const {
+        unsigned long long toLong() const {
             return _combined;
         }
 
@@ -79,11 +79,26 @@ namespace mongo {
             return ss.str(); 
         }
         
-        operator long long() const { return _combined; }
+        operator unsigned long long() const { return _combined; }
         operator string() const { return toString(); }
-    };
-    //typedef unsigned long long ShardChunkVersion;
 
+        ShardChunkVersion& operator=( const BSONElement& elem ){
+            switch ( elem.type() ){
+            case Timestamp:
+            case NumberLong:
+            case Date:
+                _combined = elem._numberLong();
+                break;
+            case EOO:
+                _combined = 0;
+                break;
+            default:
+                assert(0);
+            }
+            return *this;
+        }
+    };
+    
     typedef shared_ptr<Chunk> ChunkPtr;
 
     // key is max for each Chunk or ChunkRange
@@ -113,9 +128,10 @@ namespace mongo {
             _max = o;
         }
 
-        Shard getShard() const{
-            return _shard;
-        }
+
+        string getns() const;
+        Shard getShard() const { return _shard; }
+
         void setShard( const Shard& shard );
 
         bool contains( const BSONObj& obj ) const;
@@ -296,9 +312,7 @@ namespace mongo {
         ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique );
         virtual ~ChunkManager();
 
-        string getns() const {
-            return _ns;
-        }
+        string getns() const { return _ns; }
         
         int numChunks(){ rwlock lk( _lock , false ); return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj );
@@ -355,6 +369,7 @@ namespace mongo {
 
         void save_inlock();
         ShardChunkVersion getVersion_inlock() const;
+        void ensureIndex_inlock();
         
         DBConfig * _config;
         string _ns;

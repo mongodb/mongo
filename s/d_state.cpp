@@ -37,6 +37,7 @@
 
 #include "shard.h"
 #include "d_logic.h"
+#include "config.h"
 
 using namespace std;
 
@@ -114,7 +115,9 @@ namespace mongo {
     
     void ShardingState::setVersion( const string& ns , const ConfigVersion& version ){
         scoped_lock lk(_mutex);
-        _versions[ns] = version;
+        ConfigVersion& me = _versions[ns];
+        assert( version == 0 || version > me );
+        me = version;
     }
 
     void ShardingState::appendInfo( BSONObjBuilder& b ){
@@ -335,6 +338,7 @@ namespace mongo {
                         return false;
                     }
                     shardingState.enable( configdb );
+                    configServer.init( configdb );
                 }
             }
             

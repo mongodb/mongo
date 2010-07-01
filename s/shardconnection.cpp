@@ -161,7 +161,10 @@ namespace mongo {
         _conn = ClientConnections::get()->get( _addr );
 
         if ( _ns.size() ){
-            checkShardVersion( *_conn , _ns );
+            _setVersion = checkShardVersion( *_conn , _ns );
+        }
+        else {
+            _setVersion = false;
         }
         
     }

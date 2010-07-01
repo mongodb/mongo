@@ -42,6 +42,6 @@ namespace mongo {
     private:
     };
 
-    void checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false );
+    bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false );
 
 }
