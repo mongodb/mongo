@@ -1,4 +1,6 @@
-// value.h
+/* @file value.h
+   concurrency helpers Atomic<T> and DiagStr
+*/
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -19,30 +21,6 @@
 #pragma once
 
 namespace mongo { 
-
-    /** this string COULD be mangled but with the double buffering, assuming writes 
-    are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of 
-    diagnostic strings, where their content isn't critical.
-    */
-    class DiagStr { 
-        char buf1[256];
-        char buf2[256];
-        char *p;
-    public:
-        DiagStr() {
-            memset(buf1, 0, 256);
-            memset(buf2, 0, 256);
-            p = buf1;
-        }
-
-        const char * get() const { return p; }
-
-        void set(const char *s) {
-            char *q = (p==buf1) ? buf2 : buf1;
-            strncpy(q, s, 255);
-            p = q;
-        }
-    };
 
     extern mutex _atomicMutex;
 
@@ -69,6 +47,30 @@ namespace mongo {
             tran(Atomic<T>& a) : scoped_lock(_atomicMutex), _a(a) { }
             T& ref() { return _a.val; }
         };
+    };
+
+    /** this string COULD be mangled but with the double buffering, assuming writes 
+    are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of 
+    diagnostic strings, where their content isn't critical.
+    */
+    class DiagStr { 
+        char buf1[256];
+        char buf2[256];
+        char *p;
+    public:
+        DiagStr() {
+            memset(buf1, 0, 256);
+            memset(buf2, 0, 256);
+            p = buf1;
+        }
+
+        const char * get() const { return p; }
+
+        void set(const char *s) {
+            char *q = (p==buf1) ? buf2 : buf1;
+            strncpy(q, s, 255);
+            p = q;
+        }
     };
 
 }

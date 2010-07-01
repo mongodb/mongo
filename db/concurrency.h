@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "../util/concurrency/locks.h"
+#include "../util/concurrency/rwlock.h"
 #include "../util/mmap.h"
 
 namespace mongo {
