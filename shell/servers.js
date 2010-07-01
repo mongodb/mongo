@@ -272,7 +272,15 @@ ShardingTest.prototype.getChunksString = function( ns ){
     var q = {}
     if ( ns )
         q.ns = ns;
-    return Array.tojson( this.config.chunks.find( q ).toArray() , "\n" );
+
+    var s = "";
+    this.config.chunks.find( q ).sort( { min : 1 } ).forEach( 
+        function(z){
+            s +=  "  " + z._id + "\t" + z.lastmod.t + "|" + z.lastmod.i + "\t" + tojson(z.min) + " -> " + tojson(z.max) + " " + z.shard + "  " + z.ns + "\n";
+        }
+    );
+    
+    return s;
 }
 
 ShardingTest.prototype.printChunks = function( ns ){
