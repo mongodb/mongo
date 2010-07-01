@@ -1135,8 +1135,10 @@ namespace mongo {
                     
             }
 
+            long long size = nsd->datasize / scale;
             result.appendNumber( "count" , nsd->nrecords );
-            result.appendNumber( "size" , nsd->datasize / scale );
+            result.appendNumber( "size" , size );
+            result.append      ( "avgObjSize" , double(size) / double(nsd->nrecords) );
             int numExtents;
             result.appendNumber( "storageSize" , nsd->storageSize( &numExtents ) / scale );
             result.append( "numExtents" , numExtents );
@@ -1204,6 +1206,7 @@ namespace mongo {
 
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
+            result.append      ( "avgObjSize" , double(size) / double(objects) );
             result.appendNumber( "dataSize" , size );
             result.appendNumber( "storageSize" , storageSize);
             result.appendNumber( "numExtents" , numExtents );
