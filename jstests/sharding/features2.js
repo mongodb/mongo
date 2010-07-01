@@ -13,6 +13,7 @@ db = s.getDB( "test" );
 db.foo.save( { x : 1 } );
 db.foo.save( { x : 2 } );
 db.foo.save( { x : 3 } );
+db.foo.ensureIndex( { x : 1 } );
 
 assert.eq( "1,2,3" , db.foo.distinct( "x" ) , "distinct 1" );
 assert( a.foo.distinct("x").length == 3 || b.foo.distinct("x").length == 3 , "distinct 2" );
@@ -58,12 +59,12 @@ db.getLastError();
 
 assert.eq( 1 , s.onNumShards( "foo2" ) , "F1" );
 
+printjson( db.system.indexes.find( { ns : "test.foo2" } ).toArray() );
 s.adminCommand( { shardcollection : "test.foo2" , key : { _id : 1 } } );
 
 assert.eq( 3 , db.foo2.count() , "F2" )
 db.foo2.insert( {} );
 assert.eq( 4 , db.foo2.count() , "F3" )
-
 
 // --- map/reduce
 
@@ -71,6 +72,7 @@ db.mr.save( { x : 1 , tags : [ "a" , "b" ] } );
 db.mr.save( { x : 2 , tags : [ "b" , "c" ] } );
 db.mr.save( { x : 3 , tags : [ "c" , "a" ] } );
 db.mr.save( { x : 4 , tags : [ "b" , "c" ] } );
+db.mr.ensureIndex( { x : 1 } );
 
 m = function(){
     this.tags.forEach(
