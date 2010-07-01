@@ -1,7 +1,7 @@
 util/concurrency/ files
 
 list.h - a list class that is lock-free for reads
-locks.h - read/write locks (RWLock)
+rwlock.h - read/write locks (RWLock)
 msg.h - message passing between threads
 task.h - an abstraction around threads
 mutex.h - small enhancements that wrap boost::mutex
