@@ -661,6 +661,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
         ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
+        ("pretouch", "turn on pretouch experiment TESTING ONLY")
         ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
         ;
@@ -832,6 +833,11 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("autoresync")) {
             replSettings.autoresync = true;
         }
+        
+        if (params.count("pretouch")) {
+            replSettings.pretouch = true;
+        }
+
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
             cmdLine.source = params["source"].as<string>().c_str();

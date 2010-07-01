@@ -895,6 +895,36 @@ namespace mongo {
             log() << "sync: caught db exception " << e << " while applying op: " << op << endl;;            
         }
     }
+
+    void pretouchOperation(const BSONObj& op) {
+        const char *which = "o";
+        const char *opType = op.getStringField("op");
+        if ( *opType == 'i' )
+            ;
+        else if( *opType == 'u' )
+            which = "o2";
+        else
+            return;
+        /* todo : other operations */
+
+        try { 
+            BSONObj o = op.getObjectField(which);
+            BSONElement _id;
+            if( o.getObjectID(_id) ) {
+                const char *ns = op.getStringField("ns");
+                BSONObjBuilder b;
+                b.append(_id);
+                BSONObj result;
+                readlock lk(ns);
+                Client::Context ctx( ns );
+                Helpers::findById(cc(), ns, b.done(), result);
+            }
+        }
+        catch( DBException& ) { 
+            log() << "ignoring assertion in pretouchOperation()" << endl;
+        }
+    }
+
     
     /* local.$oplog.main is of the form:
          { ts: ..., op: <optype>, ns: ..., o: <obj> , o2: <extraobj>, b: <boolflag> }
@@ -923,6 +953,9 @@ namespace mongo {
 
         if ( !only.empty() && only != clientName )
             return;
+
+        if ( replSettings.pretouch )
+            pretouchOperation(op);
 
         dblock lk;
 

@@ -64,9 +64,11 @@ namespace mongo {
         bool autoresync;
         
         int slavedelay;
+        
+        bool pretouch;
 
         ReplSettings()
-            : slave(NotSlave) , master(false) , opIdMem(100000000) , fastsync() , autoresync(false), slavedelay() {
+            : slave(NotSlave) , master(false) , opIdMem(100000000) , fastsync() , autoresync(false), slavedelay(), pretouch(false) {
         }
 
     };
