@@ -24,7 +24,7 @@
 #include "repl.h"
 #include "update.h"
 
-#define DEBUGUPDATE(x) cout << x << endl;
+//#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
 
 namespace mongo {

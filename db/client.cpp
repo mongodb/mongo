@@ -196,7 +196,7 @@ namespace mongo {
         _client->_context = _oldContext; // note: _oldContext may be null
         
         stringstream ss;
-        ss << "unauthorized db:" << _db->name << " lock type:" << lockState << " client:" << _client->clientAddress() << endl;
+        ss << "unauthorized db:" << _db->name << " lock type:" << lockState << " client:" << _client->clientAddress();
         uasserted( 10057 , ss.str() );
     }
 
