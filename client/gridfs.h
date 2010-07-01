@@ -124,7 +124,7 @@ namespace mongo {
         unsigned int _chunkSize;
 
         // insert fileobject. All chunks must be in DB.
-        BSONObj insertFile(const string& name, const OID& id, unsigned length, const string& contentType);
+        BSONObj insertFile(const string& name, const OID& id, gridfs_offset length, const string& contentType);
 
         friend class GridFile;
     };
