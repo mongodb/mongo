@@ -909,6 +909,7 @@ namespace mongo {
             return left.getServerAddress() + "," + right.getServerAddress();
         }
 
+        DBClientConnection& masterConn();
         DBClientConnection& slaveConn();
 
         /* TODO - not yet implemented. mongos may need these. */
