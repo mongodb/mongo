@@ -280,6 +280,7 @@ namespace mongo {
                 try {
                     inDBRepair = true;
                     ensureIdIndexForNewNs(to_name.c_str());
+                    inDBRepair = old;
                 }
                 catch(...) { 
                     inDBRepair = old;
