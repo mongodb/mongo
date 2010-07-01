@@ -40,10 +40,12 @@ namespace mongo {
     } *OWS;
 
 #if defined(_DEBUG)
-# define MONGO_DEV if( 1 )
+    enum {DEBUG_BUILD = 1};
 #else
-# define MONGO_DEV if( 0 )
+    enum {DEBUG_BUILD = 0};
 #endif
+
+#define MONGO_DEV if( DEBUG_BUILD )
 #define DEV MONGO_DEV
 
 #define MONGO_DEBUGGING if( 0 )
