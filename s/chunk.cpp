@@ -21,6 +21,7 @@
 #include "config.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
+#include "../client/distlock.h"
 #include "../db/queryutil.h"
 #include "cursors.h"
 #include "strategy.h"
