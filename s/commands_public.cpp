@@ -251,6 +251,7 @@ namespace mongo {
                 result.append("ns", fullns);
                 result.appendNumber("count", count);
                 result.appendNumber("size", size);
+                result.append      ("avgObjSize", double(size) / double(count));
                 result.appendNumber("storageSize", storageSize);
                 result.append("nindexes", nindexes);
 
