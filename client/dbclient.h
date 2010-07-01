@@ -81,6 +81,7 @@ namespace mongo {
         UpdateOption_Multi = 1 << 1
     };
 
+    class DBClientBase;
 
     class ConnectionString {
     public:
@@ -89,10 +90,12 @@ namespace mongo {
         ConnectionString( const HostAndPort& server ){
             _type = MASTER;
             _servers.push_back( server );
+            _finishInit();
         }
 
         ConnectionString( ConnectionType type , const vector<HostAndPort>& servers )
             : _type( type ) , _servers( servers ){
+            _finishInit();
         }
         
         ConnectionString( ConnectionType type , const string& s ){
@@ -107,6 +110,7 @@ namespace mongo {
                 assert( _servers.size() > 0 );
             }
             
+            _finishInit();
         }
 
         ConnectionString( const string& s , ConnectionType favoredMultipleType ){
@@ -118,8 +122,19 @@ namespace mongo {
                 _type = favoredMultipleType;
                 assert( _type != MASTER );
             }
+            _finishInit();
         }
         
+        string toString() const {
+            return _string;
+        }
+        
+        operator string() const {
+            return toString();
+        }
+        
+        DBClientBase* connect( string& errmsg ) const;
+
     private:
         
         void _fillServers( string s ){
@@ -130,9 +145,20 @@ namespace mongo {
             }
             _servers.push_back( s );
         }
+        
+        void _finishInit(){
+            stringstream ss;
+            for ( unsigned i=0; i<_servers.size(); i++ ){
+                if ( i > 0 )
+                    ss << ",";
+                ss << _servers[i].toString();
+            }
+            _string = ss.str();
+        }
 
         ConnectionType _type;
         vector<HostAndPort> _servers;
+        string _string;
     };
 
     /**

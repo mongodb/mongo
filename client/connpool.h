@@ -65,6 +65,10 @@ namespace mongo {
         map<string,PoolForHost> _pools; // servername -> pool
         list<DBConnectionHook*> _hooks;
 
+        DBClientBase* _get( const string& ident );
+        
+        DBClientBase* _finishCreate( const string& ident , DBClientBase* conn );
+
     public:        
         DBConnectionPool() : _mutex("DBConnectionPool") { }
         ~DBConnectionPool();
@@ -74,7 +78,10 @@ namespace mongo {
         void onHandedOut( DBClientBase * conn );
 
         void flush();
+
         DBClientBase *get(const string& host);
+        DBClientBase *get(const ConnectionString& host);
+
         void release(const string& host, DBClientBase *c) {
             if ( c->isFailed() ){
                 delete c;
@@ -129,6 +136,11 @@ namespace mongo {
         
         ScopedDbConnection(const Shard& shard );
         ScopedDbConnection(const Shard* shard );
+
+        ScopedDbConnection(const ConnectionString& url )
+            : _host(url.toString()), _conn( pool.get(url) ) {
+        }
+
 
         string getHost() const { return _host; }
 

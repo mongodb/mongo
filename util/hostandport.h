@@ -56,6 +56,8 @@ namespace mongo {
         // @returns host:port
         string toString() const; 
 
+        operator string() const { return toString(); }
+
         string host() const { return _host; }
 
         int port() const { return _port >= 0 ? _port : cmdLine.port; }

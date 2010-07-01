@@ -27,8 +27,44 @@
 #include "../db/cmdline.h"
 #include "connpool.h"
 #include "../s/util.h"
+#include "syncclusterconnection.h"
 
 namespace mongo {
+
+    DBClientBase* ConnectionString::connect( string& errmsg ) const {
+        switch ( _type ){
+        case MASTER: {
+            DBClientConnection * c = new DBClientConnection(true);
+            log(2) << "creating new connection to:" << _servers[0] << endl;
+            if ( ! c->connect( _servers[0] , errmsg ) ) {
+                delete c;
+                return 0;
+            }
+            return c;
+        }
+            
+        case SET: {
+            DBClientPaired *p = new DBClientPaired();
+            if( !p->connect( _servers[0] , _servers[1] ) ){
+                delete p;
+                errmsg = "connect failed";
+                return 0;
+            }
+            return p;
+        }
+            
+        case SYNC:
+            // TODO , don't copy
+            list<HostAndPort> l;
+            for ( unsigned i=0; i<_servers.size(); i++ )
+                l.push_back( _servers[i] );
+            return new SyncClusterConnection( l );
+            
+        }
+
+        assert( 0 );
+        return 0;
+    }
 
     Query& Query::where(const string &jscode, BSONObj scope) { 
         /* use where() before sort() and hint() and explain(), else this will assert. */

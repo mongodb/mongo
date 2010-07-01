@@ -28,50 +28,83 @@ namespace mongo {
 
     DBConnectionPool pool;
     
-    DBClientBase* DBConnectionPool::get(const string& host) {
+    DBClientBase* DBConnectionPool::_get(const string& ident) {
         scoped_lock L(_mutex);
         
-        PoolForHost& p = _pools[host];
-
-        if ( p.pool.empty() ) {
-            int numCommas = DBClientBase::countCommas( host );
-            DBClientBase *c;
-            
-            if( numCommas == 0 ) {
-                DBClientConnection *cc = new DBClientConnection(true);
-                log(2) << "creating new connection for pool to:" << host << endl;
-                string errmsg;
-                if ( !cc->connect(host.c_str(), errmsg) ) {
-                    delete cc;
-                    uassert( 11002 ,  (string)"dbconnectionpool: connect failed " + host , false);
-                    return 0;
-                }
-                c = cc;
-                onCreate( c );
-            }
-            else if ( numCommas == 1 ) { 
-                DBClientPaired *p = new DBClientPaired();
-                if( !p->connect(host) ) { 
-                    delete p;
-                    uassert( 11003 ,  (string)"dbconnectionpool: connect failed [2] " + host , false);
-                    return 0;
-                }
-                c = p;
-            }
-            else if ( numCommas == 2 ) {
-                c = new SyncClusterConnection( host );
-            }
-            else {
-                uassert( 13071 , (string)"invalid hostname [" + host + "]" , 0 );
-                c = 0; // prevents compiler warning
-            }
-            p.created++;
-            return c;
-        }
+        PoolForHost& p = _pools[ident];
+        if ( p.pool.empty() )
+            return 0;
+        
         DBClientBase *c = p.pool.top();
         p.pool.pop();
-        onHandedOut( c );
         return c;
+    }
+
+    DBClientBase* DBConnectionPool::_finishCreate( const string& host , DBClientBase* conn ){
+        {
+            scoped_lock L(_mutex);
+            PoolForHost& p = _pools[host];
+            p.created++;
+        }
+
+        onCreate( conn );
+        onHandedOut( conn );
+        
+        return conn;
+    }
+
+    DBClientBase* DBConnectionPool::get(const ConnectionString& url) {
+        DBClientBase * c = _get( url.toString() );
+        if ( c ){
+            onHandedOut( c );
+            return c;
+        }
+        
+        string errmsg;
+        c = url.connect( errmsg );
+        uassert( 13328 ,  (string)"dbconnectionpool: connect failed " + url.toString() + " : " + errmsg , c );
+        
+        return _finishCreate( url.toString() , c );
+    }
+    
+    DBClientBase* DBConnectionPool::get(const string& host) {
+        DBClientBase * c = _get( host );
+        if ( c ){
+            onHandedOut( c );
+            return c;
+        }
+        
+        int numCommas = DBClientBase::countCommas( host );
+        
+        if( numCommas == 0 ) {
+            DBClientConnection *cc = new DBClientConnection(true);
+            log(2) << "creating new connection for pool to:" << host << endl;
+            string errmsg;
+            if ( !cc->connect(host.c_str(), errmsg) ) {
+                delete cc;
+                uassert( 11002 ,  (string)"dbconnectionpool: connect failed " + host , false);
+                return 0;
+            }
+            c = cc;
+        }
+        else if ( numCommas == 1 ) { 
+            DBClientPaired *p = new DBClientPaired();
+            if( !p->connect(host) ) { 
+                delete p;
+                uassert( 11003 ,  (string)"dbconnectionpool: connect failed [2] " + host , false);
+                return 0;
+            }
+            c = p;
+        }
+        else if ( numCommas == 2 ) {
+            c = new SyncClusterConnection( host );
+        }
+        else {
+            uassert( 13071 , (string)"invalid hostname [" + host + "]" , 0 );
+            c = 0; // prevents compiler warning
+        }
+        
+        return _finishCreate( host , c );
     }
 
     DBConnectionPool::~DBConnectionPool(){
