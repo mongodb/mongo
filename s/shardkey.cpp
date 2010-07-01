@@ -145,7 +145,7 @@ namespace mongo {
         return dir;
     }
 
-    bool ShardKeyPattern::uniqueAllowd( const BSONObj& otherPattern ) const {
+    bool ShardKeyPattern::isPrefixOf( const BSONObj& otherPattern ) const {
         BSONObjIterator a( pattern );
         BSONObjIterator b( otherPattern );
         
@@ -172,20 +172,20 @@ namespace mongo {
     class ShardKeyUnitTest : public UnitTest {
     public:
         
-        void testUniqueAllowd(){
+        void testIsPrefixOf(){
             {
                 ShardKeyPattern k( BSON( "x" << 1 ) );
-                assert( ! k.uniqueAllowd( BSON( "a" << 1 ) ) );
-                assert( k.uniqueAllowd( BSON( "x" << 1 ) ) );
-                assert( k.uniqueAllowd( BSON( "x" << 1 << "a" << 1 ) ) );
-                assert( ! k.uniqueAllowd( BSON( "a" << 1 << "x" << 1 ) ) );
+                assert( ! k.isPrefixOf( BSON( "a" << 1 ) ) );
+                assert( k.isPrefixOf( BSON( "x" << 1 ) ) );
+                assert( k.isPrefixOf( BSON( "x" << 1 << "a" << 1 ) ) );
+                assert( ! k.isPrefixOf( BSON( "a" << 1 << "x" << 1 ) ) );
             }
             { 
                 ShardKeyPattern k( BSON( "x" << 1 << "y" << 1 ) );
-                assert( ! k.uniqueAllowd( BSON( "x" << 1 ) ) );
-                assert( ! k.uniqueAllowd( BSON( "x" << 1 << "z" << 1 ) ) );
-                assert( k.uniqueAllowd( BSON( "x" << 1 << "y" << 1 ) ) );
-                assert( k.uniqueAllowd( BSON( "x" << 1 << "y" << 1 << "z" << 1 ) ) );
+                assert( ! k.isPrefixOf( BSON( "x" << 1 ) ) );
+                assert( ! k.isPrefixOf( BSON( "x" << 1 << "z" << 1 ) ) );
+                assert( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 ) ) );
+                assert( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 << "z" << 1 ) ) );
             }
         }
         
@@ -259,8 +259,10 @@ namespace mongo {
             
             testCanOrder();
             getfilt();
-            testUniqueAllowd();
+            testIsPrefixOf();
             // add middle multitype tests
+
+            log(1) << "shardKeyTest passed" << endl;
         }
     } shardKeyTest;
     

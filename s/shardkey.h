@@ -97,8 +97,12 @@ namespace mongo {
         bool partOfShardKey(const string& key ) const {
             return patternfields.count( key ) > 0;
         }
-        
-        bool uniqueAllowd( const BSONObj& otherPattern ) const;
+
+        /**
+         * @return
+         * true if 'this' is a prefix (not necessarily contained) of 'otherPattern'.
+         */
+        bool isPrefixOf( const BSONObj& otherPattern ) const;
         
         operator string() const {
             return pattern.toString();

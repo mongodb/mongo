@@ -107,7 +107,7 @@ namespace mongo {
                                  " key: " + o["key"].embeddedObjectUserCheck().toString() , 
                                  IndexDetails::isIdIndexPattern( newIndexKey ) ||
                                  ! o["unique"].trueValue() || 
-                                 r.getConfig()->getChunkManager( ns )->getShardKey().uniqueAllowd( newIndexKey ) );
+                                 r.getConfig()->getChunkManager( ns )->getShardKey().isPrefixOf( newIndexKey ) );
 
                         ChunkManagerPtr cm = r.getConfig()->getChunkManager( ns );
                         assert( cm );
