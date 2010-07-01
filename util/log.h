@@ -173,10 +173,10 @@ namespace mongo {
                 //syslog( LOG_INFO , "%s" , cc );
 #endif
 
-                cout << type << ( type[0] ? ": " : "" );
                 if ( ! threadName.empty() ){
                     cout << threadName << " ";
                 }
+                cout << type << ( type[0] ? ": " : "" );
                 cout << s;
                 cout.flush();
             }
