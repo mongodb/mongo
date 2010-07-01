@@ -669,20 +669,23 @@ DB.prototype.listCommands = function(){
     for ( var name in x.commands ){
         var c = x.commands[name];
 
-        var s = name + " lock: ";
+        var s = name + ": ";
         
         switch ( c.lockType ){
-        case -1: s += "read"; break;
-        case 0: s += "node"; break;
-        case 1: s += "write"; break;
+        case -1: s += "read-lock"; break;
+        case  0: s += "no-lock"; break;
+        case  1: s += "write-lock"; break;
         default: s += c.lockType;
         }
         
-        s += " adminOnly: " + c.adminOnly;
-        s += " slaveOk: " + c.slaveOk;
-        s += " " + c.help;
+        if (c.adminOnly) s += " adminOnly ";
+        if (c.adminOnly) s += " slaveOk ";
+
+        s += "\n  ";
+        s += c.help.replace(/\n/g, '\n  ');
+        s += "\n";
         
-        print( s )
+        print( s );
     }
 }
 
