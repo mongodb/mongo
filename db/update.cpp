@@ -24,7 +24,7 @@
 #include "repl.h"
 #include "update.h"
 
-//#define DEBUGUPDATE(x) cout << x << endl;
+#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
 
 namespace mongo {
@@ -889,10 +889,11 @@ namespace mongo {
                     
                 if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ){
                     mss->applyModsInPlace();// const_cast<BSONObj&>(onDisk) );
-                        
+                    
+                    DEBUGUPDATE( "\t\t\t doing in place update" );
                     if ( profile )
                         ss << " fastmod ";
-                        
+                    
                     if ( modsIsIndexed ){
                         seenObjects.insert( loc );
                     }
