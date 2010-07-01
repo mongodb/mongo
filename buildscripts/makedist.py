@@ -150,9 +150,13 @@ class EC2InstanceConfigurator(BaseConfigurator):
 class nodeWrapper(object):
     def __init__(self, configurator, **kwargs):
         self.terminate = False if "no_terminate" in kwargs else True
+        self.use_internal_name = False
 
     def getHostname(self): 
-        return self.node.public_ip[0] # FIXME private_ip?
+        if self.use_internal_name:
+            return self.node.private_ip[0]
+        else:
+            return self.node.public_ip[0] # FIXME private_ip?
     
     def initwait(self):
         print "waiting for node to spin up"
