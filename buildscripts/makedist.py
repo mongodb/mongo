@@ -141,7 +141,8 @@ class EC2InstanceConfigurator(BaseConfigurator):
                                  (("fedora", "8", "x86"), "ami-5647a33f"))),
                                ("rackspace_imgname",
                                 ((("fedora", "11", "x86_64"), "Fedora 11"),
-                                 (("fedora", "12", "x86_64"), "Fedora 12"))),
+                                 (("fedora", "12", "x86_64"), "Fedora 12"),
+                                 (("fedora", "13", "x86_64"), "Fedora 13")),
                                ("ec2_mtype",
                                 ((("*", "*", "x86"), "m1.small"),
                                  (("*", "*", "x86_64"), "m1.large"))),
@@ -150,9 +151,13 @@ class EC2InstanceConfigurator(BaseConfigurator):
 class nodeWrapper(object):
     def __init__(self, configurator, **kwargs):
         self.terminate = False if "no_terminate" in kwargs else True
+        self.use_internal_name = False
 
     def getHostname(self): 
-        return self.node.public_ip[0] # FIXME private_ip?
+        if self.use_internal_name:
+            return self.node.private_ip[0]
+        else:
+            return self.node.public_ip[0] # FIXME private_ip?
     
     def initwait(self):
         print "waiting for node to spin up"
