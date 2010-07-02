@@ -43,9 +43,12 @@ assert( countb > 0 , "diff2" );
 
 print( "checkpoint B" )
 
+var missing = [];
+
 for ( i=0; i<j*100; i++ ){
     var x = coll.findOne( { num : i } );
     if ( ! x ){
+        missing.push( i );
         print( "can't find: " + i );
         sleep( 1000 );
         x = coll.findOne( { num : i } );
@@ -64,6 +67,7 @@ for ( i=0; i<j*100; i++ ){
 
 
 assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
+assert( missing.length == 0 , "missing : " + tojson( missing ) );
 print( "checkpoint B.a" )
 s.printChunks();
 assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
