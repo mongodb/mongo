@@ -158,10 +158,10 @@
       <Filter>db\core</Filter>
     </ClCompile>
     <ClCompile Include="..\s\d_util.cpp">
-      <Filter>db\sharding</Filter>
+      <Filter>sharding</Filter>
     </ClCompile>
     <ClCompile Include="..\s\d_logic.cpp">
-      <Filter>db\sharding</Filter>
+      <Filter>sharding</Filter>
     </ClCompile>
     <ClCompile Include="database.cpp">
       <Filter>db\core</Filter>
@@ -281,7 +281,7 @@
       <Filter>repl_old</Filter>
     </ClCompile>
     <ClCompile Include="..\s\shardconnection.cpp">
-      <Filter>db\sharding</Filter>
+      <Filter>sharding</Filter>
     </ClCompile>
     <ClCompile Include="..\util\sock.cpp">
       <Filter>util\core</Filter>
@@ -332,10 +332,10 @@
       <Filter>db</Filter>
     </ClCompile>
     <ClCompile Include="..\s\d_writeback.cpp">
-      <Filter>db\sharding</Filter>
+      <Filter>sharding</Filter>
     </ClCompile>
     <ClCompile Include="..\s\d_state.cpp">
-      <Filter>db\sharding</Filter>
+      <Filter>sharding</Filter>
     </ClCompile>
     <ClCompile Include="..\util\text.cpp">
       <Filter>util\core</Filter>
@@ -348,6 +348,21 @@
     </ClCompile>
     <ClCompile Include="dbcommands_generic.cpp">
       <Filter>db\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\config.cpp">
+      <Filter>sharding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\chunk.cpp">
+      <Filter>sharding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\shard.cpp">
+      <Filter>sharding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\shardkey.cpp">
+      <Filter>sharding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\model.cpp">
+      <Filter>client</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -752,9 +767,6 @@
     <Filter Include="rs\test stuff">
       <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\sharding">
-      <UniqueIdentifier>{03b0d798-b13d-48f4-930d-ca827e2a3f00}</UniqueIdentifier>
-    </Filter>
     <Filter Include="db\storage engine">
       <UniqueIdentifier>{d565a775-7a99-4860-b25f-441e1655b7c6}</UniqueIdentifier>
     </Filter>
@@ -778,6 +790,9 @@
     </Filter>
     <Filter Include="db\geo">
       <UniqueIdentifier>{2a0924a5-9bd9-4c86-a149-0df09dcb5548}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sharding">
+      <UniqueIdentifier>{03b0d798-b13d-48f4-930d-ca827e2a3f00}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
