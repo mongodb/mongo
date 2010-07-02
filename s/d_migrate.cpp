@@ -114,6 +114,7 @@ namespace mongo {
 
 
 
+            Shard fromShard( from );
             Shard toShard( to );
             
             log() << "got movechunk: " << cmdObj << endl;
@@ -218,9 +219,9 @@ namespace mongo {
                 }
 
                 conn.done();
-
+                
                 // 5.d
-                // TOOD
+                configServer.logChange( "moveChunk" , ns , BSON( "range" << filter << "from" << fromShard.getName() << "to" << toShard.getName() ) );
             }
             
             
