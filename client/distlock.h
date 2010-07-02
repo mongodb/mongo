@@ -27,11 +27,14 @@
 namespace mongo {
 
     extern string ourHostname;
-
+    
     class DistributedLock {
     public:
-        DistributedLock( const ConnectionString& conn , const string& ns , const BSONObj& key , const string& field )
-            : _conn(conn), _ns(ns), _key(key.getOwned()), _field(field){
+
+        DistributedLock( const ConnectionString& conn , const string& name )
+            : _conn(conn),_name(name),_myid(""){
+            _id = BSON( "_id" << name );
+            _ns = "config.locks";
         }
 
         int getState(){
@@ -42,7 +45,7 @@ namespace mongo {
             return _state.get() != 0;
         }
         
-        bool lock_try(){
+        bool lock_try( string why , BSONObj * other = 0 ){
             // recursive
             if ( getState() > 0 )
                 return true;
@@ -50,28 +53,46 @@ namespace mongo {
             ScopedDbConnection conn( _conn );
             
             { // make sure its there so we can use simple update logic below
-                BSONObj o = conn->findOne( _ns , _key );
+                BSONObj o = conn->findOne( _ns , _id );
                 if ( o.isEmpty() ){
-                    conn->update( _ns , _key , BSON( "$set" << BSON( _field << BSON( "state" << 0 ) ) ) , 1 );
+                    try {
+                        conn->insert( _ns , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
+                    }
+                    catch ( UserException& e ){
+                    }
                 }
             }
 
-
-            BSONObjBuilder b;
-            b.appendElements( _key );
-            b.append( _field + ".state" , 0 );
             
+            BSONObjBuilder b;
+            b.appendElements( _id );
+            b.append( "state" , 0 );
 
-            conn->update( _ns , b.obj() , BSON( "$set" << BSON( _field + ".state" << 1 << "who" << myid() ) ) );
-            assert(0);
+            conn->update( _ns , b.obj() , BSON( "$set" << BSON( "state" << 1 << "who" << myid() << "when" << DATENOW << "why" << why ) ) );
+            BSONObj o = conn->getLastErrorDetailed();
+            BSONObj now = conn->findOne( _ns , _id );
+            
             conn.done();
+            
+            log() << "dist_lock lock getLastErrorDetailed: " << o << " now: " << now << endl;
+
+
+            if ( o["n"].numberInt() == 0 ){
+                if ( other )
+                    *other = now;
+                return false;
+            }
+            
+            _state.set( 1 );
+            return true;
         }
 
         void unlock(){
             ScopedDbConnection conn( _conn );
-            conn->update( _ns , _key, BSON( "$set" << BSON( _field + ".state" << 0 ) ) );
+            conn->update( _ns , _id, BSON( "$set" << BSON( "state" << 0 ) ) );
+            log() << "dist_lock unlock unlock: " << conn->findOne( _ns , _id ) << endl;
             conn.done();
-
+            
             _state.set( 0 );
         }
 
@@ -86,12 +107,13 @@ namespace mongo {
 
             return s;
         }
-
+        
     private:
         ConnectionString _conn;
         string _ns;
-        BSONObj _key;
-        string _field;
+        string _name;
+        BSONObj _id;
+        
         ThreadLocalValue<int> _state;
         ThreadLocalValue<string> _myid;
     };
@@ -99,9 +121,9 @@ namespace mongo {
     class dist_lock_try {
     public:
 
-        dist_lock_try( DistributedLock * lock )
+        dist_lock_try( DistributedLock * lock , string why )
             : _lock(lock){
-            _got = _lock->lock_try();
+            _got = _lock->lock_try( why , &_other );
         }
 
         ~dist_lock_try(){
@@ -114,9 +136,14 @@ namespace mongo {
             return _got;
         }
 
+        BSONObj other() const {
+            return _other;
+        }
+ 
     private:
         DistributedLock * _lock;
         bool _got;
+        BSONObj _other;
         
     };
 

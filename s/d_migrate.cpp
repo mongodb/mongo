@@ -32,6 +32,7 @@
 #include "../db/query.h"
 
 #include "../client/connpool.h"
+#include "../client/distlock.h"
 
 #include "../util/queue.h"
 
@@ -121,16 +122,39 @@ namespace mongo {
         
             // 2. TODO
             
+            DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
+            dist_lock_try dlk( &lockSetup , (string)"migrate-" + filter.toString() );
+            if ( ! dlk.got() ){
+                errmsg = "someone else has the lock";
+                result.append( "who" , dlk.other() );
+                return false;
+            }
+
             ShardChunkVersion maxVersion;
             string myOldShard;
             {
                 ScopedDbConnection conn( shardingState.getConfigServer() );
-
+                
                 BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
                 maxVersion = x["lastmod"];
 
                 x = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
                 myOldShard = x["shard"].String();
+                
+                if ( myOldShard != fromShard.getName() ){
+                    errmsg = "i'm out of date";
+                    result.append( "from" , fromShard.getName() );
+                    result.append( "official" , myOldShard );
+                    return false;
+                }
+                
+                if ( maxVersion < shardingState.getVersion( ns ) ){
+                    errmsg = "official version less than mine?";;
+                    result.appendTimestamp( "officialVersion" , maxVersion );
+                    result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
+                    return false;
+                }
+
                 conn.done();
             }
 
@@ -167,6 +191,7 @@ namespace mongo {
                 
                 {
                     dblock lk;
+                    assert( myVersion > shardingState.getVersion( ns ) );
                     shardingState.setVersion( ns , myVersion );
                     assert( myVersion == shardingState.getVersion( ns ) );
                 }

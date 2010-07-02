@@ -111,6 +111,7 @@ namespace mongo {
             }
             all.push_back( res );
             errors.push_back( err );
+            _lastError = res;
         }
         
         assert( all.size() == errors.size() && all.size() == _conns.size() );
@@ -124,11 +125,18 @@ namespace mongo {
                 continue;
             ok = false;
             err << _conns[i]->toString() << ": " << res << " " << errors[i];
+            _lastError = res;
         }
 
         if ( ok )
             return;
         throw UserException( 8001 , (string)"SyncClusterConnection write op failed: " + err.str() );
+    }
+
+    BSONObj SyncClusterConnection::getLastErrorDetailed(){
+        if ( _lastError.isEmpty() )
+            return DBClientBase::getLastErrorDetailed();
+        return _lastError;
     }
 
     void SyncClusterConnection::_connect( string host ){
