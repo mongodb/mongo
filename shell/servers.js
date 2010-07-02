@@ -268,6 +268,31 @@ ShardingTest.prototype.adminCommand = function(cmd){
     throw "command " + tojson( cmd ) + " failed: " + tojson( res );
 }
 
+ShardingTest.prototype._rangeToString = function(r){
+    return tojsononeline( r.min ) + " -> " + tojsononeline( r.max );
+}
+
+ShardingTest.prototype.printChangeLog = function(){
+    var s = this;
+    this.config.changelog.find().forEach( 
+        function(z){
+            var msg = z.server + "\t" + z.time + "\t" + z.what;
+            for ( i=z.what.length; i<15; i++ )
+                msg += " ";
+            msg += " " + z.ns + "\t";
+            if ( z.what == "split" ){
+                msg += s._rangeToString( z.details.before ) + " -->> (" + s._rangeToString( z.details.left ) + "),(" + s._rangeToString( z.details.right ) + ")";
+            }
+            else {
+                msg += tojsononeline( z.details );
+            }
+
+            print( msg )
+        }
+    );
+
+}
+
 ShardingTest.prototype.getChunksString = function( ns ){
     var q = {}
     if ( ns )
