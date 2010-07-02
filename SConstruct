@@ -1008,7 +1008,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
             myCheckLib( "ncurses" , staticOnly=release )
             myCheckLib( "tinfo" , staticOnly=release )
         else:
-            print( "\n*** warning: no readline library, mongo shell will not have nice interactive line editing ***\n" )
+            print( "\n*** notice: no readline library, mongo shell will not have nice interactive line editing ***\n" )
 
         if linux:
             myCheckLib( "rt" , True )
