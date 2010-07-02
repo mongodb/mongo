@@ -107,7 +107,9 @@ namespace mongo {
 
         void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ){
             scoped_lock mylk(_mutex);
-            
+
+            DEV MongoFileAllowWrites allowWrites;
+
             Ident ident(rid,host,ns);
             Info& i = _slaves[ ident ];
             if ( i.loc ){
@@ -116,7 +118,7 @@ namespace mongo {
             }
             
             dbMutex.assertAtLeastReadLocked();
-            DEV dblock lk;
+
             BSONObj res;
             if ( Helpers::findOne( NS , ident.obj , res ) ){
                 assert( res["syncedTo"].type() );
@@ -134,8 +136,9 @@ namespace mongo {
                 _started = true;
                 go();
             }
-        }
 
+        }
+        
         bool opReplicatedEnough( OpTime op , int w ){
             if ( w <= 1 || ! replSettings.master )
                 return true;

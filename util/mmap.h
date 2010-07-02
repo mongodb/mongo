@@ -58,8 +58,17 @@ namespace mongo {
     // no-ops in production
     inline void MongoFile::lockAll() {}
     inline void MongoFile::unlockAll() {}
+
 #endif
 
+    struct MongoFileAllowWrites {
+        MongoFileAllowWrites(){
+            MongoFile::lockAll();
+        }
+        ~MongoFileAllowWrites(){
+            MongoFile::unlockAll();
+        }
+    };
 
     /** template for what a new storage engine's class definition must implement 
         PRELIMINARY - subject to change.
