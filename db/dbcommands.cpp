@@ -1526,10 +1526,7 @@ namespace mongo {
         virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             static DBDirectClient db;
 
-            PRINT(cmdObj);
-
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
-            PRINT(ns);
 
             BSONObj origQuery = cmdObj.getObjectField("query"); // defaults to {}
             Query q (origQuery);
@@ -1537,16 +1534,12 @@ namespace mongo {
             if (!sort.eoo())
                 q.sort(sort.embeddedObjectUserCheck());
 
-            PRINT(q.toString());
-
             bool upsert = cmdObj["upsert"].trueValue();
-            PRINT(upsert);
 
             BSONObj fieldsHolder (cmdObj.getObjectField("fields"));
             const BSONObj* fields = (fieldsHolder.isEmpty() ? NULL : &fieldsHolder);
 
             BSONObj out = db.findOne(ns, q, fields);
-            PRINT(out);
             if (out.isEmpty()){
                 if (!upsert){
                     errmsg = "No matching object found";
@@ -1558,20 +1551,14 @@ namespace mongo {
                 uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
                 db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
 
-                PRINT(cmdObj["new"]);
                 if (cmdObj["new"].trueValue()){
                     BSONObj gle = db.getLastErrorDetailed();
-                    PRINT(gle);
 
                     BSONElement _id = gle["upserted"];
                     if (_id.eoo())
                         _id = origQuery["_id"];
 
-
-                    PRINT(_id);
-
                     out = db.findOne(ns, QUERY("_id" << _id), fields);
-                    PRINT(out);
                 }
 
             } else {
