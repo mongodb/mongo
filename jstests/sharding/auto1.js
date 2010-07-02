@@ -42,6 +42,7 @@ s.printChunks();
 for ( ; i<2800; i++ ){
     coll.save( { num : i , s : bigString } );
 }
+db.getLastError();
 
 assert.eq( 4 , s.config.chunks.count() , "shard didn't split B " );
 s.printChunks();
