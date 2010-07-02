@@ -56,7 +56,26 @@ for ( i=0; i<3; i++ ){
 printjson( hashes );
 
 for ( i=1; i<hashes.length; i++ ){
-    assert.eq( hashes[0].md5  , hashes[i].md5 , "hashes different" );
+    if ( hashes[0].md5 == hashes[i].md5 ) 
+        continue;
+    
+    assert.eq( hashes[0].numCollections , hashes[i].numCollections , "num collections" );
+
+    for ( var k in hashes[0].collections ){
+        if ( hashes[0].collections[k] == 
+             hashes[i].collections[k] )
+            continue;
+        
+        print( "collection " + k + " is differnet" );
+        
+        print( "----" );
+        s._connections[0].getDB( "config" ).getCollection( k ).find().sort( { _id : 1 } ).foreach( printjsononeline );
+        print( "----" );
+        s._connections[i].getDB( "config" ).getCollection( k ).find().sort( { _id : 1 } ).foreach( printjsononeline );
+        print( "----" );
+    }
+    
+    throw "hashes different";
 }
 
 s.stop();
