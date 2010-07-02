@@ -63,9 +63,13 @@ namespace mongo {
     }
 #endif
 #if !defined(uassert)
+    inline void uasserted(unsigned msgid, std::string) {
+        throw bson::assertion();
+    }
+
     inline void uassert(unsigned msgid, std::string msg, bool expr) {
         if( !expr )
-            throw bson::assertion();
+            uasserted( msgid , msg );
     }
     inline void msgasserted(int msgid, const char *msg) { 
         throw bson::assertion();

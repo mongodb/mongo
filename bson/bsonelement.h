@@ -18,6 +18,7 @@
 #pragma once
 
 #include <vector>
+#include <string.h>
 
 namespace bson {
     typedef mongo::BSONElement be;

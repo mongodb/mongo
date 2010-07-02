@@ -273,7 +273,7 @@ namespace mongo {
             massert( 10323 ,  "Invalid CodeWScope string size", totalSize >= strSizeWNull + 4 + 4 );
             massert( 10324 ,  "Invalid CodeWScope string size",
                      strSizeWNull > 0 &&
-                     strSizeWNull - 1 == strnlen( codeWScopeCode(), strSizeWNull ) );
+                     (strSizeWNull - 1) == strnlen( codeWScopeCode(), strSizeWNull ) );
             massert( 10325 ,  "Invalid CodeWScope size", totalSize >= strSizeWNull + 4 + 4 + 4 );
             int objSize = *( int * )( value() + 4 + 4 + strSizeWNull );
             massert( 10326 ,  "Invalid CodeWScope object size", totalSize == 4 + 4 + strSizeWNull + objSize );
