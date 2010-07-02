@@ -2,6 +2,8 @@
  *   Tests for the db object enhancement
  */
 
+assert( "test" == db, "wrong database currently not test" );
+
 dd = function( x ){
     //print( x );
 }
@@ -34,7 +36,7 @@ dd( "d" );
 db.createCollection("test");
 var found = false;
 db.getCollection( "system.namespaces" ).find().forEach( function(x) {  if (x.name == "test.test") found = true; });
-assert(found);
+assert(found, "found test.test in system.namespaces");
 
 dd( "e" );
 
@@ -43,16 +45,16 @@ dd( "e" );
  */ 
  
 db.setProfilingLevel(0);
-assert(db.getProfilingLevel() == 0);
+assert(db.getProfilingLevel() == 0, "prof level 0");
 
 db.setProfilingLevel(1);
-assert(db.getProfilingLevel() == 1);
+assert(db.getProfilingLevel() == 1, "p1");
 
 db.setProfilingLevel(2);
-assert(db.getProfilingLevel() == 2);
+assert(db.getProfilingLevel() == 2, "p2");
 
 db.setProfilingLevel(0);
-assert(db.getProfilingLevel() == 0);
+assert(db.getProfilingLevel() == 0, "prof level 0");
 
 dd( "f" );
 asserted = false;
@@ -64,7 +66,7 @@ catch (e) {
     asserted = true;
     assert(e.dbSetProfilingException);
 }
-assert( asserted );
+assert( asserted, "should have asserted" );
 
 dd( "g" );
 
