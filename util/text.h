@@ -124,8 +124,7 @@ namespace mongo {
         errno = 0;
         ret = strtoll( n, &endPtr, 10 );
         uassert( 13305, "could not convert string to long long", *endPtr == 0 && errno == 0 );
-#else
-#if _MSC_VER>=1600	// 1600 is VS2k10 1500 is VS2k8
+#elif _MSC_VER>=1600	// 1600 is VS2k10 1500 is VS2k8
         size_t endLen = 0;
         try {
             ret = stoll( n, &endLen, 10 );
@@ -141,7 +140,6 @@ namespace mongo {
             endPtr = 0;
         }
         uassert( 13310, "could not convert string to long long", *endPtr == 0 );
-#endif // _MSC_VER >= 16
 #endif // !defined(_WIN32)
         return ret;
     }
