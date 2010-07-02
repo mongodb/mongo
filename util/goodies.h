@@ -281,17 +281,17 @@ namespace mongo {
         Timer( unsigned long long start ) {
             old = start;
         }
-        int seconds(){
+        int seconds() const {
             return (int)(micros() / 1000000);
         }
-        int millis() {
+        int millis() const {
             return (long)(micros() / 1000);
         }
-        unsigned long long micros() {
+        unsigned long long micros() const {
             unsigned long long n = curTimeMicros64();
             return n - old;
         }
-        unsigned long long micros(unsigned long long & n) { // returns cur time in addition to timer result
+        unsigned long long micros(unsigned long long & n) const { // returns cur time in addition to timer result
             n = curTimeMicros64();
             return n - old;
         }

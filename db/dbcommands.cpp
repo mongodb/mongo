@@ -986,7 +986,6 @@ namespace mongo {
             if ( id == 0 )
                 return false;
 
-            Timer t;
             int num = 0;
             NamespaceDetails *d = nsdetails(ns);
             int idxNo = d->idxNo(*id);
@@ -994,10 +993,10 @@ namespace mongo {
             num /= 2;
             BtreeCursor c( d, idxNo, *id, min, max, false, 1 );
             for( ; num; c.advance(), --num );
-            int ms = t.millis();
-            if ( ms > cmdLine.slowMS ) {
-                out() << "Finding median for index: " << keyPattern << " between " << min << " and " << max << " took " << ms << "ms." << endl;
-            }
+
+            ostringstream os;
+            os << "Finding median for index: " << keyPattern << " between " << min << " and " << max;
+            logIfSlow( os.str() );
 
             if ( !c.ok() ) {
                 errmsg = "no index entries in the specified range";
@@ -1048,7 +1047,6 @@ namespace mongo {
             long long maxSize = jsobj["maxSize"].numberLong();
             long long maxObjects = jsobj["maxObjects"].numberLong();
 
-            Timer t;
             long long size = 0;
             long long numObjects = 0;
             while( c->ok() ) {
@@ -1063,18 +1061,17 @@ namespace mongo {
 
                 c->advance();
             }
-            int ms = t.millis();
-            if ( ms > cmdLine.slowMS ) {
-                if ( min.isEmpty() ) {
-                    out() << "Finding size for ns: " << ns << " took " << ms << "ms." << endl;
-                } else {
-                    out() << "Finding size for ns: " << ns << " between " << min << " and " << max << " took " << ms << "ms." << endl;
-                }
+
+            ostringstream os;
+            os <<  "Finding size for ns: " << ns;
+            if ( ! min.isEmpty() ){
+                os << " between " << min << " and " << max;
             }
+            logIfSlow( os.str() );
 
             result.append( "size", (double)size );
             result.append( "numObjects" , (double)numObjects );
-            result.append( "millis" , ms );
+            result.append( "millis" , _timer.millis() );
             return true;
         }
     } cmdDatasize;

@@ -112,9 +112,13 @@ namespace mongo {
             return BSONObj();
         }
 
+        void logIfSlow( const string& msg) const;
+
         static map<string,Command*> * _commands;
         static map<string,Command*> * _commandsByBestName;
         static map<string,Command*> * _webCommands;
+
+        Timer                         _timer;  // started right before calling run
 
     public:
         static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }

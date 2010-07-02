@@ -152,6 +152,7 @@ namespace mongo {
                 anObjBuilder.append( "help" , help.str() );
             }
             else {
+                c->_timer.reset();
                 ok = c->run( nsToDatabase( ns ) , jsobj, errmsg, anObjBuilder, false);
             }
 
@@ -187,5 +188,12 @@ namespace mongo {
         return c->locktype();
     }
 
+    void Command::logIfSlow( const string& msg ) const {
+        int ms = _timer.millis();
+        if ( ms > cmdLine.slowMS ){
+            out() << msg << " took " << ms << " ms." << endl;
+        }
+    }
+    
     
 } // namespace mongo
