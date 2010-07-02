@@ -379,10 +379,12 @@ namespace mongo {
     IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
 
     inline bool isSimpleIdQuery( const BSONObj& query ){
-        return 
-            strcmp( query.firstElement().fieldName() , "_id" ) == 0 && 
-            query.nFields() == 1 && 
-            query.firstElement().isSimpleType();
+        BSONObjIterator i(query);
+        if( !i.more() ) return false;
+        BSONElement e = i.next();
+        if( i.more() ) return false;
+        if( strcmp("_id", e.fieldName()) != 0 ) return false;
+        return e.isSimpleType(); // e.g. not something like { _id : { $gt : ...
     }
     
     // matcher() will always work on the returned cursor
