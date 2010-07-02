@@ -250,6 +250,11 @@ namespace mongo {
             return BSON( "" << digestToString( d ) );
         }
 
+        BSONObj mkdir(const BSONObj& args){
+            boost::filesystem::create_directories(args.firstElement().String());
+            return BSON( "" << true );
+        }
+
         BSONObj removeFile(const BSONObj& args){
             BSONElement e = oneArg(args);
             bool found = false;
@@ -847,6 +852,7 @@ namespace mongo {
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );
             scope.injectNative( "md5sumFile", md5sumFile );
+            scope.injectNative( "mkdir" , mkdir );
 #endif
         }
 
