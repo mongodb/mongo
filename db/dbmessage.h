@@ -143,6 +143,9 @@ namespace mongo {
             massert( 10306 ,  "Next object larger than available space",
                     js.objsize() < ( theEnd - data ) );
             if ( objcheck && !js.valid() ) {
+                if ( logLevel >= 3 ) {
+                    log() << "bad object: " << js.hexDump() << endl;
+                }
                 massert( 10307 , "bad object in message", false);
             }            
             nextjsobj += js.objsize();
