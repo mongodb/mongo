@@ -106,11 +106,12 @@ namespace mongo {
             
             Client::Context ctx( ns );
 
+            const char* field = keyPattern.firstElement().fieldName();
             BSONObjBuilder minBuilder;
-            minBuilder.appendMinKey( "" );
+            minBuilder.appendMinKey( field );
             BSONObj min = minBuilder.obj();
             BSONObjBuilder maxBuilder;
-            maxBuilder.appendMaxKey( "" );
+            maxBuilder.appendMaxKey( field );
             BSONObj max = maxBuilder.obj();
             IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
             if ( idx == NULL ){
@@ -127,7 +128,9 @@ namespace mongo {
 
             const long long dataSize = d->datasize;
             const long long recCount = d->nrecords;
-            const long long keyCount = maxChunkSize / ( dataSize / recCount );
+            long long keyCount = 0;
+            if (( dataSize > 0 ) && ( recCount > 0 ))
+                keyCount = maxChunkSize / ( dataSize / recCount );
 
             long long currCount = 0;
             vector<BSONObj> splitKeys;
