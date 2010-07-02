@@ -41,7 +41,6 @@ namespace threadpool {
         // Also, new tasks could be scheduled after this returns.
         void join();
 
-
         // task will be copied a few times so make sure it's relatively cheap
         void schedule(Task task);
 
@@ -57,7 +56,6 @@ namespace threadpool {
         void schedule(F f, A a, B b, C c, D d){ schedule(boost::bind(f,a,b,c,d)); }
         template<typename F, typename A, typename B, typename C, typename D, typename E>
         void schedule(F f, A a, B b, C c, D d, E e){ schedule(boost::bind(f,a,b,c,d,e)); }
-
 
         int tasks_remaining() { return _tasksRemaining; }
 

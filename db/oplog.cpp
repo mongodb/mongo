@@ -473,7 +473,7 @@ namespace mongo {
         }
         else if ( *opType == 'u' ) {
             RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
-            updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), false, false , debug );
+            updateObjects(ns, o, op.getObjectField("o2"), /*upsert*/ op.getBoolField("b"), /*multi*/ false, /*logop*/ false , debug );
         }
         else if ( *opType == 'd' ) {
             if ( opType[1] == 0 )

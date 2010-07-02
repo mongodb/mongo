@@ -438,7 +438,7 @@
     <ClInclude Include="stats\top.h">
       <Filter>stats</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\concurrency\locks.h">
+    <ClInclude Include="..\util\concurrency\rwlock.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
     <ClInclude Include="..\util\concurrency\mvar.h">
