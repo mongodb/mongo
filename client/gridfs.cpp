@@ -34,11 +34,11 @@ namespace mongo {
 
     const unsigned DEFAULT_CHUNK_SIZE = 256 * 1024;
 
-    Chunk::Chunk( BSONObj o ){
+    GridFSChunk::GridFSChunk( BSONObj o ){
         _data = o;
     }
 
-    Chunk::Chunk( BSONObj fileObject , int chunkNumber , const char * data , int len ){
+    GridFSChunk::GridFSChunk( BSONObj fileObject , int chunkNumber , const char * data , int len ){
         BSONObjBuilder b;
         b.appendAs( fileObject["_id"] , "files_id" );
         b.append( "n" , chunkNumber );
@@ -76,7 +76,7 @@ namespace mongo {
         int chunkNumber = 0;
         while (data < end){
             int chunkLen = MIN(_chunkSize, (unsigned)(end-data));
-            Chunk c(idObj, chunkNumber, data, chunkLen);
+            GridFSChunk c(idObj, chunkNumber, data, chunkLen);
             _client.insert( _chunksNS.c_str() , c._data );
 
             chunkNumber++;
@@ -104,8 +104,9 @@ namespace mongo {
         int chunkNumber = 0;
         gridfs_offset length = 0;
         while (!feof(fd)){
-            boost::scoped_array<char>buf (new char[_chunkSize]);
-            char* bufPos = buf.get();
+            //boost::scoped_array<char>buf (new char[_chunkSize+1]);
+            char * buf = new char[_chunkSize+1];
+            char* bufPos = buf;//.get();
             unsigned int chunkLen = 0; // how much in the chunk now
             while(chunkLen != _chunkSize && !feof(fd)){
                 int readLen = fread(bufPos, 1, _chunkSize - chunkLen, fd);
@@ -115,11 +116,12 @@ namespace mongo {
                 assert(chunkLen <= _chunkSize);
             }
 
-            Chunk c(idObj, chunkNumber, buf.get(), chunkLen);
+            GridFSChunk c(idObj, chunkNumber, buf, chunkLen);
             _client.insert( _chunksNS.c_str() , c._data );
 
             length += chunkLen;
             chunkNumber++;
+            delete[] buf;
         }
 
         if (fd != stdin)
@@ -200,7 +202,7 @@ namespace mongo {
         return meta_element.embeddedObject();
     }
 
-    Chunk GridFile::getChunk( int n ){
+    GridFSChunk GridFile::getChunk( int n ){
         _exists();
         BSONObjBuilder b;
         b.appendAs( _obj["_id"] , "files_id" );
@@ -208,7 +210,7 @@ namespace mongo {
 
         BSONObj o = _grid->_client.findOne( _grid->_chunksNS.c_str() , b.obj() );
         uassert( 10014 ,  "chunk is empty!" , ! o.isEmpty() );
-        return Chunk(o);
+        return GridFSChunk(o);
     }
 
     gridfs_offset GridFile::write( ostream & out ){
@@ -217,7 +219,7 @@ namespace mongo {
         const int num = getNumChunks();
 
         for ( int i=0; i<num; i++ ){
-            Chunk c = getChunk( i );
+            GridFSChunk c = getChunk( i );
 
             int len;
             const char * data = c.data( len );

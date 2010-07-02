@@ -27,10 +27,10 @@ namespace mongo {
     class GridFS;
     class GridFile;
 
-    class Chunk {
+    class GridFSChunk {
     public:
-        Chunk( BSONObj data );
-        Chunk( BSONObj fileId , int chunkNumber , const char * data , int len );
+        GridFSChunk( BSONObj data );
+        GridFSChunk( BSONObj fileId , int chunkNumber , const char * data , int len );
 
         int len(){
             int len;
@@ -176,7 +176,7 @@ namespace mongo {
             return (int) ceil( (double)getContentLength() / (double)getChunkSize() );
         }
 
-        Chunk getChunk( int n );
+        GridFSChunk getChunk( int n );
 
         /**
            write the file to the output stream
