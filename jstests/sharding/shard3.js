@@ -62,12 +62,16 @@ assert( a.findOne( { num : 1 } ) )
 assert( b.findOne( { num : 1 } ) )
 
 print( "GOING TO MOVE" );
+assert( a.findOne( { num : 1 } ) , "pre move 1" )
 s.printCollectionInfo( "test.foo" );
-s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s.getOther( s.getServer( "test" ) ).name } );
+myto = s.getOther( s.getServer( "test" ) ).name
+print( "counts before move: " + tojson( s.shardCounts( "foo" ) ) );
+s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : myto } )
+print( "counts after move: " + tojson( s.shardCounts( "foo" ) ) );
 s.printCollectionInfo( "test.foo" );
 assert.eq( 1 , s.onNumShards( "foo" ) , "on 1 shard again" );
-assert( a.findOne( { num : 1 } ) )
-assert( b.findOne( { num : 1 } ) )
+assert( a.findOne( { num : 1 } ) , "post move 1" )
+assert( b.findOne( { num : 1 } ) , "post move 2" )
 
 print( "*** drop" );
 

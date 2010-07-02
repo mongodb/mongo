@@ -360,6 +360,8 @@ namespace mongo {
          * @param me - so i don't get deleted before i'm done
          */
         void drop( ChunkManagerPtr me );
+
+        void _printChunks() const;
         
     private:
         
@@ -395,7 +397,6 @@ namespace mongo {
         static AtomicUInt NextSequenceNumber;
 
         bool _isValid() const;
-        void _printChunks() const;
 
         /**
          * @return number of Chunk matching the query or -1 for all chunks.

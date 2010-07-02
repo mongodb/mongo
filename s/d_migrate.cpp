@@ -206,7 +206,14 @@ namespace mongo {
                         ++myVersion;
                         temp2.appendTimestamp( "lastmod" , myVersion );
                         
+                        shardingState.setVersion( ns , myVersion );
+
                         conn->update( ShardNS::chunk , x["_id"].wrap() , BSON( "$set" << temp2.obj() ) );
+                        
+                    }
+                    else {
+                        //++myVersion;
+                        shardingState.setVersion( ns , 0 );
                     }
                 }
 

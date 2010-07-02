@@ -274,7 +274,7 @@ ShardingTest.prototype.getChunksString = function( ns ){
         q.ns = ns;
 
     var s = "";
-    this.config.chunks.find( q ).sort( { min : 1 } ).forEach( 
+    this.config.chunks.find( q ).sort( { ns : 1 , min : 1 } ).forEach( 
         function(z){
             s +=  "  " + z._id + "\t" + z.lastmod.t + "|" + z.lastmod.i + "\t" + tojson(z.min) + " -> " + tojson(z.max) + " " + z.shard + "  " + z.ns + "\n";
         }
@@ -305,6 +305,8 @@ ShardingTest.prototype.printCollectionInfo = function( ns , msg ){
         out += "  mongos " + c + " " + tojson( c.getCollection( ns ).getShardVersion() , " " , true ) + "\n";
     }
     
+    out += this.getChunksString( ns );
+
     print( out );
 }
 
@@ -367,6 +369,17 @@ ShardingTest.prototype.onNumShards = function( collName , dbName ){
             num++;
     return num;
 }
+
+
+ShardingTest.prototype.shardCounts = function( collName , dbName ){
+    this.sync(); // we should sync since we're going directly to mongod here
+    dbName = dbName || "test";
+    var counts = {}
+    for ( var i=0; i<this._connections.length; i++ )
+        counts[i] = this._connections[i].getDB( dbName ).getCollection( collName ).count();
+    return counts;
+}
+
 
 ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
     split = split || key;

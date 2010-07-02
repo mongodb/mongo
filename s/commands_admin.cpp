@@ -441,7 +441,7 @@ namespace mongo {
                     errmsg = "no chunk manager?";
                     return false;
                 }
-                
+                cm->_printChunks();
                 result.appendTimestamp( "version" , cm->getVersion().toLong() );
 
                 return 1;
