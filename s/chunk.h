@@ -128,8 +128,6 @@ namespace mongo {
         
         void appendShortVersion( const char * name , BSONObjBuilder& b );
 
-        void ensureIndex();
-        
         void _markModified();
         
         static int MaxChunkSize;
@@ -268,11 +266,6 @@ namespace mongo {
 
         void maybeChunkCollection();
         
-        /**
-         * makes sure the shard index is on all servers
-         */
-        void ensureIndex();
-
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query );
 
         void getAllShards( set<Shard>& all );
