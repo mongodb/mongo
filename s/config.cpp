@@ -533,7 +533,13 @@ namespace mongo {
         ScopedDbConnection conn( _primary );
         
         if ( ! createdCapped ){
-            conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
+            try {
+                conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
+            }
+            catch ( UserException& e ){
+                log(1) << "couldn't create changelog (like race condition): " << e << endl;
+                // don't care
+            }
             createdCapped = true;
         }
      
