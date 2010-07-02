@@ -82,4 +82,81 @@ namespace mongo {
         }
     } cmdMedianKey;
 
+     class SplitVector : public Command {
+     public:
+        SplitVector() : Command( "splitVector" , false ){}
+        virtual bool slaveOk() const { return false; }
+        virtual LockType locktype() const { return READ; }
+        virtual void help( stringstream &help ) const {
+            help <<
+                "{ splitVector : \"myLargeCollection\" , keyPattern : {x:1} , maxChunkSize : 200 } ";
+        }
+        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            const char* ns = jsobj.getStringField( "splitVector" );
+            BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
+
+            long long maxChunkSize = 0;
+            BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
+            if ( ! maxSizeElem.eoo() ){
+                maxChunkSize = maxSizeElem.numberLong();
+            } else {
+                errmsg = "need to specify the desired max chunk size";
+                return false;
+            }
+            
+            Client::Context ctx( ns );
+
+            BSONObjBuilder minBuilder;
+            minBuilder.appendMinKey( "" );
+            BSONObj min = minBuilder.obj();
+            BSONObjBuilder maxBuilder;
+            maxBuilder.appendMaxKey( "" );
+            BSONObj max = maxBuilder.obj();
+            IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
+            if ( idx == NULL ){
+                errmsg = "couldn't find index over splitting key";
+                return false;
+            }
+
+            NamespaceDetails *d = nsdetails( ns );
+            BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+
+            // We'll use the average object size and number of object in to approximate how many keys
+            // each chunk should have. We'll split a little smaller than the specificied by 'maxSize'
+            // assuming a recently sharded collectio is still going to grow.
+
+            const long long dataSize = d->datasize;
+            const long long recCount = d->nrecords;
+            const long long keyCount = maxChunkSize / ( dataSize / recCount );
+
+            long long currCount = 0;
+            vector<BSONObj> splitKeys;
+            BSONObj currKey;
+            while ( c.ok() ){ 
+                currCount++;
+                if ( currCount > keyCount ){
+                    // if it is different than the last one, add to the split vector
+                    if ( ! currKey.isEmpty() && (currKey.woCompare( c.currKey() ) == 0 ) ) 
+                         continue;
+
+                    currKey = c.currKey();
+                    splitKeys.push_back( c.prettyKey( currKey ) );
+                    currCount = 0;
+                }
+                c.advance();
+            }
+
+            ostringstream os;
+            os << "Finding the split vector between " << min << " and " << max ;
+            logIfSlow( os.str() );
+
+            // Warning: we are sending back an array of keys but are currently limited to 
+            // 4MB work of 'result' size. This should be okay for now.
+
+            result.append( "splitKeys" , splitKeys );
+            return true;
+
+        }
+    } cmdSplitVector;
+
 }  // namespace mongo
