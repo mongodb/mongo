@@ -1560,12 +1560,15 @@ namespace mongo {
 
                 PRINT(cmdObj["new"]);
                 if (cmdObj["new"].trueValue()){
-                    BSONElement _id = origQuery["_id"];
+                    BSONObj gle = db.getLastErrorDetailed();
+                    PRINT(gle);
+
+                    BSONElement _id = gle["upserted"];
                     if (_id.eoo())
-                        _id = db.getLastErrorDetailed()["upserted"];
+                        _id = origQuery["_id"];
+
 
                     PRINT(_id);
-                    PRINT(db.getLastErrorDetailed());
 
                     out = db.findOne(ns, QUERY("_id" << _id), fields);
                     PRINT(out);
