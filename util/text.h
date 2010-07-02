@@ -135,7 +135,7 @@ namespace mongo {
 #else // stoll() wasn't introduced until VS 2010.
         char* endPtr = 0;
         ret = _strtoi64( n, &endPtr, 10 );
-        uassert( 13310, "could not convert string to long long", (*endPtr == 0) && (endPtr != _I64_MAX) && (endPtr != _I64_MIN) );
+        uassert( 13310, "could not convert string to long long", (*endPtr == 0) && (ret != _I64_MAX) && (ret != _I64_MIN) );
 #endif // !defined(_WIN32)
         return ret;
     }
