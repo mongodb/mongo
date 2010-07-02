@@ -149,7 +149,7 @@ namespace mongo {
                         gotThrough = true;
                         break;
                     }
-                    catch ( StaleConfigException& se ){
+                    catch ( StaleConfigException& ){
                         log(1) << "retrying insert because of StaleConfigException: " << o << endl;
                         r.reset();
                         manager = r.getChunkManager();

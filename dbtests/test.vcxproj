@@ -255,6 +255,8 @@
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\gridfs.cpp" />
+    <ClCompile Include="..\client\model.cpp" />
+    <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\quadrant_search.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
@@ -534,10 +536,14 @@
     <ClCompile Include="..\db\json.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
     <ClCompile Include="..\db\matcher.cpp" />
+    <ClCompile Include="..\s\chunk.cpp" />
+    <ClCompile Include="..\s\config.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />
     <ClCompile Include="..\s\d_util.cpp" />
     <ClCompile Include="..\s\d_writeback.cpp" />
+    <ClCompile Include="..\s\shard.cpp" />
     <ClCompile Include="..\s\shardconnection.cpp" />
+    <ClCompile Include="..\s\shardkey.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />

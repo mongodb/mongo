@@ -193,6 +193,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
@@ -433,9 +434,13 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\s\chunk.cpp" />
+    <ClCompile Include="..\s\config.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />
     <ClCompile Include="..\s\d_writeback.cpp" />
+    <ClCompile Include="..\s\shard.cpp" />
     <ClCompile Include="..\s\shardconnection.cpp" />
+    <ClCompile Include="..\s\shardkey.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\text.cpp" />
