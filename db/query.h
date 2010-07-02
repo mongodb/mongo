@@ -77,12 +77,12 @@ namespace mongo {
     struct GetMoreWaitException { };
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
-
+    
     struct UpdateResult {
-        bool existing;
-        bool mod;
-        long long num;
-        OID upserted;
+        bool existing; // if existing objects were modified
+        bool mod;      // was this a $ mod
+        long long num; // how many objects touched
+        OID upserted;  // if something was upserted, the new _id of the object
 
         UpdateResult( bool e, bool m, unsigned long long n , const BSONObj& upsertedObject = BSONObj() )
             : existing(e) , mod(m), num(n){
