@@ -337,7 +337,7 @@ DBCollection.prototype.findAndModify = function(args){
     var ret = this._db.runCommand( cmd );
     if ( ! ret.ok ){
         if (ret.errmsg == "No matching object found"){
-            return {};
+            return null;
         }
         throw "findAndModifyFailed failed: " + tojson( ret.errmsg );
     }
