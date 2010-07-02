@@ -251,12 +251,10 @@ namespace mongo {
     };
 
     class Ports { 
-        set<MessagingPort*>& ports;
+        set<MessagingPort*> ports;
         mongo::mutex m;
     public:
-        // we "new" this so it is still be around when other automatic global vars
-        // are being destructed during termination.
-        Ports() : ports( *(new set<MessagingPort*>()) ), m("Ports") {}
+        Ports() : ports(), m("Ports") {}
         void closeAll() { \
             scoped_lock bl(m);
             for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
@@ -270,7 +268,11 @@ namespace mongo {
             scoped_lock bl(m);
             ports.erase(p);
         }
-    } ports;
+    };
+
+    // we "new" this so it is still be around when other automatic global vars
+    // are being destructed during termination.
+    Ports& ports = *(new Ports());
 
 
 

@@ -33,6 +33,6 @@ assert.eq(out.priority, 1);
 out = t.findAndModify({sort:{priority:1}, remove:1});
 assert.eq(out.priority, 2);
 
-// return empty obj if no matches (drivers may handle this differently)
+// return null (was {} before 1.5.4) if no matches (drivers may handle this differently)
 out = t.findAndModify({query:{no_such_field:1}, remove:1});
-assert.eq(out, {});
+assert.eq(out, null);

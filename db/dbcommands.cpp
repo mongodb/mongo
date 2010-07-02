@@ -1135,8 +1135,10 @@ namespace mongo {
                     
             }
 
+            long long size = nsd->datasize / scale;
             result.appendNumber( "count" , nsd->nrecords );
-            result.appendNumber( "size" , nsd->datasize / scale );
+            result.appendNumber( "size" , size );
+            result.append      ( "avgObjSize" , double(size) / double(nsd->nrecords) );
             int numExtents;
             result.appendNumber( "storageSize" , nsd->storageSize( &numExtents ) / scale );
             result.append( "numExtents" , numExtents );
@@ -1204,6 +1206,7 @@ namespace mongo {
 
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
+            result.append      ( "avgObjSize" , double(size) / double(objects) );
             result.appendNumber( "dataSize" , size );
             result.appendNumber( "storageSize" , storageSize);
             result.appendNumber( "numExtents" , numExtents );
@@ -1577,40 +1580,59 @@ namespace mongo {
             if (!sort.eoo())
                 q.sort(sort.embeddedObjectUserCheck());
 
+            bool upsert = cmdObj["upsert"].trueValue();
+
             BSONObj fieldsHolder (cmdObj.getObjectField("fields"));
             const BSONObj* fields = (fieldsHolder.isEmpty() ? NULL : &fieldsHolder);
 
             BSONObj out = db.findOne(ns, q, fields);
-            if (out.firstElement().eoo()){
-                errmsg = "No matching object found";
-                return false;
-            }
-
-            Query idQuery = QUERY( "_id" << out["_id"]);
-
-            if (cmdObj["remove"].trueValue()){
-                uassert(12515, "can't remove and update", cmdObj["update"].eoo());
-                db.remove(ns, idQuery, 1);
-
-            } else { // update
-
-                // need to include original query for $ positional operator
-                BSONObjBuilder b;
-                b.append(out["_id"]);
-                BSONObjIterator it(origQuery);
-                while (it.more()){
-                    BSONElement e = it.next();
-                    if (strcmp(e.fieldName(), "_id"))
-                        b.append(e);
+            if (out.isEmpty()){
+                if (!upsert){
+                    errmsg = "No matching object found";
+                    return false;
                 }
-                q = Query(b.obj());
 
                 BSONElement update = cmdObj["update"];
-                uassert(12516, "must specify remove or update", !update.eoo());
-                db.update(ns, q, update.embeddedObjectUserCheck());
+                uassert(13329, "upsert mode requires update field", !update.eoo());
+                uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
+                db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
 
-                if (cmdObj["new"].trueValue())
-                    out = db.findOne(ns, idQuery, fields);
+                if (cmdObj["new"].trueValue()){
+                    BSONElement _id = origQuery["_id"];
+                    if (_id.eoo())
+                        _id = db.getLastErrorDetailed()["upserted"];
+
+                    out = db.findOne(ns, QUERY("_id" << _id), fields);
+                }
+
+            } else {
+
+                Query idQuery = QUERY( "_id" << out["_id"]);
+
+                if (cmdObj["remove"].trueValue()){
+                    uassert(12515, "can't remove and update", cmdObj["update"].eoo());
+                    db.remove(ns, idQuery, 1);
+
+                } else { // update
+
+                    // need to include original query for $ positional operator
+                    BSONObjBuilder b;
+                    b.append(out["_id"]);
+                    BSONObjIterator it(origQuery);
+                    while (it.more()){
+                        BSONElement e = it.next();
+                        if (strcmp(e.fieldName(), "_id"))
+                            b.append(e);
+                    }
+                    q = Query(b.obj());
+
+                    BSONElement update = cmdObj["update"];
+                    uassert(12516, "must specify remove or update", !update.eoo());
+                    db.update(ns, q, update.embeddedObjectUserCheck());
+
+                    if (cmdObj["new"].trueValue())
+                        out = db.findOne(ns, idQuery, fields);
+                }
             }
 
             result.append("value", out);

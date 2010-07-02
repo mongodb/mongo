@@ -205,6 +205,8 @@ namespace mongo {
            call at startup, this will initiate connection to the grid db 
         */
         bool init( vector<string> configHosts );
+        
+        bool init( string s );
 
         bool allUp();
         bool allUp( string& errmsg );

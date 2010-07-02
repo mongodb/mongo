@@ -86,10 +86,10 @@ namespace mongo {
         void process( int attempt = 0 );
 
         void gotInsert();
+
+        void reset( bool reload=false );
         
     private:
-        
-        void reset( bool reload=false );
         
         Message& _m;
         DbMessage _d;

@@ -53,6 +53,9 @@ namespace mongo {
         _lastmod(0), _modified(false), _dataWritten(0)
     {}
 
+    string Chunk::getns() const {
+        return _manager->getns(); 
+    }
 
     void Chunk::setShard( const Shard& s ){
         _shard = s;
@@ -197,87 +200,42 @@ namespace mongo {
     bool Chunk::moveAndCommit( const Shard& to , string& errmsg ){
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
         
-        BSONObjBuilder detail;
-        detail.append( "from" , _shard.toString() );
-        detail.append( "to" , to.toString() );
-        appendShortVersion( "chunk" , detail );
-
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
         
         Shard from = _shard;
-        ShardChunkVersion oldVersion = _manager->getVersion( from );
+        
         BSONObj filter;
         {
             BSONObjBuilder b;
             getFilter( b );
             filter = b.obj();
         }
-        
-        ScopedDbConnection fromconn( from.getConnString() );
 
-        BSONObj startRes;
+
+        ScopedDbConnection fromconn( from);
+
+        BSONObj res;
         bool worked = fromconn->runCommand( "admin" ,
-                                            BSON( "movechunk.start" << _manager->getns() << 
+                                            BSON( "moveChunk" << _manager->getns() << 
                                                   "from" << from.getConnString() <<
                                                   "to" << to.getConnString() <<
-                                                  "filter" << filter
+                                                  "filter" << filter << 
+                                                  "shardId" << genID() <<
+                                                  "configdb" << configServer.modelServer()
                                                   ) ,
-                                            startRes
+                                            res
                                             );
         
-        if ( ! worked ){
-            errmsg = (string)"movechunk.start failed: " + startRes.jsonString();
-            fromconn.done();
-            return false;
-        }
-
-        setShard( to );
-        
-        // need to increment version # for old server
-        ChunkPtr randomChunkOnOldServer = _manager->findChunkOnServer( from );
-
-        if ( randomChunkOnOldServer ){
-            randomChunkOnOldServer->_markModified();
-        }
-
-        // update config db
-        _manager->save();
-        
-        BSONObj finishRes;
-        {
-
-            ShardChunkVersion newVersion = _manager->getVersion( from );
-            if ( newVersion == 0 && oldVersion > 0 ){
-                newVersion = oldVersion;
-                ++newVersion;
-                _manager->save();
-            }
-            else if ( newVersion <= oldVersion ){
-                log() << "newVersion: " << newVersion << " oldVersion: " << oldVersion << endl;
-                uassert( 10168 ,  "version has to be higher" , newVersion > oldVersion );
-            }
-            
-            BSONObjBuilder b;
-            b << "movechunk.finish" << _manager->getns();
-            b << "to" << to.getConnString();
-            b.appendTimestamp( "newVersion" , newVersion );
-            b.append( startRes["finishToken"] );
-        
-            worked = fromconn->runCommand( "admin" ,
-                                           b.done() , 
-                                           finishRes );
-        }
-
-        if ( ! worked ){
-            errmsg = (string)"movechunk.finish failed: " + finishRes.toString();
-            fromconn.done();
-            return false;
-        }
-
         fromconn.done();
+
+        if ( worked ){
+            _manager->_reload();
+            return true;
+        }
         
-        configServer.logChange( "migrate" , _manager->getns() , detail.obj() );
-        return true;
+        errmsg = res["errmsg"].String();
+        errmsg += " " + res.toString();
+        return false;
     }
     
     bool Chunk::splitIfShould( long dataWritten ){
@@ -445,7 +403,7 @@ namespace mongo {
         string ns = from.getStringField( "ns" );
         _shard.reset( from.getStringField( "shard" ) );
 
-        _lastmod = from.hasField( "lastmod" ) ? from["lastmod"]._numberLong() : 0;
+        _lastmod = from["lastmod"];
         assert( _lastmod > 0 );
 
         BSONElement e = from["minDotted"];
@@ -556,7 +514,8 @@ namespace mongo {
         
         ScopedDbConnection conn( temp.modelServer() );
 
-        auto_ptr<DBClientCursor> cursor = conn->query( temp.getNS() , BSON( "ns" <<  _ns ) );
+        auto_ptr<DBClientCursor> cursor = conn->query(temp.getNS(), QUERY("ns" << _ns).sort("lastmod",1), 0, 0, 0, 0,
+                (DEBUG_BUILD ? 2 : 1000000)); // batch size. Try to induce potential race conditions in debug builds
         while ( cursor->more() ){
             BSONObj d = cursor->next();
             if ( d["isMaxMarker"].trueValue() ){
@@ -739,8 +698,10 @@ namespace mongo {
     }
     
     void ChunkManager::ensureIndex(){
-        rwlock lk( _lock , false ); 
- 
+        ensureIndex_inlock();
+    }
+    
+    void ChunkManager::ensureIndex_inlock(){
         set<Shard> seen;
         
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
@@ -817,7 +778,7 @@ namespace mongo {
     }
     
     void ChunkManager::save(){
-        rwlock lk( _lock , false ); 
+        rwlock lk( _lock , true ); 
         save_inlock();
     }
     
@@ -887,7 +848,8 @@ namespace mongo {
         ScopedDbConnection conn( Chunk(0).modelServer() );
         BSONObj res;
         bool ok = conn->runCommand( "config" , cmd , res );
-        //conn.done();
+        conn.done();
+
         if ( ! ok ){
             stringstream ss;
             ss << "saving chunks failed.  cmd: " << cmd << " result: " << res;
@@ -901,7 +863,7 @@ namespace mongo {
 
         massert( 10417 ,  "how did version get smalled" , getVersion_inlock() >= a );
         
-        ensureIndex(); // TODO: this is too aggressive - but not really sooo bad
+        ensureIndex_inlock(); // TODO: this is too aggressive - but not really sooo bad
     }
     
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const{
@@ -927,8 +889,6 @@ namespace mongo {
     }
     
     ShardChunkVersion ChunkManager::getVersion_inlock() const{
-        rwlock lk( _lock , false ); 
-        
         ShardChunkVersion max = 0;
         
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
@@ -1000,7 +960,7 @@ namespace mongo {
             }
             
         } catch (...) {
-            cout << "\t invalid ChunkRangeMap! printing ranges:" << endl;
+            log( LL_ERROR ) << "\t invalid ChunkRangeMap! printing ranges:" << endl;
 
             for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it)
                 cout << it->first << ": " << *it->second << endl;
@@ -1121,6 +1081,42 @@ namespace mongo {
             log(1) << "shardObjTest passed" << endl;
         }
     } shardObjTest;
+
+
+    // ----- to be removed ---
+    extern OID serverID;
+    bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result ){
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder.append( "setShardVersion" , ns.c_str() );
+        cmdBuilder.append( "configdb" , configServer.modelServer() );
+        cmdBuilder.appendTimestamp( "version" , version.toLong() );
+        cmdBuilder.appendOID( "serverID" , &serverID );
+        if ( authoritative )
+            cmdBuilder.appendBool( "authoritative" , 1 );
+
+        Shard s = Shard::make( conn.getServerAddress() );
+        cmdBuilder.append( "shard" , s.getName() );
+        cmdBuilder.append( "shardHost" , s.getConnString() );
+        BSONObj cmd = cmdBuilder.obj();
+        
+        log(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress() << "  " << ns << "  " << cmd << " " << &conn << endl;
+        
+        return conn.runCommand( "admin" , cmd , result );
+    }
+
+    bool lockNamespaceOnServer( const Shard& shard, const string& ns ){
+        ScopedDbConnection conn( shard.getConnString() );
+        bool res = lockNamespaceOnServer( conn.conn() , ns );
+        conn.done();
+        return res;
+    }
+
+    bool lockNamespaceOnServer( DBClientBase& conn , const string& ns ){
+        // TODO: replace this
+        //BSONObj lockResult;
+        //return setShardVersion( conn , ns , grid.getNextOpTime() , true , lockResult );
+        return true;
+    }
 
 
 } // namespace mongo

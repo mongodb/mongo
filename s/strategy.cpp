@@ -68,6 +68,10 @@ namespace mongo {
     
     void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj ){
         ShardConnection dbcon( shard , ns );
+        if ( dbcon.setVersion() ){
+            dbcon.done();
+            throw StaleConfigException( ns , "for insert" );
+        }
         dbcon->insert( ns , obj );
         dbcon.done();
     }
@@ -122,6 +126,7 @@ namespace mongo {
                     
                     conn.done();
                     secsToSleep = 0;
+                    continue;
                 }
                 catch ( std::exception e ){
                     log() << "WriteBackListener exception : " << e.what() << endl;
@@ -162,15 +167,18 @@ namespace mongo {
 
     map<string,WriteBackListener*> WriteBackListener::_cache;
     mongo::mutex WriteBackListener::_lock("WriteBackListener");
-
-    void checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative ){
+    
+    /**
+     * @return true if had to do something
+     */
+    bool checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative ){
         // TODO: cache, optimize, etc...
         
         WriteBackListener::init( conn );
 
         DBConfigPtr conf = grid.getDBConfig( ns );
         if ( ! conf )
-            return;
+            return false;
         
         ShardChunkVersion version = 0;
         unsigned long long officialSequenceNumber = 0;
@@ -184,7 +192,7 @@ namespace mongo {
 
         unsigned long long & sequenceNumber = checkShardVersionLastSequence[ make_pair(&conn,ns) ];        
         if ( sequenceNumber == officialSequenceNumber )
-            return;
+            return false;
 
         if ( isSharded ){
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
@@ -201,9 +209,9 @@ namespace mongo {
             log(1) << "      setShardVersion success!" << endl;
             sequenceNumber = officialSequenceNumber;
             dassert( sequenceNumber == checkShardVersionLastSequence[ make_pair(&conn,ns) ] );
-            return;
+            return true;
         }
-
+        
         log(1) << "       setShardVersion failed!\n" << result << endl;
 
         if ( result.getBoolField( "need_authoritative" ) )
@@ -211,45 +219,13 @@ namespace mongo {
         
         if ( ! authoritative ){
             checkShardVersion( conn , ns , 1 );
-            return;
+            return true;
         }
         
         log() << "     setShardVersion failed: " << result << endl;
         massert( 10429 , (string)"setShardVersion failed! " + result.jsonString() , 0 );
-    }
-    
-    bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result ){
-        BSONObjBuilder cmdBuilder;
-        cmdBuilder.append( "setShardVersion" , ns.c_str() );
-        cmdBuilder.append( "configdb" , configServer.modelServer() );
-        cmdBuilder.appendTimestamp( "version" , version.toLong() );
-        cmdBuilder.appendOID( "serverID" , &serverID );
-        if ( authoritative )
-            cmdBuilder.appendBool( "authoritative" , 1 );
-
-        Shard s = Shard::make( conn.getServerAddress() );
-        cmdBuilder.append( "shard" , s.getName() );
-        cmdBuilder.append( "shardHost" , s.getConnString() );
-        BSONObj cmd = cmdBuilder.obj();
-        
-        log(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress() << "  " << ns << "  " << cmd << " " << &conn << endl;
-        
-        return conn.runCommand( "admin" , cmd , result );
-    }
-
-    bool lockNamespaceOnServer( const Shard& shard, const string& ns ){
-        ScopedDbConnection conn( shard.getConnString() );
-        bool res = lockNamespaceOnServer( conn.conn() , ns );
-        conn.done();
-        return res;
-    }
-
-    bool lockNamespaceOnServer( DBClientBase& conn , const string& ns ){
-        // TODO: replace this
-        //BSONObj lockResult;
-        //return setShardVersion( conn , ns , grid.getNextOpTime() , true , lockResult );
         return true;
     }
-
+    
     
 }

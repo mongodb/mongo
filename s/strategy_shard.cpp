@@ -137,13 +137,28 @@ namespace mongo {
                     
                 }
                 
-                ChunkPtr c = manager->findChunk( o );
-                log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
-                insert( c->getShard() , r.getns() , o );
+                bool gotThrough = false;
+                for ( int i=0; i<10; i++ ){
+                    try {
+                        ChunkPtr c = manager->findChunk( o );
+                        log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                        insert( c->getShard() , r.getns() , o );
+                        
+                        r.gotInsert();
+                        c->splitIfShould( o.objsize() );
+                        gotThrough = true;
+                        break;
+                    }
+                    catch ( StaleConfigException& se ){
+                        log(1) << "retrying insert because of StaleConfigException: " << o << endl;
+                        r.reset();
+                        manager = r.getChunkManager();
+                    }
+                    sleepmillis( i * 200 );
+                }
 
-                r.gotInsert();
-                
-                c->splitIfShould( o.objsize() );
+                assert( gotThrough );
+
             }            
         }
 

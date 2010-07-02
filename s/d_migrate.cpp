@@ -37,43 +37,57 @@
 
 #include "shard.h"
 #include "d_logic.h"
+#include "config.h"
+#include "chunk.h"
 
 using namespace std;
 
 namespace mongo {
 
-
-    class MoveShardStartCommand : public Command {
+    class MoveChunkCommand : public Command {
     public:
-        MoveShardStartCommand() : Command( "movechunk.start" ){}
+        MoveChunkCommand() : Command( "moveChunk" ){}
         virtual void help( stringstream& help ) const {
             help << "should not be calling this directly" << endl;
         }
 
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return WRITE; } 
+        virtual LockType locktype() const { return NONE; } 
+        
         
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-            // so i have to start clone, tell caller its ok to make change
-            // at this point the caller locks me, and updates config db
-            // then finish calls finish, and then deletes data when cursors are done
+            // 1. parse options
+            // 2. make sure my view is complete and lock
+            // 3. start migrate
+            // 4. pause till migrate caught up
+            // 5. LOCK
+            //    a) update my config, essentially locking
+            //    b) finish migrate
+            //    c) update config server
+            //    d) logChange to config server
+            // 6. wait for all current cursors to expire
+            // 7. remove data locally
             
-            string ns = cmdObj["movechunk.start"].valuestrsafe();
-            string to = cmdObj["to"].valuestrsafe();
-            string from = cmdObj["from"].valuestrsafe(); // my public address, a tad redundant, but safe
-            BSONObj filter = cmdObj.getObjectField( "filter" );
+            // -------------------------------
             
-            if ( ns.size() == 0 ){
+            // 1.
+            string ns = cmdObj.firstElement().String();
+            string to = cmdObj["to"].String();
+            string from = cmdObj["from"].String(); // my public address, a tad redundant, but safe
+            BSONObj filter = cmdObj["filter"].Obj();
+            BSONElement shardId = cmdObj["shardId"];
+            
+            if ( ns.empty() ){
                 errmsg = "need to specify namespace in command";
                 return false;
             }
             
-            if ( to.size() == 0 ){
+            if ( to.empty() ){
                 errmsg = "need to specify server to move shard to";
                 return false;
             }
-            if ( from.size() == 0 ){
+            if ( from.empty() ){
                 errmsg = "need to specify server to move shard from (redundat i know)";
                 return false;
             }
@@ -83,121 +97,150 @@ namespace mongo {
                 return false;
             }
             
-            log() << "got movechunk.start: " << cmdObj << endl;
+            if ( shardId.eoo() ){
+                errmsg = "need shardId";
+                return false;
+            }
             
+            if ( ! shardingState.enabled() ){
+                if ( cmdObj["configdb"].type() != String ){
+                    errmsg = "sharding not enabled";
+                    return false;
+                }
+                string configdb = cmdObj["configdb"].String();
+                shardingState.enable( configdb );
+                configServer.init( configdb );
+            }
+
+
+
+            Shard fromShard( from );
+            Shard toShard( to );
             
-            BSONObj res;
-            bool ok;
+            log() << "got movechunk: " << cmdObj << endl;
+        
+            // 2. TODO
             
+            ShardChunkVersion maxVersion;
+            string myOldShard;
             {
-                dbtemprelease unlock;
+                ScopedDbConnection conn( shardingState.getConfigServer() );
+
+                BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
+                maxVersion = x["lastmod"];
+
+                x = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
+                myOldShard = x["shard"].String();
+                conn.done();
+            }
+
+            // 3.
+            BSONObj startRes;
+            {
                 
                 ScopedDbConnection conn( to );
-                ok = conn->runCommand( "admin" , 
+                bool ok = conn->runCommand( "admin" , 
                                             BSON( "startCloneCollection" << ns <<
                                                   "from" << from <<
                                                   "query" << filter 
                                                   ) , 
-                                            res );
+                                            startRes );
                 conn.done();
-            }
-            
-            log() << "   movechunk.start res: " << res << endl;
-            
-            if ( ok ){
-                result.append( res["finishToken"] );
-            }
-            else {
-                errmsg = "startCloneCollection failed: ";
-                errmsg += res["errmsg"].valuestrsafe();
-            }
-            return ok;
-        }
-        
-    } moveShardStartCmd;
 
-    class MoveShardFinishCommand : public Command {
-    public:
-        MoveShardFinishCommand() : Command( "movechunk.finish" ){}
-        virtual void help( stringstream& help ) const {
-            help << "should not be calling this directly" << endl;
-        }
+                if ( ! ok ){
+                    errmsg = "startCloneCollection failed: ";
+                    errmsg += startRes["errmsg"].String();
+                    result.append( "cause" , startRes );
+                    return false;
+                }
 
-        virtual bool slaveOk() const { return false; }
-        virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return WRITE; } 
-        
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-            // see MoveShardStartCommand::run
-            
-            string ns = cmdObj["movechunk.finish"].valuestrsafe();
-            if ( ns.size() == 0 ){
-                errmsg = "need ns as cmd value";
-                return false;
-            }
-
-            string to = cmdObj["to"].valuestrsafe();
-            if ( to.size() == 0 ){
-                errmsg = "need to specify server to move shard to";
-                return false;
-            }
-
-
-            unsigned long long newVersion = extractVersion( cmdObj["newVersion"] , errmsg );
-            if ( newVersion == 0 ){
-                errmsg = "have to specify new version number";
-                return false;
-            }
-                                                        
-            BSONObj finishToken = cmdObj.getObjectField( "finishToken" );
-            if ( finishToken.isEmpty() ){
-                errmsg = "need finishToken";
-                return false;
             }
             
-            if ( ns != finishToken["collection"].valuestrsafe() ){
-                errmsg = "namespaced don't match";
-                return false;
-            }
+            // 4. 
+            sleepsecs( 2 ); // TODO: this is temp
             
-            // now we're locked
-            shardingState.setVersion( ns , newVersion );
-            ShardedConnectionInfo::get(true)->setVersion( ns , newVersion );
-            
-            BSONObj res;
-            bool ok;
-            
-            {
-                dbtemprelease unlock;
+            // 5.
+            { 
+                // 5.a
+                ShardChunkVersion myVersion = maxVersion;
+                ++myVersion;
                 
-                ScopedDbConnection conn( to );
-                ok = conn->runCommand( "admin" , 
-                                       BSON( "finishCloneCollection" << finishToken ) ,
-                                       res );
+                {
+                    dblock lk;
+                    shardingState.setVersion( ns , myVersion );
+                    assert( myVersion == shardingState.getVersion( ns ) );
+                }
+
+                BSONObj res;
+                
+                
+                // 5.b
+                {
+                    ScopedDbConnection conn( to );
+                    bool ok = conn->runCommand( "admin" , 
+                                                startRes["finishToken"].wrap( "finishCloneCollection" ) ,
+                                                res );
+                    conn.done();
+
+                    if ( ! ok ){
+                        errmsg = "finishCloneCollection failed!";
+                        result.append( "cause" , res );
+                        return false;
+                    }
+                }
+                
+                // 5.c
+                ScopedDbConnection conn( shardingState.getConfigServer() );
+                
+                BSONObjBuilder temp;
+                temp.append( "shard" , toShard.getName() );
+                temp.appendTimestamp( "lastmod" , myVersion );
+
+                conn->update( ShardNS::chunk , shardId.wrap( "_id" ) , BSON( "$set" << temp.obj() ) );
+                
+                { 
+                    // update another random chunk
+                    BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns << "shard" << myOldShard ) ).sort( BSON( "lastmod" << -1 ) ) );
+                    if ( ! x.isEmpty() ){
+                        
+                        BSONObjBuilder temp2;
+                        ++myVersion;
+                        temp2.appendTimestamp( "lastmod" , myVersion );
+                        
+                        shardingState.setVersion( ns , myVersion );
+
+                        conn->update( ShardNS::chunk , x["_id"].wrap() , BSON( "$set" << temp2.obj() ) );
+                        
+                    }
+                    else {
+                        //++myVersion;
+                        shardingState.setVersion( ns , 0 );
+                    }
+                }
+
                 conn.done();
+                
+                // 5.d
+                configServer.logChange( "moveChunk" , ns , BSON( "range" << filter << "from" << fromShard.getName() << "to" << toShard.getName() ) );
             }
             
-            if ( ! ok ){
-                // uh oh
-                errmsg = "finishCloneCollection failed!";
-                result << "finishError" << res;
-                return false;
-            }
             
-            // wait until cursors are clean
-            cout << "WARNING: deleting data before ensuring no more cursors TODO" << endl;
+            // 6. 
+            log( LL_WARNING ) << " deleting data before ensuring no more cursors TODO" << endl;
             
+            // 7
             {
-                BSONObj removeFilter = finishToken.getObjectField( "query" );
+                writelock lk(ns);
                 Client::Context ctx(ns);
-                long long num = deleteObjects( ns.c_str() , removeFilter , false , true );
-                log() << "movechunk.finish deleted: " << num << endl;
+                long long num = deleteObjects( ns.c_str() , filter , false , true );
+                log() << "moveChunk deleted: " << num << endl;
                 result.appendNumber( "numDeleted" , num );
             }
 
             return true;
+            
         }
         
-    } moveShardFinishCmd;
+    } moveChunkCmd;
 
 }

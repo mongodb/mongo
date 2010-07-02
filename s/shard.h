@@ -211,6 +211,10 @@ namespace mongo {
             return _addr;
         }
 
+        bool setVersion() const {
+            return _setVersion;
+        }
+
         static void sync();
         
     private:
@@ -219,5 +223,6 @@ namespace mongo {
         string _addr;
         string _ns;
         DBClientBase* _conn;
+        bool _setVersion;
     };
 }

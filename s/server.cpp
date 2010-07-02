@@ -30,12 +30,10 @@
 #include "balance.h"
 
 namespace mongo {
-
+    
     CmdLine cmdLine;    
     Database *database = 0;
     string mongosCommand;
-    string ourHostname;
-    OID serverID;
     bool dbexitCalled = false;
 
     bool inShutdown(){

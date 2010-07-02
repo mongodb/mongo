@@ -1063,7 +1063,7 @@ namespace mongo {
                 _state = DOING_EXPAND;
             }
             
-            if ( _state == DOING_EXPAND ){
+            if ( (_state == DOING_EXPAND) || (_state == DOING_AROUND) ){
                 GEODEBUG( "circle prefix [" << _prefix << "]" );
                 while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
                 while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
@@ -1075,16 +1075,13 @@ namespace mongo {
                 }
                 
                 if ( _g->distance( _prefix , _start ) > _maxDistance ){
-                    GEODEBUG( "\tpast circle bounds" );
+		    GEODEBUG( "\tpast circle bounds");
                     GeoHash tr = _prefix;
                     tr.move( 1 , 1 );
                     if ( _g->distance( tr , _start ) > _maxDistance )
                         _state = DOING_AROUND;
-                    else
-                        _prefix = _prefix.up();
                 }
-                else
-                    _prefix = _prefix.up();
+                _prefix = _prefix.up();
                 return;
             }
             
@@ -1092,7 +1089,13 @@ namespace mongo {
                 _state = DONE;
                 return;
             }
+            /* Clients are expected to use moreToDo before calling
+             * fillStack, so DONE is checked for there. If any more
+             * State values are defined, you should handle them
+             * here. */ 
+            assert(0);
         }
+
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
             d = _g->distance( _start , h );

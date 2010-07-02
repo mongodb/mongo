@@ -37,6 +37,7 @@
 
 #include "shard.h"
 #include "d_logic.h"
+#include "config.h"
 
 using namespace std;
 
@@ -114,7 +115,9 @@ namespace mongo {
     
     void ShardingState::setVersion( const string& ns , const ConfigVersion& version ){
         scoped_lock lk(_mutex);
-        _versions[ns] = version;
+        ConfigVersion& me = _versions[ns];
+        assert( version == 0 || version > me );
+        me = version;
     }
 
     void ShardingState::appendInfo( BSONObjBuilder& b ){
@@ -335,6 +338,7 @@ namespace mongo {
                         return false;
                     }
                     shardingState.enable( configdb );
+                    configServer.init( configdb );
                 }
             }
             
@@ -372,10 +376,15 @@ namespace mongo {
                 errmsg = "need to speciy fully namespace";
                 return false;
             }
-
+            
             ConfigVersion& oldVersion = info->getVersion(ns);
             unsigned long long& globalVersion = shardingState.getVersion(ns);
             
+            if ( oldVersion > 0 && globalVersion == 0 ){
+                // this had been reset
+                oldVersion = 0;
+            }
+
             if ( version == 0 && globalVersion == 0 ){
                 // this connection is cleaning itself
                 oldVersion = 0;
@@ -403,6 +412,7 @@ namespace mongo {
                 errmsg = "you already have a newer version";
                 result.appendTimestamp( "oldVersion" , oldVersion );
                 result.appendTimestamp( "newVersion" , version );
+                result.appendTimestamp( "globalVersion" , globalVersion );
                 return false;
             }
             

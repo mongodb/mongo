@@ -1,6 +1,6 @@
 // auto2.js
 
-s = new ShardingTest( "auto2" , 2 , 1 , 1 );
+s = new ShardingTest( "auto2" , 2 , 1 , 2 );
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
@@ -26,6 +26,7 @@ for ( j=0; j<30; j++ ){
            ) );
     
 }
+assert.eq( i , j * 100 , "setup" );
 s.adminCommand( "connpoolsync" );
 db.getLastError();
 
@@ -42,10 +43,37 @@ assert( countb > 0 , "diff2" );
 
 print( "checkpoint B" )
 
+var missing = [];
+
+for ( i=0; i<j*100; i++ ){
+    var x = coll.findOne( { num : i } );
+    if ( ! x ){
+        missing.push( i );
+        print( "can't find: " + i );
+        sleep( 1000 );
+        x = coll.findOne( { num : i } );
+        if ( ! x ){
+            print( "still can't find: " + i );
+            
+            for ( var zzz=0; zzz<s._connections.length; zzz++ ){
+                if ( s._connections[zzz].getDB( "test" ).foo.findOne( { num : 1 } ) ){
+                    print( "found on wrong server: " + s._connections[zzz] );
+                }
+            }
+            
+        }
+    }
+}
+
+s.printChangeLog();
+
+print( "missing: " + tojson( missing ) )
 assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
 print( "checkpoint B.a" )
 s.printChunks();
 assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
+assert.eq( j * 100 , counta + countb , "from each 2 a:" + counta + " b:" + countb + " i:" + i );
+assert( missing.length == 0 , "missing : " + tojson( missing ) );
 
 print( "checkpoint C" )
 

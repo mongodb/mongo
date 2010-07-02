@@ -389,7 +389,11 @@ private:
     friend class BSONObjIterator;
     friend class BSONObj;
     const BSONElement& chk(int t) const { 
-        uassert(13111, "unexpected or missing type value in BSON object", t == type());
+        if ( t != type() ){
+            stringstream ss;
+            ss << "wrong type for BSONElement (" << fieldName() << ") " << type() << " != " << t;
+            uasserted(13111, ss.str() );
+        }
         return *this;
     }
     const BSONElement& chk(bool expr) const { 
