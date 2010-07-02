@@ -126,6 +126,7 @@ namespace mongo {
                     
                     conn.done();
                     secsToSleep = 0;
+                    continue;
                 }
                 catch ( std::exception e ){
                     log() << "WriteBackListener exception : " << e.what() << endl;
