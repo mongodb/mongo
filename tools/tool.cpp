@@ -191,7 +191,7 @@ namespace mongo {
             try {
                 acquirePathLock();
             }
-            catch ( DBException& e ){
+            catch ( DBException& ){
                 cerr << endl << "If you are running a mongod on the same "
                     "path you should connect to that instead of direct data "
                     "file access" << endl << endl;

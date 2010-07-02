@@ -49,6 +49,7 @@ var out = t.findAndModify({
                 upsert: true, 
                 'new': true
                 });
+printjson(out);
 assert.neq(out._id, undefined);
 assert.eq(out.a, 1);
 assert.eq(out.b, 2);
