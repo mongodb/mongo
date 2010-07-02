@@ -117,8 +117,6 @@ namespace mongo {
         bool reload();
 
         bool dropDatabase( string& errmsg );
-        
-        virtual void save( bool check=true);
 
         virtual string modelServer();
         

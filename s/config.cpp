@@ -179,14 +179,6 @@ namespace mongo {
         }
     }
     
-    void DBConfig::save( bool check ){
-        Model::save( check );
-
-        scoped_lock lk( _lock );
-        for ( map<string,ChunkManagerPtr>::iterator i=_shards.begin(); i != _shards.end(); i++)
-            i->second->save();
-    }
-
     bool DBConfig::reload(){
         // TODO: i don't think is 100% correct
         return doload();
