@@ -150,7 +150,7 @@ namespace mongo {
                         break;
                     }
                     catch ( StaleConfigException& se ){
-                        log(1) << "retrying insert because of StaleConfigException" << endl;
+                        log(1) << "retrying insert because of StaleConfigException: " << o << endl;
                         r.reset();
                         manager = r.getChunkManager();
                     }

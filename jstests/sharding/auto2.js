@@ -65,12 +65,15 @@ for ( i=0; i<j*100; i++ ){
     }
 }
 
+s.printChangeLog();
 
+print( "missing: " + tojson( missing ) )
 assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
-assert( missing.length == 0 , "missing : " + tojson( missing ) );
 print( "checkpoint B.a" )
 s.printChunks();
 assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
+assert.eq( j * 100 , counta + countb , "from each 2 a:" + counta + " b:" + countb + " i:" + i );
+assert( missing.length == 0 , "missing : " + tojson( missing ) );
 
 print( "checkpoint C" )
 
