@@ -1004,6 +1004,7 @@ namespace mongo {
             long long maxSize = jsobj["maxSize"].numberLong();
             long long maxObjects = jsobj["maxObjects"].numberLong();
 
+            Timer timer;
             long long size = 0;
             long long numObjects = 0;
             while( c->ok() ) {
@@ -1024,11 +1025,11 @@ namespace mongo {
             if ( ! min.isEmpty() ){
                 os << " between " << min << " and " << max;
             }
-            logIfSlow( os.str() );
+            logIfSlow( timer , os.str() );
 
             result.append( "size", (double)size );
             result.append( "numObjects" , (double)numObjects );
-            result.append( "millis" , _timer.millis() );
+            result.append( "millis" , timer.millis() );
             return true;
         }
     } cmdDatasize;

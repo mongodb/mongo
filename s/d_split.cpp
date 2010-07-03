@@ -62,6 +62,7 @@ namespace mongo {
             if ( id == 0 )
                 return false;
 
+            Timer timer;
             int num = 0;
             NamespaceDetails *d = nsdetails(ns);
             int idxNo = d->idxNo(*id);
@@ -72,7 +73,7 @@ namespace mongo {
 
             ostringstream os;
             os << "Finding median for index: " << keyPattern << " between " << min << " and " << max;
-            logIfSlow( os.str() );
+            logIfSlow( timer , os.str() );
 
             if ( !c.ok() ) {
                 errmsg = "no index entries in the specified range";
@@ -143,6 +144,7 @@ namespace mongo {
             // appeared in the vector before, we omit it. The assumption here is that all the 
             // instances of a key value live in the same chunk.
 
+            Timer timer;
             long long currCount = 0;
             vector<BSONObj> splitKeys;
             BSONObj currKey;
@@ -161,7 +163,7 @@ namespace mongo {
 
             ostringstream os;
             os << "Finding the split vector for " <<  ns << " over "<< keyPattern;
-            logIfSlow( os.str() );
+            logIfSlow( timer , os.str() );
 
             // Warning: we are sending back an array of keys but are currently limited to 
             // 4MB work of 'result' size. This should be okay for now.
