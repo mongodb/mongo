@@ -4,7 +4,7 @@
 
 // -------------------------
 // assertChunkSizes verifies that a given 'splitVec' divides the 'test.jstest_splitvector'
-// collection in 'maxChunkSize' approximately sized-chunks. Its asserts fail otherwise.
+// collection in 'maxChunkSize' approximately-sized chunks. Its asserts fail otherwise.
 // @param splitVec: an array with keys for field 'x'
 //        e.g. [ { x : 1927 }, { x : 3855 }, ...
 // @param numDocs: domain of 'x' field 
@@ -78,4 +78,4 @@ res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:
 
 assert.eq( true , res.ok );
 assert.close( numDocs*docSize / (1<<20) , res.splitKeys.length , "num split keys" , -1 );
-assertChunkSizes( res.splitKeys , numDocs, 1<<20 );
+assertChunkSizes( res.splitKeys , numDocs, (1<<20) * 0.9 ); // splitVector cuts at 90% of maxChunkSize
