@@ -108,7 +108,7 @@ namespace mongo {
         void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ){
             scoped_lock mylk(_mutex);
 
-#ifdef _DEVEL
+#ifdef _DEBUG
             MongoFileAllowWrites allowWrites;
 #endif
 
