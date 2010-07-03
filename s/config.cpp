@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "../util/message.h"
+#include "../util/stringutils.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../client/model.h"
@@ -365,17 +366,7 @@ namespace mongo {
 
     bool ConfigServer::init( string s ){
         vector<string> configdbs;
-
-        while ( true ){
-            size_t idx = s.find( ',' );
-            if ( idx == string::npos ){
-                configdbs.push_back( s );
-                break;
-            }
-            configdbs.push_back( s.substr( 0 , idx ) );
-            s = s.substr( idx + 1 );
-        }
-        
+        splitStringDelim( s, configdbs, ',' );
         return init( configdbs );
     }
 
