@@ -45,8 +45,10 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; } 
         virtual void help( stringstream &help ) const {
-            help << "internal.\nexample: { medianKey:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }\n"
-                "NOTE: This command may take awhile to run";
+            help << 
+                "Internal command.\n"
+                "example: { medianKey:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }\n"
+                "NOTE: This command may take a while to run";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             const char *ns = jsobj.getStringField( "medianKey" );
@@ -89,7 +91,10 @@ namespace mongo {
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
             help <<
-                "{ splitVector : \"myLargeCollection\" , keyPattern : {x:1} , maxChunkSize : 200 } ";
+                "Internal command.\n"
+                "example: { splitVector : \"myLargeCollection\" , keyPattern : {x:1} , maxChunkSize : 200 }\n"
+                "maxChunkSize unit in MBs\n"
+                "NOTE: This command may take a while to run";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             const char* ns = jsobj.getStringField( "splitVector" );
@@ -98,7 +103,7 @@ namespace mongo {
             long long maxChunkSize = 0;
             BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
             if ( ! maxSizeElem.eoo() ){
-                maxChunkSize = maxSizeElem.numberLong();
+                maxChunkSize = maxSizeElem.numberLong() * 1<<20;
             } else {
                 errmsg = "need to specify the desired max chunk size";
                 return false;
@@ -122,15 +127,21 @@ namespace mongo {
             NamespaceDetails *d = nsdetails( ns );
             BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
 
-            // We'll use the average object size and number of object in to approximate how many keys
+            // We'll use the average object size and number of object to find approximately how many keys
             // each chunk should have. We'll split a little smaller than the specificied by 'maxSize'
             // assuming a recently sharded collectio is still going to grow.
 
             const long long dataSize = d->datasize;
             const long long recCount = d->nrecords;
             long long keyCount = 0;
-            if (( dataSize > 0 ) && ( recCount > 0 ))
-                keyCount = maxChunkSize / ( dataSize / recCount );
+            if (( dataSize > 0 ) && ( recCount > 0 )){
+                const long long avgRecSize = dataSize / recCount;
+                keyCount = 0.9 * maxChunkSize / avgRecSize;
+            }
+
+            // We traverse the index and add the keyCount-th key to the result vector. If that key
+            // appeared in the vector before, we omit it. The assumption here is that all the 
+            // instances of a key value live in the same chunk.
 
             long long currCount = 0;
             vector<BSONObj> splitKeys;
@@ -138,7 +149,6 @@ namespace mongo {
             while ( c.ok() ){ 
                 currCount++;
                 if ( currCount > keyCount ){
-                    // if it is different than the last one, add to the split vector
                     if ( ! currKey.isEmpty() && (currKey.woCompare( c.currKey() ) == 0 ) ) 
                          continue;
 
@@ -150,7 +160,7 @@ namespace mongo {
             }
 
             ostringstream os;
-            os << "Finding the split vector between " << min << " and " << max ;
+            os << "Finding the split vector for " <<  ns << " over "<< keyPattern;
             logIfSlow( os.str() );
 
             // Warning: we are sending back an array of keys but are currently limited to 
