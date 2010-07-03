@@ -69,9 +69,9 @@ for ( i=1; i<hashes.length; i++ ){
         print( "collection " + k + " is differnet" );
         
         print( "----" );
-        s._connections[0].getDB( "config" ).getCollection( k ).find().sort( { _id : 1 } ).foreach( printjsononeline );
+        s._connections[0].getDB( "config" ).getCollection( k ).find().sort( { _id : 1 } ).forEach( printjsononeline );
         print( "----" );
-        s._connections[i].getDB( "config" ).getCollection( k ).find().sort( { _id : 1 } ).foreach( printjsononeline );
+        s._connections[i].getDB( "config" ).getCollection( k ).find().sort( { _id : 1 } ).forEach( printjsononeline );
         print( "----" );
     }
     
