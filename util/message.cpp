@@ -650,7 +650,7 @@ namespace mongo {
     }
     
     int getMaxConnections(){
-#if _WIN32
+#ifdef _WIN32
         return 20000;
 #else
         struct rlimit limit;
