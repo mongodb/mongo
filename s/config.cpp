@@ -366,7 +366,7 @@ namespace mongo {
 
     bool ConfigServer::init( string s ){
         vector<string> configdbs;
-        splitStringDelim( s, configdbs, ',' );
+        splitStringDelim( s, &configdbs, ',' );
         return init( configdbs );
     }
 
@@ -380,16 +380,11 @@ namespace mongo {
         }
         ourHostname = hn;
         
-        stringstream fullString;
-
         set<string> hosts;
         for ( size_t i=0; i<configHosts.size(); i++ ){
             string host = configHosts[i];
             hosts.insert( getHost( host , false ) );
             configHosts[i] = getHost( host , true );
-            if ( i > 0 )
-                fullString << ",";
-            fullString << configHosts[i];
         }
         
         for ( set<string>::iterator i=hosts.begin(); i!=hosts.end(); i++ ){
@@ -407,8 +402,10 @@ namespace mongo {
                 return false;
         }
         
-        _primary.setAddress( fullString.str() , true );
-        log(1) << " config string : " << fullString.str() << endl;
+        string fullString;
+        joinStringDelim( configHosts, &fullString, ',' );
+        _primary.setAddress( fullString , true );
+        log(1) << " config string : " << fullString << endl;
         
         return true;
     }
