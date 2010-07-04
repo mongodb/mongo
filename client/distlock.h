@@ -58,7 +58,7 @@ namespace mongo {
                     try {
                         conn->insert( _ns , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
                     }
-                    catch ( UserException& e ){
+                    catch ( UserException& ){
                     }
                 }
             }
