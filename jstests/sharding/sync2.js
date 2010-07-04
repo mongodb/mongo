@@ -21,10 +21,10 @@ assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other A" );
 s.adminCommand( { split : "test.foo" , middle : { num : 4 } } );
 s.adminCommand( { movechunk : "test.foo" , find : { num : 3 } , to : s.getFirstOther( s.getServer( "test" ) ).name } );
 
-assert( s._connections[0].getDB( "test" ).foo.find().toArray().length > 0 , "blah 1" );
-assert( s._connections[1].getDB( "test" ).foo.find().toArray().length > 0 , "blah 2" );
+assert( s._connections[0].getDB( "test" ).foo.find().toArray().length > 0 , "shard 0 request" );
+assert( s._connections[1].getDB( "test" ).foo.find().toArray().length > 0 , "shard 1 request" );
 assert.eq( 7 , s._connections[0].getDB( "test" ).foo.find().toArray().length + 
-           s._connections[1].getDB( "test" ).foo.find().toArray().length  , "blah 3" );
+           s._connections[1].getDB( "test" ).foo.find().toArray().length  , "combined shards" );
 
 assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal B" );
 assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B" );
@@ -66,7 +66,7 @@ for ( i=1; i<hashes.length; i++ ){
              hashes[i].collections[k] )
             continue;
         
-        print( "collection " + k + " is differnet" );
+        print( "collection " + k + " is different" );
         
         print( "----" );
         s._connections[0].getDB( "config" ).getCollection( k ).find().sort( { _id : 1 } ).forEach( printjsononeline );
