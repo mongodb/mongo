@@ -846,7 +846,7 @@ namespace mongo {
 
         BSONObj cmd = cmdBuilder.obj();
         
-        log(1) << "ChunkManager::save update: " << cmd << endl;
+        log(7) << "ChunkManager::save update: " << cmd << endl;
         
         ScopedDbConnection conn( Chunk(0).modelServer() );
         BSONObj res;
