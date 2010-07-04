@@ -34,5 +34,4 @@ namespace mongo {
         }
     }
 
-
 } // namespace mongo

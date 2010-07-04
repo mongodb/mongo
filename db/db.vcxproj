@@ -443,6 +443,7 @@
     <ClCompile Include="..\s\shardkey.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
+    <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />

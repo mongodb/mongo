@@ -590,6 +590,7 @@
     <ClCompile Include="..\util\ntservice.cpp" />
     <ClCompile Include="..\util\processinfo_win32.cpp" />
     <ClCompile Include="..\util\sock.cpp" />
+    <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\util.cpp" />
     <ClCompile Include="..\s\d_logic.cpp" />

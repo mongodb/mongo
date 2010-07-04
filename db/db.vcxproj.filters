@@ -364,6 +364,9 @@
     <ClCompile Include="..\client\model.cpp">
       <Filter>client</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\stringutils.cpp">
+      <Filter>util\core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
