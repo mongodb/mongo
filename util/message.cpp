@@ -28,6 +28,10 @@
 #include "../db/cmdline.h"
 #include "../client/dbclient.h"
 
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
+
 namespace mongo {
 
     bool noUnixSocket = false;
