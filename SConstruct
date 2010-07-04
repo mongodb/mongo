@@ -646,7 +646,7 @@ elif "win32" == os.sys.platform:
         # /ZI debug info w/edit & continue 
         # /TP it's a c++ file
         # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
-        env.Append( CPPFLAGS=" /Od /RTC1 /MDd /Zi /TP /errorReport:none " )
+        env.Append( CPPFLAGS=" /Od /RTC1 /MDd /Z7 /TP /errorReport:none " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
         env.Append( LINKFLAGS=" /debug " )
 
