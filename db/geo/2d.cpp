@@ -541,6 +541,32 @@ namespace mongo {
 
             }
 
+            {
+                // see http://en.wikipedia.org/wiki/Great-circle_distance#Worked_example
+
+                {
+                    Point BNA (-86.67, 36.12);
+                    Point LAX (-118.40, 33.94);
+
+                    double dist1 = spheredist_deg(BNA, LAX);
+                    double dist2 = spheredist_deg(LAX, BNA);
+
+                    // target is 0.45306
+                    assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
+                    assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
+                }
+                {
+                    Point BNA (-1.5127, 0.6304);
+                    Point LAX (-2.0665, 0.5924);
+
+                    double dist1 = spheredist_rad(BNA, LAX);
+                    double dist2 = spheredist_rad(LAX, BNA);
+
+                    // target is 0.45306
+                    assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
+                    assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
+                }
+            }
         }
     } geoUnitTest;
     
