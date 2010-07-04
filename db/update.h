@@ -132,6 +132,7 @@ namespace mongo {
                     
                     if ( c == '$' && 
                          i > 0 && fullName[i-1] == '.' &&
+                         i+1<fullName.size() && 
                          fullName[i+1] == '.' ){
                         i++;
                         continue;
