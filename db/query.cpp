@@ -370,11 +370,12 @@ namespace mongo {
 
     class CountOp : public QueryOp {
     public:
-        CountOp( const BSONObj &spec ) :
-        count_(),
-        skip_( spec["skip"].numberLong() ),
-        limit_( spec["limit"].numberLong() ),
-        bc_() {}
+        CountOp( const string& ns , const BSONObj &spec ) :
+            _ns(ns), count_(),
+            skip_( spec["skip"].numberLong() ),
+            limit_( spec["limit"].numberLong() ),
+            bc_(),_yieldTracker(256,20){
+        }
         
         virtual void _init() {
             c_ = qp().newCursor();
@@ -391,6 +392,19 @@ namespace mongo {
                 setComplete();
                 return;
             }
+
+            if ( _cc || _yieldTracker.ping() ){
+                if ( ! _cc )
+                    _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , _ns.c_str() ) );
+                
+                if ( ! _cc->yieldSometimes() ){
+                    c_.reset();
+                    _cc.reset();
+                    setComplete();
+                    return;
+                }
+            }
+
             if ( bc_ ) {
                 if ( firstMatch_.isEmpty() ) {
                     firstMatch_ = bc_->currKeyNode().key;
@@ -407,7 +421,8 @@ namespace mongo {
                     }
                     _gotOne();
                 }
-            } else {
+            } 
+            else {
                 if ( !matcher()->matches(c_->currKey(), c_->currLoc() ) ) {
                 }
                 else if( !c_->getsetdup(c_->currLoc()) ) {
@@ -417,7 +432,7 @@ namespace mongo {
             c_->advance();
         }
         virtual QueryOp *_createChild() const {
-            CountOp *ret = new CountOp( BSONObj() );
+            CountOp *ret = new CountOp( _ns , BSONObj() );
             ret->count_ = count_;
             ret->skip_ = skip_;
             ret->limit_ = limit_;
@@ -441,6 +456,8 @@ namespace mongo {
             count_++;
         }
 
+        string _ns;
+        
         long long count_;
         long long skip_;
         long long limit_;
@@ -448,6 +465,9 @@ namespace mongo {
         BSONObj query_;
         BtreeCursor *bc_;
         BSONObj firstMatch_;
+
+        ElapsedTracker _yieldTracker;
+        shared_ptr<ClientCursor> _cc;
     };
     
     /* { count: "collectionname"[, query: <query>] }
@@ -477,7 +497,7 @@ namespace mongo {
             return num;
         }
         MultiPlanScanner mps( ns, query, BSONObj() );
-        CountOp original( cmd );
+        CountOp original( ns , cmd );
         shared_ptr< CountOp > res = mps.runOp( original );
         if ( !res->complete() ) {
             log() << "Count with ns: " << ns << " and query: " << query
