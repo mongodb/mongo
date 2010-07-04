@@ -23,6 +23,7 @@
 #include "queryoptimizer.h"
 #include "repl.h"
 #include "update.h"
+#include "btree.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
@@ -761,9 +762,92 @@ namespace mongo {
         MatchDetails _details;
     };
 
+    /* note: this is only (as-is) called for 
+             - not multi
+             - not mods is indexed
+             - not upsert
+    */
+    static UpdateResult _updateById(bool isOperatorUpdate, int idIdxNo, ModSet *mods, int profile, NamespaceDetails *d, 
+                                    NamespaceDetailsTransient *nsdt,
+                                    bool god, const char *ns, 
+                                    const BSONObj& updateobj, BSONObj patternOrig, bool logop, OpDebug& debug) 
+    {
+        DiskLoc loc;
+        {
+            IndexDetails& i = d->idx(idIdxNo);
+            BSONObj key = i.getKeyFromQuery( patternOrig );
+            loc = i.head.btree()->findSingle(i, i.head, key);
+            if( loc.isNull() ) { 
+                // no upsert support in _updateById yet, so we are done.
+                return UpdateResult(0, 0, 0);
+            }
+        }
+
+        Record *r = loc.rec();
+                
+        /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
+           regular ones at the moment. */
+        if ( isOperatorUpdate ) {                   
+            const BSONObj& onDisk = loc.obj();                    
+            auto_ptr<ModSetState> mss = mods->prepare( onDisk );
+                    
+            if( mss->canApplyInPlace() ) {
+                mss->applyModsInPlace();                    
+                DEBUGUPDATE( "\t\t\t updateById doing in place update" );
+                /*if ( profile )
+                    ss << " fastmod "; */
+            } 
+            else {
+                BSONObj newObj = mss->createNewFromMods();
+                uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= ( 4 * 1024 * 1024 ) );
+                bool changedId;
+                assert(nsdt);
+                DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug, changedId);                        
+            }
+                    
+            if ( logop ) {
+                DEV assert( mods->size() );
+                 
+                BSONObj pattern = patternOrig;
+                if ( mss->haveArrayDepMod() ) {
+                    BSONObjBuilder patternBuilder;
+                    patternBuilder.appendElements( pattern );
+                    mss->appendSizeSpecForArrayDepMods( patternBuilder );
+                    pattern = patternBuilder.obj();                        
+                }
+                        
+                if( mss->needOpLogRewrite() ) {
+                    DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
+                    logOp("u", ns, mss->getOpLogRewrite() , &pattern );
+                }
+                else {
+                    logOp("u", ns, updateobj, &pattern );
+                }
+            }
+            return UpdateResult( 1 , 1 , 1);
+        } // end $operator update
+                
+        // regular update
+        BSONElementManipulator::lookForTimestamps( updateobj );
+        checkNoMods( updateobj );
+        bool changedId = false;
+        assert(nsdt);
+        theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, changedId);
+        if ( logop ) {
+            if ( !changedId ) {
+                logOp("u", ns, updateobj, &patternOrig );
+            } else {
+                logOp("d", ns, patternOrig );
+                logOp("i", ns, updateobj );                    
+            }
+        }
+        return UpdateResult( 1 , 0 , 1 );
+    }
+ 
     UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug) {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
-        int profile = cc().database()->profile;
+        Client& client = cc();
+        int profile = client.database()->profile;
         StringBuilder& ss = debug.str;
 
         if ( logLevel > 2 )
@@ -788,6 +872,14 @@ namespace mongo {
                 mods.reset( new ModSet(updateobj, nsdt->indexKeys()) );
             }
             modsIsIndexed = mods->isIndexed();
+        }
+
+        if( !upsert && !multi && isSimpleIdQuery(patternOrig) && d && !modsIsIndexed ) {
+            int idxNo = d->findIdIndex();
+            if( idxNo >= 0 ) {
+                ss << " byid ";
+                return _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
+            }
         }
 
         set<DiskLoc> seenObjects;

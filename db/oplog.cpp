@@ -60,7 +60,7 @@ namespace mongo {
             massert(13312, "replSet error : logOp() but not primary?", theReplSet->isPrimary());
             hNew = (theReplSet->h * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         }
-        else { 
+        else {
             // must be initiation
             assert( *ns == 0 );
             hNew = 0;
@@ -466,7 +466,10 @@ namespace mongo {
                     
                     /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
                     RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow 
-                    
+
+                    /* todo : it may be better to do an insert here, and then catch the dup key exception and do update 
+                              then.  very few upserts will not be inserts...
+                              */
                     updateObjects(ns, o, b.done(), true, false, false , debug );
                 }
             }
