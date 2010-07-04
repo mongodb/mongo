@@ -236,7 +236,7 @@ int main(int argc, char* argv[], char *envp[] ) {
     printShardingVersionInfo();
     
     if ( ! configServer.init( configdbs ) ){
-        cout << "couldn't connectd to config db" << endl;
+        cout << "couldn't resolve config db address" << endl;
         return 7;
     }
     
