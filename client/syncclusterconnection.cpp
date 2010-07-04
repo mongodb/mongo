@@ -69,6 +69,7 @@ namespace mongo {
     }
 
     bool SyncClusterConnection::prepare( string& errmsg ){
+        _lastError = BSONObj();
         return fsync( errmsg );
     }
     
@@ -111,6 +112,7 @@ namespace mongo {
             }
             all.push_back( res );
             errors.push_back( err );
+            _lastError = res.getOwned();
         }
         
         assert( all.size() == errors.size() && all.size() == _conns.size() );
@@ -124,11 +126,18 @@ namespace mongo {
                 continue;
             ok = false;
             err << _conns[i]->toString() << ": " << res << " " << errors[i];
+            _lastError = res.getOwned();
         }
 
         if ( ok )
             return;
         throw UserException( 8001 , (string)"SyncClusterConnection write op failed: " + err.str() );
+    }
+
+    BSONObj SyncClusterConnection::getLastErrorDetailed(){
+        if ( _lastError.isEmpty() )
+            return DBClientBase::getLastErrorDetailed();
+        return _lastError;
     }
 
     void SyncClusterConnection::_connect( string host ){
@@ -179,7 +188,7 @@ namespace mongo {
 
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                           const BSONObj *fieldsToReturn, int queryOptions, int batchSize ){ 
-
+        _lastError = BSONObj();
         if ( ns.find( ".$cmd" ) != string::npos ){
             string cmdName = query.obj.firstElement().fieldName();
             int lockType = _lockType( cmdName );

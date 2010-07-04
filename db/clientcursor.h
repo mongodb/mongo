@@ -164,7 +164,10 @@ namespace mongo {
                 _unlock.reset(new dbtempreleasecond());
             }
             ~YieldLock(){
-                assert( ! _unlock );
+                if ( _unlock ){
+                    log( LL_WARNING ) << "ClientCursor::YieldLock not closed properly" << endl;
+                    relock();
+                }
             }
 
             bool stillOk(){

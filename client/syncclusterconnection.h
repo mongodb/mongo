@@ -83,7 +83,8 @@ namespace mongo {
         virtual string getServerAddress() const { return _address; }
         virtual bool isFailed() const { return false; }
         virtual string toString() { return _toString(); }
-        
+
+		virtual BSONObj getLastErrorDetailed();
 
     private:
         SyncClusterConnection( SyncClusterConnection& prev );
@@ -99,6 +100,8 @@ namespace mongo {
         vector<DBClientConnection*> _conns;
         map<string,int> _lockTypes;
         mongo::mutex _mutex;
+        
+        BSONObj _lastError;
     };
     
 

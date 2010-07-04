@@ -427,7 +427,15 @@ namespace mongo {
         BSONObjCmp _cmp;
     };
 
-
+    /*
+    struct chunk_lock {
+        chunk_lock( const Chunk* c ){
+            
+        }
+        
+        Chunk _c;
+    };
+    */
     inline string Chunk::genID(){ return genID(_manager->getns(), _min); }
 
 } // namespace mongo

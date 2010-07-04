@@ -388,7 +388,7 @@ commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.c
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", 
-                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" ]
+                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp s/shardconnection.cpp" )
 
@@ -435,7 +435,7 @@ coreServerFiles += scriptingFiles
 
 coreShardFiles = [ "s/config.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" ]
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" ]
-serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" , "s/d_writeback.cpp" , "s/d_migrate.cpp" , "s/d_state.cpp" ]
+serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" , "s/d_writeback.cpp" , "s/d_migrate.cpp" , "s/d_state.cpp" , "s/d_split.cpp" ]
 
 serverOnlyFiles += [ "db/module.cpp" ] + Glob( "db/modules/*.cpp" )
 
@@ -611,7 +611,8 @@ elif "win32" == os.sys.platform:
     env.Append( CPPDEFINES=[ "UNICODE" ] )
 
     winSDKHome = findVersion( [ "C:/Program Files/Microsoft SDKs/Windows/", "C:/Program Files (x86)/Microsoft SDKs/Windows/" ] ,
-                              [ "v6.0" , "v6.0a" , "v6.1", "v7.0A" ] )
+                              [ "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
+    print( "Windows SDK Root '" + winSDKHome + "'" )
 
     env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
 
@@ -645,7 +646,7 @@ elif "win32" == os.sys.platform:
         # /ZI debug info w/edit & continue 
         # /TP it's a c++ file
         # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
-        env.Append( CPPFLAGS=" /Od /RTC1 /MDd /Zi /TP /errorReport:none " )
+        env.Append( CPPFLAGS=" /Od /RTC1 /MDd /Z7 /TP /errorReport:none " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
         env.Append( LINKFLAGS=" /debug " )
 
@@ -666,7 +667,8 @@ elif "win32" == os.sys.platform:
         env.Append( LIBPATH=[ winSDKHome + "/Lib" ] )
 
     if release:
-        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRTD " )
+        #env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRTD " )
+        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  " )
     else:
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT  " )
 

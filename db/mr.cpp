@@ -552,13 +552,7 @@ namespace mongo {
                             }
                         
                             ClientCursor::YieldLock yield (cursor.get());
-                            try {    
-                                state.finalReduce( all );
-                            }
-                            catch ( ... ){
-                                yield.relock();
-                                throw;
-                            }
+                            state.finalReduce( all );
                             
                             all.clear();
                             prev = o;

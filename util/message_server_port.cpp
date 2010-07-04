@@ -122,7 +122,6 @@ namespace mongo {
         return new PortMessageServer( opts , handler );
     }    
 
-    TicketHolder connTicketHolder(20000);
 }
 
 #endif

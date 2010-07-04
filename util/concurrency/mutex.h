@@ -42,7 +42,8 @@ namespace mongo {
         //     b.lock(); alone is fine too
         //   only checked on _DEBUG builds.
         string a,b;
-
+        
+        void aBreakPoint(){}
         void programEnding();
         MutexDebugger();
         void entering(mid m) {
@@ -54,6 +55,7 @@ namespace mongo {
             Preceeding &preceeding = *_preceeding;
 
             if( a == m ) { 
+                aBreakPoint();
                 if( preceeding[b.c_str()] ) {
                     cout << "mutex problem " << b << " was locked before " << a << endl;
                     assert(false);

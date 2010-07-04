@@ -28,11 +28,17 @@
 #include "../db/cmdline.h"
 #include "../client/dbclient.h"
 
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
+
 namespace mongo {
 
     bool noUnixSocket = false;
 
     bool objcheck = false;
+
+    void checkTicketNumbers();
     
 // if you want trace output:
 #define mmm(x)
@@ -87,6 +93,7 @@ namespace mongo {
     /* listener ------------------------------------------------------------------- */
 
     void Listener::initAndListen() {
+        checkTicketNumbers();
         vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port);
         vector<int> socks;
         SOCKET maxfd = 0; // needed for select()
@@ -645,5 +652,34 @@ namespace mongo {
     int getClientId(){
         return clientId.get();
     }
+    
+    int getMaxConnections(){
+#ifdef _WIN32
+        return 20000;
+#else
+        struct rlimit limit;
+        assert( getrlimit(RLIMIT_NOFILE,&limit) == 0 );
+
+        int max = (int)(limit.rlim_cur * .8);
+
+        log(1) << "fd limit" 
+               << " hard:" << limit.rlim_max 
+               << " soft:" << limit.rlim_cur 
+               << " max conn: " << max
+               << endl;
+        
+        if ( max > 20000 )
+            max = 20000;
+
+        return max;
+#endif
+    }
+
+    void checkTicketNumbers(){
+        connTicketHolder.resize( getMaxConnections() );
+    }
+
+    TicketHolder connTicketHolder(20000);
+    
 
 } // namespace mongo

@@ -71,9 +71,9 @@ namespace mongo {
             return NULL;
         }
         
-        log(4) << "min: " << min.first << "\t" << min.second << endl;
-        log(4) << "max: " << max.first << "\t" << max.second << endl;
-        log(4) << "draining: " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
+        log(1) << "min: " << min.first << "\t" << min.second << endl;
+        log(1) << "max: " << max.first << "\t" << max.second << endl;
+        log(1) << "draining: " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
 
         // Solving imbalances takes a higher priority than draining shards. Many shards can
         // be draining at once but we choose only one of them to cater to per round.

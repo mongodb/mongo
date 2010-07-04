@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "../util/message.h"
+#include "../util/stringutils.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../client/model.h"
@@ -179,14 +180,6 @@ namespace mongo {
         }
     }
     
-    void DBConfig::save( bool check ){
-        Model::save( check );
-
-        scoped_lock lk( _lock );
-        for ( map<string,ChunkManagerPtr>::iterator i=_shards.begin(); i != _shards.end(); i++)
-            i->second->save();
-    }
-
     bool DBConfig::reload(){
         // TODO: i don't think is 100% correct
         return doload();
@@ -373,17 +366,7 @@ namespace mongo {
 
     bool ConfigServer::init( string s ){
         vector<string> configdbs;
-
-        while ( true ){
-            size_t idx = s.find( ',' );
-            if ( idx == string::npos ){
-                configdbs.push_back( s );
-                break;
-            }
-            configdbs.push_back( s.substr( 0 , idx ) );
-            s = s.substr( idx + 1 );
-        }
-        
+        splitStringDelim( s, configdbs, ',' );
         return init( configdbs );
     }
 

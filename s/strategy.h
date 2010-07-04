@@ -45,8 +45,5 @@ namespace mongo {
 
     bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result );
 
-    bool lockNamespaceOnServer( const Shard& shard , const string& ns );
-    bool lockNamespaceOnServer( DBClientBase& conn , const string& ns );
-
 }
 

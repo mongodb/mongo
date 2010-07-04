@@ -54,6 +54,7 @@ namespace mongo {
     {}
 
     string Chunk::getns() const {
+        assert( _manager );
         return _manager->getns(); 
     }
 
@@ -156,6 +157,11 @@ namespace mongo {
     }
     
     ChunkPtr Chunk::split( const BSONObj& m ){
+        
+        DistributedLock lockSetup( ConnectionString( modelServer() , ConnectionString::SYNC ) , getns() );
+        dist_lock_try dlk( &lockSetup , (string)"split-" + toString() );
+        uassert( 10166 ,  "locking namespace failed" , dlk.got() );
+
         uassert( 10165 ,  "can't split as shard that doesn't have a manager" , _manager );
 
         log(1) << " before split on: "  << m << '\n'
@@ -165,7 +171,6 @@ namespace mongo {
         appendShortVersion( "before" , detail );
         
 
-        uassert( 10166 ,  "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _manager->getns() ) );
         uassert( 13003 ,  "can't split chunk. does it have only one distinct value?" ,
                           !m.isEmpty() && _min.woCompare(m) && _max.woCompare(m)); 
 
@@ -716,24 +721,20 @@ namespace mongo {
     void ChunkManager::drop( ChunkManagerPtr me ){
         rwlock lk( _lock , true ); 
         
+        DistributedLock lockSetup( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , getns() );
+        dist_lock_try dlk( &lockSetup  , "drop" );
+        uassert( 13331 ,  "locking namespace failed" , dlk.got() );
+        
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
         
-        map<Shard,ShardChunkVersion> seen;
+        set<Shard> seen;
         
         log(1) << "ChunkManager::drop : " << _ns << endl;
 
         // lock all shards so no one can do a split/migrate
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
             ChunkPtr c = i->second;
-            ShardChunkVersion& version = seen[ c->getShard() ];
-            if ( version.isSet() ) 
-                continue;
-            version = lockNamespaceOnServer( c->getShard() , _ns );
-            if ( version.isSet() )
-                continue;
-
-            // rollback
-            uassert( 10175 ,  "don't know how to rollback locks b/c drop can't lock all shards" , 0 );
+            seen.insert( c->getShard() );
         }
         
         log(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;        
@@ -745,8 +746,8 @@ namespace mongo {
 
         
         // delete data from mongod
-        for ( map<Shard,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
-            ScopedDbConnection conn( i->first );
+        for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ){
+            ScopedDbConnection conn( *i );
             conn->dropCollection( _ns );
             conn.done();
         }
@@ -765,8 +766,8 @@ namespace mongo {
         conn.done();
         log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;                
         
-        for ( map<Shard,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
-            ScopedDbConnection conn( i->first );
+        for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ){
+            ScopedDbConnection conn( *i );
             BSONObj res;
             if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
                 throw UserException( 8071 , (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
@@ -844,6 +845,8 @@ namespace mongo {
         }
 
         BSONObj cmd = cmdBuilder.obj();
+        
+        log(7) << "ChunkManager::save update: " << cmd << endl;
         
         ScopedDbConnection conn( Chunk(0).modelServer() );
         BSONObj res;
@@ -1102,20 +1105,6 @@ namespace mongo {
         log(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress() << "  " << ns << "  " << cmd << " " << &conn << endl;
         
         return conn.runCommand( "admin" , cmd , result );
-    }
-
-    bool lockNamespaceOnServer( const Shard& shard, const string& ns ){
-        ScopedDbConnection conn( shard.getConnString() );
-        bool res = lockNamespaceOnServer( conn.conn() , ns );
-        conn.done();
-        return res;
-    }
-
-    bool lockNamespaceOnServer( DBClientBase& conn , const string& ns ){
-        // TODO: replace this
-        //BSONObj lockResult;
-        //return setShardVersion( conn , ns , grid.getNextOpTime() , true , lockResult );
-        return true;
     }
 
 

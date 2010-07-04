@@ -417,7 +417,7 @@ namespace mongo {
 		/** Get error result from the last operation on this connection. 
 			@return full error object.
 		*/
-		BSONObj getLastErrorDetailed();
+		virtual BSONObj getLastErrorDetailed();
 
         static string getLastErrorString( const BSONObj& res );
 
