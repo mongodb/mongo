@@ -111,7 +111,7 @@ namespace mongo {
             }
             all.push_back( res );
             errors.push_back( err );
-            _lastError = res;
+            _lastError = res.getOwned();
         }
         
         assert( all.size() == errors.size() && all.size() == _conns.size() );
@@ -125,7 +125,7 @@ namespace mongo {
                 continue;
             ok = false;
             err << _conns[i]->toString() << ": " << res << " " << errors[i];
-            _lastError = res;
+            _lastError = res.getOwned();
         }
 
         if ( ok )
