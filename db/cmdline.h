@@ -44,6 +44,8 @@ namespace mongo {
         int defaultProfile;    // --profile
         int slowMS;            // --time in ms that is "slow"
 
+        int pretouch;          // --pretouch for replication application (experimental)
+
         enum { 
             DefaultDBPort = 27017,
 			ConfigServerPort = 27019,

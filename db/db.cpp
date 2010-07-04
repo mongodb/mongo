@@ -737,6 +737,7 @@ int main(int argc, char* argv[], char *envp[] )
 		;
 
     hidden_options.add_options()
+        ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
         ("replSet", po::value<string>(), "specify repl set seed hostnames")
         ("command", po::value< vector<string> >(), "command")
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")

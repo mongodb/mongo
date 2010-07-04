@@ -762,7 +762,12 @@ namespace mongo {
         MatchDetails _details;
     };
 
+    static void checkTooLarge(const BSONObj& newObj) {
+        uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= ( 4 * 1024 * 1024 ) );
+    }
+
     /* note: this is only (as-is) called for 
+
              - not multi
              - not mods is indexed
              - not upsert
@@ -799,7 +804,7 @@ namespace mongo {
             } 
             else {
                 BSONObj newObj = mss->createNewFromMods();
-                uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= ( 4 * 1024 * 1024 ) );
+                checkTooLarge(newObj);
                 bool changedId;
                 assert(nsdt);
                 DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug, changedId);                        
@@ -992,7 +997,7 @@ namespace mongo {
                 } 
                 else {
                     BSONObj newObj = mss->createNewFromMods();
-                    uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= ( 4 * 1024 * 1024 ) );
+                    checkTooLarge(newObj);
                     bool changedId;
                     DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug, changedId);
                     if ( newLoc != loc || modsIsIndexed ) {
