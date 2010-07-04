@@ -389,20 +389,15 @@ namespace mongo {
         // If you try to match the code to the formula, note that I inline the cross-product.
         // TODO: optimize with SSE
 
-        double sin_x1, cos_x1;
-        double sin_y1, cos_y1;
-        double sin_x2, cos_x2;
-        double sin_y2, cos_y2;
-
-        sincos(p1._x, &sin_x1, &cos_x1);
-        sincos(p1._y, &sin_y1, &cos_y1);
-        sincos(p2._x, &sin_x2, &cos_x2);
-        sincos(p2._y, &sin_y2, &cos_y2);
+        double sin_x1(sin(p1._x)), cos_x1(cos(p1._x));
+        double sin_y1(sin(p1._y)), cos_y1(cos(p1._y));
+        double sin_x2(sin(p2._x)), cos_x2(cos(p2._x));
+        double sin_y2(sin(p2._y)), cos_y2(cos(p2._y));
         
         double cross_prod = 
             (cos_y1*cos_x1 * cos_y2*cos_x2) +
             (cos_y1*sin_x1 * cos_y2*sin_x2) +
-            (sin_y1 * sin_y2);
+            (sin_y1        * sin_y2);
 
         return acos(cross_prod);
     }
