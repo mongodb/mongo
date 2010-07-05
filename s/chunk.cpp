@@ -157,23 +157,20 @@ namespace mongo {
     }
     
     ChunkPtr Chunk::split( const BSONObj& m ){
-        
-        DistributedLock lockSetup( ConnectionString( modelServer() , ConnectionString::SYNC ) , getns() );
-        dist_lock_try dlk( &lockSetup , (string)"split-" + toString() );
-        uassert( 10166 ,  "locking namespace failed" , dlk.got() );
-
         uassert( 10165 ,  "can't split as shard that doesn't have a manager" , _manager );
 
-        log(1) << " before split on: "  << m << '\n'
-               << "\t self  : " << toString() << endl;
+        const bool isSplittable = !m.isEmpty() && _min.woCompare(m) && _max.woCompare(m);  
+        uassert( 13003 ,  "can't split chunk. does it have only one distinct value?" , isSplittable );
+                          
+        DistributedLock lockSetup( ConnectionString( modelServer() , ConnectionString::SYNC ) , getns() );
+        dist_lock_try dlk( &lockSetup , string("split-") + toString() );
+        uassert( 10166 ,  "locking namespace failed" , dlk.got() );
+
+        log(1) << " before split on: " << m << '\n' << "\t self  : " << toString() << endl;
         
         BSONObjBuilder detail(256);
         appendShortVersion( "before" , detail );
         
-
-        uassert( 13003 ,  "can't split chunk. does it have only one distinct value?" ,
-                          !m.isEmpty() && _min.woCompare(m) && _max.woCompare(m)); 
-
         ChunkPtr s( new Chunk( _manager, m.getOwned(), _max , _shard) );
 
         s->_markModified();
@@ -188,9 +185,7 @@ namespace mongo {
             _manager->_chunkMap[_max] = shared_from_this();
         }
         
-        log(1) << " after split:\n" 
-               << "\t left : " << toString() << '\n' 
-               << "\t right: "<< s->toString() << endl;
+        log(1) << " after split:\n" << "\t left : " << toString() << '\n' << "\t right: "<< s->toString() << endl;
         
         appendShortVersion( "left" , detail );
         s->appendShortVersion( "right" , detail );
