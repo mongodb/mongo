@@ -79,6 +79,65 @@ namespace mongo {
     public:
         SyncException() : DBException( "sync exception" , 10001 ){}
     };
+
+    /* started abstracting out the querying of the primary/master's oplog 
+       still fairly awkward but a start.
+    */
+    class OplogReader {
+        auto_ptr<DBClientConnection> _conn;
+        auto_ptr<DBClientCursor> cursor;
+    public:
+        void reset() {
+            cursor.reset();
+        }
+        void resetConnection() {
+            cursor.reset();
+            _conn.reset();
+        }
+        DBClientConnection* conn() { return _conn.get(); }
+        BSONObj findOne(const char *ns, Query& q) { 
+            return conn()->findOne(ns, q);
+        }
+
+        /* ok to call if already connected */
+        bool connect(string hostname);
+
+        void getReady() {
+            if( cursor.get() && cursor->isDead() ) { 
+                log() << "repl: old cursor isDead, initiating a new one" << endl;
+                reset();
+            }
+        }
+
+        bool haveCursor() { return cursor.get() != 0; }
+
+        void tailingQuery(const char *ns, BSONObj& query) { 
+            assert( !haveCursor() );
+            log(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
+            cursor = _conn->query( ns, query, 0, 0, 0, 
+                                  QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay |
+                                  QueryOption_AwaitData
+                                  );
+        }
+
+        bool more() { 
+            assert( cursor.get() );
+            return cursor->more();
+        }
+
+        /* old mongod's can't do the await flag... */
+        bool awaitCapable() { 
+            return cursor->hasResultFlag(QueryResult::ResultFlag_AwaitCapable);
+        }
+
+        BSONObj next() { 
+            return cursor->next();
+        }
+
+        void putBack(BSONObj op) { 
+            cursor->putBack(op);
+        }
+    };
     
     /* A Source is a source from which we can pull (replicate) data.
        stored in collection local.sources.
@@ -98,9 +157,6 @@ namespace mongo {
 
         void sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail);
         
-        auto_ptr<DBClientConnection> conn;
-        auto_ptr<DBClientCursor> cursor;
-
         /* we only clone one database per pass, even if a lot need done.  This helps us
            avoid overflowing the master's transaction log by doing too much work before going
            back to read more transactions. (Imagine a scenario of slave startup where we try to
@@ -114,8 +170,6 @@ namespace mongo {
         
         // returns the dummy ns used to do the drop
         string resyncDrop( const char *db, const char *requester );
-        // returns true if connected on return
-        bool connect();
         // returns possibly unowned id spec for the operation.
         static BSONObj idForOp( const BSONObj &op, bool &mod );
         static void updateSetsWithOp( const BSONObj &op, bool mayUpdateStorage );
@@ -133,6 +187,8 @@ namespace mongo {
         unsigned _sleepAdviceTime;
         
     public:
+        OplogReader oplogReader;
+
         static void applyOperation(const BSONObj& op);
         bool replacing; // in "replace mode" -- see CmdReplacePeer
         bool paired; // --pair in use
@@ -164,10 +220,6 @@ namespace mongo {
         int sync(int& nApplied);
 
         void save(); // write ourself to local.sources
-        void resetConnection() {
-            cursor = auto_ptr<DBClientCursor>(0);
-            conn = auto_ptr<DBClientConnection>(0);
-        }
 
         // make a jsobj from our member fields of the form
         //   { host: ..., source: ..., syncedTo: ... }
