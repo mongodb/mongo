@@ -88,11 +88,12 @@ namespace mongo {
 												SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
 												SERVICE_AUTO_START, SERVICE_ERROR_NORMAL,
 												commandLineWide.str().c_str(), NULL, NULL, L"\0\0", NULL, NULL );
-		if ( schService == NULL ) {
-			log() << "Error creating service." << endl;
-			::CloseServiceHandle( schSCManager );
-			return false;
-		}
+        if ( schService == NULL ) {
+            DWORD err = ::GetLastError();
+            log() << "Error creating service: " << GetWinErrMsg(err) << endl;
+            ::CloseServiceHandle( schSCManager );
+            return false;
+        }
 
 		log() << "Service creation successful." << endl;
 		log() << "Service can be started from the command line via 'net start \"" << toUtf8String(serviceName) << "\"'." << endl;
