@@ -99,7 +99,9 @@ for ( i=0; i<100; i++ ){
     gc();
 }
 
-gc(); gc();
+for ( i=0; i<100; i++ ){
+    gc();
+}
 assert.eq( 0 , db.runCommand( "cursorInfo" ).total , "cursor2" );
 
 print( "checkpoint E")

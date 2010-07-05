@@ -1001,6 +1001,7 @@ Map.prototype.values = function(){
 
 if ( typeof( gc ) == "undefined" ){
     gc = function(){
+        print( "warning: using noop gc()" );
     }
 }
    

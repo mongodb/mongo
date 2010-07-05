@@ -57,9 +57,12 @@ namespace mongo {
 
         _global->Set(v8::String::New("load"),
                      v8::FunctionTemplate::New(loadCallback, v8::External::New(this))->GetFunction() );
-
-              _wrapper = Persistent< v8::Function >::New( getObjectWrapperTemplate()->GetFunction() );
         
+        _wrapper = Persistent< v8::Function >::New( getObjectWrapperTemplate()->GetFunction() );
+        
+        _global->Set(v8::String::New("gc"), v8::FunctionTemplate::New(GCV8)->GetFunction() );
+
+
         installDBTypes( _global );
     }
 
@@ -383,6 +386,7 @@ namespace mongo {
     }        
     
     void V8Scope::gc() {
+        cout << "in gc" << endl;
         Locker l;
         while( V8::IdleNotification() );
     }

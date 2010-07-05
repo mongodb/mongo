@@ -302,4 +302,11 @@ namespace mongo {
         global->Set( v8::String::New( "_scopedThreadInject" ), FunctionTemplate::New( ScopedThreadInject )->GetFunction() );
     }
 
+    Handle<v8::Value> GCV8(const Arguments& args) {
+        Locker l;
+        while( V8::IdleNotification() );
+        return v8::Undefined();
+    }
+
+
 }

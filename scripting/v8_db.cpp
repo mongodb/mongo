@@ -29,12 +29,11 @@ using namespace v8;
 
 namespace mongo {
 
-#define CONN_STRING (v8::String::New( "_conn" ))
-
 #define DDD(x)
 
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local ){
         v8::Local<v8::FunctionTemplate> mongo = FunctionTemplate::New( local ? mongoConsLocal : mongoConsExternal );
+        mongo->InstanceTemplate()->SetInternalFieldCount( 1 );
         
         v8::Local<v8::Template> proto = mongo->PrototypeTemplate();
 
@@ -44,9 +43,12 @@ namespace mongo {
         proto->Set( v8::String::New( "update" ) , FunctionTemplate::New( mongoUpdate ) );
 
         Local<FunctionTemplate> ic = FunctionTemplate::New( internalCursorCons );
+        ic->InstanceTemplate()->SetInternalFieldCount( 1 );
         ic->PrototypeTemplate()->Set( v8::String::New("next") , FunctionTemplate::New( internalCursorNext ) );
         ic->PrototypeTemplate()->Set( v8::String::New("hasNext") , FunctionTemplate::New( internalCursorHasNext ) );
         proto->Set( v8::String::New( "internalCursor" ) , ic );
+        
+
 
         return mongo;
     }
@@ -132,9 +134,10 @@ namespace mongo {
         global->Get( v8::String::New( "Object" ) )->ToObject()->Set( v8::String::New("bsonsize") , FunctionTemplate::New( bsonsize )->GetFunction() );
     }
 
-    void destroyConnection( Persistent<Value> object, void* parameter){
-        // TODO
-        cout << "warning: destroyConnection not implemented" << endl;
+    void destroyConnection( Persistent<Value> self, void* parameter){
+        delete static_cast<DBClientBase*>(parameter);
+        self.Dispose();
+        self.Clear();
     }
 
     Handle<Value> mongoConsExternal(const Arguments& args){
@@ -183,13 +186,13 @@ namespace mongo {
         else {
             return v8::ThrowException( v8::String::New( "too many commas" ) );
         }
-                
-        Persistent<v8::Object> self = Persistent<v8::Object>::New( args.This() );
+        
+        Persistent<v8::Object> self = Persistent<v8::Object>::New( args.Holder() );
         self.MakeWeak( conn , destroyConnection );
 
         ScriptEngine::runConnectCallback( *conn );
-        // NOTE I don't believe the conn object will ever be freed.
-        args.This()->Set( CONN_STRING , External::New( conn ) );
+
+        args.This()->SetInternalField( 0 , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
         args.This()->Set( v8::String::New( "host" ) , v8::String::New( host ) );
     
@@ -207,7 +210,7 @@ namespace mongo {
         self.MakeWeak( conn , destroyConnection );
 
         // NOTE I don't believe the conn object will ever be freed.
-        args.This()->Set( CONN_STRING , External::New( conn ) );
+        args.This()->SetInternalField( 0 , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
         args.This()->Set( v8::String::New( "host" ) , v8::String::New( "EMBEDDED" ) );
         
@@ -224,13 +227,19 @@ namespace mongo {
 #endif
 
     DBClientBase * getConnection( const Arguments& args ){
-        Local<External> c = External::Cast( *(args.This()->Get( CONN_STRING )) );
+        Local<External> c = External::Cast( *(args.This()->GetInternalField( 0 )) );
         DBClientBase * conn = (DBClientBase*)(c->Value());
         assert( conn );
         return conn;
     }
 
     // ---- real methods
+
+    void destroyCursor( Persistent<Value> self, void* parameter){
+        delete static_cast<mongo::DBClientCursor*>(parameter);
+        self.Dispose();
+        self.Clear();
+    }
 
     /**
        0 - namespace
@@ -240,6 +249,8 @@ namespace mongo {
        4 - skip
     */
     Handle<Value> mongoFind(const Arguments& args){
+        HandleScope handle_scope;
+
         jsassert( args.Length() == 6 , "find needs 6 args" );
         jsassert( args[1]->IsObject() , "needs to be an object" );
         DBClientBase * conn = getConnection( args );
@@ -269,11 +280,12 @@ namespace mongo {
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
             assert( cons );
-            Local<v8::Object> c = cons->NewInstance();
-        
-            // NOTE I don't believe the cursor object will ever be freed.
-            c->Set( v8::String::New( "cursor" ) , External::New( cursor.release() ) );
-            return c;
+            
+            Persistent<v8::Object> c = Persistent<v8::Object>::New( cons->NewInstance() );
+            c.MakeWeak( cursor.get() , destroyCursor );
+            
+            c->SetInternalField( 0 , External::New( cursor.release() ) );
+            return handle_scope.Close(c);
         }
         catch ( ... ){
             return v8::ThrowException( v8::String::New( "socket error on query" ) );        
@@ -363,7 +375,8 @@ namespace mongo {
     // --- cursor ---
 
     mongo::DBClientCursor * getCursor( const Arguments& args ){
-        Local<External> c = External::Cast( *(args.This()->Get( v8::String::New( "cursor" ) ) ) );
+        Local<External> c = External::Cast( *(args.This()->GetInternalField( 0 ) ) );
+
         mongo::DBClientCursor * cursor = (mongo::DBClientCursor*)(c->Value());
         return cursor;
     }
