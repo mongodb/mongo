@@ -54,7 +54,7 @@ namespace mongo {
         operator const unsigned long long&() const { return millis; }
         string toString() const { 
             char buf[64];
-            time_t_to_String(millis, buf);
+            time_t_to_String(millis/1000, buf);
             return buf;
         }
     };
