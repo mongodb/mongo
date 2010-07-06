@@ -65,6 +65,13 @@ namespace mongo {
             return o;
         }
 
+        /** peek ahead at items buffered for future next() calls.
+            never requests new data from the server.  so peek only effective 
+            with what is already buffered.
+            WARNING: no support for _putBack yet!
+        */
+        void peek(vector<BSONObj>&, int atMost);
+
         /**
            iterate the rest of the cursor and return the number if items
          */
