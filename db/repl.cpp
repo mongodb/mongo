@@ -879,7 +879,42 @@ namespace mongo {
             return;
 
         if( cmdLine.pretouch ) {
-            pretouchOperation(op);
+            if( cmdLine.pretouch > 1 ) {
+                /* note: this is bad - should be put in ReplSource.  but this is first test... */
+                static int countdown;
+                if( countdown > 0 ) {
+                    countdown--; // was pretouched on a prev pass
+                    assert( countdown >= 0 );
+                } else {
+                    static int m;
+                    if( tp.get() == 0 ) {
+                        int nthr = min(8, cmdLine.pretouch / 2);
+                        nthr = max(nthr, 1);
+                        tp.reset( new ThreadPool(nthr) );
+                        m = cmdLine.pretouch / nthr;
+                        assert( m > 0 );
+                        // e.g. for --pretouch 24, we get 8 threads, m=3.
+                    }
+                    vector<BSONObj> v;
+                    oplogReader.peek(v, cmdLine.pretouch);
+                    unsigned a = 0;
+                    while( 1 ) {
+                        if( a >= v.size() ) break;
+                        unsigned b = a + m - 1; // v[a..b]
+                        if( b >= v.size() ) b = v.size() - 1;
+                        tp->schedule(pretouchN, v, a, b);
+                        DEV cout << "pretouch task: " << a << ".." << b << endl;
+                        a += m;
+                    }
+                    // we do one too...
+                    pretouchOperation(op);
+                    tp->join();
+                    countdown = v.size();
+                }
+            }
+            else {
+                pretouchOperation(op);
+            }
         }
 
         dblock lk;

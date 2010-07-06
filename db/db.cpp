@@ -907,6 +907,9 @@ int main(int argc, char* argv[], char *envp[] )
             /* specifies what the source in local.sources should be */
             cmdLine.source = params["source"].as<string>().c_str();
         }
+        if( params.count("pretouch") ) { 
+            cmdLine.pretouch = params["pretouch"].as<int>();
+        }
         if (params.count("replSet")) {
             /* seed list of hosts for the repl set */
             cmdLine.replSet = params["replSet"].as<string>().c_str();

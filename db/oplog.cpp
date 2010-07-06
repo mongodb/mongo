@@ -405,6 +405,47 @@ namespace mongo {
 
     int _dummy_z;
 
+    void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
+        DEV assert( !dbMutex.isWriteLocked() );
+
+        Client *c = &cc();
+        if( c == 0 ) { 
+            Client::initThread("pretouchN");
+            c = &cc();
+        }
+
+        readlock lk("");
+        for( unsigned i = a; i <= b; i++ ) {
+            const BSONObj& op = v[i];
+            const char *which = "o";
+            const char *opType = op.getStringField("op");
+            if ( *opType == 'i' )
+                ;
+            else if( *opType == 'u' )
+                which = "o2";
+            else
+                continue;
+            /* todo : other operations */
+
+            try { 
+                BSONObj o = op.getObjectField(which);
+                BSONElement _id;
+                if( o.getObjectID(_id) ) {
+                    const char *ns = op.getStringField("ns");
+                    BSONObjBuilder b;
+                    b.append(_id);
+                    BSONObj result;
+                    Client::Context ctx( ns );
+                    if( Helpers::findById(cc(), ns, b.done(), result) )
+                        _dummy_z += result.objsize(); // touch
+                }
+            }
+            catch( DBException& ) { 
+                log() << "ignoring assertion in pretouchN()" << endl;
+            }
+        }
+    }
+
     void pretouchOperation(const BSONObj& op) {
 
         if( dbMutex.isWriteLocked() )
