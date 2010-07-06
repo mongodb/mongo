@@ -157,44 +157,74 @@ namespace mongo {
     }
     
     ChunkPtr Chunk::split( const BSONObj& m ){
-        uassert( 10165 ,  "can't split as shard that doesn't have a manager" , _manager );
+        const int maxSplitPoints = 256;
 
-        const bool isSplittable = !m.isEmpty() && _min.woCompare(m) && _max.woCompare(m);  
-        uassert( 13003 ,  "can't split chunk. does it have only one distinct value?" , isSplittable );
-                          
+        uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
+        uassert( 13332 , "need a split key to split chunk" , !m.isEmpty() );
+        uassert( 13333 , "can't split a chunk in that many parts", m.nFields() < maxSplitPoints );
+        uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
+
         DistributedLock lockSetup( ConnectionString( modelServer() , ConnectionString::SYNC ) , getns() );
         dist_lock_try dlk( &lockSetup , string("split-") + toString() );
         uassert( 10166 ,  "locking namespace failed" , dlk.got() );
-
-        log(1) << " before split on: " << m << '\n' << "\t self  : " << toString() << endl;
         
-        BSONObjBuilder detail(256);
+        BSONObjBuilder detail;
         appendShortVersion( "before" , detail );
-        
-        ChunkPtr s( new Chunk( _manager, m.getOwned(), _max , _shard) );
+        log(1) << " before split on " << m.nFields() << " points\n" << "\t self  : " << toString() << endl;
 
-        s->_markModified();
+        // Iterate over the split points in 'm', splitting off a new chunk per entry. That chunk's range 
+        // convert until the next entry in 'm' or _max .
+        vector<ChunkPtr> newChunks;
+        BSONObjIterator i( m );
+        BSONElement nextPoint = i.next();
         _markModified();
-        
+        do {
+            BSONElement splitPoint = nextPoint;
+            BSONElement nextPoint = i.more() ? i.next() : _max.firstElement();
+            ChunkPtr s( new Chunk( _manager, splitPoint.wrap().getOwned() , nextPoint.wrap().getOwned() , _shard) );
+            s->_markModified();
+            newChunks.push_back(s);
+        } while ( i.more() );
+
+        // Have the chunk manager reflect the key change for the first chunk and create an entry for every
+        // new chunk spawned by it.
         {
             rwlock lk( _manager->_lock , true );
-            _manager->_chunkMap[s->getMax()] = s;
-            
-            setMax(m.getOwned());
+
+            setMax(m.firstElement().wrap().getOwned());
             DEV assert( shared_from_this() );
             _manager->_chunkMap[_max] = shared_from_this();
+
+            for ( vector<ChunkPtr>::const_iterator it = newChunks.begin(); it != newChunks.end(); ++it ){
+                ChunkPtr s = *it;
+                _manager->_chunkMap[s->getMax()] = s;
+            }
         }
         
-        log(1) << " after split:\n" << "\t left : " << toString() << '\n' << "\t right: "<< s->toString() << endl;
-        
-        appendShortVersion( "left" , detail );
-        s->appendShortVersion( "right" , detail );
-        
-        _manager->save();
-        
-        configServer.logChange( "split" , _manager->getns() , detail.obj() );
+        log(1) << " after split:\n" << toString() << endl;
+        for ( vector<ChunkPtr>::const_iterator it = newChunks.begin(); it != newChunks.end(); ++it ){
+            ChunkPtr s = *it;
+            log(1) << "\t new chunk" << s->toString() << endl;
+        }
 
-        return s;
+        // Save the new key boundaries in the configDB.
+        _manager->save();
+
+        // Log all these changes in the configDB's log.
+        appendShortVersion( "left" , detail );
+        if ( newChunks.size() == 1 ){
+            newChunks[0]->appendShortVersion( "right" , detail );
+        } else {
+            for ( size_t i=0; i < newChunks.size(); i++ ){
+                ChunkPtr s = newChunks[i];
+                ostringstream os;
+                os << "right" << i;
+                s->appendShortVersion( os.str().c_str() , detail );
+            }
+        }
+        configServer.logChange( "split", _manager->getns() , detail.obj() );
+
+        return newChunks[0];
     }
 
     bool Chunk::moveAndCommit( const Shard& to , string& errmsg ){

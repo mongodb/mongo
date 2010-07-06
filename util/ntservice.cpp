@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "ntservice.h"
+#include "winutil.h"
 #include "text.h"
 #include <direct.h>
 
@@ -61,10 +62,12 @@ namespace mongo {
 			commandLine << arg << "  ";
 		}
 		
-		SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
-		if ( schSCManager == NULL ) {
-			return false;
-		}
+        SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
+        if ( schSCManager == NULL ) {
+            DWORD err = ::GetLastError();
+            log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
+            return false;
+        }
 
 		// Make sure it exists first. TODO: Use GetLastError() to investigate why CreateService fails.
 		// TODO: Check to see if service is in "Deleting" status, suggest the user close down Services MMC snap-ins.
@@ -85,11 +88,12 @@ namespace mongo {
 												SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
 												SERVICE_AUTO_START, SERVICE_ERROR_NORMAL,
 												commandLineWide.str().c_str(), NULL, NULL, L"\0\0", NULL, NULL );
-		if ( schService == NULL ) {
-			log() << "Error creating service." << endl;
-			::CloseServiceHandle( schSCManager );
-			return false;
-		}
+        if ( schService == NULL ) {
+            DWORD err = ::GetLastError();
+            log() << "Error creating service: " << GetWinErrMsg(err) << endl;
+            ::CloseServiceHandle( schSCManager );
+            return false;
+        }
 
 		log() << "Service creation successful." << endl;
 		log() << "Service can be started from the command line via 'net start \"" << toUtf8String(serviceName) << "\"'." << endl;
@@ -142,10 +146,12 @@ namespace mongo {
     }
     
     bool ServiceController::removeService( const std::wstring& serviceName ) {
-		SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
-		if ( schSCManager == NULL ) {
-			return false;
-		}
+        SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
+        if ( schSCManager == NULL ) {
+            DWORD err = ::GetLastError();
+            log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
+            return false;
+        }
 
 		SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
 		if ( schService == NULL ) {
