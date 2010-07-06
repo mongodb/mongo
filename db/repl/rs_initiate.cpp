@@ -65,7 +65,8 @@ namespace mongo {
             if( *res.getStringField("set") )
                 uasserted(13256, "member " + i->h.toString() + " is already initiated");
             bool hasData = res["hasData"].Bool();
-            uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.", !hasData);
+            uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.", 
+                !hasData || i->h.isSelf());
         }
     }
 

@@ -132,7 +132,7 @@ namespace mongo {
         //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
         //    addMemberIfMissing(*i);
 
-        log() << "replSet load config from various servers..." << rsLog;
+        log() << "replSet startup : trying to load config from various servers..." << rsLog;
 
         loadConfig();
 
