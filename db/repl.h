@@ -32,12 +32,10 @@
 #include "dbhelpers.h"
 #include "query.h"
 #include "queryoptimizer.h"
-
 #include "../client/dbclient.h"
-
 #include "../util/optime.h"
-
 #include "oplog.h"
+#include "../util/concurrency/thread_pool.h"
 
 namespace mongo {
 
@@ -86,7 +84,9 @@ namespace mongo {
     class OplogReader {
         auto_ptr<DBClientConnection> _conn;
         auto_ptr<DBClientCursor> cursor;
+        auto_ptr<ThreadPool> tp;
     public:
+
         void reset() {
             cursor.reset();
         }

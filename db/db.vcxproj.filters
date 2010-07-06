@@ -367,6 +367,9 @@
     <ClCompile Include="..\util\stringutils.cpp">
       <Filter>util\core</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\thread_pool.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

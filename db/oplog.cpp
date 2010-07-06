@@ -312,7 +312,7 @@ namespace mongo {
             }
         }
 
-        log() << "******\n";
+        log() << "******" << endl;
         log() << "creating replication oplog of size: " << (int)( sz / ( 1024 * 1024 ) ) << "MB... (use --oplogSize to change)" << endl;
 
         b.append("size", sz);
@@ -398,7 +398,10 @@ namespace mongo {
         }
     } testoptime;
 
+    int _dummy_z;
+
     void pretouchOperation(const BSONObj& op) {
+
         if( dbMutex.isWriteLocked() )
             return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
 
@@ -422,7 +425,8 @@ namespace mongo {
                 BSONObj result;
                 readlock lk(ns);
                 Client::Context ctx( ns );
-                Helpers::findById(cc(), ns, b.done(), result);
+                if( Helpers::findById(cc(), ns, b.done(), result) )
+                    _dummy_z += result.objsize(); // touch
             }
         }
         catch( DBException& ) { 

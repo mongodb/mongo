@@ -1063,6 +1063,9 @@ int main(int argc, char* argv[], char *envp[] )
 #endif
     }
 
+    if( cmdLine.pretouch )
+        log() << "--pretouch " << cmdLine.pretouch << endl;
+
     initAndListen(cmdLine.port, appsrvPath);
     dbexit(EXIT_CLEAN);
     return 0;
