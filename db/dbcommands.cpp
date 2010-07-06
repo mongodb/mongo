@@ -1874,7 +1874,9 @@ namespace mongo {
             anObjBuilder.append("bad cmd" , _cmdobj );
         }
 
-        anObjBuilder.append("ok", ok);
+        // switch to bool, but wait a bit longer before switching?
+        // anObjBuilder.append("ok", ok);
+        anObjBuilder.append("ok", ok?1.0:0.0);
         BSONObj x = anObjBuilder.done();
         b.append((void*) x.objdata(), x.objsize());
 
