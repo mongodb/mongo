@@ -110,6 +110,14 @@ namespace mongo {
             return ss.str();
         }
         
+        string toStringPretty() const {
+            char buf[64];
+            time_t_to_String(secs, buf);
+            stringstream ss;
+            ss << buf << ':' << hex << i;
+            return ss.str();
+        }
+        
         string toString() const {
             stringstream ss;
             ss << hex << secs << ':' << i;
