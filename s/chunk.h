@@ -49,11 +49,11 @@ namespace mongo {
             unsigned long long _combined;
         };
         
-        ShardChunkVersion( int major=0, int minor=0 )
+        explicit ShardChunkVersion( int major=0, int minor=0 )
             : _minor(minor),_major(major){
         }
         
-        ShardChunkVersion( unsigned long long ll )
+        explicit ShardChunkVersion( unsigned long long ll )
             : _combined( ll ){
         }
         
@@ -80,7 +80,7 @@ namespace mongo {
         }
         
         operator unsigned long long() const { return _combined; }
-        operator string() const { return toString(); }
+        friend ostream& operator << (ostream& out, const ShardChunkVersion& scv){ return (out << scv.toString()); }
 
         ShardChunkVersion& operator=( const BSONElement& elem ){
             switch ( elem.type() ){
@@ -98,6 +98,8 @@ namespace mongo {
             return *this;
         }
     };
+
+    typedef ShardChunkVersion SCV; // shortcut for constructors
     
     typedef shared_ptr<Chunk> ChunkPtr;
 
@@ -137,7 +139,6 @@ namespace mongo {
         bool contains( const BSONObj& obj ) const;
 
         string toString() const;
-        operator string() const { return toString(); }
         friend ostream& operator << (ostream& out, const Chunk& c){ return (out << c.toString()); }
 
         bool operator==(const Chunk& s) const;
@@ -181,7 +182,7 @@ namespace mongo {
         bool moveAndCommit( const Shard& to , string& errmsg );
 
         const char * getNS(){ return "config.chunks"; }
-        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
+        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=SCV(0));
         void unserialize(const BSONObj& from);
         string modelServer();
         
@@ -344,7 +345,7 @@ namespace mongo {
         void save();
 
         string toString() const;
-        operator string() const { return toString(); }
+        friend ostream& operator<<(ostream& out, const ChunkManager& cm) { return (out << cm.toString()); }
 
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;

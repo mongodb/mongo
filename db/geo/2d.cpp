@@ -277,9 +277,7 @@ namespace mongo {
             return buf.str();
         }
         
-        operator string() const {
-            return toString();
-        }
+        friend ostream& operator << (ostream& out, const Point& p) { return (out << p.toString()); }
 
         bool between( double min , double max , double val , double fudge=0) const {
             return val + fudge >= min && val <= max + fudge;

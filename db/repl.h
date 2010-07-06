@@ -234,7 +234,7 @@ namespace mongo {
         bool operator==(const ReplSource&r) const {
             return hostName == r.hostName && sourceName() == r.sourceName();
         }
-        operator string() const { return sourceName() + "@" + hostName; }
+        string toString() const { return sourceName() + "@" + hostName; }
         
         bool haveMoreDbsToSync() const { return !addDbNextPass.empty(); }        
         int sleepAdvice() const {

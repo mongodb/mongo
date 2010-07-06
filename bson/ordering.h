@@ -39,12 +39,13 @@ namespace mongo {
         // for woCompare...
         unsigned descending(unsigned mask) const { return bits & mask; }
         
-        operator string() const {
+        string toString() const {
             StringBuilder buf(32);
             for ( unsigned i=0; i<nkeys; i++)
                 buf.append( get(i) > 0 ? "+" : "-" );
             return buf.str();
         }
+        friend ostream& operator << (ostream& out, const Ordering& o) { return (out << o.toString()); }
 
         static Ordering make(const BSONObj& obj) {
             unsigned b = 0;

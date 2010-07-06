@@ -86,7 +86,6 @@ public:
     bool ok() const { return !eoo(); }
 
     string toString( bool includeFieldName = true ) const;
-    operator string() const { return toString(); }
     string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
 
     /** Returns the type of the element */

@@ -139,8 +139,8 @@ namespace mongo {
             return old + "." + local;
         }
 
-        operator string() const {
-            return (string)buf;
+        string toString() const {
+            return buf;
         }
 
         char buf[MaxNsLen];

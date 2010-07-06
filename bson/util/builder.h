@@ -148,7 +148,7 @@ namespace mongo {
 
     class StringBuilder {
     public:
-        StringBuilder( int initsize=256 )
+        explicit StringBuilder( int initsize=256 )
             : _buf( initsize ){
         }
 
@@ -188,16 +188,18 @@ namespace mongo {
         }
 #undef SBNUM
 
-        void append( const char * str ){
-            int x = (int) strlen( str );
-            memcpy( _buf.grow( x ) , str , x );
+        void append( const char * str){
+            append(str, strlen(str));
+        }
+        void append( const char * str, int len){
+            memcpy( _buf.grow( len ) , str , len );
         }
         StringBuilder& operator<<( const char * str ){
-            append( str );
+            append( str, strlen(str) );
             return *this;
         }
         StringBuilder& operator<<( const std::string& s ){
-            append( s.c_str() );
+            append( s.c_str(), s.size() );
             return *this;
         }
         

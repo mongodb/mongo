@@ -721,7 +721,7 @@ namespace mongo {
                     int idxId = d->findIndexByKeyPattern( f.embeddedObject() );
                     if ( idxId < 0 ){
                         errmsg = "can't find index with key:";
-                        errmsg += f.embeddedObject();
+                        errmsg += f.embeddedObject().toString();
                         return false;
                     }
                     else {
@@ -1261,7 +1261,7 @@ namespace mongo {
             if ( !client.runCommand( dbname ,
                                     BSON( "cloneCollectionAsCapped" << from << "toCollection" << ( from + ".$temp_convertToCapped" ) << "size" << double( size ) ),
                                     info ) ) {
-                errmsg = "cloneCollectionAsCapped failed: " + string(info);
+                errmsg = "cloneCollectionAsCapped failed: " + info.toString();
                 return false;
             }
 
@@ -1274,7 +1274,7 @@ namespace mongo {
                                     BSON( "renameCollection" << ( dbname + "." + from + ".$temp_convertToCapped" ) 
                                           << "to" << ( dbname + "." + from ) ),
                                     info ) ) {
-                errmsg = "renameCollection failed: " + string(info);
+                errmsg = "renameCollection failed: " + info.toString();
                 return false;
             }
 

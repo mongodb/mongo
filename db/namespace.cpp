@@ -162,7 +162,7 @@ namespace mongo {
     static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
         list<string> * l = (list<string>*)extra;
         if ( ! k.hasDollarSign() )
-            l->push_back( (string)k );
+            l->push_back( k.toString() );
     }
 
     void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {

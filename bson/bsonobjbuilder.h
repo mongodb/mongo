@@ -55,7 +55,8 @@ namespace mongo {
         BSONField( const string& name , const string& longName="" ) 
             : _name(name), _longName(longName){}
         const string& name() const { return _name; }
-        operator string() const { return _name; }
+        string toString() const { return _name; }
+        friend ostream& operator << (ostream& out, const BSONField& f) { return (out << f._name); }
 
         BSONFieldValue<T> make( const T& t ) const {
             return BSONFieldValue<T>( _name , t );
@@ -370,6 +371,10 @@ namespace mongo {
         /** Append a string element */
         BSONObjBuilder& append(const char *fieldName, string str) {
             return append(fieldName, str.c_str(), (int) str.size()+1);
+        }
+        /** Append a string element */
+        BSONObjBuilder& append(const char *fieldName, ThreadSafeString tss) {
+            return append(fieldName, tss.toString());
         }
         BSONObjBuilder& appendSymbol(const char *fieldName, const char *symbol) {
             _b.append((char) Symbol);

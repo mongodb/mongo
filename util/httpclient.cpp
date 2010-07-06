@@ -108,11 +108,11 @@ namespace mongo {
         
         StringBuilder sb;
         if ( result )
-            sb << buf;
+            sb << (const char*)buf;
         
         while ( ( got = p.unsafe_recv( buf , 4096 ) ) > 0){
             if ( result )
-                sb << buf;
+                sb << (const char*)buf;
         }
 
         if ( result ){

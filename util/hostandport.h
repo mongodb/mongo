@@ -56,7 +56,7 @@ namespace mongo {
         // @returns host:port
         string toString() const; 
 
-        operator string() const { return toString(); }
+        friend ostream& operator << (ostream& out, const HostAndPort& hp) { return (out << hp.toString()); }
 
         string host() const { return _host; }
 

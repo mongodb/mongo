@@ -104,8 +104,8 @@ namespace mongo {
          */
         bool isPrefixOf( const BSONObj& otherPattern ) const;
         
-        operator string() const {
-            return pattern.toString();
+        friend ostream& operator << (ostream& out, const ShardKeyPattern& pattern){
+            return (out << pattern.toString());
         }
     private:
         BSONObj pattern;

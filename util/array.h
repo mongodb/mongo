@@ -86,9 +86,10 @@ namespace mongo {
                 return _it->_data[_pos];
             }
             
-            operator string() const {
+            friend ostream& operator << (ostream& out, const iterator& i) { return (out << i._pos); }
+            string toString() const {
                 stringstream ss;
-                ss << _pos;
+                ss << *this;
                 return ss.str();
             }
         private:
