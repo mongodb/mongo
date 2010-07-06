@@ -273,7 +273,7 @@ namespace mongo {
 
     inline bool ReplSet::isMaster(const char *client) {         
         /* todo replset */
-        return false;
+        return isPrimary();
     }
 
 }
