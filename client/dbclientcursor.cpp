@@ -159,6 +159,30 @@ namespace mongo {
         return o;
     }
 
+    void DBClientCursor::peek(vector<BSONObj>& v, int atMost) {
+        int m = atMost;
+
+        /*
+        for( stack<BSONObj>::iterator i = _putBack.begin(); i != _putBack.end(); i++ ) { 
+            if( m == 0 )
+                return;
+            v.push_back(*i);
+            m--;
+            n++;
+        }
+        */
+
+        int p = pos;
+        const char *d = data;
+        while( m && p < nReturned ) {
+            BSONObj o(d);
+            d += o.objsize();
+            p++;
+            m--;
+            v.push_back(o);
+        }
+    }
+
     void DBClientCursor::attach( ScopedDbConnection * conn ){
         assert( _scopedHost.size() == 0 );
         assert( connector == conn->get() );
@@ -174,8 +198,6 @@ namespace mongo {
         conn->done();
         connector = 0;
     }
-
-
 
     DBClientCursor::~DBClientCursor() {
         DESTRUCTOR_GUARD (
