@@ -39,7 +39,6 @@ namespace mongo {
     }
 
     static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
-        log() << "replSet logop not done" << endl;
         uassert(13288, "replSet error write op to db before replSet initialized", str::startsWith(ns, "local.") || *opstr == 'n');
     }
 
@@ -216,8 +215,14 @@ namespace mongo {
     }
 
     static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) = _logOpOld;
-    void newReplUp() { _logOp = _logOpRS; }
-    void newRepl() { _logOp = _logOpUninitialized; }
+    void newReplUp() { 
+        replSettings.master = true;
+        _logOp = _logOpRS; 
+    }
+    void newRepl() { 
+        replSettings.master = true;
+        _logOp = _logOpUninitialized; 
+    }
     void oldRepl() { _logOp = _logOpOld; }
 
     void logKeepalive() { 
