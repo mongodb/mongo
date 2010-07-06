@@ -286,8 +286,8 @@ namespace mongo {
         }
         
         bool mid( double amin , double amax , double bmin , double bmax , bool min , double& res ) const {
-            assert( amin < amax );
-            assert( bmin < bmax );
+            assert( amin <= amax );
+            assert( bmin <= bmax );
 
             if ( amin < bmin ){
                 if ( amax < bmin )
