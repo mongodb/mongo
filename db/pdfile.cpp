@@ -1628,7 +1628,7 @@ namespace mongo {
     void boostRenameWrapper( const Path &from, const Path &to ) {
         try {
             boost::filesystem::rename( from, to );
-        } catch ( const std::runtime_error & ) {
+        } catch ( const boost::filesystem::filesystem_error & ) {
             // boost rename doesn't work across partitions
             boost::filesystem::copy_file( from, to);
             boost::filesystem::remove( from );
