@@ -26,6 +26,11 @@ namespace mongo {
     using std::string;
 
     struct StringData {
+        // TODO - Hook this class up in the BSON machinery
+        // There are two assumptions here that we may want to review then.
+        // 'data' *always* finishes with a null terminator
+        // 'size' does *not* account for the null terminator
+        // These assumptions may make it easier to minimize changes to existing code
         const char*    data;
         const unsigned size;
 
@@ -35,10 +40,10 @@ namespace mongo {
         StringData( const string& s )
             : data(s.c_str()), size(s.size()) {}
         
-        struct literal_tag {};
+        struct LiteralTag {};
         template<size_t N>
-        StringData( const char (&val)[N], literal_tag )
-            : data(&val[0]), size(N) {}
+        StringData( const char (&val)[N], LiteralTag )
+            : data(&val[0]), size(N-1) {}
     };
 
 } // namespace mongo
