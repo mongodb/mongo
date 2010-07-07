@@ -41,7 +41,7 @@ namespace mongo {
             direction( _direction ),
             boundIndex_(),
             _spec( _id.getSpec() ),
-            _independentFieldRanges( independentFieldRanges )
+            _independentFieldRanges( _spec.getType() ? false : independentFieldRanges )
     {
         audit();
         init();
@@ -62,7 +62,7 @@ namespace mongo {
             bounds_( _bounds ),
             boundIndex_(),
             _spec( _id.getSpec() ),
-            _independentFieldRanges( true )
+            _independentFieldRanges( !_spec.getType() )
     {
         assert( !bounds_.empty() );
         audit();
@@ -103,16 +103,16 @@ namespace mongo {
         if ( _spec.getType() ){
             startKey = _spec.getType()->fixKey( startKey );
             endKey = _spec.getType()->fixKey( endKey );
-        }
-        // TODO what about _spec?
-        _nEqKeyElts = 0;
-        BSONObjIterator i( startKey );
-        BSONObjIterator j( endKey );
-        while( i.more() && j.more() ) {
-            if ( i.next().valuesEqual( j.next() ) ) {
-                ++_nEqKeyElts;
-            } else {
-                break;
+        } else if ( _independentFieldRanges ) {
+            _nEqKeyElts = 0;
+            BSONObjIterator i( startKey );
+            BSONObjIterator j( endKey );
+            while( i.more() && j.more() ) {
+                if ( i.next().valuesEqual( j.next() ) ) {
+                    ++_nEqKeyElts;
+                } else {
+                    break;
+                }
             }
         }
         bool found;
