@@ -52,7 +52,7 @@ namespace mongo {
             BSONObj key;
 
             BSONObjBuilder reduceArgs( sizeEstimate );
-            BSONArrayBuilder * valueBuilder = 0;
+            boost::scoped_ptr<BSONArrayBuilder>  valueBuilder;
             
             int sizeSoFar = 0;
             unsigned n = 0;
@@ -62,8 +62,8 @@ namespace mongo {
                 if ( n == 0 ){
                     reduceArgs.append( keyE );
                     key = keyE.wrap();
-                    valueBuilder = new BSONArrayBuilder( reduceArgs.subarrayStart( "values" ) );
                     sizeSoFar = 5 + keyE.size();
+                    valueBuilder.reset(new BSONArrayBuilder( reduceArgs.subarrayStart( "values" ) ));
                 }
                 
                 BSONElement ee = j.next();
@@ -80,7 +80,6 @@ namespace mongo {
             }
             assert(valueBuilder);
             valueBuilder->done();
-            delete valueBuilder;
             BSONObj args = reduceArgs.obj();
 
             s->invokeSafe( reduce , args );
@@ -306,21 +305,17 @@ namespace mongo {
         
         class MRTL {
         public:
-            MRTL( MRState& state ) : _state( state ){
-                _temp = new InMemory();
+            MRTL( MRState& state ) 
+                : _state( state )
+                , _temp(new InMemory())
+            {
                 _size = 0;
                 numEmits = 0;
             }
-            ~MRTL(){
-                delete _temp;
-            }
-            
             
             void reduceInMemory(){
-                
-                InMemory * old = _temp;
-                InMemory * n = new InMemory();
-                _temp = n;
+                boost::shared_ptr<InMemory> old = _temp;
+                _temp.reset(new InMemory());
                 _size = 0;
                 
                 for ( InMemory::iterator i=old->begin(); i!=old->end(); i++ ){
@@ -338,9 +333,6 @@ namespace mongo {
                         insert( res );
                     }
                 }
-                
-                delete( old );
-
             }
 
             void dump(){
@@ -388,7 +380,7 @@ namespace mongo {
             
             MRState& _state;
         
-            InMemory * _temp;
+            boost::shared_ptr<InMemory> _temp;
             long _size;
             
         public:
