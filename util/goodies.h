@@ -601,12 +601,10 @@ namespace mongo {
             _buf = 0;
         }
         
-        string toString() const {
+        operator string() const {
             string s = _buf;
             return s;
         }
-
-        operator string() const { return toString(); }
 
         ThreadSafeString& operator=( const char * str ){
             size_t s = strlen(str);

@@ -180,7 +180,7 @@ namespace mongo {
         if ( ! conf )
             return false;
         
-        ShardChunkVersion version(0);
+        ShardChunkVersion version = 0;
         unsigned long long officialSequenceNumber = 0;
 
         ChunkManagerPtr manager;

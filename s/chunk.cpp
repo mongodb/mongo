@@ -794,7 +794,7 @@ namespace mongo {
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ){
             ScopedDbConnection conn( *i );
             BSONObj res;
-            if ( ! setShardVersion( conn.conn() , _ns , SCV(0) , true , res ) )
+            if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
                 throw UserException( 8071 , (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
             conn.done();
         }
@@ -898,7 +898,7 @@ namespace mongo {
         rwlock lk( _lock , false ); 
         // TODO: cache or something?
         
-        ShardChunkVersion max(0);
+        ShardChunkVersion max = 0;
 
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
             ChunkPtr c = i->second;
@@ -917,7 +917,7 @@ namespace mongo {
     }
     
     ShardChunkVersion ChunkManager::getVersion_inlock() const{
-        ShardChunkVersion max(0);
+        ShardChunkVersion max = 0;
         
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
             ChunkPtr c = i->second;

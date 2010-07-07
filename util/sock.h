@@ -155,7 +155,9 @@ namespace mongo {
             return out;
         }
 
-        friend ostream& operator << (ostream& out, const SockAddr& sa) { return (out << sa.toString()); }
+        operator string() const{
+            return toString();
+        }
 
         // returns one of AF_INET, AF_INET6, or AF_UNIX
         sa_family_t getType() const {

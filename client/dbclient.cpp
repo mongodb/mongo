@@ -36,7 +36,7 @@ namespace mongo {
         case MASTER: {
             DBClientConnection * c = new DBClientConnection(true);
             log(2) << "creating new connection to:" << _servers[0] << endl;
-            if ( ! c->connect( _servers[0].toString() , errmsg ) ) {
+            if ( ! c->connect( _servers[0] , errmsg ) ) {
                 delete c;
                 return 0;
             }
@@ -45,7 +45,7 @@ namespace mongo {
             
         case SET: {
             DBClientPaired *p = new DBClientPaired();
-            if( !p->connect( _servers[0].toString() , _servers[1].toString() ) ){
+            if( !p->connect( _servers[0] , _servers[1] ) ){
                 delete p;
                 errmsg = "connect failed";
                 return 0;

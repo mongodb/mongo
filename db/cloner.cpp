@@ -333,7 +333,7 @@ namespace mongo {
                 cmdSpec << "logSizeMb" << logSizeMb;
             BSONObj info;
             if ( !conn->runCommand( db, cmdSpec.done(), info ) ) {
-                errmsg = "logCollection failed: " + info.toString();
+                errmsg = "logCollection failed: " + (string)info;
                 return false;
             }
         }
@@ -410,7 +410,7 @@ namespace mongo {
             dbtemprelease t;
             BSONObj info;
             if ( !conn->runCommand( db, BSON( "logCollection" << ns << "validateComplete" << 1 ), info ) ) {
-                errmsg = "logCollection failed: " + info.toString();
+                errmsg = "logCollection failed: " + (string)info;
                 return false;
             }
         }
@@ -642,7 +642,7 @@ namespace mongo {
                 if ( !authConn_->connect( fromhost, errmsg ) )
                     return false;
                 if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
-                    errmsg = "couldn't get nonce " + ret.toString();
+                    errmsg = "couldn't get nonce " + string( ret );
                     return false;
                 }
             }
@@ -692,7 +692,7 @@ namespace mongo {
                 {
                     dbtemprelease t;
                     if ( !authConn_->runCommand( fromdb, BSON( "authenticate" << 1 << "user" << username << "nonce" << nonce << "key" << key ), ret ) ) {
-                        errmsg = "unable to login " + ret.toString();
+                        errmsg = "unable to login " + string( ret );
                         return false;
                     }
                 }

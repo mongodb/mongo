@@ -178,7 +178,7 @@ namespace mongo {
     }
 
     ostream& operator<<( ostream &s, const ThreadSafeString &o ){
-        s << o.toString();
+        s << (string)o;
         return s;
     }
 

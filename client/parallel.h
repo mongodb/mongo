@@ -54,7 +54,9 @@ namespace mongo {
             return ss.str();
         }
 
-        friend ostream& operator << (ostream& out, const ServerAndQuery& sq) { return (out << sq.toString()); }
+        operator string() const {
+            return toString();
+        }
 
         string _server;
         BSONObj _extra;

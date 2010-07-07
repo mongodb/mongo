@@ -131,7 +131,9 @@ namespace mongo {
         
         const IndexSpec& getSpec() const;
 
-        friend ostream& operator << (ostream& out, const IndexDetails& id) { return (out << id.info.obj().toString()); }
+        operator string() const {
+            return info.obj().toString();
+        }
     };
 
     struct IndexChanges/*on an update*/ {

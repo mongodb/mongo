@@ -129,7 +129,9 @@ namespace mongo {
             return _string;
         }
         
-        friend ostream& operator << (ostream& out, const ConnectionString& cs) { return (out << cs.toString()); }
+        operator string() const {
+            return toString();
+        }
         
         DBClientBase* connect( string& errmsg ) const;
 
@@ -267,7 +269,7 @@ namespace mongo {
         bool isExplain() const;
         
         string toString() const;
-        friend ostream& operator << (ostream& out, const Query& q) { return (out << q.toString()); }
+        operator string() const { return toString(); }
     private:
         void makeComplex();
         template< class T >

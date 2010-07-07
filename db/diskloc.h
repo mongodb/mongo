@@ -86,7 +86,7 @@ namespace mongo {
             ss << hex << fileNo << ':' << ofs;
             return ss.str();
         }
-        friend ostream& operator << (ostream& out, const DiskLoc& dl) { return (out << dl.toString()); }
+        operator string() const { return toString(); }
 
         BSONObj toBSONObj() const {
             return BSON( "file" << fileNo << "offset" << ofs );

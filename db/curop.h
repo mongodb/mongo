@@ -264,7 +264,7 @@ namespace mongo {
             return _progressMeter;
         }
         
-        string getMessage() const { return _message.toString(); }
+        string getMessage() const { return _message; }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
 
         friend class Client;

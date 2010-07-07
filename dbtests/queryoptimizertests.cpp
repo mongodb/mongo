@@ -338,7 +338,7 @@ namespace QueryOptimizerTests {
         public:
             virtual ~DiffBase() {}
             void run() {
-                FieldRangeSet frs( "", fromjson( obj().toString() ) );
+                FieldRangeSet frs( "", fromjson( obj() ) );
                 FieldRange ret = frs.range( "a" );
                 ret -= frs.range( "b" );
                 check( ret );                

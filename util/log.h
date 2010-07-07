@@ -57,16 +57,10 @@ namespace mongo {
     class LazyStringImpl : public LazyString {
     public:
         LazyStringImpl( const T &t ) : t_( t ) {}
-        virtual string val() const { return t_.toString(); }
+        virtual string val() const { return (string)t_; }
     private:
         const T& t_;
     };
-
-    inline StringBuilder& operator << (StringBuilder& out, const LazyString& ls) { return (out << ls.val()); }
-    template <typename T>
-    inline StringBuilder& operator << (StringBuilder& out, const T &t) {
-        return ( out << LazyStringImpl<T>(t).val() );
-    }
 
     class Tee { 
     public:
@@ -80,9 +74,6 @@ namespace mongo {
             return *this;
         }
         virtual ~Nullstream() {}
-        virtual Nullstream& operator<<(string) {
-            return *this;
-        }
         virtual Nullstream& operator<<(const char *) {
             return *this;
         }
@@ -198,7 +189,6 @@ namespace mongo {
         }
 
         /** note these are virtual */
-        Logstream& operator<<(string x)     { ss << x; return *this; }
         Logstream& operator<<(const char *x) { ss << x; return *this; }
         Logstream& operator<<(char *x)       { ss << x; return *this; }
         Logstream& operator<<(char x)        { ss << x; return *this; }

@@ -123,7 +123,7 @@ namespace mongo {
             ss << hex << secs << ':' << i;
             return ss.str();
         }
-        friend ostream& operator << (ostream& out, const OpTime& ot) { return (out << ot.toString()); }
+        operator string() const { return toString(); }
         bool operator==(const OpTime& r) const {
             return i == r.i && secs == r.secs;
         }
