@@ -54,7 +54,12 @@ namespace mongo {
                         uasserted(13259, ss.str());
                     }
                 }
-                catch(...) { }
+                catch(DBException& e) { 
+                    log() << "replSet info " << i->h.toString() << " : " << e.toString() << rsLog;
+                }
+                catch(...) { 
+                    log() << "replSet error exception in requestHeartbeat?" << rsLog;
+                }
                 if( res.getBoolField("mismatch") )
                     uasserted(13145, "set name does not match the set name host " + i->h.toString() + " expects");
                 if( *res.getStringField("set") )
