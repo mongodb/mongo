@@ -735,6 +735,9 @@
     <ClInclude Include="geo\core.h">
       <Filter>db\geo</Filter>
     </ClInclude>
+    <ClInclude Include="instance.h">
+      <Filter>db\core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">

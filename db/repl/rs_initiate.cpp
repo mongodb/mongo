@@ -25,6 +25,7 @@
 #include "health.h"
 #include "rs.h"
 #include "rs_config.h"
+#include "../dbhelpers.h"
 
 using namespace bson;
 using namespace mongoutils;
@@ -81,18 +82,6 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
-            if( 1 ) {
-                // just make sure we can get a write lock before doing anything else.  we'll reacquire one 
-                // later.  of course it could be stuck then, but this check lowers the risk if weird things 
-                // are up.
-                time_t t = time(0);
-                writelock lk("admin.");
-                if( time(0)-t > 10 ) { 
-                    errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
-                    return false;
-                }
-            }
-
             if( !replSet ) { 
                 errmsg = "server is not running with --replSet";
                 return false;
@@ -102,6 +91,28 @@ namespace mongo {
                 result.append("info", "try querying " + rsConfigNs + "");
                 return false;
             }            
+
+            {
+                // just make sure we can get a write lock before doing anything else.  we'll reacquire one 
+                // later.  of course it could be stuck then, but this check lowers the risk if weird things 
+                // are up.
+                time_t t = time(0);
+                writelock lk("admin.");
+                if( time(0)-t > 10 ) { 
+                    errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
+                    return false;
+                }
+
+                /* check that we don't already have an oplog.  that could cause issues.
+                   it is ok if the initiating member has *other* data than that.
+                   */
+                BSONObj o;
+                if( Helpers::getFirst(rsoplog.c_str(), o) ) { 
+                    errmsg = rsoplog + " is not empty on the initiating member.  cannot initiate.";
+                    return false;
+                }
+            }
+
             if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
                 errmsg = "server already in BADCONFIG state (check logs); not initiating";
                 result.append("info", ReplSet::startupStatusMsg);

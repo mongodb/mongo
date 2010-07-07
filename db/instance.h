@@ -110,7 +110,7 @@ namespace mongo {
     /* returns true if there is no data on this server.  useful when starting replication. 
        local database does NOT count. 
     */
-    bool haveDatabases();
+    bool replHasDatabases();
 
 // --- local client ---
     

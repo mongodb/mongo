@@ -153,7 +153,7 @@ namespace mongo {
             return;
         }
 
-        ss << p("Server : " + m->fullName() );
+        ss << p("Server : " + m->fullName() + "<br>ns : " + rsoplog );
 
         //const bo fields = BSON( "o" << false << "o2" << false );
         const bo fields;

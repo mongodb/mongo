@@ -582,13 +582,23 @@ namespace mongo {
     }
 
     /* returns true if there is data on this server.  useful when starting replication. 
-       local database does NOT count. 
+       local database does NOT count except for rsoplog collection.
     */
-    bool haveDatabases() { 
+    bool replHasDatabases() { 
         vector<string> names;
         getDatabaseNames(names);
         if( names.size() >= 2 ) return true;
-        if( names.size() == 1 && names[0] != "local" ) return true;
+        if( names.size() == 1 ){
+            if( names[0] != "local" )
+                return true;
+            // we have a local database.  return true if oplog isn't empty
+            {
+                readlock lk(rsoplog);
+                BSONObj o;
+                if( Helpers::getFirst(rsoplog.c_str(), o) )
+                    return true;
+            }
+        }
         return false;
     }
 
