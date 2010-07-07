@@ -879,8 +879,8 @@ found:
     bool BtreeBucket::customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) {
         while( 1 ) {
             if ( l + 1 == h ) {
-                keyOfs = h;
-                DiskLoc next = thisLoc.btree()->k( keyOfs ).prevChildBucket;
+                keyOfs = ( direction > 0 ) ? h : l;
+                DiskLoc next = thisLoc.btree()->k( h ).prevChildBucket;
                 if ( !next.isNull() ) {
                     bestParent = make_pair( thisLoc, keyOfs );
                     thisLoc = next;
@@ -893,8 +893,14 @@ found:
             int cmp = customBSONCmp( thisLoc.btree()->keyNode( m ).key, keyBegin, keyBeginLen, keyEnd, order );
             if ( cmp < 0 ) {
                 l = m;
-            } else {
+            } else if ( cmp > 0 ) {
                 h = m;
+            } else {
+                if ( direction < 0 ) {
+                    l = m;
+                } else {
+                    h = m;
+                }
             }
         }        
     }
@@ -902,12 +908,69 @@ found:
     // find smallest/biggest value greater-equal/less-equal than specified
     // starting thisLoc + keyOfs will be strictly less than/strictly greater than keyBegin/keyBeginLen/keyEnd
     void BtreeBucket::advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction ) {
-        // TODO direction
         if ( direction < 0 ) {
+            int l = 0;
+            int h = keyOfs;
+            pair< DiskLoc, int > bestParent;
+            if ( customBSONCmp( keyNode( l ).key, keyBegin, keyBeginLen, keyEnd, order ) <= 0 ) {
+                // this comparison result assures h > l
+                if ( !customFind( l, h, keyBegin, keyBeginLen, keyEnd, order, direction, thisLoc, keyOfs, bestParent ) ) {
+                    return;
+                }
+            } else {
+                // go up parents until leftmost node is <= target or at top
+                while( !thisLoc.btree()->parent.isNull() ) {
+                    thisLoc = thisLoc.btree()->parent;
+                    if ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, keyEnd, order ) <= 0 ) {
+                        break;
+                    }
+                }
+            }
+            // go down until find biggest <= target
+            while( 1 ) {
+                l = 0;
+                h = thisLoc.btree()->n - 1;
+                // rightmost key may possibly be <= search key (if search target is in rChild)
+                if ( customBSONCmp( thisLoc.btree()->keyNode( h ).key, keyBegin, keyBeginLen, keyEnd, order ) <= 0 ) {
+                    DiskLoc next = thisLoc.btree()->nextChild;
+                    if ( !next.isNull() ) {
+                        bestParent = make_pair( thisLoc, h );
+                        thisLoc = next;
+                        continue;
+                    } else {
+                        keyOfs = h;
+                        return;
+                    }
+                }
+                if ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, keyEnd, order ) > 0 ) {
+                    DiskLoc next = thisLoc.btree()->k( 0 ).prevChildBucket;
+                    if ( next.isNull() ) {
+                        // if bestParent is null, we've hit the end and thisLoc gets set to DiskLoc()
+                        thisLoc = bestParent.first;
+                        keyOfs = bestParent.second;
+                        return;
+                    } else {
+                        thisLoc = next;
+                        continue;
+                    }
+                }
+                if ( !customFind( l, h, keyBegin, keyBeginLen, keyEnd, order, direction, thisLoc, keyOfs, bestParent ) ) {
+                    return;
+                }
+            }  
             return;
         }
-        int l = keyOfs;
-        int h = n - 1;
+        int l,h;
+        bool dontGoUp;
+        if ( direction > 0 ) {
+            int l = keyOfs;
+            int h = n - 1;
+            dontGoUp = ( customBSONCmp( keyNode( h ).key, keyBegin, keyBeginLen, keyEnd, order ) >= 0 );
+        } else {
+            int l = 0;
+            int h = keyOfs;
+            dontGoUp = ( customBSONCmp( keyNode( l ).key, keyBegin, keyBeginLen, keyEnd, order ) <= 0 );
+        }
         pair< DiskLoc, int > bestParent;
         if ( customBSONCmp( keyNode( h ).key, keyBegin, keyBeginLen, keyEnd, order ) >= 0 ) {
             // this comparison result assures h > l
