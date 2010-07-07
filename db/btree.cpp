@@ -362,6 +362,34 @@ namespace mongo {
             break;
         }
     }
+    
+    int BtreeBucket::customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, const BSONObj &rEnd, const Ordering &o ) {
+        BSONObjIterator ll( l );
+        BSONObjIterator rr( rBegin );
+        BSONObjIterator rr2( rEnd );
+        unsigned mask = 1;
+        for( int i = 0; i < rBeginLen; ++i, mask <<= 1 ) {
+            BSONElement lll = ll.next();
+            BSONElement rrr = rr.next();
+            rr2.next();
+            
+            int x = lll.woCompare( rrr, false );
+            if ( o.descending( mask ) )
+                x = -x;
+            if ( x != 0 )
+                return x;
+        }
+        for( ; ll.more(); mask <<= 1 ) {
+            BSONElement lll = ll.next();
+            BSONElement rrr = rr2.next();
+            int x = lll.woCompare( rrr, false );
+            if ( o.descending( mask ) )
+                x = -x;
+            if ( x != 0 )
+                return x;
+        }
+        return 0;
+    }
 
     bool BtreeBucket::exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, const Ordering& order) { 
         int pos;
@@ -848,6 +876,88 @@ found:
             return pos == n ? DiskLoc() /*theend*/ : thisLoc;
     }
 
+    bool BtreeBucket::customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) {
+        while( 1 ) {
+            if ( l + 1 == h ) {
+                keyOfs = h;
+                DiskLoc next = thisLoc.btree()->k( keyOfs ).prevChildBucket;
+                if ( !next.isNull() ) {
+                    bestParent = make_pair( thisLoc, keyOfs );
+                    thisLoc = next;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            int m = l + ( h - l ) / 2;
+            int cmp = customBSONCmp( thisLoc.btree()->keyNode( m ).key, keyBegin, keyBeginLen, keyEnd, order );
+            if ( cmp < 0 ) {
+                l = m;
+            } else {
+                h = m;
+            }
+        }        
+    }
+    
+    // find smallest/biggest value greater-equal/less-equal than specified
+    // starting thisLoc + keyOfs will be strictly less than/strictly greater than keyBegin/keyBeginLen/keyEnd
+    void BtreeBucket::advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction ) {
+        // TODO direction
+        if ( direction < 0 ) {
+            return;
+        }
+        int l = keyOfs;
+        int h = n - 1;
+        pair< DiskLoc, int > bestParent;
+        if ( customBSONCmp( keyNode( h ).key, keyBegin, keyBeginLen, keyEnd, order ) >= 0 ) {
+            // this comparison result assures h > l
+            if ( !customFind( l, h, keyBegin, keyBeginLen, keyEnd, order, direction, thisLoc, keyOfs, bestParent ) ) {
+                return;
+            }
+        } else {
+            // go up parents until rightmost node is >= target or at top
+            while( !thisLoc.btree()->parent.isNull() ) {
+                thisLoc = thisLoc.btree()->parent;
+                if ( customBSONCmp( thisLoc.btree()->keyNode( thisLoc.btree()->n - 1 ).key, keyBegin, keyBeginLen, keyEnd, order ) >= 0 ) {
+                    break;
+                }
+            }
+        }
+        // go down until find smallest >= target
+        while( 1 ) {
+            l = 0;
+            // leftmost key may possibly be >= search key (if search target is in rChild of this node's leftmost child)
+            if ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, keyEnd, order ) >= 0 ) {
+                DiskLoc next = thisLoc.btree()->k( 0 ).prevChildBucket;
+                if ( !next.isNull() ) {
+                    bestParent = make_pair( thisLoc, 0 );
+                    thisLoc = next;
+                    continue;
+                } else {
+                    keyOfs = 0;
+                    return;
+                }
+            }
+            h = thisLoc.btree()->n - 1;
+            if ( customBSONCmp( thisLoc.btree()->keyNode( h ).key, keyBegin, keyBeginLen, keyEnd, order ) < 0 ) {
+                DiskLoc next = thisLoc.btree()->nextChild;
+                if ( next.isNull() ) {
+                    // if bestParent is null, we've hit the end and thisLoc gets set to DiskLoc()
+                    thisLoc = bestParent.first;
+                    keyOfs = bestParent.second;
+                    return;
+                } else {
+                    thisLoc = next;
+                    continue;
+                }
+            }
+            if ( !customFind( l, h, keyBegin, keyBeginLen, keyEnd, order, direction, thisLoc, keyOfs, bestParent ) ) {
+                return;
+            }
+        }
+    }
+
+    
     /* @thisLoc disk location of *this
     */
     int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc,

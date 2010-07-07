@@ -234,6 +234,9 @@ namespace mongo {
 
         /* advance one key position in the index: */
         DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
+        
+        void advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction );
+        
         DiskLoc getHead(const DiskLoc& thisLoc);
 
         /* get tree shape */
@@ -256,7 +259,9 @@ namespace mongo {
                     const BSONObj& key, const Ordering &order, bool dupsAllowed,
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
         bool find(const IndexDetails& idx, const BSONObj& key, DiskLoc recordLoc, const Ordering &order, int& pos, bool assertIfDup);
+        bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent );
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
+        static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, const BSONObj &rEnd, const Ordering &o );
     public:
         // simply builds and returns a dup key error message string
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );
@@ -265,7 +270,7 @@ namespace mongo {
 
     class BtreeCursor : public Cursor {
     public:
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction, bool independentFieldRanges = true );
 
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const BoundList &_bounds, int _direction );
         ~BtreeCursor(){
@@ -369,9 +374,9 @@ namespace mongo {
         /* Our btrees may (rarely) have "unused" keys when items are deleted.
            Skip past them.
         */
-        void skipUnusedKeys();
-
-        /* Check if the current key is beyond endKey. */
+        bool skipUnusedKeys();
+        bool skipOutOfRangeKeysAndCheckEnd();
+        void skipAndCheck();
         void checkEnd();
 
         // selective audits on construction
@@ -382,18 +387,27 @@ namespace mongo {
 
         // init start / end keys with a new range
         void initInterval();
-
+        
+        void advanceTo( const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd);
+        
+        static BSONObj makeSuperlativeKey( const BSONObj &order, int direction );
+        
         friend class BtreeBucket;
         set<DiskLoc> dups;
         NamespaceDetails *d;
         int idxNo;
+        
         BSONObj startKey;
         BSONObj endKey;
         bool endKeyInclusive_;
+        int _nEqKeyElts;
+        
         bool multikey; // note this must be updated every getmore batch in case someone added a multikey...
 
         const IndexDetails& indexDetails;
         BSONObj order;
+        Ordering _ordering;
+        BSONObj _superlativeKey;
         DiskLoc bucket;
         int keyOfs;
         int direction; // 1=fwd,-1=reverse
@@ -403,6 +417,7 @@ namespace mongo {
         unsigned boundIndex_;
         const IndexSpec& _spec;
         shared_ptr< CoveredIndexMatcher > _matcher;
+        bool _independentFieldRanges;
     };
 
 

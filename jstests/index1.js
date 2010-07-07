@@ -17,9 +17,9 @@ assert( t.findOne( { z : { a : 17 } } ) == null);
 o = { name : "bar" , z : { a : 18 } };
 t.save( o );
 
-assert( t.find().length() == 2 );
-assert( t.find().sort( { "z.a" : 1 } ).length() == 2 );
-assert( t.find().sort( { "z.a" : -1 } ).length() == 2 );
+assert.eq.automsg( "2", "t.find().length()" );
+assert.eq.automsg( "2", "t.find().sort( { 'z.a' : 1 } ).length()" );
+assert.eq.automsg( "2", "t.find().sort( { 'z.a' : -1 } ).length()" );
 // We are planning to phase out this syntax.
 assert( t.find().sort( { z : { a : 1 } } ).length() == 2 );
 assert( t.find().sort( { z : { a: -1 } } ).length() == 2 );

@@ -64,7 +64,8 @@ namespace mongo {
     endKeyInclusive_( endKey.isEmpty() ),
     unhelpful_( false ),
     _special( special ),
-    _type(0){
+    _type(0),
+    _startOrEndSpec( !startKey.isEmpty() || !endKey.isEmpty() ){
 
         if ( !fbs_.matchPossible() ) {
             unhelpful_ = true;
@@ -159,7 +160,7 @@ namespace mongo {
             exactKeyMatch_ = true;
         }
         indexBounds_ = fbs.indexBounds( idxKey, direction_ );
-        if ( !startKey.isEmpty() || !endKey.isEmpty() ) {
+        if ( _startOrEndSpec ) {
             BSONObj newStart, newEnd;
             if ( !startKey.isEmpty() )
                 newStart = startKey;
@@ -201,7 +202,7 @@ namespace mongo {
         
         if ( indexBounds_.size() < 2 ) {
             // we are sure to spec endKeyInclusive_
-            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, indexBounds_[ 0 ].first, indexBounds_[ 0 ].second, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
+            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, indexBounds_[ 0 ].first, indexBounds_[ 0 ].second, endKeyInclusive_, direction_ >= 0 ? 1 : -1, !_startOrEndSpec ) );
         } else {
             return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, indexBounds_, direction_ >= 0 ? 1 : -1 ) );
         }
