@@ -55,37 +55,55 @@ namespace mongo {
         if ( !_shutdown ) 
             cout << "ERROR: Client::shutdown not called: " << _desc << endl;
     }
+
+    void Client::_dropns( const string& ns ){
+        Top::global.collectionDropped( ns );
+                    
+        dblock l;
+        Client::Context ctx( ns );
+        if ( ! nsdetails( ns.c_str() ) )
+            return;
+        
+        try {
+            string err;
+            BSONObjBuilder b;
+            dropCollection( ns , err , b );
+        }
+        catch ( ... ){
+            log() << "error dropping temp collection: " << ns << endl;
+        }
+
+    }
     
-    void Client::dropTempCollectionsInDB( const string db ) {
-        list<string>::iterator i = _tempCollections.begin();
-        while ( i!=_tempCollections.end() ) {
-            string ns = *i;
-            dblock l;
-            Client::Context ctx( ns );
-            if ( nsdetails( ns.c_str() ) &&
-                 ns.compare( 0, db.length(), db ) == 0 ) {
-                try {
-                    string err;
-                    BSONObjBuilder b;
-                    dropCollection( ns, err, b );
-                    i = _tempCollections.erase(i);
-                    if ( i!=_tempCollections.end() )
-                        ++i;
-                }
-                catch ( ... ){
-                    log() << "error dropping temp collection: " << ns << endl;
-                }
-            } else {
-                ++i;
-            }
+    void Client::_invalidateDB( const string& db ) {
+        assert( db.find( '.' ) == string::npos );
+
+        set<string>::iterator min = _tempCollections.lower_bound( db + "." );
+        set<string>::iterator max = _tempCollections.lower_bound( db + "|" );
+        
+        _tempCollections.erase( min , max );
+
+    }
+    
+    void Client::invalidateDB(const string& db) {
+        scoped_lock bl(clientsMutex);
+        for ( set<Client*>::iterator i = clients.begin(); i!=clients.end(); i++ ){
+            Client* cli = *i;
+            cli->_invalidateDB(db);
         }
     }
 
-    void Client::dropAllTempCollectionsInDB(const string db) {
+    void Client::invalidateNS( const string& ns ){
+        scoped_lock bl(clientsMutex);
         for ( set<Client*>::iterator i = clients.begin(); i!=clients.end(); i++ ){
             Client* cli = *i;
-            cli->dropTempCollectionsInDB(db);
+            cli->_tempCollections.erase( ns );
         }
+    }
+
+
+    void Client::addTempCollection( const string& ns ) { 
+        _tempCollections.insert( ns ); 
     }
 
     bool Client::shutdown(){
@@ -101,22 +119,8 @@ namespace mongo {
         
         if ( _tempCollections.size() ){
             didAnything = true;
-            for ( list<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
-                string ns = *i;
-                Top::global.collectionDropped( ns );
-                    
-                dblock l;
-                Client::Context ctx( ns );
-                if ( ! nsdetails( ns.c_str() ) )
-                    continue;
-                try {
-                    string err;
-                    BSONObjBuilder b;
-                    dropCollection( ns , err , b );
-                }
-                catch ( ... ){
-                    log() << "error dropping temp collection: " << ns << endl;
-                }
+            for ( set<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
+                _dropns( *i );
             }
             _tempCollections.clear();
         }

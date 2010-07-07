@@ -731,6 +731,7 @@ namespace mongo {
         log(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
+        Client::invalidateNS( name );
         Top::global.collectionDropped( name );
         dropNS(name);        
     }
@@ -1616,8 +1617,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(db.c_str());
 
-        Client * c = currentClient.get();
-        c->dropAllTempCollectionsInDB(db);
+        Client::invalidateDB( db );
 
         closeDatabase( db.c_str() );
         _deleteDataFiles( db.c_str() );

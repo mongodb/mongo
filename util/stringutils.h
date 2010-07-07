@@ -23,21 +23,6 @@ namespace mongo {
     void splitStringDelim( const string& str , vector<string>* res , char delim );
 
     void joinStringDelim( const vector<string>& strs , string* res , char delim );
-
-    struct StringData {
-        const char* data;
-        unsigned    size;
-
-        StringData( const char * c ){
-            data = c;
-            size = strlen(c);
-        }
-
-        StringData( const string& s ){
-            data = s.c_str();
-            size = s.size();
-        }
-    };
    
 } // namespace mongo
 
