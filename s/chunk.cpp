@@ -423,7 +423,7 @@ namespace mongo {
         BSONObjIterator i(o);
         while ( i.more() ){
             BSONElement e = i.next();
-            buf << e.fieldName() << "_" << e.toString( false );
+            buf << e.fieldName() << "_" << e.toString(false, true);
         }
 
         return buf.str();
