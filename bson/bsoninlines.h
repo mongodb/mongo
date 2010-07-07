@@ -19,7 +19,7 @@
 
 #include <map>
 #include "util/atomic_int.h"
-#include "util/hex.h"
+#include "../util/hex.h"
 
 namespace mongo {
 
