@@ -62,7 +62,7 @@ namespace mongo {
 
             result.append("rs", true);
             if( cmdObj["checkEmpty"].trueValue() ) { 
-                result.append("hasData", haveDatabases());
+                result.append("hasData", replHasDatabases());
             }
             if( theReplSet == 0 ) { 
                 errmsg = "still initializing";

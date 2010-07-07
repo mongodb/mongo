@@ -135,7 +135,10 @@ namespace mongo {
 
         /** add a subobject as a member */
         BSONObjBuilder& append(const string& fieldName , BSONObj subObj) {
-            return append( fieldName.c_str() , subObj );
+            _b.append((char) Object);
+            _b.append(fieldName.c_str(), fieldName.size()+1);
+            _b.append((void *) subObj.objdata(), subObj.objsize());
+            return *this;
         }
 
         /** add header for a new subobject and return bufbuilder for writing to

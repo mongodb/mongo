@@ -154,13 +154,15 @@ namespace mongo {
         CurOp * _curOp;
         Context * _context;
         bool _shutdown;
-        list<string> _tempCollections;
+        set<string> _tempCollections;
         const char *_desc;
         bool _god;
         AuthenticationInfo _ai;
         ReplTime _lastOp;
         BSONObj _handshake;
         BSONObj _remoteId;
+
+        void _dropns( const string& ns );
 
     public:
         string clientAddress() const;
@@ -175,9 +177,12 @@ namespace mongo {
         Client(const char *desc);
         ~Client();
 
-        void addTempCollection( const string& ns ) { _tempCollections.push_back( ns ); }
-        void dropTempCollectionsInDB(const string db);
-        void dropAllTempCollectionsInDB(const string db);
+        void addTempCollection( const string& ns );
+        
+        void _invalidateDB(const string& db);
+        static void invalidateDB(const string& db);
+
+        static void invalidateNS( const string& ns );
 
         void setLastOp( ReplTime op ) {
             _lastOp = op;

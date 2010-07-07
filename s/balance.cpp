@@ -42,8 +42,17 @@ namespace mongo {
         log(2) << "balancer: " << x << endl;
         
         if ( ! x.isEmpty() ){
+
             if ( x["who"].String() == _myid ){
                 log(2) << "balancer: i'm the current balancer" << endl;
+
+                // If need be, we can stop the balancer by creating a 'stopped : true' field in its 
+                // entry.
+                if ( x["stopped"].type() && x["stopped"].Bool() ){
+                    log() << "balancer: stopped flag true" << endl;
+                    return false;
+                }
+
                 return true;
             }
             
@@ -70,11 +79,18 @@ namespace mongo {
         
         BSONObjBuilder updateQuery;
         updateQuery.append( "_id" , "balancer" );
-        if ( x["x"].type() )
+        if ( x["x"].type() ){
             updateQuery.append( x["x"] );
-        else
+
+            // Carry on the stopped flag, if it existed.
+            if ( ! x["stopped"].type() ){
+                updateQuery.append( "stopped" , x["stopped"].Bool() );
+            }
+
+        } else {
             updateQuery.append( "x" , BSON( "$exists" << false ) );
-        
+        }
+
         conn.update( ShardNS::settings , 
                      updateQuery.obj() ,
                      BSON( "$set" << BSON( "who" << _myid << "x" << incarnation ) ) ,

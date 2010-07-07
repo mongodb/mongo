@@ -28,7 +28,7 @@ if ( doIt ) {
     m = startMongoProgram( "mongod", "--nssize", "8", "--noprealloc", "--smallfiles", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
     db = m.getDB( baseName );
     db[ baseName ].save( {} );
-    assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles:true} ) );
+    assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles:false} ) );
     function check() {
         files = listFiles( dbpath );
         for( f in files ) {

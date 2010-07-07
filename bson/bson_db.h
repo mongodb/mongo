@@ -41,7 +41,9 @@ namespace mongo {
     }
 
     inline OpTime BSONElement::_opTime() const {
-        return OpTime( *reinterpret_cast< const unsigned long long* >( value() ) );
+        if( type() == mongo::Date || type() == Timestamp )
+            return OpTime( *reinterpret_cast< const unsigned long long* >( value() ) );
+        return OpTime();
     }
 
     inline string BSONElement::_asCode() const {

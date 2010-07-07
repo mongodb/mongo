@@ -111,8 +111,39 @@ namespace mongo {
 
     extern time_t started;
 
+    // oplogdiags in web ui
     static void say(stringstream&ss, const bo& op) {
-        ss << op.toString() << '\n';
+        ss << "<tr>";
+
+        set<string> skip;
+        be e = op["ts"];
+        if( e.type() == Date || e.type() == Timestamp ) { 
+            ss << td( e._opTime().toStringPretty() );
+            skip.insert("ts");
+        }
+        else ss << td("?");
+
+        e = op["h"];
+        if( e.type() == NumberLong ) {
+            ss << "<td>" << hex << e.Long() << "</td>\n";
+            skip.insert("h");
+        } else
+            ss << td("?");
+
+        ss << td(op["op"].toString(false));
+        ss << td(op["ns"].toString(false));
+        skip.insert("op");
+        skip.insert("ns");
+
+        ss << "<td>";
+        for( bo::iterator i(op); i.more(); ) { 
+            be e = i.next();
+            if( skip.count(e.fieldName()) ) continue;
+            ss << e.toString() << ' ';
+        }
+        ss << "</td>";
+        ss << "</tr>";
+        ss << '\n';
     }
 
     void ReplSetImpl::_getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { 
@@ -122,14 +153,17 @@ namespace mongo {
             return;
         }
 
-        ss << p("Server : " + m->fullName() );
+        ss << p("Server : " + m->fullName() + "<br>ns : " + rsoplog );
 
-        const bo fields = BSON( "o" << false << "o2" << false );
+        //const bo fields = BSON( "o" << false << "o2" << false );
+        const bo fields;
 
         ScopedConn conn(m->fullName());        
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
-        ss << "<pre>\n";
+        static const char *h[] = {"ts","h","op","ns","rest",0};
+        ss << table(h, true);
+        //ss << "<pre>\n";
         int n = 0;
         OpTime otFirst;
         OpTime otLast;
@@ -164,9 +198,14 @@ namespace mongo {
                 ss << "\n...\n\n" << x;
             }
         }
-        ss << "</pre>\n";
-        if( !otEnd.isNull() )
-            ss << "<p>Log length in time: " << otEnd.getSecs() - otFirst.getSecs() << " secs</p>\n";
+        ss << _table();
+        //ss << "</pre>\n";
+
+        if( !otEnd.isNull() ) {
+            ss << "<p>Log length in time: ";
+            unsigned d = otEnd.getSecs() - otFirst.getSecs();
+            ss << d / 3600.0 << " hours</p>\n";
+        }
     }
 
     void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 

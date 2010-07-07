@@ -117,7 +117,9 @@ namespace mongo {
     };
 
     inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const { 
-        return from.extractFields(pattern);
+        BSONObj k = from.extractFields(pattern);
+        uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < 512);
+        return k;
     }
 
 } 

@@ -19,6 +19,7 @@
 
 #include <map>
 #include "util/atomic_int.h"
+#include "../util/hex.h"
 
 namespace mongo {
 
@@ -210,7 +211,7 @@ namespace mongo {
         return s;
     }
 
-    inline string BSONObj::toString( bool isArray ) const {
+    inline string BSONObj::toString( bool isArray, bool full ) const {
         if ( isEmpty() ) return "{}";
 
         stringstream s;
@@ -235,7 +236,7 @@ namespace mongo {
                 first = false;
             else
                 s << ", ";
-            s << e.toString( !isArray );
+            s << e.toString( !isArray, full );
         }
         s << ( isArray ? " ]" : " }" );
         return s.str();
@@ -362,7 +363,7 @@ namespace mongo {
         return totalSize;
     }
 
-    inline string BSONElement::toString( bool includeFieldName ) const {
+    inline string BSONElement::toString( bool includeFieldName, bool full ) const {
         stringstream s;
         if ( includeFieldName && type() != EOO )
             s << fieldName() << ": ";
@@ -401,10 +402,10 @@ namespace mongo {
             s << ( boolean() ? "true" : "false" );
             break;
         case Object:
-            s << embeddedObject().toString();
+            s << embeddedObject().toString(false, full);
             break;
         case mongo::Array:
-            s << embeddedObject().toString( true );
+            s << embeddedObject().toString(true, full);
             break;
         case Undefined:
             s << "undefined";
@@ -420,10 +421,10 @@ namespace mongo {
             break;
         case CodeWScope:
             s << "CodeWScope( "
-                << codeWScopeCode() << ", " << codeWScopeObject().toString() << ")";
+                << codeWScopeCode() << ", " << codeWScopeObject().toString(false, full) << ")";
             break;
         case Code:
-            if ( valuestrsize() > 80 ) {
+            if ( !full &&  valuestrsize() > 80 ) {
                 s.write(valuestr(), 70);
                 s << "...";
             } else {
@@ -433,7 +434,7 @@ namespace mongo {
         case Symbol:
         case mongo::String:
             s << '"';
-            if ( valuestrsize() > 80 ) {
+            if ( !full &&  valuestrsize() > 80 ) {
                 s.write(valuestr(), 70);
                 s << "...\"";
             } else {
@@ -454,6 +455,11 @@ namespace mongo {
             break;
         case BinData:
             s << "BinData";
+            if (full){
+                int len;
+                const char* data = binDataClean(len);
+                s << '(' << binDataType() << ", " << toHex(data, len) << ')';
+            }
             break;
         case Timestamp:
             s << "Timestamp " << timestampTime() << "|" << timestampInc();

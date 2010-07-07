@@ -15,9 +15,15 @@
  *    limitations under the License.
  */
 
+#ifndef UTIL_STRING_UTILS_HEADER
+#define UTIL_STRING_UTILS_HEADER
+
 namespace mongo {
 
     void splitStringDelim( const string& str , vector<string>* res , char delim );
-    void joinStringDelim( const vector<string>& strs , string* res , char delim );
 
+    void joinStringDelim( const vector<string>& strs , string* res , char delim );
+   
 } // namespace mongo
+
+#endif // UTIL_STRING_UTILS_HEADER

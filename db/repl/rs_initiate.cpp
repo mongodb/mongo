@@ -25,6 +25,7 @@
 #include "health.h"
 #include "rs.h"
 #include "rs_config.h"
+#include "../dbhelpers.h"
 
 using namespace bson;
 using namespace mongoutils;
@@ -53,17 +54,22 @@ namespace mongo {
                         uasserted(13259, ss.str());
                     }
                 }
-                catch(...) { }
+                catch(DBException& e) { 
+                    log() << "replSet info " << i->h.toString() << " : " << e.toString() << rsLog;
+                }
+                catch(...) { 
+                    log() << "replSet error exception in requestHeartbeat?" << rsLog;
+                }
+                if( res.getBoolField("mismatch") )
+                    uasserted(13145, "set name does not match the set name host " + i->h.toString() + " expects");
+                if( *res.getStringField("set") )
+                    uasserted(13256, "member " + i->h.toString() + " is already initiated");
                 if( !ok && !res["rs"].trueValue() ) {
                     if( !res.isEmpty() )
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
                     uasserted(13144, "need all members up to initiate, not ok: " + i->h.toString());
                 }
             }
-            if( res.getBoolField("mismatch") )
-                uasserted(13145, "set names do not match with: " + i->h.toString());
-            if( *res.getStringField("set") )
-                uasserted(13256, "member " + i->h.toString() + " is already initiated");
             bool hasData = res["hasData"].Bool();
             uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.", 
                 !hasData || i->h.isSelf());
@@ -81,18 +87,6 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
-            if( 1 ) {
-                // just make sure we can get a write lock before doing anything else.  we'll reacquire one 
-                // later.  of course it could be stuck then, but this check lowers the risk if weird things 
-                // are up.
-                time_t t = time(0);
-                writelock lk("admin.");
-                if( time(0)-t > 10 ) { 
-                    errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
-                    return false;
-                }
-            }
-
             if( !replSet ) { 
                 errmsg = "server is not running with --replSet";
                 return false;
@@ -102,6 +96,28 @@ namespace mongo {
                 result.append("info", "try querying " + rsConfigNs + "");
                 return false;
             }            
+
+            {
+                // just make sure we can get a write lock before doing anything else.  we'll reacquire one 
+                // later.  of course it could be stuck then, but this check lowers the risk if weird things 
+                // are up.
+                time_t t = time(0);
+                writelock lk("admin.");
+                if( time(0)-t > 10 ) { 
+                    errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
+                    return false;
+                }
+
+                /* check that we don't already have an oplog.  that could cause issues.
+                   it is ok if the initiating member has *other* data than that.
+                   */
+                BSONObj o;
+                if( Helpers::getFirst(rsoplog.c_str(), o) ) { 
+                    errmsg = rsoplog + " is not empty on the initiating member.  cannot initiate.";
+                    return false;
+                }
+            }
+
             if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
                 errmsg = "server already in BADCONFIG state (check logs); not initiating";
                 result.append("info", ReplSet::startupStatusMsg);

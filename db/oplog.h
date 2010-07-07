@@ -200,6 +200,7 @@ namespace mongo {
     };
 
     void pretouchOperation(const BSONObj& op);
+    void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
 
     void applyOperation_inlock(const BSONObj& op);
 }
