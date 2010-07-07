@@ -1,4 +1,4 @@
-// stringutils.h
+// stringdata.h
 
 /*    Copyright 2010 10gen Inc.
  *
@@ -15,15 +15,32 @@
  *    limitations under the License.
  */
 
-#ifndef UTIL_STRING_UTILS_HEADER
-#define UTIL_STRING_UTILS_HEADER
+#ifndef UTIL_BSON_STRINGDATA_HEADER
+#define UTIL_BSON_STRINGDATA_HEADER
+
+#include <string>
+#include <cstring>
 
 namespace mongo {
 
-    void splitStringDelim( const string& str , vector<string>* res , char delim );
+    using std::string;
 
-    void joinStringDelim( const vector<string>& strs , string* res , char delim );
-   
+    struct StringData {
+        const char*    data;
+        const unsigned size;
+
+        StringData( const char* c ) 
+            : data(c), size(strlen(c)) {}
+
+        StringData( const string& s )
+            : data(s.c_str()), size(s.size()) {}
+        
+        struct literal_tag {};
+        template<size_t N>
+        StringData( const char (&val)[N], literal_tag )
+            : data(&val[0]), size(N) {}
+    };
+
 } // namespace mongo
 
-#endif // UTIL_STRING_UTILS_HEADER
+#endif  // UTIL_BSON_STRINGDATA_HEADER
