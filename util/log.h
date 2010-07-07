@@ -324,9 +324,42 @@ namespace mongo {
     void initLogging( const string& logpath , bool append );
     void rotateLogs( int signal = 0 );
 
+    std::string toUtf8String(const std::wstring& wide);
+
     inline string errnoWithDescription(int x = errno) {
         stringstream s;
-        s << "errno:" << x << ' ' << strerror(x);
+        s << "errno:" << x << ' ';
+
+#if defined(_WIN32)
+        LPTSTR errorText = NULL;
+        FormatMessage(
+            FORMAT_MESSAGE_FROM_SYSTEM
+            |FORMAT_MESSAGE_ALLOCATE_BUFFER
+            |FORMAT_MESSAGE_IGNORE_INSERTS,  
+            NULL,
+            x, 0,
+            (LPTSTR) &errorText,  // output
+            0, // minimum size for output buffer
+            NULL);
+        if( errorText ) {
+            string x = toUtf8String(errorText);
+            s << x;
+            LocalFree(errorText);
+        }
+        else
+            s << strerror(x);
+        /*
+        DWORD n = FormatMessage( 
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+            FORMAT_MESSAGE_FROM_SYSTEM | 
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, x, 
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPTSTR) &lpMsgBuf, 0, NULL);
+        */
+#else
+        s << strerror(x);
+#endif
         return s.str();
     }
 
