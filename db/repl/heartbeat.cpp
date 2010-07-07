@@ -89,6 +89,10 @@ namespace mongo {
     /* throws dbexception */
     bool requestHeartbeat(string setName, string memberFullName, BSONObj& result, int myCfgVersion, int& theirCfgVersion, bool checkEmpty) { 
         BSONObj cmd = BSON( "replSetHeartbeat" << setName << "v" << myCfgVersion << "pv" << 1 << "checkEmpty" << checkEmpty );
+
+        // we might be talking to ourself - generally not a great idea to do outbound waiting calls in a write lock
+        assert( !dbMutex.isWriteLocked() );
+
         ScopedConn conn(memberFullName);
         return conn->runCommand("admin", cmd, result);
     }
