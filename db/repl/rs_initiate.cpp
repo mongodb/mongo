@@ -55,16 +55,16 @@ namespace mongo {
                     }
                 }
                 catch(...) { }
+                if( res.getBoolField("mismatch") )
+                    uasserted(13145, "set name does not match the set name host " + i->h.toString() + " expects");
+                if( *res.getStringField("set") )
+                    uasserted(13256, "member " + i->h.toString() + " is already initiated");
                 if( !ok && !res["rs"].trueValue() ) {
                     if( !res.isEmpty() )
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
                     uasserted(13144, "need all members up to initiate, not ok: " + i->h.toString());
                 }
             }
-            if( res.getBoolField("mismatch") )
-                uasserted(13145, "set names do not match with: " + i->h.toString());
-            if( *res.getStringField("set") )
-                uasserted(13256, "member " + i->h.toString() + " is already initiated");
             bool hasData = res["hasData"].Bool();
             uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.", 
                 !hasData || i->h.isSelf());
