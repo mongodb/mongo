@@ -624,9 +624,9 @@ namespace mongo {
         assert( holder );
         const char *data = ( ( BinDataHolder* )( holder ) )->c_;
         stringstream ss;
-        ss << "BinData( type: " << type << ", base64: \"";
+        ss << "BinData(" << type << ",\"";
         base64::encode( ss, (const char *)data, len );
-        ss << "\" )";
+        ss << "\")";
         string ret = ss.str();
         return *rval = c.toval( ret.c_str() );
     }

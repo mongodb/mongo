@@ -422,12 +422,13 @@ else {
 }
 
 if ( typeof( BinData ) != "undefined" ){
-    BinData.prototype.tojson = function(){
-        return "BinData type: " + this.type + " len: " + this.len;
+    BinData.prototype.tojson = function () {
+        //return "BinData type: " + this.type + " len: " + this.len;
+        return this.toString();
     }
 }
 else {
-    print( "warning: no BinData" );
+    print( "warning: no BinData class" );
 }
 
 if ( typeof _threadInject != "undefined" ){
