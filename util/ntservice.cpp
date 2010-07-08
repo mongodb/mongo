@@ -47,21 +47,22 @@ namespace mongo {
             commandLine << '"' << buffer << '\\' << argv[0] << "\" ";
         }
         
-		for ( int i = 1; i < argc; i++ ) {
-			std::string arg( argv[ i ] );
-			
-			// replace install command to indicate process is being started as a service
-			if ( arg == "--install" || arg == "--reinstall" ) {
-				arg = "--service";
-			}
-			
-			// Strip off --service(Name|User|Password) arguments
-			if ( arg.length() > 9 && arg.substr(0, 9) == "--service" ) {
-				continue;
-			}
-			commandLine << arg << "  ";
-		}
-		
+        for ( int i = 1; i < argc; i++ ) {
+            std::string arg( argv[ i ] );
+            // replace install command to indicate process is being started as a service
+            if ( arg == "--install" || arg == "--reinstall" ) {
+                arg = "--service";
+            } else if ( arg == "--dbpath" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << dbpath << "\"  ";
+                i++;
+                continue;
+            } else if ( arg.length() > 9 && arg.substr(0, 9) == "--service" ) {
+                // Strip off --service(Name|User|Password) arguments
+                continue;
+            }
+            commandLine << arg << "  ";
+        }
+
         SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();

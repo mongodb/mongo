@@ -825,7 +825,7 @@ namespace JSTests {
             // check that BinData js class is utilized
             s->invokeSafe( "q = x.b.toString();", BSONObj() );
             stringstream expected;
-            expected << "BinData( type: " << BinDataGeneral << ", base64: \"" << base64 << "\" )";
+            expected << "BinData(" << BinDataGeneral << ",\"" << base64 << "\")";
             ASSERT_EQUALS( expected.str(), s->getString( "q" ) );
             
             stringstream scriptBuilder;
