@@ -314,7 +314,7 @@ namespace mongo {
                 continue; // key is unused and has no children - drop it
             }
             if( i != j ) {
-                if ( j == refPos ) {
+                if ( refPos == j ) {
                     refPos = i; // i < j so j will never be refPos again
                 }
                 k( i ) = k( j );
@@ -326,6 +326,9 @@ namespace mongo {
             memcpy(temp+ofs, dataAt(ofsold), sz);
             k(i).setKeyDataOfsSavingUse( ofs );
             ++i;
+        }
+        if ( refPos == n ) {
+            refPos = i;
         }
         n = i;
         int dataUsed = tdz - ofs;
