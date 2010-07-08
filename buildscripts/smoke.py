@@ -288,14 +288,14 @@ def report():
     
     def missing(lst, src, dst):
         if lst:
-            print """The following databases were present in the %s but not the %s
+            print """The following collections were present in the %s but not the %s
 at the end of testing:""" % (src, dst)
             for db in lst:
                 print db
     missing(lost_in_slave, "master", "slave")
     missing(lost_in_master, "slave", "master")
     if screwy_in_slave:
-        print """The following databases has different hashes in master and slave
+        print """The following collections has different hashes in master and slave
 at the end of testing:"""
         for db in screwy_in_slave.keys():
             print "%s\t %s" % (db, screwy_in_slave[db])
