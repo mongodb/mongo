@@ -95,7 +95,6 @@ namespace mongo {
                             return;
                         }
                     }
-                    maybeRelease();
                     return;
                 }
                 case FindExtent: {
@@ -112,7 +111,6 @@ namespace mongo {
                     // There might be a more efficient implementation than creating new cursor & client cursor each time,
                     // not worrying about that for now
                     createClientCursor( prev );
-                    maybeRelease();
                     return;
                 }
                 case InExtent: {
@@ -123,14 +121,25 @@ namespace mongo {
                         return;
                     }
                     _findingStartCursor->c->advance();
-                    maybeRelease();
                     return;
                 }
                 default: {
                     massert( 12600, "invalid _findingStartMode", false );
                 }
             }                
-        }            
+        }     
+        void prepareToYield() {
+            if ( _findingStartCursor ) {
+                _findingStartCursor->prepareToYield( _yieldData );
+            }
+        }
+        void recoverFromYield() {
+            if ( _findingStartCursor ) {
+                if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
+                    _findingStartCursor = 0;
+                }
+            }
+        }        
     private:
         enum FindingStartMode { Initial, FindExtent, InExtent };
         const QueryPlan &_qp;
@@ -140,6 +149,7 @@ namespace mongo {
         Timer _findingStartTimer;
         ClientCursor * _findingStartCursor;
         shared_ptr<Cursor> _c;
+        ClientCursor::YieldData _yieldData;
         DiskLoc startLoc( const DiskLoc &rec ) {
             Extent *e = rec.rec()->myExtent( rec );
             if ( !_qp.nsd()->capLooped() || ( e->myLoc != _qp.nsd()->capExtent ) )
@@ -175,11 +185,6 @@ namespace mongo {
         void destroyClientCursor() {
             if ( _findingStartCursor ) {
                 ClientCursor::erase( _findingStartCursor->cursorid );
-                _findingStartCursor = 0;
-            }
-        }
-        void maybeRelease() {
-            if ( ! _findingStartCursor->yieldSometimes() ){
                 _findingStartCursor = 0;
             }
         }

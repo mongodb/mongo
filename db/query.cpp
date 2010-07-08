@@ -61,6 +61,19 @@ namespace mongo {
         virtual void _init() {
             c_ = qp().newCursor();
         }
+        virtual void prepareToYield() {
+            if ( ! _cc ) {
+                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , qp().ns() ) );
+            }
+            _cc->prepareToYield( _yieldData );
+        }        
+        virtual void recoverFromYield() {
+            if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
+                c_.reset();
+                _cc.reset();
+                massert( 13340, "cursor dropped during delete", false );
+            }
+        }
         virtual void next() {
             if ( !c_->ok() ) {
                 setComplete();
@@ -98,6 +111,8 @@ namespace mongo {
         int &bestCount_;
         long long _nscanned;
         shared_ptr<Cursor> c_;
+        shared_ptr<ClientCursor> _cc;
+        ClientCursor::YieldData _yieldData;
     };
     
     /* ns:      namespace, e.g. <database>.<collection>
@@ -129,7 +144,7 @@ namespace mongo {
 
         int best = 0;
         shared_ptr< MultiCursor::CursorOp > opPtr( new DeleteOp( justOneOrig, best ) );
-        shared_ptr< MultiCursor > creal( new MultiCursor( ns, pattern, BSONObj(), opPtr ) );
+        shared_ptr< MultiCursor > creal( new MultiCursor( ns, pattern, BSONObj(), opPtr, true ) );
         
         if( !creal->ok() )
             return nDeleted;
@@ -145,6 +160,7 @@ namespace mongo {
         do {
             if ( canYield && ! cc->yieldSometimes() ){
                 cc.release(); // has already been deleted elsewhere
+                // TODO should we assert or something?
                 break;
             }
                 
@@ -374,7 +390,7 @@ namespace mongo {
             _ns(ns), count_(),
             skip_( spec["skip"].numberLong() ),
             limit_( spec["limit"].numberLong() ),
-            bc_(),_yieldTracker(256,20){
+            bc_(){
         }
         
         virtual void _init() {
@@ -387,22 +403,26 @@ namespace mongo {
             }
         }
 
+        virtual void prepareToYield() {
+            if ( ! _cc ) {
+                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , _ns.c_str() ) );
+            }
+            _cc->prepareToYield( _yieldData );
+        }
+        
+        virtual void recoverFromYield() {
+            if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
+                c_.reset();
+                _cc.reset();
+                massert( 13337, "cursor dropped during count", false );
+                // TODO maybe we want to prevent recording the winning plan as well?
+            }
+        }
+        
         virtual void next() {
             if ( !c_->ok() ) {
                 setComplete();
                 return;
-            }
-
-            if ( _cc || _yieldTracker.ping() ){
-                if ( ! _cc )
-                    _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , _ns.c_str() ) );
-                
-                if ( ! _cc->yieldSometimes() ){
-                    c_.reset();
-                    _cc.reset();
-                    setComplete();
-                    return;
-                }
             }
 
             if ( bc_ ) {
@@ -466,8 +486,8 @@ namespace mongo {
         BtreeCursor *bc_;
         BSONObj firstMatch_;
 
-        ElapsedTracker _yieldTracker;
         shared_ptr<ClientCursor> _cc;
+        ClientCursor::YieldData _yieldData;
     };
     
     /* { count: "collectionname"[, query: <query>] }
@@ -496,7 +516,7 @@ namespace mongo {
             }
             return num;
         }
-        MultiPlanScanner mps( ns, query, BSONObj() );
+        MultiPlanScanner mps( ns, query, BSONObj(), 0, true, BSONObj(), BSONObj(), false, true );
         CountOp original( ns , cmd );
         shared_ptr< CountOp > res = mps.runOp( original );
         if ( !res->complete() ) {
@@ -587,7 +607,6 @@ namespace mongo {
             _oldN(0),
             _chunkMatcher(shardingState.getChunkMatcher(pq.ns())),
             _inMemSort(false),
-            _yieldTracker(256,20),
             _saveClientCursor(false),
             _wouldSaveClientCursor(false),
             _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
@@ -618,6 +637,30 @@ namespace mongo {
             }
         }
         
+        virtual void prepareToYield() {
+            if ( _findingStartCursor.get() ) {
+                _findingStartCursor->prepareToYield();
+            } else {
+                if ( ! _cc ) {
+                    _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , _pq.ns() ) );
+                }
+                _cc->prepareToYield( _yieldData );
+            }
+        }
+        
+        virtual void recoverFromYield() {
+            if ( _findingStartCursor.get() ) {
+                _findingStartCursor->recoverFromYield();
+            } else {
+                if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
+                    _c.reset();
+                    _cc.reset();
+                    massert( 13338, "cursor dropped during query", false );
+                    // TODO maybe we want to prevent recording the winning plan as well?
+                }
+            }
+        }        
+        
         virtual void next() {
             if ( _findingStartCursor.get() ) {
                 if ( _findingStartCursor->done() ) {
@@ -632,18 +675,6 @@ namespace mongo {
             if ( !_c->ok() ) {
                 finish( false );
                 return;
-            }
-
-            if ( _cc || _yieldTracker.ping() ){
-                if ( ! _cc )
-                    _cc.reset( new ClientCursor( _pq.getOptions() | QueryOption_NoCursorTimeout , _c , _pq.ns() ) );
-                
-                if ( ! _cc->yieldSometimes() ){
-                    _c.reset();
-                    _cc.reset();
-                    finish(false);
-                    return;
-                }
             }
 
             bool mayCreateCursor1 = _pq.wantMore() && ! _inMemSort && _pq.getNumToReturn() != 1 && useCursors;
@@ -809,7 +840,7 @@ namespace mongo {
         
         shared_ptr<Cursor> _c;
         shared_ptr<ClientCursor> _cc;
-        ElapsedTracker _yieldTracker;
+        ClientCursor::YieldData _yieldData;
 
         bool _saveClientCursor;
         bool _wouldSaveClientCursor;
@@ -965,7 +996,7 @@ namespace mongo {
             if ( mps.usingPrerecordedPlan() )
                 oldPlan = mps.oldExplain();
         }
-        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() ) );
+        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax(), false, true ) );
         BSONObj explainSuffix;
         if ( explain ) {
             BSONObjBuilder bb;
@@ -995,6 +1026,7 @@ namespace mongo {
             ClientCursor *cc;
             bool moreClauses = mps->mayRunMore();
             if ( moreClauses ) {
+                // this MultiCursor will use a dumb NoOp to advance(), so no need to specify mayYield
                 shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher(), dqo ) );
                 cc = new ClientCursor(queryOptions, multi, ns);
             } else {

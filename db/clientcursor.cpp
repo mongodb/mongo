@@ -199,39 +199,57 @@ namespace mongo {
         c->noteLocation();
     }
     
+    int ClientCursor::yieldSuggest() {
+        int writers = 0;
+        int readers = 0;
+        
+        int micros = Client::recommendedYieldMicros( &writers , &readers );
+        
+        if ( micros > 0 && writers == 0 && dbMutex.getState() <= 0 ){
+            // we have a read lock, and only reads are coming on, so why bother unlocking
+            micros = 0;
+        }
+        
+        return micros;
+    }
+    
     bool ClientCursor::yieldSometimes(){
         if ( ! _yieldSometimesTracker.ping() )
             return true;
 
-        int writers = 0;
-        int readers = 0;
-
-        int micros = Client::recommendedYieldMicros( &writers , &readers );
-        if ( micros == 0 )
-            return true;
-        
-        if ( writers == 0 && dbMutex.getState() <= 0 ){
-            // we have a read lock, and only reads are coming on, so why bother unlocking
-            return true;
-        }
-        
-        return yield( micros );
+        int micros = yieldSuggest();
+        return ( micros > 0 ) ? yield( micros ) : true;
     }
 
-    bool ClientCursor::yield( int micros ) {
-        // need to store on the stack in case this gets deleted
-        CursorId id = cursorid;
-
-        bool doingDeletes = _doingDeletes;
+    void ClientCursor::staticYield( int micros ) {
+        {
+            dbtempreleasecond unlock;
+            if ( unlock.unlocked() ){
+                if ( micros == -1 )
+                    micros = Client::recommendedYieldMicros();
+                if ( micros > 0 )
+                    sleepmicros( micros ); 
+            }
+            else {
+                log( LL_WARNING ) << "ClientCursor::yield can't unlock b/c of recursive lock" << endl;
+            }
+        }        
+    }
+    
+    void ClientCursor::prepareToYield( YieldData &data ) {
+        // need to store in case 'this' gets deleted
+        data._id = cursorid;
+        
+        data._doingDeletes = _doingDeletes;
         _doingDeletes = false;
-
+        
         updateLocation();
-
+        
         {
             /* a quick test that our temprelease is safe. 
-               todo: make a YieldingCursor class 
-               and then make the following code part of a unit test.
-            */
+             todo: make a YieldingCursor class 
+             and then make the following code part of a unit test.
+             */
             const int test = 0;
             static bool inEmpty = false;
             if( test && !inEmpty ) { 
@@ -247,28 +265,27 @@ namespace mongo {
                     dropDatabase(ns.c_str());
                 }
             }
-        }
-            
-        {
-            dbtempreleasecond unlock;
-            if ( unlock.unlocked() ){
-                if ( micros == -1 )
-                    micros = Client::recommendedYieldMicros();
-                if ( micros > 0 )
-                    sleepmicros( micros ); 
-            }
-            else {
-                log( LL_WARNING ) << "ClientCursor::yield can't unlock b/c of recursive lock" << endl;
-            }
-        }
-        
-        if ( ClientCursor::find( id , false ) == 0 ){
-            // i was deleted
+        }        
+    }
+    
+    bool ClientCursor::recoverFromYield( const YieldData &data ) {
+        ClientCursor *cc = ClientCursor::find( data._id , false );
+        if ( cc == 0 ){
+            // id was deleted
             return false;
         }
+        
+        cc->_doingDeletes = data._doingDeletes;
+        return true;        
+    }
+    
+    bool ClientCursor::yield( int micros ) {
+        YieldData data; 
+        prepareToYield( data );
+        
+        staticYield( micros );
 
-        _doingDeletes = doingDeletes;
-        return true;
+        return ClientCursor::recoverFromYield( data );
     }
 
     int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
