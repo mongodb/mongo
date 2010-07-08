@@ -74,7 +74,7 @@ namespace mongo {
             
             conn.done();
             
-            log() << "dist_lock lock getLastErrorDetailed: " << o << " now: " << now << endl;
+            log(1) << "dist_lock lock getLastErrorDetailed: " << o << " now: " << now << endl;
 
 
             if ( o["n"].numberInt() == 0 ){
@@ -90,7 +90,7 @@ namespace mongo {
         void unlock(){
             ScopedDbConnection conn( _conn );
             conn->update( _ns , _id, BSON( "$set" << BSON( "state" << 0 ) ) );
-            log() << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
+            log(1) << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
             conn.done();
             
             _state.set( 0 );
