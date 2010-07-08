@@ -23,6 +23,7 @@
 #include "pdfile.h"
 #include "queryoptimizer.h"
 #include "cmdline.h"
+#include "clientcursor.h"
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
@@ -234,7 +235,7 @@ namespace mongo {
         }
     }
     
-    QueryPlanSet::QueryPlanSet( const char *_ns, auto_ptr< FieldRangeSet > frs, const BSONObj &originalQuery, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max, bool bestGuessOnly ) :
+    QueryPlanSet::QueryPlanSet( const char *_ns, auto_ptr< FieldRangeSet > frs, const BSONObj &originalQuery, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max, bool bestGuessOnly, bool mayYield ) :
     ns(_ns),
     _originalQuery( originalQuery ),
     fbs_( frs ),
@@ -246,7 +247,9 @@ namespace mongo {
     honorRecordedPlan_( honorRecordedPlan ),
     min_( min.getOwned() ),
     max_( max.getOwned() ),
-    _bestGuessOnly( bestGuessOnly ) {
+    _bestGuessOnly( bestGuessOnly ),
+    _mayYield( mayYield ),
+    _yieldSometimesTracker( 256, 20 ){
         if ( hint && !hint->eoo() ) {
             hint_ = hint->wrap();
         }
@@ -502,6 +505,23 @@ namespace mongo {
     plans_( plans ) {
     }
     
+    void QueryPlanSet::Runner::mayYield( const vector< shared_ptr< QueryOp > > &ops ) {
+        if ( plans_._mayYield ) {
+            if ( plans_._yieldSometimesTracker.ping() ) {
+                int micros = ClientCursor::yieldSuggest();
+                if ( micros > 0 ) {
+                    for( vector< shared_ptr< QueryOp > >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
+                        prepareToYield( **i );
+                    }
+                    ClientCursor::staticYield( micros );
+                    for( vector< shared_ptr< QueryOp > >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
+                        recoverFromYield( **i );
+                    }                        
+                }
+            }
+        }        
+    }
+    
     shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
         massert( 10369 ,  "no plans", plans_.plans_.size() > 0 );
         
@@ -533,6 +553,7 @@ namespace mongo {
             unsigned errCount = 0;
             bool first = true;
             for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+                mayYield( ops );
                 QueryOp &op = **i;
                 nextOp( op );
                 if ( op.complete() ) {
@@ -571,36 +592,37 @@ namespace mongo {
         return ops[ 0 ];
     }
     
+#define GUARD_OP_EXCEPTION( op, expression ) \
+    try { \
+        expression; \
+    } \
+    catch ( DBException& e ) { \
+        op.setException( e.getInfo() ); \
+    } \
+    catch ( const std::exception &e ) { \
+        op.setException( ExceptionInfo( e.what() , 0 ) ); \
+    } \
+    catch ( ... ) { \
+        op.setException( ExceptionInfo( "Caught unknown exception" , 0 ) ); \
+    }
+        
+    
     void QueryPlanSet::Runner::initOp( QueryOp &op ) {
-        try {
-            op.init();
-        } 
-        catch ( DBException& e ){
-            op.setException( e.getInfo() );
-        }
-        catch ( const std::exception &e ) {
-            op.setException( ExceptionInfo( e.what() , 0 ) );
-        } 
-        catch ( ... ) {
-            op.setException( ExceptionInfo( "Caught unknown exception" , 0 ) );
-        }        
+        GUARD_OP_EXCEPTION( op, op.init() );
     }
 
     void QueryPlanSet::Runner::nextOp( QueryOp &op ) {
-        try {
-            if ( !op.error() )
-                op.next();
-        } 
-        catch ( DBException& e ){
-            op.setException( e.getInfo() );
-        }
-        catch ( const std::exception &e ) {
-            op.setException( ExceptionInfo( e.what() , 0 ) );
-        } 
-        catch ( ... ) {
-            op.setException( ExceptionInfo( "Caught unknown exception" , 0 ) );
-        } 
+        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.next(); } );
     }
+
+    void QueryPlanSet::Runner::prepareToYield( QueryOp &op ) {
+        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.prepareToYield(); } );
+    }
+
+    void QueryPlanSet::Runner::recoverFromYield( QueryOp &op ) {
+        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.recoverFromYield(); } );
+    }
+    
     
     MultiPlanScanner::MultiPlanScanner( const char *ns,
                                        const BSONObj &query,
@@ -609,7 +631,8 @@ namespace mongo {
                                        bool honorRecordedPlan,
                                        const BSONObj &min,
                                        const BSONObj &max,
-                                       bool bestGuessOnly ) :
+                                       bool bestGuessOnly,
+                                       bool mayYield ) :
     _ns( ns ),
     _or( !query.getField( "$or" ).eoo() ),
     _query( query.getOwned() ),
@@ -617,7 +640,8 @@ namespace mongo {
     _i(),
     _honorRecordedPlan( honorRecordedPlan ),
     _bestGuessOnly( bestGuessOnly ),
-    _hint( ( hint && !hint->eoo() ) ? hint->wrap() : BSONObj() )
+    _hint( ( hint && !hint->eoo() ) ? hint->wrap() : BSONObj() ),
+    _mayYield( mayYield )
     {
         if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() || !_fros.getSpecial().empty() ) {
             _or = false;
@@ -628,7 +652,7 @@ namespace mongo {
         // if _or == false, don't use or clauses for index selection
         if ( !_or ) {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, _query ) );
-            _currentQps.reset( new QueryPlanSet( ns, frs, _query, order, hint, honorRecordedPlan, min, max, _bestGuessOnly ) );
+            _currentQps.reset( new QueryPlanSet( ns, frs, _query, order, hint, honorRecordedPlan, min, max, _bestGuessOnly, _mayYield ) );
         } else {
             BSONElement e = _query.getField( "$or" );
             massert( 13268, "invalid $or spec", e.type() == Array && e.embeddedObject().nFields() > 0 );
@@ -644,7 +668,7 @@ namespace mongo {
         ++_i;
         auto_ptr< FieldRangeSet > frs( _fros.topFrs() );
         BSONElement hintElt = _hint.firstElement();
-        _currentQps.reset( new QueryPlanSet( _ns, frs, _query, BSONObj(), &hintElt, _honorRecordedPlan, BSONObj(), BSONObj(), _bestGuessOnly ) );
+        _currentQps.reset( new QueryPlanSet( _ns, frs, _query, BSONObj(), &hintElt, _honorRecordedPlan, BSONObj(), BSONObj(), _bestGuessOnly, _mayYield ) );
         shared_ptr< QueryOp > ret( _currentQps->runOp( op ) );
         BSONObj selectedIndexKey = ret->qp().indexKey();
         const char *first = 0;

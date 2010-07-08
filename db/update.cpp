@@ -735,6 +735,19 @@ namespace mongo {
                 setComplete();
             }
         }
+        virtual void prepareToYield() {
+            if ( ! _cc ) {
+                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
+            }
+            _cc->prepareToYield( _yieldData );
+        }        
+        virtual void recoverFromYield() {
+            if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
+                _c.reset();
+                _cc.reset();
+                massert( 13339, "cursor dropped during update", false );
+            }
+        }        
         virtual void next() {
             if ( ! _c->ok() ) {
                 setComplete();
@@ -760,6 +773,8 @@ namespace mongo {
         long long _nscanned;
         bool _hasPositionalField;
         MatchDetails _details;
+        shared_ptr<ClientCursor> _cc;
+        ClientCursor::YieldData _yieldData;
     };
 
     static void checkTooLarge(const BSONObj& newObj) {
@@ -893,7 +908,7 @@ namespace mongo {
         long long nscanned = 0;
         MatchDetails details;
         shared_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
-        shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr ) );
+        shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr, true ) );
         
         auto_ptr<ClientCursor> cc;
             
@@ -913,6 +928,7 @@ namespace mongo {
                     }
                     if ( ! cc->yield() ){
                         cc.release();
+                        // TODO should we assert or something?
                         break;
                     }
                 }

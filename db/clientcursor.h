@@ -156,6 +156,13 @@ namespace mongo {
          * @return same as yield()
          */
         bool yieldSometimes();
+        
+        static int yieldSuggest();
+        static void staticYield( int micros );
+        
+        struct YieldData { CursorId _id; bool _doingDeletes; };
+        void prepareToYield( YieldData &data );
+        static bool recoverFromYield( const YieldData &data );
 
         struct YieldLock : boost::noncopyable {
             explicit YieldLock( ptr<ClientCursor> cc )

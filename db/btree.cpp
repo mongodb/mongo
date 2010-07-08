@@ -314,6 +314,7 @@ namespace mongo {
                 if ( i < refPos ) {
                     --refPos;
                 }
+                // FIXME don't drop ref pos
                 continue; // key is unused and has no children - drop it
             }
             if( i != j ) {

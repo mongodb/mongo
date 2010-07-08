@@ -22,6 +22,7 @@
 #include "jsobj.h"
 #include "queryutil.h"
 #include "matcher.h"
+#include "../util/message.h"
 
 namespace mongo {
     
@@ -108,6 +109,9 @@ namespace mongo {
 
         virtual bool mayRecordPlan() const = 0;
         
+        virtual void prepareToYield() { massert( 13335, "yield not supported", false ); }
+        virtual void recoverFromYield() { massert( 13336, "yield not supported", false ); }
+        
         /** @return a copy of the inheriting class, which will be run with its own
                     query plan.  If multiple plan sets are required for an $or query,
                     the QueryOp of the winning plan from a given set will be cloned
@@ -177,7 +181,8 @@ namespace mongo {
                      bool honorRecordedPlan = true,
                      const BSONObj &min = BSONObj(),
                      const BSONObj &max = BSONObj(),
-                     bool bestGuessOnly = false );
+                     bool bestGuessOnly = false,
+                     bool mayYield = false);
         int nPlans() const { return plans_.size(); }
         shared_ptr< QueryOp > runOp( QueryOp &op );
         template< class T >
@@ -201,10 +206,13 @@ namespace mongo {
         struct Runner {
             Runner( QueryPlanSet &plans, QueryOp &op );
             shared_ptr< QueryOp > run();
+            void mayYield( const vector< shared_ptr< QueryOp > > &ops );
             QueryOp &op_;
             QueryPlanSet &plans_;
             static void initOp( QueryOp &op );
             static void nextOp( QueryOp &op );
+            static void prepareToYield( QueryOp &op );
+            static void recoverFromYield( QueryOp &op );
         };
         const char *ns;
         BSONObj _originalQuery;
@@ -220,6 +228,8 @@ namespace mongo {
         BSONObj max_;
         string _special;
         bool _bestGuessOnly;
+        bool _mayYield;
+        ElapsedTracker _yieldSometimesTracker;
     };
 
     // Handles $or type queries by generating a QueryPlanSet for each $or clause
@@ -242,8 +252,8 @@ namespace mongo {
     // with $or the clauses may likely be logically distinct.)  The greedy
     // implementation won't do any worse than all the $or clauses individually,
     // and it can often do better.  In the first cut we are intentionally using
-    // QueryPattern tracking to record successful plans on $or queries for use by
-    // subsequent $or queries, even though there may be a significant aggregate
+    // QueryPattern tracking to record successful plans on $or clauses for use by
+    // subsequent $or clauses, even though there may be a significant aggregate
     // $nor component that would not be represented in QueryPattern.
     class MultiPlanScanner {
     public:
@@ -254,7 +264,8 @@ namespace mongo {
                          bool honorRecordedPlan = true,
                          const BSONObj &min = BSONObj(),
                          const BSONObj &max = BSONObj(),
-                         bool bestGuessOnly = false );
+                         bool bestGuessOnly = false,
+                         bool mayYield = false);
         shared_ptr< QueryOp > runOp( QueryOp &op );
         template< class T >
         shared_ptr< T > runOp( T &op ) {
@@ -272,6 +283,7 @@ namespace mongo {
             return !_or && _currentQps->usingPrerecordedPlan();
         }
         void setBestGuessOnly() { _bestGuessOnly = true; }
+        void mayYield( bool val ) { _mayYield = val; }
     private:
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
@@ -286,6 +298,7 @@ namespace mongo {
         bool _honorRecordedPlan;
         bool _bestGuessOnly;
         BSONObj _hint;
+        bool _mayYield;
     };
     
     class MultiCursor : public Cursor {
@@ -297,8 +310,8 @@ namespace mongo {
             virtual shared_ptr< Cursor > newCursor() const = 0;  
         };
         // takes ownership of 'op'
-        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr< CursorOp > op = shared_ptr< CursorOp >() )
-        : _mps( new MultiPlanScanner( ns, pattern, order, 0, true, BSONObj(), BSONObj(), !op.get() ) ) {
+        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr< CursorOp > op = shared_ptr< CursorOp >(), bool mayYield = false )
+        : _mps( new MultiPlanScanner( ns, pattern, order, 0, true, BSONObj(), BSONObj(), !op.get(), mayYield ) ) {
             if ( op.get() ) {
                 _op = op;
             } else {
@@ -317,6 +330,7 @@ namespace mongo {
         MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, const shared_ptr< CoveredIndexMatcher > &matcher, const QueryOp &op )
         : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ) {
             _mps->setBestGuessOnly();
+            _mps->mayYield( false ); // with a NoOp, there's no need to yield in QueryPlanSet
             if ( !ok() ) {
                 // would have been advanced by UserQueryOp if possible
                 advance();
