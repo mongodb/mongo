@@ -595,7 +595,14 @@ namespace mongo {
                 return JS_FALSE;            
             }
             string encoded = c.toString( argv[ 1 ] );
-            string decoded = base64::decode( encoded );
+            string decoded;
+            try {
+                decoded = base64::decode( encoded );
+            }
+            catch(...) { 
+                JS_ReportError(cx, "BinData could not decode base64 parameter");
+                return JS_FALSE;
+            }
 
             assert( JS_SetPrivate( cx, obj, new BinDataHolder( decoded.data(), decoded.length() ) ) );
             c.setProperty( obj, "len", c.toval( (double)decoded.length() ) );
