@@ -316,9 +316,17 @@ def expandSuites(suites):
             expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlow', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
             break
         if suite == 'smoke':
-            (globstr, usedb) = ('test', False)
+            if os.sys.platform == "windows":
+                program = 'test.exe'
+            else:
+                program = 'test'
+            (globstr, usedb) = (program, False)
         elif suite == 'smokePerf':
-            (globstr, usedb) = ('perftest', False)
+            if os.sys.platform == "windows":
+                program = 'perftest.exe'
+            else:
+                program = 'perftest'
+            (globstr, usedb) = (program, False)
         elif suite == 'smokeJs':
             # FIXME: _runner.js seems equivalent to "[!_]*.js".
             #(globstr, usedb) = ('_runner.js', True)
@@ -345,9 +353,16 @@ def expandSuites(suites):
             (globstr, usedb) = ('tool/*.js', False)
         # well, the above almost works for everything...
         elif suite == 'smokeClient':
-            tests += [(os.path.join(mongoRepo, path), False) for path in ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]]
+            paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
+            if os.sys.platform == "windows":
+                paths = [path+'.exe' for path in paths]
+            tests += [(os.path.join(mongoRepo, path), False) for path in paths]
         elif suite == 'mongosTest':
-            tests += [(os.path.join(mongoRepo, 'mongos'), False)]
+            if os.sys.platform == "windows":
+                program = 'mongos.exe'
+            else:
+                program = 'mongos'
+            tests += [(os.path.join(mongoRepo, program), False)]
         else:
             raise Exception('unknown test suite %s' % suite)
 
