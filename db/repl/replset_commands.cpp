@@ -44,6 +44,26 @@ namespace mongo {
         }
     } cmdReplSetGetStatus;
 
+    class CmdReplSetReconfig : public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "Adjust configuration of a replica set\n";
+            help << "{ replSetReconfig : config_object }";
+            help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+        }
+        CmdReplSetReconfig() : ReplSetCommand("replSetReconfig") { }
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) ) 
+                return false;
+            if( !theReplSet->isPrimary() ) { 
+                errmsg = "replSetReconfig command must be sent to the current replica set primary.";
+                return false;
+            }
+            errmsg = "not yet implemented";
+            return false;
+        }
+    } cmdReplSetReconfig;
+
     class CmdReplSetFreeze : public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
