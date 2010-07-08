@@ -50,7 +50,9 @@ namespace {
 #define DEBUGMATCHER(x)
 
 namespace mongo {
-    
+
+    extern BSONObj staticNull;
+        
     class Where {
     public:
         Where() {
@@ -739,7 +741,7 @@ namespace mongo {
                 return false;
             if ( cmp == 0 ) {
                 /* missing is ok iff we were looking for null */
-                if ( m.type() == jstNULL || m.type() == Undefined ) {
+                if ( m.type() == jstNULL || m.type() == Undefined || ( bm.compareOp == BSONObj::opIN && bm.myset->count( staticNull.firstElement() ) > 0 ) ) {
                     if ( ( bm.compareOp == BSONObj::NE ) ^ bm.isNot ) {
                         return false;
                     }
