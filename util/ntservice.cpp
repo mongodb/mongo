@@ -34,7 +34,7 @@ namespace mongo {
 	ServiceController::ServiceController() {
     }
     
-    bool ServiceController::installService( const std::wstring& serviceName, const std::wstring& displayName, const std::wstring& serviceDesc, const std::wstring& serviceUser, const std::wstring& servicePassword, int argc, char* argv[] ) {
+    bool ServiceController::installService( const std::wstring& serviceName, const std::wstring& displayName, const std::wstring& serviceDesc, const std::wstring& serviceUser, const std::wstring& servicePassword, const std::string dbpath, int argc, char* argv[] ) {
         assert(argc >= 1);
 
         stringstream commandLine;

@@ -1049,7 +1049,7 @@ int main(int argc, char* argv[], char *envp[] )
             ServiceController::removeService( windowsServiceName );
 	}
 	if ( installService || reinstallService ) {
-            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", windowsServiceUser, windowsServicePassword, argc, argv ) )
+            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", windowsServiceUser, windowsServicePassword, dbpath, argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
