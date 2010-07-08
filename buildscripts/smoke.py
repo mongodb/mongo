@@ -133,7 +133,7 @@ class mongod(object):
             # This function not available in Python 2.5
             self.proc.terminate()
         except AttributeError:
-            if os.sys.platform == "windows":
+            if os.sys.platform == "win32":
                 import win32process
                 win32process.TerminateProcess(self.proc._handle, -1)
             else:
@@ -316,13 +316,13 @@ def expandSuites(suites):
             expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlow', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
             break
         if suite == 'smoke':
-            if os.sys.platform == "windows":
+            if os.sys.platform == "win32":
                 program = 'test.exe'
             else:
                 program = 'test'
             (globstr, usedb) = (program, False)
         elif suite == 'smokePerf':
-            if os.sys.platform == "windows":
+            if os.sys.platform == "win32":
                 program = 'perftest.exe'
             else:
                 program = 'perftest'
@@ -354,11 +354,11 @@ def expandSuites(suites):
         # well, the above almost works for everything...
         elif suite == 'smokeClient':
             paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
-            if os.sys.platform == "windows":
+            if os.sys.platform == "win32":
                 paths = [path+'.exe' for path in paths]
             tests += [(os.path.join(mongoRepo, path), False) for path in paths]
         elif suite == 'mongosTest':
-            if os.sys.platform == "windows":
+            if os.sys.platform == "win32":
                 program = 'mongos.exe'
             else:
                 program = 'mongos'
