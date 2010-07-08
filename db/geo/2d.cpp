@@ -832,6 +832,9 @@ namespace mongo {
                 // 2
                 Point center( _spec , _n );
                 double farthest = hopper->farthest();
+                // Phase 1 might not have found any points.
+                if (farthest == -1)
+                    farthest = _spec->sizeDiag( _prefix );
                 Box want( center._x - farthest , center._y - farthest , farthest * 2 );
                 _prefix = _n;
                 while ( _spec->sizeEdge( _prefix ) < ( farthest / 2 ) ){
