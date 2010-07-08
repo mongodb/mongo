@@ -158,6 +158,9 @@ namespace mongo {
                 break;
             bucket = b->advance(bucket, keyOfs, direction, "skipUnusedKeys");
             u++;
+            if ( u % 10 == 0 ) {
+                skipOutOfRangeKeysAndCheckEnd();
+            }
         }
         if ( u > 10 )
             OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
