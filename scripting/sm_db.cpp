@@ -590,6 +590,10 @@ namespace mongo {
         if ( argc == 2 ){
 
             int type = (int)c.toNumber( argv[ 0 ] );
+            if( type < 0 || type > 255 ) { 
+                JS_ReportError( cx , "invalid BinData subtype -- range is 0..255 see bsonspec.org" );
+                return JS_FALSE;            
+            }
             string encoded = c.toString( argv[ 1 ] );
             string decoded = base64::decode( encoded );
 
@@ -600,7 +604,7 @@ namespace mongo {
             return JS_TRUE;
         }
         else {
-            JS_ReportError( cx , "BinData needs 2 arguments" );
+            JS_ReportError( cx , "BinData needs 2 arguments -- BinData(subtype,data)" );
             return JS_FALSE;            
         }
     }
