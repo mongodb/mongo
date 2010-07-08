@@ -288,14 +288,14 @@ def report():
     
     def missing(lst, src, dst):
         if lst:
-            print """The following databases were present in the %s but not the %s
+            print """The following collections were present in the %s but not the %s
 at the end of testing:""" % (src, dst)
             for db in lst:
                 print db
     missing(lost_in_slave, "master", "slave")
     missing(lost_in_master, "slave", "master")
     if screwy_in_slave:
-        print """The following databases has different hashes in master and slave
+        print """The following collections has different hashes in master and slave
 at the end of testing:"""
         for db in screwy_in_slave.keys():
             print "%s\t %s" % (db, screwy_in_slave[db])
@@ -316,9 +316,17 @@ def expandSuites(suites):
             expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlow', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
             break
         if suite == 'smoke':
-            (globstr, usedb) = ('test', False)
+            if os.sys.platform == "windows":
+                program = 'test.exe'
+            else:
+                program = 'test'
+            (globstr, usedb) = (program, False)
         elif suite == 'smokePerf':
-            (globstr, usedb) = ('perftest', False)
+            if os.sys.platform == "windows":
+                program = 'perftest.exe'
+            else:
+                program = 'perftest'
+            (globstr, usedb) = (program, False)
         elif suite == 'smokeJs':
             # FIXME: _runner.js seems equivalent to "[!_]*.js".
             #(globstr, usedb) = ('_runner.js', True)
@@ -332,7 +340,7 @@ def expandSuites(suites):
         elif suite == 'smokeJsSlow':
             (globstr, usedb) = ('slow/*.js', True)
         elif suite == 'smokeParallel':
-            (globstr, usedb) = ('parallel/*', True)
+            (globstr, usedb) = ('parallel/*.js', True)
         elif suite == 'smokeClone':
             (globstr, usedb) = ('clone/*.js', False)
         elif suite == 'smokeRepl':
@@ -345,9 +353,16 @@ def expandSuites(suites):
             (globstr, usedb) = ('tool/*.js', False)
         # well, the above almost works for everything...
         elif suite == 'smokeClient':
-            tests += [(os.path.join(mongoRepo, path), False) for path in ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]]
+            paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
+            if os.sys.platform == "windows":
+                paths = [path+'.exe' for path in paths]
+            tests += [(os.path.join(mongoRepo, path), False) for path in paths]
         elif suite == 'mongosTest':
-            tests += [(os.path.join(mongoRepo, 'mongos'), False)]
+            if os.sys.platform == "windows":
+                program = 'mongos.exe'
+            else:
+                program = 'mongos'
+            tests += [(os.path.join(mongoRepo, program), False)]
         else:
             raise Exception('unknown test suite %s' % suite)
 
@@ -356,6 +371,8 @@ def expandSuites(suites):
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
+    if not tests:
+        raise Exception( "no tests specified" )
     return tests
 
 def main():
