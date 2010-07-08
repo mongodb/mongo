@@ -343,7 +343,6 @@ namespace mongo {
         { 0 }
     };
 
-
      // -------------  db_collection -------------
 
      JSBool db_collection_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){    
@@ -590,8 +589,19 @@ namespace mongo {
         if ( argc == 2 ){
 
             int type = (int)c.toNumber( argv[ 0 ] );
+            if( type < 0 || type > 255 ) { 
+                JS_ReportError( cx , "invalid BinData subtype -- range is 0..255 see bsonspec.org" );
+                return JS_FALSE;            
+            }
             string encoded = c.toString( argv[ 1 ] );
-            string decoded = base64::decode( encoded );
+            string decoded;
+            try {
+                decoded = base64::decode( encoded );
+            }
+            catch(...) { 
+                JS_ReportError(cx, "BinData could not decode base64 parameter");
+                return JS_FALSE;
+            }
 
             assert( JS_SetPrivate( cx, obj, new BinDataHolder( decoded.data(), decoded.length() ) ) );
             c.setProperty( obj, "len", c.toval( (double)decoded.length() ) );
@@ -600,7 +610,7 @@ namespace mongo {
             return JS_TRUE;
         }
         else {
-            JS_ReportError( cx , "BinData needs 2 arguments" );
+            JS_ReportError( cx , "BinData needs 2 arguments -- BinData(subtype,data)" );
             return JS_FALSE;            
         }
     }
@@ -613,11 +623,52 @@ namespace mongo {
         assert( holder );
         const char *data = ( ( BinDataHolder* )( holder ) )->c_;
         stringstream ss;
-        ss << "BinData( type: " << type << ", base64: \"";
+        ss << "BinData(" << type << ",\"";
         base64::encode( ss, (const char *)data, len );
-        ss << "\" )";
+        ss << "\")";
         string ret = ss.str();
         return *rval = c.toval( ret.c_str() );
+    }
+
+    JSBool bindataBase64(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        int len = (int)c.getNumber( obj, "len" );
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char *data = ( ( BinDataHolder* )( holder ) )->c_;
+        stringstream ss;
+        base64::encode( ss, (const char *)data, len );
+        string ret = ss.str();
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    JSBool bindataAsHex(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        int type = (int)c.getNumber( obj , "type" );
+        int len = (int)c.getNumber( obj, "len" );
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char *data = ( ( BinDataHolder* )( holder ) )->c_;
+        stringstream ss;
+        ss << hex;
+        for( int i = 0; i < len; i++ ) {
+            unsigned v = (unsigned char) data[i];
+            ss << v;
+        }
+        string ret = ss.str();
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    JSBool bindataLength(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        int len = (int)c.getNumber( obj, "len" );
+        return *rval = c.toval((double) len);
+    }
+
+    JSBool bindataSubtype(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        int t = (int)c.getNumber( obj, "type" );
+        return *rval = c.toval((double) t);
     }
 
     void bindata_finalize( JSContext * cx , JSObject * obj ){
@@ -638,6 +689,10 @@ namespace mongo {
 
     JSFunctionSpec bindata_functions[] = {
         { "toString" , bindata_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "hex", bindataAsHex, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "base64", bindataBase64, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "length", bindataLength, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "subtype", bindataSubtype, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
     

@@ -344,11 +344,15 @@ namespace mongo {
         }
 
 
-        ifstream file( fileString.c_str() , ios_base::in | ios_base::binary);
-        if ( ! file.is_open() ){
+        FILE* file = fopen( fileString.c_str() , "rb" );
+        if ( ! file ){
             log() << "error opening file: " << fileString << endl;
             return 0;
         }
+
+#if !defined(__sunos__) && defined(POSIX_FADV_SEQUENTIAL)
+        posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
+#endif
 
         log(1) << "\t file size: " << fileLength << endl;
 
@@ -363,14 +367,14 @@ namespace mongo {
         ProgressMeter m( fileLength );
 
         while ( read < fileLength ) {
-            file.read( buf , 4 );
+            fread(buf, 4, 1, file);
             int size = ((int*)buf)[0];
             if ( size >= BUF_SIZE ){
                 cerr << "got an object of size: " << size << "  terminating..." << endl;
             }
             uassert( 10264 ,  "invalid object size" , size < BUF_SIZE );
 
-            file.read( buf + 4 , size - 4 );
+            fread(buf+4, size-4, 1, file);
 
             BSONObj o( buf );
             if ( _objcheck && ! o.valid() ){

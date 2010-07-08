@@ -30,6 +30,12 @@
 
 #ifndef _WIN32
 #include <sys/resource.h>
+#else
+
+// errno doesn't work for winsock.
+#undef errno
+#define errno WSAGetLastError()
+
 #endif
 
 namespace mongo {
@@ -566,8 +572,9 @@ namespace mongo {
                 throw SocketException();
             }
             if ( ret == -1 ) {
-                if ( errno != EAGAIN || _timeout == 0 ) {                
-                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription() << " " << farEnd.toString()<<endl;
+                int e = errno;
+                if ( e != EAGAIN || _timeout == 0 ) {                
+                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString()<<endl;
                     throw SocketException();
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {

@@ -310,14 +310,13 @@ namespace mongo {
         topSize = 0;
         int i = 0;
         for ( int j = 0; j < n; j++ ) {
-            if( j > 0 && k( j ).isUnused() && k( j ).prevChildBucket.isNull() ) {
-                if ( i < refPos ) {
-                    --refPos;
-                }
-                // FIXME don't drop ref pos
+            if( j > 0 && ( j != refPos ) && k( j ).isUnused() && k( j ).prevChildBucket.isNull() ) {
                 continue; // key is unused and has no children - drop it
             }
             if( i != j ) {
+                if ( j == refPos ) {
+                    refPos = i; // i < j so j will never be refPos again
+                }
                 k( i ) = k( j );
             }
             short ofsold = k(i).keyDataOfs();

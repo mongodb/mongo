@@ -31,8 +31,8 @@ namespace mongo {
         // 'data' *always* finishes with a null terminator
         // 'size' does *not* account for the null terminator
         // These assumptions may make it easier to minimize changes to existing code
-        const char*    data;
-        const unsigned size;
+        const char* const data;
+        const unsigned    size;
 
         StringData( const char* c ) 
             : data(c), size(strlen(c)) {}

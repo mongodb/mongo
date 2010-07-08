@@ -322,7 +322,7 @@ namespace BtreeTests {
 
             ASSERT( unused2 < unused );
         }
-    private:
+    protected:
         void insert( long long n ) {
             string val( 800, ' ' );
             for( int i = 0; i < 800; i += 8 ) {
@@ -337,6 +337,36 @@ namespace BtreeTests {
         }        
     };
 
+    class DontDropReferenceKey : public PackUnused {
+    public:
+        void run() {
+            // with 80 root node is full
+            for ( long long i = 0; i < 80; i += 1 ) {
+                insert( i );
+            }
+            
+            BSONObjBuilder start;
+            start.appendMinKey( "a" );
+            BSONObjBuilder end;
+            end.appendMaxKey( "a" );
+            BSONObj l = bt()->keyNode( 0 ).key;
+            string toInsert;
+            auto_ptr< BtreeCursor > c( new BtreeCursor( nsdetails( ns() ), 1, id(), start.done(), end.done(), false, 1 ) );
+            while( c->ok() ) {
+                if ( c->currKey().woCompare( l ) > 0 ) {
+                    toInsert = c->currKey().firstElement().valuestr();
+                    break;
+                }
+                c->advance();
+            }
+            // too much work to try to make this happen through inserts and deletes
+            const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket ) = DiskLoc();
+            const_cast< DiskLoc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() |= 1; // make unused
+            BSONObj k = BSON( "a" << toInsert );
+            Base::insert( k );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "btree" ){
@@ -352,6 +382,7 @@ namespace BtreeTests {
             add< SERVER983 >();
             add< ReuseUnused >();
             add< PackUnused >();
+            add< DontDropReferenceKey >();
         }
     } myall;
 }

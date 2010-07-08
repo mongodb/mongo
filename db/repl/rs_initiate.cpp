@@ -55,7 +55,7 @@ namespace mongo {
                     }
                 }
                 catch(DBException& e) { 
-                    log() << "replSet info " << i->h.toString() << " : " << e.toString() << rsLog;
+                    log() << "replSet requestHeartbeat " << i->h.toString() << " : " << e.toString() << rsLog;
                 }
                 catch(...) { 
                     log() << "replSet error exception in requestHeartbeat?" << rsLog;
@@ -78,7 +78,7 @@ namespace mongo {
 
     class CmdReplSetInitiate : public ReplSetCommand { 
     public:
-        virtual LockType locktype() const { return WRITE; }
+        virtual LockType locktype() const { return NONE; }
         CmdReplSetInitiate() : ReplSetCommand("replSetInitiate") { }
         virtual void help(stringstream& h) const { 
             h << "Initiate/christen a replica set."; 
@@ -145,18 +145,18 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
+                writelock lk("");
                 bo comment = BSON( "msg" << "initiating set");
                 newConfig.saveConfigLocally(comment);
+                log() << "replSet replSetInitiate config now saved locally.  Should come online in about a minute." << rsLog;
+                result.append("info", "Config now saved locally.  Should come online in about a minute.");
+                ReplSet::startupStatus = ReplSet::SOON;
+                ReplSet::startupStatusMsg = "Received replSetInitiate - should come online shortly.";
             }
             catch( DBException& e ) { 
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
                 throw;
             }
-
-            log() << "replSet replSetInitiate config now saved locally.  Should come online in about a minute." << rsLog;
-            result.append("info", "Config now saved locally.  Should come online in about a minute.");
-            ReplSet::startupStatus = ReplSet::SOON;
-            ReplSet::startupStatusMsg = "Received replSetInitiate - should come online shortly.";
 
             return true;
         }
