@@ -74,6 +74,7 @@ public:
         if ( is_directory( root ) ) {
             directory_iterator end;
             directory_iterator i(root);
+            path indexes;
             while ( i != end ) {
                 path p = *i;
                 i++;
@@ -96,8 +97,15 @@ public:
                     }
                 }
 
-                drillDown(p, use_db, use_coll);
+                if ( p.leaf() == "system.indexes.bson" )
+                    indexes = p;
+                else
+                    drillDown(p, use_db, use_coll);
             }
+
+            if (!indexes.empty())
+                drillDown(indexes, use_db, use_coll);
+
             return;
         }
 
