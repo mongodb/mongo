@@ -70,6 +70,9 @@ namespace mongo {
         /** validate the settings. does not call check() on each member, you have to do that separately. */
         void check() const;
 
+        /** check if modification makes sense */
+        static bool legalChange(const ReplSetConfig& old, const ReplSetConfig& n, string& errmsg);
+
         static void receivedNewConfig(BSONObj);
         void saveConfigLocally(BSONObj comment); // to local db
         string saveConfigEverywhere(); // returns textual info on what happened
