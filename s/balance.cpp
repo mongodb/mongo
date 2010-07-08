@@ -57,6 +57,7 @@ namespace mongo {
             }
             
             BSONObj other = conn.findOne( ShardNS::mongos , x["who"].wrap( "_id" ) );
+            // TODO: if it can't find it for 10 minutes, should reset
             massert( 13125 , (string)"can't find mongos: " + x["who"].String() , ! other.isEmpty() );
 
             int secsSincePing = (int)(( jsTime() - other["ping"].Date() ) / 1000 );
