@@ -332,7 +332,7 @@ def expandSuites(suites):
         elif suite == 'smokeJsSlow':
             (globstr, usedb) = ('slow/*.js', True)
         elif suite == 'smokeParallel':
-            (globstr, usedb) = ('parallel/*', True)
+            (globstr, usedb) = ('parallel/*.js', True)
         elif suite == 'smokeClone':
             (globstr, usedb) = ('clone/*.js', False)
         elif suite == 'smokeRepl':
@@ -356,6 +356,8 @@ def expandSuites(suites):
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
+    if not tests:
+        raise Exception( "no tests specified" )
     return tests
 
 def main():
