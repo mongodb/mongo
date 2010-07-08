@@ -39,17 +39,17 @@ namespace mongo {
 
     bool Balancer::_shouldIBalance( DBClientBase& conn ){
         BSONObj x = conn.findOne( ShardNS::settings , BSON( "_id" << "balancer" ) );
-        log(2) << "balancer: " << x << endl;
+        log(2) << "balancer configDB entry: " << x << endl;
         
         if ( ! x.isEmpty() ){
 
             if ( x["who"].String() == _myid ){
-                log(2) << "balancer: i'm the current balancer" << endl;
+                log(2) << "I'm the current balancer" << endl;
 
                 // If need be, we can stop the balancer by creating a 'stopped : true' field in its 
                 // entry.
                 if ( x["stopped"].type() && x["stopped"].Bool() ){
-                    log() << "balancer: stopped flag true" << endl;
+                    log() << "stopped flag true" << endl;
                     return false;
                 }
 
@@ -61,13 +61,15 @@ namespace mongo {
             massert( 13125 , (string)"can't find mongos: " + x["who"].String() , ! other.isEmpty() );
 
             int secsSincePing = (int)(( jsTime() - other["ping"].Date() ) / 1000 );
-            log(2) << "current balancer is: " << other << " ping delay(secs): " << secsSincePing << endl;
-            
+            ostringstream msgPing;
+            msgPing << secsSincePing << "secs since last ping from balancer in charge: " << other << endl;
             if ( secsSincePing < ( 60 * 10 ) ){
+                log(2) << msgPing.str();
                 return false;
             }
             
-            log() << "balancer: going to take over" << endl;
+            log() << msgPing.str();
+            log() << "will try to take over: " << x << endl;
             // we want to take over, so fall through to below
         }
 
@@ -101,8 +103,10 @@ namespace mongo {
         // the incarnation for that other guy.
         
         x = conn.findOne( ShardNS::settings , BSON( "_id" << "balancer" ) );
-        log() << "balancer: after update: " << x << endl;
-        return _myid == x["who"].String() && incarnation == x["x"].OID();
+        bool takeOver = _myid == x["who"].String() && incarnation == x["x"].OID();
+        log() << ( takeOver ? "" : "un" ) << "successful takeover. Current balancer is : " << x << endl;
+
+        return takeOver;
     }    
 
     int Balancer::_moveChunks( const vector<CandidateChunkPtr>* candidateChunks ) {
@@ -126,7 +130,7 @@ namespace mongo {
 
                 c = cm->findChunk( chunkToMove["min"].Obj() );
                 if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
-                    log() << "balancer: chunk mismatch after reload, ignoring will retry issue cm: " 
+                    log() << "chunk mismatch after reload, ignoring will retry issue cm: " 
                           << c->getMin() << " min: " << chunkToMove["min"].Obj() << endl;
                     continue;
                 }
@@ -138,8 +142,8 @@ namespace mongo {
                 continue;
             }
 
-            log() << "balancer: MOVE FAILED **** " << errmsg << "\n"
-                  << "  from: " << chunkInfo.from << " to: " << " chunk: " << chunkToMove << endl;
+            log() << "MOVE FAILED **** " << errmsg << "\n"
+                  << "           from: " << chunkInfo.from << " to: " << chunkInfo.to << " chunk: " << chunkToMove << endl;
         }
 
         return movedCount;
@@ -224,8 +228,7 @@ namespace mongo {
 
             BSONElement shardedColls = db["sharded"];
             if ( shardedColls.eoo() ){
-                log(2) << "balancer: skipping database with no sharded collection (" 
-                      << db["_id"].str() << ")" << endl;
+                log(2) << "skipping database with no sharded collection (" << db["_id"].str() << ")" << endl;
                 continue;
             }
             
@@ -238,7 +241,7 @@ namespace mongo {
         cursor.reset();
 
         if ( collections.empty() ) {
-            log(1) << "balancer: no collections to balance" << endl;
+            log(1) << "no collections to balance" << endl;
             return;
         }
 
@@ -253,7 +256,7 @@ namespace mongo {
         vector<Shard> allShards;
         Shard::getAllShards( allShards );
         if ( allShards.size() < 2) {
-            log(1) << "balancer: can't balance without more active shards" << endl;
+            log(1) << "can't balance without more active shards" << endl;
             return;
         }
 
@@ -286,7 +289,7 @@ namespace mongo {
             cursor.reset();
 
             if (shardToChunksMap.empty()) {
-                log(1) << "balancer: skipping empty collection (" << ns << ")";
+                log(1) << "skipping empty collection (" << ns << ")";
                 continue;
             }
                 
@@ -330,22 +333,29 @@ namespace mongo {
                                     
                 vector<CandidateChunkPtr> candidateChunks;
                 if ( _shouldIBalance( conn.conn() ) ){
-                    log(1) << "balancer: start balancing round" << endl;        
+
+                    log(1) << "*** start balancing round" << endl;        
+
                     candidateChunks.clear();
                     _doBalanceRound( conn.conn() , &candidateChunks );
 
                     if ( candidateChunks.size() == 0 ) {
-                        log(1) << "balancer: no need to move any chunk" << endl;
+                        log(1) << "no need to move any chunk" << endl;
 
                     } else {
                         _balancedLastTime = _moveChunks( &candidateChunks );
-                        log(1) << "balancer: end balancing round" << endl;        
                     }
+
+                    log(1) << "*** end of balancing round" << endl;        
+
                 }
                 conn.done();
             }
             catch ( std::exception& e ){
                 log() << "caught exception while doing balance: " << e.what() << endl;
+
+                // Just to match the opening statement if in log level 1
+                log(1) << "*** End of balancing round" << endl;        
 
                 // It's possible this shard was removed
                 Shard::reloadShardInfo(); 

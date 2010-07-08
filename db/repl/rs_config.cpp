@@ -113,6 +113,25 @@ namespace mongo {
         mchk(votes >= 0 && votes <= 100);
     }
 
+    /*static*/ bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) { 
+        if( o._id != n._id ) { 
+            errmsg = "set name may not change"; 
+            return false;
+        }
+        /* TODO : wonder if we need to allow o.version < n.version only, which is more lenient.
+                  if someone had some intermediate config this node doesnt have, that could be 
+                  necessary.  but then how did we become primary?  so perhaps we are fine as-is.
+                  */
+        if( o.version + 1 != n.version ) { 
+            errmsg = "version number wrong";
+            return false;
+        }
+
+        /* TODO : MORE CHECKS HERE */
+
+        return true;
+    }
+
     void ReplSetConfig::clear() { 
         version = -5;
         _ok = false;
@@ -197,14 +216,15 @@ namespace mongo {
     }
 
     static inline void configAssert(bool expr) {
-        uassert(13122, "bad " + rsConfigNs + " config", expr);
+        uassert(13122, "bad repl set config?", expr);
     }
 
     ReplSetConfig::ReplSetConfig(BSONObj cfg) { 
         clear();
         from(cfg);
-        configAssert( version < 0 /*unspecified*/ || version == 1 );
-        version = 1;
+        configAssert( version < 0 /*unspecified*/ || (version >= 1 && version <= 5000) );
+        if( version < 1 )
+            version = 1;
         _ok = true;
     }
 

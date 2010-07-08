@@ -33,7 +33,7 @@ using namespace mongoutils;
 namespace mongo { 
 
     /* throws */ 
-    static void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg) {
+    void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg) {
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ )
             if( i->h.isSelf() )
@@ -60,10 +60,21 @@ namespace mongo {
                 catch(...) { 
                     log() << "replSet error exception in requestHeartbeat?" << rsLog;
                 }
+                cout << "TEMP hb res cfg change:" << res.toString() << endl;
                 if( res.getBoolField("mismatch") )
                     uasserted(13145, "set name does not match the set name host " + i->h.toString() + " expects");
-                if( *res.getStringField("set") )
-                    uasserted(13256, "member " + i->h.toString() + " is already initiated");
+                if( *res.getStringField("set") ) {
+                    if( cfg.version <= 1 ) {
+                        // this was to be initiation, no one shoudl be initiated already.
+                        uasserted(13256, "member " + i->h.toString() + " is already initiated");
+                    }
+                    else {
+                        // Assure no one has a newer config.
+                        if( res["v"].Int() >= cfg.version ) {
+                            uasserted(133341, "member " + i->h.toString() + " has a config version >= to the new cfg version; cannot change config");
+                        }
+                    }
+                }
                 if( !ok && !res["rs"].trueValue() ) {
                     if( !res.isEmpty() )
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
@@ -95,14 +106,14 @@ namespace mongo {
                 errmsg = "already initialized";
                 result.append("info", "try querying " + rsConfigNs + "");
                 return false;
-            }            
+            }
 
             {
                 // just make sure we can get a write lock before doing anything else.  we'll reacquire one 
                 // later.  of course it could be stuck then, but this check lowers the risk if weird things 
                 // are up.
                 time_t t = time(0);
-                writelock lk("admin.");
+                writelock lk("");
                 if( time(0)-t > 10 ) { 
                     errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
                     return false;
@@ -138,6 +149,11 @@ namespace mongo {
 
             try {
                 ReplSetConfig newConfig(cmdObj["replSetInitiate"].Obj());
+
+                if( newConfig.version > 1 ) { 
+                    errmsg = "can't initiate with a version number greater than 1";
+                    return false;
+                }
 
                 log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 

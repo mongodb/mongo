@@ -21,6 +21,7 @@
 #include "config.h"
 
 #include "../client/dbclient.h"
+#include "../util/stringutils.h"
 #include "../util/unittest.h"
 
 #include "balancer_policy.h"
@@ -67,13 +68,18 @@ namespace mongo {
         // If there is no candidate chunk receiver -- they may have all been maxed out, 
         // draining, ... -- there's not much that the policy can do.  
         if ( min.second == numeric_limits<unsigned>::max() ){
-            log() << "balancer: no availalable shards to take chunks" << endl;
+            log() << "no availalable shards to take chunks" << endl;
             return NULL;
         }
         
-        log(1) << "min: " << min.first << "\t" << min.second << endl;
-        log(1) << "max: " << max.first << "\t" << max.second << endl;
-        log(1) << "draining: " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
+        log(1) << "collection : " << ns << endl;
+        log(1) << "donor      : " << max.second << " chunks on " << max.first << endl;
+        log(1) << "receiver   : " << min.second << " chunks on " << min.first << endl;
+        if ( ! drainingShards.empty() ){
+            string drainingStr;
+            joinStringDelim( drainingShards, &drainingStr, ',' );
+            log(1) << "draining           : " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
+        }
 
         // Solving imbalances takes a higher priority than draining shards. Many shards can
         // be draining at once but we choose only one of them to cater to per round.
@@ -96,7 +102,7 @@ namespace mongo {
         const vector<BSONObj>& chunksFrom = shardToChunksMap.find( from )->second;
         const vector<BSONObj>& chunksTo = shardToChunksMap.find( to )->second;
         BSONObj chunkToMove = pickChunk( chunksFrom , chunksTo );
-        log() << "balancer: chose [" << from << "] to [" << to << "] " << chunkToMove << endl;        
+        log() << "chose [" << from << "] to [" << to << "] " << chunkToMove << endl;        
 
         return new ChunkInfo( ns, to, from, chunkToMove );
     }
