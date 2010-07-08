@@ -154,10 +154,20 @@ class nodeWrapper(object):
         self.use_internal_name = False
 
     def getHostname(self): 
+        internal_name=self.node.private_ip[0]
+        public_name=self.node.public_ip[0]
+        if not (internal_name or external_name):
+            raise Exception('host has no name?')
         if self.use_internal_name:
-            return self.node.private_ip[0]
+            # FIXME: by inspection, it seems this is sometimes the
+            # empty string.  Dunno if that's EC2 or libcloud being
+            # stupid, but it's not good.
+            if internal_name:
+                return internal_name
+            else:
+                return public_name
         else:
-            return self.node.public_ip[0] # FIXME private_ip?
+            return public_name 
     
     def initwait(self):
         print "waiting for node to spin up"
