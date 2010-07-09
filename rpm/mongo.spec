@@ -91,7 +91,7 @@ fi
 %postun server
 if test $1 -ge 1
 then
-  /sbin/service mongod stop >/dev/null 2>&1 || :
+  /sbin/service mongod condrestart >/dev/null 2>&1 || :
 fi
 
 %files
