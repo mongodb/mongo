@@ -61,7 +61,8 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMaster(BSONObjBuilder& b) {
-        b.append("ismaster", isPrimary());
+        bool isp = isPrimary();
+        b.append("ismaster", isp);
         b.append("secondary", isSecondary());
         b.append("msg", "replica sets not yet fully implemented. do not use yet.");
         {
@@ -73,6 +74,11 @@ namespace mongo {
                     a.append(BSONObjBuilder::numStr(++n).c_str(), m->h().toString());
             }
             b.appendArray("hosts", a.done());
+        }
+        if( !isp ) { 
+            const Member *m = currentPrimary();
+            if( m )
+                b.append("primary", m->h().toString());
         }
     }
 

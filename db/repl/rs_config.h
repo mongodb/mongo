@@ -50,7 +50,7 @@ namespace mongo {
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
             bool hot() const { 
-                return !arbiterOnly;
+                return !arbiterOnly && priority > 0;
             }
         };
         vector<MemberCfg> members;
