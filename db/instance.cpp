@@ -772,7 +772,7 @@ namespace mongo {
             uassert( 12596 , "old lock file" , 0 );
         }
 
-        uassert( 133342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
+        uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
         stringstream ss;
         ss << getpid() << endl;
         string s = ss.str();

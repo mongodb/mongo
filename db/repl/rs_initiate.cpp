@@ -71,7 +71,7 @@ namespace mongo {
                     else {
                         // Assure no one has a newer config.
                         if( res["v"].Int() >= cfg.version ) {
-                            uasserted(133341, "member " + i->h.toString() + " has a config version >= to the new cfg version; cannot change config");
+                            uasserted(13341, "member " + i->h.toString() + " has a config version >= to the new cfg version; cannot change config");
                         }
                     }
                 }
