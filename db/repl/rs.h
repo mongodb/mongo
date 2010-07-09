@@ -193,11 +193,11 @@ namespace mongo {
         ReplSetConfig *_cfg;
 
         /** load our configuration from admin.replset.  try seed machines too. 
-            throws exception if a problem.
+            @return true if ok; throws if config really bad; false if config doesn't include self
         */
-        void _loadConfigFinish(vector<ReplSetConfig>& v);
+        bool _loadConfigFinish(vector<ReplSetConfig>& v);
         void loadConfig();
-        void initFromConfig(ReplSetConfig& c);//, bool save);
+        bool initFromConfig(ReplSetConfig& c); // true if ok; throws if config really bad; false if config doesn't include self
 
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
