@@ -750,10 +750,14 @@ namespace mongo {
         if ( boost::filesystem::exists( name ) && boost::filesystem::file_size( name ) > 0 ){
             oldFile = true;
         }
-        
-        lockFile = open( name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO );
+
+        lockFile = open( name.c_str(), O_RDWR | O_CREAT , S_IRWXU | S_IRWXG | S_IRWXO );
         uassert( 10309 ,  "Unable to create / open lock file for lockfilepath: " + name, lockFile > 0 );
-        uassert( 10310 ,  "Unable to acquire lock for lockfilepath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
+        if (flock( lockFile, LOCK_EX | LOCK_NB ) != 0) {
+            close ( lockFile );
+            lockFile = 0;
+            uassert( 10310 ,  "Unable to acquire lock for lockfilepath: " + name,  0 );
+        }
 
         if ( oldFile ){
             // we check this here because we want to see if we can get the lock
@@ -763,10 +767,12 @@ namespace mongo {
                  << "recommend removing file and running --repair\n" 
                  << "see: http://dochub.mongodb.org/core/repair for more information\n"
                  << "*************" << endl;
+            close ( lockFile );
+            lockFile = 0;
             uassert( 12596 , "old lock file" , 0 );
         }
 
-
+        uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
         stringstream ss;
         ss << getpid() << endl;
         string s = ss.str();

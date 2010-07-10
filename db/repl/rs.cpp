@@ -61,7 +61,8 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMaster(BSONObjBuilder& b) {
-        b.append("ismaster", isPrimary());
+        bool isp = isPrimary();
+        b.append("ismaster", isp);
         b.append("secondary", isSecondary());
         b.append("msg", "replica sets not yet fully implemented. do not use yet.");
         {
@@ -73,6 +74,11 @@ namespace mongo {
                     a.append(BSONObjBuilder::numStr(++n).c_str(), m->h().toString());
             }
             b.appendArray("hosts", a.done());
+        }
+        if( !isp ) { 
+            const Member *m = currentPrimary();
+            if( m )
+                b.append("primary", m->h().toString());
         }
     }
 
@@ -176,7 +182,24 @@ namespace mongo {
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
     string ReplSetImpl::startupStatusMsg;
 
-    void ReplSetImpl::initFromConfig(ReplSetConfig& c) { //, bool save) { 
+    // true if ok; throws if config really bad; false if config doesn't include self
+    bool ReplSetImpl::initFromConfig(ReplSetConfig& c) {
+        {
+            int me = 0;
+            for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
+                const ReplSetConfig::MemberCfg& m = *i;
+                if( m.h.isSelf() ) {
+                    me++;
+                }
+            }
+            if( me == 0 ) {
+                // log() << "replSet config : " << _cfg->toString() << rsLog;
+                log() << "replSet info can't find self in the repl set configuration" << rsLog;
+                return false;
+            }
+            uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
+        }
+
         _cfg = new ReplSetConfig(c);
         assert( _cfg->ok() );
         assert( _name.empty() || _name == _cfg->_id );
@@ -184,11 +207,9 @@ namespace mongo {
         assert( !_name.empty() );
 
         assert( _members.head() == 0 );
-        int me=0;
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
             if( m.h.isSelf() ) {
-                me++;
                 assert( _self == 0 );
                 _self = new Member(m.h, m._id, &m);
                 _selfId = m._id;
@@ -197,18 +218,15 @@ namespace mongo {
                 _members.push(mi);
             }
         }
-        if( me != 1 ) {
-            log() << "replSet config : " << _cfg->toString() << rsLog;
-            uassert( 13302, "replSet : can't find self in the repl set configuration", me == 1 );
-        }
 
 /*        if( save ) { 
             _cfg->save();
         }*/
+        return true;
     }
 
     // Our own config must be the first one.
-    void ReplSetImpl::_loadConfigFinish(vector<ReplSetConfig>& cfgs) { 
+    bool ReplSetImpl::_loadConfigFinish(vector<ReplSetConfig>& cfgs) { 
         int v = -1;
         ReplSetConfig *highest = 0;
         int myVersion = -2000;
@@ -222,12 +240,16 @@ namespace mongo {
             }
         }
         assert( highest );
-        initFromConfig(*highest);
+
+        if( !initFromConfig(*highest) ) 
+            return false;
+
         if( highest->version > myVersion && highest->version >= 0 ) { 
             log() << "replSet got config version " << highest->version << " from a remote, saving locally" << rsLog;
             writelock lk("admin.");
             highest->saveConfigLocally(BSONObj());
         }
+        return true;
     }
 
     void ReplSetImpl::loadConfig() {
@@ -236,9 +258,20 @@ namespace mongo {
             startupStatusMsg = "loading " + rsConfigNs + " config (LOADINGCONFIG)";
             try {
                 vector<ReplSetConfig> configs;
-                configs.push_back( ReplSetConfig(HostAndPort::me()) );
+                try { 
+                    configs.push_back( ReplSetConfig(HostAndPort::me()) );
+                }
+                catch(DBException& e) {
+                    log() << "replSet exception loading our local replset configuration object : " << e.toString() << rsLog;
+                    throw;
+                }
                 for( vector<HostAndPort>::const_iterator i = _seeds->begin(); i != _seeds->end(); i++ ) {
-                    configs.push_back( ReplSetConfig(*i) );
+                    try { 
+                        configs.push_back( ReplSetConfig(*i) );
+                    }
+                    catch( DBException& e ) { 
+                        log() << "replSet exception trying to load config from " << *i << " : " << e.toString() << rsLog;
+                    }
                 }
                 int nok = 0;
                 int nempty = 0;
@@ -267,7 +300,12 @@ namespace mongo {
                     sleepsecs(20);
                     continue;
                 }
-                _loadConfigFinish(configs);
+
+                if( !_loadConfigFinish(configs) ) { 
+                    log() << "replSet info Couldn't load config yet. Sleeping 20sec and will try again." << rsLog;
+                    sleepsecs(20);
+                    continue;
+                }
             }
             catch(DBException& e) { 
                 startupStatus = BADCONFIG;

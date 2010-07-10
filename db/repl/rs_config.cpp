@@ -129,6 +129,9 @@ namespace mongo {
 
         /* TODO : MORE CHECKS HERE */
 
+        cout << "TODO : don't allow removal of a node until we handle it at the removed node end." << endl;
+        // we could change its votes to zero perhaps instead as a short term...
+
         return true;
     }
 
@@ -290,7 +293,7 @@ namespace mongo {
         uassert(13109, "multiple rows in " + rsConfigNs + " not supported", !c->more());
         from(o);
         _ok = true;
-        log(level) << "replSet load config ok " << h.toString() << rsLog;
+        log(level) << "replSet load config ok from " << h.toString() << rsLog;
     }
 
 }
