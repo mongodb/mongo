@@ -20,6 +20,14 @@
 #include "../client/syncclusterconnection.h"
 #include "../util/base64.h"
 #include "../util/text.h"
+#include "../util/hex.h"
+
+#if( BOOST_VERSION >= 1042000 )
+#include <boost/uuid/uuid.hpp>
+#define HAVE_UUID 1
+#else
+;
+#endif
 
 namespace mongo {
 
@@ -524,7 +532,6 @@ namespace mongo {
         { 0 }
     };
 
-
     // dbpointer
 
     JSBool dbpointer_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
@@ -580,8 +587,74 @@ namespace mongo {
  
     JSClass dbref_class = bson_class; // name will be fixed later
 
-    // BinData
+    // UUID **************************
 
+    JSBool uuid_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        Convertor c( cx );
+        
+	if( argc == 0 ) { 
+            JS_ReportError( cx , "UUID needs 1 argument -- UUID(hexstr)" );
+            return JS_FALSE;            
+	}
+        else if ( argc == 1 ) {
+
+            string encoded = c.toString( argv[ 0 ] );
+	    if( encoded.size() != 32 ) { 
+	      JS_ReportError( cx, "expect 32 char hex string to UUID()" );
+	      return JS_FALSE;
+	    }
+
+	    char buf[16];
+	    for( int i = 0; i < 16; i++ ) {
+	      buf[i] = fromHex(encoded.c_str() + i * 2);
+	    }
+
+            assert( JS_SetPrivate( cx, obj, new BinDataHolder( buf, 16 ) ) );
+            c.setProperty( obj, "len", c.toval( (double)16 ) );
+            c.setProperty( obj, "type", c.toval( (double)3 ) );
+
+            return JS_TRUE;
+        }
+        else {
+            JS_ReportError( cx , "UUID needs 1 argument -- UUID(hexstr)" );
+            return JS_FALSE;            
+        }
+    }
+ 
+  JSBool uuid_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char *data = ( ( BinDataHolder* )( holder ) )->c_;
+        stringstream ss;
+        ss << "UUID(\"" << toHex(data, 16);
+        ss << "\")";
+        string ret = ss.str();
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    void uuid_finalize( JSContext * cx , JSObject * obj ){
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        if ( holder ){
+            delete ( BinDataHolder* )holder;
+            assert( JS_SetPrivate( cx , obj , 0 ) );
+        }
+    }    
+    
+    JSClass uuid_class = {
+        "UUID" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, uuid_finalize,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSFunctionSpec uuid_functions[] = {
+        { "toString" , uuid_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { 0 }
+    };
+    
+    // BinData **************************
 
     JSBool bindata_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         Convertor c( cx );
@@ -644,7 +717,6 @@ namespace mongo {
 
     JSBool bindataAsHex(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
-        int type = (int)c.getNumber( obj , "type" );
         int len = (int)c.getNumber( obj, "len" );
         void *holder = JS_GetPrivate( cx, obj );
         assert( holder );
@@ -905,6 +977,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );

@@ -431,6 +431,12 @@ else {
     print( "warning: no BinData class" );
 }
 
+if ( typeof( UUID ) != "undefined" ){
+    UUID.prototype.tojson = function () {
+        return this.toString();
+    }
+}
+
 if ( typeof _threadInject != "undefined" ){
     print( "fork() available!" );
     

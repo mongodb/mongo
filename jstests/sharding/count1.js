@@ -14,7 +14,7 @@ s.adminCommand( { enablesharding : "test" } )
 s.adminCommand( { shardcollection : "test.foo" , key : { name : 1 } } );
 
 primary = s.getServer( "test" ).getDB( "test" );
-seconday = s.getOther( primary ).getDB( "test" );
+secondary = s.getOther( primary ).getDB( "test" );
 
 assert.eq( 1 , s.config.chunks.count() , "sanity check A" );
 
@@ -34,13 +34,13 @@ s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 assert.eq( 6 , db.foo.find().count() , "basic count after split " );
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "basic count after split sorted " );
 
-s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : secondary.getMongo().name } );
 
 /*
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
-assert.eq( 3 , seconday.foo.find().toArray().length , "secondary count" );
+assert.eq( 3 , secondary.foo.find().toArray().length , "secondary count" );
 assert.eq( 3 , primary.foo.find().sort( { name : 1 } ).toArray().length , "primary count sorted" );
-assert.eq( 3 , seconday.foo.find().sort( { name : 1 } ).toArray().length , "secondary count sorted" );
+assert.eq( 3 , secondary.foo.find().sort( { name : 1 } ).toArray().length , "secondary count sorted" );
 
 assert.eq( 6 , db.foo.find().toArray().length , "total count after move" );
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).toArray().length , "total count() sorted" );
