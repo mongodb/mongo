@@ -168,6 +168,7 @@ namespace mongo {
 
     protected:
         void _fillIsMaster(BSONObjBuilder&);
+        void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
         const ReplSetConfig& config() { return *_cfg; }
         string name() const { return _name; } /* @return replica set's logical name */
         MemberState state() const { return _myState; }        
