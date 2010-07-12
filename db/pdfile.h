@@ -52,7 +52,7 @@ namespace mongo {
     shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
 
 // -1 if library unavailable.
-    boost::intmax_t freeSpace();
+    boost::intmax_t freeSpace( const string &path = dbpath );
 
     /*---------------------------------------------------------------------*/
 
