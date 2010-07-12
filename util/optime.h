@@ -111,10 +111,8 @@ namespace mongo {
         }
         
         string toStringPretty() const {
-            char buf[64];
-            time_t_to_String(secs, buf);
             stringstream ss;
-            ss << buf << ':' << hex << i;
+            ss << time_t_to_String_short(secs) << ':' << hex << i;
             return ss.str();
         }
         

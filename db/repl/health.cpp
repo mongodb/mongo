@@ -118,7 +118,8 @@ namespace mongo {
         set<string> skip;
         be e = op["ts"];
         if( e.type() == Date || e.type() == Timestamp ) { 
-            ss << td( e._opTime().toStringPretty() );
+            OpTime ot = e._opTime();
+            ss << td( a("",ot.toString(),ot.toStringPretty()) );
             skip.insert("ts");
         }
         else ss << td("?");
@@ -206,6 +207,7 @@ namespace mongo {
             unsigned d = otEnd.getSecs() - otFirst.getSecs();
             ss << d / 3600.0 << " hours</p>\n";
         }
+        ss << p("Current time: " + time_t_to_String_short(time(0)));
     }
 
     void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 

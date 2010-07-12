@@ -31,7 +31,7 @@ namespace mongo {
         writelock lk("admin."); // so we are synchronized with _logOp() 
         _myState = PRIMARY;
         _currentPrimary = _self;
-        log() << "replSet self is now primary" << rsLog;
+        log(2) << "replSet self is now primary" << rsLog;
     }
 
     void ReplSetImpl::relinquish() { 
@@ -215,7 +215,7 @@ namespace mongo {
             }
             if( me == 0 ) {
                 // log() << "replSet config : " << _cfg->toString() << rsLog;
-                log() << "replSet info can't find self in the repl set configuration" << rsLog;
+                log() << "replSet warning can't find self in the repl set configuration" << rsLog;
                 return false;
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
