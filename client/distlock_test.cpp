@@ -1,4 +1,4 @@
-// distlock.h
+// distlock_test.h
 
 /*    Copyright 2009 10gen Inc.
  *

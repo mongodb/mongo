@@ -390,7 +390,7 @@ commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", 
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", 
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ]
 commonFiles += Glob( "util/*.c" )
-commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp s/shardconnection.cpp" )
+commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
 
 #mmap stuff
 
