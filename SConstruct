@@ -1123,6 +1123,13 @@ def jsToH(target, source, env):
 
     out = open( outFile , 'w' )
     out.write( h )
+    out.close()
+
+    # mongo_vstudio.cpp is in git as the .vcproj doesn't generate this file.
+    if outFile.find( "mongo.cpp" ) >= 0:
+        out = open( outFile.replace( "mongo" , "mongo_vstudio" ) , 'w' )
+        out.write( h )
+        out.close()
 
     return None
 
@@ -1219,7 +1226,6 @@ env.JSHeader( "shell/mongo.jsall" )
 
 env.JSConcat( "shell/mongo-server.jsall"  , [ "shell/servers.js"] )
 env.JSHeader( "shell/mongo-server.jsall" )
-
 
 shellEnv = env.Clone();
 
