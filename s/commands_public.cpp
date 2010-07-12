@@ -396,16 +396,14 @@ namespace mongo {
                 massert( 10420 ,  "how could chunk manager be null!" , cm );
 
                 BSONObj query = getQuery(cmdObj);
-                vector<shared_ptr<ChunkRange> > chunks;
-                cm->getChunksForQuery( chunks , query );
+                set<Shard> shards;
+                cm->getShardsForQuery(shards, query);
                 
                 set<BSONObj,BSONObjCmp> all;
                 int size = 32;
                 
-                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    shared_ptr<ChunkRange> c = *i;
-
-                    ShardConnection conn( c->getShard() , fullns );
+                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ){
+                    ShardConnection conn( *i , fullns );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                     conn.done();
@@ -415,11 +413,11 @@ namespace mongo {
                         return false;
                     }
                     
-                    BSONObjIterator it( res["values"].embeddedObjectUserCheck() );
+                    BSONObjIterator it( res["values"].embeddedObject() );
                     while ( it.more() ){
                         BSONElement nxt = it.next();
                         BSONObjBuilder temp(32);
-                        temp.appendAs( nxt , "x" );
+                        temp.appendAs( nxt , "" );
                         all.insert( temp.obj() );
                     }
 
