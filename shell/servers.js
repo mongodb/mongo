@@ -54,7 +54,7 @@ createMongoArgs = function( binaryName , args ){
 }
 
 __nextPort = 27000;
-startMongodTest = function (port, dirname, restart) {
+startMongodTest = function (port, dirname, restart, extraOptions ) {
     if (!port)
         port = __nextPort++;
     var f = startMongodEmpty;
@@ -62,7 +62,8 @@ startMongodTest = function (port, dirname, restart) {
         f = startMongodNoReset;
     if (!dirname)
         dirname = "" + port; // e.g., data/db/27000
-    var conn = f.apply(null, [
+    
+    var options = 
         {
             port: port,
             dbpath: "/data/db/" + dirname,
@@ -70,9 +71,13 @@ startMongodTest = function (port, dirname, restart) {
             smallfiles: "",
             oplogSize: "2",
             nohttpinterface: ""
-        }
-    ]
-    );
+        };
+
+    if ( extraOptions )
+        Object.extend( options , extraOptions );
+    
+    var conn = f.apply(null, [ options ] );
+
     conn.name = "localhost:" + port;
     return conn;
 }
@@ -753,12 +758,12 @@ allocatePorts = function( n ) {
 }
 
 
-SyncCCTest = function( testName ){
+SyncCCTest = function( testName , extraMongodOptions ){
     this._testName = testName;
     this._connections = [];
     
     for ( var i=0; i<3; i++ ){
-        this._connections.push( startMongodTest( 30000 + i , testName + i ) );
+        this._connections.push( startMongodTest( 30000 + i , testName + i , false, extraMongodOptions ) );
     }
     
     this.url = this._connections.map( function(z){ return z.name; } ).join( "," );
