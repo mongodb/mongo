@@ -273,6 +273,7 @@ DB.prototype.help = function() {
     print("\tdb.getProfilingLevel()");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSisterDB(name) get the db at the same server as this onew");
+    print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
     print("\tdb.printCollectionStats()");
@@ -533,6 +534,8 @@ DB.prototype.tojson = function(){
 DB.prototype.toString = function(){
     return this._name;
 }
+
+DB.prototype.isMaster = function(){ return db.runCommand("isMaster");}
 
 DB.prototype.currentOp = function(){
     return db.$cmd.sys.inprog.findOne();

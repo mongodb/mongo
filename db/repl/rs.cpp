@@ -60,21 +60,42 @@ namespace mongo {
         return L;
     }
 
+    void ReplSetImpl::_fillIsMasterHost(const Member *m, vector<string>& hosts, vector<string>& passives, vector<string>& arbiters) {
+        if( m->hot() ) {
+            hosts.push_back(m->h().toString());
+        }
+        else if( !m->config().arbiterOnly ) {
+            passives.push_back(m->h().toString());
+        }
+        else {
+            arbiters.push_back(m->h().toString());
+        }
+    }
+
     void ReplSetImpl::_fillIsMaster(BSONObjBuilder& b) {
         bool isp = isPrimary();
         b.append("ismaster", isp);
         b.append("secondary", isSecondary());
         b.append("msg", "replica sets not yet fully implemented. do not use yet.");
         {
-            BSONObjBuilder a;
-            int n = 0;
-            a.append("0", _self->h().toString());
+            vector<string> hosts, passives, arbiters;
+            _fillIsMasterHost(_self, hosts, passives, arbiters);
+
             for( Member *m = _members.head(); m; m = m->next() ) {
-                if( m->hot() )
-                    a.append(BSONObjBuilder::numStr(++n).c_str(), m->h().toString());
+                _fillIsMasterHost(m, hosts, passives, arbiters);
             }
-            b.appendArray("hosts", a.done());
+
+            if( hosts.size() > 0 ) {
+                b.append("hosts", hosts);
+            }
+            if( passives.size() > 0 ) {
+                b.append("passives", passives);
+            }
+            if( arbiters.size() > 0 ) {
+                b.append("arbiters", arbiters);
+            }
         }
+
         if( !isp ) { 
             const Member *m = currentPrimary();
             if( m )

@@ -17,7 +17,6 @@ friendlyEqual = function( a , b ){
     return false;
 }
 
-
 doassert = function (msg) {
     if (msg.indexOf("assert") == 0)
         print(msg);
