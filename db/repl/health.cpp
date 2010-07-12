@@ -131,8 +131,8 @@ namespace mongo {
         } else
             ss << td("?");
 
-        ss << td(op["op"].toString(false));
-        ss << td(op["ns"].toString(false));
+        ss << td(op["op"].valuestrsafe());
+        ss << td(op["ns"].valuestrsafe());
         skip.insert("op");
         skip.insert("ns");
 

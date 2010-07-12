@@ -100,20 +100,19 @@ namespace mongo {
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
                 writelock lk("");
-                bo comment = BSON( "msg" << "initiating set");
+                bo comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
                 newConfig.saveConfigLocally(comment);
-                log() << "replSet replSetInitiate config now saved locally.  Should come online in about a minute." << rsLog;
-                result.append("info", "Config now saved locally.  Should come online in about a minute.");
-                ReplSet::startupStatus = ReplSet::SOON;
-                ReplSet::startupStatusMsg = "Received replSetInitiate - should come online shortly.";
+                /* RELOAD THE CONFIG */ 
+                //TODO
+                log() << "replSet replSetReconfig new config saved locally" << rsLog;
+                ReplSet::startupStatusMsg = "replSetReconfig'd";
             }
             catch( DBException& e ) { 
                 log() << "replSet replSetReconfig exception: " << e.what() << rsLog;
                 throw;
             }
 
-            errmsg = "not yet implemented";
-            return false;
+            return true;
         }
     } cmdReplSetReconfig;
 

@@ -1761,7 +1761,7 @@ namespace mongo {
         
 
         if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
-            result.append( "errmsg" ,  "access denied" );
+            result.append( "errmsg" ,  "access denied- use admin db" );
             log() << "command denied: " << cmdObj.toString() << endl;
             return false;
         }        
