@@ -22,8 +22,8 @@
 #include "../util/text.h"
 #include "../util/hex.h"
 
-#if( BOOST_VERSION >= 1042000 )
-#include <boost/uuid/uuid.hpp>
+#if( BOOST_VERSION >= 104200 )
+//#include <boost/uuid/uuid.hpp>
 #define HAVE_UUID 1
 #else
 ;
@@ -592,10 +592,14 @@ namespace mongo {
     JSBool uuid_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         Convertor c( cx );
         
-	if( argc == 0 ) { 
+        if( argc == 0 ) { 
+#if defined(HAVE_UUID)
+            //uuids::uuid
+#else
+#endif
             JS_ReportError( cx , "UUID needs 1 argument -- UUID(hexstr)" );
             return JS_FALSE;            
-	}
+        }
         else if ( argc == 1 ) {
 
             string encoded = c.toString( argv[ 0 ] );
