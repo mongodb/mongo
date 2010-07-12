@@ -638,44 +638,47 @@ namespace mongo {
         return ChunkPtr();
     }
 
+    namespace {
+        BSONObj fixUp(const BSONObj& in, const BSONObj& fields){
+            BSONObjBuilder b;
+            b.appendKeys(fields, in);
+            return b.obj();
+        }
+    }
+
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
         rwlock lk( _lock , false ); 
 
-        FieldRangeSet ranges(_ns.c_str(), query, false);
-        BSONObjIterator fields(_key.key());
-        BSONElement field = fields.next();
-        FieldRange range = ranges.range(field.fieldName());
-        
-        uassert(13088, "no support for special queries yet", range.getSpecial().empty());
+        //TODO look into FieldRangeSetOr
+        FieldRangeSet frs(_ns.c_str(), query, false);
+        uassert(13088, "no support for special queries yet", frs.getSpecial().empty());
 
-        if (range.empty()) {
-            /* no matches so no shards */
-        } else if (range.equality()) {
-            shards.insert( _chunkRanges.upper_bound(BSON(field.fieldName() << range.min()))->second->getShard() );
-        } else if (!range.nontrivial()) {
-            getAllShards(shards);
-        } else {
-            for (vector<FieldInterval>::const_iterator it=range.intervals().begin(), end=range.intervals().end();
-                 it != end;
-                 ++it)
-            {
-                const FieldInterval& fi = *it;
-                assert(fi.valid());
-                BSONObj minObj = BSON(field.fieldName() << fi._lower._bound);
-                BSONObj maxObj = BSON(field.fieldName() << fi._upper._bound);
-                ChunkRangeMap::const_iterator min, max;
-                min = (fi._lower._inclusive ? _chunkRanges.upper_bound(minObj) : _chunkRanges.lower_bound(minObj));
-                max = (fi._upper._inclusive ? _chunkRanges.upper_bound(maxObj) : _chunkRanges.lower_bound(maxObj));
+        {
+            // special case if most-significant field isn't in query
+            FieldRange range = frs.range(_key.key().firstElement().fieldName());
+            if (!range.nontrivial()){
+                getAllShards(shards);
+                return;
+            }
+        }
 
-                assert(min != _chunkRanges.ranges().end());
+        BoundList ranges = frs.indexBounds(_key.key(), 1);
+        for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it){
+            BSONObj minObj = fixUp(it->first, _key.key());
+            BSONObj maxObj = fixUp(it->second, _key.key());
 
-                // make max non-inclusive like end iterators
-                if(max != _chunkRanges.ranges().end())
-                    ++max;
+            ChunkRangeMap::const_iterator min, max;
+            min = _chunkRanges.upper_bound(minObj);
+            max = _chunkRanges.upper_bound(maxObj);
 
-                for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
-                    shards.insert(it->second->getShard());
-                }
+            assert(min != _chunkRanges.ranges().end());
+
+            // make max non-inclusive like end iterators
+            if(max != _chunkRanges.ranges().end())
+                ++max;
+
+            for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
+                shards.insert(it->second->getShard());
             }
         }
     }
