@@ -271,6 +271,7 @@ namespace mongo {
     }
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, bool& exhaust ) {
+        bool doSlaveUpdate = pass == 0 || exhaust;
         exhaust = false;
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p._c;
@@ -295,7 +296,7 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
-            if ( pass == 0 )
+            if ( doSlaveUpdate )
                 cc->updateSlaveLocation( curop );
 
             int queryOptions = cc->_queryOptions;
