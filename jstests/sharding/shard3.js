@@ -49,8 +49,8 @@ function doCounts( name , total ){
 }
 
 var total = doCounts( "before wrong save" )
-secondary.save( { num : -3 } );
-doCounts( "after wrong save" , total )
+//secondary.save( { num : -3 } );
+//doCounts( "after wrong save" , total )
 
 // --- move all to 1 ---
 print( "MOVE ALL TO 1" );

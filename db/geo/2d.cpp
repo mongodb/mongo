@@ -766,7 +766,7 @@ namespace mongo {
             min.checkCur( found , hopper );
             max = min;
             
-            if ( min.bucket.isNull() ){
+            if ( min.bucket.isNull() || ( !(hopper->found()) ) ){
                 min.bucket = id.head.btree()->locate( id , id.head , start.wrap() , 
                                                       ordering , min.pos , min.found , minDiskLoc , -1 );
                 min.checkCur( found , hopper );

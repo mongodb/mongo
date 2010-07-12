@@ -187,13 +187,14 @@ namespace mongo {
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 10419 ,  "how could chunk manager be null!" , cm );
                 
-                vector<shared_ptr<ChunkRange> > chunks;
-                cm->getChunksForQuery( chunks , filter );
+                set<Shard> shards;
+                cm->getShardsForQuery( shards , filter );
                 
                 unsigned long long total = 0;
-                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    shared_ptr<ChunkRange> c = *i;
-                    total += c->countObjects( filter );
+                for (set<Shard>::iterator it=shards.begin(), end=shards.end(); it != end; ++it){
+                    ShardConnection conn(*it, fullns);
+                    total += conn->count(fullns, filter);
+                    conn.done();
                 }
                 
                 result.append( "n" , (double)total );
@@ -269,8 +270,6 @@ namespace mongo {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
                 
-                BSONObj filter = cmdObj.getObjectField("query");
-                
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
@@ -280,77 +279,23 @@ namespace mongo {
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 13002 ,  "how could chunk manager be null!" , cm );
                 
-                vector<shared_ptr<ChunkRange> > chunks;
-                cm->getChunksForQuery( chunks , filter );
+                BSONObj filter = cmdObj.getObjectField("query");
+                uassert(13343,  "query for sharded findAndModify must have shardkey", cm->hasShardKey(filter));
 
-                BSONObj sort = cmdObj.getObjectField("sort");
-                if (!sort.isEmpty()){
-                    ShardKeyPattern& sk = cm->getShardKey();
-                    {
-                        BSONObjIterator k (sk.key());
-                        BSONObjIterator s (sort);
-                        bool good = true;
-                        while (k.more()){
-                            if (!s.more()){
-                                good = false;
-                                break;
-                            }
+                //TODO with upsert consider tracking for splits
 
-                            BSONElement ke = k.next();
-                            BSONElement se = s.next();
+                ChunkPtr chunk = cm->findChunk(filter);
+                ShardConnection conn( chunk->getShard() , fullns );
+                BSONObj res;
+                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                conn.done();
 
-                            // TODO consider values when we support compound keys
-                            if (strcmp(ke.fieldName(), se.fieldName()) != 0){
-                                good = false;
-                                break;
-                            }
-                        }
-
-                        uassert(13001, "Sort must match shard key for sharded findandmodify", good);
-                    }
-
-                    std::sort(chunks.begin(), chunks.end(), ChunkCmp(sort));
-                }
-
-                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    shared_ptr<ChunkRange> c = *i;
-
-                    BSONObj myCommand = fixCmdObj( cmdObj , c );
-                    ShardConnection conn( c->getShard() , fullns );
-                    BSONObj res;
-                    bool ok = conn->runCommand( conf->getName() , myCommand , res );
-                    conn.done();
-
-                    if (ok || (strcmp(res["errmsg"].valuestrsafe(), "No matching object found") != 0)){
-                        result.appendElements(res);
-                        return ok;
-                    }
+                if (ok || (strcmp(res["errmsg"].valuestrsafe(), "No matching object found") != 0)){
+                    result.appendElements(res);
+                    return ok;
                 }
                 
                 return true;
-            }
-
-        private:
-            BSONObj fixCmdObj(const BSONObj& cmdObj, const shared_ptr<ChunkRange> chunk){
-                assert(chunk);
-
-                BSONObjBuilder b;
-                BSONObjIterator i(cmdObj);
-                bool foundQuery = false;
-                while (i.more()){
-                    BSONElement e = i.next();
-                    if (strcmp(e.fieldName(), "query") != 0){
-                        b.append(e);
-                    }else{
-                        foundQuery = true;
-                        b.append("query", ClusteredCursor::concatQuery(e.embeddedObjectUserCheck(), chunk->getFilter()));
-                    }
-                }
-
-                if (!foundQuery)
-                    b.append("query", chunk->getFilter());
-
-                return b.obj();
             }
 
         } findAndModifyCmd;
@@ -380,7 +325,7 @@ namespace mongo {
         public:
             DistinctCmd() : PublicGridCommand("distinct"){}
             virtual void help( stringstream &help ) const {
-                help << "{ distinct : 'collection name' , key : 'a.b' }";
+                help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
             }
             bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -394,17 +339,16 @@ namespace mongo {
                 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 10420 ,  "how could chunk manager be null!" , cm );
-                
-                vector<shared_ptr<ChunkRange> > chunks;
-                cm->getChunksForQuery( chunks , BSONObj() );
+
+                BSONObj query = getQuery(cmdObj);
+                set<Shard> shards;
+                cm->getShardsForQuery(shards, query);
                 
                 set<BSONObj,BSONObjCmp> all;
                 int size = 32;
                 
-                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    shared_ptr<ChunkRange> c = *i;
-
-                    ShardConnection conn( c->getShard() , fullns );
+                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ){
+                    ShardConnection conn( *i , fullns );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                     conn.done();
@@ -414,11 +358,11 @@ namespace mongo {
                         return false;
                     }
                     
-                    BSONObjIterator it( res["values"].embeddedObjectUserCheck() );
+                    BSONObjIterator it( res["values"].embeddedObject() );
                     while ( it.more() ){
                         BSONElement nxt = it.next();
                         BSONObjBuilder temp(32);
-                        temp.appendAs( nxt , "x" );
+                        temp.appendAs( nxt , "" );
                         all.insert( temp.obj() );
                     }
 
@@ -533,8 +477,8 @@ namespace mongo {
                     q = cmdObj["query"].embeddedObjectUserCheck();
                 }
                 
-                vector<shared_ptr<ChunkRange> > chunks;
-                cm->getChunksForQuery( chunks , q );
+                set<Shard> shards;
+                cm->getShardsForQuery( shards , q );
                 
                 const string shardedOutputCollection = getTmpName( collection );
                 
@@ -546,9 +490,8 @@ namespace mongo {
                 
                 list< shared_ptr<Future::CommandResult> > futures;
                 
-                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    shared_ptr<ChunkRange> c = *i;
-                    futures.push_back( Future::spawnCommand( c->getShard().getConnString() , dbName , shardedCommand ) );
+                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ){
+                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand ) );
                 }
                 
                 BSONObjBuilder shardresults;

@@ -1473,7 +1473,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; } 
         virtual void help( stringstream &help ) const {
-            help << "{ distinct : 'collection name' , key : 'a.b' }";
+            help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){

@@ -48,6 +48,7 @@ namespace mongo {
         getWritebackQueue( remote )->push( o );
     }
 
+    // Note, this command will block until there is something to WriteBack
     class WriteBackCommand : public Command {
     public:
         virtual LockType locktype() const { return NONE; } 

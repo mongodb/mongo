@@ -97,14 +97,38 @@ namespace mongo {
         void _connect( string host );
 
         string _address;
+        vector<string> _connAddresses;
         vector<DBClientConnection*> _conns;
         map<string,int> _lockTypes;
         mongo::mutex _mutex;
         
-        BSONObj _lastError;
+        vector<BSONObj> _lastErrors;
     };
     
+    class UpdateNotTheSame : public UserException {
+    public:
+        UpdateNotTheSame( int code , const string& msg , const vector<string>& addrs , const vector<BSONObj>& lastErrors )
+            : UserException( code , msg ) , _addrs( addrs ) , _lastErrors( lastErrors ){
+            assert( _addrs.size() == _lastErrors.size() );
+        }
+        
+        virtual ~UpdateNotTheSame() throw() {
+        }
 
+        unsigned size() const {
+            return _addrs.size();
+        }
+
+        pair<string,BSONObj> operator[](unsigned i) const {
+            return make_pair( _addrs[i] , _lastErrors[i] );
+        }
+
+    private:
+
+        vector<string> _addrs;
+        vector<BSONObj> _lastErrors;
+    };
+    
 };
 
 #include "undef_macros.h"

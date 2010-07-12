@@ -22,7 +22,9 @@
 
 #include "../pch.h"
 #include "dbclient.h"
+#include "connpool.h"
 #include "redef_macros.h"
+#include "syncclusterconnection.h"
 
 namespace mongo {
 
@@ -45,56 +47,8 @@ namespace mongo {
             return _state.get() != 0;
         }
         
-        bool lock_try( string why , BSONObj * other = 0 ){
-            // recursive
-            if ( getState() > 0 )
-                return true;
-
-            ScopedDbConnection conn( _conn );
-            
-            { // make sure its there so we can use simple update logic below
-                BSONObj o = conn->findOne( _ns , _id );
-                if ( o.isEmpty() ){
-                    try {
-                        conn->insert( _ns , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
-                    }
-                    catch ( UserException& ){
-                    }
-                }
-            }
-
-            
-            BSONObjBuilder b;
-            b.appendElements( _id );
-            b.append( "state" , 0 );
-
-            conn->update( _ns , b.obj() , BSON( "$set" << BSON( "state" << 1 << "who" << myid() << "when" << DATENOW << "why" << why ) ) );
-            BSONObj o = conn->getLastErrorDetailed();
-            BSONObj now = conn->findOne( _ns , _id );
-            
-            conn.done();
-            
-            log(1) << "dist_lock lock getLastErrorDetailed: " << o << " now: " << now << endl;
-
-
-            if ( o["n"].numberInt() == 0 ){
-                if ( other )
-                    *other = now;
-                return false;
-            }
-            
-            _state.set( 1 );
-            return true;
-        }
-
-        void unlock(){
-            ScopedDbConnection conn( _conn );
-            conn->update( _ns , _id, BSON( "$set" << BSON( "state" << 0 ) ) );
-            log(1) << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
-            conn.done();
-            
-            _state.set( 0 );
-        }
+        bool lock_try( string why , BSONObj * other = 0 );
+        void unlock();
 
         string myid(){
             string s = _myid.get();
