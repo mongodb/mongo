@@ -903,6 +903,8 @@ def doConfigure( myenv , needPcre=True , shell=False ):
         if failIfNotFound:
             print( "can't find or link against library " + str( poss ) + " in " + str( myenv["LIBPATH"] ) )
             print( "see config.log for more information" )
+            if windows:
+                print( "use scons --64 when cl.exe is 64 bit compiler" )
             Exit(1)
 
         return False
@@ -969,6 +971,8 @@ def doConfigure( myenv , needPcre=True , shell=False ):
                     J = "js64d"
                     print( "looking for js64d.lib for spidermonkey. (available at mongodb.org prebuilt)" );
             else:
+                if not force32:
+                    print( "Assuming a 32 bit build is desired" )
                 if release:
                     J = [ "js32r", "js", "mozjs" , "js_static" ]
                 else:
