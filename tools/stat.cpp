@@ -176,6 +176,13 @@ namespace mongo {
             cell( ss , "% locked" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
             cell( ss , "% idx miss" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
 
+            if ( b.getFieldDotted( "globalLock.currentQueue" ).type() == Object ){
+                int r = b.getFieldDotted( "globalLock.currentQueue.readers" ).numberInt();
+                int w = b.getFieldDotted( "globalLock.currentQueue.writers" ).numberInt();
+                stringstream temp;
+                temp << r+w << "|" << r << "|" << w;
+                cell( ss , "q t|r|w" , 9 , temp.str() );
+            }
             cell( ss , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
             {

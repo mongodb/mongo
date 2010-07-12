@@ -358,6 +358,14 @@ namespace mongo {
                 t.append("lockTime", tl);
                 t.append("ratio", (tt ? tl/tt : 0));
                 
+                BSONObjBuilder ttt( t.subobjStart( "currentQueue" ) );
+                int w=0, r=0;
+                Client::recommendedYieldMicros( &w , &r );
+                ttt.append( "total" , w + r );
+                ttt.append( "readers" , r );
+                ttt.append( "writers" , w );
+                ttt.done();
+
                 result.append( "globalLock" , t.obj() );
             }
             timeBuilder.appendNumber( "after basic" , Listener::getElapsedTimeMillis() - start );
