@@ -69,7 +69,7 @@ namespace mongo {
     }
 
     bool SyncClusterConnection::prepare( string& errmsg ){
-        _lastError = BSONObj();
+        _lastErrors.clear();
         return fsync( errmsg );
     }
     
@@ -94,7 +94,7 @@ namespace mongo {
     }
 
     void SyncClusterConnection::_checkLast(){
-        vector<BSONObj> all;
+        _lastErrors.clear();
         vector<string> errors;
 
         for ( size_t i=0; i<_conns.size(); i++ ){
@@ -110,23 +110,21 @@ namespace mongo {
             catch ( ... ){
                 err += "unknown failure";
             }
-            all.push_back( res );
+            _lastErrors.push_back( res.getOwned() );
             errors.push_back( err );
-            _lastError = res.getOwned();
         }
-        
-        assert( all.size() == errors.size() && all.size() == _conns.size() );
+
+        assert( _lastErrors.size() == errors.size() && _lastErrors.size() == _conns.size() );
         
         stringstream err;
         bool ok = true;
         
         for ( size_t i = 0; i<_conns.size(); i++ ){
-            BSONObj res = all[i];
+            BSONObj res = _lastErrors[i];
             if ( res["ok"].trueValue() && res["fsyncFiles"].numberInt() > 0 )
                 continue;
             ok = false;
             err << _conns[i]->toString() << ": " << res << " " << errors[i];
-            _lastError = res.getOwned();
         }
 
         if ( ok )
@@ -135,9 +133,9 @@ namespace mongo {
     }
 
     BSONObj SyncClusterConnection::getLastErrorDetailed(){
-        if ( _lastError.isEmpty() )
-            return DBClientBase::getLastErrorDetailed();
-        return _lastError;
+        if ( _lastErrors.size() )
+            return _lastErrors[0];
+        return DBClientBase::getLastErrorDetailed();
     }
 
     void SyncClusterConnection::_connect( string host ){
@@ -146,6 +144,7 @@ namespace mongo {
         string errmsg;
         if ( ! c->connect( host , errmsg ) )
             log() << "SyncClusterConnection connect fail to: " << host << " errmsg: " << errmsg << endl;
+        _connAddresses.push_back( host );
         _conns.push_back( c );
     }
 
@@ -188,7 +187,7 @@ namespace mongo {
 
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                           const BSONObj *fieldsToReturn, int queryOptions, int batchSize ){ 
-        _lastError = BSONObj();
+        _lastErrors.clear();
         if ( ns.find( ".$cmd" ) != string::npos ){
             string cmdName = query.obj.firstElement().fieldName();
             int lockType = _lockType( cmdName );
@@ -287,6 +286,16 @@ namespace mongo {
         
         if ( _writeConcern ){
             _checkLast();
+            assert( _lastErrors.size() > 1 );
+            
+            int a = _lastErrors[0]["n"].numberInt();
+            for ( unsigned i=1; i<_lastErrors.size(); i++ ){
+                int b = _lastErrors[i]["n"].numberInt();
+                if ( a == b )
+                    continue;
+                
+                throw UpdateNotTheSame( 8017 , "update not consistent" , _connAddresses , _lastErrors );
+            }
         }
     }
 

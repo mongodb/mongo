@@ -309,10 +309,10 @@ namespace mongo {
     bool Chunk::moveIfShould( ChunkPtr newChunk ){
         ChunkPtr toMove;
        
-        if ( newChunk->countObjects() <= 1 ){
+        if ( newChunk->countObjects(2) <= 1 ){
             toMove = newChunk;
         }
-        else if ( this->countObjects() <= 1 ){
+        else if ( this->countObjects(2) <= 1 ){
             DEV assert( shared_from_this() );
             toMove = shared_from_this();
         }
@@ -355,24 +355,18 @@ namespace mongo {
         return (long)result["size"].number();
     }
 
+    int Chunk::countObjects(int maxCount) const { 
+        static const BSONObj fields = BSON("_id" << 1 );
 
-    template <typename ChunkType>
-    inline long countObjectsHelper(const ChunkType* chunk, const BSONObj& filter){
-        ShardConnection conn( chunk->getShard().getConnString() , chunk->getManager()->getns() );
+        ShardConnection conn( getShard() , _manager->getns() );
         
-        BSONObj f = chunk->getFilter();
-        if ( ! filter.isEmpty() )
-            f = ClusteredCursor::concatQuery( f , filter );
-
-        BSONObj result;
-        unsigned long long n = conn->count( chunk->getManager()->getns() , f );
+        // not using regular count as this is more flexible and supports $min/$max
+        Query q = Query().minKey(_min).maxKey(_max);
+        int n = conn->query(_manager->getns(), q, maxCount, 0, &fields)->itcount();
         
         conn.done();
-        return (long)n;
+        return n;
     }
-    
-    long Chunk::countObjects( const BSONObj& filter ) const { return countObjectsHelper(this, filter); }
-    long ChunkRange::countObjects( const BSONObj& filter ) const { return countObjectsHelper(this, filter); }
 
     void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ){
         BSONObjBuilder bb( b.subobjStart( name ) );
@@ -644,71 +638,51 @@ namespace mongo {
         return ChunkPtr();
     }
 
-    int ChunkManager::_getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query ){
+    namespace {
+        BSONObj fixUp(const BSONObj& in, const BSONObj& fields){
+            BSONObjBuilder b;
+            b.appendKeys(fields, in);
+            return b.obj();
+        }
+    }
+
+    void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
         rwlock lk( _lock , false ); 
 
-        FieldRangeSet ranges(_ns.c_str(), query, false);
-        BSONObjIterator fields(_key.key());
-        BSONElement field = fields.next();
-        FieldRange range = ranges.range(field.fieldName());
-        
-        uassert(13088, "no support for special queries yet", range.getSpecial().empty());
+        //TODO look into FieldRangeSetOr
+        FieldRangeSet frs(_ns.c_str(), query, false);
+        uassert(13088, "no support for special queries yet", frs.getSpecial().empty());
 
-        if (range.empty()) {
-            return 0;
-
-        } else if (range.equality()) {
-            chunks.push_back( _chunkRanges.upper_bound(BSON(field.fieldName() << range.min()))->second );
-            return 1;
-        } else if (!range.nontrivial()) {
-            return -1; // all chunks
-        } else {
-            set<shared_ptr<ChunkRange>, ChunkCmp> chunkSet;
-
-            for (vector<FieldInterval>::const_iterator it=range.intervals().begin(), end=range.intervals().end();
-                 it != end;
-                 ++it)
-            {
-                const FieldInterval& fi = *it;
-                assert(fi.valid());
-                BSONObj minObj = BSON(field.fieldName() << fi._lower._bound);
-                BSONObj maxObj = BSON(field.fieldName() << fi._upper._bound);
-                ChunkRangeMap::const_iterator min, max;
-                min = (fi._lower._inclusive ? _chunkRanges.upper_bound(minObj) : _chunkRanges.lower_bound(minObj));
-                max = (fi._upper._inclusive ? _chunkRanges.upper_bound(maxObj) : _chunkRanges.lower_bound(maxObj));
-
-                assert(min != _chunkRanges.ranges().end());
-
-                // make max non-inclusive like end iterators
-                if(max != _chunkRanges.ranges().end())
-                    ++max;
-
-                for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
-                    chunkSet.insert(it->second);
-                }
-            }
-
-            chunks.assign(chunkSet.begin(), chunkSet.end());
-            return chunks.size();
-        }
-    }
-
-    int ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
-        vector<shared_ptr<ChunkRange> > chunks;
-        int ret = _getChunksForQuery(chunks, query);
-
-        if (ret == -1){
-            getAllShards(shards);
-        } 
-        else {
-            for ( vector<shared_ptr<ChunkRange> >::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
-                shared_ptr<ChunkRange> c = *it;
-                shards.insert(c->getShard());
+        {
+            // special case if most-significant field isn't in query
+            FieldRange range = frs.range(_key.key().firstElement().fieldName());
+            if (!range.nontrivial()){
+                getAllShards(shards);
+                return;
             }
         }
 
-        return shards.size();
+        BoundList ranges = frs.indexBounds(_key.key(), 1);
+        for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it){
+            BSONObj minObj = fixUp(it->first, _key.key());
+            BSONObj maxObj = fixUp(it->second, _key.key());
+
+            ChunkRangeMap::const_iterator min, max;
+            min = _chunkRanges.upper_bound(minObj);
+            max = _chunkRanges.upper_bound(maxObj);
+
+            assert(min != _chunkRanges.ranges().end());
+
+            // make max non-inclusive like end iterators
+            if(max != _chunkRanges.ranges().end())
+                ++max;
+
+            for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
+                shards.insert(it->second->getShard());
+            }
+        }
     }
+
 
     void ChunkManager::getAllShards( set<Shard>& all ){
         rwlock lk( _lock , false ); 

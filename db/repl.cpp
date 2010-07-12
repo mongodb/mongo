@@ -1221,8 +1221,15 @@ namespace mongo {
             if ( ts.type() != Date && ts.type() != Timestamp ) {
                 string err = op.getStringField("$err");
                 if ( !err.empty() ) {
-                    problem() << "repl: $err reading remote oplog: " + err << '\n';
-                    massert( 10390 ,  "got $err reading remote oplog", false );
+                    // 13051 is "tailable cursor requested on non capped collection"
+                    if (op.getIntField("code") == 13051) {
+                        problem() << "trying to slave off of a non-master" << '\n';
+                        massert( 13344 ,  "trying to slave off of a non-master", false );
+                    }
+                    else {
+                        problem() << "repl: $err reading remote oplog: " + err << '\n';
+                        massert( 10390 ,  "got $err reading remote oplog", false );
+                    }
                 }
                 else {
                     problem() << "repl: bad object read from remote oplog: " << op.toString() << '\n';

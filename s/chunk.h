@@ -163,7 +163,7 @@ namespace mongo {
          */
         long getPhysicalSize() const;
         
-        long countObjects( const BSONObj& filter = BSONObj() ) const;
+        int countObjects(int maxcount=0) const;
         
         /**
          * if the amount of data written nears the max size of a shard
@@ -237,7 +237,6 @@ namespace mongo {
         bool contains(const BSONObj& obj) const;
         void getFilter( BSONObjBuilder& b ) const;
         BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
-        long countObjects( const BSONObj& filter = BSONObj() ) const;
 
         ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end)
             : _manager(begin->second->getManager())
@@ -329,10 +328,7 @@ namespace mongo {
          */
         void ensureIndex();
 
-        /**
-         * @return number of Shards added to the set
-         */
-        int getShardsForQuery( set<Shard>& shards , const BSONObj& query );
+        void getShardsForQuery( set<Shard>& shards , const BSONObj& query );
 
         void getAllShards( set<Shard>& all );
 
@@ -392,11 +388,6 @@ namespace mongo {
         static AtomicUInt NextSequenceNumber;
 
         bool _isValid() const;
-
-        /**
-         * @return number of Chunk matching the query or -1 for all chunks.
-         */
-        int _getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query );
     };
 
     // like BSONObjCmp. for use as an STL comparison functor
