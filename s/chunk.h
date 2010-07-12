@@ -163,7 +163,7 @@ namespace mongo {
          */
         long getPhysicalSize() const;
         
-        long countObjects( const BSONObj& filter = BSONObj() ) const;
+        int countObjects(int maxcount=0) const;
         
         /**
          * if the amount of data written nears the max size of a shard
@@ -237,7 +237,6 @@ namespace mongo {
         bool contains(const BSONObj& obj) const;
         void getFilter( BSONObjBuilder& b ) const;
         BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
-        long countObjects( const BSONObj& filter = BSONObj() ) const;
 
         ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end)
             : _manager(begin->second->getManager())

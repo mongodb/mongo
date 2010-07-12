@@ -309,10 +309,10 @@ namespace mongo {
     bool Chunk::moveIfShould( ChunkPtr newChunk ){
         ChunkPtr toMove;
        
-        if ( newChunk->countObjects() <= 1 ){
+        if ( newChunk->countObjects(2) <= 1 ){
             toMove = newChunk;
         }
-        else if ( this->countObjects() <= 1 ){
+        else if ( this->countObjects(2) <= 1 ){
             DEV assert( shared_from_this() );
             toMove = shared_from_this();
         }
@@ -355,24 +355,18 @@ namespace mongo {
         return (long)result["size"].number();
     }
 
+    int Chunk::countObjects(int maxCount) const { 
+        static const BSONObj fields = BSON("_id" << 1 );
 
-    template <typename ChunkType>
-    inline long countObjectsHelper(const ChunkType* chunk, const BSONObj& filter){
-        ShardConnection conn( chunk->getShard().getConnString() , chunk->getManager()->getns() );
+        ShardConnection conn( getShard() , _manager->getns() );
         
-        BSONObj f = chunk->getFilter();
-        if ( ! filter.isEmpty() )
-            f = ClusteredCursor::concatQuery( f , filter );
-
-        BSONObj result;
-        unsigned long long n = conn->count( chunk->getManager()->getns() , f );
+        // not using regular count as this is more flexible and supports $min/$max
+        Query q = Query().minKey(_min).maxKey(_max);
+        int n = conn->query(_manager->getns(), q, maxCount, 0, &fields)->itcount();
         
         conn.done();
-        return (long)n;
+        return n;
     }
-    
-    long Chunk::countObjects( const BSONObj& filter ) const { return countObjectsHelper(this, filter); }
-    long ChunkRange::countObjects( const BSONObj& filter ) const { return countObjectsHelper(this, filter); }
 
     void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ){
         BSONObjBuilder bb( b.subobjStart( name ) );
