@@ -328,10 +328,7 @@ namespace mongo {
          */
         void ensureIndex();
 
-        /**
-         * @return number of Shards added to the set
-         */
-        int getShardsForQuery( set<Shard>& shards , const BSONObj& query );
+        void getShardsForQuery( set<Shard>& shards , const BSONObj& query );
 
         void getAllShards( set<Shard>& all );
 
@@ -391,11 +388,6 @@ namespace mongo {
         static AtomicUInt NextSequenceNumber;
 
         bool _isValid() const;
-
-        /**
-         * @return number of Chunk matching the query or -1 for all chunks.
-         */
-        int _getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query );
     };
 
     // like BSONObjCmp. for use as an STL comparison functor

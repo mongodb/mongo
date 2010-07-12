@@ -638,7 +638,7 @@ namespace mongo {
         return ChunkPtr();
     }
 
-    int ChunkManager::_getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query ){
+    void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
         rwlock lk( _lock , false ); 
 
         FieldRangeSet ranges(_ns.c_str(), query, false);
@@ -649,16 +649,12 @@ namespace mongo {
         uassert(13088, "no support for special queries yet", range.getSpecial().empty());
 
         if (range.empty()) {
-            return 0;
-
+            /* no matches so no shards */
         } else if (range.equality()) {
-            chunks.push_back( _chunkRanges.upper_bound(BSON(field.fieldName() << range.min()))->second );
-            return 1;
+            shards.insert( _chunkRanges.upper_bound(BSON(field.fieldName() << range.min()))->second->getShard() );
         } else if (!range.nontrivial()) {
-            return -1; // all chunks
+            getAllShards(shards);
         } else {
-            set<shared_ptr<ChunkRange>, ChunkCmp> chunkSet;
-
             for (vector<FieldInterval>::const_iterator it=range.intervals().begin(), end=range.intervals().end();
                  it != end;
                  ++it)
@@ -678,31 +674,12 @@ namespace mongo {
                     ++max;
 
                 for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
-                    chunkSet.insert(it->second);
+                    shards.insert(it->second->getShard());
                 }
             }
-
-            chunks.assign(chunkSet.begin(), chunkSet.end());
-            return chunks.size();
         }
     }
 
-    int ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
-        vector<shared_ptr<ChunkRange> > chunks;
-        int ret = _getChunksForQuery(chunks, query);
-
-        if (ret == -1){
-            getAllShards(shards);
-        } 
-        else {
-            for ( vector<shared_ptr<ChunkRange> >::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
-                shared_ptr<ChunkRange> c = *it;
-                shards.insert(c->getShard());
-            }
-        }
-
-        return shards.size();
-    }
 
     void ChunkManager::getAllShards( set<Shard>& all ){
         rwlock lk( _lock , false ); 
