@@ -330,11 +330,6 @@ namespace mongo {
         void ensureIndex();
 
         /**
-         * @return number of Chunk added to the vector
-         */
-        int getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query );
-
-        /**
          * @return number of Shards added to the set
          */
         int getShardsForQuery( set<Shard>& shards , const BSONObj& query );

@@ -693,18 +693,6 @@ namespace mongo {
         }
     }
 
-    int ChunkManager::getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query ){
-        int ret = _getChunksForQuery(chunks, query);
-
-        if (ret == -1){
-            for (ChunkRangeMap::const_iterator it=_chunkRanges.ranges().begin(), end=_chunkRanges.ranges().end(); it != end; ++it){
-                chunks.push_back(it->second);
-            }
-        }
-        return chunks.size();
-        //return ret;
-    }
-
     int ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
         vector<shared_ptr<ChunkRange> > chunks;
         int ret = _getChunksForQuery(chunks, query);
