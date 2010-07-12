@@ -374,7 +374,7 @@ namespace mongo {
         /* Our btrees may (rarely) have "unused" keys when items are deleted.
            Skip past them.
         */
-        bool skipUnusedKeys();
+        bool skipUnusedKeys( bool mayJump );
         bool skipOutOfRangeKeysAndCheckEnd();
         void skipAndCheck();
         void checkEnd();

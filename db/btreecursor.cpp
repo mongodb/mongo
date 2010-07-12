@@ -130,7 +130,7 @@ namespace mongo {
     }
 
     void BtreeCursor::skipAndCheck() {
-        skipUnusedKeys();
+        skipUnusedKeys( true );
         if ( !_independentFieldRanges ) {
             checkEnd();
             return;
@@ -140,14 +140,14 @@ namespace mongo {
                 break;
             }
             while( skipOutOfRangeKeysAndCheckEnd() );
-            if ( !skipUnusedKeys() ) {
+            if ( !skipUnusedKeys( true ) ) {
                 break;
             }
         }
     }
     
     /* skip unused keys. */
-    bool BtreeCursor::skipUnusedKeys() {
+    bool BtreeCursor::skipUnusedKeys( bool mayJump ) {
         int u = 0;
         while ( 1 ) {
             if ( !ok() )
@@ -158,7 +158,7 @@ namespace mongo {
                 break;
             bucket = b->advance(bucket, keyOfs, direction, "skipUnusedKeys");
             u++;
-            if ( u % 10 == 0 ) {
+            if ( mayJump && ( u % 10 == 0 ) ) {
                 skipOutOfRangeKeysAndCheckEnd();
             }
         }
@@ -316,7 +316,7 @@ namespace mongo {
                             /* we were deleted but still exist as an unused
                             marker key. advance.
                             */
-                            skipUnusedKeys();
+                            skipUnusedKeys( false );
                         }
                         return;
                 }
@@ -340,7 +340,7 @@ namespace mongo {
         bucket = indexDetails.head.btree()->locate(indexDetails, indexDetails.head, keyAtKeyOfs, _ordering, keyOfs, found, locAtKeyOfs, direction);
         RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
         if ( ! bucket.isNull() )
-            skipUnusedKeys();
+            skipUnusedKeys( false );
 
     }
 
