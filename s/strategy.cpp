@@ -95,7 +95,7 @@ namespace mongo {
                     
                     {
                         BSONObjBuilder cmd;
-                        cmd.appendOID( "writebacklisten" , &serverID );
+                        cmd.appendOID( "writebacklisten" , &serverID ); // Command will block for data
                         if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ){
                             log() <<  "writebacklisten command failed!  "  << result << endl;
                             conn.done();
