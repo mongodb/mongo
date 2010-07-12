@@ -20,7 +20,7 @@
 #include "snapshots.h"
 #include "../client.h"
 #include "../clientcursor.h"
-#include "../util/mongoutils/html.h"
+#include "../../util/mongoutils/html.h"
 
 /**
    handles snapshotting performance metrics and other such things
