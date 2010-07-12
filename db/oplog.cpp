@@ -440,8 +440,8 @@ namespace mongo {
                         _dummy_z += result.objsize(); // touch
                 }
             }
-            catch( DBException& ) { 
-                log() << "ignoring assertion in pretouchN()" << endl;
+            catch( DBException& e ) { 
+                log() << "ignoring assertion in pretouchN() " << a << ' ' << b << ' ' << i << ' ' << e.toString() << endl;
             }
         }
     }

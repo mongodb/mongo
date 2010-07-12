@@ -886,14 +886,11 @@ namespace mongo {
                     countdown--; // was pretouched on a prev pass
                     assert( countdown >= 0 );
                 } else {
-                    static int m;
+                    const int m = 4;
                     if( tp.get() == 0 ) {
-                        int nthr = min(8, cmdLine.pretouch / 2);
+                        int nthr = min(8, cmdLine.pretouch);
                         nthr = max(nthr, 1);
                         tp.reset( new ThreadPool(nthr) );
-                        m = cmdLine.pretouch / nthr;
-                        assert( m > 0 );
-                        // e.g. for --pretouch 24, we get 8 threads, m=3.
                     }
                     vector<BSONObj> v;
                     oplogReader.peek(v, cmdLine.pretouch);
@@ -1769,5 +1766,29 @@ namespace mongo {
         replPair = new ReplPair(remoteEnd, arb);
     }
 
+    void testPretouch() {
+        int nthr = min(8, 8);
+        nthr = max(nthr, 1);
+        int m = 8 / nthr;
+        ThreadPool tp(nthr);
+        vector<BSONObj> v;
+
+        BSONObj x = BSON( "ns" << "test.foo" << "o" << BSON( "_id" << 1 ) << "op" << "i" );
+
+        v.push_back(x);
+        v.push_back(x);
+        v.push_back(x);
+
+        unsigned a = 0;
+        while( 1 ) {
+            if( a >= v.size() ) break;
+            unsigned b = a + m - 1; // v[a..b]
+            if( b >= v.size() ) b = v.size() - 1;
+            tp.schedule(pretouchN, v, a, b);
+            DEV cout << "pretouch task: " << a << ".." << b << endl;
+            a += m;
+        }
+        tp.join();
+    }
     
 } // namespace mongo

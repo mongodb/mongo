@@ -108,7 +108,7 @@ namespace mongo {
         //ss << "\n</pre>\n" << "<h4>% time in write lock, historically, by 4 sec periods</h4>\n<p>";
         for ( int i=0; i<numDeltas(); i++ ){
             SnapshotDelta d( getPrev(i+1) , getPrev(i) );
-            unsigned e = d.elapsed() / 1000;
+            unsigned e = (unsigned) d.elapsed() / 1000;
             ss << (unsigned)(100*d.percentWriteLocked());
             if( e < 3900 || e > 4100 ) 
                 ss << '(' << e / 1000.0 << "s)";

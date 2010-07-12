@@ -593,6 +593,9 @@ sendmore:
         // listen() will return when exit code closes its socket.
         exitCleanly(EXIT_NET_ERROR);
     }
+
+    void testPretouch();
+
     void initAndListen(int listenPort, const char *appserverLoc = NULL) {
         try { _initAndListen(listenPort, appserverLoc); }
         catch ( std::exception &e ) {
