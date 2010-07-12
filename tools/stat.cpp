@@ -60,6 +60,27 @@ namespace mongo {
             out << "sleep time: time to wait (in seconds) between calls" << endl;
         }
 
+        virtual void printExtraHelpAfter( ostream & out ){
+            out << "\n";
+            out << " Fields\n";
+            out << "   inserts/s \t- # of inserts per second\n";
+            out << "   query/s   \t- # of queries per second\n";
+            out << "   update/s  \t- # of updates per second\n";
+            out << "   delete/s  \t- # of deletes per second\n";
+            out << "   getmore/s \t- # of get mores (cursor batch) per second\n";
+            out << "   command/s \t- # of commands per second\n";
+            out << "   flushes/s \t- # of fsync flushes per second\n";
+            out << "   mapped    \t- amount of data mmaped (total data size) megabytes\n";
+            out << "   visze     \t- virtual size of process in megabytes\n";
+            out << "   res       \t- resident size of process in megabytes\n";
+            out << "   faults/s  \t- # of pages faults/sec (linux only)\n";
+            out << "   locked    \t- percent of time in global write lock\n";
+            out << "   idx miss  \t- percent of btree page misses (sampled)\n";
+            out << "   q t|r|w   \t- lock queue lengths (total|read|write)\n";
+            out << "   conn      \t- number of open connections\n";
+        }
+
+        
         BSONObj stats(){
             if ( _http ){
                 HttpClient c;
@@ -109,7 +130,9 @@ namespace mongo {
             double y = ( b.getFieldDotted( outof ).number() - a.getFieldDotted( outof ).number() );
             if ( y == 0 )
                 return 0;
-            return x / y;
+            double p = x / y;
+            p = (double)((int)(p * 1000)) / 10;
+            return p;
         }
 
         void cellstart( stringstream& ss , string name , unsigned& width ){
@@ -173,8 +196,8 @@ namespace mongo {
                     cell( ss , "faults/s" , 6 , (int)diff( "page_faults" , ax , bx ) );
             }
             
-            cell( ss , "% locked" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
-            cell( ss , "% idx miss" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
+            cell( ss , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
+            cell( ss , "idx miss %" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
 
             if ( b.getFieldDotted( "globalLock.currentQueue" ).type() == Object ){
                 int r = b.getFieldDotted( "globalLock.currentQueue.readers" ).numberInt();

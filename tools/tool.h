@@ -79,7 +79,8 @@ namespace mongo {
 
         virtual void printHelp(ostream &out);
 
-        virtual void printExtraHelp( ostream & out );
+        virtual void printExtraHelp( ostream & out ){}
+        virtual void printExtraHelpAfter( ostream & out ){}
 
     protected:
 

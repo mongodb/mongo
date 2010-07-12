@@ -76,12 +76,10 @@ namespace mongo {
             delete _conn;
     }
 
-    void Tool::printExtraHelp( ostream & out ){
-    }
-
     void Tool::printHelp(ostream &out) {
         printExtraHelp(out);
         _options->print(out);
+        printExtraHelpAfter(out);
     }
 
     int Tool::main( int argc , char ** argv ){
