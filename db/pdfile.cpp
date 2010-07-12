@@ -1725,10 +1725,10 @@ namespace mongo {
 #include <sys/statvfs.h>
 namespace mongo {
 #endif
-    boost::intmax_t freeSpace() {
+    boost::intmax_t freeSpace ( const string &path = dbpath ) {
 #if !defined(_WIN32)
         struct statvfs info;
-        assert( !statvfs( dbpath.c_str() , &info ) );
+        assert( !statvfs( path.c_str() , &info ) );
         return boost::intmax_t( info.f_bavail ) * info.f_frsize;
 #else
         return -1;
@@ -1751,7 +1751,7 @@ namespace mongo {
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
         boost::intmax_t totalSize = dbSize( dbName );
-        boost::intmax_t freeSize = freeSpace();
+        boost::intmax_t freeSize = freeSpace( repairpath );
         if ( freeSize > -1 && freeSize < totalSize ) {
             stringstream ss;
             ss << "Cannot repair database " << dbName << " having size: " << totalSize
