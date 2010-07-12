@@ -69,8 +69,8 @@ namespace mongo {
         }        
         virtual void recoverFromYield() {
             if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
-                c_.reset();
                 _cc.reset();
+                c_.reset();
                 massert( 13340, "cursor dropped during delete", false );
             }
         }
@@ -111,7 +111,7 @@ namespace mongo {
         int &bestCount_;
         long long _nscanned;
         shared_ptr<Cursor> c_;
-        shared_ptr<ClientCursor> _cc;
+        ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
     };
     
@@ -486,7 +486,7 @@ namespace mongo {
         BtreeCursor *bc_;
         BSONObj firstMatch_;
 
-        shared_ptr<ClientCursor> _cc;
+        ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
     };
     
@@ -839,7 +839,7 @@ namespace mongo {
         auto_ptr< ScanAndOrder > _so;
         
         shared_ptr<Cursor> _c;
-        shared_ptr<ClientCursor> _cc;
+        ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
 
         bool _saveClientCursor;

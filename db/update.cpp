@@ -773,7 +773,7 @@ namespace mongo {
         long long _nscanned;
         bool _hasPositionalField;
         MatchDetails _details;
-        shared_ptr<ClientCursor> _cc;
+        ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
     };
 

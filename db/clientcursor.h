@@ -103,6 +103,40 @@ namespace mongo {
                 release();
             }
         }; 
+        
+        // This object assures safe and reliable cleanup of the ClientCursor.
+        // The implementation assumes that there will be no duplicate ids among cursors
+        // (which is assured if cursors must last longer than 1 second).
+        class CleanupPointer : boost::noncopyable {
+        public:
+            CleanupPointer() : _c( 0 ), _id( -1 ) {}
+            void reset( ClientCursor *c = 0 ) {
+                if ( c == _c ) {
+                    return;
+                }
+
+                if ( _c ) {
+                    // be careful in case cursor was deleted by someone else
+                    ClientCursor::erase( _id );
+                }
+                
+                if ( c ) {
+                    _c = c;
+                    _id = c->cursorid;
+                } else {
+                    _c = 0;
+                    _id = -1;
+                }
+            }
+            ~CleanupPointer() {
+                DESTRUCTOR_GUARD ( reset(); );
+            }
+            operator bool() { return _c; }
+            ClientCursor * operator-> () { return _c; }
+        private:
+            ClientCursor *_c;
+            CursorId _id;
+        };
 
         /*const*/ CursorId cursorid;
         string ns;
