@@ -91,8 +91,12 @@ r = function( key , values ){
 };
 
 doMR = function( n ){
+    print(n);
+
     var res = db.mr.mapReduce( m , r );
     printjson( res );
+    assert.eq( new NumberLong(4) , res.counts.input , "MR T0 " + n );
+
     var x = db[res.result];
     assert.eq( 3 , x.find().count() , "MR T1 " + n );
     
@@ -113,6 +117,12 @@ s.shardGo( "mr" , { x : 1 } , { x : 2 } , { x : 3 } );
 assert.eq( 2 , s.onNumShards( "mr" ) , "E1" );
 
 doMR( "after" );
+
+s.adminCommand({split:'test.mr' , middle:{x:3}} );
+s.adminCommand({split:'test.mr' , middle:{x:4}} );
+s.adminCommand({movechunk:'test.mr', find:{x:3}, to: s.getServer('test').name } );
+
+doMR( "after extra split" );
 
 // count
 
