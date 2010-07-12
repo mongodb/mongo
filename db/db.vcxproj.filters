@@ -370,6 +370,9 @@
     <ClCompile Include="..\util\concurrency\thread_pool.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\distlock.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -737,6 +740,9 @@
     </ClInclude>
     <ClInclude Include="instance.h">
       <Filter>db\core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\distlock.h">
+      <Filter>client</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
