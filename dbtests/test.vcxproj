@@ -254,6 +254,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\gridfs.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />

@@ -193,6 +193,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -575,6 +576,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
+    <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\gridfs.h" />
     <ClInclude Include="..\client\parallel.h" />
     <ClInclude Include="..\targetver.h" />

@@ -17,7 +17,7 @@
 
 
 /**
- * distribuetd locking mechanism
+ * distributed locking mechanism
  */
 
 #include "../pch.h"

@@ -1,4 +1,4 @@
-// distlock.h
+// @file distlock.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "../pch.h"
+#include "pch.h"
 #include "dbclient.h"
 #include "distlock.h"
 
