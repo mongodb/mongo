@@ -1725,7 +1725,7 @@ namespace mongo {
 #include <sys/statvfs.h>
 namespace mongo {
 #endif
-    boost::intmax_t freeSpace ( const string &path = dbpath ) {
+    boost::intmax_t freeSpace ( const string &path ) {
 #if !defined(_WIN32)
         struct statvfs info;
         assert( !statvfs( path.c_str() , &info ) );
