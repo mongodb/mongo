@@ -20,6 +20,7 @@
 #include "snapshots.h"
 #include "../client.h"
 #include "../clientcursor.h"
+#include "../util/mongoutils/html.h"
 
 /**
    handles snapshotting performance metrics and other such things
@@ -87,6 +88,7 @@ namespace mongo {
 
     void Snapshots::outputLockInfoHTML( stringstream& ss ){
         scoped_lock lk(_lock);
+        /*
         ss << "\n<table>";
         ss << "<tr><th>elapsed(ms)</th><th>% write locked</th></tr>\n";
         
@@ -100,6 +102,19 @@ namespace mongo {
         }
         
         ss << "</table>\n";
+        */
+
+        ss << "\n</pre>\n<div style=\"background-color:#bbb; color:#000\">" << "% time in write lock, historically, by 4 sec periods</div><div>";
+        //ss << "\n</pre>\n" << "<h4>% time in write lock, historically, by 4 sec periods</h4>\n<p>";
+        for ( int i=0; i<numDeltas(); i++ ){
+            SnapshotDelta d( getPrev(i+1) , getPrev(i) );
+            unsigned e = d.elapsed() / 1000;
+            ss << (unsigned)(100*d.percentWriteLocked());
+            if( e < 3900 || e > 4100 ) 
+                ss << '(' << e / 1000.0 << "s)";
+            ss << ' ';
+        }
+        ss << "</div>\n<pre>";
     }
 
     void SnapshotThread::run(){

@@ -258,7 +258,8 @@ namespace mongo {
                 else {
                     if( !ok ) {
                         log() << "replSet TEMP !ok heartbeating " << h.toString() << " on cfg load" << rsLog;
-                        if( !info.isEmpty() ) log() << "replSet TEMP response was: " << info.toString() << rsLog;
+                        if( !info.isEmpty() ) 
+                            log() << "replSet info " << h.toString() << " : " << info.toString() << rsLog;
                         return;
                     }
                     { 
