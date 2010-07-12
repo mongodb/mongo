@@ -1,6 +1,6 @@
 // test that disk space check happens on --repairpath partition
 
-var baseName = "jstests_disk_repair3";
+var baseName = "jstests_disk_repair4";
 var smallbase = "/data/db/repairpartitiontest"
 var smallpath = smallbase + "/dir"
 
