@@ -380,7 +380,7 @@ namespace mongo {
         public:
             DistinctCmd() : PublicGridCommand("distinct"){}
             virtual void help( stringstream &help ) const {
-                help << "{ distinct : 'collection name' , key : 'a.b' }";
+                help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
             }
             bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -394,9 +394,10 @@ namespace mongo {
                 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 10420 ,  "how could chunk manager be null!" , cm );
-                
+
+                BSONObj query = getQuery(cmdObj);
                 vector<shared_ptr<ChunkRange> > chunks;
-                cm->getChunksForQuery( chunks , BSONObj() );
+                cm->getChunksForQuery( chunks , query );
                 
                 set<BSONObj,BSONObjCmp> all;
                 int size = 32;
