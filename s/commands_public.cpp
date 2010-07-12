@@ -532,8 +532,8 @@ namespace mongo {
                     q = cmdObj["query"].embeddedObjectUserCheck();
                 }
                 
-                vector<shared_ptr<ChunkRange> > chunks;
-                cm->getChunksForQuery( chunks , q );
+                set<Shard> shards;
+                cm->getShardsForQuery( shards , q );
                 
                 const string shardedOutputCollection = getTmpName( collection );
                 
@@ -545,9 +545,8 @@ namespace mongo {
                 
                 list< shared_ptr<Future::CommandResult> > futures;
                 
-                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    shared_ptr<ChunkRange> c = *i;
-                    futures.push_back( Future::spawnCommand( c->getShard().getConnString() , dbName , shardedCommand ) );
+                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ){
+                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand ) );
                 }
                 
                 BSONObjBuilder shardresults;
