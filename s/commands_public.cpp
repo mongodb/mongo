@@ -187,13 +187,14 @@ namespace mongo {
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 10419 ,  "how could chunk manager be null!" , cm );
                 
-                vector<shared_ptr<ChunkRange> > chunks;
-                cm->getChunksForQuery( chunks , filter );
+                set<Shard> shards;
+                cm->getShardsForQuery( shards , filter );
                 
                 unsigned long long total = 0;
-                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    shared_ptr<ChunkRange> c = *i;
-                    total += c->countObjects( filter );
+                for (set<Shard>::iterator it=shards.begin(), end=shards.end(); it != end; ++it){
+                    ShardConnection conn(*it, fullns);
+                    total += conn->count(fullns, filter);
+                    conn.done();
                 }
                 
                 result.append( "n" , (double)total );
