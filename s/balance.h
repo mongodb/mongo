@@ -41,12 +41,6 @@ namespace mongo {
         typedef shared_ptr<CandidateChunk> CandidateChunkPtr;
 
         /**
-         * Returns true iff this mongos process gained (or maintained) the
-         * reponsibility moving chunks around.
-         */
-        bool _shouldIBalance( DBClientBase& conn );
-        
-        /**
          * Gathers all the necessary information about shards and chunks, and 
          * decides whether there are candidate chunks to be moved.
          */
