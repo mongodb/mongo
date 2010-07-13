@@ -196,4 +196,14 @@ namespace mongo {
         return _instance;
     }
 
+    
+    string getHostNameCached(){
+        static string host;
+        if ( host.empty() ){
+            string s = getHostName();
+            host = s;
+        }
+        return host;
+    }
+
 } // namespace mongo

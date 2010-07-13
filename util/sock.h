@@ -253,6 +253,8 @@ namespace mongo {
         return buf;
     }
 
+    string getHostNameCached();
+
     class ListeningSockets {
     public:
         ListeningSockets() : _mutex("ListeningSockets"), _sockets( new set<int>() ){
