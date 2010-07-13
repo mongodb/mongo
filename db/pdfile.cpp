@@ -112,6 +112,7 @@ namespace mongo {
     bool directoryperdb = false;
     string repairpath;
     string lockfilepath;
+    string pidfilepath;
 
     DataFileMgr theDataFileMgr;
     DatabaseHolder dbHolder;

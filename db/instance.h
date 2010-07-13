@@ -141,5 +141,6 @@ namespace mongo {
 
     extern int lockFile;
     void acquirePathLock();
+    void maybeCreatePidFile();
     
 } // namespace mongo
