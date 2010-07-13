@@ -752,7 +752,7 @@ namespace mongo {
     }
     void acquirePathLock() {
 #if !defined(_WIN32) && !defined(__sunos__)
-      string name = ( boost::filesystem::path( lockfilepath.empty() ? dbpath : lockfilepath ) / "mongod.lock" ).native_file_string();
+      string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
 
         bool oldFile = false;
 
