@@ -525,8 +525,10 @@ namespace mongo {
         ss << " nreturned:" << msgdata->nReturned;
         dbresponse.response = resp;
         dbresponse.responseTo = m.header()->id;
-        if( exhaust ) { ss << " exhaust "; 
-        dbresponse.exhaust = ns;}
+        if( exhaust ) { 
+            ss << " exhaust "; 
+            dbresponse.exhaust = ns;
+        }
         return ok;
     }
 
