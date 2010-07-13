@@ -132,14 +132,17 @@ namespace mongo {
                 if ( lastPing.isEmpty() ){
                     // TODO: maybe this should clear, not sure yet
                     log() << "lastPing is empty! this could be bad: " << o << endl;
+                    conn.done();
                     return false;
                 }
 
                 long elapsed = jsTime() - lastPing["ping"].Date(); // in ms
                 elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
 
-                if ( elapsed <= _takeoverMinutes )
+                if ( elapsed <= _takeoverMinutes ){
+                    conn.done();
                     return false;
+                }
                 
                 log() << "forcfully taking over lock from: " << o << " elapsed minutes: " << elapsed << endl;
                 conn->update( _ns , _id , BSON( "$set" << BSON( "state" << 0 ) ) );
