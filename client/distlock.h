@@ -31,7 +31,7 @@ namespace mongo {
     class DistributedLock {
     public:
 
-        DistributedLock( const ConnectionString& conn , const string& name );
+        DistributedLock( const ConnectionString& conn , const string& name , int takeoverMinutes = 30 );
 
         int getState(){
             return _state.get();
@@ -46,8 +46,10 @@ namespace mongo {
 
     private:
         ConnectionString _conn;
-        string _ns;
         string _name;
+        int _takeoverMinutes;
+        
+        string _ns;
         BSONObj _id;
         
         ThreadLocalValue<int> _state;

@@ -21,6 +21,8 @@
 
 namespace mongo {
 
+    string lockPingNS = "config.lockpings";
+
     ThreadLocalValue<string> distLockIds("");
 
     string getDistLockId(){
@@ -33,15 +35,26 @@ namespace mongo {
         }
         return s;
     }
-
+    
     void distLockPingThread( ConnectionString addr ){
         while(1){
             try {
                 ScopedDbConnection conn( addr );
-                conn->update( "config.lockpings" , 
+                
+                // do ping
+                conn->update( lockPingNS , 
                               BSON( "_id" << getDistLockId() ) , 
                               BSON( "$set" << BSON( "ping" << DATENOW ) ) ,
                               true );
+                
+                
+                // remove really old entries
+                BSONObjBuilder f;
+                f.appendDate( "$lt" , jsTime() - ( 2 * 86400 * 1000 ) );
+                BSONObj r = BSON( "ping" << f.obj() );
+                conn->remove( lockPingNS , r );
+
+
                 conn.done();
             }
             catch ( std::exception& e ){
@@ -72,8 +85,8 @@ namespace mongo {
         
     } distLockPinger;
     
-    DistributedLock::DistributedLock( const ConnectionString& conn , const string& name )
-        : _conn(conn),_name(name){
+    DistributedLock::DistributedLock( const ConnectionString& conn , const string& name , int takeoverMinutes )
+        : _conn(conn),_name(name),_takeoverMinutes(takeoverMinutes){
         _id = BSON( "_id" << name );
         _ns = "config.locks";
         distLockPinger.got( conn );
