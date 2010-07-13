@@ -743,6 +743,13 @@ namespace mongo {
 #endif
     }
 
+    void writePid(int fd) {
+            stringstream ss;
+            ss << getpid() << endl;
+            string s = ss.str();
+            const char * data = s.c_str();
+            assert ( write( fd, data, strlen( data ) ) );
+    }
     void acquirePathLock() {
 #if !defined(_WIN32) && !defined(__sunos__)
       string name = ( boost::filesystem::path( lockfilepath.empty() ? dbpath : lockfilepath ) / "mongod.lock" ).native_file_string();
@@ -775,13 +782,21 @@ namespace mongo {
         }
 
         uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
-        stringstream ss;
-        ss << getpid() << endl;
-        string s = ss.str();
-        const char * data = s.c_str();
-        assert( write( lockFile , data , strlen( data ) ) );
+        writePid( lockFile );
         fsync( lockFile );
 #endif        
+    }
+
+    void maybeCreatePidFile() {
+        if (!(pidfilepath.empty())) {
+            int pidfd;
+            int oflags = O_CREAT|O_TRUNC|O_WRONLY;
+            int omode = S_IRWXU|S_IRWXG|S_IRWXO;
+            string name = boost::filesystem::path( pidfilepath ).native_file_string();
+            assert( ( (pidfd=(open(name.c_str(), oflags, omode))) > -1 ) );
+            writePid(pidfd);
+            assert( close( pidfd ) == 0 );
+        }
     }
     
 } // namespace mongo
