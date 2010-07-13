@@ -44,7 +44,6 @@ namespace mongo {
     BSONField<long long> ShardFields::maxSize ("maxSize");
     BSONField<long long> ShardFields::currSize("currSize");
 
-    string ourHostname;
     OID serverID;
 
     /* --- DBConfig --- */
@@ -378,7 +377,6 @@ namespace mongo {
             sleepsecs(5);
             dbexit( EXIT_BADOPTIONS );
         }
-        ourHostname = hn;
         
         set<string> hosts;
         for ( size_t i=0; i<configHosts.size(); i++ ){
@@ -524,9 +522,9 @@ namespace mongo {
         }
      
         stringstream id;
-        id << ourHostname << "-" << terseCurrentTime() << "-" << num++;
+        id << getHostNameCached() << "-" << terseCurrentTime() << "-" << num++;
 
-        BSONObj msg = BSON( "_id" << id.str() << "server" << ourHostname << "time" << DATENOW <<
+        BSONObj msg = BSON( "_id" << id.str() << "server" << getHostNameCached() << "time" << DATENOW <<
                             "what" << what << "ns" << ns << "details" << detail );
         log() << msg << endl;
         conn->insert( "config.changelog" , msg );

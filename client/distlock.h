@@ -28,16 +28,10 @@
 
 namespace mongo {
 
-    extern string ourHostname;
-    
     class DistributedLock {
     public:
 
-        DistributedLock( const ConnectionString& conn , const string& name )
-            : _conn(conn),_name(name),_myid(""){
-            _id = BSON( "_id" << name );
-            _ns = "config.locks";
-        }
+        DistributedLock( const ConnectionString& conn , const string& name );
 
         int getState(){
             return _state.get();
@@ -50,18 +44,6 @@ namespace mongo {
         bool lock_try( string why , BSONObj * other = 0 );
         void unlock();
 
-        string myid(){
-            string s = _myid.get();
-            if ( s.empty() ){
-                stringstream ss;
-                ss << ourHostname << ":" << time(0) << ":" << rand();
-                s = ss.str();
-                _myid.set( s );
-            }
-
-            return s;
-        }
-        
     private:
         ConnectionString _conn;
         string _ns;
@@ -69,7 +51,6 @@ namespace mongo {
         BSONObj _id;
         
         ThreadLocalValue<int> _state;
-        ThreadLocalValue<string> _myid;
     };
     
     class dist_lock_try {

@@ -22,7 +22,6 @@
 
 namespace mongo {
     
-    extern std::string ourHostname;
     extern OID serverID;
     
     // from request.cpp

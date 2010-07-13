@@ -20,6 +20,65 @@
 #include "distlock.h"
 
 namespace mongo {
+
+    ThreadLocalValue<string> distLockIds("");
+
+    string getDistLockId(){
+        string s = distLockIds.get();
+        if ( s.empty() ){
+            stringstream ss;
+            ss << getHostNameCached() << ":" << time(0) << ":" << rand();
+            s = ss.str();
+            distLockIds.set( s );
+        }
+        return s;
+    }
+
+    void distLockPingThread( ConnectionString addr ){
+        while(1){
+            try {
+                ScopedDbConnection conn( addr );
+                conn->update( "config.lockpings" , 
+                              BSON( "_id" << getDistLockId() ) , 
+                              BSON( "$set" << BSON( "ping" << DATENOW ) ) ,
+                              true );
+                conn.done();
+            }
+            catch ( std::exception& e ){
+                log( LL_WARNING ) << "couldn't ping: " << e.what() << endl;
+            }
+            sleepsecs(30);
+        }
+    }
+        
+    
+    class DistributedLockPinger {
+    public:
+        DistributedLockPinger()
+            : _mutex( "DistributedLockPinger" ){
+        }
+        
+        void got( const ConnectionString& conn ){
+            string s = conn.toString();
+            scoped_lock lk( _mutex );
+            if ( _seen.count( s ) > 0 )
+                return;
+            boost::thread t( boost::bind( &distLockPingThread , conn ) );
+            _seen.insert( s );
+        }
+        
+        set<string> _seen;
+        mongo::mutex _mutex;
+        
+    } distLockPinger;
+    
+    DistributedLock::DistributedLock( const ConnectionString& conn , const string& name )
+        : _conn(conn),_name(name){
+        _id = BSON( "_id" << name );
+        _ns = "config.locks";
+        distLockPinger.got( conn );
+    }
+
        
     bool DistributedLock::lock_try( string why , BSONObj * other ){
         // recursive
@@ -55,7 +114,7 @@ namespace mongo {
         bool gotLock = false;
         BSONObj now;
             
-        BSONObj whatIWant = BSON( "$set" << BSON( "state" << 1 << "who" << myid() <<
+        BSONObj whatIWant = BSON( "$set" << BSON( "state" << 1 << "who" << getDistLockId() <<
                                                   "when" << DATENOW << "why" << why << "ts" << ts ) );
         try {
             conn->update( _ns , queryBuilder.obj() , whatIWant );

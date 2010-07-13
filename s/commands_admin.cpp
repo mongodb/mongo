@@ -42,8 +42,6 @@
 
 namespace mongo {
 
-    extern string ourHostname;
-
     namespace dbgrid_cmds {
 
         set<string> dbgridCommands;
@@ -796,7 +794,7 @@ namespace mongo {
             IsDbGridCmd() : Command("isdbgrid") { }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("isdbgrid", 1);
-                result.append("hostname", ourHostname);
+                result.append("hostname", getHostNameCached());
                 return true;
             }
         } isdbgrid;

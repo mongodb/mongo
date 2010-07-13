@@ -308,7 +308,7 @@ namespace mongo {
 
         { // init stuff, don't want to do at static init
             StringBuilder buf;
-            buf << ourHostname << ":" << cmdLine.port;
+            buf << getHostNameCached() << ":" << cmdLine.port;
             _myid = buf.str();
             log(1) << "balancer myid: " << _myid << endl;
             
