@@ -201,6 +201,7 @@ namespace mongo {
          */
 
         log() << "DBConfig::dropDatabase: " << _name << endl;
+        configServer.logChange( "dropDatabase.start" , _name , BSONObj() );
         
         // 1
         if ( ! configServer.allUp( errmsg ) ){
@@ -253,6 +254,7 @@ namespace mongo {
         
         log(1) << "\t dropped primary db for: " << _name << endl;
 
+        configServer.logChange( "dropDatabase" , _name , BSONObj() );
         return true;
     }
 
@@ -261,7 +263,7 @@ namespace mongo {
         set<string> seen;
         while ( true ){
             map<string,ChunkManagerPtr>::iterator i = _shards.begin();
-
+            
             if ( i == _shards.end() )
                 break;
 
@@ -280,6 +282,7 @@ namespace mongo {
             uassert( 10184 ,  "_dropShardedCollections too many collections - bailing" , num < 100000 );
             log(2) << "\t\t dropped " << num << " so far" << endl;
         }
+        
         return true;
     }
     

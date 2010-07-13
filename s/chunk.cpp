@@ -707,6 +707,8 @@ namespace mongo {
     
     void ChunkManager::drop( ChunkManagerPtr me ){
         rwlock lk( _lock , true ); 
+
+        configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
         
         DistributedLock lockSetup( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , getns() );
         dist_lock_try dlk( &lockSetup  , "drop" );
@@ -763,6 +765,7 @@ namespace mongo {
 
 
         log(1) << "ChunkManager::drop : " << _ns << "\t DONE" << endl;        
+        configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
     
     void ChunkManager::save(){
