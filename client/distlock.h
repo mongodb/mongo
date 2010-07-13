@@ -31,7 +31,10 @@ namespace mongo {
     class DistributedLock {
     public:
 
-        DistributedLock( const ConnectionString& conn , const string& name , int takeoverMinutes = 30 );
+        /**
+         * @param takeoverMinutes how long before we steal lock in minutes
+         */
+        DistributedLock( const ConnectionString& conn , const string& name , int takeoverMinutes = 10 );
 
         int getState(){
             return _state.get();

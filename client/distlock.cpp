@@ -24,12 +24,22 @@ namespace mongo {
     string lockPingNS = "config.lockpings";
 
     ThreadLocalValue<string> distLockIds("");
+    
+    string getDistLockProcess(){
+        static string s;
+        if ( s.empty() ){
+            stringstream ss;
+            ss << getHostNameCached() << ":" << time(0) << ":" << rand();
+            s = ss.str();
+        }
+        return s;
+    }
 
     string getDistLockId(){
         string s = distLockIds.get();
         if ( s.empty() ){
             stringstream ss;
-            ss << getHostNameCached() << ":" << time(0) << ":" << rand();
+            ss << getDistLockProcess() << ":" << getThreadName() << ":" << rand();
             s = ss.str();
             distLockIds.set( s );
         }
@@ -37,24 +47,29 @@ namespace mongo {
     }
     
     void distLockPingThread( ConnectionString addr ){
+        static int loops = 0;
         while(1){
             try {
                 ScopedDbConnection conn( addr );
                 
                 // do ping
                 conn->update( lockPingNS , 
-                              BSON( "_id" << getDistLockId() ) , 
+                              BSON( "_id" << getDistLockProcess() ) , 
                               BSON( "$set" << BSON( "ping" << DATENOW ) ) ,
                               true );
                 
                 
                 // remove really old entries
                 BSONObjBuilder f;
-                f.appendDate( "$lt" , jsTime() - ( 2 * 86400 * 1000 ) );
+                f.appendDate( "$lt" , jsTime() - ( 4 * 86400 * 1000 ) );
                 BSONObj r = BSON( "ping" << f.obj() );
                 conn->remove( lockPingNS , r );
-
-
+                
+                // create index so remove is fast even with a lot of servers
+                if ( loops++ == 0 ){
+                    conn->ensureIndex( lockPingNS , BSON( "ping" << 1 ) );
+                }
+                
                 conn.done();
             }
             catch ( std::exception& e ){
@@ -94,9 +109,8 @@ namespace mongo {
 
        
     bool DistributedLock::lock_try( string why , BSONObj * other ){
-        // recursive
-        if ( getState() > 0 )
-            return true;
+        // check for recrusive
+        assert( getState() == 0 );
 
         ScopedDbConnection conn( _conn );
             
@@ -114,20 +128,35 @@ namespace mongo {
                 }
             }
             else if ( o["state"].numberInt() > 0 ){
-                return false;
+                BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
+                if ( lastPing.isEmpty() ){
+                    // TODO: maybe this should clear, not sure yet
+                    log() << "lastPing is empty! this could be bad: " << o << endl;
+                    return false;
+                }
+
+                long elapsed = jsTime() - lastPing["ping"].Date(); // in ms
+                elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
+
+                if ( elapsed <= _takeoverMinutes )
+                    return false;
+                
+                log() << "forcfully taking over lock from: " << o << " elapsed minutes: " << elapsed << endl;
+                conn->update( _ns , _id , BSON( "$set" << BSON( "state" << 0 ) ) );
             }
             else if ( o["ts"].type() ){
                 queryBuilder.append( o["ts"] );
             }
         }
-            
+        
         OID ts;
         ts.init();
 
         bool gotLock = false;
         BSONObj now;
             
-        BSONObj whatIWant = BSON( "$set" << BSON( "state" << 1 << "who" << getDistLockId() <<
+        BSONObj whatIWant = BSON( "$set" << BSON( "state" << 1 << 
+                                                  "who" << getDistLockId() << "process" << getDistLockProcess() <<
                                                   "when" << DATENOW << "why" << why << "ts" << ts ) );
         try {
             conn->update( _ns , queryBuilder.obj() , whatIWant );
