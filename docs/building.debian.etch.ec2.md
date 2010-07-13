@@ -1,4 +1,7 @@
 
+Building on debian etch on ec2
+================
+
 ami-f2f6159b
 
   apt-get update
