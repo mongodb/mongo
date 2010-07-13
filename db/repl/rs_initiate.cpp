@@ -45,7 +45,7 @@ namespace mongo {
             BSONObj res;
             {
                 bool ok = false;
-                try { 
+                try {
                     int theirVersion = -1000;
                     ok = requestHeartbeat(cfg._id, i->h.toString(), res, -1, theirVersion, true); 
                     if( theirVersion >= cfg.version ) { 

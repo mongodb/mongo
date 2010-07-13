@@ -36,6 +36,7 @@ namespace mongo {
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
 
+    /* member of a replica set */
     class Member : public List1<Member>::Base {
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c);
@@ -71,6 +72,7 @@ namespace mongo {
     };
 
     struct Target;
+
     class Consensus {
         ReplSetImpl &rs;
         struct LastYea { 
@@ -94,7 +96,7 @@ namespace mongo {
         void multiCommand(BSONObj cmd, list<Target>& L);
     };
 
-    /** most operations on a ReplSet object should be done while locked. */
+    /** most operations on a ReplSet object should be done while locked. that logic implemented here. */
     class RSBase : boost::noncopyable { 
     private:
         mutex m;
@@ -134,7 +136,7 @@ namespace mongo {
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
              singleton and long lived.
     */
-    class ReplSetImpl : RSBase {
+    class ReplSetImpl : protected RSBase {
     public:
         /** info on our state if the replset isn't yet "up".  for example, if we are pre-initiation. */
         enum StartupStatus { 
@@ -167,6 +169,7 @@ namespace mongo {
         void loadLastOpTimeWritten();
 
     protected:
+        bool initFromConfig(ReplSetConfig& c); // true if ok; throws if config really bad; false if config doesn't include self
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
         const ReplSetConfig& config() { return *_cfg; }
@@ -198,13 +201,10 @@ namespace mongo {
         */
         bool _loadConfigFinish(vector<ReplSetConfig>& v);
         void loadConfig();
-        bool initFromConfig(ReplSetConfig& c); // true if ok; throws if config really bad; false if config doesn't include self
 
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
-
-    private:
         const Member *_currentPrimary;
         Member *_self;        
         List1<Member> _members; /* all members of the set EXCEPT self. */
@@ -229,6 +229,7 @@ namespace mongo {
     class ReplSet : public ReplSetImpl { 
     public:
         ReplSet(string cfgString) : ReplSetImpl(cfgString) { }
+
         /* call after constructing to start - returns fairly quickly after launching its threads */
         void go() { _go(); }
         void fatal() { _fatal(); }
@@ -240,6 +241,9 @@ namespace mongo {
         void summarizeAsHtml(stringstream& ss) const { _summarizeAsHtml(ss); }
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
         void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
+
+        /* we have a new config (reconfig) - apply it. */
+        void haveNewConfig(ReplSetConfig& c);
 
         /* if we delete old configs, this needs to assure locking. currently we don't so it is ok. */
         const ReplSetConfig& getConfig() { return config(); }

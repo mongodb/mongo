@@ -99,12 +99,7 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
-                writelock lk("");
-                bo comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
-                newConfig.saveConfigLocally(comment);
-                /* RELOAD THE CONFIG */ 
-                //TODO
-                log() << "replSet replSetReconfig new config saved locally" << rsLog;
+                theReplSet->haveNewConfig(newConfig);
                 ReplSet::startupStatusMsg = "replSetReconfig'd";
             }
             catch( DBException& e ) { 

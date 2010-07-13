@@ -24,6 +24,8 @@
 
 namespace mongo { 
 
+    using namespace bson;
+
     bool replSet = false;
     ReplSet *theReplSet = 0;
 
@@ -205,6 +207,7 @@ namespace mongo {
 
     // true if ok; throws if config really bad; false if config doesn't include self
     bool ReplSetImpl::initFromConfig(ReplSetConfig& c) {
+        assert( lockedByMe() );
         {
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
@@ -227,7 +230,8 @@ namespace mongo {
         _name = _cfg->_id;
         assert( !_name.empty() );
 
-        assert( _members.head() == 0 );
+        //assert( _members.head() == 0 );
+        _members.orphanAll();
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
             if( m.h.isSelf() ) {
@@ -240,9 +244,6 @@ namespace mongo {
             }
         }
 
-/*        if( save ) { 
-            _cfg->save();
-        }*/
         return true;
     }
 
@@ -344,9 +345,25 @@ namespace mongo {
 
     void ReplSetImpl::_fatal() 
     { 
-        lock l(this);
+        //lock l(this);
         _myState = FATAL; 
         log() << "replSet error fatal error, stopping replication" << rsLog; 
+    }
+
+
+    void ReplSet::haveNewConfig(ReplSetConfig& newConfig) { 
+        writelock lk("");
+        lock l(this);
+        bo comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
+        newConfig.saveConfigLocally(comment);
+        try { 
+            initFromConfig(newConfig);
+            log() << "replSet replSetReconfig new config saved locally" << rsLog;
+        }
+        catch(...) { 
+            log() << "replSet error unexpected exception in haveNewConfig()" << rsLog;
+            _fatal();
+        }
     }
 
     /* forked as a thread during startup 
