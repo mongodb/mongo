@@ -111,7 +111,6 @@ namespace mongo {
     string dbpath = "/data/db/";
     bool directoryperdb = false;
     string repairpath;
-    string lockfilepath;
     string pidfilepath;
 
     DataFileMgr theDataFileMgr;

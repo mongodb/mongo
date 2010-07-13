@@ -676,7 +676,6 @@ int main(int argc, char* argv[], char *envp[] )
          "comma separated list of ip addresses to listen on - all local ips by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
 #if !defined(_WIN32) && !defined(__sunos__)
-        ("lockfilepath", po::value<string>(&lockfilepath), "directory for lockfile (if not set, dbpath is used)")
         ("pidfilepath", po::value<string>(&pidfilepath), "directory for pidfile (if not set, no pidfile is created)")
 #endif
         ("directoryperdb", "each database will be stored in a separate directory")
