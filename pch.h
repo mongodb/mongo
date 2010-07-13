@@ -31,9 +31,11 @@
 #endif
 
 #if defined(WIN32)
-// so you don't have to define this yourself as the code seems to use it...
-#undef _WIN32
+
+#ifndef _WIN32
 #define _WIN32
+#endif
+
 #endif
 
 #if defined(_WIN32)
