@@ -94,57 +94,6 @@ namespace mongo {
         b.append( patternfields.begin()->c_str(), temp.obj() );
     }    
 
-    /**
-      Example
-      sort:   { ts: -1 }
-      *this:  { ts:1 }
-      -> -1
-
-      @return
-      0 if sort either doesn't have all the fields or has extra fields
-      < 0 if sort is descending
-      > 1 if sort is ascending
-    */
-    int ShardKeyPattern::canOrder( const BSONObj& sort ) const{
-        // e.g.:
-        //   sort { a : 1 , b : -1 }
-        //   pattern { a : -1, b : 1, c : 1 }
-        //     -> -1
-
-        int dir = 0;
-
-        BSONObjIterator s(sort);
-        BSONObjIterator p(pattern);
-        while( 1 ) {
-            BSONElement e = s.next();
-            if( e.eoo() )
-                break;
-            if( !p.moreWithEOO() ) 
-                return 0;
-            BSONElement ep = p.next();
-            bool same = e == ep;
-            if( !same ) {
-                if( strcmp(e.fieldName(), ep.fieldName()) != 0 )
-                    return 0;
-                // same name, but opposite direction
-                if( dir == -1 ) 
-                    ;  // ok
-                else if( dir == 1 )
-                    return 0; // wrong direction for a 2nd field
-                else // dir == 0, initial pass
-                    dir = -1;
-            }
-            else { 
-                // fields are the same
-                if( dir == -1 ) 
-                    return 0; // wrong direction
-                dir = 1;
-            }
-        }
-
-        return dir;
-    }
-
     bool ShardKeyPattern::isPrefixOf( const BSONObj& otherPattern ) const {
         BSONObjIterator a( pattern );
         BSONObjIterator b( otherPattern );
@@ -164,9 +113,7 @@ namespace mongo {
     }
     
     /* things to test for compound : 
-       x hasshardkey 
        _ getFilter (hard?)
-       x canOrder
        \ middle (deprecating?)
     */
     class ShardKeyUnitTest : public UnitTest {
@@ -211,14 +158,6 @@ namespace mongo {
             BSONObj x = fromjson("{ key: { $gte: 30, $lt: 90 } }");
             assert( x.woEqual(b.obj()) );
         }
-        void testCanOrder() { 
-            ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
-            assert( k.canOrder( fromjson("{a:1}") ) == 1 );
-            assert( k.canOrder( fromjson("{a:-1}") ) == -1 );
-            assert( k.canOrder( fromjson("{a:1,b:-1,c:1}") ) == 1 );
-            assert( k.canOrder( fromjson("{a:1,b:1}") ) == 0 );
-            assert( k.canOrder( fromjson("{a:-1,b:1}") ) == -1 );
-        }
         void extractkeytest() { 
             ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
 
@@ -253,11 +192,6 @@ namespace mongo {
 
             assert( k.compare(a,b) < 0 );
             
-            assert( k.canOrder( fromjson("{key:1}") ) == 1 );
-            assert( k.canOrder( fromjson("{zz:1}") ) == 0 );
-            assert( k.canOrder( fromjson("{key:-1}") ) == -1 );
-            
-            testCanOrder();
             getfilt();
             testIsPrefixOf();
             // add middle multitype tests
