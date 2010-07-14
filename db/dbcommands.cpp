@@ -958,6 +958,12 @@ namespace mongo {
                 }
             }
 
+            if ( n == 0 ){
+                log( LL_WARNING ) << "filemd5: no chunks for: " << query << endl;
+                result.append( "errmsg" , "no chunks found with that file" );
+                return false;
+            }
+
             md5_finish(&st, d);
 
             result.append( "md5" , digestToString( d ) );

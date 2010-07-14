@@ -1322,7 +1322,8 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ] )
-    addSmoketest("smokeJsSlow", [add_exe("mongo")])
+    addSmoketest("smokeJsSlowNightly", [add_exe("mongo")])
+    addSmoketest("smokeJsSlowWeekly", [add_exe("mongo")])
     addSmoketest( "smokeQuota", [ "mongo" ] )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ) ] )
 
