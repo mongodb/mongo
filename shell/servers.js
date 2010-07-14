@@ -205,6 +205,18 @@ ShardingTest.prototype.getServerName = function( dbname ){
     throw "couldn't find dbname: " + dbname + " total: " + this.config.databases.count();
 }
 
+
+ShardingTest.prototype.getNonPrimaries = function( dbname ){
+    var x = this.config.databases.findOne( { _id : dbname } );
+    if ( ! x ){
+        this.config.databases.find().forEach( printjson );
+        throw "couldn't find dbname: " + dbname + " total: " + this.config.databases.count();
+    }
+    
+    return this.config.shards.find( { _id : { $ne : x.primary } } ).map( function(z){ return z._id; } )
+}
+
+
 ShardingTest.prototype.getConnNames = function(){
     var names = [];
     for ( var i=0; i<this._connections.length; i++ ){
@@ -240,6 +252,9 @@ ShardingTest.prototype.normalize = function( x ){
 ShardingTest.prototype.getOther = function( one ){
     if ( this._connections.length != 2 )
         throw "getOther only works with 2 servers";
+
+    if ( one._mongo )
+        one = one._mongo
 
     if ( this._connections[0] == one )
         return this._connections[1];
