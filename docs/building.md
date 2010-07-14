@@ -19,7 +19,7 @@ To install
 
     $ scons --prefix=/opt/mongo install
 
-Please note that prebuilt binaries are available on [mongodb.org](http://www.mongodb.org/downloads) and may be the easier way to get started.
+Please note that prebuilt binaries are available on [mongodb.org](http://www.mongodb.org/downloads) and may be the easiest way to get started.
 
 SCONS TARGETS
 --------------
