@@ -57,6 +57,7 @@ log
 logs
 docs/html
 docs/latex
+docs/doxygen
 32bit
 scratch
 
