@@ -134,17 +134,12 @@ namespace mongo {
 
         BSONObj median = result.getObjectField( "median" );
         if (median == getMin()){
-            //TODO compound support
-            BSONElement key = getMin().firstElement();
-            BSONObjBuilder b;
-            b.appendAs(key, "$gt");
-
-            Query q = QUERY(key.fieldName() << b.obj());
+            Query q;
+            q.minKey(_min).maxKey(_max);
             q.sort(_manager->getShardKey().key());
 
             median = conn->findOne(_manager->getns(), q);
             median = _manager->getShardKey().extractKey( median );
-            PRINT(median);
         }
 
         conn.done();
