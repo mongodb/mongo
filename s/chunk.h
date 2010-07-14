@@ -57,6 +57,16 @@ namespace mongo {
             : _combined( ll ){
         }
         
+        ShardChunkVersion( const BSONElement& e ){
+            if ( e.type() == Date || e.type() == Timestamp ){
+                _combined = e._numberLong();
+            }
+            else {
+                log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
+                assert(0);
+            }
+        }
+
         ShardChunkVersion incMajor() const {
             return ShardChunkVersion( _major + 1 , 0 );
         }
