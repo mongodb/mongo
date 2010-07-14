@@ -562,7 +562,7 @@ namespace mongo {
         if ( _map.size() == 0 )
             return false;
         
-        BSONObj x = loc.obj().extractFieldsDotted(_key);
+        BSONObj x = loc.obj().extractFields(_key);
         
         MyMap::const_iterator a = _map.upper_bound( x );
         a--;
