@@ -1282,6 +1282,13 @@ def runShellTest( env, target, source ):
         spec = [ x.abspath for x in g ]
     elif target == "smokeJsSlow":
         spec = [x.abspath for x in Glob(jsSpec(["slow/*"]))]
+    # Targets for compatibility w/1.5.x.  Have SlowNightly does
+    # nothing, SlowWeekly does all the slow tests.
+    elif target == "smokeJsSlowNightly":
+        spec = []
+    elif target == "smokeJsSlowWeekly":
+        spec = [x.abspath for x in Glob(jsSpec(["slow/*"]))]
+
     elif target == "smokeParallel":
         spec = [x.abspath for x in Glob(jsSpec(["parallel/*"]))]
     else:
@@ -1300,6 +1307,8 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest("smokeJsSlow", [add_exe("mongo")], runShellTest)
+    addSmoketest("smokeJsSlowNightly", [add_exe("mongo")], runShellTest)
+    addSmoketest("smokeJsSlowWeekly", [add_exe("mongo")], runShellTest)
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [ jsDirTestSpec( "tool" ) ] )
 
