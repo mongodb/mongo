@@ -570,6 +570,7 @@ public:
             *len = result.stop - str;
         } else if ( !result.full ) {
             int limit = strnlen(result.stop , 10);
+            if (limit == -1) limit = 10;
             msgasserted(10340, "Failure parsing JSON string near: " + string( result.stop, limit ));
         }
         BSONObj ret = b.pop();
