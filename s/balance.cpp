@@ -258,31 +258,30 @@ namespace mongo {
             
             try {
                 ScopedDbConnection conn( config );
-                _ping( conn.conn() );
-                
+
+                _ping( conn.conn() );                
                 if ( ! _checkOIDs() ){
                     uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
                 }
                                     
-                vector<CandidateChunkPtr> candidateChunks;
                 dist_lock_try lk( &balanceLock , "doing balance round" );
-                if ( lk.got() ){
-
-                    log(1) << "*** start balancing round" << endl;        
-
-                    candidateChunks.clear();
-                    _doBalanceRound( conn.conn() , &candidateChunks );
-
-                    if ( candidateChunks.size() == 0 ) {
-                        log(1) << "no need to move any chunk" << endl;
-
-                    } else {
-                        _balancedLastTime = _moveChunks( &candidateChunks );
-                    }
-
-                    log(1) << "*** end of balancing round" << endl;        
-
+                if ( ! lk.got() ){
+                    log(1) << "skipping balancing round during ongoing split or move activity." << endl;
+                    conn.done();
+                    continue;
                 }
+                        
+                log(1) << "*** start balancing round" << endl;        
+
+                vector<CandidateChunkPtr> candidateChunks;
+                _doBalanceRound( conn.conn() , &candidateChunks );
+                if ( candidateChunks.size() == 0 ) {
+                    log(1) << "no need to move any chunk" << endl;
+                } else {
+                    _balancedLastTime = _moveChunks( &candidateChunks );
+                }
+
+                log(1) << "*** end of balancing round" << endl;        
                 conn.done();
             }
             catch ( std::exception& e ){

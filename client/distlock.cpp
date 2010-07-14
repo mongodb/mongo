@@ -140,11 +140,12 @@ namespace mongo {
                 elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
 
                 if ( elapsed <= _takeoverMinutes ){
+                    log(1) << "dist_lock lock failed because taken by: " << o << endl;
                     conn.done();
                     return false;
                 }
                 
-                log() << "forcfully taking over lock from: " << o << " elapsed minutes: " << elapsed << endl;
+                log() << "dist_lock forcefully taking over from: " << o << " elapsed minutes: " << elapsed << endl;
                 conn->update( _ns , _id , BSON( "$set" << BSON( "state" << 0 ) ) );
             }
             else if ( o["ts"].type() ){
