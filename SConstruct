@@ -1402,6 +1402,14 @@ def run_shell_tests(env, target, source):
 env.Alias("test_shell", [], [run_shell_tests])
 env.AlwaysBuild("test_shell")
 
+#  ---- Docs ----
+def build_docs(env, target, source):
+    from buildscripts import docs
+    docs.main()
+
+env.Alias("docs", [], [build_docs])
+env.AlwaysBuild("docs")
+
 #  ----  INSTALL -------
 
 def getSystemInstallName():

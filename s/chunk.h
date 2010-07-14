@@ -165,7 +165,9 @@ namespace mongo {
 
         BSONObj pickSplitPoint() const;
         ChunkPtr split();
-        ChunkPtr split( const BSONObj& middle );
+
+        BSONArray pickSplitVector() const;
+        ChunkPtr multiSplit( const BSONArray& middle );
 
         /**
          * @return size of shard in bytes
@@ -332,6 +334,8 @@ namespace mongo {
         ShardKeyPattern& getShardKey(){  return _key; }
         const ShardKeyPattern& getShardKey() const {  return _key; }
         bool isUnique(){ return _unique; }
+
+        void maybeChunkCollection();
         
         /**
          * makes sure the shard index is on all servers

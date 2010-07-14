@@ -525,7 +525,7 @@ namespace mongo {
                 if ( middle.isEmpty() )
                     old->split();
                 else
-                    old->split( middle );
+                    old->multiSplit( BSON_ARRAY ( middle ) );
 
                 return true;
             }
