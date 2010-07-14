@@ -1034,6 +1034,7 @@ rs.help = function () {
     print("\trs.initiate()                   { replSetInitiate : null } initiates set with default settings");
     print("\trs.initiate(cfg)                { replSetInitiate : cfg } initiates set with configuration cfg");
     print("\trs.add(hostportstr)             add a new member to the set with default attributes");
+    print("\trs.conf()                       return configuration from local.system.replset");
     print();
     print("\tdb.isMaster()                   check who is primary");
 }
@@ -1051,6 +1052,7 @@ rs.add = function (hostport) {
     c.members.push({ _id: max + 1, host: hostport });
     return db._adminCommand({ replSetReconfig: c });
 }
+rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
 
 help = shellHelper.help = function (x) {
     if (x == "connect") {
