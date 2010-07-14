@@ -638,14 +638,6 @@ namespace mongo {
         return ChunkPtr();
     }
 
-    namespace {
-        BSONObj fixUp(const BSONObj& in, const BSONObj& fields){
-            BSONObjBuilder b;
-            b.appendKeys(fields, in);
-            return b.obj();
-        }
-    }
-
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
         rwlock lk( _lock , false ); 
 
@@ -664,8 +656,8 @@ namespace mongo {
 
         BoundList ranges = frs.indexBounds(_key.key(), 1);
         for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it){
-            BSONObj minObj = fixUp(it->first, _key.key());
-            BSONObj maxObj = fixUp(it->second, _key.key());
+            BSONObj minObj = it->first.replaceFieldNames(_key.key());
+            BSONObj maxObj = it->second.replaceFieldNames(_key.key());
 
             ChunkRangeMap::const_iterator min, max;
             min = _chunkRanges.upper_bound(minObj);
