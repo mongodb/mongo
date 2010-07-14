@@ -178,6 +178,22 @@ namespace mongo {
         string _scopedHost;
     };
     
+    /** iterate over objects in current batch only - will not cause a network call
+     */
+    class DBClientCursorBatchIterator {
+    public:
+        DBClientCursorBatchIterator( DBClientCursor &c ) : _c( c ), _n() {}
+        bool moreInCurrentBatch() { return _c.moreInCurrentBatch(); }
+        BSONObj nextSafe() {
+            massert( 13345, "BatchIterator empty", moreInCurrentBatch() );
+            ++_n;
+            return _c.nextSafe();
+        }
+        int n() const { return _n; }
+    private:
+        DBClientCursor &_c;
+        int _n;
+    };
     
 } // namespace mongo
 

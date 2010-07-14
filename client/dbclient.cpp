@@ -164,6 +164,17 @@ namespace mongo {
         return o["ok"].trueValue();
     }
 
+    enum QueryOptions DBClientWithCommands::availableOptions() {
+        if ( !_haveCachedAvailableOptions ) {
+            BSONObj ret;
+            if ( runCommand( "admin", BSON( "availablequeryoptions" << 1 ), ret ) ) {
+                _cachedAvailableOptions = ( enum QueryOptions )( ret.getIntField( "options" ) );
+            }
+            _haveCachedAvailableOptions = true;
+        }
+        return _cachedAvailableOptions;
+    }
+    
     inline bool DBClientWithCommands::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options) {
         string ns = dbname + ".$cmd";
         info = findOne(ns, cmd, 0 , options);
@@ -575,19 +586,49 @@ namespace mongo {
         return auto_ptr< DBClientCursor >( 0 );
     }
 
-    unsigned long long DBClientConnection::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn ) {
+    struct DBClientFunConvertor {
+        void operator()( DBClientCursorBatchIterator &i ) {
+            while( i.moreInCurrentBatch() ) {
+                _f( i.nextSafe() );
+            }
+        }
+        boost::function<void(const BSONObj &)> _f;
+    };
+    
+    unsigned long long DBClientConnection::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
+        DBClientFunConvertor fun;
+        fun._f = f;
+        boost::function<void(DBClientCursorBatchIterator &)> ptr( fun );
+        return DBClientConnection::query( ptr, ns, query, fieldsToReturn, queryOptions );
+    }
+        
+    unsigned long long DBClientConnection::query( boost::function<void(DBClientCursorBatchIterator &)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
+        // mask options
+        queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
         unsigned long long n = 0;
 
+        bool doExhaust = ( availableOptions() & QueryOption_Exhaust );
+        if ( doExhaust ) {
+            queryOptions |= (int)QueryOption_Exhaust;            
+        }
+        auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
+        massert( 133082, "socket error for mapping query", c.get() );
+        
+        if ( !doExhaust ) {
+            while( c->more() ) {
+                DBClientCursorBatchIterator i( *c );
+                f( i );
+                n += i.n();
+            }
+            return n;
+        }
+
         try { 
-
-            auto_ptr<DBClientCursor> c(  
-              this->query(ns, query, 0, 0, fieldsToReturn, (int) QueryOption_Exhaust) );
-
             while( 1 ) { 
                 while( c->moreInCurrentBatch() ) { 
-                    BSONObj o = c->nextSafe();
-                    f(o);
-                    n++;
+                    DBClientCursorBatchIterator i( *c );
+                    f( i );
+                    n += i.n();
                 }
 
                 if( c->getCursorId() == 0 ) 
@@ -595,7 +636,6 @@ namespace mongo {
 
                 c->exhaustReceiveMore();
             }
-
         }
         catch(std::exception&) { 
             /* connection CANNOT be used anymore as more data may be on the way from the server.

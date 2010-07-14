@@ -68,7 +68,9 @@ namespace mongo {
             Use the query( boost::function<void(const BSONObj&)> f, ... ) version of the connection's query() 
             method, and it will take care of all the details for you.
         */
-        QueryOption_Exhaust = 1 << 6
+        QueryOption_Exhaust = 1 << 6,
+        
+        QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust
 
     };
 
@@ -174,6 +176,7 @@ namespace mongo {
     class BSONObj;
     class ScopedDbConnection;
     class DBClientCursor;
+    class DBClientCursorBatchIterator;
 
     /** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a Query object. 
         Examples:
@@ -342,7 +345,7 @@ namespace mongo {
         /** controls how chatty the client is about network errors & such.  See log.h */
         int _logLevel;
 
-        DBClientWithCommands() : _logLevel(0) { }
+        DBClientWithCommands() : _logLevel(0), _cachedAvailableOptions( (enum QueryOptions)0 ), _haveCachedAvailableOptions(false) { }
 
         /** helper function.  run a simple command where the command expression is simply
               { command : 1 }
@@ -641,7 +644,12 @@ namespace mongo {
 
     protected:
         bool isOk(const BSONObj&);
-
+        
+        enum QueryOptions availableOptions();
+        
+    private:
+        enum QueryOptions _cachedAvailableOptions;
+        bool _haveCachedAvailableOptions;
     };
     
     /**
@@ -789,7 +797,8 @@ namespace mongo {
 
         /** uses QueryOption_Exhaust 
          */
-        unsigned long long query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0);
+        unsigned long long query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        unsigned long long query( boost::function<void(DBClientCursorBatchIterator&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /**
            @return true if this connection is currently in a failed state.  When autoreconnect is on, 
