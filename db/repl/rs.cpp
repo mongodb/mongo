@@ -236,6 +236,7 @@ namespace mongo {
 
         //assert( _members.head() == 0 );
         _members.orphanAll();
+        _self = 0;
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
             if( m.h.isSelf() ) {
@@ -247,7 +248,6 @@ namespace mongo {
                 _members.push(mi);
             }
         }
-
         return true;
     }
 
@@ -323,7 +323,7 @@ namespace mongo {
                         log() << "replSet sleeping 20sec and will try again." << rsLog;
                     }
 
-                    sleepsecs(20);
+                    sleepsecs(10);
                     continue;
                 }
 
@@ -356,8 +356,8 @@ namespace mongo {
 
 
     void ReplSet::haveNewConfig(ReplSetConfig& newConfig) { 
+        lock l(this); // convention is to lock replset before taking the db rwlock
         writelock lk("");
-        lock l(this);
         bo comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
         newConfig.saveConfigLocally(comment);
         try { 

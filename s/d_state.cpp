@@ -541,8 +541,20 @@ namespace mongo {
     }
 
     void ChunkMatcher::gotRange( const BSONObj& min , const BSONObj& max ){
-        assert( min.nFields() == 1 );
-        _field = min.firstElement().fieldName();
+        if (_key.isEmpty()){
+            BSONObjBuilder b;
+
+            BSONForEach(e, min) {
+                b.append(e.fieldName(), 1);
+            }
+
+            _key = b.obj();
+        }
+
+        //TODO debug mode only?
+        assert(min.nFields() == _key.nFields());
+        assert(max.nFields() == _key.nFields());
+
         _map[min] = make_pair(min,max);
     }
 
@@ -550,7 +562,7 @@ namespace mongo {
         if ( _map.size() == 0 )
             return false;
         
-        BSONObj x = loc.obj().getFieldDotted( _field.c_str() ).wrap( _field.c_str() ); // TODO: this is slow
+        BSONObj x = loc.obj().extractFields(_key);
         
         MyMap::const_iterator a = _map.upper_bound( x );
         a--;
