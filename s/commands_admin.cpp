@@ -560,8 +560,11 @@ namespace mongo {
 
                 if ( middle.isEmpty() )
                     old->split();
-                else
-                    old->multiSplit( BSON_ARRAY ( middle ) );
+                else {
+                    vector<BSONObj> splitPoints;
+                    splitPoints.push_back( middle );
+                    old->multiSplit( splitPoints );
+                }
 
                 return true;
             }
