@@ -313,7 +313,7 @@ def expandSuites(suites):
     for suite in suites:
         if suite == 'smokeAll':
             tests = []
-            expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlow', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
+            expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlowNightly', 'smokeJsSlowWeekly', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
             break
         if suite == 'smoke':
             if os.sys.platform == "win32":
@@ -337,8 +337,10 @@ def expandSuites(suites):
             (globstr, usedb) = ('perf/*.js', True)
         elif suite == 'smokeDisk':
             (globstr, usedb) = ('disk/*.js', True)
-        elif suite == 'smokeJsSlow':
-            (globstr, usedb) = ('slow/*.js', True)
+        elif suite == 'smokeJsSlowNightly':
+            (globstr, usedb) = ('slowNightly/*.js', True)
+        elif suite == 'smokeJsSlowWeekly':
+            (globstr, usedb) = ('slowNightly/*.js', True)
         elif suite == 'smokeParallel':
             (globstr, usedb) = ('parallel/*.js', True)
         elif suite == 'smokeClone':
