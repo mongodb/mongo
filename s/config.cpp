@@ -95,6 +95,7 @@ namespace mongo {
         _sharded[ns] = CollectionInfo( fieldsAndOrder , unique );
 
         info.reset( new ChunkManager( this , ns , fieldsAndOrder , unique ) );
+        info->maybeChunkCollection();
         _shards[ns] = info;
         return info;
 
@@ -529,7 +530,7 @@ namespace mongo {
 
         BSONObj msg = BSON( "_id" << id.str() << "server" << getHostNameCached() << "time" << DATENOW <<
                             "what" << what << "ns" << ns << "details" << detail );
-        log() << msg << endl;
+        log() << "config change: " << msg << endl;
         conn->insert( "config.changelog" , msg );
         
         conn.done();
