@@ -715,6 +715,10 @@ namespace mongo {
             for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
                 shards.insert(it->second->getShard());
             }
+
+            // once we know we need to visit all shards no need to keep looping
+            if (shards.size() == _shards.size())
+                break;
         }
     }
 
