@@ -254,7 +254,6 @@ namespace mongo {
         DistributedLock balanceLock( config , "balancer" );
 
         while ( ! inShutdown() ){
-            sleepsecs( 10 );
             
             try {
                 ScopedDbConnection conn( config );
@@ -263,11 +262,14 @@ namespace mongo {
                 if ( ! _checkOIDs() ){
                     uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
                 }
-                                    
+                
                 dist_lock_try lk( &balanceLock , "doing balance round" );
                 if ( ! lk.got() ){
                     log(1) << "skipping balancing round during ongoing split or move activity." << endl;
                     conn.done();
+
+                    sleepsecs( 30 ); // no need to wake up soon
+
                     continue;
                 }
                         
@@ -283,6 +285,8 @@ namespace mongo {
 
                 log(1) << "*** end of balancing round" << endl;        
                 conn.done();
+
+                sleepsecs( _balancedLastTime ? 5 : 10 );
             }
             catch ( std::exception& e ){
                 log() << "caught exception while doing balance: " << e.what() << endl;
