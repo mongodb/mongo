@@ -288,6 +288,9 @@ ShardingTest.prototype.printChangeLog = function(){
             if ( z.what == "split" ){
                 msg += s._rangeToString( z.details.before ) + " -->> (" + s._rangeToString( z.details.left ) + "),(" + s._rangeToString( z.details.right ) + ")";
             }
+            else if (z.what == "multi-split" ){
+                msg += s._rangeToString( z.details.before ) + "  -->> (" + z.details.number + "/" + z.details.of + " " + s._rangeToString( z.details.chunk ) + ")"; 
+            }
             else {
                 msg += tojsononeline( z.details );
             }

@@ -57,6 +57,16 @@ namespace mongo {
             : _combined( ll ){
         }
         
+        ShardChunkVersion( const BSONElement& e ){
+            if ( e.type() == Date || e.type() == Timestamp ){
+                _combined = e._numberLong();
+            }
+            else {
+                log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
+                assert(0);
+            }
+        }
+
         ShardChunkVersion incMajor() const {
             return ShardChunkVersion( _major + 1 , 0 );
         }
@@ -155,7 +165,9 @@ namespace mongo {
 
         BSONObj pickSplitPoint() const;
         ChunkPtr split();
-        ChunkPtr split( const BSONObj& middle );
+
+        BSONArray pickSplitVector() const;
+        ChunkPtr multiSplit( const BSONArray& middle );
 
         /**
          * @return size of shard in bytes
@@ -322,6 +334,8 @@ namespace mongo {
         ShardKeyPattern& getShardKey(){  return _key; }
         const ShardKeyPattern& getShardKey() const {  return _key; }
         bool isUnique(){ return _unique; }
+
+        void maybeChunkCollection();
         
         /**
          * makes sure the shard index is on all servers

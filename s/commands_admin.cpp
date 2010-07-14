@@ -463,7 +463,7 @@ namespace mongo {
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ShardConnection::sync();
 
-                string ns = cmdObj[_name.c_str()].valuestrsafe();
+                string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
@@ -525,7 +525,7 @@ namespace mongo {
                 if ( middle.isEmpty() )
                     old->split();
                 else
-                    old->split( middle );
+                    old->multiSplit( BSON_ARRAY ( middle ) );
 
                 return true;
             }
