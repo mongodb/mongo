@@ -73,5 +73,14 @@ end = new Date()
 print( "elapsed: " + ( end.getTime() - start.getTime() ) );
 
 
+x = db.runCommand( "fsync" )
+assert( ! x.ok , "fsync not on admin should fail : " + tojson( x ) );
+assert( x.errmsg.indexOf( "access denied" ) >= 0 , "fsync not on admin should fail : " + tojson( x ) )
+
+x = db._adminCommand( "fsync" )
+assert( x.ok == 1 && x.numFiles > 0 , "fsync failed : " + tojson( x ) )
+
+x = db._adminCommand( { "fsync" :1, lock:true } )
+assert( ! x.ok , "lock should fail: " + tojson( x ) )
 
 s.stop()

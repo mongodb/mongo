@@ -166,6 +166,42 @@ namespace mongo {
             }
         } listGridCommands;
 
+        class FsyncCommand : public GridAdminCmd {
+        public:
+            FsyncCommand() : GridAdminCmd( "fsync" ){}
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                if ( cmdObj["lock"].trueValue() ){
+                    errmsg = "can't do lock through mongos";
+                    return false;
+                }
+                
+                BSONObjBuilder sub;
+
+                bool ok = true;
+                int numFiles = 0;
+                
+                vector<Shard> shards;
+                Shard::getAllShards( shards );
+                for ( vector<Shard>::iterator i=shards.begin(); i!=shards.end(); i++ ){
+                    Shard s = *i;
+
+                    BSONObj x = s.runCommand( "admin" , "fsync" );
+                    sub.append( s.getName() , x );
+
+                    if ( ! x["ok"].trueValue() ){
+                        ok = false;
+                        errmsg = x["errmsg"].String();
+                    }
+                    
+                    numFiles += x["numFiles"].numberInt();
+                }
+                
+                result.append( "numFiles" , numFiles );
+                result.append( "all" , sub.obj() );
+                return ok;
+            }
+        } fsyncCmd;
+
         // ------------ database level commands -------------
 
         class ListDatabaseCommand : public GridAdminCmd {
