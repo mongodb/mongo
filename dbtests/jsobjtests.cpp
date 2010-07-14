@@ -1578,6 +1578,20 @@ namespace JsobjTests {
         }
     };
 
+    class StringDataTest {
+    public:
+        void run(){
+            StringData a( string( "aaa" ) );
+            ASSERT_EQUALS( 3u , a.size );
+
+            StringData b( string( "bbb" ).c_str() );
+            ASSERT_EQUALS( 3u , b.size );
+
+            StringData c( StringData( "ccc", StringData::LiteralTag() ) );
+            ASSERT_EQUALS( 3u , c.size );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1676,6 +1690,7 @@ namespace JsobjTests {
             add< BuilderPartialItearte >();
             add< BSONFieldTests >();
             add< BSONForEachTest >();
+            add< StringDataTest >();
         }
     } myall;
     
