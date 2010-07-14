@@ -276,7 +276,11 @@ namespace mongo {
             return true;
         }
     };
+
+    /** helpers ----------------- */
     
+    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet );
+
     /** inlines ----------------- */
 
     inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 

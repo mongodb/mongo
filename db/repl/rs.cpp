@@ -112,13 +112,12 @@ namespace mongo {
     }
 */
 
-    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds) { 
+    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet ) { 
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
         uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
         setname = string(p, slash-p);
 
-        set<HostAndPort> seedSet;
         p = slash + 1;
         while( 1 ) {
             const char *comma = strchr(p, ',');
@@ -152,47 +151,14 @@ namespace mongo {
         _self(0), 
         mgr( new Manager(this) )
     {
-        // todo: call parseReplSetCmdLine here instead of this redundant code
         h = 0;
         _myState = STARTUP;
         _currentPrimary = 0;
 
-        const char *p = cfgString.c_str(); 
-        const char *slash = strchr(p, '/');
-        uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
-        _name = string(p, slash-p);
-
-        log() << "replSet startup " << cfgString << rsLog;
-
-        set<HostAndPort> seedSet;
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
-        p = slash + 1;
-        while( 1 ) {
-            const char *comma = strchr(p, ',');
-            if( comma == 0 ) comma = strchr(p,0);
-            if( p == comma )
-                break;
-            //uassert(13094, "bad --replSet config string", p != comma);
-            {
-                HostAndPort m;
-                try {
-                    m = HostAndPort( string(p, comma-p) );
-                }
-                catch(...) {
-                    uassert(13114, "bad --replSet seed hostname", false);
-                }
-                uassert(13096, "bad --replSet config string - dups?", seedSet.count(m) == 0 );
-                seedSet.insert(m);
-                uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
-                if( m.isSelf() )
-                    log() << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
-                else
-                    seeds->push_back(m);
-                if( *comma == 0 )
-                    break;
-                p = comma + 1;
-            }
-        }
+        set<HostAndPort> seedSet;
+
+        parseReplsetCmdLine( cfgString , _name ,*seeds , seedSet );
 
         _seeds = seeds;
         //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )

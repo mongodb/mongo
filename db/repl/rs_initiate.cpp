@@ -87,8 +87,6 @@ namespace mongo {
         }
     }
 
-    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds);
-
     class CmdReplSetInitiate : public ReplSetCommand { 
     public:
         virtual LockType locktype() const { return NONE; }
@@ -152,13 +150,14 @@ namespace mongo {
 
                 string name;
                 vector<HostAndPort> seeds;
-                parseReplsetCmdLine(cmdLine.replSet, name, seeds); // may throw...
+                set<HostAndPort> seedSet;
+                parseReplsetCmdLine(cmdLine.replSet, name, seeds, seedSet); // may throw...
 
                 bob b;
                 b.append("_id", name);
                 bob members;
                 members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::me().toString() ));
-                for( int i = 0; i < seeds.size(); i++ )
+                for( unsigned i = 0; i < seeds.size(); i++ )
                     members.append(bob::numStr(i), BSON( "_id" << i << "host" << seeds[i].toString()));
                 b.appendArray("members", members.obj());
                 configObj = b.obj();
