@@ -1563,6 +1563,21 @@ namespace JsobjTests {
         }
     };
 
+    class BSONForEachTest {
+    public:
+        void run(){
+            BSONObj obj = BSON("a" << 1 << "a" << 2 << "a" << 3);
+            
+            int count = 0;
+            BSONForEach(e, obj){
+                ASSERT_EQUALS( e.fieldName() , string("a") );
+                count += e.Int();
+            }
+
+            ASSERT_EQUALS( count , 1+2+3 );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1660,6 +1675,7 @@ namespace JsobjTests {
             add< EmbeddedNumbers >();
             add< BuilderPartialItearte >();
             add< BSONFieldTests >();
+            add< BSONForEachTest >();
         }
     } myall;
     

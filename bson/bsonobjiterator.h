@@ -17,8 +17,9 @@
 
 #pragma once
 
-namespace mongo {
+#include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__
 
+namespace mongo {
     /** iterator for a BSONObj
 
        Note each BSONObj ends with an EOO element: so you will get more() on an empty
@@ -101,5 +102,30 @@ namespace mongo {
         int _cur;
     };
 
+/** Similar to BOOST_FOREACH
+ *
+ *  because the iterator is defined outside of the for, you must use {} around
+ *  the surrounding scope. Don't do this:
+ *
+ *  if (foo)
+ *      BSONForEach(e, obj)
+ *          doSomething(e);
+ *
+ *  but this is OK:
+ *
+ *  if (foo) {
+ *      BSONForEach(e, obj)
+ *          doSomething(e);
+ *  }
+ *
+ */
+
+#define BSONForEach(e, obj)                                     \
+    BSONObjIterator BOOST_PP_CAT(it_,__LINE__)(obj);            \
+    for ( BSONElement e;                                        \
+          (BOOST_PP_CAT(it_,__LINE__).more() ?                  \
+               (e = BOOST_PP_CAT(it_,__LINE__).next(), true) :  \
+               false) ;                                         \
+          /*nothing*/ )
 
 }

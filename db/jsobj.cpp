@@ -736,31 +736,6 @@ namespace mongo {
             return nullElement;
     }
 
-    /* makes a new BSONObj with the fields specified in pattern.
-       fields returned in the order they appear in pattern.
-       if any field missing or undefined in the original object, that field
-       in the output will be null.
-
-       n^2 implementation bad if pattern and object have lots
-       of fields - normally pattern doesn't so should be fine.
-    */
-    BSONObj BSONObj::extractFieldsDotted(BSONObj pattern) const {
-        BSONObjBuilder b;
-        BSONObjIterator i(pattern);
-        while (i.more()) {
-            BSONElement e = i.next();
-            const char *name = e.fieldName();
-
-            BSONElement x = getFieldDotted( name );
-            if ( x.eoo() || x.type() == Undefined ) {
-                b.appendNull(name);
-            } else {
-                b.appendAs(x, name);
-            }
-        }
-        return b.done();
-    }
-
     /**
      sets element field names to empty string
      If a field in pattern is missing, it is omitted from the returned

@@ -30,9 +30,6 @@ namespace mongo {
 
     // -----------
 
-    /**
-     * TODO: this only works with single fields at the moment
-     */
     class ChunkMatcher {
         typedef map<BSONObj,pair<BSONObj,BSONObj>,BSONObjCmp> MyMap;
     public:
@@ -45,7 +42,7 @@ namespace mongo {
         void gotRange( const BSONObj& min , const BSONObj& max );
         
         ConfigVersion _version;
-        string _field;
+        BSONObj _key;
         MyMap _map;
         
         friend class ShardingState;
