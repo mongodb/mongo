@@ -744,11 +744,13 @@ namespace mongo {
     }
 
     void writePid(int fd) {
+#if !defined(_WIN32) && !defined(__sunos__)
             stringstream ss;
             ss << getpid() << endl;
             string s = ss.str();
             const char * data = s.c_str();
             assert ( write( fd, data, strlen( data ) ) );
+#endif
     }
     void acquirePathLock() {
 #if !defined(_WIN32) && !defined(__sunos__)
@@ -788,6 +790,7 @@ namespace mongo {
     }
 
     void maybeCreatePidFile() {
+#if !defined(_WIN32) && !defined(__sunos__)
         if (!(pidfilepath.empty())) {
             int pidfd;
             int oflags = O_CREAT|O_TRUNC|O_WRONLY;
@@ -797,6 +800,7 @@ namespace mongo {
             writePid(pidfd);
             assert( close( pidfd ) == 0 );
         }
+#endif        
     }
     
 } // namespace mongo
