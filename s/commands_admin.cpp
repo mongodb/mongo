@@ -377,6 +377,13 @@ namespace mongo {
                     return false;
                 }
 
+                BSONForEach(e, key){
+                    if (e.isNumber() || e.number() != 1.0){
+                        errmsg = "shard keys must all be ascending";
+                        return false;
+                    }
+                }
+
                 if ( ns.find( ".system." ) != string::npos ){
                     errmsg = "can't shard system namespaces";
                     return false;
