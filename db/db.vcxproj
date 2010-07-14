@@ -569,7 +569,6 @@
     <None Include="..\SConstruct" />
     <None Include="..\util\mongoutils\README" />
     <None Include="mongo.ico" />
-    <None Include="readme.txt" />
     <None Include="repl\notes.txt" />
     <None Include="repl\test.html" />
     <None Include="repl\testing.js" />

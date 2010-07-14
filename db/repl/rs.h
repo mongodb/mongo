@@ -248,6 +248,8 @@ namespace mongo {
         /* if we delete old configs, this needs to assure locking. currently we don't so it is ok. */
         const ReplSetConfig& getConfig() { return config(); }
 
+        bool lockedByMe() { return RSBase::lockedByMe(); }
+
     };
 
     /** base class for repl set commands.  checks basic things such as in rs mode before the command 

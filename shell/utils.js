@@ -1,4 +1,3 @@
-
 __quiet = false;
 __magicNoPrint = { __magicNoPrint : 1111 }
 
@@ -844,65 +843,6 @@ shellHelper = function( command , rest , shouldPrint ){
     return res;
 }
 
-help = shellHelper.help = function (x) {
-    if (x == "connect") {
-        print("\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
-        print("Additional connections may be opened:\n");
-        print("    var x = new Mongo('host[:port]');");
-        print("    var mydb = x.getDB('mydb');");
-        print("  or");
-        print("    var mydb = connect('host[:port]/mydb');");
-        print("\nNote: the REPL prompt only auto-reports getLastError() for the shell command line connection.\n");
-        return;
-    }
-    if (x == "misc") {
-        print("\tb = new BinData(subtype,base64str)  create a BSON BinData value");
-        print("\tb.subtype()                         the BinData subtype (0..255)");
-        print("\tb.length()                          length of the BinData data in bytes");
-        print("\tb.hex()                             the data as a hex encoded string");
-        print("\tb.base64()                          the data as a base 64 encoded string");
-        print("\tb.toString()");
-        return;
-    }
-    if (x == "admin") {
-        print("\tls([path])                      list files");
-        print("\tpwd()                           returns current directory");
-        print("\tlistFiles([path])               returns file list");
-        print("\thostname()                      returns name of this host");
-        print("\tcat(fname)                      returns contents of text file as a string");
-        print("\tremoveFile(f)                   delete a file");
-        print("\tload(jsfilename)                load and execute a .js file");
-        print("\trun(program[, args...])         spawn a program and wait for its completion");
-        print("\tsleep(m)                        sleep m milliseconds");
-        print("\tgetMemInfo()                    diagnostic");
-        return;
-    }
-    if (x == "test") {
-        print("\tstartMongodEmpty(args)        DELETES DATA DIR and then starts mongod");
-        print("\t                              returns a connection to the new server");
-        print("\tstartMongodTest()             DELETES DATA DIR");
-        print("\t                              automatically picks port #s starting at 27000 and increasing");
-        print("\t                              or you can specify the port as the first arg");
-        print("\t                              dir is /data/db/<port>/ if not specified as the 2nd arg");
-        print("\t                              returns a connection to the new server");
-        return;
-    }
-    print("\t" + "help connect                 connecting to a db help");
-    print("\t" + "help admin                   administrative help");
-    print("\t" + "help misc                    misc things to know");
-    print("\t" + "show dbs                     show database names");
-    print("\t" + "show collections             show collections in current database");
-    print("\t" + "show users                   show users in current database");
-    print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
-    print("\t" + "use <db name>                set current database to <db name>");
-    print("\t" + "db.help()                    help on db methods");
-    print("\t" + "db.foo.help()                help on collection methods");
-    print("\t" + "db.foo.find()                list objects in collection foo");
-    print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
-    print("\t" + "it                           result of the last line evaluated; use to further iterate");
-    print("\t" + "exit                         quit the mongo shell");
-}
-
 shellHelper.use = function( dbname ){
     db = db.getMongo().getDB( dbname );
     print( "switched to db " + db.getName() );
@@ -1086,4 +1026,76 @@ Geo.distance = function( a , b ){
 
     return Math.sqrt( Math.pow( by - ay , 2 ) + 
                       Math.pow( bx - ax , 2 ) );
+}
+
+rs = {};
+rs.help = function () {
+    print("\trs.status()                     { replSetGetStatus : 1 } checks repl set status");
+    print("\trs.initiate()                   { replSetInitiate : null } initiates set with default settings");
+    print("\trs.initiate(cfg)                { replSetInitiate : cfg } initiates set with configuration cfg");
+    print();
+    print("\tdb.isMaster()                   check who is primary");
+}
+rs.status = function () { return db._adminCommand("replSetGetStatus"); }
+rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
+
+help = shellHelper.help = function (x) {
+    if (x == "connect") {
+        print("\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
+        print("Additional connections may be opened:\n");
+        print("    var x = new Mongo('host[:port]');");
+        print("    var mydb = x.getDB('mydb');");
+        print("  or");
+        print("    var mydb = connect('host[:port]/mydb');");
+        print("\nNote: the REPL prompt only auto-reports getLastError() for the shell command line connection.\n");
+        return;
+    }
+    if (x == "misc") {
+        print("\tb = new BinData(subtype,base64str)  create a BSON BinData value");
+        print("\tb.subtype()                         the BinData subtype (0..255)");
+        print("\tb.length()                          length of the BinData data in bytes");
+        print("\tb.hex()                             the data as a hex encoded string");
+        print("\tb.base64()                          the data as a base 64 encoded string");
+        print("\tb.toString()");
+        return;
+    }
+    if (x == "admin") {
+        print("\tls([path])                      list files");
+        print("\tpwd()                           returns current directory");
+        print("\tlistFiles([path])               returns file list");
+        print("\thostname()                      returns name of this host");
+        print("\tcat(fname)                      returns contents of text file as a string");
+        print("\tremoveFile(f)                   delete a file");
+        print("\tload(jsfilename)                load and execute a .js file");
+        print("\trun(program[, args...])         spawn a program and wait for its completion");
+        print("\tsleep(m)                        sleep m milliseconds");
+        print("\tgetMemInfo()                    diagnostic");
+        return;
+    }
+    if (x == "test") {
+        print("\tstartMongodEmpty(args)        DELETES DATA DIR and then starts mongod");
+        print("\t                              returns a connection to the new server");
+        print("\tstartMongodTest()             DELETES DATA DIR");
+        print("\t                              automatically picks port #s starting at 27000 and increasing");
+        print("\t                              or you can specify the port as the first arg");
+        print("\t                              dir is /data/db/<port>/ if not specified as the 2nd arg");
+        print("\t                              returns a connection to the new server");
+        return;
+    }
+    print("\t" + "db.help()                    help on db methods");
+    print("\t" + "db.mycoll.help()             help on collection methods");
+    print("\t" + "help connect                 connecting to a db help");
+    print("\t" + "help admin                   administrative help");
+    print("\t" + "help misc                    misc things to know");
+    print("\t" + "rs.help()                    help on replica set methods");
+    print();
+    print("\t" + "show dbs                     show database names");
+    print("\t" + "show collections             show collections in current database");
+    print("\t" + "show users                   show users in current database");
+    print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+    print("\t" + "use <db_name>                set current database");
+    print("\t" + "db.foo.find()                list objects in collection foo");
+    print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
+    print("\t" + "it                           result of the last line evaluated; use to further iterate");
+    print("\t" + "exit                         quit the mongo shell");
 }

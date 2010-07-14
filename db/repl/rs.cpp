@@ -111,11 +111,48 @@ namespace mongo {
 
     }
 */
+
+    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds) { 
+        const char *p = cfgString.c_str(); 
+        const char *slash = strchr(p, '/');
+        uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
+        setname = string(p, slash-p);
+
+        set<HostAndPort> seedSet;
+        p = slash + 1;
+        while( 1 ) {
+            const char *comma = strchr(p, ',');
+            if( comma == 0 ) comma = strchr(p,0);
+            if( p == comma )
+                break;
+            {
+                HostAndPort m;
+                try {
+                    m = HostAndPort( string(p, comma-p) );
+                }
+                catch(...) {
+                    uassert(13114, "bad --replSet seed hostname", false);
+                }
+                uassert(13096, "bad --replSet config string - dups?", seedSet.count(m) == 0 );
+                seedSet.insert(m);
+                uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
+                if( m.isSelf() ) {
+                    log() << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
+                } else
+                    seeds.push_back(m);
+                if( *comma == 0 )
+                    break;
+                p = comma + 1;
+            }
+        }
+    }
+
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
     ReplSetImpl::ReplSetImpl(string cfgString) : elect(this), 
         _self(0), 
         mgr( new Manager(this) )
     {
+        // todo: call parseReplSetCmdLine here instead of this redundant code
         h = 0;
         _myState = STARTUP;
         _currentPrimary = 0;
@@ -207,7 +244,8 @@ namespace mongo {
 
     // true if ok; throws if config really bad; false if config doesn't include self
     bool ReplSetImpl::initFromConfig(ReplSetConfig& c) {
-        assert( lockedByMe() );
+        lock lk(this);
+
         {
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 

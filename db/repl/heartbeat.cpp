@@ -93,6 +93,10 @@ namespace mongo {
         // we might be talking to ourself - generally not a great idea to do outbound waiting calls in a write lock
         assert( !dbMutex.isWriteLocked() );
 
+        // these are slow (multisecond to respond), so generally we don't want to be locked, at least not without
+        // thinking acarefully about it first.
+        assert( theReplSet == 0 || !theReplSet->lockedByMe() );
+
         ScopedConn conn(memberFullName);
         return conn->runCommand("admin", cmd, result);
     }
