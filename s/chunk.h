@@ -166,8 +166,8 @@ namespace mongo {
         BSONObj pickSplitPoint() const;
         ChunkPtr split();
 
-        BSONArray pickSplitVector() const;
-        ChunkPtr multiSplit( const BSONArray& middle );
+        void pickSplitVector( vector<BSONObj>* splitPoints ) const;
+        ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
 
         /**
          * @return size of shard in bytes
