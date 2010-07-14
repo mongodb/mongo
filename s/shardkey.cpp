@@ -21,51 +21,30 @@
 #include "../db/jsobj.h"
 #include "../util/unittest.h"
 
-/**
-   TODO: this only works with numbers right now
-         this is very temporary, need to make work with anything
-*/
-
 namespace mongo {
-    void minForPat(BSONObjBuilder& out, const BSONObj& pat){
-        BSONElement e = pat.firstElement();
-        if (e.type() == Object){
-            BSONObjBuilder sub;
-            minForPat(sub, e.embeddedObject());
-            out.append(e.fieldName(), sub.obj());
-        } else {
-            out.appendMinKey(e.fieldName());
-        }
-    }
-
-    void maxForPat(BSONObjBuilder& out, const BSONObj& pat){
-        BSONElement e = pat.firstElement();
-        if (e.type() == Object){
-            BSONObjBuilder sub;
-            maxForPat(sub, e.embeddedObject());
-            out.append(e.fieldName(), sub.obj());
-        } else {
-            out.appendMaxKey(e.fieldName());
-        }
-    }
 
     ShardKeyPattern::ShardKeyPattern( BSONObj p ) : pattern( p.getOwned() ) {
         pattern.getFieldNames(patternfields);
 
         BSONObjBuilder min;
-        minForPat(min, pattern);
-        gMin = min.obj();
-
         BSONObjBuilder max;
-        maxForPat(max, pattern);
+
+        BSONObjIterator it(p);
+        while (it.more()){
+            BSONElement e (it.next());
+            min.appendMinKey(e.fieldName());
+            max.appendMaxKey(e.fieldName());
+        }
+        
+        gMin = min.obj();
         gMax = max.obj();
     }
 
     int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
         BSONObj L = extractKey(lObject);
-        uassert( 10198 , "left object doesn't have shard key", !L.isEmpty());
+        uassert( 10198 , "left object doesn't have full shard key", L.nFields() == (int)patternfields.size());
         BSONObj R = extractKey(rObject);
-        uassert( 10199 , "right object doesn't have shard key", !R.isEmpty());
+        uassert( 10199 , "right object doesn't have full shard key", R.nFields() == (int)patternfields.size());
         return L.woCompare(R);
     }
 
@@ -159,11 +138,11 @@ namespace mongo {
             assert( x.woEqual(b.obj()) );
         }
         void extractkeytest() { 
-            ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
+            ShardKeyPattern k( fromjson("{a:1,'sub.b':-1,'sub.c':1}") );
 
-            BSONObj x = fromjson("{a:1,b:2,c:3}");
-            assert( k.extractKey( fromjson("{a:1,b:2,c:3}") ).woEqual(x) );
-            assert( k.extractKey( fromjson("{b:2,c:3,a:1}") ).woEqual(x) );
+            BSONObj x = fromjson("{a:1,'sub.b':2,'sub.c':3}");
+            assert( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).woEqual(x) );
+            assert( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).woEqual(x) );
         }
         void run(){
             extractkeytest();
