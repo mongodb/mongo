@@ -16,7 +16,7 @@ while ( bigString.length < 10000 )
 
 inserted = 0;
 num = 0;
-while ( inserted < ( 20 * 1024 * 1024 ) ){
+while ( inserted < ( 40 * 1024 * 1024 ) ){
     db.foo.insert( { _id : num++ , s : bigString } );
     inserted += bigString.length;
 }
@@ -43,7 +43,7 @@ function diff(){
     return Math.max( x.shard0 , x.shard1 ) - Math.min( x.shard0 , x.shard1 );
 }
 
-assert.lt( 20 , diff() );
+assert.lt( 10 , diff() );
 
 // Wait for balancer to kick in.
 var initialDiff = diff();
