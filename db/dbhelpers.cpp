@@ -262,8 +262,6 @@ namespace mongo {
         cc->setDoingDeletes( true );
         
         while ( c->ok() ){
-            cout << "want to delete : " << c->current() << endl;
-
             DiskLoc rloc = c->currLoc();
             BSONObj key = c->currKey();
 
