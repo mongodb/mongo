@@ -96,6 +96,7 @@ namespace mongo {
         b.appendBool( "writeBack" , true );
         b.append( "ns" , ns );
         b.appendTimestamp( "version" , shardingState.getVersion( ns ) );
+        b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
         log() << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
         queueWriteBack( clientID.str() , b.obj() );
