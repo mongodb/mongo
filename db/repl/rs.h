@@ -139,6 +139,8 @@ namespace mongo {
         bool lockedByMe() { return _lockedByMe.get(); } 
     };
 
+    class ReplSetHealthPollTask;
+
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
              singleton and long lived.
@@ -166,6 +168,10 @@ namespace mongo {
         long long h;
     private:
         unsigned _selfId; // stored redundantly we hit this a lot
+
+        set<ReplSetHealthPollTask*> healthTasks;
+        void endOldHealthTasks();
+        void startHealthTaskFor(Member *m);
 
     private:
         Consensus elect;
