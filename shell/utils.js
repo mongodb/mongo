@@ -170,6 +170,23 @@ assert.gt = function( a , b , msg ){
     doassert( a + " is not greater than " + b + " : " + msg );
 }
 
+assert.lte = function( a , b , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
+    if ( a <= b )
+        return;
+    doassert( a + " is not less than or eq " + b + " : " + msg );
+}
+
+assert.gte = function( a , b , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
+    if ( a >= b )
+        return;
+    doassert( a + " is not greater than or eq " + b + " : " + msg );
+}
+
+
 assert.close = function( a , b , msg , places ){
     if (places === undefined) {
         places = 4;
