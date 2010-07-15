@@ -45,6 +45,201 @@ using namespace std;
 
 namespace mongo {
 
+    class ChunkCommandHelper : public Command {
+    public:
+        ChunkCommandHelper( const char * name ) 
+            : Command( name ){
+        }
+        
+        virtual void help( stringstream& help ) const {
+            help << "internal should not be calling this directly" << endl;
+        }
+        virtual bool slaveOk() const { return false; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; } 
+
+    };
+
+
+    class MigrateFromStatus {
+    public:
+        
+        MigrateFromStatus()
+            : _mutex( "MigrateFromStatus" ){
+            _active = false;
+        }
+
+        void start( string ns , const BSONObj& min , const BSONObj& max ){
+            assert( ! _active );
+            
+            assert( ! min.isEmpty() );
+            assert( ! max.isEmpty() );
+            assert( ns.size() );
+            
+            _ns = ns;
+            _min = min;
+            _max = max;
+            
+            _deleted.clear();
+            _reload.clear();
+            
+            _active = true;
+        }
+
+        void done(){
+            if ( ! _active )
+                return;
+            _active = false;
+
+            scoped_lock lk( _mutex );
+            _deleted.clear();
+            _reload.clear();
+        }
+        
+        void logOp( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ){
+            if ( ! _active )
+                return;
+
+            if ( _ns != ns )
+                return;
+            
+            char op = opstr[0];
+            if ( op == 'n' || op =='c' || ( op == 'd' && opstr[1] == 'b' ) )
+                return;
+
+            BSONElement ide;
+            if ( patt )
+                ide = patt->getField( "_id" );
+            else 
+                ide = obj["_id"];
+            
+            if ( ide.eoo() ){
+                log( LL_WARNING ) << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << endl;
+                return;
+            }
+            
+            BSONObj it;
+
+            switch ( opstr[0] ){
+                
+            case 'd': {
+                // can't filter deletes :(
+                scoped_lock lk( _mutex );
+                _deleted.push_back( ide.wrap() );
+                return;
+            }
+                
+            case 'i': 
+                it = obj;
+                break;
+                
+            case 'u': 
+                if ( ! Helpers::findById( cc() , _ns.c_str() , ide.wrap() , it ) ){
+                    log( LL_WARNING ) << "logOpForSharding couldn't find: " << ide << " even though should have" << endl;
+                    return;
+                }
+                break;
+                
+            }
+
+            BSONObj k = it.extractFields( _min, true );
+
+            if ( k.woCompare( _min ) < 0 ||
+                 k.woCompare( _max ) >= 0 )
+                return;
+            
+            scoped_lock lk( _mutex );
+            _reload.push_back( ide.wrap() );
+        }
+
+        void xfer( list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ){
+            static long long maxSize = 1024 * 1024;
+            
+            if ( l->size() == 0 || size > maxSize )
+                return;
+            
+            BSONArrayBuilder arr(b.subarrayStart(name));
+            
+            list<BSONObj>::iterator i = l->begin(); 
+            
+            while ( i != l->end() && size < maxSize ){
+                BSONObj t = *i;
+                if ( explode ){
+                    BSONObj it;
+                    if ( Helpers::findById( cc() , _ns.c_str() , t, it ) ){
+                        arr.append( it );
+                    }
+                }
+                else {
+                    arr.append( t );
+                }
+                i = l->erase( i );
+                size += t.objsize();
+            }
+            
+            arr.done();
+        }
+
+        bool transferMods( string& errmsg , BSONObjBuilder& b ){
+            if ( ! _active ){
+                errmsg = "no active migration!";
+                return false;
+            }
+
+            long long size = 0;
+
+            {
+                scoped_lock lk( _mutex );
+                xfer( &_deleted , b , "deleted" , size , false );
+                {
+                    readlock rl( _ns );
+                    Client::Context cx( _ns );
+                    xfer( &_reload , b , "reload" , size , true );
+                }
+            }
+
+            b.append( "size" , size );
+
+            return true;
+        }
+
+    private:
+        
+        bool _active;
+
+        string _ns;
+        BSONObj _min;
+        BSONObj _max;
+
+        list<BSONObj> _reload;
+        list<BSONObj> _deleted;
+
+        mongo::mutex _mutex;
+        
+    } migrateFromStatus;
+    
+    struct MigrateStatusHolder {
+        MigrateStatusHolder( string ns , const BSONObj& min , const BSONObj& max ){
+            migrateFromStatus.start( ns , min , max );
+        }
+        ~MigrateStatusHolder(){
+            migrateFromStatus.done();
+        }
+    };
+
+    void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ){
+        migrateFromStatus.logOp( opstr , ns , obj , patt );
+    }
+
+    class TransferModsCommand : public ChunkCommandHelper{
+    public:
+        TransferModsCommand() : ChunkCommandHelper( "_transferMods" ){}
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            return migrateFromStatus.transferMods( errmsg, result );
+        }
+    } transferModsCommand;
+
     /**
      * this is the main entry for moveChunk
      * called to initial a move
@@ -170,7 +365,11 @@ namespace mongo {
                 conn.done();
             }
             
+            
+
             // 3.
+            MigrateStatusHolder statusHolder( ns , min , max );
+            
             {
                 
                 ScopedDbConnection conn( to );
@@ -276,7 +475,7 @@ namespace mongo {
                                                                  "to" << toShard.getName() ) );
             }
             
-            
+            migrateFromStatus.done();
             // 6. 
             log( LL_WARNING ) << " deleting data before ensuring no more cursors TODO" << endl;
             
@@ -338,6 +537,7 @@ namespace mongo {
                 state = ERROR;
                 errmsg = "UNKNOWN ERROR";
             }
+            active = false;
         }
 
         void _go(){
@@ -381,11 +581,30 @@ namespace mongo {
             }
 
             state = CATCHUP;
-            // TODO
+            while ( true ){
+                BSONObj res;
+                assert( conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) );
+                if ( res["size"].number() == 0 )
+                    break;
+                
+                apply( res );
+            }
+
 
             state = STEADY;
             while ( state == STEADY || state == COMMIT_START ){
-                // TODO
+                sleepmillis( 20 );
+
+                BSONObj res;
+                if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
+                    log() << "_transferMods failed in STEADY state: " << res << endl;
+                    errmsg = res.toString();
+                    state = ERROR;
+                    return;
+                }
+                if ( res["size"].number() > 0 ){
+                    apply( res );
+                }
 
                 if ( state == COMMIT_START )
                     break;
@@ -393,8 +612,6 @@ namespace mongo {
 
             state = DONE;
             conn.done();
-
-            active = false;
         }
 
         void status( BSONObjBuilder& b ){
@@ -419,6 +636,27 @@ namespace mongo {
 
 
         }
+
+        void apply( const BSONObj& xfer ){
+            if ( xfer["deleted"].isABSONObj() ){
+                writelock lk(ns);
+                Client::Context cx(ns);
+            
+                // TODO:
+                assert(0);
+            }
+            
+            if ( xfer["reload"].isABSONObj() ){
+                writelock lk(ns);
+                Client::Context cx(ns);
+
+                BSONObjIterator i( xfer["reload"].Obj() );
+                while ( i.more() ){
+                    BSONObj it = i.next().Obj();
+                    Helpers::upsert( ns , it );
+                }
+            }
+        }
         
         string stateString(){
             switch ( state ){
@@ -438,7 +676,14 @@ namespace mongo {
             if ( state != STEADY )
                 return false;
             state = COMMIT_START;
-            return true;
+            
+            for ( int i=0; i<86400; i++ ){
+                sleepmillis(1);
+                if ( state == DONE )
+                    return true;
+            }
+            log() << "startCommit never finished!" << endl;
+            return false;
         }
 
         bool active;
@@ -463,25 +708,10 @@ namespace mongo {
         migrateStatus.go();
         cc().shutdown();
     }
-
-    class RecvChunkCommandHelper : public Command {
-    public:
-        RecvChunkCommandHelper( const char * name ) 
-            : Command( name ){
-        }
-        
-        virtual void help( stringstream& help ) const {
-            help << "internal should not be calling this directly" << endl;
-        }
-        virtual bool slaveOk() const { return false; }
-        virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; } 
-
-    };
     
-    class RecvChunkStartCommand : public RecvChunkCommandHelper {
+    class RecvChunkStartCommand : public ChunkCommandHelper {
     public:
-        RecvChunkStartCommand() : RecvChunkCommandHelper( "_recvChunkStart" ){}
+        RecvChunkStartCommand() : ChunkCommandHelper( "_recvChunkStart" ){}
 
         virtual LockType locktype() const { return WRITE; }  // this is so don't have to do locking internally
 
@@ -509,9 +739,9 @@ namespace mongo {
 
     } recvChunkStartCmd;
 
-    class RecvChunkStatusCommand : public RecvChunkCommandHelper {
+    class RecvChunkStatusCommand : public ChunkCommandHelper {
     public:
-        RecvChunkStatusCommand() : RecvChunkCommandHelper( "_recvChunkStatus" ){}
+        RecvChunkStatusCommand() : ChunkCommandHelper( "_recvChunkStatus" ){}
 
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             migrateStatus.status( result );
@@ -520,9 +750,9 @@ namespace mongo {
         
     } recvChunkStatusCommand;
 
-    class RecvChunkCommitCommand : public RecvChunkCommandHelper {
+    class RecvChunkCommitCommand : public ChunkCommandHelper {
     public:
-        RecvChunkCommitCommand() : RecvChunkCommandHelper( "_recvChunkCommit" ){}
+        RecvChunkCommitCommand() : ChunkCommandHelper( "_recvChunkCommit" ){}
         
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             bool ok = migrateStatus.startCommit();
@@ -531,6 +761,6 @@ namespace mongo {
         }
 
     } recvChunkCommitCommand;
-
+    
     
 }

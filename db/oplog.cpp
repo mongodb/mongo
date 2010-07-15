@@ -25,6 +25,8 @@
 
 namespace mongo {
 
+    void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
+
     int __findingStartInitialTimeout = 5; // configurable for testing    
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
@@ -120,6 +122,7 @@ namespace mongo {
         p += obj.objsize();
         *p = EOO;
         
+
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
             log( 6 ) << "logOp:" << temp << endl;
@@ -206,12 +209,13 @@ namespace mongo {
         p += obj.objsize();
         *p = EOO;
         
+        context.getClient()->setLastOp( ts.asDate() );
+
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
             log( 6 ) << "logging op:" << temp << endl;
         }
-        
-        context.getClient()->setLastOp( ts.asDate() );
+
     }
 
     static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) = _logOpOld;
@@ -249,6 +253,9 @@ namespace mongo {
             //char cl[ 256 ];
             //nsToDatabase( ns, cl );
         }
+        
+        logOpForSharding( opstr , ns , obj , patt );
+
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
         if ( t.cllEnabled() ) {
             try {
