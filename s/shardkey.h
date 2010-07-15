@@ -68,12 +68,6 @@ namespace mongo {
          */
         bool hasShardKey( const BSONObj& obj ) const;
         
-        /**
-           returns a query that filters results only for the range desired, i.e. returns 
-             { "field" : { $gte: keyval(min), $lt: keyval(max) } }
-        */
-        void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ) const;
-
         BSONObj key() const { return pattern; }
 
         string toString() const;

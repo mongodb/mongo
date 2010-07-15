@@ -270,14 +270,6 @@ namespace mongo {
         
         Shard from = _shard;
         
-        BSONObj filter;
-        {
-            BSONObjBuilder b;
-            getFilter( b );
-            filter = b.obj();
-        }
-
-
         ScopedDbConnection fromconn( from);
 
         BSONObj res;
@@ -285,7 +277,8 @@ namespace mongo {
                                             BSON( "moveChunk" << _manager->getns() << 
                                                   "from" << from.getConnString() <<
                                                   "to" << to.getConnString() <<
-                                                  "filter" << filter << 
+                                                  "min" << _min << 
+                                                  "max" << _max << 
                                                   "shardId" << genID() <<
                                                   "configdb" << configServer.modelServer()
                                                   ) ,
@@ -420,13 +413,6 @@ namespace mongo {
             ;
     }
 
-    void Chunk::getFilter( BSONObjBuilder& b ) const{
-        _manager->getShardKey().getFilter( b , _min , _max );
-    }
-    void ChunkRange::getFilter( BSONObjBuilder& b ) const{
-        _manager->getShardKey().getFilter( b , _min , _max );
-    }
-    
     void Chunk::serialize(BSONObjBuilder& to,ShardChunkVersion myLastMod){
         
         to.append( "_id" , genID( _manager->getns() , _min ) );

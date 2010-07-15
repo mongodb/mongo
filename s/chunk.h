@@ -156,9 +156,6 @@ namespace mongo {
             return ! ( *this == s );
         }
         
-        void getFilter( BSONObjBuilder& b ) const;
-        BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
-        
         // if min/max key is pos/neg infinity
         bool minIsInf() const;
         bool maxIsInf() const;
@@ -247,8 +244,6 @@ namespace mongo {
 
         // clones of Chunk methods
         bool contains(const BSONObj& obj) const;
-        void getFilter( BSONObjBuilder& b ) const;
-        BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
 
         ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end)
             : _manager(begin->second->getManager())

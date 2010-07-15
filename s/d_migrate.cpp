@@ -45,6 +45,12 @@ using namespace std;
 
 namespace mongo {
 
+    /**
+     * this is the main entry for moveChunk
+     * called to initial a move
+     * usually by a mongos
+     * this is called on the "from" side
+     */
     class MoveChunkCommand : public Command {
     public:
         MoveChunkCommand() : Command( "moveChunk" ){}
@@ -76,7 +82,8 @@ namespace mongo {
             string ns = cmdObj.firstElement().String();
             string to = cmdObj["to"].String();
             string from = cmdObj["from"].String(); // my public address, a tad redundant, but safe
-            BSONObj filter = cmdObj["filter"].Obj();
+            BSONObj min  = cmdObj["min"].Obj();
+            BSONObj max  = cmdObj["max"].Obj();
             BSONElement shardId = cmdObj["shardId"];
             
             if ( ns.empty() ){
@@ -93,8 +100,13 @@ namespace mongo {
                 return false;
             }
             
-            if ( filter.isEmpty() ){
-                errmsg = "need to specify a filter";
+            if ( min.isEmpty() ){
+                errmsg = "need to specify a min";
+                return false;
+            }
+
+            if ( max.isEmpty() ){
+                errmsg = "need to specify a max";
                 return false;
             }
             
@@ -123,7 +135,7 @@ namespace mongo {
             // 2. TODO
             
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
-            dist_lock_try dlk( &lockSetup , (string)"migrate-" + filter.toString() );
+            dist_lock_try dlk( &lockSetup , (string)"migrate-" + min.toString() );
             if ( ! dlk.got() ){
                 errmsg = "someone else has the lock";
                 result.append( "who" , dlk.other() );
@@ -157,31 +169,44 @@ namespace mongo {
 
                 conn.done();
             }
-
+            
             // 3.
-            BSONObj startRes;
             {
                 
                 ScopedDbConnection conn( to );
+                BSONObj res;
                 bool ok = conn->runCommand( "admin" , 
-                                            BSON( "startCloneCollection" << ns <<
+                                            BSON( "_recvChunkStart" << ns <<
                                                   "from" << from <<
-                                                  "query" << filter 
+                                                  "min" << min <<
+                                                  "max" << max
                                                   ) , 
-                                            startRes );
+                                            res );
                 conn.done();
 
                 if ( ! ok ){
-                    errmsg = "startCloneCollection failed: ";
-                    errmsg += startRes["errmsg"].String();
-                    result.append( "cause" , startRes );
+                    errmsg = "_recvChunkStart failed: ";
+                    errmsg += res["errmsg"].String();
+                    result.append( "cause" , res );
                     return false;
                 }
 
             }
             
             // 4. 
-            sleepsecs( 2 ); // TODO: this is temp
+            for ( int i=0; i<86400; i++ ){ // don't want a single chunk move to take more than a day
+                sleepsecs( 1 ); 
+                ScopedDbConnection conn( to );
+                BSONObj res;
+                conn->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
+                res = res.getOwned();
+                conn.done();
+                
+                log(0) << "_recvChunkStatus : " << res << endl;
+                
+                if ( res["state"].String() == "steady" )
+                    break;
+            }
             
             // 5.
             { 
@@ -196,19 +221,19 @@ namespace mongo {
                     assert( myVersion == shardingState.getVersion( ns ) );
                 }
 
-                BSONObj res;
-                
                 
                 // 5.b
                 {
+                    BSONObj res;
                     ScopedDbConnection conn( to );
                     bool ok = conn->runCommand( "admin" , 
-                                                startRes["finishToken"].wrap( "finishCloneCollection" ) ,
+                                                BSON( "_recvChunkCommit" << 1 ) ,
                                                 res );
                     conn.done();
 
                     if ( ! ok ){
-                        errmsg = "finishCloneCollection failed!";
+                        log() << "_recvChunkCommit failed: " << res << endl;
+                        errmsg = "_recvChunkCommit failed!";
                         result.append( "cause" , res );
                         return false;
                     }
@@ -246,7 +271,9 @@ namespace mongo {
                 conn.done();
                 
                 // 5.d
-                configServer.logChange( "moveChunk" , ns , BSON( "range" << filter << "from" << fromShard.getName() << "to" << toShard.getName() ) );
+                configServer.logChange( "moveChunk" , ns , BSON( "min" << min << "max" << max <<
+                                                                 "from" << fromShard.getName() << 
+                                                                 "to" << toShard.getName() ) );
             }
             
             
@@ -256,8 +283,7 @@ namespace mongo {
             // 7
             {
                 writelock lk(ns);
-                Client::Context ctx(ns);
-                long long num = deleteObjects( ns.c_str() , filter , false , true );
+                long long num = Helpers::removeRange( ns , min , max , true );
                 log() << "moveChunk deleted: " << num << endl;
                 result.appendNumber( "numDeleted" , num );
             }
@@ -268,4 +294,227 @@ namespace mongo {
         
     } moveChunkCmd;
 
+    /* -----
+       below this are the "to" side commands
+       
+       command to initiate
+       worker thread
+         does initial clone
+         pulls initial change set
+         keeps pulling
+         keeps state
+       command to get state
+       commend to "commit"
+    */
+
+    class MigrateStatus {
+    public:
+        
+        MigrateStatus(){
+            active = false;
+        }
+
+        void prepare(){
+            assert( ! active );
+            state = READY;
+            errmsg = "";
+
+            numCloned = 0;
+            numCatchup = 0;
+            numSteady = 0;
+
+            active = true;
+        }
+
+        void go(){
+            try {
+                _go();
+            }
+            catch ( std::exception& e ){
+                state = ERROR;
+                errmsg = e.what();
+            }
+            catch ( ... ){
+                state = ERROR;
+                errmsg = "UNKNOWN ERROR";
+            }
+        }
+
+        void _go(){
+            assert( active );
+            assert( state == READY );
+            assert( ! min.isEmpty() );
+            assert( ! max.isEmpty() );
+
+            ScopedDbConnection conn( from );
+            conn->getLastError(); // just test connection
+            
+            state = CLONE;
+            {
+                auto_ptr<DBClientCursor> cursor = conn->query( ns , Query().minKey( min ).maxKey( max ) , /* QueryOption_Exhaust */ 0 );
+                while ( cursor->more() ){
+                    BSONObj o = cursor->next();
+                    {
+                        writelock lk( ns );
+                        Helpers::upsert( ns , o );
+                    }
+                    numCloned++;
+                }
+            }
+            
+            // TODO: indexes
+            
+            state = CATCHUP;
+            // TODO
+
+            state = STEADY;
+            while ( state == STEADY || state == COMMIT_START ){
+                // TODO
+
+                if ( state == COMMIT_START )
+                    break;
+            }
+
+            state = DONE;
+            conn.done();
+
+            active = false;
+        }
+
+        void status( BSONObjBuilder& b ){
+            b.appendBool( "active" , active );
+            if ( ! active )
+                return;
+
+            b.append( "ns" , ns );
+            b.append( "from" , from );
+            b.append( "min" , min );
+            b.append( "max" , max );
+
+            b.append( "state" , stateString() );
+
+            {
+                BSONObjBuilder bb( b.subobjStart( "counts" ) );
+                bb.append( "cloned" , numCloned );
+                bb.append( "catchup" , numCatchup );
+                bb.append( "steady" , numSteady );
+                bb.done();
+            }
+
+
+        }
+        
+        string stateString(){
+            switch ( state ){
+            case READY: return "ready";
+            case CLONE: return "clone";
+            case CATCHUP: return "catchup";
+            case STEADY: return "steady";
+            case COMMIT_START: return "commitStart";
+            case DONE: return "done";
+            case ERROR: return "error";
+            }
+            assert(0);
+            return "";
+        }
+
+        bool startCommit(){
+            if ( state != STEADY )
+                return false;
+            state = COMMIT_START;
+            return true;
+        }
+
+        bool active;
+        
+        string ns;
+        string from;
+        
+        BSONObj min;
+        BSONObj max;
+        
+        long long numCloned;
+        long long numCatchup;
+        long long numSteady;
+
+        enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , ERROR } state;
+        string errmsg;
+        
+    } migrateStatus;
+    
+    void migrateThread(){
+        Client::initThread( "migrateThread" );
+        migrateStatus.go();
+        cc().shutdown();
+    }
+
+    class RecvChunkCommandHelper : public Command {
+    public:
+        RecvChunkCommandHelper( const char * name ) 
+            : Command( name ){
+        }
+        
+        virtual void help( stringstream& help ) const {
+            help << "internal should not be calling this directly" << endl;
+        }
+        virtual bool slaveOk() const { return false; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; } 
+
+    };
+    
+    class RecvChunkStartCommand : public RecvChunkCommandHelper {
+    public:
+        RecvChunkStartCommand() : RecvChunkCommandHelper( "_recvChunkStart" ){}
+
+        virtual LockType locktype() const { return WRITE; }  // this is so don't have to do locking internally
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+
+            if ( migrateStatus.active ){
+                errmsg = "migrate already in progress";
+                return false;
+            }
+
+            migrateStatus.prepare();
+
+            migrateStatus.ns = cmdObj.firstElement().String();
+            migrateStatus.from = cmdObj["from"].String();
+            migrateStatus.min = cmdObj["min"].Obj().getOwned();
+            migrateStatus.max = cmdObj["max"].Obj().getOwned();
+            
+            // TODO: check data in range currently
+
+            boost::thread m( migrateThread );
+            
+            result.appendBool( "started" , true );
+            return true;
+        }
+
+    } recvChunkStartCmd;
+
+    class RecvChunkStatusCommand : public RecvChunkCommandHelper {
+    public:
+        RecvChunkStatusCommand() : RecvChunkCommandHelper( "_recvChunkStatus" ){}
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            migrateStatus.status( result );
+            return 1;
+        }
+        
+    } recvChunkStatusCommand;
+
+    class RecvChunkCommitCommand : public RecvChunkCommandHelper {
+    public:
+        RecvChunkCommitCommand() : RecvChunkCommandHelper( "_recvChunkCommit" ){}
+        
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool ok = migrateStatus.startCommit();
+            migrateStatus.status( result );
+            return ok;
+        }
+
+    } recvChunkCommitCommand;
+
+    
 }
