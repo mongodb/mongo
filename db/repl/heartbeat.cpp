@@ -102,13 +102,13 @@ namespace mongo {
     }
 
     /* poll every other set member to check its status */
-    class ReplSetHealthPoll : public task::Task {
+    class ReplSetHealthPollTask : public task::Task {
         HostAndPort h;
         HeartbeatInfo m;
     public:
-        ReplSetHealthPoll(const HostAndPort& hh, const HeartbeatInfo& mm) : h(hh), m(mm) { }
+        ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm) : h(hh), m(mm) { }
 
-        string name() { return "ReplSetHealthPoll"; }
+        string name() { return "ReplSetHealthPollTask"; }
         void doWork() { 
             cout << "TEMP healthpool dowork " << endl;
 
@@ -171,7 +171,21 @@ namespace mongo {
             mem.lastHeartbeatMsg = msg;
         }
     };
-    
+
+    void ReplSetImpl::endOldHealthTasks() { 
+        for( set<ReplSetHealthPollTask*>::iterator i = healthTasks.begin(); i != healthTasks.end(); i++ )
+            (*i)->halt();
+        healthTasks.clear();
+        cout << "cleared old tasks " << healthTasks.size() << endl;
+    }
+
+    void ReplSetImpl::startHealthTaskFor(Member *m) {
+        ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
+        cout << "TEMP starting healthtask thread " << m->h().toString() << endl;
+        healthTasks.insert(task);
+        task::repeat(shared_ptr<task::Task>(task), 2000);
+    }
+
     /** called during repl set startup.  caller expects it to return fairly quickly. 
         note ReplSet object is only created once we get a config - so this won't run 
         until the initiation.
@@ -179,13 +193,14 @@ namespace mongo {
     void ReplSetImpl::startThreads() {
         task::fork(mgr->taskPtr());
 
-        Member* m = _members.head();
+        /*Member* m = _members.head();
         while( m ) {
-            ReplSetHealthPoll *task = new ReplSetHealthPoll(m->h(), m->hbinfo());
+            ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
             cout << "TEMP starting hb thread " << m->h().toString() << endl;
+            healthTasks.insert(task);
             task::repeat(shared_ptr<task::Task>(task), 2000);
             m = m->next();
-        }
+        }*/
 
         mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
     }

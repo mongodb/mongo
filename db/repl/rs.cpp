@@ -234,8 +234,11 @@ namespace mongo {
         _name = _cfg->_id;
         assert( !_name.empty() );
 
-        //assert( _members.head() == 0 );
+        // start with no members.  if this is a reconfig, drop the old ones.
         _members.orphanAll();
+
+        endOldHealthTasks();
+
         _self = 0;
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
@@ -246,6 +249,7 @@ namespace mongo {
             } else {
                 Member *mi = new Member(m.h, m._id, &m);
                 _members.push(mi);
+                startHealthTaskFor(mi);
             }
         }
         return true;
