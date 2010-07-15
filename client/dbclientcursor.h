@@ -189,7 +189,7 @@ namespace mongo {
         DBClientCursorBatchIterator( DBClientCursor &c ) : _c( c ), _n() {}
         bool moreInCurrentBatch() { return _c.moreInCurrentBatch(); }
         BSONObj nextSafe() {
-            massert( 13345, "BatchIterator empty", moreInCurrentBatch() );
+            massert( 13383, "BatchIterator empty", moreInCurrentBatch() );
             ++_n;
             return _c.nextSafe();
         }
