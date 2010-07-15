@@ -375,7 +375,7 @@ namespace mongo {
                 }
 
                 BSONForEach(e, key){
-                    if (e.isNumber() || e.number() != 1.0){
+                    if (!e.isNumber() || e.number() != 1.0){
                         errmsg = "shard keys must all be ascending";
                         return false;
                     }
