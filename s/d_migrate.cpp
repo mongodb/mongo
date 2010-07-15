@@ -132,7 +132,7 @@ namespace mongo {
             
             log() << "got movechunk: " << cmdObj << endl;
         
-            // 2. TODO
+            // 2. 
             
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
             dist_lock_try dlk( &lockSetup , (string)"migrate-" + min.toString() );
@@ -362,8 +362,24 @@ namespace mongo {
                 }
             }
             
-            // TODO: indexes
-            
+            {
+                
+                auto_ptr<DBClientCursor> indexes = conn->getIndexes( ns );
+                vector<BSONObj> all;
+                while ( indexes->more() ){
+                    all.push_back( indexes->next().getOwned() );
+                }
+                
+                writelock lk( ns );
+                Client::Context ct( ns );
+                
+                string system_indexes = cc().database()->name + ".system.indexes";
+                for ( unsigned i=0; i<all.size(); i++ ){
+                    BSONObj idx = all[i];
+                    theDataFileMgr.insert( system_indexes.c_str() , idx.objdata() , idx.objsize() );
+                }
+            }
+
             state = CATCHUP;
             // TODO
 
