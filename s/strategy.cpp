@@ -123,6 +123,7 @@ namespace mongo {
                         if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ){
                             // this means when the write went originally, the version was old
                             // if we're here, it means we've already updated the config, so don't need to do again
+                            db->getChunkManager( ns , true ); // TEMP TEMP TEMP ERH
                         }
                         else {
                             db->getChunkManager( ns , true );
