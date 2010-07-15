@@ -29,6 +29,10 @@
 #   running with replication should be an orthogonal concern.  (And
 #   maybe test replica set replication, too.)
 
+# 6 We use cleanbb.py to clear out the dbpath, but cleanbb.py kills
+#   off all mongods on a box, which means you can't run two smoke.py
+#   jobs on the same host at once.  So something's gotta change.
+
 from __future__ import with_statement
 from subprocess import Popen, PIPE, call
 import os
