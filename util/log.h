@@ -150,10 +150,19 @@ namespace mongo {
         static int doneSetup;
         stringstream ss;
         LogLevel logLevel;
+        static boost::scoped_ptr<ostream> stream;
+        static FILE* logfile;
     public:
+
+        static void setLogFile(FILE* f){
+            scoped_lock lk(mutex);
+            logfile = f;
+        }
+
         static int magicNumber(){
             return 1717;
         }
+
         void flush(Tee *t = 0) {
             // this ensures things are sane
             if ( doneSetup == 1717 ) {
@@ -164,7 +173,15 @@ namespace mongo {
                 
                 string threadName = getThreadName();
                 const char * type = logLevelToString(logLevel);
-                
+
+                StringBuilder sb;
+                if (!threadName.empty()){
+                    sb << "[" << threadName << "] ";
+                }
+                sb << type << ( type[0] ? ": " : "" );
+                sb << s;
+                string out = sb.str();
+
                 scoped_lock lk(mutex);
                 
                 if( t ) t->write(logLevel,s);
@@ -172,13 +189,8 @@ namespace mongo {
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
 #endif
-
-                if ( ! threadName.empty() ){
-                    cout << "[" << threadName << "] ";
-                }
-                cout << type << ( type[0] ? ": " : "" );
-                cout << s;
-                cout.flush();
+                fwrite(out.data(), out.size(), 1, logfile);
+                fflush(logfile);
             }
             _init();
         }

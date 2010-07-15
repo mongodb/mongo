@@ -757,6 +757,7 @@ int main(int argc, char* argv[], char *envp[] )
     visible_options.add(sharding_options);
     Module::addOptions( visible_options );
 
+    setupCoreSignals();
     setupSignals();
 
     dbExecCommand = argv[0];
