@@ -100,11 +100,24 @@ namespace mongo {
         static void putSingletonGod(const char *ns, BSONObj obj, bool logTheOp);
         static bool getFirst(const char *ns, BSONObj& result) { return getSingleton(ns, result); }
         static bool getLast(const char *ns, BSONObj& result); // get last object int he collection; e.g. {$natural : -1}
+        
+
+        /**
+         * you have to lock
+         * you do not have to have Context set
+         * o has to have an _id field or will assert
+         */
+        static void upsert( const string& ns , const BSONObj& o );
 
         /** You do not need to set the database before calling.
             @return true if collection is empty.
         */
         static bool isEmpty(const char *ns);
+
+        // TODO: this should be somewhere else probably
+        static BSONObj toKeyFormat( const BSONObj& o , BSONObj& key );
+
+        static long long removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield = false );
 
         /* Remove all objects from a collection.
         You do not need to set the database before calling.
