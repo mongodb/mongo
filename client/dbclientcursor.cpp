@@ -130,6 +130,8 @@ namespace mongo {
 
     /** If true, safe to call next().  Requests more from server if necessary. */
     bool DBClientCursor::more() {
+        _assertIfNull();
+
         if ( !_putBack.empty() )
             return true;
         
@@ -200,6 +202,9 @@ namespace mongo {
     }
 
     DBClientCursor::~DBClientCursor() {
+        if (!this)
+            return;
+
         DESTRUCTOR_GUARD (
 
             if ( cursorId && _ownCursor ) {
