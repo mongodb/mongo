@@ -97,7 +97,7 @@ namespace mongo {
 
                 checkAllMembersUpForConfigChange(newConfig);
 
-                log() << "replSet replSetInitiate all members seem up" << rsLog;
+                log() << "replSet replSetReconfig all members seem up" << rsLog;
 
                 theReplSet->haveNewConfig(newConfig);
                 ReplSet::startupStatusMsg = "replSetReconfig'd";

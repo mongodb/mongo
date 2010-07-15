@@ -104,23 +104,30 @@ namespace mongo {
         ThreadLocalValue<bool> _lockedByMe;
     protected:
         RSBase() : m("RSBase"), _locked(0) { }
-        class lock : scoped_lock { 
-            RSBase& _b;
+
+        class lock { 
+            RSBase& rsbase;
+            auto_ptr<scoped_lock> sl;
         public:
-            lock(RSBase* b) : scoped_lock(b->m), _b(*b) { 
-                DEV assert(_b._locked == 0);
-                _b._locked++; 
-                _b._lockedByMe.set(true);
-                cout << "RSLOCKED" << endl;
+            lock(RSBase* b) : rsbase(*b) { 
+                if( rsbase._lockedByMe.get() )
+                    return; // recursive is ok...
+
+                sl.reset( new scoped_lock(rsbase.m) );
+                DEV assert(rsbase._locked == 0);
+                rsbase._locked++; 
+                rsbase._lockedByMe.set(true);
             }
             ~lock() { 
-                cout << "RSUNLOCKED" << endl;
-                assert( _b._lockedByMe.get() );
-                DEV assert(_b._locked == 1);
-                _b._lockedByMe.set(false);
-                _b._locked--; 
+                if( sl.get() ) {
+                    assert( rsbase._lockedByMe.get() );
+                    DEV assert(rsbase._locked == 1);
+                    rsbase._lockedByMe.set(false);
+                    rsbase._locked--; 
+                }
             }
         };
+
     public:
         /* for asserts */
         bool locked() const { return _locked != 0; }
@@ -131,6 +138,8 @@ namespace mongo {
         */
         bool lockedByMe() { return _lockedByMe.get(); } 
     };
+
+    class ReplSetHealthPollTask;
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
@@ -159,6 +168,10 @@ namespace mongo {
         long long h;
     private:
         unsigned _selfId; // stored redundantly we hit this a lot
+
+        set<ReplSetHealthPollTask*> healthTasks;
+        void endOldHealthTasks();
+        void startHealthTaskFor(Member *m);
 
     private:
         Consensus elect;
@@ -230,7 +243,7 @@ namespace mongo {
     public:
         ReplSet(string cfgString) : ReplSetImpl(cfgString) { }
 
-        /* call after constructing to start - returns fairly quickly after launching its threads */
+        /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }
         void fatal() { _fatal(); }
         bool isMaster(const char *client);
@@ -247,6 +260,8 @@ namespace mongo {
 
         /* if we delete old configs, this needs to assure locking. currently we don't so it is ok. */
         const ReplSetConfig& getConfig() { return config(); }
+
+        bool lockedByMe() { return RSBase::lockedByMe(); }
 
     };
 
@@ -274,7 +289,11 @@ namespace mongo {
             return true;
         }
     };
+
+    /** helpers ----------------- */
     
+    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet );
+
     /** inlines ----------------- */
 
     inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 

@@ -1066,8 +1066,9 @@ namespace mongo {
             BSONElementManipulator::lookForTimestamps( updateobj );
             checkNoMods( updateobj );
             bool changedId = false;
-            theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, changedId);
+            theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, changedId, god);
             if ( logop ) {
+                DEV if( god ) log() << "REALLY??" << endl; // god doesn't get logged, this would be bad.
                 if ( !changedId ) {
                     logOp("u", ns, updateobj, &pattern );
                 } else {

@@ -46,6 +46,9 @@ namespace mongo {
             return HostAndPort("localhost", cmdLine.port);
         }
 
+        /* uses real hostname instead of localhost */
+        static HostAndPort Me();
+
         bool operator<(const HostAndPort& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
 
         /* returns true if the host/port combo identifies this process instance. */
@@ -75,6 +78,13 @@ namespace mongo {
     */
     inline bool sameHostname(const string& a, const string& b) {
         return str::before(a, '.') == str::before(b, '.');
+    }
+
+    inline HostAndPort HostAndPort::Me() { 
+        string h = getHostName();
+        assert( !h.empty() );
+        assert( h != "localhost" );
+        return HostAndPort(h, cmdLine.port);
     }
 
     inline bool HostAndPort::isSelf() const { 

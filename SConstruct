@@ -1322,7 +1322,8 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ] )
-    addSmoketest("smokeJsSlow", [add_exe("mongo")])
+    addSmoketest("smokeJsSlowNightly", [add_exe("mongo")])
+    addSmoketest("smokeJsSlowWeekly", [add_exe("mongo")])
     addSmoketest( "smokeQuota", [ "mongo" ] )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ) ] )
 
@@ -1400,6 +1401,14 @@ def run_shell_tests(env, target, source):
 
 env.Alias("test_shell", [], [run_shell_tests])
 env.AlwaysBuild("test_shell")
+
+#  ---- Docs ----
+def build_docs(env, target, source):
+    from buildscripts import docs
+    docs.main()
+
+env.Alias("docs", [], [build_docs])
+env.AlwaysBuild("docs")
 
 #  ----  INSTALL -------
 

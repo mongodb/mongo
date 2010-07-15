@@ -292,8 +292,8 @@ namespace mongo {
             }
         }
         else {
-            result.append("ismaster", replSettings.master ? 1 : 0);
-            result.append("msg", "not paired");
+            result.append("ismaster", replSettings.master || replSettings.slave == 0 ? 1 : 0);
+            //result.append("msg", "not paired");
         }
         
         if ( level ){

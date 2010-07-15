@@ -159,6 +159,13 @@ namespace mongo {
     void ShardConnection::_init(){
         assert( _addr.size() );
         _conn = ClientConnections::get()->get( _addr );
+        _finishedInit = false;
+    }
+
+    void ShardConnection::_finishInit(){
+        if ( _finishedInit )
+            return;
+        _finishedInit = true;
 
         if ( _ns.size() ){
             _setVersion = checkShardVersion( *_conn , _ns );
@@ -173,6 +180,7 @@ namespace mongo {
         if ( _conn ){
             ClientConnections::get()->done( _addr , _conn );
             _conn = 0;
+            _finishedInit = true;
         }
     }
 
@@ -180,6 +188,7 @@ namespace mongo {
         if ( _conn ){
             delete _conn;
             _conn = 0;
+            _finishedInit = true;
         }
     }
 

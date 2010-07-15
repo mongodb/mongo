@@ -222,7 +222,8 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
     char * buf = new char[1024];
     char * l = fgets( buf , 1024 , stdin );
     int len = strlen( buf );
-    buf[len-1] = 0;
+    if ( len )
+        buf[len-1] = 0;
     return l;
 #endif
 }

@@ -136,6 +136,7 @@ namespace mongo {
                 obj = fromjson("{\"err\":\"no op number field specified?\"}");
             }
             else { 
+                log() << "going to kill op: " << e << endl;
                 obj = fromjson("{\"info\":\"attempting to kill op\"}");
                 killCurrentOp.kill( (unsigned) e.number() );
             }

@@ -823,9 +823,6 @@
     <None Include="repl\test.html">
       <Filter>rs\test stuff</Filter>
     </None>
-    <None Include="readme.txt">
-      <Filter>util\concurrency</Filter>
-    </None>
     <None Include="..\SConstruct">
       <Filter>db</Filter>
     </None>

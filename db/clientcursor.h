@@ -146,7 +146,7 @@ namespace mongo {
         int _queryOptions;        // see enum QueryOptions dbclient.h
         OpTime _slaveReadTill;
 
-        ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const char *_ns) :
+        ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const string& _ns) :
             _idleAgeMillis(0), _pinValue(0), 
             _doingDeletes(false), _yieldSometimesTracker(128,10),
             ns(_ns), c(_c), 

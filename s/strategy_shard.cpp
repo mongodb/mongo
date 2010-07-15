@@ -187,7 +187,7 @@ namespace mongo {
             if ( ! manager->hasShardKey( query ) ){
                 if ( multi ){
                 }
-                else if ( query.nFields() != 1 || strcmp( query.firstElement().fieldName() , "_id" ) ){
+                else if ( strcmp( query.firstElement().fieldName() , "_id" ) || query.nFields() != 1 ){
                     throw UserException( 8013 , "can't do update with query that doesn't have the shard key" );
                 }
                 else {

@@ -24,6 +24,7 @@
 #include "queryoptimizer.h"
 #include "btree.h"
 #include "pdfile.h"
+#include "oplog.h"
 
 namespace mongo {
 
@@ -147,6 +148,7 @@ namespace mongo {
     
     bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
                            bool * nsFound , bool * indexFound ){
+        dbMutex.assertAtLeastReadLocked();
         Database *database = c.database();
         assert( database );
         NamespaceDetails *d = database->namespaceIndex.details(ns);
@@ -203,6 +205,16 @@ namespace mongo {
         return true;
     }
 
+    void Helpers::upsert( const string& ns , const BSONObj& o ){
+        BSONElement e = o["_id"];
+        assert( e.type() );
+        BSONObj id = e.wrap();
+        
+        OpDebug debug;
+        Client::Context context(ns);
+        updateObjects(ns.c_str(), o, /*pattern=*/id, /*upsert=*/true, /*multi=*/false , /*logtheop=*/true , debug );
+    }
+
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         OpDebug debug;
         Client::Context context(ns);
@@ -213,6 +225,59 @@ namespace mongo {
         OpDebug debug;
         Client::Context context(ns);
         _updateObjects(/*god=*/true, ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , logTheOp , debug );
+    }
+
+    BSONObj Helpers::toKeyFormat( const BSONObj& o , BSONObj& key ){
+        BSONObjBuilder me;
+        BSONObjBuilder k;
+
+        BSONObjIterator i( o );
+        while ( i.more() ){
+            BSONElement e = i.next();
+            k.append( e.fieldName() , 1 );
+            me.appendAs( e , "" );
+        }
+        key = k.obj();
+        return me.obj();
+    }
+
+    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield ){
+        BSONObj keya , keyb;
+        BSONObj minClean = toKeyFormat( min , keya );
+        BSONObj maxClean = toKeyFormat( max , keyb );
+        assert( keya == keyb );
+
+        Client::Context ctx(ns);
+        NamespaceDetails* nsd = nsdetails( ns.c_str() );
+        assert( nsd );
+
+        int ii = nsd->findIndexByKeyPattern( keya );
+        assert( ii >= 0 );
+        
+        long long num = 0;
+        
+        IndexDetails& i = nsd->idx( ii );
+
+        shared_ptr<Cursor> c( new BtreeCursor( nsd , ii , i , minClean , maxClean , false, 1 ) );
+        auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+        cc->setDoingDeletes( true );
+        
+        while ( c->ok() ){
+            DiskLoc rloc = c->currLoc();
+            BSONObj key = c->currKey();
+
+            c->advance();
+            c->noteLocation();
+            
+            logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() );
+            theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
+            num++;
+
+            c->checkLocation();
+
+        }
+
+        return num;
     }
 
     void Helpers::emptyCollection(const char *ns) {

@@ -949,7 +949,7 @@ namespace mongo {
         uassert( 10009 , "checkmaster: no master found", false);
     }
 
-    inline DBClientConnection& DBClientPaired::checkMaster() {
+    DBClientConnection& DBClientPaired::checkMaster() {
         if ( master > NotSetR ) {
             // a master is selected.  let's just make sure connection didn't die
             DBClientConnection& c = master == Left ? left : right;

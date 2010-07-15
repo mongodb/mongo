@@ -60,19 +60,6 @@ namespace mongo {
         return true;
     }
 
-    /**
-      returns a query that filters results only for the range desired, i.e. returns 
-        { $gte : keyval(min), $lt : keyval(max) }
-    */
-    void ShardKeyPattern::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ) const{
-        massert( 10426 , "not done for compound patterns", patternfields.size() == 1);
-        BSONObjBuilder temp;
-        temp.appendAs( extractKey(min).firstElement(), "$gte" );
-        temp.appendAs( extractKey(max).firstElement(), "$lt" );
-
-        b.append( patternfields.begin()->c_str(), temp.obj() );
-    }    
-
     bool ShardKeyPattern::isPrefixOf( const BSONObj& otherPattern ) const {
         BSONObjIterator a( pattern );
         BSONObjIterator b( otherPattern );
@@ -92,7 +79,6 @@ namespace mongo {
     }
     
     /* things to test for compound : 
-       _ getFilter (hard?)
        \ middle (deprecating?)
     */
     class ShardKeyUnitTest : public UnitTest {
@@ -130,13 +116,7 @@ namespace mongo {
             }
 
         }
-        void getfilt() { 
-            ShardKeyPattern k( BSON( "key" << 1 ) );
-            BSONObjBuilder b;
-            k.getFilter(b, fromjson("{z:3,key:30}"), fromjson("{key:90}"));
-            BSONObj x = fromjson("{ key: { $gte: 30, $lt: 90 } }");
-            assert( x.woEqual(b.obj()) );
-        }
+
         void extractkeytest() { 
             ShardKeyPattern k( fromjson("{a:1,'sub.b':-1,'sub.c':1}") );
 
@@ -171,7 +151,6 @@ namespace mongo {
 
             assert( k.compare(a,b) < 0 );
             
-            getfilt();
             testIsPrefixOf();
             // add middle multitype tests
 

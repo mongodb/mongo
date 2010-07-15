@@ -26,7 +26,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "unix files", "unix files", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{407B4B88-3451-433C-B74F-31B31FEB5791}"
 	ProjectSection(SolutionItems) = preProject
-		..\shell\mongo_vstudio.cpp = ..\shell\mongo_vstudio.cpp
 		..\shell\utils.h = ..\shell\utils.h
 	EndProjectSection
 EndProject
@@ -40,7 +39,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "..\dbtests\test.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bsondemo", "..\bson\bsondemo\bsondemo.vcxproj", "{C9DB5EB7-81AA-4185-BAA1-DA035654402F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongoutils", "..\util\mongoutils\mongoutils.vcxproj", "{7B84584E-92BC-4DB9-971B-A1A8F93E5053}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongoutils test program", "..\util\mongoutils\mongoutils.vcxproj", "{7B84584E-92BC-4DB9-971B-A1A8F93E5053}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "jstests", "jstests", "{F5ABFB2C-A34F-48C1-9B5F-01D456AF6C57}"
 	ProjectSection(SolutionItems) = preProject
