@@ -147,7 +147,6 @@ namespace mongo {
         return ss.str();
     }	
 
-    
     class LoggingManager {
     public:
         LoggingManager()
@@ -193,13 +192,22 @@ namespace mongo {
                 rename( _path.c_str() , s.c_str() );
 #endif
             }
-        
-            _file = freopen( _path.c_str() , _append ? "a" : "w"  , stdout );
-            if ( ! _file ){
+            
+            
+            FILE* tmp = fopen(_path.c_str(), (_append ? "a" : "w"));
+            if (!tmp){
                 cerr << "can't open: " << _path.c_str() << " for log file" << endl;
                 dbexit( EXIT_BADOPTIONS );
                 assert(0);
             }
+
+            Logstream::setLogFile(tmp); // after this point no thread will be using old file
+
+            if (_file){
+                fclose(_file);
+            }
+
+            _file = tmp;
             _opened = time(0);
         }
         
@@ -222,6 +230,9 @@ namespace mongo {
     void rotateLogs( int signal ){
         loggingManager.rotate();
     }
+
+    // done *before* static initialization
+    FILE* Logstream::logfile = stdout;
 
     string errnoWithPrefix( const char * prefix ){
         stringstream ss;
