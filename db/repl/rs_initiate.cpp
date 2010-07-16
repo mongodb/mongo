@@ -104,7 +104,7 @@ namespace mongo {
             }
             if( theReplSet ) {
                 errmsg = "already initialized";
-                result.append("info", "try querying " + rsConfigNs + "");
+                result.append("info", "try querying " + rsConfigNs + " to see current configuration");
                 return false;
             }
 

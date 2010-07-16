@@ -182,6 +182,14 @@ namespace mongo {
         void loadLastOpTimeWritten();
 
     protected:
+        // "heartbeat message"
+        // sent in requestHeartbeat respond in field "hbm" 
+        char _hbmsg[256];
+        void sethbmsg(string s) { 
+            assert(s.size() < sizeof(_hbmsg));
+            strcpy(_hbmsg, s.c_str());
+        }
+
         bool initFromConfig(ReplSetConfig& c); // true if ok; throws if config really bad; false if config doesn't include self
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
@@ -199,7 +207,7 @@ namespace mongo {
            throws exception if a problem initializing. */
         ReplSetImpl(string cfgString);
 
-        /* call after constructing to start - returns fairly quickly after launching its threads */
+        /* call afer constructing to start - returns fairly quickly after launching its threads */
         void _go();
 
     private:
@@ -245,7 +253,8 @@ namespace mongo {
 
     class ReplSet : public ReplSetImpl { 
     public:
-        ReplSet(string cfgString) : ReplSetImpl(cfgString) { }
+        ReplSet(string cfgString) : ReplSetImpl(cfgString) { 
+        }
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }
@@ -267,6 +276,8 @@ namespace mongo {
 
         bool lockedByMe() { return RSBase::lockedByMe(); }
 
+        // heartbeat msg to send to others; descriptive diagnostic info
+        string hbmsg() const { return _hbmsg; }
     };
 
     /** base class for repl set commands.  checks basic things such as in rs mode before the command 

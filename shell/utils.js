@@ -1054,6 +1054,8 @@ rs.help = function () {
     print("\trs.conf()                       return configuration from local.system.replset");
     print();
     print("\tdb.isMaster()                   check who is primary");
+    print();
+    print("\tsee also http://<host>:28017/_replSet for additional diagnostic info");
 }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
