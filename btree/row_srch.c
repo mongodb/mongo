@@ -19,13 +19,16 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_ROW_INDX *rip;
-	WT_SDBT *sdbt;
+	WT_ROW *rip;
+	WT_REPL *repl;
 	u_int32_t addr, base, indx, limit, size;
 	int cmp, isleaf, ret;
 
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
+	toc->srch_repl = repl = NULL;
+	toc->srch_exp = NULL;
+	toc->srch_rcc_offset = 0;
 
 	db = toc->db;
 	idb = db->idb;
@@ -110,26 +113,22 @@ restart:
 		}
 	}
 
-	/*
-	 * If we're inserting, we're returning a position in the tree rather
-	 * than an item, so it's always useful.
-	 */
-	if (!LF_ISSET(WT_INSERT)) {
-		/* Lookups only return exact matches. */
-		if (cmp != 0) {
-			ret = WT_NOTFOUND;
-			goto err;
-		}
-
-		/* Return the match unless it's been deleted. */
-		WT_REPL_CURRENT_SET(rip, sdbt);
-		if (sdbt != NULL && WT_SDBT_DELETED_ISSET(sdbt->data)) {
-			ret = WT_NOTFOUND;
-			goto err;
-		}
+	/* If we didn't find an exact match, we're done. */
+	if (cmp != 0) {
+		/* XXX: In the future, check for an inserted key/data item. */
+		ret = WT_NOTFOUND;
+		goto err;
 	}
+
+	/* Check for a deleted item. */
+	if ((repl = WT_ROW_REPL(page, rip)) != NULL)
+		if (WT_REPL_DELETED_ISSET(repl->data)) {
+			ret = WT_NOTFOUND;
+			goto err;
+		}
 	toc->srch_page = page;
 	toc->srch_ip = rip;
+	toc->srch_repl = repl;
 	return (0);
 
 err:	if (page != idb->root_page)
