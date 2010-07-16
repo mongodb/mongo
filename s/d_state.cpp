@@ -537,7 +537,9 @@ namespace mongo {
         
 
         if ( clientVersion == 0 ){
-            errmsg = "client in sharded mode, but doesn't have version set for this collection";
+            stringstream ss;
+            ss << "client in sharded mode, but doesn't have version set for this collection: " << ns << " myVersion: " << version;
+            errmsg = ss.str();
             return false;
         }
 

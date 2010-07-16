@@ -7,6 +7,8 @@ s2 = s._mongos[1];
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
+s.config.databases.find().forEach( printjson )
+
 a = s.getDB( "test" ).foo;
 b = s2.getDB( "test" ).foo;
 

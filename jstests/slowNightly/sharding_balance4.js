@@ -55,14 +55,27 @@ function check(){
     for ( var x in counts ){
         var e = counts[x];
         var z = db.foo.findOne( { _id : parseInt( x ) } )
-        assert( z , "couldn't find : " + x )
-        assert.eq( e , z.x , "count for : " + x )
+        
+        if ( z && z.x == e )
+            continue;
+        
+        sleep( 5000 );
+        
+        var y = db.foo.findOne( { _id : parseInt( x ) } )
+
+        if ( y ){
+            delete y.s;
+        }
+        
+        assert( z , "couldn't find : " + x + " y:" + tojson(y))
+        assert.eq( e , z.x , "count for : " + x + " y:" + tojson(y))
     }
 }
 
 function diff(){
     doUpdate( false )
-    
+    db.getLastError();
+
     if ( Math.random() > .99 ){
         db.getLastError()
         check();
