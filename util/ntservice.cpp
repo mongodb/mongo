@@ -66,7 +66,7 @@ namespace mongo {
         SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();
-            log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
+            cerr << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
             return false;
         }
 
@@ -74,7 +74,7 @@ namespace mongo {
 		// TODO: Check to see if service is in "Deleting" status, suggest the user close down Services MMC snap-ins.
 		SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
 		if ( schService != NULL ) {
-			log() << "There is already a service named " << toUtf8String(serviceName) << ". Aborting" << endl;
+			cerr << "There is already a service named " << toUtf8String(serviceName) << ". Aborting" << endl;
 			::CloseServiceHandle( schService );
 			::CloseServiceHandle( schSCManager );
 			return false;
@@ -82,7 +82,7 @@ namespace mongo {
 		std::basic_ostringstream< TCHAR > commandLineWide;
  		commandLineWide << commandLine.str().c_str();
 
-		log() << "Creating service " << toUtf8String(serviceName) << "." << endl;
+		cerr << "Creating service " << toUtf8String(serviceName) << "." << endl;
 
 		// create new service
 		schService = ::CreateService( schSCManager, serviceName.c_str(), displayName.c_str(),
@@ -91,13 +91,13 @@ namespace mongo {
 												commandLineWide.str().c_str(), NULL, NULL, L"\0\0", NULL, NULL );
         if ( schService == NULL ) {
             DWORD err = ::GetLastError();
-            log() << "Error creating service: " << GetWinErrMsg(err) << endl;
+            cerr << "Error creating service: " << GetWinErrMsg(err) << endl;
             ::CloseServiceHandle( schSCManager );
             return false;
         }
 
-		log() << "Service creation successful." << endl;
-		log() << "Service can be started from the command line via 'net start \"" << toUtf8String(serviceName) << "\"'." << endl;
+		cerr << "Service creation successful." << endl;
+		cerr << "Service can be started from the command line via 'net start \"" << toUtf8String(serviceName) << "\"'." << endl;
 
 		bool serviceInstalled;
 
@@ -111,10 +111,10 @@ namespace mongo {
 				actualServiceUser = serviceUser;
 			}
 
-			log() << "Setting service login credentials. User: " << toUtf8String(actualServiceUser) << endl;
+			cerr << "Setting service login credentials. User: " << toUtf8String(actualServiceUser) << endl;
 			serviceInstalled = ::ChangeServiceConfig( schService, SERVICE_NO_CHANGE, SERVICE_NO_CHANGE, SERVICE_NO_CHANGE, NULL, NULL, NULL, NULL, actualServiceUser.c_str(), servicePassword.c_str(), NULL );
 			if ( !serviceInstalled ) {
-				log() << "Setting service login failed. Service has 'LocalService' permissions." << endl;
+				cerr << "Setting service login failed. Service has 'LocalService' permissions." << endl;
 			}
 		}
 		
@@ -137,7 +137,7 @@ namespace mongo {
 
 		}
 		else {
-			log() << "Could not set service description. Check the event log for more details." << endl;
+			cerr << "Could not set service description. Check the event log for more details." << endl;
 		}
 
 		::CloseServiceHandle( schService );
@@ -150,13 +150,13 @@ namespace mongo {
         SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();
-            log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
+            cerr << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
             return false;
         }
 
 		SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
 		if ( schService == NULL ) {
-			log() << "Could not find a service named " << toUtf8String(serviceName) << " to uninstall." << endl;
+			cerr << "Could not find a service named " << toUtf8String(serviceName) << " to uninstall." << endl;
 			::CloseServiceHandle( schSCManager );
 			return false;
 		}
@@ -165,7 +165,7 @@ namespace mongo {
 		
 		// stop service if its running
 		if ( ::ControlService( schService, SERVICE_CONTROL_STOP, &serviceStatus ) ) {
-			log() << "Service " << toUtf8String(serviceName) << " is currently running. Stopping service." << endl;
+			cerr << "Service " << toUtf8String(serviceName) << " is currently running. Stopping service." << endl;
 			while ( ::QueryServiceStatus( schService, &serviceStatus ) ) {
 				if ( serviceStatus.dwCurrentState == SERVICE_STOP_PENDING )
 				{
@@ -173,20 +173,20 @@ namespace mongo {
 				}
 				else { break; }
 			}
-			log() << "Service stopped." << endl;
+			cerr << "Service stopped." << endl;
 		}
 
-		log() << "Deleting service " << toUtf8String(serviceName) << "." << endl;
+		cerr << "Deleting service " << toUtf8String(serviceName) << "." << endl;
 		bool serviceRemoved = ::DeleteService( schService );
 		
 		::CloseServiceHandle( schService );
 		::CloseServiceHandle( schSCManager );
 
 		if (serviceRemoved) {
-			log() << "Service deleted successfully." << endl;
+			cerr << "Service deleted successfully." << endl;
 		}
 		else {
-			log() << "Failed to delete service." << endl;
+			cerr << "Failed to delete service." << endl;
 		}
 
 		return serviceRemoved;
