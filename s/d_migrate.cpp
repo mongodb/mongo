@@ -542,11 +542,11 @@ namespace mongo {
                 _go();
             }
             catch ( std::exception& e ){
-                state = ERROR;
+                state = FAIL;
                 errmsg = e.what();
             }
             catch ( ... ){
-                state = ERROR;
+                state = FAIL;
                 errmsg = "UNKNOWN ERROR";
             }
             active = false;
@@ -611,7 +611,7 @@ namespace mongo {
                 if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
                     log() << "_transferMods failed in STEADY state: " << res << endl;
                     errmsg = res.toString();
-                    state = ERROR;
+                    state = FAIL;
                     return;
                 }
                 if ( res["size"].number() > 0 ){
@@ -678,7 +678,7 @@ namespace mongo {
             case STEADY: return "steady";
             case COMMIT_START: return "commitStart";
             case DONE: return "done";
-            case ERROR: return "error";
+            case FAIL: return "fail";
             }
             assert(0);
             return "";
@@ -710,7 +710,7 @@ namespace mongo {
         long long numCatchup;
         long long numSteady;
 
-        enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , ERROR } state;
+        enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , FAIL } state;
         string errmsg;
         
     } migrateStatus;
