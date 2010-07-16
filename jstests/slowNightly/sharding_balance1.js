@@ -15,7 +15,7 @@ while ( bigString.length < 10000 )
 
 inserted = 0;
 num = 0;
-while ( inserted < ( 40 * 1024 * 1024 ) ){
+while ( inserted < ( 20 * 1024 * 1024 ) ){
     db.foo.insert( { _id : num++ , s : bigString } );
     inserted += bigString.length;
 }
@@ -31,11 +31,11 @@ function diff(){
 }
 
 function sum(){
-    var x = dist();
+    var x = s.chunkCounts( "foo" );
     return x.shard0 + x.shard1;
 }
 
-assert.lt( 10 , diff() , "big differential here" );
+assert.lt( 20 , diff() , "big differential here" );
 print( diff() )
 
 assert.soon( function(){
@@ -44,11 +44,10 @@ assert.soon( function(){
 } , "balance didn't happen" , 1000 * 60 * 3 , 5000 );
     
 var chunkCount = sum();
-host = s.config.shards.findOne({_id : "shard0" }).host;
-s.adminCommand( { removeshard: host } );
+s.adminCommand( { removeshard: "shard0" } );
 
 assert.soon( function(){
-    printjson(dist());
+    printjson(s.chunkCounts( "foo" ));
     s.config.shards.find().forEach(function(z){printjson(z);});
     return chunkCount == s.config.chunks.count({shard: "shard1"});
 } , "removeshard didn't happen" , 1000 * 60 * 3 , 5000 );

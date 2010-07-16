@@ -215,25 +215,26 @@ namespace mongo {
                     errmsg = "you have to specify where you want to move it";
                     return false;
                 }
+                Shard s = Shard::make( to );
 
-                if ( config->getPrimary() == to ){
+                if ( config->getPrimary() == s.getConnString() ){
                     errmsg = "thats already the primary";
                     return false;
                 }
 
-                if ( ! grid.knowAboutShard( to ) ){
+                if ( ! grid.knowAboutShard( s.getConnString() ) ){
                     errmsg = "that server isn't known to me";
                     return false;
                 }
 
                 ScopedDbConnection conn( configServer.getPrimary() );
 
-                log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString() << " to: " << to << endl;
+                log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString() 
+                      << " to: " << s.toString() << endl;
 
                 // TODO LOCKING: this is not safe with multiple mongos
 
-
-                ScopedDbConnection toconn( to );
+                ScopedDbConnection toconn( s.getConnString() );
 
                 // TODO AARON - we need a clone command which replays operations from clone start to now
                 //              using a seperate smaller oplog
@@ -249,7 +250,7 @@ namespace mongo {
 
                 ScopedDbConnection fromconn( config->getPrimary() );
 
-                config->setPrimary( to );
+                config->setPrimary( s.getConnString() );
                 config->save( true );
 
                 log() << "movePrimary:  dropping " << dbname << " from old" << endl;
@@ -257,7 +258,7 @@ namespace mongo {
                 fromconn->dropDatabase( dbname.c_str() );
                 fromconn.done();
 
-                result << "primary" << to;
+                result << "primary " << s.toString();
 
                 conn.done();
                 return true;
@@ -707,8 +708,9 @@ namespace mongo {
                 help << "remove a shard to the system.";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string shard = cmdObj.firstElement().valuestrsafe();
-                if ( ! grid.knowAboutShard( shard ) ){
+                string target = cmdObj.firstElement().valuestrsafe();
+                Shard s = Shard::make( target );
+                if ( ! grid.knowAboutShard( s.getConnString() ) ){
                     errmsg = "unknown shard";
                     return false;
                 }
@@ -716,20 +718,20 @@ namespace mongo {
                 ScopedDbConnection conn( configServer.getPrimary() );
 
                 // If the server is not yet draining chunks, put it in draining mode.
-                BSONObj searchDoc = BSON( "host" << shard );
-                BSONObj drainingDoc = BSON( "host" << shard << ShardFields::draining(true) );
+                BSONObj searchDoc = BSON( "_id" << s.getName() );
+                BSONObj drainingDoc = BSON( "_id" << s.getName() << ShardFields::draining(true) );
                 BSONObj shardDoc = conn->findOne( "config.shards", drainingDoc );
                 if ( shardDoc.isEmpty() ){
 
                     // TODO prevent move chunks to this shard.
 
-                    log() << "going to start draining shard: " << shard << endl;
+                    log() << "going to start draining shard: " << s.getName() << endl;
                     BSONObj newStatus = BSON( "$set" << BSON( ShardFields::draining(true) ) );
                     conn->update( "config.shards" , searchDoc , newStatus, false /* do no upsert */);
 
                     errmsg = conn->getLastError();
                     if ( errmsg.size() ){
-                        log() << "error starting remove shard: " << shard << " err: " << errmsg << endl;
+                        log() << "error starting remove shard: " << s.getName() << " err: " << errmsg << endl;
                         return false;
                     }
 
@@ -737,7 +739,7 @@ namespace mongo {
 
                     result.append( "msg"   , "draining started successfully" );
                     result.append( "state" , "started" ); 
-                    result.append( "shard" , shard );
+                    result.append( "shard" , s.getName() );
                     conn.done();
                     return true;
                 }
@@ -749,12 +751,12 @@ namespace mongo {
                 BSONObj primaryDoc = BSON( "primary" << shardDoc[ "_id" ].str() );
                 long long dbCount = conn->count( "config.databases" , primaryDoc );
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ){
-                    log() << "going to remove shard: " << shard << endl;                    
+                    log() << "going to remove shard: " << s.getName() << endl;                    
                     conn->remove( "config.shards" , searchDoc );
 
                     errmsg = conn->getLastError();
                     if ( errmsg.size() ){
-                        log() << "error concluding remove shard: " << shard << " err: " << errmsg << endl;
+                        log() << "error concluding remove shard: " << s.getName() << " err: " << errmsg << endl;
                         return false;
                     }
 
@@ -763,7 +765,7 @@ namespace mongo {
 
                     result.append( "msg"   , "removeshard completed successfully" );
                     result.append( "state" , "completed" );
-                    result.append( "shard" , shard );
+                    result.append( "shard" , s.getName() );
                     conn.done();
                     return true;
                 }

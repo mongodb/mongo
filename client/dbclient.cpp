@@ -199,7 +199,7 @@ namespace mongo {
         BSONObj res;
         if( !runCommand(ns.db.c_str(), cmd, res, options) )
             uasserted(11010,string("count fails:") + res.toString());
-        return res.getIntField("n");
+        return res["n"].numberLong();
     }
 
     BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");

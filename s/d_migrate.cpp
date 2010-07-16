@@ -489,6 +489,7 @@ namespace mongo {
             
             // 7
             {
+                ShardForceModeBlock sf;
                 writelock lk(ns);
                 long long num = Helpers::removeRange( ns , min , max , true );
                 log() << "moveChunk deleted: " << num << endl;

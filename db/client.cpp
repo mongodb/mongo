@@ -27,6 +27,8 @@
 #include "json.h"
 #include "security.h"
 #include "commands.h"
+#include "instance.h"
+#include "../s/d_logic.h"
 
 namespace mongo {
 
@@ -190,8 +192,15 @@ namespace mongo {
         _client->_curOp->enter( this );
         if ( doauth )
             _auth( lockState );
-    }
 
+        {
+            string errmsg;
+            if ( ! shardVersionOk( _ns , errmsg ) ){
+                msgasserted( 13388 , (string)"shard version not ok in Client::Context: " + errmsg );
+            }
+        }
+    }
+    
     void Client::Context::_auth( int lockState ){
         if ( _client->_ai.isAuthorizedForLock( _db->name , lockState ) )
             return;
