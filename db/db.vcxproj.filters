@@ -379,6 +379,9 @@
     <ClCompile Include="..\s\d_split.cpp">
       <Filter>sharding</Filter>
     </ClCompile>
+    <ClCompile Include="repl\rs_sync.cpp">
+      <Filter>rs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
