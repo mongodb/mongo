@@ -1006,7 +1006,7 @@ namespace mongo {
                 if ( idx == 0 )
                     return false;
                 NamespaceDetails *d = nsdetails(ns.c_str());
-                c.reset( new BtreeCursor( d, d->idxNo(*idx), *idx, min, max, false, 1, false ) );
+                c.reset( new BtreeCursor( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }
             
             long long maxSize = jsobj["maxSize"].numberLong();

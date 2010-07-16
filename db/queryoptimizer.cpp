@@ -160,21 +160,19 @@ namespace mongo {
             exactIndexedQueryCount == _originalQuery.nFields() ) {
             exactKeyMatch_ = true;
         }
-        indexBounds_ = fbs.indexBounds( idxKey, direction_ );
+        _frv.reset( new FieldRangeVector( fbs, idxKey, direction_ ) );
         if ( _startOrEndSpec ) {
             BSONObj newStart, newEnd;
             if ( !startKey.isEmpty() )
-                newStart = startKey;
+                _startKey = startKey;
             else
-                newStart = indexBounds_[ 0 ].first;
+                _startKey = _frv->startKey();
             if ( !endKey.isEmpty() )
-                newEnd = endKey;
+                _endKey = endKey;
             else
-                newEnd = indexBounds_[ indexBounds_.size() - 1 ].second;
-            BoundList newBounds;
-            newBounds.push_back( make_pair( newStart, newEnd ) );
-            indexBounds_ = newBounds;
+                _endKey = _frv->endKey();
         }
+
         if ( ( scanAndOrderRequired_ || order_.isEmpty() ) &&
             !fbs.range( idxKey.firstElement().fieldName() ).nontrivial() ) {
             unhelpful_ = true;
@@ -201,11 +199,13 @@ namespace mongo {
 
         massert( 10363 ,  "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
         
-        if ( indexBounds_.size() < 2 ) {
+        if ( _startOrEndSpec ) {
             // we are sure to spec endKeyInclusive_
-            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, indexBounds_[ 0 ].first, indexBounds_[ 0 ].second, endKeyInclusive_, direction_ >= 0 ? 1 : -1, !_startOrEndSpec ) );
+            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, _startKey, _endKey, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
+        } else if ( index_->getSpec().getType() ) {
+            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, _frv->startKey(), _frv->endKey(), true, direction_ >= 0 ? 1 : -1 ) );            
         } else {
-            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, indexBounds_, direction_ >= 0 ? 1 : -1 ) );
+            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, _frv, direction_ >= 0 ? 1 : -1 ) );
         }
     }
     

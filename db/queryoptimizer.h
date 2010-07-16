@@ -61,8 +61,8 @@ namespace mongo {
         BSONObj simplifiedQuery( const BSONObj& fields = BSONObj(), bool expandIn = false ) const { return fbs_.simplifiedQuery( fields, expandIn ); }
         const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
-        // just for testing
-        BoundList indexBounds() const { return indexBounds_; }
+        // just here for testing
+        const FieldRangeVector *frv() const { return _frv.get(); }
     private:
         NamespaceDetails *d;
         int idxNo;
@@ -74,7 +74,9 @@ namespace mongo {
         bool scanAndOrderRequired_;
         bool exactKeyMatch_;
         int direction_;
-        BoundList indexBounds_;
+        shared_ptr< FieldRangeVector > _frv;
+        BSONObj _startKey;
+        BSONObj _endKey;
         bool endKeyInclusive_;
         bool unhelpful_;
         string _special;

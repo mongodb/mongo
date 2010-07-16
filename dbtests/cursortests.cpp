@@ -28,7 +28,29 @@ namespace CursorTests {
     
     namespace BtreeCursorTests {
 
-        class MultiRange {
+        // The ranges expressed in these tests are impossible given our query
+        // syntax, so going to do them a hacky way.
+        
+        class Base {
+        protected:
+            FieldRangeVector *vec( int *vals, int len, int direction = 1 ) {
+                FieldRangeSet s( "", BSON( "a" << 1 ) );
+                for( int i = 0; i < len; i += 2 ) {
+                    _objs.push_back( BSON( "a" << BSON( "$gte" << vals[ i ] << "$lte" << vals[ i + 1 ] ) ) );
+                    FieldRangeSet s2( "", _objs.back() );
+                    if ( i == 0 ) {
+                        s.range( "a" ) = s2.range( "a" );
+                    } else {
+                        s.range( "a" ) |= s2.range( "a" );
+                    }
+                }
+                return new FieldRangeVector( s, BSON( "a" << 1 ), direction );
+            }
+        private:
+            vector< BSONObj > _objs;
+        };
+        
+        class MultiRange : public Base {
         public:
             void run() {
                 dblock lk;
@@ -39,11 +61,10 @@ namespace CursorTests {
                         c.insert( ns, BSON( "a" << i ) );
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
-                BoundList b;
-                b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 1 ), BSON( "" << 2 ) ) );
-                b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 4 ), BSON( "" << 6 ) ) );
+                int v[] = { 1, 2, 4, 6 };
+                shared_ptr< FieldRangeVector > frv( vec( v, 4 ) );
                 Client::Context ctx( ns );
-                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), b, 1 );
+                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, 1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
                 double expected[] = { 1, 2, 4, 5, 6 };
                 for( int i = 0; i < 5; ++i ) {
@@ -55,7 +76,7 @@ namespace CursorTests {
             }
         };
 
-        class MultiRangeGap {
+        class MultiRangeGap : public Base {
         public:
             void run() {
                 dblock lk;
@@ -68,12 +89,10 @@ namespace CursorTests {
                         c.insert( ns, BSON( "a" << i ) );
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
-                BoundList b;
-                b.push_back( pair< BSONObj, BSONObj >( BSON( "" << -50 ), BSON( "" << 2 ) ) );
-                b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 40 ), BSON( "" << 60 ) ) );
-                b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 109 ), BSON( "" << 200 ) ) );
+                int v[] = { -50, 2, 40, 60, 109, 200 };
+                shared_ptr< FieldRangeVector > frv( vec( v, 6 ) );
                 Client::Context ctx( ns );
-                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), b, 1 );
+                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, 1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
                 double expected[] = { 0, 1, 2, 109 };
                 for( int i = 0; i < 4; ++i ) {
@@ -85,7 +104,7 @@ namespace CursorTests {
             }
         };
      
-        class MultiRangeReverse {
+        class MultiRangeReverse : public Base {
         public:
             void run() {
                 dblock lk;
@@ -96,11 +115,10 @@ namespace CursorTests {
                         c.insert( ns, BSON( "a" << i ) );
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
-                BoundList b;
-                b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 6 ), BSON( "" << 4 ) ) );
-                b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 2 ), BSON( "" << 1 ) ) );
+                int v[] = { 1, 2, 4, 6 };
+                shared_ptr< FieldRangeVector > frv( vec( v, 4, -1 ) );
                 Client::Context ctx( ns );
-                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), b, -1 );
+                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, -1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 reverse multi", c.toString() );
                 double expected[] = { 6, 5, 4, 2, 1 };
                 for( int i = 0; i < 5; ++i ) {
@@ -112,6 +130,122 @@ namespace CursorTests {
             }
         };
      
+        class Base2 {
+        public:
+            virtual ~Base2() { _c.dropCollection( ns() ); }
+        protected:
+            static const char *ns() { return "unittests.cursortests.Base2"; }
+            DBDirectClient _c;
+            virtual BSONObj idx() const = 0;
+            virtual int direction() const { return 1; }
+            void insert( const BSONObj &o ) {
+                _objs.push_back( o );
+                _c.insert( ns(), o );
+            }
+            void check( const BSONObj &spec ) {
+                _c.ensureIndex( ns(), idx() );
+                Client::Context ctx( ns() );
+                FieldRangeSet frs( ns(), spec );
+                shared_ptr< FieldRangeVector > frv( new FieldRangeVector( frs, idx(), direction() ) );
+                BtreeCursor c( nsdetails( ns() ), 1, nsdetails( ns() )->idx( 1 ), frv, direction() );
+                Matcher m( spec );
+                int count = 0;
+                while( c.ok() ) {
+                    ASSERT( m.matches( c.current() ) );
+                    c.advance();
+                    ++count;
+                }
+                int expectedCount = 0;
+                for( vector< BSONObj >::const_iterator i = _objs.begin(); i != _objs.end(); ++i ) {
+                    if ( m.matches( *i ) ) {
+                        ++expectedCount;
+                    }
+                }
+                ASSERT_EQUALS( expectedCount, count );
+            }
+        private:
+            dblock _lk;
+            vector< BSONObj > _objs;
+        };
+        
+        class EqEq : public Base2 {
+        public:
+            void run() {
+                insert( BSON( "a" << 4 << "b" << 5 ) );
+                insert( BSON( "a" << 4 << "b" << 5 ) );
+                insert( BSON( "a" << 4 << "b" << 4 ) );
+                insert( BSON( "a" << 5 << "b" << 4 ) );
+                check( BSON( "a" << 4 << "b" << 5 ) );
+            }
+            virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
+        };
+
+        class EqRange : public Base2 {
+        public:
+            void run() {
+                insert( BSON( "a" << 3 << "b" << 5 ) );
+                insert( BSON( "a" << 4 << "b" << 0 ) );
+                insert( BSON( "a" << 4 << "b" << 5 ) );
+                insert( BSON( "a" << 4 << "b" << 6 ) );
+                insert( BSON( "a" << 4 << "b" << 6 ) );
+                insert( BSON( "a" << 4 << "b" << 10 ) );
+                insert( BSON( "a" << 4 << "b" << 11 ) );
+                insert( BSON( "a" << 5 << "b" << 5 ) );
+                check( BSON( "a" << 4 << "b" << BSON( "$gte" << 1 << "$lte" << 10 ) ) );
+            }
+            virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
+        };        
+
+        class EqIn : public Base2 {
+        public:
+            void run() {
+                insert( BSON( "a" << 3 << "b" << 5 ) );
+                insert( BSON( "a" << 4 << "b" << 0 ) );
+                insert( BSON( "a" << 4 << "b" << 5 ) );
+                insert( BSON( "a" << 4 << "b" << 6 ) );
+                insert( BSON( "a" << 4 << "b" << 6 ) );
+                insert( BSON( "a" << 4 << "b" << 10 ) );
+                insert( BSON( "a" << 4 << "b" << 11 ) );
+                insert( BSON( "a" << 5 << "b" << 5 ) );
+                check( BSON( "a" << 4 << "b" << BSON( "$in" << BSON_ARRAY( 5 << 6 << 11 ) ) ) );
+            }
+            virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
+        };        
+
+        class RangeEq : public Base2 {
+        public:
+            void run() {
+                insert( BSON( "a" << 0 << "b" << 4 ) );
+                insert( BSON( "a" << 1 << "b" << 4 ) );
+                insert( BSON( "a" << 4 << "b" << 3 ) );
+                insert( BSON( "a" << 5 << "b" << 4 ) );
+                insert( BSON( "a" << 7 << "b" << 4 ) );
+                insert( BSON( "a" << 4 << "b" << 4 ) );
+                insert( BSON( "a" << 9 << "b" << 6 ) );
+                insert( BSON( "a" << 11 << "b" << 1 ) );
+                insert( BSON( "a" << 11 << "b" << 4 ) );
+                check( BSON( "a" << BSON( "$gte" << 1 << "$lte" << 10 ) << "b" << 4 ) );
+            }
+            virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
+        };        
+
+        class RangeIn : public Base2 {
+        public:
+            void run() {
+                insert( BSON( "a" << 0 << "b" << 4 ) );
+                insert( BSON( "a" << 1 << "b" << 5 ) );
+                insert( BSON( "a" << 4 << "b" << 3 ) );
+                insert( BSON( "a" << 5 << "b" << 4 ) );
+                insert( BSON( "a" << 7 << "b" << 5 ) );
+                insert( BSON( "a" << 4 << "b" << 4 ) );
+                insert( BSON( "a" << 9 << "b" << 6 ) );
+                insert( BSON( "a" << 11 << "b" << 1 ) );
+                insert( BSON( "a" << 11 << "b" << 4 ) );
+                check( BSON( "a" << BSON( "$gte" << 1 << "$lte" << 10 ) << "b" << BSON( "$in" << BSON_ARRAY( 4 << 6 ) ) ) );
+            }
+            virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
+        };        
+        
     } // namespace BtreeCursorTests
     
     class All : public Suite {
@@ -122,6 +256,11 @@ namespace CursorTests {
             add< BtreeCursorTests::MultiRange >();
             add< BtreeCursorTests::MultiRangeGap >();
             add< BtreeCursorTests::MultiRangeReverse >();
+            add< BtreeCursorTests::EqEq >();
+            add< BtreeCursorTests::EqRange >();
+            add< BtreeCursorTests::EqIn >();
+            add< BtreeCursorTests::RangeEq >();
+            add< BtreeCursorTests::RangeIn >();
         }
     } myall;
 } // namespace CursorTests

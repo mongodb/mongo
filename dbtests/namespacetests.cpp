@@ -591,7 +591,7 @@ namespace NamespaceTests {
                 ASSERT( userCreateNS( ns(), fromjson( spec() ), err, false ) );
             }
             virtual string spec() const {
-                return "{\"capped\":true,\"size\":512}";
+                return "{\"capped\":true,\"size\":512,\"$nExtents\":1}";
             }
             int nRecords() const {
                 int count = 0;

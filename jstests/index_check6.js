@@ -12,6 +12,7 @@ for ( var age=10; age<50; age++ ){
 
 assert.eq( 10 , t.find( { age : 30 } ).explain().nscanned , "A" );
 assert.eq( 20 , t.find( { age : { $gte : 29 , $lte : 30 } } ).explain().nscanned , "B" );
+assert.eq( 12 , t.find( { age : { $gte : 25 , $lte : 30 }, rating: {$in: [0,9] } } ).explain().nscanned , "C1" );
 
 assert.eq( 2 , t.find( { age : { $gte : 29 , $lte : 30 } , rating : 5 } ).explain().nscanned , "C" ); // SERVER-371
 assert.eq( 4 , t.find( { age : { $gte : 29 , $lte : 30 } , rating : { $gte : 4 , $lte : 5 } } ).explain().nscanned , "D" ); // SERVER-371

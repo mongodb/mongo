@@ -405,6 +405,8 @@
 		934BEE9F10E050A500178102 /* processinfo_none.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = processinfo_none.cpp; sourceTree = "<group>"; };
 		934BEEA010E050A500178102 /* queue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = queue.h; sourceTree = "<group>"; };
 		934CE9C911EBB73E00EB6ADC /* repair4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = repair4.js; sourceTree = "<group>"; };
+		934CEA0F11EBEF7C00EB6ADC /* or9.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or9.js; sourceTree = "<group>"; };
+		934CEC2F11EFD8DF00EB6ADC /* index_check9.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = index_check9.js; sourceTree = "<group>"; };
 		934DD87C0EFAD23B00459CC1 /* background.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = background.cpp; sourceTree = "<group>"; };
 		934DD87D0EFAD23B00459CC1 /* background.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = background.h; sourceTree = "<group>"; };
 		934DD87F0EFAD23B00459CC1 /* builder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = builder.h; sourceTree = "<group>"; };
@@ -827,6 +829,8 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				934CEC2F11EFD8DF00EB6ADC /* index_check9.js */,
+				934CEA0F11EBEF7C00EB6ADC /* or9.js */,
 				93C5BC9E11E5B7FE00F9671C /* group6.js */,
 				93C5BC7911E5AE8700F9671C /* in6.js */,
 				938A74BF11D17ECE005265E1 /* numberlong.js */,

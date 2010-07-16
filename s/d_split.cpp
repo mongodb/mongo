@@ -66,9 +66,9 @@ namespace mongo {
             int num = 0;
             NamespaceDetails *d = nsdetails(ns);
             int idxNo = d->idxNo(*id);
-            for( BtreeCursor c( d, idxNo, *id, min, max, false, 1, false ); c.ok(); c.advance(), ++num );
+            for( BtreeCursor c( d, idxNo, *id, min, max, false, 1 ); c.ok(); c.advance(), ++num );
             num /= 2;
-            BtreeCursor c( d, idxNo, *id, min, max, false, 1, false );
+            BtreeCursor c( d, idxNo, *id, min, max, false, 1 );
             for( ; num; c.advance(), --num );
 
             ostringstream os;

@@ -366,15 +366,15 @@ namespace mongo {
         }
     }
     
-    int BtreeBucket::customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, const BSONObj &rEnd, const Ordering &o ) {
+    int BtreeBucket::customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, const vector< const BSONElement * > &rEnd, const Ordering &o ) {
         BSONObjIterator ll( l );
         BSONObjIterator rr( rBegin );
-        BSONObjIterator rr2( rEnd );
+        vector< const BSONElement * >::const_iterator rr2 = rEnd.begin();
         unsigned mask = 1;
         for( int i = 0; i < rBeginLen; ++i, mask <<= 1 ) {
             BSONElement lll = ll.next();
             BSONElement rrr = rr.next();
-            rr2.next();
+            ++rr2;
             
             int x = lll.woCompare( rrr, false );
             if ( o.descending( mask ) )
@@ -384,7 +384,8 @@ namespace mongo {
         }
         for( ; ll.more(); mask <<= 1 ) {
             BSONElement lll = ll.next();
-            BSONElement rrr = rr2.next();
+            BSONElement rrr = **rr2;
+            ++rr2;
             int x = lll.woCompare( rrr, false );
             if ( o.descending( mask ) )
                 x = -x;
@@ -879,7 +880,7 @@ found:
             return pos == n ? DiskLoc() /*theend*/ : thisLoc;
     }
 
-    bool BtreeBucket::customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) {
+    bool BtreeBucket::customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) {
         while( 1 ) {
             if ( l + 1 == h ) {
                 keyOfs = ( direction > 0 ) ? h : l;
@@ -911,7 +912,7 @@ found:
     // find smallest/biggest value greater-equal/less-equal than specified
     // starting thisLoc + keyOfs will be strictly less than/strictly greater than keyBegin/keyBeginLen/keyEnd
     // All the direction checks below allowed me to refactor the code, but possibly separate forward and reverse implementations would be more efficient
-    void BtreeBucket::advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction ) {
+    void BtreeBucket::advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd, const Ordering &order, int direction ) {
         int l,h;
         bool dontGoUp;
         if ( direction > 0 ) {

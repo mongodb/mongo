@@ -743,12 +743,10 @@ namespace QueryOptimizerTests {
                 return nsd()->idxNo( *index(key) );
             }
             BSONObj startKey( const QueryPlan &p ) const {
-                BoundList bl = p.indexBounds();
-                return bl[ 0 ].first.getOwned();
+                return p.frv()->startKey();
             }
             BSONObj endKey( const QueryPlan &p ) const {
-                BoundList bl = p.indexBounds();
-                return bl[ bl.size() - 1 ].second.getOwned();
+                return p.frv()->endKey();
             }
         private:
             dblock lk_;
@@ -1535,8 +1533,9 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ) ) );
                 QueryPlan qp( nsd(), 1, *frs, fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
-                for( int i = 2; i < 10; ++i, c->advance() ) {
-                    ASSERT_EQUALS( i, c->current().getField( "b" ).number() );
+                int matches[] = { 2, 3, 6, 9 };
+                for( int i = 0; i < 4; ++i, c->advance() ) {
+                    ASSERT_EQUALS( matches[ i ], c->current().getField( "b" ).number() );
                 }
                 ASSERT( !c->ok() );
             }

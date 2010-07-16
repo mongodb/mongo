@@ -235,7 +235,7 @@ namespace mongo {
         /* advance one key position in the index: */
         DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
         
-        void advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction );
+        void advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd, const Ordering &order, int direction );
         
         DiskLoc getHead(const DiskLoc& thisLoc);
 
@@ -259,9 +259,9 @@ namespace mongo {
                     const BSONObj& key, const Ordering &order, bool dupsAllowed,
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
         bool find(const IndexDetails& idx, const BSONObj& key, DiskLoc recordLoc, const Ordering &order, int& pos, bool assertIfDup);
-        bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent );
+        bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent );
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
-        static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, const BSONObj &rEnd, const Ordering &o );
+        static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, const vector< const BSONElement * > &rEnd, const Ordering &o );
     public:
         // simply builds and returns a dup key error message string
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );
@@ -270,9 +270,9 @@ namespace mongo {
 
     class BtreeCursor : public Cursor {
     public:
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction, bool independentFieldRanges = true );
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
 
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const BoundList &_bounds, int _direction );
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
         ~BtreeCursor(){
         }
         virtual bool ok() {
@@ -339,7 +339,7 @@ namespace mongo {
         virtual string toString() {
             string s = string("BtreeCursor ") + indexDetails.indexName();
             if ( direction < 0 ) s += " reverse";
-            if ( bounds_.size() > 1 ) s += " multi";
+            if ( bounds_.get() && bounds_->size() > 1 ) s += " multi";
             return s;
         }
 
@@ -349,11 +349,13 @@ namespace mongo {
 
         virtual BSONArray prettyIndexBounds() const {
             BSONArrayBuilder ba;
-            if ( bounds_.size() == 0 ) {
+            if ( !bounds_.get() ) {
                 ba << BSON_ARRAY( prettyKey( startKey ) << prettyKey( endKey ) );
             } else {
-                for( BoundList::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i ) {
-                    ba << BSON_ARRAY( prettyKey( i->first ) << prettyKey( i->second ) );
+                FieldRangeVector::Iterator i( *bounds_ );
+                while( i.ok() ) {
+                    ba << BSON_ARRAY( prettyKey( i.startKey() ) << prettyKey( i.endKey() ) );                    
+                    i.advance();
                 }
             }
             return ba.arr();
@@ -385,12 +387,7 @@ namespace mongo {
         // set initial bucket
         void init();
 
-        // init start / end keys with a new range
-        void initInterval();
-        
-        void advanceTo( const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd);
-        
-        static BSONObj makeSuperlativeKey( const BSONObj &order, int direction );
+        void advanceTo( const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd);
         
         friend class BtreeBucket;
         set<DiskLoc> dups;
@@ -400,21 +397,19 @@ namespace mongo {
         BSONObj startKey;
         BSONObj endKey;
         bool endKeyInclusive_;
-        int _nEqKeyElts;
         
         bool multikey; // note this must be updated every getmore batch in case someone added a multikey...
 
         const IndexDetails& indexDetails;
         BSONObj order;
         Ordering _ordering;
-        BSONObj _superlativeKey;
         DiskLoc bucket;
         int keyOfs;
         int direction; // 1=fwd,-1=reverse
         BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
         DiskLoc locAtKeyOfs;
-        BoundList bounds_;
-        unsigned boundIndex_;
+        shared_ptr< FieldRangeVector > bounds_;
+        auto_ptr< FieldRangeVector::Iterator > _boundsIterator;
         const IndexSpec& _spec;
         shared_ptr< CoveredIndexMatcher > _matcher;
         bool _independentFieldRanges;

@@ -39,7 +39,7 @@ namespace mongo {
         }
         FieldBound _lower;
         FieldBound _upper;
-        bool valid() const {
+        bool strictValid() const {
             int cmp = _lower._bound.woCompare( _upper._bound, false );
             return ( cmp < 0 || ( cmp == 0 && _lower._inclusive && _upper._inclusive ) );
         }
@@ -96,6 +96,19 @@ namespace mongo {
         // reconstructs $in, regex, inequality matches
         // this is a hack - we should submit FieldRange directly to a Matcher instead
         BSONObj simplifiedComplex() const;
+        // constructs a range which is the reverse of the current one
+        // note - the resulting intervals may not be strictValid()
+        void reverse( FieldRange &ret ) const {
+            assert( _special.empty() );
+            ret._intervals.clear();
+            ret._objData = _objData;
+            for( vector< FieldInterval >::const_reverse_iterator i = _intervals.rbegin(); i != _intervals.rend(); ++i ) {
+                FieldInterval fi;
+                fi._lower = i->_upper;
+                fi._upper = i->_lower;
+                ret._intervals.push_back( fi );
+            }
+        }
     private:
         BSONObj addObj( const BSONObj &o );
         void finishOperation( const vector< FieldInterval > &newIntervals, const FieldRange &other );
@@ -175,12 +188,13 @@ namespace mongo {
     // and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
     // would be valid for index {i:-1} with direction -1.
     typedef vector< pair< BSONObj, BSONObj > > BoundList;	
-
+    
     // ranges of fields' value that may be determined from query -- used to
     // determine index limits
     class FieldRangeSet {
     public:
         friend class FieldRangeOrSet;
+        friend class FieldRangeVector;
         FieldRangeSet( const char *ns, const BSONObj &query , bool optimize=true );
         bool hasRange( const char *fieldName ) const {
             map< string, FieldRange >::const_iterator f = _ranges.find( fieldName );
@@ -215,7 +229,6 @@ namespace mongo {
             return true;
         }
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
-        BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
         string getSpecial() const;
         const FieldRangeSet &operator-=( const FieldRangeSet &other ) {
             map< string, FieldRange >::iterator i = _ranges.begin();
@@ -232,6 +245,7 @@ namespace mongo {
                     ++j;
                 }
             }
+            appendQueries( other );
             return *this;
         }
         const FieldRangeSet &operator&=( const FieldRangeSet &other ) {
@@ -254,9 +268,17 @@ namespace mongo {
                 _ranges[ j->first ] = j->second;
                 ++j;                
             }
+            appendQueries( other );
             return *this;
         }
+        // TODO get rid of this
+        BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
     private:
+        void appendQueries( const FieldRangeSet &other ) {
+            for( vector< BSONObj >::const_iterator i = other._queries.begin(); i != other._queries.end(); ++i ) {
+                _queries.push_back( *i );                
+            }                        
+        }
         void processQueryField( const BSONElement &e, bool optimize );
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
         static FieldRange *trivialRange_;
@@ -264,9 +286,137 @@ namespace mongo {
         mutable map< string, FieldRange > _ranges;
         const char *_ns;
         // make sure memory for FieldRange BSONElements is owned
-        BSONObj _query;
+        vector< BSONObj > _queries;
     };
 
+    class FieldRangeVector {
+    public:
+        FieldRangeVector( const FieldRangeSet &frs, const BSONObj &keyPattern, int direction )
+        :_keyPattern( keyPattern ), _direction( direction >= 0 ? 1 : -1 )
+        {
+            _queries = frs._queries;
+            BSONObjIterator i( _keyPattern );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                int number = (int) e.number(); // returns 0.0 if not numeric
+                bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
+                if ( forward ) {
+                    _ranges.push_back( frs.range( e.fieldName() ) );
+                } else {
+                    _ranges.push_back( FieldRange() );
+                    frs.range( e.fieldName() ).reverse( _ranges.back() );
+                }
+                assert( !_ranges.back().empty() );
+            }
+            uassert( 13345, "combinatorial limit of $in partitioning of result set exceeded", size() < 1000000 );
+        }
+        long long size() {
+            long long ret = 1;
+            for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+                ret *= i->intervals().size();
+            }
+            return ret;
+        }        
+        BSONObj startKey() const {
+            BSONObjBuilder b;
+            for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+                const FieldInterval &fi = i->intervals().front();
+                b.appendAs( fi._lower._bound, "" );
+            }
+            return b.obj();            
+        }
+        BSONObj endKey() const {
+            BSONObjBuilder b;
+            for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+                const FieldInterval &fi = i->intervals().back();
+                b.appendAs( fi._upper._bound, "" );
+            }
+            return b.obj();            
+        }
+        class Iterator {
+        public:
+            Iterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), 0 ), _cmp( _v._ranges.size(), 0 ), _superlative( _v._ranges.size(), 0 ) {
+                static BSONObj minObj = minObject();
+                static BSONElement minElt = minObj.firstElement();
+                static BSONObj maxObj = maxObject();
+                static BSONElement maxElt = maxObj.firstElement();
+                BSONObjIterator i( _v._keyPattern );
+                for( int j = 0; j < (int)_superlative.size(); ++j ) {
+                    int number = (int) i.next().number();
+                    bool forward = ( ( number >= 0 ? 1 : -1 ) * ( _v._direction >= 0 ? 1 : -1 ) > 0 );
+                    _superlative[ j ] = forward ? &maxElt : &minElt;
+                }
+            }
+            static BSONObj minObject() {
+                BSONObjBuilder b;
+                b.appendMinKey( "" );
+                return b.obj();
+            }
+            static BSONObj maxObject() {
+                BSONObjBuilder b;
+                b.appendMaxKey( "" );
+                return b.obj();
+            }
+            bool advance() {
+                int i = _i.size() - 1;
+                while( i >= 0 && _i[ i ] >= ( (int)_v._ranges[ i ].intervals().size() - 1 ) ) {
+                    --i;
+                }
+                if( i >= 0 ) {
+                    _i[ i ]++;
+                    for( unsigned j = i + 1; j < _i.size(); ++j ) {
+                        _i[ j ] = 0;
+                    }
+                } else {
+                    _i[ 0 ] = _v._ranges[ 0 ].intervals().size();
+                }
+                return ok();
+            }
+            // return value
+            // -2 end of iteration
+            // -1 no skipping
+            // >= 0 skip parameter
+            int advance( const BSONObj &curr );
+            const vector< const BSONElement * > &cmp() const { return _cmp; }
+            void setZero( int i ) {
+                for( int j = i; j < (int)_i.size(); ++j ) {
+                    _i[ j ] = 0;
+                }
+            }
+            bool ok() {
+                return _i[ 0 ] < (int)_v._ranges[ 0 ].intervals().size();
+            }
+            BSONObj startKey() {
+                BSONObjBuilder b;
+                for( int unsigned i = 0; i < _i.size(); ++i ) {
+                    const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
+                    b.appendAs( fi._lower._bound, "" );
+                }
+                return b.obj();
+            }
+            // temp
+            BSONObj endKey() {
+                BSONObjBuilder b;
+                for( int unsigned i = 0; i < _i.size(); ++i ) {
+                    const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
+                    b.appendAs( fi._upper._bound, "" );
+                }
+                return b.obj();            
+            }
+            // check
+        private:
+            const FieldRangeVector &_v;
+            vector< int > _i;
+            vector< const BSONElement* > _cmp;
+            vector< const BSONElement* > _superlative;
+        };
+    private:
+        vector< FieldRange > _ranges;
+        BSONObj _keyPattern;
+        int _direction;
+        vector< BSONObj > _queries; // make sure mem owned
+    };
+        
     // generages FieldRangeSet objects, accounting for or clauses
     class FieldRangeOrSet {
     public:

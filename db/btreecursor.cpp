@@ -27,63 +27,48 @@ namespace mongo {
     extern int otherTraceLevel;
 
     BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails &_id, 
-                              const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction, bool independentFieldRanges ) :
+                              const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction ) :
             d(_d), idxNo(_idxNo), 
             startKey( _startKey ),
             endKey( _endKey ),
             endKeyInclusive_( endKeyInclusive ),
-            _nEqKeyElts( 0 ),
             multikey( d->isMultikey( idxNo ) ),
             indexDetails( _id ),
             order( _id.keyPattern() ),
             _ordering( Ordering::make( order ) ),
-            _superlativeKey( makeSuperlativeKey( order, _direction ) ),
             direction( _direction ),
-            boundIndex_(),
             _spec( _id.getSpec() ),
-            _independentFieldRanges( _spec.getType() ? false : independentFieldRanges )
+            _independentFieldRanges( false )
     {
         audit();
         init();
         DEV assert( dups.size() == 0 );
     }
 
-    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const vector< pair< BSONObj, BSONObj > > &_bounds, int _direction )
+    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction )
         :
             d(_d), idxNo(_idxNo), 
             endKeyInclusive_( true ),
-            _nEqKeyElts( 0 ),
             multikey( d->isMultikey( idxNo ) ),
             indexDetails( _id ),
             order( _id.keyPattern() ),
             _ordering( Ordering::make( order ) ),
-            _superlativeKey( makeSuperlativeKey( order, _direction ) ),
             direction( _direction ),
-            bounds_( _bounds ),
-            boundIndex_(),
+            bounds_( ( assert( _bounds.get() ), _bounds ) ),
+            _boundsIterator( new FieldRangeVector::Iterator( *bounds_  ) ),
             _spec( _id.getSpec() ),
-            _independentFieldRanges( !_spec.getType() )
+            _independentFieldRanges( true )
     {
-        assert( !bounds_.empty() );
+        massert( 13346, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
         audit();
-        initInterval();
+        startKey = bounds_->startKey();
+        bool found;
+        bucket = indexDetails.head.btree()->
+        locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);        
+        skipAndCheck();
         DEV assert( dups.size() == 0 );
     }
 
-    BSONObj BtreeCursor::makeSuperlativeKey( const BSONObj &order, int direction ) {
-        BSONObjBuilder b;
-        BSONObjIterator i( order );
-        while( i.more() ) {
-            BSONElement e = i.next();
-            if ( ( e.number() < 0 ) ^ ( direction < 0 ) ) {
-                b.appendMinKey( "" );
-            } else {
-                b.appendMaxKey( "" );                
-            }
-        }
-        return b.obj();
-    }
-    
     void BtreeCursor::audit() {
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
 
@@ -103,38 +88,16 @@ namespace mongo {
         if ( _spec.getType() ){
             startKey = _spec.getType()->fixKey( startKey );
             endKey = _spec.getType()->fixKey( endKey );
-        } else if ( _independentFieldRanges ) {
-            _nEqKeyElts = 0;
-            BSONObjIterator i( startKey );
-            BSONObjIterator j( endKey );
-            while( i.more() && j.more() ) {
-                if ( i.next().valuesEqual( j.next() ) ) {
-                    ++_nEqKeyElts;
-                } else {
-                    break;
-                }
-            }
         }
         bool found;
         bucket = indexDetails.head.btree()->
             locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
-        skipAndCheck();
+        skipUnusedKeys( false );
+        checkEnd();
     }
     
-    void BtreeCursor::initInterval() {
-        do {
-            startKey = bounds_[ boundIndex_ ].first;
-            endKey = bounds_[ boundIndex_ ].second;
-            init();
-        } while ( !ok() && ++boundIndex_ < bounds_.size() );
-    }
-
     void BtreeCursor::skipAndCheck() {
         skipUnusedKeys( true );
-        if ( !_independentFieldRanges ) {
-            checkEnd();
-            return;
-        }
         while( 1 ) {
             if ( !skipOutOfRangeKeysAndCheckEnd() ) {
                 break;
@@ -144,6 +107,21 @@ namespace mongo {
                 break;
             }
         }
+    }
+    
+    bool BtreeCursor::skipOutOfRangeKeysAndCheckEnd() {
+        if ( !ok() ) {
+            return false;
+        }
+        int ret = _boundsIterator->advance( currKeyNode().key );
+        if ( ret == -2 ) {
+            bucket = DiskLoc();
+            return false;
+        } else if ( ret == -1 ) {
+            return false;
+        }
+        advanceTo( currKeyNode().key, ret, _boundsIterator->cmp() );
+        return true;
     }
     
     /* skip unused keys. */
@@ -186,84 +164,17 @@ namespace mongo {
         }
     }
     
-    bool BtreeCursor::skipOutOfRangeKeysAndCheckEnd() {
-        if ( bucket.isNull() )
-            return false;
-        bool eq = true;
-        if ( !endKey.isEmpty() ) {
-            int i = 0;
-            BSONObjIterator c( currKey() );
-            BSONObjIterator l( startKey );
-            BSONObjIterator r( endKey );
-            BSONObjIterator o( order );
-            for( ; i < _nEqKeyElts; ++i ) {
-                BSONElement cc = c.next();
-                BSONElement ll = l.next();
-                BSONElement rr = r.next();
-                BSONElement oo = o.next();
-                int x = cc.woCompare( rr, false );
-                if ( ( oo.number() < 0 ) ^ ( direction < 0 ) ) {
-                    x = -x;
-                }
-                if ( x > 0 ) {
-                    bucket = DiskLoc();
-                    return false;
-                }
-                // can't have x < 0, since start and end are equal for these fields
-                assert( x == 0 );
-            }
-            // first range (non equality) element
-            if( c.more() ) {
-                BSONElement cc = c.next();
-                BSONElement ll = l.next();
-                BSONElement rr = r.next();
-                BSONElement oo = o.next();
-                int x = cc.woCompare( rr, false );
-                if ( ( oo.number() < 0 ) ^ ( direction < 0 ) ) {
-                    x = -x;
-                }
-                if ( x > 0 ) {
-                    bucket = DiskLoc();
-                    return false;
-                } else if ( x < 0 ) {
-                    eq = false;
-                }
-                ++i;
-            }
-            // subsequent elements
-            for( ; c.more(); ++i ) {
-                BSONElement cc = c.next();
-                BSONElement ll = l.next();
-                BSONElement rr = r.next();
-                BSONElement oo = o.next();
-                int x = cc.woCompare( rr, false );
-                if ( ( oo.number() < 0 ) ^ ( direction < 0 ) ) {
-                    x = -x;
-                }
-                if ( x > 0 ) {
-                    advanceTo( currKey(), i, _superlativeKey );
-                    return true;
-                } else if ( x < 0 ) {
-                    eq = false;
-                    int y = cc.woCompare( ll, false );
-                    if ( ( oo.number() < 0 ) ^ ( direction < 0 ) ) {
-                        y = -y;
-                    }
-                    if ( y < 0 ) {
-                        advanceTo( currKey(), i, startKey );
-                        return true;
-                    }
-                }
-            }
-                
-            if ( eq && !endKeyInclusive_ ) {
-                bucket = DiskLoc();
-            }
-        }
-        return false;
-    }
-
-    void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, const BSONObj &keyEnd) {
+    void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd) {
+//        log() << "curr: " << currKey() << ", advancing to: ";
+//        BSONObjIterator boi( keyBegin );
+//        int i;
+//        for( i = 0; i < keyBeginLen; ++i ) {
+//            log() << ", " << boi.next();
+//        }
+//        for( ;i < (int)keyEnd.size(); ++i ) {
+//            log() << ", " << *keyEnd[ i ];
+//        }
+//        log() << endl;
         bucket.btree()->advanceTo( indexDetails, bucket, keyOfs, keyBegin, keyBeginLen, keyEnd, _ordering, direction );
     }
     
@@ -271,11 +182,17 @@ namespace mongo {
         killCurrentOp.checkForInterrupt();
         if ( bucket.isNull() )
             return false;
+
         bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");
+
+        if ( !_independentFieldRanges ) {
+            skipUnusedKeys( false );
+            checkEnd();
+            return ok();
+        }
+        
         skipAndCheck();
-        if( !ok() && ++boundIndex_ < bounds_.size() )
-            initInterval();
-        return !bucket.isNull();
+        return ok();
     }
 
     void BtreeCursor::noteLocation() {
