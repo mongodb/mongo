@@ -333,7 +333,7 @@ def func_method(a, f):
 
 	# If entering the API with a WT_TOC handle, free/clear it.
 	if toc:
-		f.write('\tWT_TRET(__wt_toc_api_clr(toc, ')
+		f.write('\tWT_TRET(__wt_toc_api_clr(toc, method_name, ')
 		if toc_alloc:
 			f.write('1')
 		else:
