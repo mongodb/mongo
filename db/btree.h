@@ -347,18 +347,12 @@ namespace mongo {
             return key.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
         }
 
-        virtual BSONArray prettyIndexBounds() const {
-            BSONArrayBuilder ba;
-            if ( !bounds_.get() ) {
-                ba << BSON_ARRAY( prettyKey( startKey ) << prettyKey( endKey ) );
+        virtual BSONObj prettyIndexBounds() const {
+            if ( !_independentFieldRanges ) {
+                return BSON( "start" << prettyKey( startKey ) << "end" << prettyKey( endKey ) );
             } else {
-                FieldRangeVector::Iterator i( *bounds_ );
-                while( i.ok() ) {
-                    ba << BSON_ARRAY( prettyKey( i.startKey() ) << prettyKey( i.endKey() ) );                    
-                    i.advance();
-                }
+                return bounds_->obj();
             }
-            return ba.arr();
         }
         
         void forgetEndKey() { endKey = BSONObj(); }

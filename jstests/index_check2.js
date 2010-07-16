@@ -38,4 +38,4 @@ scanned3 = t.find(q3).explain().nscanned;
 assert( scanned3 <= Math.max( scanned1 , scanned2 ) , "$all makes query optimizer not work well" );
 
 exp3 = t.find( q3 ).explain();
-assert.eq( exp3.indexBounds[0][0], exp3.indexBounds[0][1], "$all range not a single key" );
+assert.eq( exp3.indexBounds.tags[0][0], exp3.indexBounds.tags[0][1], "$all range not a single key" );

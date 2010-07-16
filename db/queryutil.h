@@ -330,6 +330,19 @@ namespace mongo {
             }
             return b.obj();            
         }
+        BSONObj obj() const {
+            BSONObjBuilder b;
+            BSONObjIterator k( _keyPattern );
+            for( int i = 0; i < (int)_ranges.size(); ++i ) {
+                BSONArrayBuilder a( b.subarrayStart( k.next().fieldName() ) );
+                for( vector< FieldInterval >::const_iterator j = _ranges[ i ].intervals().begin();
+                    j != _ranges[ i ].intervals().end(); ++j ) {
+                    a << BSONArray( BSON_ARRAY( j->_lower._bound << j->_upper._bound ).clientReadable() );
+                }
+                a.done();
+            }
+            return b.obj();
+        }
         bool matches( const BSONObj &obj ) const;
         class Iterator {
         public:

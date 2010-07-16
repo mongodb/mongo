@@ -469,7 +469,7 @@ namespace mongo {
             shared_ptr<Cursor> c = (*i)->newCursor();
             BSONObjBuilder explain;
             explain.append( "cursor", c->toString() );
-            explain.appendArray( "indexBounds", c->prettyIndexBounds() );
+            explain.append( "indexBounds", c->prettyIndexBounds() );
             arr.push_back( explain.obj() );
         }
         BSONObjBuilder b;

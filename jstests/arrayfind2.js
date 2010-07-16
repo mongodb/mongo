@@ -22,14 +22,14 @@ go( "no index" );
 t.ensureIndex( { a : 1 } );
 go( "index(a)" );
 
-assert.eq( [], t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
+assert.eq( {}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
 
 t.ensureIndex( { "a.x": 1 } );
 
-assert.eq( [ [ {"a.x":3},{"a.x":3} ] ], t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
+assert.eq( {"a.x":[[3,3]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
 // only first $elemMatch used to find bounds
-assert.eq( [ [ {"a.x":3},{"a.x":3} ] ], t.find( { a : { $all : [ { $elemMatch : { x : 3 } }, { $elemMatch : { y : 5 } } ] } } ).explain().indexBounds );
+assert.eq( {"a.x":[[3,3]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } }, { $elemMatch : { y : 5 } } ] } } ).explain().indexBounds );
 
 t.ensureIndex( { "a.x":1,"a.y":-1 } );
 
-assert.eq( [ [ {"a.x":3,"a.y":1.7976931348623157e+308},{"a.x":3,"a.y":4} ] ], t.find( { a : { $all : [ { $elemMatch : { x : 3, y : { $gt: 4 } } } ] } } ).explain().indexBounds );
+assert.eq( {"a.x":[[3,3]],"a.y":[[1.7976931348623157e+308,4]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3, y : { $gt: 4 } } } ] } } ).explain().indexBounds );

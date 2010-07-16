@@ -31,17 +31,17 @@ print( "now indexed" );
 doit();
 
 // check bound unions SERVER-322
-assert.eq( [
-            [ {x:1},{x:1} ],
-            [ {x:2.5},{x:2.5} ],
-            [ {x:"a"},{x:"a"} ],
-            [ {x:"b"},{x:"e"} ],
-            [ {x:/^b/},{x:/^b/} ],
-            [ {x:/^c/},{x:/^c/} ],            
-            [ {x:/^d/},{x:/^d/} ]
-            ],
+assert.eq( {
+            x:[[1,1],
+               [2.5,2.5],
+               ["a","a"],
+               ["b","e"],
+               [/^b/,/^b/],
+               [/^c/,/^c/],            
+               [/^d/,/^d/]]
+          },
             t.find( { x : { $in: [ 1, 2.5, "a", "b", /^b/, /^c/, /^d/ ] } } ).explain().indexBounds );
 
 // SERVER-505
-assert.eq( [ [ {x:"a"}, {x:"a"} ] ], t.find( { x : { $all: [ "a", /^a/ ] } } ).explain().indexBounds );
-assert.eq( [ [ {x:"a"}, {x:"b"} ] ], t.find( { x : { $all: [ /^a/ ] } } ).explain().indexBounds );
+assert.eq( {x:[["a","a"]]}, t.find( { x : { $all: [ "a", /^a/ ] } } ).explain().indexBounds );
+assert.eq( {x:[["a","b"]]}, t.find( { x : { $all: [ /^a/ ] } } ).explain().indexBounds );
