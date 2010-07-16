@@ -1070,7 +1070,13 @@ def concatjs(target, source, env):
     for s in source:
         f = open( str(s) , 'r' )
         for l in f:
-            l = l.split("//")[0].strip()
+
+            #strip comments. special case if // is potentially in a string
+            parts = l.split("//", 1)
+            if (len(parts) > 1) and ('"' not in parts[1]) and ('"' not in parts[1]):
+                l = parts[0]
+
+            l = l.strip()
             if len ( l ) == 0:
                 continue
             
@@ -1112,7 +1118,6 @@ def jsToH(target, source, env):
 
     for l in open( str(source[0]) , 'r' ):
         l = l.strip()
-        l = l.split( "//" )[0]
         l = l.replace( '\\' , "\\\\" )
         l = l.replace( '"' , "\\\"" )
 
