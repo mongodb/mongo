@@ -9,8 +9,14 @@
 
 #include "wt_internal.h"
 
-static void __wt_bt_page_discard_repl(ENV *, WT_SDBT *);
+static void __wt_bt_page_discard_expcol(ENV *, WT_PAGE *);
+static void __wt_bt_page_discard_repl(ENV *, WT_PAGE *);
+static void __wt_bt_page_discard_repl_list(ENV *, WT_REPL *);
+static int  __wt_bt_rcc_expand_compare(const void *, const void *);
+static int  __wt_bt_rcc_expand_sort(
+	ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, u_int32_t *);
 static int  __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int  __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int  __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int  __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -24,6 +30,7 @@ int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
+	IDB *idb;
 	ENV *env;
 	WT_PAGE *new;
 	WT_PAGE_HDR *hdr;
@@ -31,6 +38,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	int ret;
 
 	db = toc->db;
+	idb = db->idb;
 	env = toc->env;
 	hdr = page->hdr;
 
@@ -101,7 +109,10 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		WT_ERR(__wt_bt_rec_col_fix(toc, page, new));
+		if (F_ISSET(idb, WT_REPEAT_COMP))
+			WT_ERR(__wt_bt_rec_col_fix_rcc(toc, page, new));
+		else
+			WT_ERR(__wt_bt_rec_col_fix(toc, page, new));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_ERR(__wt_bt_rec_col_var(toc, page, new));
@@ -159,94 +170,245 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
 
 /*
  * __wt_bt_rec_col_fix --
- *	Reconcile a fixed-width column-store leaf page.
+ *	Reconcile a fixed-width column-store leaf page (does not handle
+ *	repeat-count compression).
  */
 static int
 __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	DB *db;
 	ENV *env;
-	IDB *idb;
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
-	WT_SDBT *sdbt;
+	WT_REPL *repl;
 	u_int32_t i, len;
-	u_int16_t repeat_count;
-	u_int8_t *data, *last_data;
+	u_int8_t *data;
 
 	db = toc->db;
 	env = toc->env;
-	idb = db->idb;
 	hdr = new->hdr;
-	last_data = NULL;
 
 	/*
 	 * We need a "deleted" data item to store on the page.  Make sure the
 	 * WT_TOC's scratch buffer is big enough (our caller is using tmp1 so
-	 * we use tmp2).   Clear the buffer's contents, and set the delete flag.
+	 * we use tmp2).   Clear the buffer's contents and set the delete flag.
 	 */
-	len = db->fixed_len + sizeof(u_int16_t);
+	len = db->fixed_len;
 	if (toc->tmp2.mem_size < len)
 		WT_RET(__wt_realloc(
 		    env, &toc->tmp2.mem_size, len, &toc->tmp2.data));
 	memset(toc->tmp2.data, 0, len);
-	if (F_ISSET(idb, WT_REPEAT_COMP)) {
-		WT_FIX_REPEAT_COUNT(toc->tmp2.data) = 1;
-		WT_FIX_DELETE_SET(WT_FIX_REPEAT_DATA(toc->tmp2.data));
-	} else {
-		len = db->fixed_len;		/* No compression, fix len */
-		WT_FIX_DELETE_SET(toc->tmp2.data);
-	}
+	WT_FIX_DELETE_SET(toc->tmp2.data);
 
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a reference to the data, on- or off- page, and see if
 		 * it's been deleted.
 		 */
-		repeat_count = 1;
-		WT_REPL_CURRENT_SET(cip, sdbt);
-		if (sdbt != NULL) {
-			if (WT_SDBT_DELETED_ISSET(sdbt->data))
-				data = toc->tmp2.data;
+		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
+			if (WT_REPL_DELETED_ISSET(repl->data))
+				data = toc->tmp2.data;	/* Replaced deleted */
 			else
-				data = sdbt->data;
-		} else if (cip->data == NULL) {
-			data = toc->tmp2.data;
-		} else {
-			data = cip->data;
-			repeat_count = WT_FIX_REPEAT_COUNT(cip->data);
-		}
-		new->records += repeat_count;
-
-		/*
-		 * If the database supports repeat compression, check to see
-		 * if we can fold this item into the previous one.
-		 */
-		if (last_data != NULL &&
-		    memcmp(WT_FIX_REPEAT_DATA(last_data),
-		    WT_FIX_REPEAT_DATA(data), db->fixed_len) == 0 &&
-		    WT_FIX_REPEAT_COUNT(last_data) < UINT16_MAX) {
-			WT_FIX_REPEAT_COUNT(last_data) += repeat_count;
-			continue;
-		}
+				data = repl->data;	/* Replaced data */
+		} else if (WT_FIX_DELETE_ISSET(cip->data))
+			data = toc->tmp2.data;		/* On-page deleted */
+		else
+			data = cip->data;		/* On-page data */
 
 		if (len > new->space_avail) {
 			fprintf(stderr, "PAGE GREW, SPLIT\n");
 			__wt_abort(toc->env);
 		}
 
-		if (F_ISSET(idb, WT_REPEAT_COMP))
-			last_data = new->first_free;
 		memcpy(new->first_free, data, len);
 		new->first_free += len;
 		new->space_avail -= len;
 
+		++new->records;
 		++hdr->u.entries;
 	}
 
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
 	return (__wt_page_write(db, new));
+}
+
+/*
+ * __wt_bt_rec_col_fix_rcc --
+ *	Reconcile a repeat-count compressed, fixed-width column-store leaf page.
+ */
+static int
+__wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+{
+	DB *db;
+	ENV *env;
+	WT_COL *cip;
+	WT_COL_EXPAND *exp, **expsort, **expp;
+	WT_PAGE_HDR *hdr;
+	WT_REPL *repl;
+	u_int32_t i, len, n_expsort;
+	u_int16_t n, repeat_count, total;
+	u_int8_t *data, *last_data;
+
+	db = toc->db;
+	env = toc->env;
+	expsort = NULL;
+	hdr = new->hdr;
+	n_expsort = 0;			/* Necessary for the sort function */
+	last_data = NULL;
+
+	/*
+	 * We need a "deleted" data item to store on the page.  Make sure the
+	 * WT_TOC's scratch buffer is big enough (our caller is using tmp1 so
+	 * we use tmp2).   Clear the buffer's contents and set the delete flag.
+	 */
+	len = db->fixed_len + sizeof(u_int16_t);
+	if (toc->tmp2.mem_size < len)
+		WT_RET(__wt_realloc(
+		    env, &toc->tmp2.mem_size, len, &toc->tmp2.data));
+	memset(toc->tmp2.data, 0, len);
+	WT_FIX_REPEAT_COUNT(toc->tmp2.data) = 1;
+	WT_FIX_DELETE_SET(WT_FIX_REPEAT_DATA(toc->tmp2.data));
+
+	WT_INDX_FOREACH(page, cip, i) {
+		/*
+		 * Get a sorted list of any expansion entries we've created for
+		 * this set of records.  The sort function returns a NULL-
+		 * terminated array of references to WT_COL_EXPAND structures,
+		 * sorted by record offset.
+		 */
+		WT_RET(__wt_bt_rcc_expand_sort(
+		    env, page, cip, &expsort, &n_expsort));
+
+		/*
+		 * Generate entries on the page: using the WT_REPL entry for
+		 * records listed in the WT_COL_EXPAND array, and original data
+		 * otherwise.
+		 */
+		total = WT_FIX_REPEAT_COUNT(cip->data);
+		for (expp = expsort, n = 1; n <= total; n += repeat_count) {
+			if ((exp = *expp) != NULL && n == exp->rcc_offset) {
+				++expp;
+
+				repl = exp->repl;
+				if (WT_REPL_DELETED_ISSET(repl->data))
+					data = toc->tmp2.data;
+				else
+					data = repl->data;
+				repeat_count = 1;
+			} else {
+				if (WT_FIX_DELETE_ISSET(cip->data))
+					data = toc->tmp2.data;
+				else
+					data = cip->data;
+				/*
+				 * The repeat count is the number of records
+				 * up to the next WT_COL_EXPAND record, or
+				 * up to the end of this entry if we have no
+				 * more WT_COL_EXPAND records.
+				 */
+				if (exp == NULL)
+					repeat_count = (total - n) + 1;
+				else
+					repeat_count = exp->rcc_offset - n;
+			}
+
+			/*
+			 * In all cases, check the last entry written on the
+			 * page to see if it's identical, and increment its
+			 * repeat count where possible.
+			 */
+			if (last_data != NULL &&
+			    memcmp(WT_FIX_REPEAT_DATA(last_data),
+			    WT_FIX_REPEAT_DATA(data), db->fixed_len) == 0 &&
+			    WT_FIX_REPEAT_COUNT(last_data) < UINT16_MAX) {
+				WT_FIX_REPEAT_COUNT(last_data) += repeat_count;
+				continue;
+			}
+
+			if (len > new->space_avail) {
+				fprintf(stderr, "PAGE GREW, SPLIT\n");
+				__wt_abort(toc->env);
+			}
+
+			last_data = new->first_free;
+			memcpy(new->first_free, data, len);
+			new->first_free += len;
+			new->space_avail -= len;
+
+			++hdr->u.entries;
+		}
+	}
+
+	/* Free the sort array. */
+	if (expsort != NULL)
+		__wt_free(env, expsort, n_expsort * sizeof(WT_COL_EXPAND *));
+
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
+
+	return (__wt_page_write(db, new));
+}
+
+/*
+ * __wt_bt_rcc_expand_compare --
+ *	Qsort function: sort WT_COL_EXPAND structures based on the record
+ *	offset, in ascending order.
+ */
+static int
+__wt_bt_rcc_expand_compare(const void *a, const void *b)
+{
+	WT_COL_EXPAND *a_exp, *b_exp;
+
+	a_exp = *(WT_COL_EXPAND **)a;
+	b_exp = *(WT_COL_EXPAND **)b;
+
+	return (a_exp->rcc_offset > b_exp->rcc_offset ? 1 : 0);
+}
+
+/*
+ * __wt_bt_rcc_expand_sort --
+ *	Return the current on-page index's array of WT_COL_EXPAND structures,
+ *	sorted by record offset.
+ */
+static int
+__wt_bt_rcc_expand_sort(ENV *env,
+    WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, u_int32_t *np)
+{
+	WT_COL_EXPAND *exp;
+	u_int16_t n;
+
+	/* Figure out how big the array needs to be. */
+	for (n = 0,
+	    exp = WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next, ++n)
+		;
+
+	/*
+	 * Allocate that big an array -- always allocate at least one slot,
+	 * our caller expects NULL-termination.
+	 */
+	if (n >= *np) {
+		if (*expsortp != NULL)
+			__wt_free(
+			    env, *expsortp, *np * sizeof(WT_COL_EXPAND *));
+		WT_RET(__wt_calloc(
+		    env, n + 10, sizeof(WT_COL_EXPAND *), expsortp));
+		*np = n + 10;
+	}
+
+	/* Enter the WT_COL_EXPAND structures into the array. */
+	for (n = 0,
+	    exp = WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next, ++n)
+		(*expsortp)[n] = exp;
+
+	/* Sort the entries. */
+	if (n != 0)
+		qsort(*expsortp, (size_t)n,
+		    sizeof(WT_COL_EXPAND *), __wt_bt_rcc_expand_compare);
+
+	/* NULL-terminate the array. */
+	(*expsortp)[n] = NULL;
+
+	return (0);
 }
 
 /*
@@ -259,11 +421,11 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	DB *db;
 	DBT *data, data_dbt;
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	WT_ITEM data_item;
 	WT_OVFL data_ovfl;
 	WT_PAGE_HDR *hdr;
-	WT_SDBT *sdbt;
+	WT_REPL *repl;
 	u_int32_t i, len;
 
 	db = toc->db;
@@ -279,17 +441,16 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data, on- or off- page, and see if
 		 * it's been deleted.
 		 */
-		WT_REPL_CURRENT_SET(cip, sdbt);
-		if (sdbt != NULL) {
-			if (WT_SDBT_DELETED_ISSET(sdbt->data))
+		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
+			if (WT_REPL_DELETED_ISSET(repl->data))
 				goto deleted;
 
 			/*
 			 * Build the data's WT_ITEM chunk from the most recent
 			 * replacement value.
 			 */
-			data->data = sdbt->data;
-			data->size = sdbt->size;
+			data->data = repl->data;
+			data->size = repl->size;
 			WT_RET(__wt_bt_build_data_item(
 			    toc, data, &data_item, &data_ovfl));
 			data_loc = DATA_OFF_PAGE;
@@ -354,8 +515,8 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_ITEM key_item, data_item;
 	WT_OVFL key_ovfl, data_ovfl;
 	WT_PAGE_HDR *hdr;
-	WT_ROW_INDX *rip;
-	WT_SDBT *sdbt;
+	WT_ROW *rip;
+	WT_REPL *repl;
 	u_int32_t i, len, type;
 
 	db = toc->db;
@@ -378,17 +539,16 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data.  We get the data first because
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
-		WT_REPL_CURRENT_SET(rip, sdbt);
-		if (sdbt != NULL) {
-			if (WT_SDBT_DELETED_ISSET(sdbt->data))
+		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
+			if (WT_REPL_DELETED_ISSET(repl->data))
 				continue;
 
 			/*
 			 * Build the data's WT_ITEM chunk from the most recent
 			 * replacement value.
 			 */
-			data->data = sdbt->data;
-			data->size = sdbt->size;
+			data->data = repl->data;
+			data->size = repl->size;
 			WT_RET(__wt_bt_build_data_item(
 			    toc, data, &data_item, &data_ovfl));
 			data_loc = DATA_OFF_PAGE;
@@ -508,8 +668,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 void
 __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 {
-	WT_COL_INDX *cip;
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 	u_int32_t i;
 	void *bp, *ep, *last_key;
 
@@ -517,52 +676,47 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	WT_ENV_FCHK_ASSERT(
 	    env, "__wt_bt_page_discard", page->flags, WT_APIMASK_WT_PAGE);
 
+	/* Free the on-disk index array. */
 	switch (page->hdr->type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_VAR:
-		WT_INDX_FOREACH(page, cip, i)
-			if (cip->repl != NULL)
-				__wt_bt_page_discard_repl(env, cip->repl);
-		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
+		/*
+		 * For each entry, see if the key was an allocation, that is,
+		 * if it points somewhere other than the original page.  If it
+		 * is an allocation, free it.
+		 *
+		 * Only handle the first key entry for duplicate key/data pairs,
+		 * the others reference the same memory.
+		 */
 		bp = (u_int8_t *)page->hdr;
 		ep = (u_int8_t *)bp + page->size;
 		last_key = NULL;
-		WT_INDX_FOREACH(page, rip, i) {
-			/*
-			 * For each entry, see if the key was an allocation,
-			 * that is, if it points somewhere other than the
-			 * original page.  If it's an allocation, free it.
-			 *
-			 * Only handle the first entry for a duplicate, the
-			 * others simply point to the same chunk of memory.
-			 */
+		WT_INDX_FOREACH(page, rip, i)
 			if (rip->key != last_key &&
 			    (rip->key < bp || rip->key >= ep)) {
 				last_key = rip->key;
 				__wt_free(env, rip->key, rip->size);
 			}
-
-			/*
-			 * For each entry, see if data replacement was made,
-			 * if so, free the replacements.
-			 */
-			if (rip->repl != NULL)
-				__wt_bt_page_discard_repl(env, rip->repl);
-		}
 		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DESCRIPT:
 	case WT_PAGE_OVFL:
 	default:
 		break;
 	}
-
 	if (page->u.indx != NULL)
 		__wt_free(env, page->u.indx, 0);
+
+	/* Free the modified/deletion replacements array. */
+	if (page->repl != NULL)
+		__wt_bt_page_discard_repl(env, page);
+	/* Free the repeat-count compressed column store expansion array. */
+	if (page->expcol != NULL)
+		__wt_bt_page_discard_expcol(env, page);
 
 	__wt_free(env, page->hdr, page->size);
 	__wt_free(env, page, sizeof(WT_PAGE));
@@ -573,23 +727,71 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
  *	Discard the replacement array.
  */
 static void
-__wt_bt_page_discard_repl(ENV *env, WT_SDBT *repl)
+__wt_bt_page_discard_repl(ENV *env, WT_PAGE *page)
 {
-	WT_SDBT *trepl;
+	WT_REPL **replp;
 	u_int i;
 
-	/* Free the data pointers and then the WT_REPL structure itself. */
-	while ((trepl = repl) != NULL) {
-		for (i = 0; i < WT_REPL_CHUNK; ++i, ++repl)
-			if (repl->data != NULL &&
-			    !WT_SDBT_DELETED_ISSET(repl->data))
-				__wt_free(env, repl->data, repl->size);
+	/*
+	 * For each non-NULL slot in the page's array of replacements, free the
+	 * linked list anchored in that slot.
+	 */
+	WT_REPL_FOREACH(page, replp, i)
+		if (*replp != NULL)
+			__wt_bt_page_discard_repl_list(env, *replp);
 
+	/* Free the page's array of replacements. */
+	__wt_free(env, page->repl, page->indx_count * sizeof(WT_REPL *));
+}
+
+/*
+ * __wt_bt_page_discard_expcol --
+ *	Discard the repeat-count compressed column store expansion array.
+ */
+static void
+__wt_bt_page_discard_expcol(ENV *env, WT_PAGE *page)
+{
+	WT_COL_EXPAND **expp, *exp, *a;
+	u_int i;
+
+	/*
+	 * For each non-NULL slot in the page's repeat-count compressed column
+	 * store expansion array, free the linked list of WT_COL_EXPAND
+	 * structures anchored in that slot.
+	 */
+	WT_EXPCOL_FOREACH(page, expp, i) {
+		if ((exp = *expp) == NULL)
+			continue;
 		/*
-		 * The last slot in the array is fake -- if it's non-NULL,
-		 * it points to a previous array which we also walk.
+		 * Free the linked list of WT_REPL structures anchored in the
+		 * WT_COL_EXPAND entry.
 		 */
-		repl = repl->data == NULL ? NULL : (WT_SDBT *)repl->data;
-		__wt_free(env, trepl, sizeof(WT_SDBT));
+		__wt_bt_page_discard_repl_list(env, exp->repl);
+		do {
+			a = exp->next;
+			__wt_free(env, exp, sizeof(WT_COL_EXPAND));
+		} while ((exp = a) != NULL);
 	}
+
+	/* Free the page's expansion array. */
+	__wt_free(
+	    env, page->expcol, page->indx_count * sizeof(WT_COL_EXPAND *));
+}
+
+/*
+ * __wt_bt_page_discard_repl_list --
+ *	Walk a WT_REPL forward-linked list and free the data it references
+ *	and the structure itself.
+ */
+static void
+__wt_bt_page_discard_repl_list(ENV *env, WT_REPL *repl)
+{
+	WT_REPL *a;
+
+	do {
+		if (!WT_REPL_DELETED_ISSET(repl->data))
+			__wt_free(env, repl->data, repl->size);
+		a = repl->next;
+		__wt_free(env, repl, sizeof(WT_REPL));
+	} while ((repl = a) != NULL);
 }
