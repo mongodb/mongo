@@ -428,6 +428,27 @@ ShardingTest.prototype.shardCounts = function( collName , dbName ){
     return counts;
 }
 
+ShardingTest.prototype.chunkCounts = function( collName , dbName ){
+    dbName = dbName || "test";
+    var x = {}
+
+    s.config.shards.find().forEach( 
+        function(z){
+            x[z._id] = 0;
+        }
+    );
+    
+    s.config.chunks.find( { ns : dbName + "." + collName } ).forEach(
+        function(z){
+            if ( x[z.shard] )
+                x[z.shard]++
+            else
+                x[z.shard] = 1;
+        }
+    );
+    return x;
+
+}
 
 ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
     split = split || key;
