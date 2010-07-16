@@ -1009,11 +1009,14 @@ namespace mongo {
                 
             }
             
+            long long totalSize = 0;
+
             BSONArrayBuilder bb( result.subarrayStart( "databases" ) );
             for ( map<string,long long>::iterator i=sizes.begin(); i!=sizes.end(); ++i ){
                 string name = i->first;
                 long long size = i->second;
-
+                totalSize += size;
+                
                 BSONObjBuilder temp;
                 temp.append( "name" , name );
                 temp.appendNumber( "size" , size );
@@ -1024,6 +1027,9 @@ namespace mongo {
             }
             bb.done();
 
+            result.appendNumber( "totalSize" , totalSize );
+            result.appendNumber( "totalSizeMb" , totalSize / ( 1024 * 1024 ) );
+            
             return 1;
         }
 
