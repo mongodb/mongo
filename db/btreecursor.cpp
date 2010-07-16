@@ -59,7 +59,7 @@ namespace mongo {
             _spec( _id.getSpec() ),
             _independentFieldRanges( true )
     {
-        massert( 13346, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
+        massert( 13384, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
         audit();
         startKey = bounds_->startKey();
         bool found;

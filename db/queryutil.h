@@ -305,7 +305,7 @@ namespace mongo {
                 }
                 assert( !_ranges.back().empty() );
             }
-            uassert( 13345, "combinatorial limit of $in partitioning of result set exceeded", size() < 1000000 );
+            uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded", size() < 1000000 );
         }
         long long size() {
             long long ret = 1;
