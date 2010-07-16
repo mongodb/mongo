@@ -20,6 +20,7 @@
 
 #include "../pch.h"
 #include "../client/dbclient.h"
+#include "../db/jsobj.h"
 
 /**
    some generic sharding utils that can be used in mongod or mongos
@@ -27,6 +28,82 @@
 
 namespace mongo {
     
+    struct ShardChunkVersion {
+        union {
+            struct {
+                int _minor;
+                int _major;
+            };
+            unsigned long long _combined;
+        };
+        
+        ShardChunkVersion( int major=0, int minor=0 )
+            : _minor(minor),_major(major){
+        }
+        
+        ShardChunkVersion( unsigned long long ll )
+            : _combined( ll ){
+        }
+        
+        ShardChunkVersion( const BSONElement& e ){
+            if ( e.type() == Date || e.type() == Timestamp ){
+                _combined = e._numberLong();
+            }
+            else if ( e.eoo() ){
+                _combined = 0;
+            }
+            else {
+                log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
+                assert(0);
+            }
+        }
+
+        ShardChunkVersion incMajor() const {
+            return ShardChunkVersion( _major + 1 , 0 );
+        }
+
+        void operator++(){
+            _minor++;
+        }
+
+        unsigned long long toLong() const {
+            return _combined;
+        }
+
+        bool isSet() const {
+            return _combined > 0;
+        }
+
+        string toString() const { 
+            stringstream ss; 
+            ss << _major << "|" << _minor; 
+            return ss.str(); 
+        }
+        operator unsigned long long() const { return _combined; }
+        operator string() const { return toString(); }
+
+        ShardChunkVersion& operator=( const BSONElement& elem ){
+            switch ( elem.type() ){
+            case Timestamp:
+            case NumberLong:
+            case Date:
+                _combined = elem._numberLong();
+                break;
+            case EOO:
+                _combined = 0;
+                break;
+            default:
+                assert(0);
+            }
+            return *this;
+        }
+    };
+    
+    inline ostream& operator<<( ostream &s , const ShardChunkVersion& v){
+        s << v._major << "|" << v._minor;
+        return s;
+    }
+
     /** 
      * your config info for a given shard/chunk is out of date 
      */
