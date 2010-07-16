@@ -55,6 +55,7 @@ function check(){
     for ( var x in counts ){
         var e = counts[x];
         var z = db.foo.findOne( { _id : parseInt( x ) } )
+        assert( z , "couldn't find : " + x )
         assert.eq( e , z.x , "count for : " + x )
     }
 }

@@ -61,6 +61,9 @@ namespace mongo {
             if ( e.type() == Date || e.type() == Timestamp ){
                 _combined = e._numberLong();
             }
+            else if ( e.eoo() ){
+                _combined = 0;
+            }
             else {
                 log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
                 assert(0);
@@ -192,7 +195,7 @@ namespace mongo {
         const char * getNS(){ return "config.chunks"; }
         void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
         void unserialize(const BSONObj& from);
-        string modelServer();
+        string modelServer() const;
         
         void appendShortVersion( const char * name , BSONObjBuilder& b );
 
@@ -202,14 +205,18 @@ namespace mongo {
         
         static int MaxChunkSize;
 
-        string genID();
+        string genID() const;
         static string genID( const string& ns , const BSONObj& min );
 
         const ChunkManager* getManager() const { return _manager; }
         
         bool modified();
+
+        ShardChunkVersion getVersionOnConfigServer() const;
     private:
-        
+
+        bool _splitIfShould( long dataWritten );
+
         // main shard info
         
         ChunkManager * _manager;
@@ -349,6 +356,12 @@ namespace mongo {
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;
 
+        /** 
+         * actually does a query on the server
+         * doesn't look at any local data
+         */
+        ShardChunkVersion getVersionOnConfigServer() const;
+        
         /**
          * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
          */
@@ -431,6 +444,6 @@ namespace mongo {
         Chunk _c;
     };
     */
-    inline string Chunk::genID(){ return genID(_manager->getns(), _min); }
+    inline string Chunk::genID() const { return genID(_manager->getns(), _min); }
 
 } // namespace mongo
