@@ -458,7 +458,9 @@ namespace mongo {
         }
         void allClausesSimplified( vector< BSONObj > &ret ) const {
             for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
-                ret.push_back( i->simplifiedQuery() );
+                if ( i->matchPossible() ) {
+                    ret.push_back( i->simplifiedQuery() );
+                }
             }
         }
         string getSpecial() const { return _baseSet.getSpecial(); }

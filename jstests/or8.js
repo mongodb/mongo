@@ -7,5 +7,10 @@ t.find({ "$or": [ { "PropA": { "$lt": "b" } }, { "PropA": { "$lt": "b", "$gt": "
 
 // empty $in
 
-//t.ensureIndex( {a:1} );
-//t.find({ $or: [ { a: {$in:[]} } ] } ).toArray();
+t.save( {a:1} );
+t.save( {a:3} );
+t.ensureIndex( {a:1} );
+t.find({ $or: [ { a: {$in:[]} } ] } ).toArray();
+assert.eq.automsg( "2", "t.find({ $or: [ { a: {$in:[]} }, {a:1}, {a:3} ] } ).toArray().length" );
+assert.eq.automsg( "2", "t.find({ $or: [ {a:1}, { a: {$in:[]} }, {a:3} ] } ).toArray().length" );
+assert.eq.automsg( "2", "t.find({ $or: [ {a:1}, {a:3}, { a: {$in:[]} } ] } ).toArray().length" );
