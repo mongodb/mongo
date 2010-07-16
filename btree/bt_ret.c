@@ -14,19 +14,18 @@
  *	Retrun a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_bt_dbt_return(WT_TOC *toc,
-    DBT *key, DBT *data, WT_PAGE *page, void *ip, int key_return)
+__wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 {
 	DB *db;
 	DBT local_key, local_data;
 	ENV *env;
 	IDB *idb;
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
-	WT_PAGE *ovfl_page;
-	WT_ROW_INDX *rip;
-	WT_SDBT *sdbt;
+	WT_PAGE *page, *ovfl_page;
+	WT_ROW *rip;
+	WT_REPL *repl;
 	void *orig;
 	u_int32_t size;
 	int (*callback)(DB *, DBT *, DBT *), ret;
@@ -34,11 +33,14 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
-	cip = ip;
 	ovfl = NULL;
-	rip = ip;
 	callback = data->callback;
 	ret = 0;
+
+	page = toc->srch_page;
+	cip = toc->srch_ip;
+	rip = toc->srch_ip;
+	repl = toc->srch_repl;
 
 	/*
 	 * Handle the key item -- the key may be unchanged, in which case we
@@ -60,9 +62,9 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	 * through the tree).  Use memory in the application's DBT instead, it
 	 * is discarded when the WT_TOC is discarded.
 	 *
-	 * Key return implies a reference to a WT_ROW_INDX index (we don't
-	 * return record number keys yet, that will probably change when I
-	 * add cursor support).
+	 * Key return implies a reference to a WT_ROW index (we don't return
+	 * record number keys yet, that will probably change when I add cursor
+	 * support).
 	 */
 	if (key_return) {
 		if (WT_KEY_PROCESS(rip)) {
@@ -97,18 +99,16 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	switch (page->hdr->type) {
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
-		WT_REPL_CURRENT_SET(rip, sdbt);
-		if (sdbt != NULL)
+		if (repl != NULL)
 			goto repl;
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		WT_REPL_CURRENT_SET(cip, sdbt);
-		if (sdbt != NULL) {
-repl:			if (WT_SDBT_DELETED_ISSET(sdbt->data))
+		if (repl != NULL) {
+repl:			if (WT_REPL_DELETED_ISSET(repl->data))
 				return (WT_NOTFOUND);
-			data->data = sdbt->data;
-			data->size = sdbt->size;
+			data->data = repl->data;
+			data->size = repl->size;
 			return (callback == NULL ? 0 : callback(db, key, data));
 		}
 		break;
