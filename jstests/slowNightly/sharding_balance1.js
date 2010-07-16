@@ -31,7 +31,7 @@ function diff(){
 }
 
 function sum(){
-    var x = dist();
+    var x = s.chunkCounts( "foo" );
     return x.shard0 + x.shard1;
 }
 
@@ -48,7 +48,7 @@ host = s.config.shards.findOne({_id : "shard0" }).host;
 s.adminCommand( { removeshard: host } );
 
 assert.soon( function(){
-    printjson(dist());
+    printjson(s.chunkCounts( "foo" ));
     s.config.shards.find().forEach(function(z){printjson(z);});
     return chunkCount == s.config.chunks.count({shard: "shard1"});
 } , "removeshard didn't happen" , 1000 * 60 * 3 , 5000 );
