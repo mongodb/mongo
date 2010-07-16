@@ -183,7 +183,7 @@ namespace mongo {
     /**
      * @return true if had to do something
      */
-    bool checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative ){
+    bool checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative , int tryNumber ){
         // TODO: cache, optimize, etc...
         
         WriteBackListener::init( conn );
@@ -194,7 +194,7 @@ namespace mongo {
         
         ShardChunkVersion version = 0;
         unsigned long long officialSequenceNumber = 0;
-
+        
         ChunkManagerPtr manager;
         const bool isSharded = conf->isSharded( ns );
         if ( isSharded ){
@@ -230,10 +230,17 @@ namespace mongo {
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
         
         if ( ! authoritative ){
-            checkShardVersion( conn , ns , 1 );
+            checkShardVersion( conn , ns , 1 , tryNumber + 1 );
             return true;
         }
         
+        if ( tryNumber < 4 ){
+            log(1) << "going to retry checkShardVersion" << endl;
+            sleepmillis( 10 );
+            checkShardVersion( conn , ns , 1 , tryNumber + 1 );
+            return true;
+        }
+
         log() << "     setShardVersion failed: " << result << endl;
         massert( 10429 , (string)"setShardVersion failed! " + result.jsonString() , 0 );
         return true;
