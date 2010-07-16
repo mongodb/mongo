@@ -326,7 +326,7 @@ __wt_bt_verify_cmp(
 	 * believe we're going to be working in this database.
 	 */
 	child_rip = first_entry ?
-	    child->u.r_indx : child->u.r_indx + (child->indx_count - 1);
+	    child->u.irow : child->u.irow + (child->indx_count - 1);
 	if (WT_KEY_PROCESS(child_rip)) {
 		cd_ref = &toc->tmp1;
 		WT_RET(__wt_bt_key_process(toc, NULL, child_rip, cd_ref));

@@ -1145,11 +1145,11 @@ __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
 		allocated = page->indx_count * sizeof(WT_COL);
 		WT_RET(__wt_realloc(env, &allocated,
 		    (page->indx_count + 100) * sizeof(WT_COL),
-		    &page->u.c_indx));
+		    &page->u.icol));
 	}
 
 	/* Add in the new index entry. */
-	cip = page->u.c_indx + page->indx_count;
+	cip = page->u.icol + page->indx_count;
 	++page->indx_count;
 
 	/* Fill in the on-page data. */
@@ -1189,11 +1189,11 @@ __wt_bt_promote_row_indx(
 		allocated = page->indx_count * sizeof(WT_ROW);
 		WT_RET(__wt_realloc(env, &allocated,
 		    (page->indx_count + 100) * sizeof(WT_ROW),
-		    &page->u.r_indx));
+		    &page->u.irow));
 	}
 
 	/* Add in the new index entry. */
-	rip = page->u.r_indx + page->indx_count;
+	rip = page->u.irow + page->indx_count;
 	++page->indx_count;
 
 	/*
@@ -1235,7 +1235,7 @@ __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
 	 * Because of the bulk load pattern, we're always adding records to
 	 * the subtree referenced by the last entry in each parent page.
 	 */
-	cip = parent->u.c_indx + (parent->indx_count - 1);
+	cip = parent->u.icol + (parent->indx_count - 1);
 	WT_COL_OFF_RECORDS(cip) += incr;
 }
 
@@ -1252,7 +1252,7 @@ __wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t incr)
 	 * Because of the bulk load pattern, we're always adding records to
 	 * the subtree referenced by the last entry in each parent page.
 	 */
-	rip = parent->u.r_indx + (parent->indx_count - 1);
+	rip = parent->u.irow + (parent->indx_count - 1);
 	WT_ROW_OFF_RECORDS(rip) += incr;
 }
 

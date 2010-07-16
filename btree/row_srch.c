@@ -48,7 +48,7 @@ restart:
 			 * If the key is compressed or an overflow, it may not
 			 * have been instantiated yet.
 			 */
-			rip = page->u.r_indx + indx;
+			rip = page->u.irow + indx;
 			if (WT_KEY_PROCESS(rip))
 				WT_ERR(
 				    __wt_bt_key_process(toc, page, rip, NULL));
@@ -90,7 +90,7 @@ restart:
 		 * than or equal to key.
 		 */
 		if (cmp != 0)
-			rip = page->u.r_indx + (base == 0 ? 0 : base - 1);
+			rip = page->u.irow + (base == 0 ? 0 : base - 1);
 
 		/* If we've reached the leaf page, we're done. */
 		if (isleaf)

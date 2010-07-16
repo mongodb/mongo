@@ -150,14 +150,14 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
 		WT_RET((__wt_calloc(env,
-		    nindx, sizeof(WT_COL), &page->u.c_indx)));
+		    nindx, sizeof(WT_COL), &page->u.icol)));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET((__wt_calloc(env,
-		    nindx, sizeof(WT_ROW), &page->u.r_indx)));
+		    nindx, sizeof(WT_ROW), &page->u.irow)));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -205,7 +205,7 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 
 	idb = db->idb;
 	hdr = page->hdr;
-	rip = page->u.r_indx;
+	rip = page->u.irow;
 	records = 0;
 
 	/*
@@ -277,7 +277,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
 			if (rip == NULL)
-				rip = page->u.r_indx;
+				rip = page->u.irow;
 			else
 				++rip;
 			if (idb->huffman_key != NULL ||
@@ -326,7 +326,7 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 	u_int32_t i;
 
 	hdr = page->hdr;
-	cip = page->u.c_indx;
+	cip = page->u.icol;
 	records = 0;
 
 	/*
@@ -367,7 +367,7 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 	 * data (WT_ITEM_DATA), overflow (WT_ITEM_DATA_OVFL) or deleted
 	 * (WT_ITEM_DEL) items.
 	 */
-	cip = page->u.c_indx;
+	cip = page->u.icol;
 	WT_ITEM_FOREACH(page, item, i) {
 		cip->data = item;
 		++cip;
@@ -400,7 +400,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	 * The page contains sorted data items.  The data items are on-page
 	 * (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL) items.
 	 */
-	rip = page->u.r_indx;
+	rip = page->u.irow;
 	WT_ITEM_FOREACH(page, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DUP:
@@ -439,7 +439,7 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 
 	idb = db->idb;
 	hdr = page->hdr;
-	cip = page->u.c_indx;
+	cip = page->u.icol;
 	records = 0;
 
 	/*

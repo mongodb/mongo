@@ -60,10 +60,10 @@ restart:
 				}
 			} else
 				cip =
-				    page->u.c_indx + ((recno - record_cnt) - 1);
+				    page->u.icol + ((recno - record_cnt) - 1);
 			goto done;
 		case WT_PAGE_COL_VAR:
-			cip = page->u.c_indx + ((recno - record_cnt) - 1);
+			cip = page->u.icol + ((recno - record_cnt) - 1);
 			goto done;
 		case WT_PAGE_COL_INT:
 		default:

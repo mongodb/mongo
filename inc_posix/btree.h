@@ -205,8 +205,8 @@ struct __wt_page {
 	 */
 	u_int32_t indx_count;		/* On-disk entry count */
 	union {				/* On-disk entry index */
-		WT_COL *c_indx;		/* On-disk column store entries */
-		WT_ROW *r_indx;		/* On-disk row store entries */
+		WT_COL *icol;		/* On-disk column store entries */
+		WT_ROW *irow;		/* On-disk row store entries */
 		void *indx;
 	} u;
 
@@ -255,13 +255,13 @@ struct __wt_page {
  * Return the the appropriate entry for one of the three arrays, or NULL if
  * there's no such entry.
  */
-#define	WT_COL_SLOT(page, ip)	((WT_COL *)(ip) - (page)->u.c_indx)
+#define	WT_COL_SLOT(page, ip)	((WT_COL *)(ip) - (page)->u.icol)
 #define	WT_COL_ARRAY(page, ip, array)					\
 	((page)->array == NULL ? NULL : page->array[WT_COL_SLOT(page, ip)])
 #define	WT_COL_REPL(page, ip)	WT_COL_ARRAY(page, ip, repl)
 #define	WT_COL_EXPCOL(page, ip)	WT_COL_ARRAY(page, ip, expcol)
 
-#define	WT_ROW_SLOT(page, ip)	((WT_ROW *)(ip) - (page)->u.r_indx)
+#define	WT_ROW_SLOT(page, ip)	((WT_ROW *)(ip) - (page)->u.irow)
 #define	WT_ROW_ARRAY(page, ip, array)					\
 	((page)->array == NULL ? NULL : page->array[WT_ROW_SLOT(page, ip)])
 #define	WT_ROW_REPL(page, ip)	WT_ROW_ARRAY(page, ip, repl)
