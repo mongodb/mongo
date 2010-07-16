@@ -335,7 +335,7 @@ namespace mongo {
         
         rwlock lk( chunkSplitLock , 1 , true );
 
-        log(1) << "\t splitIfShould : " << *this << endl;
+        log(3) << "\t splitIfShould : " << *this << endl;
 
         _dataWritten = 0;
         

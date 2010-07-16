@@ -35,6 +35,7 @@
 #include "../client/distlock.h"
 
 #include "../util/queue.h"
+#include "../util/unittest.h"
 
 #include "shard.h"
 #include "d_logic.h"
@@ -59,6 +60,12 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; } 
 
     };
+
+    bool isInRange( const BSONObj& obj , const BSONObj& min , const BSONObj& max ){
+        BSONObj k = obj.extractFields( min, true );
+
+        return k.woCompare( min ) >= 0 && k.woCompare( max ) < 0;
+    }
 
 
     class MigrateFromStatus {
@@ -143,11 +150,8 @@ namespace mongo {
                 break;
                 
             }
-
-            BSONObj k = it.extractFields( _min, true );
-
-            if ( k.woCompare( _min ) < 0 ||
-                 k.woCompare( _max ) >= 0 )
+            
+            if ( ! isInRange( it , _min , _max ) )
                 return;
             
             scoped_lock lk( _mutex );
@@ -678,7 +682,7 @@ namespace mongo {
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ){
                     BSONObj id = i.next().Obj();
-                    Helpers::removeRange( ns , id , id, false , true );
+                    //Helpers::removeRange( ns , id , id, false , true );
                 }
             }
             
@@ -795,6 +799,20 @@ namespace mongo {
         }
 
     } recvChunkCommitCommand;
-    
-    
+
+
+    class IsInRangeTest : public UnitTest {
+    public:
+        void run(){
+            BSONObj min = BSON( "x" << 1 );
+            BSONObj max = BSON( "x" << 5 );
+
+            assert( ! isInRange( BSON( "x" << 0 ) , min , max ) );
+            assert( isInRange( BSON( "x" << 1 ) , min , max ) );
+            assert( isInRange( BSON( "x" << 3 ) , min , max ) );
+            assert( isInRange( BSON( "x" << 4 ) , min , max ) );
+            assert( ! isInRange( BSON( "x" << 5 ) , min , max ) );
+            assert( ! isInRange( BSON( "x" << 6 ) , min , max ) );
+        }
+    } isInRangeTest;
 }
