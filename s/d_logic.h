@@ -20,12 +20,13 @@
 
 #include "../pch.h"
 #include "../db/jsobj.h"
+#include "util.h"
 
 namespace mongo {
     
     class ShardingState;
     
-    typedef unsigned long long ConfigVersion;
+    typedef ShardChunkVersion ConfigVersion;
     typedef map<string,ConfigVersion> NSVersionMap;
 
     // -----------
@@ -108,12 +109,34 @@ namespace mongo {
         
         static ShardedConnectionInfo* get( bool create );
         
+        bool inForceMode() const { 
+            return _forceMode;
+        }
+        
+        void enterForceMode(){ _forceMode = true; }
+        void leaveForceMode(){ _forceMode = false; }
+
     private:
         
         OID _id;
         NSVersionMap _versions;
+        bool _forceMode;
 
         static boost::thread_specific_ptr<ShardedConnectionInfo> _tl;
+    };
+
+    struct ShardForceModeBlock {
+        ShardForceModeBlock(){
+            info = ShardedConnectionInfo::get( false );
+            if ( info )
+                info->enterForceMode();
+        }
+        ~ShardForceModeBlock(){
+            if ( info )
+                info->leaveForceMode();
+        }
+
+        ShardedConnectionInfo * info;
     };
     
     // -----------------
