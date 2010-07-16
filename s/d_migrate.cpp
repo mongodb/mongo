@@ -674,9 +674,12 @@ namespace mongo {
             if ( xfer["deleted"].isABSONObj() ){
                 writelock lk(ns);
                 Client::Context cx(ns);
-            
-                // TODO:
-                assert(0);
+                
+                BSONObjIterator i( xfer["deleted"].Obj() );
+                while ( i.more() ){
+                    BSONObj id = i.next().Obj();
+                    Helpers::removeRange( ns , id , id, false , true );
+                }
             }
             
             if ( xfer["reload"].isABSONObj() ){
