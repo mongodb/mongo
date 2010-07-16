@@ -34,9 +34,9 @@ __wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data)
 	}
 
 	WT_ERR(__wt_bt_search_col(toc, recno));
-	page = toc->srch_page;
-	ret = __wt_bt_dbt_return(toc, NULL, data, page, toc->srch_ip, 0);
+	ret = __wt_bt_dbt_return(toc, NULL, data, 0);
 
+	page = toc->srch_page;
 err:	if (page != NULL && page != idb->root_page)
 		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
