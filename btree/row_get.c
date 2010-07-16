@@ -19,7 +19,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 	u_int32_t type;
 	int ret;
 
@@ -52,7 +52,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 			goto err;
 		}
 	}
-	ret = __wt_bt_dbt_return(toc, key, data, page, rip, 0);
+	ret = __wt_bt_dbt_return(toc, key, data, 0);
 
 err:	if (page != NULL && page != idb->root_page)
 		__wt_bt_page_out(toc, &page, 0);
