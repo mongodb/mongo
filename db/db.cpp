@@ -265,6 +265,7 @@ sendmore:
                         QueryResult *qr = (QueryResult *) header;
                         long long cursorid = qr->cursorId;
                         if( cursorid ) {
+                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
                             string ns = dbresponse.exhaust; // before reset() free's it...
                             m.reset();
                             BufBuilder b(512);
@@ -273,7 +274,6 @@ sendmore:
                             b.append(header->responseTo);
                             b.append((int) dbGetMore);
                             b.append((int) 0);
-                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
                             b.append(ns);
                             b.append((int) 0); // ntoreturn
                             b.append(cursorid);
