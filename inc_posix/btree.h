@@ -11,18 +11,6 @@
 extern "C" {
 #endif
 
-/*******************************************
- * Internal forward declarations.
- *******************************************/
-struct __wt_col_indx;		typedef struct __wt_col_indx WT_COL_INDX;
-struct __wt_item;		typedef struct __wt_item WT_ITEM;
-struct __wt_off;		typedef struct __wt_off WT_OFF;
-struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
-struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
-struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
-struct __wt_row_indx;		typedef struct __wt_row_indx WT_ROW_INDX;
-struct __wt_sdbt;		typedef struct __wt_sdbt WT_SDBT;
-
 /*
  * In WiredTiger there are "database allocation units", which is the smallest
  * database chunk that can be allocated.  The smallest database allocation unit
@@ -133,11 +121,23 @@ struct __wt_page_desc {
 #define	WT_PAGE_DESC_SIZE		512
 
 /*
+ * WT_REPL --
+ *	Modification/deletion for a WT_{COL,ROW} entry.
+ */
+struct __wt_repl {
+	/* In-memory deletes are flagged by an illegal data pointer value. */
+#define	WT_REPL_DELETED_VALUE		((void *)0x01)
+#define	WT_REPL_DELETED_ISSET(p)	((p) == WT_REPL_DELETED_VALUE)
+	void	 *data;			/* data */
+	u_int32_t size;			/* data length */
+
+	struct __wt_repl *next;		/* forward-linked list */
+};
+
+/*
  * WT_PAGE --
  * The WT_PAGE structure describes the in-memory information about a database
- * page.   When pages are read, the page is reviewed, and in-memory specific
- * information is created.  That information is generally what's used in the
- * cache, not the actual page itself.
+ * page.
  */
 struct __wt_page {
 	/*
@@ -145,7 +145,7 @@ struct __wt_page {
 	 * need something bigger, but the page-size configuration code limits
 	 * page sizes to 128MB.
 	 */
-	u_int32_t addr;			/* Page's allocation address */
+	u_int32_t addr;			/* Page's file allocation address */
 	u_int32_t size;			/* Page size */
 
 	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
@@ -153,37 +153,7 @@ struct __wt_page {
 	u_int8_t *first_free;		/* Page's first free byte address */
 	u_int32_t space_avail;		/* Page's available memory */
 
-	u_int64_t records;		/* Records in this page and below */
-
-	/*
-	 * Each item on a page is referenced by a indx field, which points to a
-	 * WT_{ROW,COL}_INDX structure.  (This is where the on-page index array
-	 * found in DB 1.85 and Berkeley DB moved.)
-	 *
-	 * We use a union so you can increment the address and have the right
-	 * thing happen (and so you're forced to think about what exactly you
-	 * are dereferencing when you write the code).
-	 *
-	 * Further complications:
-	 *
-	 * In row store leaf pages there may be duplicate data items; in those
-	 * cases, there is a single indx entry per key/data pair, but multiple
-	 * indx entries may reference the same key.
-	 *
-	 * In column store repeat-count compressed fixed-length pages, a single
-	 * indx entry may reference a large number of records, because there's
-	 * a single on-page entry that represents many identical records.   (We
-	 * can't expand those entries when the page comes into memory because
-	 * that requires unacceptable resources when pages are moved to/from the
-	 * cache, including for read-only databases.)  Instead, a single indx
-	 * entry represents all of the identical records.
-	 */
-	union {				/* Entry index */
-		WT_COL_INDX *c_indx;	/* Array of WT_COL_INDX structures */
-		WT_ROW_INDX *r_indx;	/* Array of WT_ROW_INDX structures */
-		void *indx;
-	} u;
-	u_int32_t indx_count;		/* Entry count */
+	u_int64_t records;		/* Records in this subtree */
 
 	/*
 	 * The page's LRU access generation is set on each cache retrieval and
@@ -212,8 +182,90 @@ struct __wt_page {
 	WT_MEMORY_FLUSH;						\
 } while (0);
 
+	/*
+	 * Each disk page entry is referenced by an array of WT_ROW/WT_COL
+	 * structures: this is where the on-page index in DB 1.85 and Berkeley
+	 * DB is re-created, when a page is read into the cache.  It's sorted
+	 * by the key, fixed in size, and references data on the page.
+	 *
+	 * Complications:
+	 *
+	 * In row store leaf pages there may be duplicate data items; in those
+	 * cases, there is a single indx entry per key/data pair, but multiple
+	 * indx entries will reference the same physical key from the original
+	 * on-disk page.
+	 *
+	 * In column store repeat-count compressed fixed-length pages, a single
+	 * indx entry may reference a large number of records, because there's
+	 * a single on-page entry that represents many identical records.   (We
+	 * can't expand those entries when the page comes into memory because
+	 * that'd require unacceptable resources as pages are moved to/from the
+	 * cache, including for read-only databases.)  Instead, a single indx
+	 * entry represents all of the identical records.
+	 */
+	u_int32_t indx_count;		/* On-disk entry count */
+	union {				/* On-disk entry index */
+		WT_COL *c_indx;		/* On-disk column store entries */
+		WT_ROW *r_indx;		/* On-disk row store entries */
+		void *indx;
+	} u;
+
+	/*
+	 * Entry modifications or deletions are stored in the replacement array.
+	 * When the first element on a page is modified, the array is allocated,
+	 * with one slot for every existing element in the page.  A slot points
+	 * to a WT_REPL structure; if more than one modification is done to a
+	 * single entry, the WT_REPL structures are formed into a forward-linked
+	 * list.
+	 */
+	WT_REPL **repl;			/* Modification index */
+
+	/*
+	 * Row store page insertions are stored in the rinsert array.  When the
+	 * first insertion is done to a row store page, the array is allocated,
+	 * with one slot for every existing element in the page.  Each slot is
+	 * a forward-linked list of new entries sorting greater than or equal to
+	 * the entry with the same array offset in the original index.  Slots
+	 * point to WT_ROW_INSERT structures.
+	 */
+	WT_ROW_INSERT **insrow;
+
+	/*
+	 * Modifying (or deleting) repeat-count compressed column store records
+	 * is problematical, because the index entry would no longer reference
+	 * a set of identical items.  We handle this by "inserting" a new entry
+	 * into an array that behaves much like the rinsert array.  This is the
+	 * only case where it's possible to insert into a column store -- it's
+	 * normally only possible to append to a column store as insert requires
+	 * re-numbering all subsequent records.  (Berkeley DB did support that
+	 * functionality, but it never performed well and it isn't useful enough
+	 * to  re-implement, IMNSHO.)
+	 */
+	WT_COL_EXPAND **expcol;
+
 	u_int32_t flags;
 };
+
+/*
+ * WT_{COL,ROW}_SLOT --
+ * There are 3 different arrays which map one-to-one to the original on-disk
+ * index: repl, insrow and expcol.  WT_{COL,ROW}_SLOT returns the offset.
+ *
+ * WT_{COL,ROW}_ARRAY --
+ * Return the the appropriate entry for one of the three arrays, or NULL if
+ * there's no such entry.
+ */
+#define	WT_COL_SLOT(page, ip)	((WT_COL *)(ip) - (page)->u.c_indx)
+#define	WT_COL_ARRAY(page, ip, array)					\
+	((page)->array == NULL ? NULL : page->array[WT_COL_SLOT(page, ip)])
+#define	WT_COL_REPL(page, ip)	WT_COL_ARRAY(page, ip, repl)
+#define	WT_COL_EXPCOL(page, ip)	WT_COL_ARRAY(page, ip, expcol)
+
+#define	WT_ROW_SLOT(page, ip)	((WT_ROW *)(ip) - (page)->u.r_indx)
+#define	WT_ROW_ARRAY(page, ip, array)					\
+	((page)->array == NULL ? NULL : page->array[WT_ROW_SLOT(page, ip)])
+#define	WT_ROW_REPL(page, ip)	WT_ROW_ARRAY(page, ip, repl)
+#define	WT_ROW_INSROW(page, ip)	WT_ROW_ARRAY(page, ip, insrow)
 
 /*
  * WT_PAGE_HDR --
@@ -284,35 +336,23 @@ struct __wt_page_hdr {
 #define	WT_PAGE_BYTE(page)	(((u_int8_t *)(page)->hdr) + WT_PAGE_HDR_SIZE)
 
 /*
- * WT_SDBT --
- *	Minimal version of the DBT structure -- just the data & size fields.
+ * WT_ROW --
+ * The WT_ROW structure describes the in-memory information about a single
+ * key/data pair on a row store database page.
  */
-struct __wt_sdbt {
-	/* In-memory deletes are flagged by an illegal data pointer value. */
-#define	WT_SDBT_DELETED_VALUE		((void *)0x01)
-#define	WT_SDBT_DELETED_ISSET(p)	((p) == WT_SDBT_DELETED_VALUE)
-	void	 *data;			/* data */
-	u_int32_t size;			/* data length */
-};
-
-/*
- * WT_ROW_INDX --
- * The WT_ROW_INDX structure describes the in-memory information about a single
- * key/data pair on a row-store database page.
- */
-struct __wt_row_indx {
+struct __wt_row {
 	/*
-	 * WT_ROW_INDX structures are used to describe pages where there's a
-	 * sort key (that is, a row-store, not a column-store, which is only
-	 * "sorted" by record number).
+	 * WT_ROW structures are used to describe pages where there's a sort
+	 * key (that is, a row-store, not a column-store, which is "sorted"
+	 * by record number).
 	 *
-	 * The first fields of the WT_ROW_INDX structure are the same as the
-	 * first fields of a DBT so we can hand it to a comparison function
-	 * without copying (this is important for keys on internal pages).
+	 * The first fields of the WT_ROW structure are the same as the first
+	 * fields of a DBT so we can hand it to a comparison function without
+	 * copying (this is important for keys on internal pages).
 	 *
 	 * If a key requires processing (for example, an overflow key or an
 	 * Huffman encoded key), the key field points to the on-page key,
-	 * but the size is set to 0 to indicate the key requires processing.
+	 * but the size is set to 0 to indicate the key is not yet processed.
 	 */
 #define	WT_KEY_PROCESS(ip)						\
 	((ip)->size == 0)
@@ -324,44 +364,10 @@ struct __wt_row_indx {
 	(ip)->key = (_key);						\
 	(ip)->size = 0;							\
 } while (0)
-	void	 *key;			/* DBT: key */
-	u_int32_t size;			/* DBT: key length */
+	void	 *key;			/* Key */
+	u_int32_t size;			/* Key length */
 
-	WT_ITEM	 *data;			/* Key's on-page data item */
-
-	/*
-	 * Data items on leaf pages may be updated with new data, stored in the
-	 * WT_SDBT repl aarray.  It's an array for two reasons: first, we don't
-	 * block readers when updating it, which means it may be in use during
-	 * updates, and second because we'll need transactional history when we
-	 * add MVCC to the system.  The second reason is the array has to grow
-	 * while other threads are reading it, and we don't want to acquire a
-	 * a lock.  To make this work, the last element of the repl array is a
-	 * fake entry pointing to a previous repl array (it's an odd sort of
-	 * forward-linked list, allowing the array to grow without replacement.
-	 *
-	 * We can potentially allocate lots of these little arrays, so make an
-	 * effort to play nicely with power-of-two allocators.
-	 */
-#define	WT_REPL_CHUNK	(64 / sizeof(WT_SDBT))
-
-	/*
-	 * We do not list how many entries in the array are used (it's only a
-	 * few slots per chunk, so it's cheap to find the first non-NULL entry).
-	 * Readers are safe because The entry is filled in and flushed, before
-	 * the repl field is updated.
-	 *
-	 * WT_SDBT_CURRENT --
-	 * Set sdbt to the most recent replacement entry referenced by a ROW/COL
-	 * structure, or NULL if there's been no replacement.
-	 */
-#define	WT_REPL_CURRENT_SET(ip, sdbt) do {				\
-	if ((sdbt = (ip)->repl) != NULL)				\
-		for (; (sdbt)->data == NULL; ++(sdbt))			\
-			;						\
-} while (0)
-
-	WT_SDBT  *repl;			/* Replacement data array */
+	WT_ITEM	 *data;			/* Data */
 };
 /*
  * WT_ROW_SIZE is the expected structure size -- we check at startup to ensure
@@ -369,26 +375,31 @@ struct __wt_row_indx {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_ROW_INDX_SIZE	16
+#define	WT_ROW_SIZE	(2 * sizeof(void *) + sizeof(u_int32_t))
+/*
+ * WT_ROW_INSERT --
+ * The WT_ROW_INSERT structure describes the in-memory information about an
+ * inserted key/data pair on a row store database page.
+ */
+struct __wt_row_insert {
+	WT_ROW	entry;			/* key/data pair */
+	WT_REPL *repl;			/* modifications/deletions */
+
+	WT_ROW_INSERT *next;		/* forward-linked list */
+};
 
 /*
- * WT_COL_INDX --
- * The WT_COL_INDX structure describes the in-memory information about a single
+ * WT_COL --
+ * The WT_COL structure describes the in-memory information about a single
  * item on a column-store database page.
  */
-struct __wt_col_indx {
+struct __wt_col {
 	/*
 	 * The on-page data is untyped for column-store pages -- if the page
 	 * has variable-length objects, it's a WT_ITEM layout, like row-store
-	 * pages.  If the page has fixed-length objects, it's untyped data.
+	 * pages.  If the page has fixed-length objects, it's untyped bytes.
 	 */
-	void	 *data;			/* On-page data */
-
-	/*
-	 * Data items on leaf pages may be updated with new data -- see the
-	 * comment for the WT_ROW_INDX repl field.
-	 */
-	WT_SDBT	 *repl;			/* Replacement data array */
+	void	 *data;			/* on-page data */
 };
 /*
  * WT_COL_SIZE is the expected structure size --  we check at startup to ensure
@@ -396,19 +407,55 @@ struct __wt_col_indx {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_COL_INDX_SIZE	8
+#define	WT_COL_SIZE	(sizeof(void *))
+/*
+ * WT_COL_EXPAND --
+ * The WT_COL_EXPAND structure describes the in-memory information about a
+ * replaced key/data pair on a repeat-compressed, column store database page.
+ */
+struct __wt_col_expand {
+	/*
+	 * The stored "key" in the WT_COL_EXPAND structure isn't a record
+	 * number: it's the offset in the set of records maintained for the
+	 * index, that is, it's an offset from the starting record number
+	 * for the original, on-disk page index.
+	 */
+	u_int16_t rcc_offset;		/* recno offset in this index */
+
+	WT_REPL *repl;                  /* modifications/deletions */
+
+	WT_COL_EXPAND *next;		/* forward-linked list */
+};
 
 /*
- * Macro to walk the indexes of an in-memory page: works for both WT_ROW_INDX
- * and WT_COL_INDX, based on the type of ip.
+ * WT_INDX_FOREACH --
+ * Macro to walk the indexes of an in-memory page: works for both WT_ROW and
+ * WT_COL, based on the type of ip.
  */
 #define	WT_INDX_FOREACH(page, ip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
 
 /*
+ * WT_REPL_FOREACH --
+ * Macro to walk the replacement array of an in-memory page.
+ */
+#define	WT_REPL_FOREACH(page, replp, i)					\
+	for ((i) = (page)->indx_count,					\
+	    (replp) = (page)->repl; (i) > 0; ++(replp), --(i))
+
+/*
+ * WT_EXPCOL_FOREACH --
+ * Macro to walk the repeat-count compressed column store expansion  array of
+ * an in-memory page.
+ */
+#define	WT_EXPCOL_FOREACH(page, exp, i)					\
+	for ((i) = (page)->indx_count,					\
+	    (exp) = (page)->expcol; (i) > 0; ++(exp), --(i))
+
+/*
  * On both row- and column-store internal pages, the on-page data referenced
- * by the WT_{ROW,COL}_INDX data field is a WT_OFF structure, which contains a
+ * by the WT_ROW/WT_COL data field is a WT_OFF structure, which contains a
  * record count and a page addr/size pair.   Macros to reach into the on-page
  * structure and return the values.
  */
@@ -529,10 +576,10 @@ struct __wt_item {
 	((u_int8_t *)(addr) + sizeof(WT_ITEM))
 
 /*
- * On row-store pages, the on-page data referenced by the WT_INDX page_data
- * field may be a WT_OVFL (which contains the address for the start of the
- * overflow pages and its length), or a WT_OFF structure.  These macros do
- * the cast for the right type.
+ * On row-store pages, the on-page data referenced by the WT_ROW data field
+ * may be a WT_OVFL (which contains the address for the start of the overflow
+ * pages and its length), or a WT_OFF structure.  These macros do the cast
+ * to the right type.
  */
 #define	WT_ITEM_BYTE_OFF(addr)						\
 	((WT_OFF *)(WT_ITEM_BYTE(addr)))
