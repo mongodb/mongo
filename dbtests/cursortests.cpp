@@ -62,7 +62,7 @@ namespace CursorTests {
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
                 int v[] = { 1, 2, 4, 6 };
-                shared_ptr< FieldRangeVector > frv( vec( v, 4 ) );
+                boost::shared_ptr< FieldRangeVector > frv( vec( v, 4 ) );
                 Client::Context ctx( ns );
                 BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, 1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
@@ -90,7 +90,7 @@ namespace CursorTests {
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
                 int v[] = { -50, 2, 40, 60, 109, 200 };
-                shared_ptr< FieldRangeVector > frv( vec( v, 6 ) );
+                boost::shared_ptr< FieldRangeVector > frv( vec( v, 6 ) );
                 Client::Context ctx( ns );
                 BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, 1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
@@ -116,7 +116,7 @@ namespace CursorTests {
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
                 int v[] = { 1, 2, 4, 6 };
-                shared_ptr< FieldRangeVector > frv( vec( v, 4, -1 ) );
+                boost::shared_ptr< FieldRangeVector > frv( vec( v, 4, -1 ) );
                 Client::Context ctx( ns );
                 BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, -1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 reverse multi", c.toString() );
@@ -146,7 +146,7 @@ namespace CursorTests {
                 _c.ensureIndex( ns(), idx() );
                 Client::Context ctx( ns() );
                 FieldRangeSet frs( ns(), spec );
-                shared_ptr< FieldRangeVector > frv( new FieldRangeVector( frs, idx(), direction() ) );
+                boost::shared_ptr< FieldRangeVector > frv( new FieldRangeVector( frs, idx(), direction() ) );
                 BtreeCursor c( nsdetails( ns() ), 1, nsdetails( ns() )->idx( 1 ), frv, direction() );
                 Matcher m( spec );
                 int count = 0;

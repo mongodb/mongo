@@ -437,6 +437,8 @@
     </ClCompile>
     <ClCompile Include="..\s\chunk.cpp" />
     <ClCompile Include="..\s\config.cpp" />
+    <ClCompile Include="..\s\d_migrate.cpp" />
+    <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />
     <ClCompile Include="..\s\d_writeback.cpp" />
     <ClCompile Include="..\s\shard.cpp" />
@@ -578,6 +580,7 @@
     <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\gridfs.h" />
     <ClInclude Include="..\client\parallel.h" />
+    <ClInclude Include="..\s\d_logic.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\pcre-7.4\config.h" />
     <ClInclude Include="..\pcre-7.4\pcre.h" />

@@ -668,6 +668,12 @@
     <ClCompile Include="..\client\distlock.cpp">
       <Filter>client</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\d_migrate.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_split.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

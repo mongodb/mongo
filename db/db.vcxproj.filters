@@ -373,6 +373,12 @@
     <ClCompile Include="..\client\distlock.cpp">
       <Filter>client</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\d_migrate.cpp">
+      <Filter>sharding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_split.cpp">
+      <Filter>sharding</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -743,6 +749,9 @@
     </ClInclude>
     <ClInclude Include="..\client\distlock.h">
       <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_logic.h">
+      <Filter>sharding</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
