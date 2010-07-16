@@ -82,7 +82,7 @@ function diff(){
 
     if ( Math.random() > .99 ){
         db.getLastError()
-        check();
+        check(); // SERVER-1430  TODO
     }
 
     var x = dist();
