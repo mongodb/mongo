@@ -17,17 +17,35 @@ class Serial:
 		self.op = op
 		self.args = args
 
-serial['bt_delete'] = Serial(
-	'bt_del',
+serial['bt_rcc_expand'] = Serial(
+	'bt_rcc_expand',
 	'WT_WORKQ_SPIN',
-	['WT_PAGE */page'])
+	['WT_PAGE */page',
+	 'int/slot',
+	 'WT_COL_EXPAND **/new_expcol',
+	 'WT_COL_EXPAND */exp'])
+
+serial['bt_rcc_expand_repl'] = Serial(
+	'bt_rcc_expand_repl',
+	'WT_WORKQ_SPIN',
+	['WT_PAGE */page',
+	 'WT_COL_EXPAND */exp',
+	 'WT_REPL */repl'])
 
 serial['bt_replace'] = Serial(
-	'bt_repl',
+	'bt_replace',
 	'WT_WORKQ_SPIN',
-	['WT_ROW_INDX */indx',
+	['WT_ROW */indx',
 	 'void */data',
 	 'u_int32_t/size'])
+
+serial['bt_update'] = Serial(
+	'bt_update',
+	'WT_WORKQ_SPIN',
+	['WT_PAGE */page',
+	 'int/slot',
+	 'WT_REPL **/new_repl',
+	 'WT_REPL */repl'])
 
 serial['cache_in'] = Serial(
 	'cache_in',
