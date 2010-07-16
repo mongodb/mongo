@@ -74,6 +74,7 @@ namespace mongo {
         
         ChunkMatcherPtr getChunkMatcher( const string& ns );
         
+        bool inCriticalMigrateSection();
     private:
         
         bool _enabled;

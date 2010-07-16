@@ -417,6 +417,11 @@ namespace mongo {
             }
             
             if ( version < globalVersion ){
+                while ( shardingState.inCriticalMigrateSection() ){
+                    dbtemprelease r;
+                    sleepmillis(2);
+                    log() << "waiting till out of critical section" << endl;
+                }
                 errmsg = "going to older version for global";
                 result.appendTimestamp( "version" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );

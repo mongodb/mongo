@@ -67,6 +67,7 @@ namespace mongo {
         MigrateFromStatus()
             : _mutex( "MigrateFromStatus" ){
             _active = false;
+            _inCriticalSection = false;
         }
 
         void start( string ns , const BSONObj& min , const BSONObj& max ){
@@ -85,11 +86,12 @@ namespace mongo {
             
             _active = true;
         }
-
+        
         void done(){
             if ( ! _active )
                 return;
             _active = false;
+            _inCriticalSection = false;
 
             scoped_lock lk( _mutex );
             _deleted.clear();
@@ -189,19 +191,20 @@ namespace mongo {
             long long size = 0;
 
             {
+                readlock rl( _ns );
+                Client::Context cx( _ns );
+                
                 scoped_lock lk( _mutex );
                 xfer( &_deleted , b , "deleted" , size , false );
-                {
-                    readlock rl( _ns );
-                    Client::Context cx( _ns );
-                    xfer( &_reload , b , "reload" , size , true );
-                }
+                xfer( &_reload , b , "reload" , size , true );
             }
 
             b.append( "size" , size );
 
             return true;
         }
+
+        bool _inCriticalSection;
 
     private:
         
@@ -410,6 +413,7 @@ namespace mongo {
             // 5.
             { 
                 // 5.a
+                migrateFromStatus._inCriticalSection = true;
                 ShardChunkVersion myVersion = maxVersion;
                 ++myVersion;
                 
@@ -418,6 +422,7 @@ namespace mongo {
                     assert( myVersion > shardingState.getVersion( ns ) );
                     shardingState.setVersion( ns , myVersion );
                     assert( myVersion == shardingState.getVersion( ns ) );
+                    log() << "moveChunk locking myself to: " << myVersion << endl;
                 }
 
                 
@@ -460,15 +465,18 @@ namespace mongo {
 
                         conn->update( ShardNS::chunk , x["_id"].wrap() , BSON( "$set" << temp2.obj() ) );
                         
+                        log() << "moveChunk updating self to: " << myVersion << endl;
                     }
                     else {
                         //++myVersion;
                         shardingState.setVersion( ns , 0 );
+
+                        log() << "moveChunk now i'm empty" << endl;
                     }
                 }
 
                 conn.done();
-                
+                migrateFromStatus._inCriticalSection = false;
                 // 5.d
                 configServer.logChange( "moveChunk" , ns , BSON( "min" << min << "max" << max <<
                                                                  "from" << fromShard.getName() << 
@@ -492,6 +500,10 @@ namespace mongo {
         }
         
     } moveChunkCmd;
+
+    bool ShardingState::inCriticalMigrateSection(){
+        return migrateFromStatus._inCriticalSection;
+    }
 
     /* -----
        below this are the "to" side commands
