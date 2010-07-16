@@ -234,6 +234,7 @@ namespace mongo {
     boost::thread_specific_ptr<ShardedConnectionInfo> ShardedConnectionInfo::_tl;
 
     ShardedConnectionInfo::ShardedConnectionInfo(){
+        _forceMode = false;
         _id.clear();
     }
     
@@ -378,7 +379,7 @@ namespace mongo {
             }
             
             ConfigVersion& oldVersion = info->getVersion(ns);
-            unsigned long long& globalVersion = shardingState.getVersion(ns);
+            ConfigVersion& globalVersion = shardingState.getVersion(ns);
             
             if ( oldVersion > 0 && globalVersion == 0 ){
                 // this had been reset
@@ -503,21 +504,27 @@ namespace mongo {
     bool shardVersionOk( const string& ns , string& errmsg ){
         if ( ! shardingState.enabled() )
             return true;
-        
+
         ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
+
         if ( ! info ){
             // this means the client has nothing sharded
             // so this allows direct connections to do whatever they want
             // which i think is the correct behavior
             return true;
         }
-
-        unsigned long long version;    
-        if ( ! shardingState.hasVersion( ns , version ) )
+        
+        if ( info->inForceMode() ){
             return true;
+        }
 
-        unsigned long long clientVersion = info->getVersion(ns);
-                
+        ConfigVersion version;    
+        if ( ! shardingState.hasVersion( ns , version ) ){
+            return true;
+        }
+
+        ConfigVersion clientVersion = info->getVersion(ns);
+
         if ( version == 0 && clientVersion > 0 ){
             stringstream ss;
             ss << "version: " << version << " clientVersion: " << clientVersion;

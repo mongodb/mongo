@@ -30,6 +30,7 @@
 #include "shardkey.h"
 #include "shard.h"
 #include "config.h"
+#include "util.h"
 
 namespace mongo {
     
@@ -40,75 +41,6 @@ namespace mongo {
     class ChunkRangeMangager;
     class ChunkObjUnitTest;
 
-    struct ShardChunkVersion {
-        union {
-            struct {
-                int _minor;
-                int _major;
-            };
-            unsigned long long _combined;
-        };
-        
-        ShardChunkVersion( int major=0, int minor=0 )
-            : _minor(minor),_major(major){
-        }
-        
-        ShardChunkVersion( unsigned long long ll )
-            : _combined( ll ){
-        }
-        
-        ShardChunkVersion( const BSONElement& e ){
-            if ( e.type() == Date || e.type() == Timestamp ){
-                _combined = e._numberLong();
-            }
-            else {
-                log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
-                assert(0);
-            }
-        }
-
-        ShardChunkVersion incMajor() const {
-            return ShardChunkVersion( _major + 1 , 0 );
-        }
-
-        void operator++(){
-            _minor++;
-        }
-
-        unsigned long long toLong() const {
-            return _combined;
-        }
-
-        bool isSet() const {
-            return _combined > 0;
-        }
-
-        string toString() const { 
-            stringstream ss; 
-            ss << _major << "|" << _minor; 
-            return ss.str(); 
-        }
-        
-        operator unsigned long long() const { return _combined; }
-        operator string() const { return toString(); }
-
-        ShardChunkVersion& operator=( const BSONElement& elem ){
-            switch ( elem.type() ){
-            case Timestamp:
-            case NumberLong:
-            case Date:
-                _combined = elem._numberLong();
-                break;
-            case EOO:
-                _combined = 0;
-                break;
-            default:
-                assert(0);
-            }
-            return *this;
-        }
-    };
-    
     typedef shared_ptr<Chunk> ChunkPtr;
 
     // key is max for each Chunk or ChunkRange
@@ -192,7 +124,7 @@ namespace mongo {
         const char * getNS(){ return "config.chunks"; }
         void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
         void unserialize(const BSONObj& from);
-        string modelServer();
+        string modelServer() const;
         
         void appendShortVersion( const char * name , BSONObjBuilder& b );
 
@@ -202,14 +134,18 @@ namespace mongo {
         
         static int MaxChunkSize;
 
-        string genID();
+        string genID() const;
         static string genID( const string& ns , const BSONObj& min );
 
         const ChunkManager* getManager() const { return _manager; }
         
         bool modified();
+
+        ShardChunkVersion getVersionOnConfigServer() const;
     private:
-        
+
+        bool _splitIfShould( long dataWritten );
+
         // main shard info
         
         ChunkManager * _manager;
@@ -349,6 +285,12 @@ namespace mongo {
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;
 
+        /** 
+         * actually does a query on the server
+         * doesn't look at any local data
+         */
+        ShardChunkVersion getVersionOnConfigServer() const;
+        
         /**
          * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
          */
@@ -431,6 +373,6 @@ namespace mongo {
         Chunk _c;
     };
     */
-    inline string Chunk::genID(){ return genID(_manager->getns(), _min); }
+    inline string Chunk::genID() const { return genID(_manager->getns(), _min); }
 
 } // namespace mongo

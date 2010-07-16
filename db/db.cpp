@@ -392,7 +392,7 @@ sendmore:
     void repairDatabases() {
 		//        LastError * le = lastError.get( true );
         Client::GodScope gs;
-        log(1) << "enter repairDatabases" << endl;
+        log(1) << "enter repairDatabases (to check pdfile version #)" << endl;
         
         //assert(checkNsFilesOnLoad);
         checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.

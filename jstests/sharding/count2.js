@@ -23,12 +23,18 @@ s1.adminCommand( { split : "test.foo" , middle : { name : "ddd" } } );
 assert.eq( 3, db1.count( { name : { $gte: "aaa" , $lt: "ddd" } } ) , "initial count mongos1" );
 assert.eq( 3, db2.count( { name : { $gte: "aaa" , $lt: "ddd" } } ) , "initial count mongos2" );
 
+s1.printChunks( "test.foo" )
+
 s1.adminCommand( { movechunk : "test.foo" , find : { name : "aaa" } , to : s1.getOther( s1.getServer( "test" ) ).name } );
 
 assert.eq( 3, db1.count( { name : { $gte: "aaa" , $lt: "ddd" } } ) , "post count mongos1" );
 
 // The second mongos still thinks its shard mapping is valid and accepts a cound
-//assert.eq( 3, db2.count( { name : { $gte: "aaa" , $lt: "ddd" } } ) , "post count mongos2" ); // ***** asserting *****
+print( "before sleep: " + Date() )
+sleep( 2000 )
+print( "after  sleep: " + Date() )
+s1.printChunks( "test.foo" )
+assert.eq( 3, db2.find( { name : { $gte: "aaa" , $lt: "ddd" } } ).count() , "post count mongos2" );
 
 db2.findOne();
 

@@ -184,20 +184,64 @@ namespace mongo {
                     return true;
                 }
                 
+                long long total = 0;
+                map<string,long long> shardCounts;
+                
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
-                massert( 10419 ,  "how could chunk manager be null!" , cm );
-                
-                set<Shard> shards;
-                cm->getShardsForQuery( shards , filter );
-                
-                unsigned long long total = 0;
-                for (set<Shard>::iterator it=shards.begin(), end=shards.end(); it != end; ++it){
-                    ShardConnection conn(*it, fullns);
-                    total += conn->count(fullns, filter);
-                    conn.done();
+                while ( true ){
+                    massert( 10419 ,  "how could chunk manager be null!" , cm );
+                    
+                    set<Shard> shards;
+                    cm->getShardsForQuery( shards , filter );
+                    assert( shards.size() );
+                    
+                    bool hadToBreak = false;
+
+                    for (set<Shard>::iterator it=shards.begin(), end=shards.end(); it != end; ++it){
+                        ShardConnection conn(*it, fullns);
+                        if ( conn.setVersion() ){
+                            total = 0;
+                            shardCounts.clear();
+                            cm = conf->getChunkManager( fullns );
+                            conn.done();
+                            hadToBreak = true;
+                            break;
+                        }
+                        
+                        BSONObj temp;
+                        bool ok = conn->runCommand( dbName , BSON( "count" << collection << "query" << filter ) , temp );
+                        conn.done();
+                        
+                        if ( ok ){
+                            long long mine = temp["n"].numberLong();
+                            total += mine;
+                            shardCounts[it->getName()] = mine;
+                            continue;
+                        }
+                        
+                        if ( 13388 == temp["code"].numberInt() ){
+                            // my version is old
+                            total = 0;
+                            shardCounts.clear();
+                            cm = conf->getChunkManager( fullns , true );
+                            hadToBreak = true;
+                            break;
+                        }
+
+                        // command failed :(
+                        errmsg = "failed on : " + it->getName();
+                        result.append( "cause" , temp );
+                        return false;
+                    }
+                    if ( ! hadToBreak )
+                        break;
                 }
                 
-                result.append( "n" , (double)total );
+                result.appendNumber( "n" , total );
+                BSONObjBuilder temp( result.subobjStart( "shards" ) );
+                for ( map<string,long long>::iterator i=shardCounts.begin(); i!=shardCounts.end(); ++i )
+                    temp.appendNumber( i->first , i->second );
+                temp.done();
                 return true;
             }
         } countCmd;

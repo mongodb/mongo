@@ -1,5 +1,3 @@
-// util.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -16,22 +14,13 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-/**
-   these are commands that live in mongod
-   mostly around shard management and checking
- */
-
 #include "pch.h"
-#include "util.h"
+#include "../client.h"
+#include "../../client/dbclient.h"
+#include "rs.h"
 
-using namespace std;
+namespace mongo { 
 
-namespace mongo {
-
-    bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ){
-        // no-op in mongod
-        return false;
-    }
+    using namespace bson;
 
 }

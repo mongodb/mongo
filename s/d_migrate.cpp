@@ -489,6 +489,7 @@ namespace mongo {
             
             // 7
             {
+                ShardForceModeBlock sf;
                 writelock lk(ns);
                 long long num = Helpers::removeRange( ns , min , max , true );
                 log() << "moveChunk deleted: " << num << endl;
@@ -551,12 +552,19 @@ namespace mongo {
             }
             active = false;
         }
-
+        
         void _go(){
             assert( active );
             assert( state == READY );
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
+
+            { // delete any data already in range
+                writelock lk( ns );
+                long long num = Helpers::removeRange( ns , min , max , true );
+                if ( num )
+                    log( LL_WARNING ) << "moveChunkCmd deleted data already in chunk # objects: " << num << endl;
+            }
 
             ScopedDbConnection conn( from );
             conn->getLastError(); // just test connection
@@ -741,8 +749,6 @@ namespace mongo {
             migrateStatus.min = cmdObj["min"].Obj().getOwned();
             migrateStatus.max = cmdObj["max"].Obj().getOwned();
             
-            // TODO: check data in range currently
-
             boost::thread m( migrateThread );
             
             result.appendBool( "started" , true );

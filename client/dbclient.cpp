@@ -199,7 +199,7 @@ namespace mongo {
         BSONObj res;
         if( !runCommand(ns.db.c_str(), cmd, res, options) )
             uasserted(11010,string("count fails:") + res.toString());
-        return res.getIntField("n");
+        return res["n"].numberLong();
     }
 
     BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
@@ -612,7 +612,7 @@ namespace mongo {
             queryOptions |= (int)QueryOption_Exhaust;            
         }
         auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
-        massert( 133082, "socket error for mapping query", c.get() );
+        massert( 13386, "socket error for mapping query", c.get() );
         
         if ( !doExhaust ) {
             while( c->more() ) {

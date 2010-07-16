@@ -240,7 +240,7 @@ namespace mongo {
         key = k.obj();
         return me.obj();
     }
-
+    
     long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield ){
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
@@ -249,7 +249,8 @@ namespace mongo {
 
         Client::Context ctx(ns);
         NamespaceDetails* nsd = nsdetails( ns.c_str() );
-        assert( nsd );
+        if ( ! nsd )
+            return 0;
 
         int ii = nsd->findIndexByKeyPattern( keya );
         assert( ii >= 0 );

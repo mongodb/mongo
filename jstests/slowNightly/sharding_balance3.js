@@ -3,8 +3,6 @@
 s = new ShardingTest( "slow_sharding_balance3" , 2 , 2 , 1 , { chunksize : 1 } );
 
 s.adminCommand( { enablesharding : "test" } );
-s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
-assert.eq( 1 , s.config.chunks.count()  , "setup1" );
 
 s.config.settings.find().forEach( printjson );
 
@@ -22,23 +20,11 @@ while ( inserted < ( 40 * 1024 * 1024 ) ){
 }
 
 db.getLastError();
+s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
-function dist(){
-    var x = {}
-    s.config.chunks.find( { ns : "test.foo" } ).forEach(
-        function(z){
-            if ( x[z.shard] )
-                x[z.shard]++
-            else
-                x[z.shard] = 1;
-        }
-    );
-    return x;
-}
-
 function diff(){
-    var x = dist();
+    var x = s.chunkCounts( "foo" );
     printjson( x )
     return Math.max( x.shard0 , x.shard1 ) - Math.min( x.shard0 , x.shard1 );
 }

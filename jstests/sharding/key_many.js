@@ -10,7 +10,7 @@ types =  [
     { name : "embedded 1" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b" } ,
     { name : "embedded 2" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b.c" } ,
     { name : "object" , values : [ {a:1, b:1.2}, {a:1, b:3.5}, {a:1, b:4.5}, {a:2, b:1.2}, {a:2, b:3.5}, {a:2, b:4.5} ] , keyfield : "o" } ,
-    //{ name : "compound" , values : [ {a:1, b:1.2}, {a:1, b:3.5}, {a:1, b:4.5}, {a:2, b:1.2}, {a:2, b:3.5}, {a:2, b:4.5} ] , keyfield : "o" , compound : true } ,
+    { name : "compound" , values : [ {a:1, b:1.2}, {a:1, b:3.5}, {a:1, b:4.5}, {a:2, b:1.2}, {a:2, b:3.5}, {a:2, b:4.5} ] , keyfield : "o" , compound : true } ,
     { name : "oid_id" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "_id" } ,
     { name : "oid_other" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "o" } ,
     ]
@@ -52,6 +52,15 @@ function makeObject( v ){
     p[keys[i]] = v;
 
     return o;
+}
+
+function makeInQuery(){
+    if (curT.compound){
+        // cheating a bit...
+        return {'o.a': {$in: [1,2]}};
+    } else {
+        return makeObjectDotted({$in: curT.values});
+    }
 }
 
 function getKey( o ){
@@ -112,7 +121,7 @@ for ( var i=0; i<types.length; i++ ){
     assert.eq( 6 , count , curT.name + " total count with stats() sum" );
 
     assert.eq( curT.values , c.find().sort( makeObjectDotted( 1 ) ).toArray().map( getKey ) , curT.name + " sort 1" );
-    assert.eq( curT.values , c.find(makeObjectDotted({$in: curT.values})).sort( makeObjectDotted( 1 ) ).toArray().map( getKey ) , curT.name + " sort 1" );
+    assert.eq( curT.values , c.find(makeInQuery()).sort( makeObjectDotted( 1 ) ).toArray().map( getKey ) , curT.name + " sort 1 - $in" );
     assert.eq( curT.values.reverse() , c.find().sort( makeObjectDotted( -1 ) ).toArray().map( getKey ) , curT.name + " sort 2" );
 
 

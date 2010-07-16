@@ -25,7 +25,7 @@
 #include "../commands.h"
 #include "rs_exception.h"
 #include "rs_optime.h"
-#include "rsmember.h"
+#include "rs_member.h"
 #include "rs_config.h"
 
 namespace mongo {
