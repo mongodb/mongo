@@ -9,8 +9,6 @@
 
 #include "wt_internal.h"
 
-static void __wt_workq_repl(WT_TOC *, WT_SDBT **, void *, u_int32_t);
-
 /*
  * __wt_db_row_del --
  *	Db.row_del method.
@@ -21,22 +19,39 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
+	WT_REPL **new_repl, *repl;
 	int ret;
 
 	env = toc->env;
 	idb = toc->db->idb;
-
-	/* Make sure we have a spare replacement array in the WT_TOC. */
-	if (toc->repl_spare == NULL)
-		WT_RET(__wt_calloc(
-		    env, WT_REPL_CHUNK + 1, sizeof(WT_SDBT), &toc->repl_spare));
+	new_repl = NULL;
+	repl = NULL;
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_bt_search_row(toc, key, 0));
 	page = toc->srch_page;
 
-	/* Delete the item. */
-	__wt_bt_delete_serial(toc, page, ret);
+	/* Allocate a page replacement array as necessary. */
+	if (page->repl == NULL)
+		WT_ERR(__wt_calloc(
+		    env, page->indx_count, sizeof(WT_REPL *), &new_repl));
+
+	/* Allocate a WT_REPL structure and fill it in. */
+	WT_ERR(__wt_calloc(env, 1, sizeof(WT_REPL), &repl));
+	repl->data = WT_REPL_DELETED_VALUE;
+
+	/* Schedule the workQ to insert the WT_REPL structure. */
+	__wt_bt_update_serial(toc,
+	    page, WT_ROW_SLOT(page, toc->srch_ip), new_repl, repl, ret);
+
+	if (0) {
+err:		if (repl != NULL)
+			__wt_free(env, repl, sizeof(WT_REPL));
+	}
+
+	/* Free any replacement array unless the workQ used it. */
+	if (new_repl != NULL && new_repl != page->repl)
+		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 
 	if (page != NULL && page != idb->root_page)
 		__wt_bt_page_out(toc, &page, ret == 0 ? WT_MODIFIED : 0);
@@ -45,81 +60,34 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 }
 
 /*
- * __wt_bt_del_serial_func --
- *	Server function to discard an entry.
+ * __wt_bt_update_serial_func --
+ *	Server function to update a WT_REPL entry in the modification array.
  */
 int
-__wt_bt_del_serial_func(WT_TOC *toc)
+__wt_bt_update_serial_func(WT_TOC *toc)
 {
-	DB *db;
-	WT_COL_INDX *cip;
 	WT_PAGE *page;
-	WT_ROW_INDX *rip;
+	WT_REPL **new_repl, *repl;
+	int slot;
 
-	__wt_bt_delete_unpack(toc, page);
-	db = toc->db;
-
-	/*
-	 * The entry we're updating is the last one pushed on the stack.
-	 *
-	 * If we need a new replacement array, check on that.
-	 */
-	switch (page->hdr->type) {
-	case WT_PAGE_DUP_LEAF:
-	case WT_PAGE_ROW_LEAF:
-		rip = toc->srch_ip;
-		__wt_workq_repl(toc, &rip->repl, WT_SDBT_DELETED_VALUE, 0);
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-		cip = toc->srch_ip;
-		__wt_workq_repl(toc, &cip->repl, WT_SDBT_DELETED_VALUE, 0);
-		break;
-	WT_ILLEGAL_FORMAT(db);
-	}
-	return (0);
-}
-
-/*
- * __wt_workq_repl --
- *	Update a WT_{ROW,COL}_INDX replacement array.
- */
-static void
-__wt_workq_repl(WT_TOC *toc, WT_SDBT **replp, void *data, u_int32_t size)
-{
-	WT_SDBT *repl;
+	__wt_bt_update_unpack(toc, page, slot, new_repl, repl);
 
 	/*
-	 * The WorkQ thread updates the WT_{ROW,COL}_INDX replacement arrays,
-	 * serializing changes or deletions of existing key/data items.
-	 *
-	 * The caller's WT_TOC structure has a cache, spare WT_SDBT array if we
-	 * need one.  Update the replacement entry before making any new
-	 * replacement array visible to anyone, the rest of the code depends on
-	 * there being a replacement item if the replacement array exists.
-	 *
-	 * First, check if we're entering in a new replacment array -- if we
-	 * are, enter the information into the new replacement array (including
-	 * linking it into the list of replacement arrays), flush memory, and
-	 * then update the WT_{ROW,COL}_INDX's replacement array reference.
+	 * If the page does not yet have a replacement array, our caller passed
+	 * us one of the correct size.   (It's the caller's responsibility to
+	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if ((repl = *replp) == NULL || repl->data != NULL) {
-		repl = toc->repl_spare;
-		repl[WT_REPL_CHUNK - 1].data = data;
-		repl[WT_REPL_CHUNK - 1].size = size;
-		repl[WT_REPL_CHUNK].data = *replp;
-		WT_MEMORY_FLUSH;
-		*replp = repl;
-		toc->repl_spare = NULL;
-	} else {
-		/*
-		 * There's an existing replacement array with at least one empty
-		 * slot: find the first available empty slot and update it.
-		 */
-		for (; repl[1].data == NULL; ++repl)
-			;
-		repl->data = data;
-		repl->size = size;
-	}
+	if (page->repl == NULL)
+		page->repl = new_repl;
+
+	/*
+	 * Insert the new WT_REPL as the first item in the forward-linked list
+	 * of replacement structures.  Flush memory to ensure the list is never
+	 * broken.
+	 */
+	repl->next = page->repl[slot];
 	WT_MEMORY_FLUSH;
+	page->repl[slot] = repl;
+	WT_PAGE_MODIFY_SET_AND_FLUSH(page);
+	return (0);
 }
