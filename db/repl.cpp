@@ -53,8 +53,6 @@ namespace mongo {
     // our config from command line etc.
     ReplSettings replSettings;
 
-    void ensureHaveIdIndex(const char *ns);
-
     /* if 1 sync() is running */
     volatile int syncing = 0;
 	static volatile int relinquishSyncingSome = 0;
