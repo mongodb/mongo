@@ -2,19 +2,47 @@
 
 typedef struct {
 	WT_PAGE * page;
-} __wt_bt_delete_args;
-#define	 __wt_bt_delete_serial(toc, _page, ret) do {\
-	__wt_bt_delete_args _args;\
+	int slot;
+	WT_COL_EXPAND ** new_expcol;
+	WT_COL_EXPAND * exp;
+} __wt_bt_rcc_expand_args;
+#define	 __wt_bt_rcc_expand_serial(toc, _page, _slot, _new_expcol, _exp, ret) do {\
+	__wt_bt_rcc_expand_args _args;\
 	_args.page = _page;\
+	_args.slot = _slot;\
+	_args.new_expcol = _new_expcol;\
+	_args.exp = _exp;\
 	(ret) = __wt_toc_serialize_func(\
-	    toc, WT_WORKQ_SPIN, __wt_bt_del_serial_func, &_args);\
+	    toc, WT_WORKQ_SPIN, __wt_bt_rcc_expand_serial_func, &_args);\
 } while (0)
-#define	__wt_bt_delete_unpack(toc, _page) do {\
-	_page = ((__wt_bt_delete_args *)(toc)->wq_args)->page;\
+#define	__wt_bt_rcc_expand_unpack(toc, _page, _slot, _new_expcol, _exp) do {\
+	_page = ((__wt_bt_rcc_expand_args *)(toc)->wq_args)->page;\
+	_slot = ((__wt_bt_rcc_expand_args *)(toc)->wq_args)->slot;\
+	_new_expcol = ((__wt_bt_rcc_expand_args *)(toc)->wq_args)->new_expcol;\
+	_exp = ((__wt_bt_rcc_expand_args *)(toc)->wq_args)->exp;\
 } while (0)
 
 typedef struct {
-	WT_ROW_INDX * indx;
+	WT_PAGE * page;
+	WT_COL_EXPAND * exp;
+	WT_REPL * repl;
+} __wt_bt_rcc_expand_repl_args;
+#define	 __wt_bt_rcc_expand_repl_serial(toc, _page, _exp, _repl, ret) do {\
+	__wt_bt_rcc_expand_repl_args _args;\
+	_args.page = _page;\
+	_args.exp = _exp;\
+	_args.repl = _repl;\
+	(ret) = __wt_toc_serialize_func(\
+	    toc, WT_WORKQ_SPIN, __wt_bt_rcc_expand_repl_serial_func, &_args);\
+} while (0)
+#define	__wt_bt_rcc_expand_repl_unpack(toc, _page, _exp, _repl) do {\
+	_page = ((__wt_bt_rcc_expand_repl_args *)(toc)->wq_args)->page;\
+	_exp = ((__wt_bt_rcc_expand_repl_args *)(toc)->wq_args)->exp;\
+	_repl = ((__wt_bt_rcc_expand_repl_args *)(toc)->wq_args)->repl;\
+} while (0)
+
+typedef struct {
+	WT_ROW * indx;
 	void * data;
 	u_int32_t size;
 } __wt_bt_replace_args;
@@ -24,12 +52,34 @@ typedef struct {
 	_args.data = _data;\
 	_args.size = _size;\
 	(ret) = __wt_toc_serialize_func(\
-	    toc, WT_WORKQ_SPIN, __wt_bt_repl_serial_func, &_args);\
+	    toc, WT_WORKQ_SPIN, __wt_bt_replace_serial_func, &_args);\
 } while (0)
 #define	__wt_bt_replace_unpack(toc, _indx, _data, _size) do {\
 	_indx = ((__wt_bt_replace_args *)(toc)->wq_args)->indx;\
 	_data = ((__wt_bt_replace_args *)(toc)->wq_args)->data;\
 	_size = ((__wt_bt_replace_args *)(toc)->wq_args)->size;\
+} while (0)
+
+typedef struct {
+	WT_PAGE * page;
+	int slot;
+	WT_REPL ** new_repl;
+	WT_REPL * repl;
+} __wt_bt_update_args;
+#define	 __wt_bt_update_serial(toc, _page, _slot, _new_repl, _repl, ret) do {\
+	__wt_bt_update_args _args;\
+	_args.page = _page;\
+	_args.slot = _slot;\
+	_args.new_repl = _new_repl;\
+	_args.repl = _repl;\
+	(ret) = __wt_toc_serialize_func(\
+	    toc, WT_WORKQ_SPIN, __wt_bt_update_serial_func, &_args);\
+} while (0)
+#define	__wt_bt_update_unpack(toc, _page, _slot, _new_repl, _repl) do {\
+	_page = ((__wt_bt_update_args *)(toc)->wq_args)->page;\
+	_slot = ((__wt_bt_update_args *)(toc)->wq_args)->slot;\
+	_new_repl = ((__wt_bt_update_args *)(toc)->wq_args)->new_repl;\
+	_repl = ((__wt_bt_update_args *)(toc)->wq_args)->repl;\
 } while (0)
 
 typedef struct {
