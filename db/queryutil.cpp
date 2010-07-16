@@ -932,6 +932,11 @@ namespace mongo {
     }
     
     bool FieldRangeVector::matchesElement( const BSONElement &e, int i, bool forward ) const {
+        int l = matchingLowElement( e, i, forward );
+        return ( l % 2 == 0 ); // if we're inside an interval        
+    }
+    
+    int FieldRangeVector::matchingLowElement( const BSONElement &e, int i, bool forward ) const {
         int l = -1;
         int h = _ranges[ i ].intervals().size() * 2;
         while( l + 1 < h ) {
@@ -951,11 +956,11 @@ namespace mongo {
             } else if ( cmp > 0 ) {
                 h = m;
             } else {
-                return true;
+                return ( m % 2 == 0 ) ? m : m - 1;
             }
         }
         assert( l + 1 == h );
-        return ( l % 2 == 0 ); // if we're inside an interval
+        return l;
     }
     
     bool FieldRangeVector::matches( const BSONObj &obj ) const {
@@ -966,7 +971,7 @@ namespace mongo {
             }
             BSONElement kk = k.next();
             int number = (int) kk.number();
-            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0 );
+            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0 ) >= 0;
             BSONElement e = obj.getField( kk.fieldName() );
             if ( e.eoo() ) {
                 e = staticNull.firstElement();
@@ -990,53 +995,88 @@ namespace mongo {
         return true;
     }
     
+    // TODO optimize more
     int FieldRangeVector::Iterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );
         BSONObjIterator o( _v._keyPattern );
         int latestNonEndpoint = -1;
-//        log() << "direction: " << _v._direction << endl;
-//        log() << "curr: " << curr << endl;
-//        log() << "query: " << _v._queries[ 0 ] << endl;
         for( int i = 0; i < (int)_i.size(); ++i ) {
-//            log() << "a i: " << i << endl;
+            if ( i > 0 && !_v._ranges[ i - 1 ].intervals()[ _i[ i - 1 ] ].equality() ) {
+                // TODO if possible avoid this certain cases when field in prev key is the same
+                setMinus( i );
+            }
             bool eq = false;
-            BSONElement jj = j.next();
             BSONElement oo = o.next();
-            while( _i[ i ] < (int)_v._ranges[ i ].intervals().size() ) {
-//                cout << "a _i[ i ]: " << _i[ i ] << endl;
-//                cout << "lower: " << _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound << endl;
-//                cout << "upper: " << _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._bound << endl;
-                int x = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound.woCompare( jj, false );
-                if ( ( oo.number() < 0 ) ^ ( _v._direction < 0 ) ) {
-                    x = -x;
-                }
-//                cout << "x: " << x << endl;
-                if ( x > 0 ) {
-                    setZero( i + 1 );
+            bool reverse = ( ( oo.number() < 0 ) ^ ( _v._direction < 0 ) );
+            BSONElement jj = j.next();
+            if ( _i[ i ] == -1 ) {
+                int l = _v.matchingLowElement( jj, i, !reverse );
+                if ( l % 2 == 0 ) {
+                    _i[ i ] = l / 2;
+                    int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
+                    if ( diff > 1 ) {
+                        latestNonEndpoint = i;
+                    } else if ( diff == 1 ) {
+                        int x = _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._bound.woCompare( jj, false );
+                        if ( x != 0 ) {
+                            latestNonEndpoint = i;
+                        }
+                    }
+                    continue;
+                } else {
+                    if ( l == (int)_v._ranges[ i ].intervals().size() * 2 - 1 ) {
+                        if ( latestNonEndpoint == -1 ) {
+                            return -2;
+                        }
+                        setZero( latestNonEndpoint + 1 );
+                        // skip to curr / latestNonEndpoint + 1 / superlative
+                        for( int j = latestNonEndpoint + 1; j < (int)_i.size(); ++j ) {
+                            _cmp[ j ] = _superlative[ j ];
+                        }
+                        return latestNonEndpoint + 1;                        
+                    }
+                    _i[ i ] = ( l + 1 ) / 2;
                     // skip to curr / i / nextbounds
                     _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound;
                     for( int j = i + 1; j < (int)_i.size(); ++j ) {
                         _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
                     }
-                    return i;
+                    return i;                    
                 }
-                x = _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._bound.woCompare( jj, false );
-                if ( ( oo.number() < 0 ) ^ ( _v._direction < 0 ) ) {
+            }
+            while( _i[ i ] < (int)_v._ranges[ i ].intervals().size() ) {
+                int x = _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._bound.woCompare( jj, false );
+                if ( reverse ) {
                     x = -x;
                 }
-//                cout << "x: " << x << endl;
-                if ( x >= 0 ) {
-                    if ( x == 0 ) {
-                        eq = true;
-                    }
+                if ( x == 0 ) {
+                    eq = true;
                     break;
+                }
+                if ( x > 0 ) {
+                    if ( !_v._ranges[ i ].intervals()[ _i[ i ] ].equality() ) {
+                        x = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound.woCompare( jj, false );
+                        if ( reverse ) {
+                            x = -x;
+                        }
+                    }
+                    if ( x > 0 ) {
+                        setZero( i + 1 );
+                        // skip to curr / i / nextbounds
+                        _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound;
+                        for( int j = i + 1; j < (int)_i.size(); ++j ) {
+                            _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
+                        }
+                        return i;
+                    } else {
+                        break;
+                    }
                 }
                 ++_i[ i ];
                 setZero( i + 1 );
                 // mark need to check lower bound?
             }
             int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
-//            log() << "a diff: " << diff << endl;
             if ( diff > 1 || ( !eq && diff == 1 ) ) {
                 latestNonEndpoint = i;
             } else if ( diff == 0 ) {
@@ -1049,10 +1089,6 @@ namespace mongo {
                     _cmp[ j ] = _superlative[ j ];
                 }
                 return latestNonEndpoint + 1;
-            }
-            if ( !_v._ranges[ i ].intervals()[ _i[ i ] ].equality() ) {
-                // todo don't zero it if already have
-                setZero( i + 1 );
             }
         }
         return -1;        

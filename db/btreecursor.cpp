@@ -63,8 +63,9 @@ namespace mongo {
         audit();
         startKey = bounds_->startKey();
         bool found;
+        _boundsIterator->advance( startKey ); // handles initialization
         bucket = indexDetails.head.btree()->
-        locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);        
+        locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
         skipAndCheck();
         DEV assert( dups.size() == 0 );
     }
@@ -165,16 +166,6 @@ namespace mongo {
     }
     
     void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd) {
-//        log() << "curr: " << currKey() << ", advancing to: ";
-//        BSONObjIterator boi( keyBegin );
-//        int i;
-//        for( i = 0; i < keyBeginLen; ++i ) {
-//            log() << ", " << boi.next();
-//        }
-//        for( ;i < (int)keyEnd.size(); ++i ) {
-//            log() << ", " << *keyEnd[ i ];
-//        }
-//        log() << endl;
         bucket.btree()->advanceTo( indexDetails, bucket, keyOfs, keyBegin, keyBeginLen, keyEnd, _ordering, direction );
     }
     

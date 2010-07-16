@@ -32,8 +32,8 @@ namespace mongo {
     };
 
     struct FieldInterval {
-        FieldInterval(){}
-        FieldInterval( const BSONElement& e ){
+        FieldInterval() : _cachedEquality( -1 ) {}
+        FieldInterval( const BSONElement& e ) : _cachedEquality( -1 ) {
             _lower._bound = _upper._bound = e;
             _lower._inclusive = _upper._inclusive = true;
         }
@@ -43,7 +43,13 @@ namespace mongo {
             int cmp = _lower._bound.woCompare( _upper._bound, false );
             return ( cmp < 0 || ( cmp == 0 && _lower._inclusive && _upper._inclusive ) );
         }
-        bool equality() const { return _lower._inclusive && _upper._inclusive && _lower._bound.woCompare( _upper._bound, false ) == 0; }
+        bool equality() const {
+            if ( _cachedEquality == -1 ) {
+                _cachedEquality = ( _lower._inclusive && _upper._inclusive && _lower._bound.woCompare( _upper._bound, false ) == 0 );
+            }
+            return _cachedEquality;
+        }
+        mutable int _cachedEquality;
     };
 
     // range of a field's value that may be determined from query -- used to
@@ -346,7 +352,7 @@ namespace mongo {
         bool matches( const BSONObj &obj ) const;
         class Iterator {
         public:
-            Iterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), 0 ), _cmp( _v._ranges.size(), 0 ), _superlative( _v._ranges.size(), 0 ) {
+            Iterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), -1 ), _cmp( _v._ranges.size(), 0 ), _superlative( _v._ranges.size(), 0 ) {
                 static BSONObj minObj = minObject();
                 static BSONElement minElt = minObj.firstElement();
                 static BSONObj maxObj = maxObject();
@@ -394,6 +400,11 @@ namespace mongo {
                     _i[ j ] = 0;
                 }
             }
+            void setMinus( int i ) {
+                for( int j = i; j < (int)_i.size(); ++j ) {
+                    _i[ j ] = -1;
+                }
+            }
             bool ok() {
                 return _i[ 0 ] < (int)_v._ranges[ 0 ].intervals().size();
             }
@@ -422,6 +433,7 @@ namespace mongo {
             vector< const BSONElement* > _superlative;
         };
     private:
+        int matchingLowElement( const BSONElement &e, int i, bool direction ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
         vector< FieldRange > _ranges;
         BSONObj _keyPattern;
