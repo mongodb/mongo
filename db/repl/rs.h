@@ -237,6 +237,10 @@ namespace mongo {
         friend class Member;
         friend class Manager;
         friend class Consensus;
+
+    private:
+        /* pulling data from primary related - see rs_sync.cpp */
+        void syncDoInitialSync();
     };
 
     class ReplSet : public ReplSetImpl { 

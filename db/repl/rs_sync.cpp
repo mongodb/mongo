@@ -19,8 +19,18 @@
 #include "../../client/dbclient.h"
 #include "rs.h"
 
-namespace mongo { 
+namespace mongo {
 
-    using namespace bson;
+    void dropAllDatabasesExceptLocal();
+
+    void ReplSetImpl::syncDoInitialSync() { 
+        log() << "replSet syncDoInitialSync" << rsLog;
+        dropAllDatabasesExceptLocal();
+
+    }
+
+    void syncThread() { 
+        Client::initThread("rs_sync");
+    }
 
 }
