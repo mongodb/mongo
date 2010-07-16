@@ -45,12 +45,9 @@ namespace mongo {
 
     namespace dbgrid_cmds {
 
-        set<string> dbgridCommands;
-
         class GridAdminCmd : public Command {
         public:
             GridAdminCmd( const char * n ) : Command( n , false, tolowerString(n).c_str() ){
-                dbgridCommands.insert( n );
             }
             virtual bool slaveOk() const {
                 return true;
@@ -148,23 +145,6 @@ namespace mongo {
 
             time_t _started;
         } cmdServerStatus;
-
-        class ListGridCommands : public GridAdminCmd {
-        public:
-            ListGridCommands() : GridAdminCmd( "gridCommands" ){}
-            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-
-                BSONObjBuilder arr;
-                int num=0;
-                for ( set<string>::iterator i = dbgridCommands.begin(); i != dbgridCommands.end(); i++ ){
-                    string s = BSONObjBuilder::numStr( num++ );
-                    arr.append( s.c_str() , *i );
-                }
-
-                result.appendArray( "commands" , arr.done() );
-                return true;
-            }
-        } listGridCommands;
 
         class FsyncCommand : public GridAdminCmd {
         public:
