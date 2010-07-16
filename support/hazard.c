@@ -142,7 +142,7 @@ __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
  *	Verify that no hazard references are set.
  */
 void
-__wt_hazard_empty(WT_TOC *toc)
+__wt_hazard_empty(WT_TOC *toc, const char *name)
 {
 	ENV *env;
 	WT_PAGE **hp;
@@ -161,7 +161,7 @@ __wt_hazard_empty(WT_TOC *toc)
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
 		if (*hp != NULL) {
 			__wt_api_env_errx(env,
-			    "WT_TOC left library with a hazard reference set");
+			    "%s: returned with a hazard reference set", name);
 			*hp = NULL;
 			WT_MEMORY_FLUSH;
 		}

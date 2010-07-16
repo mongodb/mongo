@@ -264,7 +264,7 @@ static int __wt_api_db_bulk_load(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_BULK_LOAD);
 	ret = __wt_db_bulk_load(toc, flags, progress, cb);
-	WT_TRET(__wt_toc_api_clr(toc, 1));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 1));
 	return (ret);
 }
 
@@ -285,7 +285,7 @@ static int __wt_api_db_close(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_CLOSE);
 	ret = __wt_db_close(toc, flags);
-	WT_TRET(__wt_toc_api_clr(toc, 1));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 1));
 	return (ret);
 }
 
@@ -312,7 +312,7 @@ static int __wt_api_db_col_del(
 	WT_STAT_INCR(ienv->method_stats, DB_COL_DEL);
 	while ((ret = __wt_db_col_del(toc, recno)) == WT_RESTART)
 		;
-	WT_TRET(__wt_toc_api_clr(toc, 0));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
 }
 
@@ -339,7 +339,7 @@ static int __wt_api_db_col_get(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_COL_GET);
 	ret = __wt_db_col_get(toc, recno, data);
-	WT_TRET(__wt_toc_api_clr(toc, 0));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
 }
 
@@ -368,7 +368,7 @@ static int __wt_api_db_col_put(
 	WT_STAT_INCR(ienv->method_stats, DB_COL_PUT);
 	while ((ret = __wt_db_col_put(toc, recno, data)) == WT_RESTART)
 		;
-	WT_TRET(__wt_toc_api_clr(toc, 0));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
 }
 
@@ -421,7 +421,7 @@ static int __wt_api_db_dump(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_DUMP);
 	ret = __wt_db_dump(toc, stream, progress, flags);
-	WT_TRET(__wt_toc_api_clr(toc, 1));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 1));
 	return (ret);
 }
 
@@ -574,7 +574,7 @@ static int __wt_api_db_open(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_OPEN);
 	ret = __wt_db_open(toc, name, mode, flags);
-	WT_TRET(__wt_toc_api_clr(toc, 1));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 1));
 	return (ret);
 }
 
@@ -601,7 +601,7 @@ static int __wt_api_db_row_del(
 	WT_STAT_INCR(ienv->method_stats, DB_ROW_DEL);
 	while ((ret = __wt_db_row_del(toc, key)) == WT_RESTART)
 		;
-	WT_TRET(__wt_toc_api_clr(toc, 0));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
 }
 
@@ -628,7 +628,7 @@ static int __wt_api_db_row_get(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_ROW_GET);
 	ret = __wt_db_row_get(toc, key, data);
-	WT_TRET(__wt_toc_api_clr(toc, 0));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
 }
 
@@ -657,7 +657,7 @@ static int __wt_api_db_row_put(
 	WT_STAT_INCR(ienv->method_stats, DB_ROW_PUT);
 	while ((ret = __wt_db_row_put(toc, key, data)) == WT_RESTART)
 		;
-	WT_TRET(__wt_toc_api_clr(toc, 0));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
 }
 
@@ -698,7 +698,7 @@ static int __wt_api_db_stat_print(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_STAT_PRINT);
 	ret = __wt_db_stat_print(toc, stream);
-	WT_TRET(__wt_toc_api_clr(toc, 1));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 1));
 	return (ret);
 }
 
@@ -722,7 +722,7 @@ static int __wt_api_db_sync(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_SYNC);
 	ret = __wt_db_sync(toc, progress, flags);
-	WT_TRET(__wt_toc_api_clr(toc, 1));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 1));
 	return (ret);
 }
 
@@ -745,7 +745,7 @@ static int __wt_api_db_verify(
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_VERIFY);
 	ret = __wt_db_verify(toc, progress);
-	WT_TRET(__wt_toc_api_clr(toc, 1));
+	WT_TRET(__wt_toc_api_clr(toc, method_name, 1));
 	return (ret);
 }
 
