@@ -76,6 +76,7 @@ namespace mongo {
             }
             result.append("set", theReplSet->name());
             result.append("state", theReplSet->state());
+            result.append("hbmsg", theReplSet->hbmsg());
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             int v = theReplSet->config().version;
             result.append("v", v);
@@ -130,7 +131,7 @@ namespace mongo {
                         mem.upSince = mem.lastHeartbeat;
                     }
                     mem.health = 1.0;
-                    mem.lastHeartbeatMsg = "";
+                    mem.lastHeartbeatMsg = info["hbmsg"].String();
                     if( info.hasElement("opTime") )
                         mem.opTime = info["opTime"].Date();
 

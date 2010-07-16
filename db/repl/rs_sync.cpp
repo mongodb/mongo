@@ -25,8 +25,9 @@ namespace mongo {
 
     void ReplSetImpl::syncDoInitialSync() { 
         log() << "replSet syncDoInitialSync" << rsLog;
+        sethbmsg("initial sync drop all databases");
         dropAllDatabasesExceptLocal();
-
+        sethbmsg("initial sync - not yet implemented");
     }
 
     void syncThread() { 

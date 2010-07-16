@@ -151,6 +151,8 @@ namespace mongo {
         _self(0), 
         mgr( new Manager(this) )
     {
+        memset(_hbmsg, 0, sizeof(_hbmsg));
+        *_hbmsg = '.'; // temp...just to see
         h = 0;
         _myState = STARTUP;
         _currentPrimary = 0;
@@ -355,6 +357,7 @@ namespace mongo {
     { 
         //lock l(this);
         _myState = FATAL; 
+        sethbmsg("fatal error");
         log() << "replSet error fatal error, stopping replication" << rsLog; 
     }
 
