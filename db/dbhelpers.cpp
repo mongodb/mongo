@@ -259,7 +259,7 @@ namespace mongo {
         
         IndexDetails& i = nsd->idx( ii );
 
-        shared_ptr<Cursor> c( new BtreeCursor( nsd , ii , i , minClean , maxClean , true, 1 ) );
+        shared_ptr<Cursor> c( new BtreeCursor( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
         auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
         cc->setDoingDeletes( true );
         
