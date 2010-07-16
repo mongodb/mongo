@@ -241,7 +241,7 @@ namespace mongo {
         return me.obj();
     }
     
-    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield ){
+    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive ){
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
         BSONObj maxClean = toKeyFormat( max , keyb );
@@ -259,7 +259,7 @@ namespace mongo {
         
         IndexDetails& i = nsd->idx( ii );
 
-        shared_ptr<Cursor> c( new BtreeCursor( nsd , ii , i , minClean , maxClean , false, 1 ) );
+        shared_ptr<Cursor> c( new BtreeCursor( nsd , ii , i , minClean , maxClean , true, 1 ) );
         auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
         cc->setDoingDeletes( true );
         
