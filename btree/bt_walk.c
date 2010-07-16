@@ -19,9 +19,9 @@ __wt_bt_tree_walk(WT_TOC *toc, u_int32_t addr,
     u_int32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
 {
 	DB *db;
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	WT_PAGE *page;
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 	u_int32_t i;
 	int ret;
 

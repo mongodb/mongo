@@ -1128,7 +1128,7 @@ static int
 __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
 {
 	ENV *env;
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	u_int32_t allocated;
 
 	env = toc->env;
@@ -1142,9 +1142,9 @@ __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
 	 * new boundary.
 	 */
 	if (page->indx_count % 100 == 0) {
-		allocated = page->indx_count * sizeof(WT_COL_INDX);
+		allocated = page->indx_count * sizeof(WT_COL);
 		WT_RET(__wt_realloc(env, &allocated,
-		    (page->indx_count + 100) * sizeof(WT_COL_INDX),
+		    (page->indx_count + 100) * sizeof(WT_COL),
 		    &page->u.c_indx));
 	}
 
@@ -1170,7 +1170,7 @@ __wt_bt_promote_row_indx(
 	DB *db;
 	ENV *env;
 	IDB *idb;
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 	u_int32_t allocated;
 
 	env = toc->env;
@@ -1186,9 +1186,9 @@ __wt_bt_promote_row_indx(
 	 * new boundary.
 	 */
 	if (page->indx_count % 100 == 0) {
-		allocated = page->indx_count * sizeof(WT_ROW_INDX);
+		allocated = page->indx_count * sizeof(WT_ROW);
 		WT_RET(__wt_realloc(env, &allocated,
-		    (page->indx_count + 100) * sizeof(WT_ROW_INDX),
+		    (page->indx_count + 100) * sizeof(WT_ROW),
 		    &page->u.r_indx));
 	}
 
@@ -1229,7 +1229,7 @@ __wt_bt_promote_row_indx(
 static void
 __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
 {
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 
 	/*
 	 * Because of the bulk load pattern, we're always adding records to
@@ -1246,7 +1246,7 @@ __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
 static void
 __wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t incr)
 {
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 
 	/*
 	 * Because of the bulk load pattern, we're always adding records to

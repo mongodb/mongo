@@ -20,14 +20,14 @@ __wt_bt_build_verify(void)
 		u_int s, c, align;
 		char *name;
 	} list[] = {
-		{ sizeof(WT_COL_INDX), WT_COL_INDX_SIZE, 0, "WT_COL_INDX" },
+		{ sizeof(WT_COL), WT_COL_SIZE, 0, "WT_COL" },
 		{ sizeof(WT_ITEM), WT_ITEM_SIZE, 0, "WT_ITEM" },
 		{ sizeof(WT_OFF), WT_OFF_SIZE, sizeof(u_int32_t), "WT_OFF" },
 		{ sizeof(WT_OVFL), WT_OVFL_SIZE, sizeof(u_int32_t), "WT_OVFL" },
 		{ sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE, 0, "WT_PAGE_DESC" },
 		{ sizeof(WT_PAGE_HDR),
 		    WT_PAGE_HDR_SIZE, sizeof(u_int32_t), "WT_PAGE_HDR" },
-		{ sizeof(WT_ROW_INDX), WT_ROW_INDX_SIZE, 0, "WT_ROW_INDX" }
+		{ sizeof(WT_ROW), WT_ROW_SIZE, 0, "WT_ROW" }
 	}, *lp;
 
 	/*

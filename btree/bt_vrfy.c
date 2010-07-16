@@ -27,14 +27,14 @@ typedef struct {
 
 static int __wt_bt_verify_addfrag(DB *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_checkfrag(DB *, WT_VSTUFF *);
-static int __wt_bt_verify_cmp(WT_TOC *, WT_ROW_INDX *, WT_PAGE *, int);
+static int __wt_bt_verify_cmp(WT_TOC *, WT_ROW *, WT_PAGE *, int);
 static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, WT_VSTUFF *);
 static int __wt_bt_verify_page_col_fix(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_col_int(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_desc(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_tree(
-		WT_TOC *, WT_ROW_INDX *, u_int32_t, WT_OFF *, WT_VSTUFF *);
+		WT_TOC *, WT_ROW *, u_int32_t, WT_OFF *, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -161,13 +161,13 @@ err:	if (page != NULL)
  */
 static int
 __wt_bt_verify_tree(WT_TOC *toc,
-    WT_ROW_INDX *parent_rip, u_int32_t level, WT_OFF *off, WT_VSTUFF *vs)
+    WT_ROW *parent_rip, u_int32_t level, WT_OFF *off, WT_VSTUFF *vs)
 {
 	DB *db;
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 	int ret;
 
 	db = toc->db;
@@ -298,11 +298,11 @@ err:		if (vs->leaf != NULL)
  */
 static int
 __wt_bt_verify_cmp(
-    WT_TOC *toc, WT_ROW_INDX *parent_rip, WT_PAGE *child, int first_entry)
+    WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 {
 	DB *db;
 	DBT *cd_ref, *pd_ref;
-	WT_ROW_INDX *child_rip;
+	WT_ROW *child_rip;
 	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
