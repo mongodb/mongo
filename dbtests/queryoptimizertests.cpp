@@ -703,7 +703,7 @@ namespace QueryOptimizerTests {
                 FieldRangeSet frs1( "", fromjson( "{b:{$in:[5,6]},c:7,d:{$in:[8,9]}}" ) );
                 FieldRangeSet frs2( "", fromjson( "{a:1,b:5,c:{$in:[7,8]},d:{$in:[8,9]},e:10}" ) );
                 frs1 &= frs2;
-                ASSERT_EQUALS( fromjson( "{a:1,b:5,c:7,d:{$in:[8,9]},e:10}" ), frs1.simplifiedQuery( BSONObj(), true ) );
+                ASSERT_EQUALS( fromjson( "{a:1,b:5,c:7,d:{$gte:8,$lte:9},e:10}" ), frs1.simplifiedQuery( BSONObj() ) );
             }
         };
         

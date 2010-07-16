@@ -93,9 +93,6 @@ namespace mongo {
                 i->_upper._inclusive = false;
             }
         }
-        // reconstructs $in, regex, inequality matches
-        // this is a hack - we should submit FieldRange directly to a Matcher instead
-        BSONObj simplifiedComplex() const;
         // constructs a range which is the reverse of the current one
         // note - the resulting intervals may not be strictValid()
         void reverse( FieldRange &ret ) const {
@@ -221,7 +218,7 @@ namespace mongo {
         }
         const char *ns() const { return _ns; }
         // if fields is specified, order fields of returned object to match those of 'fields'
-        BSONObj simplifiedQuery( const BSONObj &fields = BSONObj(), bool expandIn = false ) const;
+        BSONObj simplifiedQuery( const BSONObj &fields = BSONObj() ) const;
         bool matchPossible() const {
             for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i )
                 if ( i->second.empty() )
@@ -333,6 +330,7 @@ namespace mongo {
             }
             return b.obj();            
         }
+        bool matches( const BSONObj &obj ) const;
         class Iterator {
         public:
             Iterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), 0 ), _cmp( _v._ranges.size(), 0 ), _superlative( _v._ranges.size(), 0 ) {
@@ -411,6 +409,7 @@ namespace mongo {
             vector< const BSONElement* > _superlative;
         };
     private:
+        bool matchesElement( const BSONElement &e, int i, bool direction ) const;
         vector< FieldRange > _ranges;
         BSONObj _keyPattern;
         int _direction;

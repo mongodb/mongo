@@ -799,6 +799,13 @@ namespace mongo {
                 }
             }            
         }
+        
+        for( vector< shared_ptr< FieldRangeVector > >::const_iterator i = _orConstraints.begin();
+            i != _orConstraints.end(); ++i ) {
+            if ( (*i)->matches( jsobj ) ) {
+                return false;
+            }
+        }
                 
         if ( where ) {
             if ( where->func == 0 ) {
@@ -847,6 +854,9 @@ namespace mongo {
             return false;
         }
         if ( _orMatchers.size() != other._orMatchers.size() ) {
+            return false;
+        }
+        if ( _orConstraints.size() != other._orConstraints.size() ) {
             return false;
         }
         {

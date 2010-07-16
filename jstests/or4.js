@@ -81,6 +81,8 @@ t.remove( {} );
 t.save( {a:[1,2]} );
 assert.eq.automsg( "1", "t.find( {$or:[{a:1},{a:2}]} ).toArray().length" );
 assert.eq.automsg( "1", "t.count( {$or:[{a:1},{a:2}]} )" );
+assert.eq.automsg( "1", "t.find( {$or:[{a:2},{a:1}]} ).toArray().length" );
+assert.eq.automsg( "1", "t.count( {$or:[{a:2},{a:1}]} )" );
 
 t.remove();
 

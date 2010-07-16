@@ -58,11 +58,10 @@ namespace mongo {
         const char *ns() const { return fbs_.ns(); }
         NamespaceDetails *nsd() const { return d; }
         BSONObj originalQuery() const { return _originalQuery; }
-        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj(), bool expandIn = false ) const { return fbs_.simplifiedQuery( fields, expandIn ); }
+        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return fbs_.simplifiedQuery( fields ); }
         const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
-        // just here for testing
-        const FieldRangeVector *frv() const { return _frv.get(); }
+        shared_ptr< FieldRangeVector > frv() const { return _frv; }
     private:
         NamespaceDetails *d;
         int idxNo;
@@ -89,12 +88,12 @@ namespace mongo {
     // each clone its own query plan.
     class QueryOp {
     public:
-        QueryOp() : _complete(), _stopRequested(), _qp(), _error(), _haveOrConstraint() {}
+        QueryOp() : _complete(), _stopRequested(), _qp(), _error() {}
 
         // Used when handing off from one QueryOp type to another
         QueryOp( const QueryOp &other ) :
         _complete(), _stopRequested(), _qp(), _error(), _matcher( other._matcher ),
-        _haveOrConstraint( other._haveOrConstraint ), _orConstraint( other._orConstraint ) {}
+        _orConstraint( other._orConstraint ) {}
         
         virtual ~QueryOp() {}
         
@@ -121,9 +120,9 @@ namespace mongo {
                     should only be called after the query op has completed executing.
         */
         QueryOp *createChild() {
-            if( _haveOrConstraint ) {
+            if( _orConstraint.get() ) {
                 _matcher->addOrConstraint( _orConstraint );
-                _haveOrConstraint = false;
+                _orConstraint.reset();
             }
             QueryOp *ret = _createChild();
             ret->_oldMatcher = _matcher;
@@ -143,8 +142,7 @@ namespace mongo {
         shared_ptr< CoveredIndexMatcher > matcher() const { return _matcher; }
     protected:
         void setComplete() {
-            _haveOrConstraint = true;
-            _orConstraint = qp().simplifiedQuery( qp().indexKey(), true );
+            _orConstraint = qp().frv();
             _complete = true;
         }
         void setStop() { setComplete(); _stopRequested = true; }
@@ -163,8 +161,7 @@ namespace mongo {
         bool _error;
         shared_ptr< CoveredIndexMatcher > _matcher;
         shared_ptr< CoveredIndexMatcher > _oldMatcher;
-        bool _haveOrConstraint;
-        BSONObj _orConstraint;
+        shared_ptr< FieldRangeVector > _orConstraint;
     };
     
     // Set of candidate query plans for a particular query.  Used for running

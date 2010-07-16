@@ -28,6 +28,7 @@ namespace mongo {
     class Cursor;
     class CoveredIndexMatcher;
     class Matcher;
+    class FieldRangeVector;
 
     class RegexMatcher {
     public:
@@ -153,8 +154,8 @@ namespace mongo {
             return jsobj.toString();
         }
 
-        void addOrConstraint( const BSONObj &o ) {
-            _norMatchers.push_back( shared_ptr< Matcher >( new Matcher( o ) ) );
+        void addOrConstraint( const shared_ptr< FieldRangeVector > &frv ) {
+            _orConstraints.push_back( frv );
         }
         
         bool sameCriteriaCount( const Matcher &other ) const;
@@ -202,6 +203,7 @@ namespace mongo {
         vector< shared_ptr< BSONObjBuilder > > _builders;
         list< shared_ptr< Matcher > > _orMatchers;
         list< shared_ptr< Matcher > > _norMatchers;
+        vector< shared_ptr< FieldRangeVector > > _orConstraints;
 
         friend class CoveredIndexMatcher;
     };
@@ -218,8 +220,8 @@ namespace mongo {
         Matcher& docMatcher() { return *_docMatcher; }
 
         // once this is called, shouldn't use this matcher for matching any more
-        void addOrConstraint( const BSONObj &o ) {
-            _docMatcher->addOrConstraint( o );
+        void addOrConstraint( const shared_ptr< FieldRangeVector > &frv ) {
+            _docMatcher->addOrConstraint( frv );
         }
         
         CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {

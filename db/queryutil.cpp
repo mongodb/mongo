@@ -24,6 +24,8 @@
 #include "../util/unittest.h"
 
 namespace mongo {
+    extern BSONObj staticNull;
+    
     /** returns a string that when used as a matcher, would match a super set of regex()
         returns "" for complex regular expressions
         used to optimize queries in some simple regex cases that start with '^'
@@ -494,60 +496,7 @@ namespace mongo {
         _objData.push_back( o );
         return o;
     }
-    
-    BSONObj FieldRange::simplifiedComplex() const {
-        BSONObjBuilder bb;
-        BSONArrayBuilder a;
-        set< string > regexLow;
-        set< string > regexHigh;
-        for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
-            // this recovers exact $in fields and regexes - should be everything for equality
-            if ( i->equality() ) {
-                a << i->_upper._bound;
-                // right now btree cursor doesn't do exclusive bounds so we need to match end of the regex range
-                if ( i->_upper._bound.type() == RegEx ) {
-                    string r = simpleRegex( i->_upper._bound );
-                    if ( !r.empty() ) {
-                        regexLow.insert( r );
-                        string re = simpleRegexEnd( r );
-                        regexHigh.insert( re );
-                        a << re;
-                    }
-                }
-            }
-        }
-        BSONArray in = a.arr();
-        if ( !in.isEmpty() ) {
-            bb << "$in" << in;
-        }
-        BSONObj low;
-        BSONObj high;
-        // should only be one non regex ineq range
-        for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
-            if ( !i->equality() ) {
-                if ( !i->_lower._inclusive || i->_lower._bound.type() != String || !regexLow.count( i->_lower._bound.valuestr() ) ) {
-                    BSONObjBuilder b;
-                    // in btree impl lower bound always inclusive
-                    b.appendAs( i->_lower._bound, "$gte" );
-                    low = b.obj();
-                }
-                if ( i->_upper._inclusive || i->_upper._bound.type() != String || !regexHigh.count( i->_upper._bound.valuestr() ) ) {
-                    BSONObjBuilder b;
-                    // in btree impl upper bound always
-                    b.appendAs( i->_upper._bound, "$lte" );
-                    high = b.obj();
-                }
-            }
-        }
-        if ( !low.isEmpty() ) {
-            bb.appendElements( low );
-        }
-        if ( !high.isEmpty() ) {
-            bb.appendElements( high );
-        }
-        return bb.obj();        
-    }
-    
+        
     string FieldRangeSet::getSpecial() const {
         string s = "";
         for ( map<string,FieldRange>::iterator i=_ranges.begin(); i!=_ranges.end(); i++ ){
@@ -688,7 +637,7 @@ namespace mongo {
         return *trivialRange_;
     }
     
-    BSONObj FieldRangeSet::simplifiedQuery( const BSONObj &_fields, bool expandIn ) const {
+    BSONObj FieldRangeSet::simplifiedQuery( const BSONObj &_fields ) const {
         BSONObj fields = _fields;
         if ( fields.isEmpty() ) {
             BSONObjBuilder b;
@@ -708,16 +657,12 @@ namespace mongo {
                 b.appendAs( range.min(), name );
             else if ( range.nontrivial() ) {
                 BSONObj o;
-                if ( expandIn ) {
-                    o = range.simplifiedComplex();
-                } else {
-                    BSONObjBuilder c;
-                    if ( range.min().type() != MinKey )
-                        c.appendAs( range.min(), range.minInclusive() ? "$gte" : "$gt" );
-                    if ( range.max().type() != MaxKey )
-                        c.appendAs( range.max(), range.maxInclusive() ? "$lte" : "$lt" );
-                    o = c.obj();
-                }
+                BSONObjBuilder c;
+                if ( range.min().type() != MinKey )
+                    c.appendAs( range.min(), range.minInclusive() ? "$gte" : "$gt" );
+                if ( range.max().type() != MaxKey )
+                    c.appendAs( range.max(), range.maxInclusive() ? "$lte" : "$lt" );
+                o = c.obj();
                 b.append( name, o );
             }
         }
@@ -984,6 +929,65 @@ namespace mongo {
                 b.appendArray(e.fieldName(), subb.obj());
             }
         }
+    }
+    
+    bool FieldRangeVector::matchesElement( const BSONElement &e, int i, bool forward ) const {
+        int l = -1;
+        int h = _ranges[ i ].intervals().size() * 2;
+        while( l + 1 < h ) {
+            int m = ( l + h ) / 2;
+            BSONElement toCmp;
+            if ( m % 2 == 0 ) {
+                toCmp = _ranges[ i ].intervals()[ m / 2 ]._lower._bound;
+            } else {
+                toCmp = _ranges[ i ].intervals()[ m / 2 ]._upper._bound;
+            }
+            int cmp = toCmp.woCompare( e, false );
+            if ( !forward ) {
+                cmp = -cmp;
+            }
+            if ( cmp < 0 ) {
+                l = m;
+            } else if ( cmp > 0 ) {
+                h = m;
+            } else {
+                return true;
+            }
+        }
+        assert( l + 1 == h );
+        return ( l % 2 == 0 ); // if we're inside an interval
+    }
+    
+    bool FieldRangeVector::matches( const BSONObj &obj ) const {
+        BSONObjIterator k( _keyPattern );
+        for( int i = 0; i < (int)_ranges.size(); ++i ) {
+            if ( _ranges[ i ].empty() ) {
+                return false;
+            }
+            BSONElement kk = k.next();
+            int number = (int) kk.number();
+            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0 );
+            BSONElement e = obj.getField( kk.fieldName() );
+            if ( e.eoo() ) {
+                e = staticNull.firstElement();
+            }
+            if ( e.type() == Array ) {
+                BSONObjIterator j( e.embeddedObject() );
+                bool match = false;
+                while( j.more() ) {
+                    if ( matchesElement( j.next(), i, forward ) ) {
+                        match = true;
+                        break;
+                    }
+                }
+                if ( !match ) {
+                    return false;
+                }
+            } else if ( !matchesElement( e, i, forward ) ) {
+                return false;
+            }
+        }
+        return true;
     }
     
     int FieldRangeVector::Iterator::advance( const BSONObj &curr ) {
