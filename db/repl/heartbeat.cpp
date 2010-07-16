@@ -113,6 +113,11 @@ namespace mongo {
         void doWork() { 
             cout << "TEMP healthpool dowork " << endl;
 
+            if ( !theReplSet ) {
+                log() << "theReplSet not initialized yet, skipping health poll this round" << endl;
+                return;
+            }
+
             HeartbeatInfo mem = m;
             HeartbeatInfo old = mem;
             try { 
