@@ -87,10 +87,6 @@ __wt_wt_toc_close(WT_TOC *toc)
 	if (toc->flist != NULL)
 		WT_TRET(__wt_flist_sched(toc));
 
-	if (toc->repl_spare != NULL)
-		__wt_free(env,
-		    toc->repl_spare, (WT_REPL_CHUNK + 1) * sizeof(WT_SDBT));
-
 	/* Unlock and destroy the thread's mutex. */
 	if (toc->mtx != NULL) {
 		__wt_unlock(env, toc->mtx);
@@ -148,13 +144,13 @@ __wt_toc_api_set(ENV *env, const char *name, DB *db, WT_TOC **tocp)
  *	Clear the WT_TOC, freeing it if it was allocated by the library.
  */
 int
-__wt_toc_api_clr(WT_TOC *toc, int islocal)
+__wt_toc_api_clr(WT_TOC *toc, const char *name, int islocal)
 {
 	/*
 	 * The WT_TOC should hold no more hazard references; this is a
 	 * diagnostic check, but it's cheap so we do it all the time.
 	 */
-	__wt_hazard_empty(toc);
+	__wt_hazard_empty(toc, name);
 
 	if (islocal)
 		return (toc->close(toc, 0));
