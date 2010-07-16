@@ -215,25 +215,26 @@ namespace mongo {
                     errmsg = "you have to specify where you want to move it";
                     return false;
                 }
+                Shard s = Shard::make( to );
 
-                if ( config->getPrimary() == to ){
+                if ( config->getPrimary() == s.getConnString() ){
                     errmsg = "thats already the primary";
                     return false;
                 }
 
-                if ( ! grid.knowAboutShard( to ) ){
+                if ( ! grid.knowAboutShard( s.getConnString() ) ){
                     errmsg = "that server isn't known to me";
                     return false;
                 }
 
                 ScopedDbConnection conn( configServer.getPrimary() );
 
-                log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString() << " to: " << to << endl;
+                log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString() 
+                      << " to: " << s.toString() << endl;
 
                 // TODO LOCKING: this is not safe with multiple mongos
 
-
-                ScopedDbConnection toconn( to );
+                ScopedDbConnection toconn( s.getConnString() );
 
                 // TODO AARON - we need a clone command which replays operations from clone start to now
                 //              using a seperate smaller oplog
@@ -249,7 +250,7 @@ namespace mongo {
 
                 ScopedDbConnection fromconn( config->getPrimary() );
 
-                config->setPrimary( to );
+                config->setPrimary( s.getConnString() );
                 config->save( true );
 
                 log() << "movePrimary:  dropping " << dbname << " from old" << endl;
@@ -257,7 +258,7 @@ namespace mongo {
                 fromconn->dropDatabase( dbname.c_str() );
                 fromconn.done();
 
-                result << "primary" << to;
+                result << "primary " << s.toString();
 
                 conn.done();
                 return true;
