@@ -10,16 +10,17 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_bt_debug_col_fix_indx(WT_TOC *, WT_COL_INDX *, FILE *);
-static int  __wt_bt_debug_col_var_indx(WT_TOC *, WT_COL_INDX *, FILE *);
+static void __wt_bt_debug_col_fix_indx(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
+static int  __wt_bt_debug_col_var_indx(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
+static void __wt_bt_debug_expcol(WT_COL_EXPAND *, FILE *);
 static int  __wt_bt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_int(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *);
-static void __wt_bt_debug_repl(WT_SDBT *, FILE *);
-static int  __wt_bt_debug_row_indx(WT_TOC *, WT_ROW_INDX *, FILE *);
+static void __wt_bt_debug_repl(WT_REPL *, FILE *);
+static int  __wt_bt_debug_row_indx(WT_TOC *, WT_PAGE *, WT_ROW *, FILE *);
 static int  __wt_bt_debug_set_fp(const char *, FILE **, int *);
 
 static int
@@ -201,8 +202,8 @@ int
 __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	DB *db;
-	WT_COL_INDX *cip;
-	WT_ROW_INDX *rip;
+	WT_COL *cip;
+	WT_ROW *rip;
 	u_int32_t i;
 	int do_close;
 
@@ -220,16 +221,16 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_INDX_FOREACH(page, rip, i)
-			WT_RET(__wt_bt_debug_row_indx(toc, rip, fp));
+			WT_RET(__wt_bt_debug_row_indx(toc, page, rip, fp));
 		break;
 	case WT_PAGE_COL_FIX:
 		WT_INDX_FOREACH(page, cip, i)
-			__wt_bt_debug_col_fix_indx(toc, cip, fp);
+			__wt_bt_debug_col_fix_indx(toc, page, cip, fp);
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
 		WT_INDX_FOREACH(page, cip, i)
-			WT_RET(__wt_bt_debug_col_var_indx(toc, cip, fp));
+			WT_RET(__wt_bt_debug_col_var_indx(toc, page, cip, fp));
 		break;
 	case WT_PAGE_OVFL:
 		break;
@@ -246,33 +247,38 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 
 /*
  * __wt_bt_debug_col_var_indx --
- *	Dump a single WT_COL_INDX structure for a WT_PAGE_COL_{INT,VAR} page.
+ *	Dump a WT_COL structure (including any modifications/deletions) for a
+ *	WT_PAGE_COL_{INT,VAR} page.
  */
 static int
-__wt_bt_debug_col_var_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
+__wt_bt_debug_col_var_indx(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
 {
+	WT_REPL *repl;
+
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	if (cip->repl != NULL)
-		__wt_bt_debug_repl(cip->repl, fp);
-	else {
-		fprintf(fp, "\tdata {");
-		WT_RET(__wt_bt_debug_item_data(toc, cip->data, fp));
-		fprintf(fp, "}\n");
-	}
+	fprintf(fp, "\tdata {");
+	WT_RET(__wt_bt_debug_item_data(toc, cip->data, fp));
+	fprintf(fp, "}\n");
+
+	if ((repl = WT_COL_REPL(page, cip)) != NULL)
+		__wt_bt_debug_repl(repl, fp);
 	return (0);
 }
 
 /*
  * __wt_bt_debug_col_fix_indx --
- *	Dump a single WT_COL_INDX structure for a WT_PAGE_COL_FIX page.
+ *	Dump a WT_COL structure (including any modifications/deletions) for a
+ *	WT_PAGE_COL_FIX page.
  */
 static void
-__wt_bt_debug_col_fix_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
+__wt_bt_debug_col_fix_indx(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
 {
 	DB *db;
 	IDB *idb;
+	WT_COL_EXPAND *exp;
+	WT_REPL *repl;
 
 	db = toc->db;
 	idb = db->idb;
@@ -280,27 +286,33 @@ __wt_bt_debug_col_fix_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	if (cip->repl != NULL)
-		__wt_bt_debug_repl(cip->repl, fp);
-	else if (F_ISSET(idb, WT_REPEAT_COMP)) {
+	if (F_ISSET(idb, WT_REPEAT_COMP)) {
 		fprintf(fp,
 		    "\trepeat %lu {", (u_long)WT_FIX_REPEAT_COUNT(cip->data));
 		__wt_bt_print(WT_FIX_REPEAT_DATA(cip->data), db->fixed_len, fp);
 		fprintf(fp, "}\n");
+
+		if ((exp = WT_COL_EXPCOL(page, cip)) != NULL)
+			__wt_bt_debug_expcol(exp, fp);
 	} else {
 		fprintf(fp, "\tdata {");
 		__wt_bt_print(cip->data, db->fixed_len, fp);
 		fprintf(fp, "}\n");
+
+		if ((repl = WT_COL_REPL(page, cip)) != NULL)
+			__wt_bt_debug_repl(repl, fp);
 	}
 }
 
 /*
  * __wt_bt_debug_row_indx --
- *	Dump a single WT_ROW_INDX structure.
+ *	Dump a single WT_ROW structure.
  */
 static int
-__wt_bt_debug_row_indx(WT_TOC *toc, WT_ROW_INDX *rip, FILE *fp)
+__wt_bt_debug_row_indx(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, FILE *fp)
 {
+	WT_REPL *repl;
+
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
@@ -308,13 +320,14 @@ __wt_bt_debug_row_indx(WT_TOC *toc, WT_ROW_INDX *rip, FILE *fp)
 		fprintf(fp, "\tkey {requires processing}\n");
 	else
 		__wt_bt_debug_dbt("\tkey", rip, fp);
-	if (rip->repl != NULL)
-		__wt_bt_debug_repl(rip->repl, fp);
-	else {
-		fprintf(fp, "\tdata {");
-		WT_RET(__wt_bt_debug_item_data(toc, rip->data, fp));
-		fprintf(fp, "}\n");
-	}
+
+	fprintf(fp, "\tdata {");
+	WT_RET(__wt_bt_debug_item_data(toc, rip->data, fp));
+	fprintf(fp, "}\n");
+
+	if ((repl = WT_ROW_REPL(page, rip)) != NULL)
+		__wt_bt_debug_repl(repl, fp);
+
 	return (0);
 }
 
@@ -323,28 +336,36 @@ __wt_bt_debug_row_indx(WT_TOC *toc, WT_ROW_INDX *rip, FILE *fp)
  *	Dump a replacement array.
  */
 static void
-__wt_bt_debug_repl(WT_SDBT *repl, FILE *fp)
+__wt_bt_debug_repl(WT_REPL *repl, FILE *fp)
 {
-	u_int i;
+	if (fp == NULL)				/* Default to stderr */
+		fp = stderr;
+
+	for (; repl != NULL; repl = repl->next)
+		if (WT_REPL_DELETED_ISSET(repl->data))
+			fprintf(fp, "\trepl: {deleted}\n");
+		else
+			__wt_bt_debug_dbt("\trepl", repl, fp);
+}
+
+/*
+ * __wt_bt_debug_expcol --
+ *	Dump a column store expansion array.
+ */
+static void
+__wt_bt_debug_expcol(WT_COL_EXPAND *exp, FILE *fp)
+{
+	WT_REPL *repl;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	while (repl != NULL) {
-		for (i = 0; i < WT_REPL_CHUNK; ++i, ++repl) {
-			if (repl->data == NULL)
-				continue;
-			if (WT_SDBT_DELETED_ISSET(repl->data)) {
-				fprintf(fp, "\trepl: {deleted}\n");
-				continue;
-			}
-			__wt_bt_debug_dbt("\trepl", repl, fp);
-		}
-		/*
-		 * The last slot in the array is fake -- if it's non-NULL,
-		 * it points to a previous array which we also walk.
-		 */
-		repl = repl->data == NULL ? NULL : (WT_SDBT *)repl->data;
+	for (; exp != NULL; exp = exp->next) {
+		repl = exp->repl;
+		if (WT_REPL_DELETED_ISSET(repl->data))
+			fprintf(fp, "\texp: {deleted}\n");
+		else
+			__wt_bt_debug_dbt("\texp", repl, fp);
 	}
 }
 
@@ -388,9 +409,11 @@ __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
 	case WT_ITEM_DATA:
-	case WT_ITEM_DEL:
 	case WT_ITEM_DUP:
 		break;
+	case WT_ITEM_DEL:
+		fprintf(fp, "\n");
+		return (0);
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
@@ -509,7 +532,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_DEL:
 		hp = NULL;
 		p = (u_int8_t *)"deleted";
-		size = sizeof("deleted" - 1);
+		size = 7;
 		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
