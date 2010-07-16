@@ -188,6 +188,18 @@ namespace mongo {
         dist_lock_try dlk( &lockSetup , string("split-") + toString() );
         uassert( 10166 , "locking namespace failed" , dlk.got() );
         
+        {
+            ShardChunkVersion onServer = getVersionOnConfigServer();
+            ShardChunkVersion mine = _lastmod;
+            if ( onServer > mine ){
+                stringstream ss;
+                ss << "mulitSplit failing because config not up to date" 
+                   << " onServer: " << onServer.toString()
+                   << " mine: " << mine.toString();
+                uasserted( 13387 , ss.str() );
+            }
+        }
+
         BSONObjBuilder detail;
         appendShortVersion( "before" , detail );
         log(1) << "before split on " << m.size() << " points " << toString() << endl;
@@ -298,6 +310,16 @@ namespace mongo {
     }
     
     bool Chunk::splitIfShould( long dataWritten ){
+        try {
+            return _splitIfShould( dataWritten );
+        }
+        catch ( std::exception& e ){
+            log( LL_ERROR ) << "splitIfShould failed: " << e.what() << endl;
+            return false;
+        }
+    }
+
+    bool Chunk::_splitIfShould( long dataWritten ){
         _dataWritten += dataWritten;
         
         int myMax = MaxChunkSize;
@@ -348,11 +370,11 @@ namespace mongo {
             toMove = shared_from_this();
         }
         else {
-            log(1) << "don't know how to decide if i should move inner shard" << endl;
+            // moving middle shards is handled by balancer
+            return false;
         }
 
-        if ( ! toMove )
-            return false;
+        assert( toMove );
         
         Shard newLocation = Shard::pick();
         if ( getShard() == newLocation ){
@@ -434,7 +456,7 @@ namespace mongo {
         to << "shard" << _shard.getName();
     }
 
-    string Chunk::genID( const string& ns , const BSONObj& o ){
+    string Chunk::genID( const string& ns , const BSONObj& o ) {
         StringBuilder buf( ns.size() + o.objsize() + 16 );
         buf << ns << "-";
 
@@ -474,11 +496,18 @@ namespace mongo {
         uassert( 10173 ,  "Chunk needs a max" , ! _max.isEmpty() );
     }
 
-    string Chunk::modelServer() {
+    string Chunk::modelServer() const {
         // TODO: this could move around?
         return configServer.modelServer();
     }
     
+    ShardChunkVersion Chunk::getVersionOnConfigServer() const {
+        ScopedDbConnection conn( modelServer() );
+        BSONObj o = conn->findOne( ShardNS::chunk , BSON( "_id" << genID() ) );
+        conn.done();
+        return o["lastmod"];
+    }
+
     void Chunk::_markModified(){
         _modified = true;
     }
@@ -891,6 +920,20 @@ namespace mongo {
         }
 
         soleChunk->multiSplit( splitPoints );
+    }
+
+    ShardChunkVersion ChunkManager::getVersionOnConfigServer() const {
+        static Chunk temp(0);
+        
+        ScopedDbConnection conn( temp.modelServer() );
+        
+        auto_ptr<DBClientCursor> cursor = conn->query(temp.getNS(), QUERY("ns" << _ns).sort("lastmod",1), 1 );
+        BSONObj o;
+        if ( cursor->more() )
+            o = cursor->next();
+        conn.done();
+             
+        return o["lastmod"];
     }
 
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const{
