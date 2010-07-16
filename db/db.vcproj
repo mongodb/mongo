@@ -1823,6 +1823,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\repl\rs_sync.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\repl\rs_config.h"
 				>
 			</File>
