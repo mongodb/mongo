@@ -196,7 +196,7 @@ namespace mongo {
         {
             string errmsg;
             if ( ! shardVersionOk( _ns , errmsg ) ){
-                uasserted( 13388 , (string)"shard version not ok in Client::Context: " + errmsg );
+                msgasserted( 13388 , (string)"shard version not ok in Client::Context: " + errmsg );
             }
         }
     }

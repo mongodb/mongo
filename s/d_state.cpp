@@ -541,7 +541,9 @@ namespace mongo {
             return false;
         }
 
-        errmsg = (string)"your version is too old  ns: " + ns;
+        stringstream ss;
+        ss << "your version is too old  ns: " + ns << " global: " << version << " client: " << clientVersion;
+        errmsg = ss.str();
         return false;
     }
 

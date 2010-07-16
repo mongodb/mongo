@@ -882,6 +882,11 @@ int main(int argc, char* argv[], char *envp[] )
             cmdLine.notablescan = true;
         }
         if (params.count("install")) {
+            if ( ! params.count( "logpath" ) ){
+                cout << "--install has to be used with --logpath" << endl;
+                ::exit(-1);
+            }
+
             installService = true;
         }
         if (params.count("remove")) {

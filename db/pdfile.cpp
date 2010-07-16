@@ -1611,6 +1611,18 @@ namespace mongo {
 
 namespace mongo {
 
+    void dropAllDatabasesExceptLocal() { 
+        vector<string> n;
+        getDatabaseNames(n);
+        if( n.size() == 0 ) return;
+        log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
+        for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
+            if( *i != "local" ) { 
+                dropDatabase(*i);
+            }
+        }
+    }
+
     void dropDatabase(string db) {
         log(1) << "dropDatabase " << db << endl;
         assert( cc().database()->name == db );
