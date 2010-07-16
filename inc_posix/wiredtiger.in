@@ -48,7 +48,8 @@ extern "C" {
 @uintptr_t_decl@
 
 /*******************************************
- * Forward declarations
+ * Forward structure declarations -- not all are needed by wiredtiger.h, but
+ * enough are that it's easier to keep them all here.
  *******************************************/
 struct __db;			typedef struct __db DB;
 struct __dbc;			typedef struct __dbc DBC;
@@ -57,9 +58,20 @@ struct __env;			typedef struct __env ENV;
 struct __idb;			typedef struct __idb IDB;
 struct __idbc;			typedef struct __idbc IDBC;
 struct __ienv;			typedef struct __ienv IENV;
+
+struct __wt_col;		typedef struct __wt_col WT_COL;
+struct __wt_col_expand;		typedef struct __wt_col_expand WT_COL_EXPAND;
 struct __wt_flist;		typedef struct __wt_flist WT_FLIST;
+struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
+struct __wt_off;		typedef struct __wt_off WT_OFF;
+struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
+struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
+struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
+struct __wt_repl;		typedef struct __wt_repl WT_REPL;
+struct __wt_row;		typedef struct __wt_row WT_ROW;
+struct __wt_row_insert;		typedef struct __wt_row_insert WT_ROW_INSERT;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
 
 /*******************************************
@@ -127,10 +139,13 @@ struct __wt_toc {
 
 	WT_PAGE	**hazard;		/* Hazard reference array */
 
-	WT_PAGE *srch_page;		/* Search page */
-	void	*srch_ip;		/* Search WT_{COL,ROW}_INDX */
-
-	void	*repl_spare;		/* Cached, spare replacement array. */
+					/* Search return values: */
+	WT_PAGE  *srch_page;		/*    page */
+	void	 *srch_ip;		/*    WT_{COL,ROW} index */
+	WT_REPL	 *srch_repl;		/*    WT_REPL array index */
+					/* Reepat-compress column store only: */
+	WT_COL_EXPAND *srch_exp;	/*    WT_COL_EXPAND array index */
+	u_int16_t srch_rcc_offset;	/*    WT_COL index record offset */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
