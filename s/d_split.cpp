@@ -112,13 +112,15 @@ namespace mongo {
             
             Client::Context ctx( ns );
 
-            const char* field = keyPattern.firstElement().fieldName();
             BSONObjBuilder minBuilder;
-            minBuilder.appendMinKey( field );
-            BSONObj min = minBuilder.obj();
             BSONObjBuilder maxBuilder;
-            maxBuilder.appendMaxKey( field );
+            BSONForEach(key, keyPattern){
+                minBuilder.appendMinKey( key.fieldName() );
+                maxBuilder.appendMaxKey( key.fieldName() );
+            }
+            BSONObj min = minBuilder.obj();
             BSONObj max = maxBuilder.obj();
+
             IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
             if ( idx == NULL ){
                 errmsg = "couldn't find index over splitting key";

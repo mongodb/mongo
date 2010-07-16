@@ -1,7 +1,7 @@
-// sharding_balance1.js
+// sharding_balance3.js
 
 
-s = new ShardingTest( "slow_sharding_balance1" , 2 , 2 , 1 , { chunksize : 1 } )
+s = new ShardingTest( "slow_sharding_balance3" , 2 , 2 , 1 , { chunksize : 1 } )
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
@@ -15,14 +15,27 @@ bigString = ""
 while ( bigString.length < 10000 )
     bigString += "asdasdasdasdadasdasdasdasdasdasdasdasda";
 
-inserted = 0;
+N = 3000
+
 num = 0;
-while ( inserted < ( 20 * 1024 * 1024 ) ){
-    db.foo.insert( { _id : num++ , s : bigString } );
-    inserted += bigString.length;
+
+counts = {}
+
+function doUpdate( includeString ){
+    var up = { $inc : { x : 1 } }
+    if ( includeString )
+        up["$set"] = { s : bigString };
+    var myid = Random.randInt( N )
+    db.foo.update( { _id : myid } , up , true );
+
+    counts[myid] = ( counts[myid] ? counts[myid] : 0 ) + 1;
 }
 
+for ( i=0; i<N*10; i++ ){
+    doUpdate( true )
+}
 db.getLastError();
+
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
 function dist(){
@@ -38,9 +51,25 @@ function dist(){
     return x;
 }
 
+function check(){
+    for ( var x in counts ){
+        var e = counts[x];
+        var z = db.foo.findOne( { _id : parseInt( x ) } )
+        assert.eq( e , z.x , "count for : " + x )
+    }
+}
+
 function diff(){
+    doUpdate( false )
+    
+    if ( Math.random() > .99 ){
+        db.getLastError()
+        check();
+    }
+
     var x = dist();
-    printjson( x )
+    if ( Math.random() > .999 )
+        printjson( x )
     return Math.max( x.shard0 , x.shard1 ) - Math.min( x.shard0 , x.shard1 );
 }
 
@@ -49,22 +78,14 @@ function sum(){
     return x.shard0 + x.shard1;
 }
 
-assert.lt( 20 , diff() );
+assert.lt( 20 , diff() ,"initial load" );
 print( diff() )
 
 assert.soon( function(){
+    
     var d = diff();
     return d < 5;
-} , "balance didn't happen" , 1000 * 60 * 3 , 5000 );
+} , "balance didn't happen" , 1000 * 60 * 3 , 1 );
     
-var chunkCount = sum();
-host = s.config.shards.findOne({_id : "shard0" }).host;
-s.adminCommand( { removeshard: host } );
-
-assert.soon( function(){
-    printjson(dist());
-    s.config.shards.find().forEach(function(z){printjson(z);});
-    return chunkCount == s.config.chunks.count({shard: "shard1"});
-} , "removeshard didn't happen" , 1000 * 60 * 3 , 5000 );
 
 s.stop();

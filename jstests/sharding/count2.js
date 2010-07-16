@@ -26,7 +26,7 @@ assert.eq( 3, db2.count( { name : { $gte: "aaa" , $lt: "ddd" } } ) , "initial co
 s1.adminCommand( { movechunk : "test.foo" , find : { name : "aaa" } , to : s1.getOther( s1.getServer( "test" ) ).name } );
 
 assert.eq( 3, db1.count( { name : { $gte: "aaa" , $lt: "ddd" } } ) , "post count mongos1" );
-// TOFIX
+
 // The second mongos still thinks its shard mapping is valid and accepts a cound
 //assert.eq( 3, db2.count( { name : { $gte: "aaa" , $lt: "ddd" } } ) , "post count mongos2" ); // ***** asserting *****
 

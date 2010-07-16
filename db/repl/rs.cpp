@@ -24,6 +24,8 @@
 
 namespace mongo { 
 
+    using namespace bson;
+
     bool replSet = false;
     ReplSet *theReplSet = 0;
 
@@ -109,31 +111,19 @@ namespace mongo {
 
     }
 */
-    /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSetImpl::ReplSetImpl(string cfgString) : elect(this), 
-        _self(0), 
-        mgr( new Manager(this) )
-    {
-        h = 0;
-        _myState = STARTUP;
-        _currentPrimary = 0;
 
+    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet ) { 
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
         uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
-        _name = string(p, slash-p);
+        setname = string(p, slash-p);
 
-        log() << "replSet startup " << cfgString << rsLog;
-
-        set<HostAndPort> seedSet;
-        vector<HostAndPort> *seeds = new vector<HostAndPort>;
         p = slash + 1;
         while( 1 ) {
             const char *comma = strchr(p, ',');
             if( comma == 0 ) comma = strchr(p,0);
             if( p == comma )
                 break;
-            //uassert(13094, "bad --replSet config string", p != comma);
             {
                 HostAndPort m;
                 try {
@@ -145,15 +135,30 @@ namespace mongo {
                 uassert(13096, "bad --replSet config string - dups?", seedSet.count(m) == 0 );
                 seedSet.insert(m);
                 uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
-                if( m.isSelf() )
+                if( m.isSelf() ) {
                     log() << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
-                else
-                    seeds->push_back(m);
+                } else
+                    seeds.push_back(m);
                 if( *comma == 0 )
                     break;
                 p = comma + 1;
             }
         }
+    }
+
+    /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
+    ReplSetImpl::ReplSetImpl(string cfgString) : elect(this), 
+        _self(0), 
+        mgr( new Manager(this) )
+    {
+        h = 0;
+        _myState = STARTUP;
+        _currentPrimary = 0;
+
+        vector<HostAndPort> *seeds = new vector<HostAndPort>;
+        set<HostAndPort> seedSet;
+
+        parseReplsetCmdLine( cfgString , _name ,*seeds , seedSet );
 
         _seeds = seeds;
         //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
@@ -205,6 +210,8 @@ namespace mongo {
 
     // true if ok; throws if config really bad; false if config doesn't include self
     bool ReplSetImpl::initFromConfig(ReplSetConfig& c) {
+        lock lk(this);
+
         {
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
@@ -227,7 +234,12 @@ namespace mongo {
         _name = _cfg->_id;
         assert( !_name.empty() );
 
-        assert( _members.head() == 0 );
+        // start with no members.  if this is a reconfig, drop the old ones.
+        _members.orphanAll();
+
+        endOldHealthTasks();
+
+        _self = 0;
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
             if( m.h.isSelf() ) {
@@ -237,12 +249,9 @@ namespace mongo {
             } else {
                 Member *mi = new Member(m.h, m._id, &m);
                 _members.push(mi);
+                startHealthTaskFor(mi);
             }
         }
-
-/*        if( save ) { 
-            _cfg->save();
-        }*/
         return true;
     }
 
@@ -318,7 +327,7 @@ namespace mongo {
                         log() << "replSet sleeping 20sec and will try again." << rsLog;
                     }
 
-                    sleepsecs(20);
+                    sleepsecs(10);
                     continue;
                 }
 
@@ -344,9 +353,25 @@ namespace mongo {
 
     void ReplSetImpl::_fatal() 
     { 
-        lock l(this);
+        //lock l(this);
         _myState = FATAL; 
         log() << "replSet error fatal error, stopping replication" << rsLog; 
+    }
+
+
+    void ReplSet::haveNewConfig(ReplSetConfig& newConfig) { 
+        lock l(this); // convention is to lock replset before taking the db rwlock
+        writelock lk("");
+        bo comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
+        newConfig.saveConfigLocally(comment);
+        try { 
+            initFromConfig(newConfig);
+            log() << "replSet replSetReconfig new config saved locally" << rsLog;
+        }
+        catch(...) { 
+            log() << "replSet error unexpected exception in haveNewConfig()" << rsLog;
+            _fatal();
+        }
     }
 
     /* forked as a thread during startup 

@@ -1,4 +1,7 @@
 
+Building on open solaris on ec2
+================
+
 ami-4133d528
 
 

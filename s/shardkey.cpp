@@ -21,51 +21,30 @@
 #include "../db/jsobj.h"
 #include "../util/unittest.h"
 
-/**
-   TODO: this only works with numbers right now
-         this is very temporary, need to make work with anything
-*/
-
 namespace mongo {
-    void minForPat(BSONObjBuilder& out, const BSONObj& pat){
-        BSONElement e = pat.firstElement();
-        if (e.type() == Object){
-            BSONObjBuilder sub;
-            minForPat(sub, e.embeddedObject());
-            out.append(e.fieldName(), sub.obj());
-        } else {
-            out.appendMinKey(e.fieldName());
-        }
-    }
-
-    void maxForPat(BSONObjBuilder& out, const BSONObj& pat){
-        BSONElement e = pat.firstElement();
-        if (e.type() == Object){
-            BSONObjBuilder sub;
-            maxForPat(sub, e.embeddedObject());
-            out.append(e.fieldName(), sub.obj());
-        } else {
-            out.appendMaxKey(e.fieldName());
-        }
-    }
 
     ShardKeyPattern::ShardKeyPattern( BSONObj p ) : pattern( p.getOwned() ) {
         pattern.getFieldNames(patternfields);
 
         BSONObjBuilder min;
-        minForPat(min, pattern);
-        gMin = min.obj();
-
         BSONObjBuilder max;
-        maxForPat(max, pattern);
+
+        BSONObjIterator it(p);
+        while (it.more()){
+            BSONElement e (it.next());
+            min.appendMinKey(e.fieldName());
+            max.appendMaxKey(e.fieldName());
+        }
+        
+        gMin = min.obj();
         gMax = max.obj();
     }
 
     int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
         BSONObj L = extractKey(lObject);
-        uassert( 10198 , "left object doesn't have shard key", !L.isEmpty());
+        uassert( 10198 , "left object doesn't have full shard key", L.nFields() == (int)patternfields.size());
         BSONObj R = extractKey(rObject);
-        uassert( 10199 , "right object doesn't have shard key", !R.isEmpty());
+        uassert( 10199 , "right object doesn't have full shard key", R.nFields() == (int)patternfields.size());
         return L.woCompare(R);
     }
 
@@ -79,70 +58,6 @@ namespace mongo {
                 return false;
         }
         return true;
-    }
-
-    /**
-      returns a query that filters results only for the range desired, i.e. returns 
-        { $gte : keyval(min), $lt : keyval(max) }
-    */
-    void ShardKeyPattern::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ) const{
-        massert( 10426 , "not done for compound patterns", patternfields.size() == 1);
-        BSONObjBuilder temp;
-        temp.appendAs( extractKey(min).firstElement(), "$gte" );
-        temp.appendAs( extractKey(max).firstElement(), "$lt" );
-
-        b.append( patternfields.begin()->c_str(), temp.obj() );
-    }    
-
-    /**
-      Example
-      sort:   { ts: -1 }
-      *this:  { ts:1 }
-      -> -1
-
-      @return
-      0 if sort either doesn't have all the fields or has extra fields
-      < 0 if sort is descending
-      > 1 if sort is ascending
-    */
-    int ShardKeyPattern::canOrder( const BSONObj& sort ) const{
-        // e.g.:
-        //   sort { a : 1 , b : -1 }
-        //   pattern { a : -1, b : 1, c : 1 }
-        //     -> -1
-
-        int dir = 0;
-
-        BSONObjIterator s(sort);
-        BSONObjIterator p(pattern);
-        while( 1 ) {
-            BSONElement e = s.next();
-            if( e.eoo() )
-                break;
-            if( !p.moreWithEOO() ) 
-                return 0;
-            BSONElement ep = p.next();
-            bool same = e == ep;
-            if( !same ) {
-                if( strcmp(e.fieldName(), ep.fieldName()) != 0 )
-                    return 0;
-                // same name, but opposite direction
-                if( dir == -1 ) 
-                    ;  // ok
-                else if( dir == 1 )
-                    return 0; // wrong direction for a 2nd field
-                else // dir == 0, initial pass
-                    dir = -1;
-            }
-            else { 
-                // fields are the same
-                if( dir == -1 ) 
-                    return 0; // wrong direction
-                dir = 1;
-            }
-        }
-
-        return dir;
     }
 
     bool ShardKeyPattern::isPrefixOf( const BSONObj& otherPattern ) const {
@@ -164,9 +79,6 @@ namespace mongo {
     }
     
     /* things to test for compound : 
-       x hasshardkey 
-       _ getFilter (hard?)
-       x canOrder
        \ middle (deprecating?)
     */
     class ShardKeyUnitTest : public UnitTest {
@@ -204,27 +116,13 @@ namespace mongo {
             }
 
         }
-        void getfilt() { 
-            ShardKeyPattern k( BSON( "key" << 1 ) );
-            BSONObjBuilder b;
-            k.getFilter(b, fromjson("{z:3,key:30}"), fromjson("{key:90}"));
-            BSONObj x = fromjson("{ key: { $gte: 30, $lt: 90 } }");
-            assert( x.woEqual(b.obj()) );
-        }
-        void testCanOrder() { 
-            ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
-            assert( k.canOrder( fromjson("{a:1}") ) == 1 );
-            assert( k.canOrder( fromjson("{a:-1}") ) == -1 );
-            assert( k.canOrder( fromjson("{a:1,b:-1,c:1}") ) == 1 );
-            assert( k.canOrder( fromjson("{a:1,b:1}") ) == 0 );
-            assert( k.canOrder( fromjson("{a:-1,b:1}") ) == -1 );
-        }
-        void extractkeytest() { 
-            ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
 
-            BSONObj x = fromjson("{a:1,b:2,c:3}");
-            assert( k.extractKey( fromjson("{a:1,b:2,c:3}") ).woEqual(x) );
-            assert( k.extractKey( fromjson("{b:2,c:3,a:1}") ).woEqual(x) );
+        void extractkeytest() { 
+            ShardKeyPattern k( fromjson("{a:1,'sub.b':-1,'sub.c':1}") );
+
+            BSONObj x = fromjson("{a:1,'sub.b':2,'sub.c':3}");
+            assert( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).woEqual(x) );
+            assert( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).woEqual(x) );
         }
         void run(){
             extractkeytest();
@@ -253,12 +151,6 @@ namespace mongo {
 
             assert( k.compare(a,b) < 0 );
             
-            assert( k.canOrder( fromjson("{key:1}") ) == 1 );
-            assert( k.canOrder( fromjson("{zz:1}") ) == 0 );
-            assert( k.canOrder( fromjson("{key:-1}") ) == -1 );
-            
-            testCanOrder();
-            getfilt();
             testIsPrefixOf();
             // add middle multitype tests
 

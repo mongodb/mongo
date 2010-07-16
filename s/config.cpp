@@ -44,7 +44,6 @@ namespace mongo {
     BSONField<long long> ShardFields::maxSize ("maxSize");
     BSONField<long long> ShardFields::currSize("currSize");
 
-    string ourHostname;
     OID serverID;
 
     /* --- DBConfig --- */
@@ -96,6 +95,7 @@ namespace mongo {
         _sharded[ns] = CollectionInfo( fieldsAndOrder , unique );
 
         info.reset( new ChunkManager( this , ns , fieldsAndOrder , unique ) );
+        info->maybeChunkCollection();
         _shards[ns] = info;
         return info;
 
@@ -202,6 +202,7 @@ namespace mongo {
          */
 
         log() << "DBConfig::dropDatabase: " << _name << endl;
+        configServer.logChange( "dropDatabase.start" , _name , BSONObj() );
         
         // 1
         if ( ! configServer.allUp( errmsg ) ){
@@ -254,6 +255,7 @@ namespace mongo {
         
         log(1) << "\t dropped primary db for: " << _name << endl;
 
+        configServer.logChange( "dropDatabase" , _name , BSONObj() );
         return true;
     }
 
@@ -262,7 +264,7 @@ namespace mongo {
         set<string> seen;
         while ( true ){
             map<string,ChunkManagerPtr>::iterator i = _shards.begin();
-
+            
             if ( i == _shards.end() )
                 break;
 
@@ -281,6 +283,7 @@ namespace mongo {
             uassert( 10184 ,  "_dropShardedCollections too many collections - bailing" , num < 100000 );
             log(2) << "\t\t dropped " << num << " so far" << endl;
         }
+        
         return true;
     }
     
@@ -378,7 +381,6 @@ namespace mongo {
             sleepsecs(5);
             dbexit( EXIT_BADOPTIONS );
         }
-        ourHostname = hn;
         
         set<string> hosts;
         for ( size_t i=0; i<configHosts.size(); i++ ){
@@ -524,11 +526,11 @@ namespace mongo {
         }
      
         stringstream id;
-        id << ourHostname << "-" << terseCurrentTime() << "-" << num++;
+        id << getHostNameCached() << "-" << terseCurrentTime() << "-" << num++;
 
-        BSONObj msg = BSON( "_id" << id.str() << "server" << ourHostname << "time" << DATENOW <<
+        BSONObj msg = BSON( "_id" << id.str() << "server" << getHostNameCached() << "time" << DATENOW <<
                             "what" << what << "ns" << ns << "details" << detail );
-        log() << msg << endl;
+        log() << "config change: " << msg << endl;
         conn->insert( "config.changelog" , msg );
         
         conn.done();

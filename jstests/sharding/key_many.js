@@ -10,6 +10,7 @@ types =  [
     { name : "embedded 1" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b" } ,
     { name : "embedded 2" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b.c" } ,
     { name : "object" , values : [ {a:1, b:1.2}, {a:1, b:3.5}, {a:1, b:4.5}, {a:2, b:1.2}, {a:2, b:3.5}, {a:2, b:4.5} ] , keyfield : "o" } ,
+    //{ name : "compound" , values : [ {a:1, b:1.2}, {a:1, b:3.5}, {a:1, b:4.5}, {a:2, b:1.2}, {a:2, b:3.5}, {a:2, b:4.5} ] , keyfield : "o" , compound : true } ,
     { name : "oid_id" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "_id" } ,
     { name : "oid_other" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "o" } ,
     ]
@@ -23,7 +24,18 @@ seconday = s.getOther( primary ).getDB( "test" );
 
 function makeObjectDotted( v ){
     var o = {};
-    o[curT.keyfield] = v;
+    if (curT.compound){
+        var prefix = curT.keyfield + '.';
+        if (typeof(v) == 'object'){
+            for (key in v)
+                o[prefix + key] = v[key];
+        } else {
+            for (key in curT.values[0])
+                o[prefix + key] = v;
+        }
+    } else {
+        o[curT.keyfield] = v;
+    }
     return o;
 }
 

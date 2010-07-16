@@ -154,5 +154,11 @@ assert.throws( function(){ db.foo6.group( { key : { a : 1 } , initial : { count 
 db.foo8.save( { a : 1 } );
 assert( ! s.admin.runCommand( { shardcollection : "test.foo8" , key : { a : 1 } } ).ok , "non-empty collection" );
 
+// --- listDatabases ---
+
+r = db.getMongo().getDBs()
+assert.eq( 4 , r.databases.length , "listDatabases 1 : " + tojson( r ) )
+assert.lt( 10000 , r.totalSize , "listDatabases 2 : " + tojson( r ) );
+
 s.stop()
 

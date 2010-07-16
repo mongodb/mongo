@@ -28,6 +28,7 @@
 #include "pch.h"
 #include "../util/message.h"
 #include "../util/processinfo.h"
+#include "../util/stringutils.h"
 
 #include "../client/connpool.h"
 
@@ -42,16 +43,11 @@
 
 namespace mongo {
 
-    extern string ourHostname;
-
     namespace dbgrid_cmds {
-
-        set<string> dbgridCommands;
 
         class GridAdminCmd : public Command {
         public:
-            GridAdminCmd( const char * n ) : Command( n ){
-                dbgridCommands.insert( n );
+            GridAdminCmd( const char * n ) : Command( n , false, tolowerString(n).c_str() ){
             }
             virtual bool slaveOk() const {
                 return true;
@@ -150,58 +146,53 @@ namespace mongo {
             time_t _started;
         } cmdServerStatus;
 
-        class ListGridCommands : public GridAdminCmd {
+        class FsyncCommand : public GridAdminCmd {
         public:
-            ListGridCommands() : GridAdminCmd("gridcommands") { }
+            FsyncCommand() : GridAdminCmd( "fsync" ){}
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-
-                BSONObjBuilder arr;
-                int num=0;
-                for ( set<string>::iterator i = dbgridCommands.begin(); i != dbgridCommands.end(); i++ ){
-                    string s = BSONObjBuilder::numStr( num++ );
-                    arr.append( s.c_str() , *i );
+                if ( cmdObj["lock"].trueValue() ){
+                    errmsg = "can't do lock through mongos";
+                    return false;
                 }
+                
+                BSONObjBuilder sub;
 
-                result.appendArray( "commands" , arr.done() );
-                return true;
+                bool ok = true;
+                int numFiles = 0;
+                
+                vector<Shard> shards;
+                Shard::getAllShards( shards );
+                for ( vector<Shard>::iterator i=shards.begin(); i!=shards.end(); i++ ){
+                    Shard s = *i;
+
+                    BSONObj x = s.runCommand( "admin" , "fsync" );
+                    sub.append( s.getName() , x );
+
+                    if ( ! x["ok"].trueValue() ){
+                        ok = false;
+                        errmsg = x["errmsg"].String();
+                    }
+                    
+                    numFiles += x["numFiles"].numberInt();
+                }
+                
+                result.append( "numFiles" , numFiles );
+                result.append( "all" , sub.obj() );
+                return ok;
             }
-        } listGridCommands;
+        } fsyncCmd;
 
         // ------------ database level commands -------------
 
-        class ListDatabaseCommand : public GridAdminCmd {
-        public:
-            ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
-            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection conn( configServer.getPrimary() );
-
-                auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , BSONObj() );
-
-                BSONObjBuilder list;
-                int num = 0;
-                while ( cursor->more() ){
-                    string s = BSONObjBuilder::numStr( num++ );
-
-                    BSONObj o = cursor->next();
-                    list.append( s.c_str() , o["_id"].valuestrsafe() );
-                }
-
-                result.appendArray("databases" , list.obj() );
-                conn.done();
-
-                return true;
-            }
-        } gridListDatabase;
-
         class MoveDatabasePrimaryCommand : public GridAdminCmd {
         public:
-            MoveDatabasePrimaryCommand() : GridAdminCmd("moveprimary") { }
+            MoveDatabasePrimaryCommand() : GridAdminCmd("movePrimary") { }
             virtual void help( stringstream& help ) const {
                 help << " example: { moveprimary : 'foo' , to : 'localhost:9999' }";
                 // TODO: locking?
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string dbname = cmdObj["moveprimary"].valuestrsafe();
+                string dbname = cmdObj.firstElement().valuestrsafe();
 
                 if ( dbname.size() == 0 ){
                     errmsg = "no db";
@@ -275,14 +266,14 @@ namespace mongo {
 
         class EnableShardingCmd : public GridAdminCmd {
         public:
-            EnableShardingCmd() : GridAdminCmd( "enablesharding" ){}
+            EnableShardingCmd() : GridAdminCmd( "enableSharding" ){}
             virtual void help( stringstream& help ) const {
                 help
                     << "Enable sharding for a db. (Use 'shardcollection' command afterwards.)\n"
                     << "  { enablesharding : \"<dbname>\" }\n";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string dbname = cmdObj["enablesharding"].valuestrsafe();
+                string dbname = cmdObj.firstElement().valuestrsafe();
                 if ( dbname.size() == 0 ){
                     errmsg = "no db";
                     return false;
@@ -307,7 +298,7 @@ namespace mongo {
 
         class ShardCollectionCmd : public GridAdminCmd {
         public:
-            ShardCollectionCmd() : GridAdminCmd( "shardcollection" ){}
+            ShardCollectionCmd() : GridAdminCmd( "shardCollection" ){}
 
             virtual void help( stringstream& help ) const {
                 help
@@ -316,7 +307,7 @@ namespace mongo {
             }
 
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string ns = cmdObj["shardcollection"].valuestrsafe();
+                string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
@@ -337,9 +328,13 @@ namespace mongo {
                 if ( key.isEmpty() ){
                     errmsg = "no shard key";
                     return false;
-                } else if (key.nFields() > 1){
-                    errmsg = "compound shard keys not supported yet";
-                    return false;
+                }
+
+                BSONForEach(e, key){
+                    if (!e.isNumber() || e.number() != 1.0){
+                        errmsg = "shard keys must all be ascending";
+                        return false;
+                    }
                 }
 
                 if ( ns.find( ".system." ) != string::npos ){
@@ -424,7 +419,7 @@ namespace mongo {
             }
             
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string ns = cmdObj["getShardVersion"].valuestrsafe();
+                string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "need to speciy fully namespace";
                     return false;
@@ -464,7 +459,7 @@ namespace mongo {
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ShardConnection::sync();
 
-                string ns = cmdObj[_name.c_str()].valuestrsafe();
+                string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
@@ -498,7 +493,7 @@ namespace mongo {
 
         class SplitValueCommand : public SplitCollectionHelper {
         public:
-            SplitValueCommand() : SplitCollectionHelper( "splitvalue" ){}
+            SplitValueCommand() : SplitCollectionHelper( "splitValue" ){}
             virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManagerPtr manager , ChunkPtr old , BSONObj middle ){
 
                 result << "shardinfo" << old->toString();
@@ -525,8 +520,11 @@ namespace mongo {
 
                 if ( middle.isEmpty() )
                     old->split();
-                else
-                    old->split( middle );
+                else {
+                    vector<BSONObj> splitPoints;
+                    splitPoints.push_back( middle );
+                    old->multiSplit( splitPoints );
+                }
 
                 return true;
             }
@@ -536,7 +534,7 @@ namespace mongo {
 
         class MoveChunkCmd : public GridAdminCmd {
         public:
-            MoveChunkCmd() : GridAdminCmd( "movechunk" ){}
+            MoveChunkCmd() : GridAdminCmd( "moveChunk" ){}
             virtual void help( stringstream& help ) const {
                 help << "{ movechunk : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
             }
@@ -544,7 +542,7 @@ namespace mongo {
                 ShardConnection::sync();
 
                 Timer t;
-                string ns = cmdObj["movechunk"].valuestrsafe();
+                string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
@@ -593,7 +591,7 @@ namespace mongo {
 
         class ListShardsCmd : public GridAdminCmd {
         public:
-            ListShardsCmd() : GridAdminCmd("listshards") { }
+            ListShardsCmd() : GridAdminCmd("listShards") { }
             virtual void help( stringstream& help ) const {
                 help << "list all shards of the system";
             }
@@ -617,14 +615,14 @@ namespace mongo {
 		/* a shard is a single mongod server or a replica pair.  add it (them) to the cluster as a storage partition. */
         class AddShard : public GridAdminCmd {
         public:
-            AddShard() : GridAdminCmd("addshard") { }
+            AddShard() : GridAdminCmd("addShard") { }
             virtual void help( stringstream& help ) const {
                 help << "add a new shard to the system";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
                 
-                string host = cmdObj["addshard"].valuestrsafe();
+                string host = cmdObj.firstElement().valuestrsafe();
                 
                 if ( host == "localhost" || host.find( "localhost:" ) == 0 ||
                      host == "127.0.0.1" || host.find( "127.0.0.1:" ) == 0 ){
@@ -704,12 +702,12 @@ namespace mongo {
          */
         class RemoveShardCmd : public GridAdminCmd {
         public:
-            RemoveShardCmd() : GridAdminCmd("removeshard") { }
+            RemoveShardCmd() : GridAdminCmd("removeShard") { }
             virtual void help( stringstream& help ) const {
                 help << "remove a shard to the system.";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string shard = cmdObj["removeshard"].valuestrsafe();
+                string shard = cmdObj.firstElement().valuestrsafe();
                 if ( ! grid.knowAboutShard( shard ) ){
                     errmsg = "unknown shard";
                     return false;
@@ -796,7 +794,7 @@ namespace mongo {
             IsDbGridCmd() : Command("isdbgrid") { }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("isdbgrid", 1);
-                result.append("hostname", ourHostname);
+                result.append("hostname", getHostNameCached());
                 return true;
             }
         } isdbgrid;
@@ -852,7 +850,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "get previous error (since last reseterror command)";
             }
-            CmdShardingGetPrevError() : Command("getpreverror") { }
+            CmdShardingGetPrevError() : Command( "getPrevError" , false , "getpreverror") { }
             virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg += "getpreverror not supported for sharded environments";
                 return false;
@@ -869,7 +867,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "check for an error on the last command executed";
             }
-            CmdShardingGetLastError() : Command("getlasterror") { }
+            CmdShardingGetLastError() : Command("getLastError" , false , "getlasterror") { }
             virtual bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 LastError *le = lastError.disableForCommand();
                 {
@@ -968,7 +966,7 @@ namespace mongo {
     
     class CmdListDatabases : public Command {
     public:
-        CmdListDatabases() : Command("listDatabases") {}
+        CmdListDatabases() : Command("listDatabases", false , "listdatabases" ) {}
 
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
@@ -1011,11 +1009,14 @@ namespace mongo {
                 
             }
             
+            long long totalSize = 0;
+
             BSONArrayBuilder bb( result.subarrayStart( "databases" ) );
             for ( map<string,long long>::iterator i=sizes.begin(); i!=sizes.end(); ++i ){
                 string name = i->first;
                 long long size = i->second;
-
+                totalSize += size;
+                
                 BSONObjBuilder temp;
                 temp.append( "name" , name );
                 temp.appendNumber( "size" , size );
@@ -1026,6 +1027,9 @@ namespace mongo {
             }
             bb.done();
 
+            result.appendNumber( "totalSize" , totalSize );
+            result.appendNumber( "totalSizeMb" , totalSize / ( 1024 * 1024 ) );
+            
             return 1;
         }
 

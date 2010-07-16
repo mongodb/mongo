@@ -68,26 +68,6 @@ namespace mongo {
          */
         bool hasShardKey( const BSONObj& obj ) const;
         
-        /**
-           returns a query that filters results only for the range desired, i.e. returns 
-             { "field" : { $gte: keyval(min), $lt: keyval(max) } }
-        */
-        void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ) const;
-        
-        /**
-           Returns if the given sort pattern can be ordered by the shard key pattern.
-           Example
-            sort:   { ts: -1 }
-            *this:  { ts:1 }
-              -> -1
-
-              @return
-              0 if sort either doesn't have all the fields or has extra fields
-              < 0 if sort is descending
-              > 1 if sort is ascending
-         */
-        int canOrder( const BSONObj& sort ) const;
-
         BSONObj key() const { return pattern; }
 
         string toString() const;

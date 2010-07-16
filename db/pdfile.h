@@ -106,7 +106,8 @@ namespace mongo {
             NamespaceDetails *d,
             NamespaceDetailsTransient *nsdt,
             Record *toupdate, const DiskLoc& dl,
-            const char *buf, int len, OpDebug& debug, bool &changedId);
+            const char *buf, int len, OpDebug& debug, bool &changedId, bool god=false);
+
         // The object o may be updated if modified on insert.                                
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
 

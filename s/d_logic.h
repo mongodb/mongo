@@ -30,9 +30,6 @@ namespace mongo {
 
     // -----------
 
-    /**
-     * TODO: this only works with single fields at the moment
-     */
     class ChunkMatcher {
         typedef map<BSONObj,pair<BSONObj,BSONObj>,BSONObjCmp> MyMap;
     public:
@@ -45,7 +42,7 @@ namespace mongo {
         void gotRange( const BSONObj& min , const BSONObj& max );
         
         ConfigVersion _version;
-        string _field;
+        BSONObj _key;
         MyMap _map;
         
         friend class ShardingState;
@@ -77,6 +74,7 @@ namespace mongo {
         
         ChunkMatcherPtr getChunkMatcher( const string& ns );
         
+        bool inCriticalMigrateSection();
     private:
         
         bool _enabled;
@@ -139,6 +137,8 @@ namespace mongo {
      * @return true if we took care of the message and nothing else should be done
      */
     bool handlePossibleShardedMessage( Message &m, DbResponse &dbresponse );
+
+    void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 
     // -----------------
     // --- writeback ---

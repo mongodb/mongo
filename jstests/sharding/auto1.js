@@ -36,7 +36,7 @@ for ( ; i<1500; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
-assert.eq( 3 , s.config.chunks.count() , "shard didn't split A " );
+assert.lte( 3 , s.config.chunks.count() , "shard didn't split A " );
 s.printChunks();
 
 for ( ; i<2800; i++ ){
@@ -44,7 +44,7 @@ for ( ; i<2800; i++ ){
 }
 db.getLastError();
 
-assert.eq( 4 , s.config.chunks.count() , "shard didn't split B " );
+assert.lte( 4 , s.config.chunks.count() , "shard didn't split B " );
 s.printChunks();
 
 

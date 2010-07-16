@@ -90,11 +90,13 @@ namespace mongo {
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
         
-        log() << "got write with an old config - writing back" << endl;
+        log() << "got write with an old config - writing back ns: " << ns << endl;
 
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );
         b.append( "ns" , ns );
+        b.appendTimestamp( "version" , shardingState.getVersion( ns ) );
+        b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
         log() << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
         queueWriteBack( clientID.str() , b.obj() );

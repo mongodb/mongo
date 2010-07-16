@@ -38,6 +38,7 @@ namespace mongo {
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
                   bool masterSameProcess, bool slaveOk, Query q = Query());
         void replayOpLog( DBClientCursor *c, const BSONObj &query );
+        struct Fun;
     public:
         Cloner() { }
 
@@ -86,70 +87,102 @@ namespace mongo {
         return res;
     }
 
+    struct Cloner::Fun {
+        void operator()( DBClientCursorBatchIterator &i ) {
+            mongolock l( true );
+            if ( context ) {
+                context->relocked();
+            }
+            
+            while( i.moreInCurrentBatch() ) {
+                if ( n % 128 == 127 /*yield some*/ ) {
+                    dbtemprelease t;
+                }
+                
+                BSONObj tmp = i.nextSafe();
+            
+                /* assure object is valid.  note this will slow us down a little. */
+                if ( !tmp.valid() ) {
+                    stringstream ss;
+                    ss << "Cloner: skipping corrupt object from " << from_collection;
+                    BSONElement e = tmp.firstElement();
+                    try {
+                        e.validate();
+                        ss << " firstElement: " << e;
+                    }
+                    catch( ... ){
+                        ss << " firstElement corrupt";
+                    }
+                    out() << ss.str() << endl;
+                    continue;
+                }
+            
+                ++n;
+            
+                BSONObj js = tmp;
+                if ( isindex ) {
+                    assert( strstr(from_collection, "system.indexes") );
+                    js = fixindex(tmp);
+                    storedForLater->push_back( js.getOwned() );
+                    continue;
+                }
+            
+                try { 
+                    theDataFileMgr.insertWithObjMod(to_collection, js);
+                    if ( logForRepl )
+                        logOp("i", to_collection, js);
+                }
+                catch( UserException& e ) { 
+                    log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
+                }
+            
+                RARELY if ( time( 0 ) - saveLast > 60 ) {
+                    log() << n << " objects cloned so far from collection " << from_collection << endl;
+                    saveLast = time( 0 );
+                }
+            }
+        }
+        int n;
+        bool isindex;
+        const char *from_collection;
+        const char *to_collection;
+        time_t saveLast;
+        list<BSONObj> *storedForLater;     
+        bool logForRepl;
+        Client::Context *context;
+    };
+    
     /* copy the specified collection
        isindex - if true, this is system.indexes collection, in which we do some transformation when copying.
     */
     void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk, Query query) {
-        auto_ptr<DBClientCursor> c;
-        {
-            dbtemprelease r;
-            c = conn->query( from_collection, query, 0, 0, 0, QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 ) );
-        }
-        
         list<BSONObj> storedForLater;
         
-        massert( 13055 , "socket error in Cloner:copy" , c.get() );
-        long long n = 0;
-        time_t saveLast = time( 0 );
-        while ( 1 ) {
-            if( !c->moreInCurrentBatch() || n % 128 == 127 /*yield some*/ ) {
-                dbtemprelease r;
-                if ( !c->more() )
-                    break;
-            }
-            BSONObj tmp = c->next();
-
-            /* assure object is valid.  note this will slow us down a little. */
-            if ( !tmp.valid() ) {
-                stringstream ss;
-                ss << "Cloner: skipping corrupt object from " << from_collection;
-                BSONElement e = tmp.firstElement();
-                try {
-                    e.validate();
-                    ss << " firstElement: " << e;
+        Fun f;
+        f.n = 0;
+        f.isindex = isindex;
+        f.from_collection = from_collection;
+        f.to_collection = to_collection;
+        f.saveLast = time( 0 );
+        f.storedForLater = &storedForLater;
+        f.logForRepl = logForRepl;
+        
+        int options = QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 );
+        {
+            dbtemprelease r;
+            f.context = r._context;
+            DBClientConnection *remote = dynamic_cast< DBClientConnection* >( conn.get() );
+            if ( remote ) {
+                remote->query( boost::function<void(DBClientCursorBatchIterator &)>( f ), from_collection, query, 0, options );                
+            } else { // no exhaust mode for direct client, so we have this hack
+                auto_ptr<DBClientCursor> c = conn->query( from_collection, query, 0, 0, 0, options );
+                while( c->more() ) {
+                    DBClientCursorBatchIterator i( *c );
+                    f( i );
                 }
-                catch( ... ){
-                    ss << " firstElement corrupt";
-                }
-                out() << ss.str() << endl;
-                continue;
-            }
-
-            ++n;
-            
-            BSONObj js = tmp;
-            if ( isindex ) {
-                assert( strstr(from_collection, "system.indexes") );
-                js = fixindex(tmp);
-                storedForLater.push_back( js.getOwned() );
-                continue;
-            }
-
-            try { 
-                theDataFileMgr.insertWithObjMod(to_collection, js);
-                if ( logForRepl )
-                    logOp("i", to_collection, js);
-            }
-            catch( UserException& e ) { 
-                log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
-            }
-            
-            RARELY if ( time( 0 ) - saveLast > 60 ) {
-                log() << n << " objects cloned so far from collection " << from_collection << endl;
-                saveLast = time( 0 );
             }
         }
-
+        
         if ( storedForLater.size() ){
             for ( list<BSONObj>::iterator i = storedForLater.begin(); i!=storedForLater.end(); i++ ){
                 BSONObj js = *i;
@@ -193,6 +226,7 @@ namespace mongo {
         {  
             dbtemprelease r;
 		
+            // just using exhaust for collection copying right now
             auto_ptr<DBClientCursor> c;
             {
                 if ( conn.get() ) {

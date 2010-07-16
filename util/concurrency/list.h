@@ -50,7 +50,13 @@ public:
     void push(T* t) {
         scoped_lock lk(_m);
         t->_next = _head;
-        _head = t; }
+        _head = t; 
+    }
+
+    // intentionally leak.
+    void orphanAll() { 
+        _head = 0;
+    }
 
     /* t is not deleted, but is removed from the list. (orphaned) */
     void orphan(T* t) { 

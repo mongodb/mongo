@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "../util/message.h"
 #include "../client/dbclient.h"
+#include "../db/dbmessage.h"
 
 using namespace mongo;
 using namespace std;
@@ -46,9 +47,26 @@ public:
 
             int oldId = m.header()->id;
             if ( m.operation() == dbQuery || m.operation() == dbMsg || m.operation() == dbGetMore ) {
+                bool exhaust = false;
+                if ( m.operation() == dbQuery ) {
+                    DbMessage d( m );
+                    QueryMessage q( d );
+                    exhaust = q.queryOptions & QueryOption_Exhaust;
+                }
                 Message response;
                 dest.port().call( m, response );
                 mp_.reply( m, response, oldId );
+                while ( exhaust ) {
+                    MsgData *header = response.header();
+                    QueryResult *qr = (QueryResult *) header;
+                    if ( qr->cursorId ) {
+                        response.reset();
+                        dest.port().recv( response );
+                        mp_.reply( m, response ); // m argument is ignored anyway                    
+                    } else {
+                        exhaust = false;
+                    }
+                }
             } else {
                 dest.port().say( m, oldId );
             }

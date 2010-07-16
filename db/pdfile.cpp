@@ -111,7 +111,7 @@ namespace mongo {
     string dbpath = "/data/db/";
     bool directoryperdb = false;
     string repairpath;
-    string lockfilepath;
+    string pidfilepath;
 
     DataFileMgr theDataFileMgr;
     DatabaseHolder dbHolder;
@@ -857,7 +857,7 @@ namespace mongo {
         NamespaceDetails *d,
         NamespaceDetailsTransient *nsdt,
         Record *toupdate, const DiskLoc& dl,
-        const char *_buf, int _len, OpDebug& debug, bool &changedId)
+        const char *_buf, int _len, OpDebug& debug, bool &changedId, bool god)
     {
         StringBuilder& ss = debug.str;
         dassert( toupdate == dl.rec() );
@@ -894,7 +894,7 @@ namespace mongo {
             if ( cc().database()->profile )
                 ss << " moved ";
             deleteRecord(ns, toupdate, dl);
-            return insert(ns, objNew.objdata(), objNew.objsize(), false);
+            return insert(ns, objNew.objdata(), objNew.objsize(), god);
         }
 
         nsdt->notifyOfWriteOp();

@@ -105,7 +105,7 @@ namespace mongo {
          */
         const Shard& getShard( const string& ns );
         
-        const Shard& getPrimary(){
+        const Shard& getPrimary() const {
             uassert( 8041 , (string)"no primary shard configured for db: " + _name , _primary.ok() );
             return _primary;
         }
@@ -225,6 +225,10 @@ namespace mongo {
          * @param msg any more info
          */
         void logChange( const string& what , const string& ns , const BSONObj& detail = BSONObj() );
+
+        ConnectionString getConnectionString() const {
+            return ConnectionString( _primary.getConnString() , ConnectionString::SYNC );
+        }
 
         static int VERSION;
         

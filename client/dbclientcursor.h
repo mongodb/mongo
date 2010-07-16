@@ -38,7 +38,7 @@ namespace mongo {
             if you want to exhaust whatever data has been fetched to the client already but 
             then perhaps stop.
         */
-        bool moreInCurrentBatch() { return !_putBack.empty() || pos < nReturned; }
+        bool moreInCurrentBatch() { _assertIfNull(); return !_putBack.empty() || pos < nReturned; }
 
         /** next
 		   @return next object in the result cursor.
@@ -90,7 +90,7 @@ namespace mongo {
            available from the dbclientcursor.
         */
         bool isDead() const {
-            return cursorId == 0;
+            return  !this || cursorId == 0;
         }
 
         bool tailable() const {
@@ -102,6 +102,7 @@ namespace mongo {
             ResultFlag_ErrSet is the possible exception to that
         */
         bool hasResultFlag( int flag ){
+            _assertIfNull();
             return (resultFlags & flag) != 0;
         }
 
@@ -176,8 +177,27 @@ namespace mongo {
         void exhaustReceiveMore(); // for exhaust
         bool _ownCursor; // see decouple()
         string _scopedHost;
+
+        // Don't call from a virtual function
+        void _assertIfNull() { uassert(13348, "connection died", this); }
     };
     
+    /** iterate over objects in current batch only - will not cause a network call
+     */
+    class DBClientCursorBatchIterator {
+    public:
+        DBClientCursorBatchIterator( DBClientCursor &c ) : _c( c ), _n() {}
+        bool moreInCurrentBatch() { return _c.moreInCurrentBatch(); }
+        BSONObj nextSafe() {
+            massert( 13383, "BatchIterator empty", moreInCurrentBatch() );
+            ++_n;
+            return _c.nextSafe();
+        }
+        int n() const { return _n; }
+    private:
+        DBClientCursor &_c;
+        int _n;
+    };
     
 } // namespace mongo
 

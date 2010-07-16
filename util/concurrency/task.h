@@ -35,7 +35,9 @@ namespace mongo {
         public:
             Task();
 
-            /** for a repeating task, stop after current invocation ends. */
+            /** for a repeating task, stop after current invocation ends. can be called by other threads 
+                as long as the Task is still in scope.
+                */
             void halt();
         private:
             shared_ptr<Task> me;

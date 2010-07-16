@@ -45,7 +45,7 @@ namespace mongo {
             BSONObj res;
             {
                 bool ok = false;
-                try { 
+                try {
                     int theirVersion = -1000;
                     ok = requestHeartbeat(cfg._id, i->h.toString(), res, -1, theirVersion, true); 
                     if( theirVersion >= cfg.version ) { 
@@ -142,13 +142,33 @@ namespace mongo {
                 return false;
             }
 
+            BSONObj configObj;
+
             if( cmdObj["replSetInitiate"].type() != Object ) {
-                errmsg = "no configuration specified";
-                return false;
+                result.append("info2", "no configuration explicitly specified -- making one");
+                log() << "replSet info initiate : no configuration specified.  Using a default configuration for the set" << rsLog;
+
+                string name;
+                vector<HostAndPort> seeds;
+                set<HostAndPort> seedSet;
+                parseReplsetCmdLine(cmdLine.replSet, name, seeds, seedSet); // may throw...
+
+                bob b;
+                b.append("_id", name);
+                bob members;
+                members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::Me().toString() ));
+                for( unsigned i = 0; i < seeds.size(); i++ )
+                    members.append(bob::numStr(i), BSON( "_id" << i << "host" << seeds[i].toString()));
+                b.appendArray("members", members.obj());
+                configObj = b.obj();
+                log() << "replSet created this configuration for initiation : " << configObj.toString() << rsLog;
+            }
+            else { 
+                configObj = cmdObj["replSetInitiate"].Obj();
             }
 
             try {
-                ReplSetConfig newConfig(cmdObj["replSetInitiate"].Obj());
+                ReplSetConfig newConfig(configObj);
 
                 if( newConfig.version > 1 ) { 
                     errmsg = "can't initiate with a version number greater than 1";

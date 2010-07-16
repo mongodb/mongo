@@ -172,17 +172,6 @@ namespace mongo {
         /** @return false if not present */
         bool getBoolField(const char *name) const;
 
-        /** makes a new BSONObj with the fields specified in pattern.
-           fields returned in the order they appear in pattern.
-           if any field is missing or undefined in the object, that field in the
-           output will be null.
-
-           sets output field names to match pattern field names.
-           If an array is encountered while scanning the dotted names in pattern,
-           that field is treated as missing.
-        */
-        BSONObj extractFieldsDotted(BSONObj pattern) const;
-        
         /**
            sets element field names to empty string
            If a field in pattern is missing, it is omitted from the returned

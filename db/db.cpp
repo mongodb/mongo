@@ -265,6 +265,7 @@ sendmore:
                         QueryResult *qr = (QueryResult *) header;
                         long long cursorid = qr->cursorId;
                         if( cursorid ) {
+                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
                             string ns = dbresponse.exhaust; // before reset() free's it...
                             m.reset();
                             BufBuilder b(512);
@@ -273,7 +274,6 @@ sendmore:
                             b.append(header->responseTo);
                             b.append((int) dbGetMore);
                             b.append((int) 0);
-                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
                             b.append(ns);
                             b.append((int) 0); // ntoreturn
                             b.append(cursorid);
@@ -542,6 +542,7 @@ sendmore:
         }
         
         acquirePathLock();
+        maybeCreatePidFile();
         remove_all( dbpath + "/_tmp/" );
 
         theFileAllocator().start();
@@ -675,7 +676,7 @@ int main(int argc, char* argv[], char *envp[] )
          "comma separated list of ip addresses to listen on - all local ips by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
 #if !defined(_WIN32) && !defined(__sunos__)
-        ("lockfilepath", po::value<string>(&lockfilepath), "directory for lockfile (if not set, dbpath is used)")
+        ("pidfilepath", po::value<string>(&pidfilepath), "directory for pidfile (if not set, no pidfile is created)")
 #endif
         ("directoryperdb", "each database will be stored in a separate directory")
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
@@ -756,6 +757,7 @@ int main(int argc, char* argv[], char *envp[] )
     visible_options.add(sharding_options);
     Module::addOptions( visible_options );
 
+    setupCoreSignals();
     setupSignals();
 
     dbExecCommand = argv[0];
@@ -1137,7 +1139,7 @@ namespace mongo {
     void interruptThread() {
         int x;
         sigwait( &asyncSignals, &x );
-        log() << "got kill or ctrl c signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
+        log() << "got kill or ctrl c or hup signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
         Client::initThread( "interruptThread" );
         exitCleanly( EXIT_KILL );
     }
@@ -1161,6 +1163,7 @@ namespace mongo {
         setupSIGTRAPforGDB();
 
         sigemptyset( &asyncSignals );
+        sigaddset( &asyncSignals, SIGHUP );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
         assert( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );

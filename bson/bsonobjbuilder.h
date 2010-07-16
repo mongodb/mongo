@@ -321,6 +321,14 @@ namespace mongo {
             the number of milliseconds since January 1, 1970, 00:00:00 GMT
         */
         BSONObjBuilder& appendDate(const char *fieldName, Date_t dt) {
+            /* easy to pass a time_t to this and get a bad result.  thus this warning. */
+#if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
+            if( dt > 0 && dt <= 0xffffffff ) { 
+                static int n;
+                if( n++ == 0 )
+                    log() << "DEV WARNING appendDate() called with a tiny (but nonzero) date" << endl;
+            }
+#endif
             _b.append((char) Date);
             _b.append(fieldName);
             _b.append(dt);

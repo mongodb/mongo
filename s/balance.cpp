@@ -21,6 +21,8 @@
 #include "../db/jsobj.h"
 #include "../db/cmdline.h"
 
+#include "../client/distlock.h"
+
 #include "balance.h"
 #include "server.h"
 #include "shard.h"
@@ -36,78 +38,6 @@ namespace mongo {
     Balancer::~Balancer() {
         delete _policy;
     }
-
-    bool Balancer::_shouldIBalance( DBClientBase& conn ){
-        BSONObj x = conn.findOne( ShardNS::settings , BSON( "_id" << "balancer" ) );
-        log(2) << "balancer configDB entry: " << x << endl;
-        
-        if ( ! x.isEmpty() ){
-
-            if ( x["who"].String() == _myid ){
-                log(2) << "I'm the current balancer" << endl;
-
-                // If need be, we can stop the balancer by creating a 'stopped : true' field in its 
-                // entry.
-                if ( x["stopped"].type() && x["stopped"].Bool() ){
-                    log() << "stopped flag true" << endl;
-                    return false;
-                }
-
-                return true;
-            }
-            
-            BSONObj other = conn.findOne( ShardNS::mongos , x["who"].wrap( "_id" ) );
-            // TODO: if it can't find it for 10 minutes, should reset
-            massert( 13125 , (string)"can't find mongos: " + x["who"].String() , ! other.isEmpty() );
-
-            int secsSincePing = (int)(( jsTime() - other["ping"].Date() ) / 1000 );
-            ostringstream msgPing;
-            msgPing << secsSincePing << "secs since last ping from balancer in charge: " << other << endl;
-            if ( secsSincePing < ( 60 * 10 ) ){
-                log(2) << msgPing.str();
-                return false;
-            }
-            
-            log() << msgPing.str();
-            log() << "will try to take over: " << x << endl;
-            // we want to take over, so fall through to below
-        }
-
-        // Taking over means replacing 'who' with this balancer's address. Note that
-        // to avoid any races, we use a compare-and-set strategy relying on the 
-        // incarnation of the previous balancer (the key 'x').
-
-        OID incarnation;
-        incarnation.init();
-        
-        BSONObjBuilder updateQuery;
-        updateQuery.append( "_id" , "balancer" );
-        if ( x["x"].type() ){
-            updateQuery.append( x["x"] );
-
-            // Carry on the stopped flag, if it existed.
-            if ( ! x["stopped"].type() ){
-                updateQuery.append( "stopped" , x["stopped"].Bool() );
-            }
-
-        } else {
-            updateQuery.append( "x" , BSON( "$exists" << false ) );
-        }
-
-        conn.update( ShardNS::settings , 
-                     updateQuery.obj() ,
-                     BSON( "$set" << BSON( "who" << _myid << "x" << incarnation ) ) ,
-                     true );
-
-        // If another balancer beats this one to the punch, the following query will see 
-        // the incarnation for that other guy.
-        
-        x = conn.findOne( ShardNS::settings , BSON( "_id" << "balancer" ) );
-        bool takeOver = _myid == x["who"].String() && incarnation == x["x"].OID();
-        log() << ( takeOver ? "" : "un" ) << "successful takeover. Current balancer is : " << x << endl;
-
-        return takeOver;
-    }    
 
     int Balancer::_moveChunks( const vector<CandidateChunkPtr>* candidateChunks ) {
         int movedCount = 0;
@@ -308,7 +238,7 @@ namespace mongo {
 
         { // init stuff, don't want to do at static init
             StringBuilder buf;
-            buf << ourHostname << ":" << cmdLine.port;
+            buf << getHostNameCached() << ":" << cmdLine.port;
             _myid = buf.str();
             log(1) << "balancer myid: " << _myid << endl;
             
@@ -320,36 +250,43 @@ namespace mongo {
         _ping();
         _checkOIDs();
 
+        ConnectionString config = configServer.getConnectionString();
+        DistributedLock balanceLock( config , "balancer" );
+
         while ( ! inShutdown() ){
-            sleepsecs( 10 );
             
             try {
-                ScopedDbConnection conn( configServer.getPrimary() );
-                _ping( conn.conn() );
-                
+                ScopedDbConnection conn( config );
+
+                _ping( conn.conn() );                
                 if ( ! _checkOIDs() ){
                     uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
                 }
-                                    
-                vector<CandidateChunkPtr> candidateChunks;
-                if ( _shouldIBalance( conn.conn() ) ){
+                
+                dist_lock_try lk( &balanceLock , "doing balance round" );
+                if ( ! lk.got() ){
+                    log(1) << "skipping balancing round during ongoing split or move activity." << endl;
+                    conn.done();
 
-                    log(1) << "*** start balancing round" << endl;        
+                    sleepsecs( 30 ); // no need to wake up soon
 
-                    candidateChunks.clear();
-                    _doBalanceRound( conn.conn() , &candidateChunks );
-
-                    if ( candidateChunks.size() == 0 ) {
-                        log(1) << "no need to move any chunk" << endl;
-
-                    } else {
-                        _balancedLastTime = _moveChunks( &candidateChunks );
-                    }
-
-                    log(1) << "*** end of balancing round" << endl;        
-
+                    continue;
                 }
+                        
+                log(1) << "*** start balancing round" << endl;        
+
+                vector<CandidateChunkPtr> candidateChunks;
+                _doBalanceRound( conn.conn() , &candidateChunks );
+                if ( candidateChunks.size() == 0 ) {
+                    log(1) << "no need to move any chunk" << endl;
+                } else {
+                    _balancedLastTime = _moveChunks( &candidateChunks );
+                }
+
+                log(1) << "*** end of balancing round" << endl;        
                 conn.done();
+
+                sleepsecs( _balancedLastTime ? 5 : 10 );
             }
             catch ( std::exception& e ){
                 log() << "caught exception while doing balance: " << e.what() << endl;

@@ -1,5 +1,38 @@
 #!/usr/bin/python
 
+# smoke.py: run some mongo tests.
+
+# Bugs, TODOs: 
+
+# 0 Some tests hard-code pathnames relative to the mongo repository,
+#   so the smoke.py process and all its children must be run with the
+#   mongo repo as current working directory.  That's kinda icky.
+
+# 1 The tests that are implemented as standalone executables ("test",
+#   "perftest"), don't take arguments for the dbpath, but
+#   unconditionally use "/tmp/unittest".
+
+# 2 mongod output gets intermingled with mongo output, and it's often
+#   hard to find error messages in the slop.  Maybe have smoke.py do
+#   some fancier wrangling of child process output?
+
+# 3 Some test suites run their own mongods, and so don't need us to
+#   run any mongods around their execution.  (It's harmless to do so,
+#   but adds noise in the output.)
+
+# 4 Running a separate mongo shell for each js file is slower than
+#   loading js files into one mongo shell process.  Maybe have runTest
+#   queue up all filenames ending in ".js" and run them in one mongo
+#   shell at the "end" of testing?
+
+# 5 Right now small-oplog implies master/slave replication.  Maybe
+#   running with replication should be an orthogonal concern.  (And
+#   maybe test replica set replication, too.)
+
+# 6 We use cleanbb.py to clear out the dbpath, but cleanbb.py kills
+#   off all mongods on a box, which means you can't run two smoke.py
+#   jobs on the same host at once.  So something's gotta change.
+
 from __future__ import with_statement
 from subprocess import Popen, PIPE, call
 import os
@@ -313,7 +346,7 @@ def expandSuites(suites):
     for suite in suites:
         if suite == 'smokeAll':
             tests = []
-            expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlow', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
+            expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlowNightly', 'smokeJsSlowWeekly', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
             break
         if suite == 'smoke':
             if os.sys.platform == "win32":
@@ -337,8 +370,10 @@ def expandSuites(suites):
             (globstr, usedb) = ('perf/*.js', True)
         elif suite == 'smokeDisk':
             (globstr, usedb) = ('disk/*.js', True)
-        elif suite == 'smokeJsSlow':
-            (globstr, usedb) = ('slow/*.js', True)
+        elif suite == 'smokeJsSlowNightly':
+            (globstr, usedb) = ('slowNightly/*.js', True)
+        elif suite == 'smokeJsSlowWeekly':
+            (globstr, usedb) = ('slowNightly/*.js', True)
         elif suite == 'smokeParallel':
             (globstr, usedb) = ('parallel/*.js', True)
         elif suite == 'smokeClone':
@@ -397,9 +432,11 @@ def main():
                       help='If supplied, run each test in a fresh mongod')
     parser.add_option('--from-file', dest='File',
                       help="Run tests/suites named in FILE, one test per line, '-' means stdin")
-    parser.add_option('--smoke-db-prefix', dest='smokeDbPrefix', default='')
+    parser.add_option('--smoke-db-prefix', dest='smokeDbPrefix', default='',
+                      help="Prefix to use for the mongods' dbpaths.")
     parser.add_option('--small-oplog', dest='smallOplog', default=False,
-                      action="store_true")
+                      action="store_true",
+                      help='Run tests with master/slave replication & use a small oplog')
     global tests
     (options, tests) = parser.parse_args()
 

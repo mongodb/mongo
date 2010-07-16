@@ -57,6 +57,16 @@ namespace mongo {
             : _combined( ll ){
         }
         
+        ShardChunkVersion( const BSONElement& e ){
+            if ( e.type() == Date || e.type() == Timestamp ){
+                _combined = e._numberLong();
+            }
+            else {
+                log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
+                assert(0);
+            }
+        }
+
         ShardChunkVersion incMajor() const {
             return ShardChunkVersion( _major + 1 , 0 );
         }
@@ -146,16 +156,15 @@ namespace mongo {
             return ! ( *this == s );
         }
         
-        void getFilter( BSONObjBuilder& b ) const;
-        BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
-        
         // if min/max key is pos/neg infinity
         bool minIsInf() const;
         bool maxIsInf() const;
 
         BSONObj pickSplitPoint() const;
         ChunkPtr split();
-        ChunkPtr split( const BSONObj& middle );
+
+        void pickSplitVector( vector<BSONObj>* splitPoints ) const;
+        ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
 
         /**
          * @return size of shard in bytes
@@ -235,8 +244,6 @@ namespace mongo {
 
         // clones of Chunk methods
         bool contains(const BSONObj& obj) const;
-        void getFilter( BSONObjBuilder& b ) const;
-        BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
 
         ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end)
             : _manager(begin->second->getManager())
@@ -322,6 +329,8 @@ namespace mongo {
         ShardKeyPattern& getShardKey(){  return _key; }
         const ShardKeyPattern& getShardKey() const {  return _key; }
         bool isUnique(){ return _unique; }
+
+        void maybeChunkCollection();
         
         /**
          * makes sure the shard index is on all servers

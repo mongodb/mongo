@@ -193,16 +193,19 @@ namespace mongo {
         void kill();
 
         DBClientBase& conn(){
+            _finishInit();
             assert( _conn );
             return *_conn;
         }
         
         DBClientBase* operator->(){
+            _finishInit();
             assert( _conn );
             return _conn;
         }
 
         DBClientBase* get(){
+            _finishInit();
             assert( _conn );
             return _conn;
         }
@@ -211,7 +214,8 @@ namespace mongo {
             return _addr;
         }
 
-        bool setVersion() const {
+        bool setVersion() {
+            _finishInit();
             return _setVersion;
         }
 
@@ -219,7 +223,10 @@ namespace mongo {
         
     private:
         void _init();
+        void _finishInit();
         
+        bool _finishedInit;
+
         string _addr;
         string _ns;
         DBClientBase* _conn;

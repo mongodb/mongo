@@ -661,7 +661,7 @@ namespace mongo {
 
     extern string dbpath; // --dbpath parm
     extern bool directoryperdb;
-    extern string lockfilepath; // --lockfilepath param
+    extern string pidfilepath; // --pidfilepath param
 
     // Rename a namespace within current 'client' db.
     // (Arguments should include db name)

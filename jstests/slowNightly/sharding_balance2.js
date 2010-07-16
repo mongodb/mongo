@@ -1,12 +1,24 @@
-// sharding_balance3.js
+// sharding_balance2.js
 
-s = new ShardingTest( "slow_sharding_balance3" , 2 , 2 , 1 , { chunksize : 1 } );
+s = new ShardingTest( "slow_sharding_balance2" , 2 , 2 , 1 , { chunksize : 1 , manualAddShard : true } )
+
+names = s.getConnNames();
+for ( var i=0; i<names.length; i++ ){
+    if ( i==1 ) {
+        // We set maxSize of the shard to something artificially low. That mongod would still 
+        // allocate and mmap storage as usual but the balancing mongos would not ship any chunk
+        // to it.
+        s.adminCommand( { addshard : names[i] , allowLocal : true , maxSize : 1 } );
+    } else {
+        s.adminCommand( { addshard : names[i] , allowLocal : true } );
+    }
+}
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 assert.eq( 1 , s.config.chunks.count()  , "setup1" );
 
-s.config.settings.find().forEach( printjson );
+s.config.settings.find().forEach( printjson )
 
 db = s.getDB( "test" );
 
@@ -16,7 +28,7 @@ while ( bigString.length < 10000 )
 
 inserted = 0;
 num = 0;
-while ( inserted < ( 20 * 1024 * 1024 ) ){
+while ( inserted < ( 40 * 1024 * 1024 ) ){
     db.foo.insert( { _id : num++ , s : bigString } );
     inserted += bigString.length;
 }
@@ -43,29 +55,14 @@ function diff(){
     return Math.max( x.shard0 , x.shard1 ) - Math.min( x.shard0 , x.shard1 );
 }
 
-assert.lt( 20 , diff() );
-
-// Wait for balancer to kick in.
-var initialDiff = diff();
-var maxRetries = 3;
-while ( diff() == initialDiff ){
-    sleep( 5000 );
-    assert.lt( 0, maxRetries--, "Balancer did not kick in.");
-}
-
-print("* A");
-print( "disabling the balancer" );
-s.config.settings.update( { _id : "balancer" }, { $set : { stopped : true } } );
-s.config.settings.find().forEach( printjson );
-print("* B");
-
-
+assert.lt( 10 , diff() );
 print( diff() )
 
 var currDiff = diff();
 assert.repeat( function(){
     var d = diff();
     return d != currDiff;
-} , "balance with stopped flag should not have happened" , 1000 * 30 , 5000 );
+} , "balance with maxSize should not have happened" , 1000 * 30 , 5000 );
+    
 
-s.stop()
+s.stop();

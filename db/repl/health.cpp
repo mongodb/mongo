@@ -355,13 +355,13 @@ namespace mongo {
             bb.append("name", m->fullName());
             bb.append("health", m->hbinfo().health);
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
-            bb.appendDate("lastHeartbeat", m->hbinfo().lastHeartbeat);
+            bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
             bb.append("errmsg", m->lhb());
             v.push_back(bb.obj());
             m = m->next();
         }
         b.append("set", name());
-        b.appendDate("date", time(0));
+        b.appendTimeT("date", time(0));
         b.append("myState", _myState);
         b.append("members", v);
     }
