@@ -150,14 +150,14 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
 		WT_RET((__wt_calloc(env,
-		    nindx, sizeof(WT_COL_INDX), &page->u.c_indx)));
+		    nindx, sizeof(WT_COL), &page->u.c_indx)));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET((__wt_calloc(env,
-		    nindx, sizeof(WT_ROW_INDX), &page->u.r_indx)));
+		    nindx, sizeof(WT_ROW), &page->u.r_indx)));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -199,7 +199,7 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 	WT_ITEM *item;
 	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 	u_int64_t records;
 	u_int32_t i;
 
@@ -252,7 +252,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_ITEM *item;
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 	u_int32_t i, indx_count;
 	u_int64_t records;
 
@@ -319,7 +319,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 static int
 __wt_bt_page_inmem_col_int(WT_PAGE *page)
 {
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
@@ -354,7 +354,7 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 static int
 __wt_bt_page_inmem_col_var(WT_PAGE *page)
 {
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
@@ -369,7 +369,7 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 	 */
 	cip = page->u.c_indx;
 	WT_ITEM_FOREACH(page, item, i) {
-		cip->data = WT_ITEM_TYPE(item) == WT_ITEM_DEL ? NULL : item;
+		cip->data = item;
 		++cip;
 	}
 
@@ -388,7 +388,7 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 static int
 __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 {
-	WT_ROW_INDX *rip;
+	WT_ROW *rip;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
@@ -431,7 +431,7 @@ static int
 __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
-	WT_COL_INDX *cip;
+	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
 	u_int32_t i;
@@ -472,7 +472,7 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *rip, DBT *dbt)
+__wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt)
 {
 	DBT local_dbt;
 	ENV *env;
@@ -502,7 +502,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *rip, DBT *dbt)
 	 * (2) Compressed overflow item
 	 * (3) Compressed on-page item
 	 *
-	 * In these cases, the WT_ROW_INDX data field points to the on-page
+	 * In these cases, the WT_ROW data field points to the on-page
 	 * item.   We're going to process that item to create an in-memory
 	 * key.
 	 *
@@ -522,7 +522,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *rip, DBT *dbt)
 	/*
 	 * When returning keys to the application, this function is called with
 	 * a DBT into which to copy the key; if that isn't given, copy the key
-	 * into allocated memory in the WT_ROW_INDX structure.
+	 * into allocated memory in the WT_ROW structure.
 	 */
 	if (dbt == NULL) {
 		WT_CLEAR(local_dbt);
@@ -542,8 +542,8 @@ __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *rip, DBT *dbt)
 
 	/*
 	 * If no target DBT specified (that is, we're intending to persist this
-	 * conversion in our in-memory tree), update the WT_ROW_INDX reference
-	 * with the processed key.
+	 * conversion in our in-memory tree), update the WT_ROW reference with
+	 * the processed key.
 	 *
 	 * If there are any duplicates of this item, update them as well.
 	 */
