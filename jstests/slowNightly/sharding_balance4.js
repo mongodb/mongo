@@ -36,6 +36,10 @@ for ( i=0; i<N*10; i++ ){
 }
 db.getLastError();
 
+s.printChunks( "test.foo" )
+
+check( "initial" )
+
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
 function dist(){
@@ -51,7 +55,7 @@ function dist(){
     return x;
 }
 
-function check(){
+function check( msg ){
     for ( var x in counts ){
         var e = counts[x];
         var z = db.foo.findOne( { _id : parseInt( x ) } )
@@ -59,7 +63,7 @@ function check(){
         if ( z && z.x == e )
             continue;
         
-        sleep( 5000 );
+        sleep( 10000 );
         
         var y = db.foo.findOne( { _id : parseInt( x ) } )
 
@@ -67,8 +71,8 @@ function check(){
             delete y.s;
         }
         
-        assert( z , "couldn't find : " + x + " y:" + tojson(y))
-        assert.eq( e , z.x , "count for : " + x + " y:" + tojson(y))
+        assert( z , "couldn't find : " + x + " y:" + tojson(y) + " " + msg )
+        assert.eq( e , z.x , "count for : " + x + " y:" + tojson(y) + " " + msg )
     }
 }
 
