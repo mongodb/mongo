@@ -184,30 +184,6 @@ namespace mongo {
 
         // ------------ database level commands -------------
 
-        class ListDatabaseCommand : public GridAdminCmd {
-        public:
-            ListDatabaseCommand() : GridAdminCmd("listDatabases") { }
-            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection conn( configServer.getPrimary() );
-
-                auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , BSONObj() );
-
-                BSONObjBuilder list;
-                int num = 0;
-                while ( cursor->more() ){
-                    string s = BSONObjBuilder::numStr( num++ );
-
-                    BSONObj o = cursor->next();
-                    list.append( s.c_str() , o["_id"].valuestrsafe() );
-                }
-
-                result.appendArray("databases" , list.obj() );
-                conn.done();
-
-                return true;
-            }
-        } gridListDatabase;
-
         class MoveDatabasePrimaryCommand : public GridAdminCmd {
         public:
             MoveDatabasePrimaryCommand() : GridAdminCmd("movePrimary") { }
