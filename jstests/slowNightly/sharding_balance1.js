@@ -44,8 +44,7 @@ assert.soon( function(){
 } , "balance didn't happen" , 1000 * 60 * 3 , 5000 );
     
 var chunkCount = sum();
-host = s.config.shards.findOne({_id : "shard0" }).host;
-s.adminCommand( { removeshard: host } );
+s.adminCommand( { removeshard: "shard0" } );
 
 assert.soon( function(){
     printjson(s.chunkCounts( "foo" ));
