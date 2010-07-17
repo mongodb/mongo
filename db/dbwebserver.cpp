@@ -32,6 +32,7 @@
 #include "background.h"
 #include "commands.h"
 #include "../util/version.h"
+#include "../util/ramlog.h"
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #undef assert
@@ -87,7 +88,9 @@ namespace mongo {
 
     class DbWebServer : public MiniWebServer {
     public:
-        DbWebServer(const string& ip, int port) : MiniWebServer(ip, port) {}
+        DbWebServer(const string& ip, int port) : MiniWebServer(ip, port), ramlog(new RamLog()) {
+            Logstream::get().addGlobalTee( ramlog );
+        }
 
     private:
         // caller locks
@@ -147,6 +150,9 @@ namespace mongo {
             statsSnapshots.outputLockInfoHTML( ss );
 
             BackgroundOperation::dump(ss);
+
+            ss << "<h3>Log</h3>\n";
+            ramlog->toHTML( ss );
         }
 
         void display( stringstream& ss , double elapsed , const Top::UsageData& usage ){
@@ -791,6 +797,7 @@ namespace mongo {
 
     private:
         static DBDirectClient db;
+        RamLog * ramlog;
     };
 
     DBDirectClient DbWebServer::db;

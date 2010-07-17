@@ -83,6 +83,8 @@ namespace mongo {
     bool UnitTest::running = false;
 
     Nullstream nullstream;
+    vector<Tee*> Logstream::globalTees;
+    
 
     thread_specific_ptr<Logstream> Logstream::tsp;
 

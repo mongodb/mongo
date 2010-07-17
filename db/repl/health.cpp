@@ -257,77 +257,9 @@ namespace mongo {
         s << _table();
     }
 
-    static int repeats(const vector<const char *>& v, int i) { 
-        for( int j = i-1; j >= 0 && j+8 > i; j-- ) {
-            if( strcmp(v[i]+20,v[j]+20) == 0 ) {
-                for( int x = 1; ; x++ ) {
-                    if( j+x == i ) return j;
-                    if( i+x>=(int) v.size() ) return -1;
-                    if( strcmp(v[i+x]+20,v[j+x]+20) ) return -1;
-                }
-                return -1;
-            }
-        }
-        return -1;
-    }
-
-    static string clean(const vector<const char *>& v, int i, string line="") { 
-        if( line.empty() ) line = v[i];
-        if( i > 0 && strncmp(v[i], v[i-1], 11) == 0 )
-            return string("           ") + line.substr(11);
-        return v[i];
-    }
-
-    /*static bool isWarning(const char *line) {
-        const char *p = strstr(line, "replSet ");
-        if( p ) { 
-            p += 8;
-            return startsWith(p, "warning") || startsWith(p, "error");
-        }
-        return false;
-    }*/
-    static string color(string line) { 
-        string s = str::after(line, "replSet ");
-        if( str::startsWith(s, "warning") || startsWith(s, "error") )
-            return red(line);
-        if( str::startsWith(s, "info") ) {
-            if( str::endsWith(s, " up\n") )
-                return green(line);
-            if( str::endsWith(s, " down\n") )
-                return yellow(line);
-            return blue(line);
-        }
-
-        return line;
-    }
 
     void fillRsLog(stringstream& s) {
-        bool first = true;
-        s << "<pre>\n";
-        vector<const char *> v = _rsLog.get();
-        for( int i = 0; i < (int)v.size(); i++ ) {
-            assert( strlen(v[i]) > 20 );
-            int r = repeats(v, i);
-            if( r < 0 ) {
-                s << color( clean(v,i) );
-            } else {
-                stringstream x;
-                x << string(v[i], 0, 20);
-                int nr = (i-r);
-                int last = i+nr-1;
-                for( ; r < i ; r++ ) x << '.';
-                if( 1 ) { 
-                    stringstream r; 
-                    if( nr == 1 ) r << "repeat last line";
-                    else r << "repeats last " << nr << " lines; ends " << string(v[last]+4,0,15);
-                    first = false; s << a("", r.str(), clean(v,i,x.str()));
-                }
-                else s << x.str();
-                s << '\n';
-                i = last;
-            }
-        }
-        s << "</pre>\n";
+        _rsLog.toHTML( s );
     }
 
     Member* ReplSetImpl::findById(unsigned id) const { 

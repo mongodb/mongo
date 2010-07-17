@@ -152,6 +152,7 @@ namespace mongo {
         LogLevel logLevel;
         static boost::scoped_ptr<ostream> stream;
         static FILE* logfile;
+        static vector<Tee*> globalTees;
     public:
 
         static void setLogFile(FILE* f){
@@ -185,6 +186,8 @@ namespace mongo {
                 scoped_lock lk(mutex);
                 
                 if( t ) t->write(logLevel,s);
+                for ( unsigned i=0; i<globalTees.size(); i++ )
+                    globalTees[i]->write(logLevel,s);
                 
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
@@ -247,6 +250,10 @@ namespace mongo {
 
         Logstream& prolog() {
             return *this;
+        }
+        
+        void addGlobalTee( Tee * t ){
+            globalTees.push_back( t );
         }
 
     private:
