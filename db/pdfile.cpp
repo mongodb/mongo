@@ -167,7 +167,7 @@ namespace mongo {
             return false;
         }
 
-        log(1) << "create collection " << ns << ' ' << options << '\n';
+        log(1) << "create collection " << ns << ' ' << options.toString() << '\n';
 
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
            and then go back and set to ok : 1 after we are done.
@@ -1225,7 +1225,8 @@ namespace mongo {
 
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) { 
-        tlog() << "building new index on " << idx.keyPattern() << " for " << ns << ( background ? " background" : "" ) << endl;
+        tlog() << "building new index on " << idx.keyPattern().toString() << " for " << ns 
+               << ( background ? " background" : "" ) << endl;
         Timer t;
 		unsigned long long n;
 

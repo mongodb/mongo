@@ -34,7 +34,7 @@ namespace mongo {
         virtual void queryOp( Request& r ){
             QueryMessage q( r.d() );
 
-            log(3) << "shard query: " << q.ns << "  " << q.query << endl;
+            log(3) << "shard query: " << q.ns << "  " << q.query.toString() << endl;
             
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
@@ -131,7 +131,7 @@ namespace mongo {
                     }
                     
                     if ( bad ){
-                        log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
+                        log() << "tried to insert object without shard key: " << r.getns() << "  " << o.toString() << endl;
                         throw UserException( 8011 , "tried to insert object without shard key" );
                     }
                     
@@ -141,7 +141,7 @@ namespace mongo {
                 for ( int i=0; i<10; i++ ){
                     try {
                         ChunkPtr c = manager->findChunk( o );
-                        log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                        log(4) << "  server:" << c->getShard().toString() << " " << o.toString() << endl;
                         insert( c->getShard() , r.getns() , o );
                         
                         r.gotInsert();
@@ -150,7 +150,7 @@ namespace mongo {
                         break;
                     }
                     catch ( StaleConfigException& ){
-                        log(1) << "retrying insert because of StaleConfigException: " << o << endl;
+                        log(1) << "retrying insert because of StaleConfigException: " << o.toString() << endl;
                         r.reset();
                         manager = r.getChunkManager();
                     }
@@ -242,7 +242,7 @@ namespace mongo {
 
             set<Shard> shards;
             manager->getShardsForQuery( shards , pattern );
-            log(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
+            log(2) << "delete : " << pattern.toString() << " \t " << shards.size() << " justOne: " << justOne << endl;
             if ( shards.size() == 1 ){
                 doWrite( dbDelete , r , *shards.begin() );
                 return;

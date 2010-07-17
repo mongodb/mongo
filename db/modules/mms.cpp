@@ -105,7 +105,7 @@ namespace mongo {
                     
                     BSONObj postData = bb.obj();
                     
-                    log(1) << "mms url: " << url.str() << "\n\t post: " << postData << endl;;
+                    log(1) << "mms url: " << url.str() << "\n\t post: " << postData.toString() << endl;;
                     
                     HttpClient c;
                     HttpClient::Result r;

@@ -732,7 +732,7 @@ namespace mongo {
         if ( ! runCommand( nsToDatabase( ns.c_str() ) , 
                            BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) , 
                            info ) ){
-            log(_logLevel) << "dropIndex failed: " << info << endl;
+            log(_logLevel) << "dropIndex failed: " << info.toString() << endl;
             uassert( 10007 ,  "dropIndex failed" , 0 );
         }
         resetIndexCache();

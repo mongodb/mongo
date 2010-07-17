@@ -134,7 +134,7 @@ namespace mongo {
                     }
 
                     BSONObj x = b.obj();
-                    log() << old << "\n\t" << x << endl;
+                    log() << old.toString() << "\n\t" << x.toString() << endl;
                     newDBs[old["name"].String()] = x;
                 }
 
@@ -169,7 +169,7 @@ namespace mongo {
                     }
                     
                     BSONObj n = b.obj();
-                    log() << x << "\n\t" << n << endl;
+                    log() << x.toString() << "\n\t" << n.toString() << endl;
                     chunks[id] = n;
                     num++;
                 }

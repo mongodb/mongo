@@ -169,7 +169,7 @@ namespace mongo {
     
     void DBConfig::unserialize(const BSONObj& from){
         _name = from.getStringField("_id");
-        log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
+        log(1) << "DBConfig unserialize: " << _name << " " << from.toString() << endl;
         
         _shardingEnabled = from.getBoolField("partitioned");
         _primary.reset( from.getStringField("primary") );
@@ -475,7 +475,7 @@ namespace mongo {
             string name = o["_id"].valuestrsafe();
             got.insert( name );
             if ( name == "chunksize" ){
-                log(1) << "MaxChunkSize: " << o["value"] << endl;
+                log(1) << "MaxChunkSize: " << o["value"].toString() << endl;
                 Chunk::MaxChunkSize = o["value"].numberInt() * 1024 * 1024;
             }
             else if ( name == "balancer" ){
@@ -539,7 +539,7 @@ namespace mongo {
 
         BSONObj msg = BSON( "_id" << id.str() << "server" << getHostNameCached() << "time" << DATENOW <<
                             "what" << what << "ns" << ns << "details" << detail );
-        log() << "config change: " << msg << endl;
+        log() << "config change: " << msg.toString() << endl;
         conn->insert( "config.changelog" , msg );
         
         conn.done();

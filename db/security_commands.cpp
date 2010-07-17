@@ -99,7 +99,7 @@ namespace mongo {
         virtual void help(stringstream& ss) const { ss << "internal"; }
         CmdAuthenticate() : Command("authenticate") {}
         bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            log(1) << " authenticate: " << cmdObj << endl;
+            log(1) << " authenticate: " << cmdObj.toString() << endl;
 
             string user = cmdObj.getStringField("user");
             string key = cmdObj.getStringField("key");

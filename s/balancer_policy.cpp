@@ -102,7 +102,7 @@ namespace mongo {
         const vector<BSONObj>& chunksFrom = shardToChunksMap.find( from )->second;
         const vector<BSONObj>& chunksTo = shardToChunksMap.find( to )->second;
         BSONObj chunkToMove = pickChunk( chunksFrom , chunksTo );
-        log() << "chose [" << from << "] to [" << to << "] " << chunkToMove << endl;        
+        log() << "chose [" << from << "] to [" << to << "] " << chunkToMove.toString() << endl;        
 
         return new ChunkInfo( ns, to, from, chunkToMove );
     }

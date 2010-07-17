@@ -729,7 +729,7 @@ namespace mongo {
                     int idxId = d->findIndexByKeyPattern( f.embeddedObject() );
                     if ( idxId < 0 ){
                         errmsg = "can't find index with key:";
-                        errmsg += f.embeddedObject();
+                        errmsg += f.embeddedObject().toString();
                         return false;
                     }
                     else {
@@ -1270,7 +1270,7 @@ namespace mongo {
             if ( !client.runCommand( dbname ,
                                     BSON( "cloneCollectionAsCapped" << from << "toCollection" << ( from + ".$temp_convertToCapped" ) << "size" << double( size ) ),
                                     info ) ) {
-                errmsg = "cloneCollectionAsCapped failed: " + string(info);
+                errmsg = "cloneCollectionAsCapped failed: " + info.toString();
                 return false;
             }
 
@@ -1283,7 +1283,7 @@ namespace mongo {
                                     BSON( "renameCollection" << ( dbname + "." + from + ".$temp_convertToCapped" ) 
                                           << "to" << ( dbname + "." + from ) ),
                                     info ) ) {
-                errmsg = "renameCollection failed: " + string(info);
+                errmsg = "renameCollection failed: " + info.toString();
                 return false;
             }
 
@@ -1692,7 +1692,7 @@ namespace mongo {
                     if ( !idx.head.isValid() || !idx.info.isValid() ) {
                         log() << "invalid index for ns: " << c << " " << idx.head << " " << idx.info;
                         if ( idx.info.isValid() )
-                            log() << " " << idx.info.obj();
+                            log() << " " << idx.info.obj().toString();
                         log() << endl;
                     }
                 }
@@ -1808,7 +1808,7 @@ namespace mongo {
         }
 
         if ( c->adminOnly() )
-            log( 2 ) << "command: " << cmdObj << endl;
+            log( 2 ) << "command: " << cmdObj.toString() << endl;
         
         if ( c->locktype() == Command::NONE ){
             // we also trust that this won't crash
@@ -1863,7 +1863,7 @@ namespace mongo {
         string dbname = nsToDatabase( ns );
 
         if( logLevel >= 1 ) 
-            log() << "run command " << ns << ' ' << _cmdobj << endl;
+            log() << "run command " << ns << ' ' << _cmdobj.toString() << endl;
         
         const char *p = strchr(ns, '.');
         if ( !p ) return false;

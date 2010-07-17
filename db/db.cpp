@@ -376,7 +376,7 @@ sendmore:
                 bool ok = db.runCommand( dbName , BSON( "reIndex" << c.substr( dbName.size() + 1 ) ) , out );
                 if ( ! ok ){
                     errmsg = "reindex failed";
-                    log() << "\t\t reindex failed: " << out << endl;
+                    log() << "\t\t reindex failed: " << out.toString() << endl;
                     return false;
                 }
             }
@@ -409,8 +409,8 @@ sendmore:
             if ( !h->currentVersion() || forceRepair ) {
                 log() << "****" << endl;
                 log() << "****" << endl;
-                log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
-                      << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+                log() << "need to upgrade database " << dbName << " with pdfile version " << h->version 
+                      << "." << h->versionMinor << ", " << "new version: " << VERSION << "." << VERSION_MINOR << endl;
                 if ( shouldRepairDatabases ){
                     // QUESTION: Repair even if file format is higher version than code?
                     log() << "\t starting upgrade" << endl;

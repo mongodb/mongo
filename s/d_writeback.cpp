@@ -69,7 +69,7 @@ namespace mongo {
             
             const OID id = e.__oid();
             BSONObj z = getWritebackQueue(id.str())->blockingPop();
-            log(1) << "WriteBackCommand got : " << z << endl;
+            log(1) << "WriteBackCommand got : " << z.toString() << endl;
             
             result.append( "data" , z );
             

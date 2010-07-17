@@ -88,7 +88,6 @@ namespace mongo {
             This is an abbreviated representation which might be used for logging.
         */
         string toString( bool isArray = false, bool full=false ) const;
-        operator string() const { return toString(); }
         
         /** Properly formatted JSON string. 
             @param pretty if true we try to add some lf's and indentation

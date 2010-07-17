@@ -125,7 +125,7 @@ namespace mongo {
 
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
-            log( 6 ) << "logOp:" << temp << endl;
+            log( 6 ) << "logOp:" << temp.toString() << endl;
         }
     }
 
@@ -213,7 +213,7 @@ namespace mongo {
 
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
-            log( 6 ) << "logging op:" << temp << endl;
+            log( 6 ) << "logging op:" << temp.toString() << endl;
         }
 
     }
@@ -389,7 +389,7 @@ namespace mongo {
                     }
                 }
             }
-            log() << "started logCollection with cmd obj: " << cmdObj << endl;
+            log() << "started logCollection with cmd obj: " << cmdObj.toString() << endl;
             return true;
         }
     } cmdlogcollection;
@@ -489,7 +489,7 @@ namespace mongo {
 
     void applyOperation_inlock(const BSONObj& op){
         if( logLevel >= 6 ) 
-            log() << "applying op: " << op << endl;
+            log() << "applying op: " << op.toString() << endl;
         
         assertInWriteLock();
 

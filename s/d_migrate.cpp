@@ -123,7 +123,7 @@ namespace mongo {
                 ide = obj["_id"];
             
             if ( ide.eoo() ){
-                log( LL_WARNING ) << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << endl;
+                log( LL_WARNING ) << "logOpForSharding got mod with no _id, ignoring  obj: " << obj.toString() << endl;
                 return;
             }
             
@@ -332,7 +332,7 @@ namespace mongo {
             Shard fromShard( from );
             Shard toShard( to );
             
-            log() << "got movechunk: " << cmdObj << endl;
+            log() << "got movechunk: " << cmdObj.toString() << endl;
         
             // 2. 
             
@@ -414,7 +414,7 @@ namespace mongo {
                 res = res.getOwned();
                 conn.done();
                 
-                log(0) << "_recvChunkStatus : " << res << endl;
+                log(0) << "_recvChunkStatus : " << res.toString() << endl;
                 
                 if ( ! ok ){
                     errmsg = "_recvChunkStatus error";
@@ -452,7 +452,7 @@ namespace mongo {
                     conn.done();
 
                     if ( ! ok ){
-                        log() << "_recvChunkCommit failed: " << res << endl;
+                        log() << "_recvChunkCommit failed: " << res.toString() << endl;
                         errmsg = "_recvChunkCommit failed!";
                         result.append( "cause" , res );
                         return false;
@@ -634,7 +634,7 @@ namespace mongo {
 
                 BSONObj res;
                 if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
-                    log() << "_transferMods failed in STEADY state: " << res << endl;
+                    log() << "_transferMods failed in STEADY state: " << res.toString() << endl;
                     errmsg = res.toString();
                     state = FAIL;
                     return;

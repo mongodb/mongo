@@ -60,8 +60,8 @@ namespace mongo {
         
         if ( logLevel >= 5 ){
             log(5) << "ClusteredCursor::query (" << type() << ") server:" << server 
-                   << " ns:" << _ns << " query:" << q << " num:" << num << 
-                " _fields:" << _fields << " options: " << _options << endl;
+                   << " ns:" << _ns << " query:" << q.toString() << " num:" << num << 
+                " _fields:" << _fields.toString() << " options: " << _options << endl;
         }
         
         auto_ptr<DBClientCursor> cursor = 

@@ -235,7 +235,7 @@ namespace mongo {
 
             auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? QueryOption_SlaveOk : 0 , batchSize );
             if ( ! cursor.get() ){
-                log() << "query failed : " << ns << " " << q << " to: " << conn->toString() << endl;
+                log() << "query failed : " << ns << " " << q.toString() << " to: " << conn->toString() << endl;
                 JS_ReportError( cx , "error doing query: failed" );
                 return JS_FALSE;
             }
