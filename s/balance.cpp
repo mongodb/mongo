@@ -61,7 +61,7 @@ namespace mongo {
                 c = cm->findChunk( chunkToMove["min"].Obj() );
                 if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
                     log() << "chunk mismatch after reload, ignoring will retry issue cm: " 
-                          << c->getMin().toString() << " min: " << chunkToMove["min"].String() << endl;
+                          << c->getMin() << " min: " << chunkToMove["min"].Obj() << endl;
                     continue;
                 }
             }
@@ -73,8 +73,7 @@ namespace mongo {
             }
 
             log() << "MOVE FAILED **** " << errmsg << "\n"
-                  << "           from: " << chunkInfo.from << " to: " << chunkInfo.to 
-                  << " chunk: " << chunkToMove.toString() << endl;
+                  << "           from: " << chunkInfo.from << " to: " << chunkInfo.to << " chunk: " << chunkToMove << endl;
         }
 
         return movedCount;

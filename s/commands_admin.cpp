@@ -242,7 +242,7 @@ namespace mongo {
                 bool worked = toconn->runCommand( dbname.c_str() , BSON( "clone" << config->getPrimary().getConnString() ) , cloneRes );
                 toconn.done();
                 if ( ! worked ){
-                    log() << "clone failed" << cloneRes.toString() << endl;
+                    log() << "clone failed" << cloneRes << endl;
                     errmsg = "clone failed";
                     conn.done();
                     return false;
@@ -402,7 +402,7 @@ namespace mongo {
                     conn.done();
                 }
 
-                tlog() << "CMD: shardcollection: " << cmdObj.toString() << endl;
+                tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
                 config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
                 config->save( true );
@@ -569,7 +569,7 @@ namespace mongo {
                 
                 Shard to = Shard::make( toString );
 
-                tlog() << "CMD: movechunk: " << cmdObj.toString() << endl;
+                tlog() << "CMD: movechunk: " << cmdObj << endl;
 
                 ChunkManagerPtr info = config->getChunkManager( ns );
                 ChunkPtr c = info->findChunk( find );
@@ -682,11 +682,11 @@ namespace mongo {
                     return false;
                 }
                 
-                log() << "going to add shard: " << shard.toString() << endl;
+                log() << "going to add shard: " << shard << endl;
                 conn->insert( "config.shards" , shard );
                 errmsg = conn->getLastError();
                 if ( errmsg.size() ){
-                    log() << "error adding shard: " << shard.toString() << " err: " << errmsg << endl;
+                    log() << "error adding shard: " << shard << " err: " << errmsg << endl;
                     return false;
                 }
                 result.append( "added" , shard["host"].valuestrsafe() );

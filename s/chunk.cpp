@@ -212,9 +212,9 @@ namespace mongo {
         _markModified();
         do {
             BSONObj splitPoint = nextPoint;
-            log(4) << "splitPoint: " << splitPoint.toString() << endl;
+            log(4) << "splitPoint: " << splitPoint << endl;
             nextPoint = (++i != m.end()) ? i->getOwned() : _max.getOwned();
-            log(4) << "nextPoint: " << nextPoint.toString() << endl;
+            log(4) << "nextPoint: " << nextPoint << endl;
             ChunkPtr s( new Chunk( _manager, splitPoint , nextPoint , _shard) );
             s->_markModified();
             newChunks.push_back(s);
@@ -278,8 +278,7 @@ namespace mongo {
     bool Chunk::moveAndCommit( const Shard& to , string& errmsg ){
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
         
-        log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() 
-              << " -> " << to.toString() << endl;
+        log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
         
         Shard from = _shard;
         
@@ -380,13 +379,11 @@ namespace mongo {
         Shard newLocation = Shard::pick();
         if ( getShard() == newLocation ){
             // if this is the best server, then we shouldn't do anything!
-            log(1) << "not moving chunk: " << toString() << " b/c would move to same place  " << newLocation.toString() 
-                   << " -> " << getShard().toString() << endl;
+            log(1) << "not moving chunk: " << toString() << " b/c would move to same place  " << newLocation.toString() << " -> " << getShard().toString() << endl;
             return 0;
         }
 
-        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objects: " 
-              << toMove->countObjects() << endl;
+        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objects: " << toMove->countObjects() << endl;
 
         string errmsg;
         massert( 10412 ,  (string)"moveAndCommit failed: " + errmsg , 
@@ -673,11 +670,11 @@ namespace mongo {
 
         if ( retry ){
             stringstream ss;
-            ss << "couldn't find a chunk aftry retry which should be impossible extracted: " << key.toString();
+            ss << "couldn't find a chunk aftry retry which should be impossible extracted: " << key;
             throw UserException( 8070 , ss.str() );
         }
         
-        log() << "ChunkManager: couldn't find chunk for: " << key.toString() << " going to retry" << endl;
+        log() << "ChunkManager: couldn't find chunk for: " << key << " going to retry" << endl;
         _reload();
         return findChunk( obj , true );
     }
@@ -888,7 +885,7 @@ namespace mongo {
 
         BSONObj cmd = cmdBuilder.obj();
         
-        log(7) << "ChunkManager::save update: " << cmd.toString() << endl;
+        log(7) << "ChunkManager::save update: " << cmd << endl;
         
         ScopedDbConnection conn( Chunk(0).modelServer() );
         BSONObj res;
@@ -1172,8 +1169,7 @@ namespace mongo {
         cmdBuilder.append( "shardHost" , s.getConnString() );
         BSONObj cmd = cmdBuilder.obj();
         
-        log(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress() << "  " << ns 
-               << "  " << cmd.toString() << " " << &conn << endl;
+        log(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress() << "  " << ns << "  " << cmd << " " << &conn << endl;
         
         return conn.runCommand( "admin" , cmd , result );
     }

@@ -37,7 +37,7 @@ namespace mongo {
             
             bool lateAssert = false;
         
-            log(3) << "single query: " << q.ns << "  " << q.query.toString() << "  ntoreturn: " << q.ntoreturn << endl;
+            log(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << endl;
             
             try {
                 if ( r.isCommand() ){
@@ -55,7 +55,7 @@ namespace mongo {
                     
                     string commandName = q.query.firstElement().fieldName();
                     if (  ! _commandsSafeToPass.count( commandName ) )
-                        log() << "passing through unknown command: " << commandName << " " << q.query.toString() << endl;
+                        log() << "passing through unknown command: " << commandName << " " << q.query << endl;
                 }
 
                 lateAssert = true;

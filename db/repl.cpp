@@ -606,7 +606,7 @@ namespace mongo {
         BSONObj pattern = b.done();
 
         BSONObj o = jsobj();
-        log( 1 ) << "Saving repl source: " << o.toString() << endl;
+        log( 1 ) << "Saving repl source: " << o << endl;
 
         {
             OpDebug debug;
@@ -840,10 +840,10 @@ namespace mongo {
             applyOperation_inlock( op );
         }
         catch ( UserException& e ) {
-            log() << "sync: caught user assertion " << e << " while applying op: " << op.toString() << endl;;
+            log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;;
         }
         catch ( DBException& e ) {
-            log() << "sync: caught db exception " << e << " while applying op: " << op.toString() << endl;;            
+            log() << "sync: caught db exception " << e << " while applying op: " << op << endl;;            
         }
 
     }
@@ -854,7 +854,7 @@ namespace mongo {
        see logOp() comments.
     */
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail) {
-        log( 6 ) << "processing op: " << op.toString() << endl;
+        log( 6 ) << "processing op: " << op << endl;
         // skip no-op
         if ( op.getStringField( "op" )[ 0 ] == 'n' )
             return;
@@ -969,12 +969,12 @@ namespace mongo {
                 if ( !idTracker.haveId( ns, id ) ) {
                     applyOperation( op );    
                 } else if ( idTracker.haveModId( ns, id ) ) {
-                    log( 6 ) << "skipping operation matching mod id object " << op.toString() << endl;
+                    log( 6 ) << "skipping operation matching mod id object " << op << endl;
                     BSONObj existing;
                     if ( Helpers::findOne( ns, id, existing ) )
                         logOp( "i", ns, existing );
                 } else {
-                    log( 6 ) << "skipping operation matching changed id object " << op.toString() << endl;
+                    log( 6 ) << "skipping operation matching changed id object " << op << endl;
                 }
             } else {
                 applyOperation( op );
@@ -1430,7 +1430,7 @@ namespace mongo {
         BSONObj res;
         bool ok = conn->runCommand( "admin" , cmd.obj() , res );
         // ignoring for now on purpose for older versions
-        log(ok) << "replHandshake res not: " << ok << " res: " << res.toString() << endl;
+        log(ok) << "replHandshake res not: " << ok << " res: " << res << endl;
         return true;
     }
 

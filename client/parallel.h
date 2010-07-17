@@ -50,7 +50,7 @@ namespace mongo {
 
         string toString() const {
             StringBuilder ss;
-            ss << "server:" << _server << " _extra:" << _extra.toString() << " _orderObject:" << _orderObject.toString();
+            ss << "server:" << _server << " _extra:" << _extra << " _orderObject:" << _orderObject;
             return ss.str();
         }
 

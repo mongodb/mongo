@@ -302,7 +302,7 @@ namespace mongo {
 
             if( pass == 0 ) {
                 StringBuilder& ss = curop.debug().str;
-                ss << " getMore: " << cc->query.toString() << " ";
+                ss << " getMore: " << cc->query << " ";
             }
             
             start = cc->pos;
@@ -521,7 +521,7 @@ namespace mongo {
         CountOp original( ns , cmd );
         shared_ptr< CountOp > res = mps.runOp( original );
         if ( !res->complete() ) {
-            log() << "Count with ns: " << ns << " and query: " << query.toString()
+            log() << "Count with ns: " << ns << " and query: " << query
                   << " failed with exception: " << res->exception()
                   << endl;
             return 0;
@@ -864,7 +864,7 @@ namespace mongo {
         const char *ns = q.ns;
         
         if( logLevel >= 2 )
-            log() << "query: " << ns << jsobj.toString() << endl;
+            log() << "query: " << ns << jsobj << endl;
         
         ss << ns;
         {
@@ -880,7 +880,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
             BSONObjBuilder cmdResBuf;
             if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
-                ss << " command: " << jsobj.toString();
+                ss << " command: " << jsobj;
                 curop.markCommand();
                 auto_ptr< QueryResult > qr;
                 qr.reset( (QueryResult *) bb.buf() );
@@ -1067,7 +1067,7 @@ namespace mongo {
                 ss << " ntoskip:" << ntoskip;
             if ( dbprofile )
                 ss << " \nquery: ";
-            ss << jsobj.toString() << ' ';
+            ss << jsobj << ' ';
         }
         ss << " nreturned:" << n;
         return exhaust;

@@ -253,7 +253,7 @@ namespace mongo {
             while ( c->more() ){
                 BSONObj collection = c->next();
 
-                log(2) << "\t cloner got " << collection.toString() << endl;
+                log(2) << "\t cloner got " << collection << endl;
 
                 BSONElement e = collection.getField("name");
                 if ( e.eoo() ) {
@@ -284,7 +284,7 @@ namespace mongo {
                 dbtemprelease r;
             }
             BSONObj collection = *i;
-            log(2) << "  really will clone: " << collection.toString() << endl;
+            log(2) << "  really will clone: " << collection << endl;
             const char * from_name = collection["name"].valuestr();
             BSONObj options = collection.getObjectField("options");
             
@@ -346,7 +346,7 @@ namespace mongo {
                 doesn't exist on this server */
             string err;
             if ( runCount( ns , BSON( "query" << query ) , err ) > 0 ){
-                log() << "WARNING: data already exists for: " << ns << " in range : " << query.toString() << " deleting..." << endl;
+                log() << "WARNING: data already exists for: " << ns << " in range : " << query << " deleting..." << endl;
                 deleteObjects( ns , query , false , logForRepl , false );
             }
         }
@@ -367,7 +367,7 @@ namespace mongo {
                 cmdSpec << "logSizeMb" << logSizeMb;
             BSONObj info;
             if ( !conn->runCommand( db, cmdSpec.done(), info ) ) {
-                errmsg = "logCollection failed: " + info.toString();
+                errmsg = "logCollection failed: " + (string)info;
                 return false;
             }
         }
@@ -444,7 +444,7 @@ namespace mongo {
             dbtemprelease t;
             BSONObj info;
             if ( !conn->runCommand( db, BSON( "logCollection" << ns << "validateComplete" << 1 ), info ) ) {
-                errmsg = "logCollection failed: " + info.toString();
+                errmsg = "logCollection failed: " + (string)info;
                 return false;
             }
         }
@@ -534,9 +534,7 @@ namespace mongo {
              */
             Client::Context ctx( collection );
             
-            log() << "cloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost 
-                  << " query: " << query.toString() << " logSizeMb: " << logSizeMb 
-                  << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
+            log() << "cloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << " logSizeMb: " << logSizeMb << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
             
             Cloner c;
             long long cursorId;
@@ -581,8 +579,7 @@ namespace mongo {
              */
             Client::Context ctx(collection);
             
-            log() << "startCloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost 
-                  << " query: " << query.toString() << endl;
+            log() << "startCloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
             
             Cloner c;
             long long cursorId;
@@ -639,8 +636,7 @@ namespace mongo {
             
             Client::Context ctx( collection );
             
-            log() << "finishCloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost 
-                  << " query: " << query.toString() << endl;
+            log() << "finishCloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
             
             Cloner c;
             return c.finishCloneCollection( fromhost.c_str(), collection.c_str(), query, cursorId, errmsg );
@@ -680,7 +676,7 @@ namespace mongo {
                 if ( !authConn_->connect( fromhost, errmsg ) )
                     return false;
                 if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
-                    errmsg = "couldn't get nonce " + ret.toString();
+                    errmsg = "couldn't get nonce " + string( ret );
                     return false;
                 }
             }
@@ -730,7 +726,7 @@ namespace mongo {
                 {
                     dbtemprelease t;
                     if ( !authConn_->runCommand( fromdb, BSON( "authenticate" << 1 << "user" << username << "nonce" << nonce << "key" << key ), ret ) ) {
-                        errmsg = "unable to login " + ret.toString();
+                        errmsg = "unable to login " + string( ret );
                         return false;
                     }
                 }

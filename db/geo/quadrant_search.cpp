@@ -163,7 +163,7 @@ namespace mongo {
          
             Timer t;
 
-            log(1) << "SEARCH near:" << n.toString() << " maxDistance:" << maxDistance << " search: " << search.toString() << endl;
+            log(1) << "SEARCH near:" << n << " maxDistance:" << maxDistance << " search: " << search << endl;
             int x,y;
             {
                 BSONObjIterator i( n );

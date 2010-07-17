@@ -97,14 +97,14 @@ namespace mongo {
                         BSONObjBuilder cmd;
                         cmd.appendOID( "writebacklisten" , &serverID ); // Command will block for data
                         if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ){
-                            log() <<  "writebacklisten command failed!  "  << result.toString() << endl;
+                            log() <<  "writebacklisten command failed!  "  << result << endl;
                             conn.done();
                             continue;
                         }
 
                     }
                     
-                    log(1) << "writebacklisten result: " << result.toString() << endl;
+                    log(1) << "writebacklisten result: " << result << endl;
                     
                     BSONObj data = result.getObjectField( "data" );
                     if ( data.getBoolField( "writeBack" ) ){
@@ -133,7 +133,7 @@ namespace mongo {
                         r.process();
                     }
                     else {
-                        log() << "unknown writeBack result: " << result.toString() << endl;
+                        log() << "unknown writeBack result: " << result << endl;
                     }
                     
                     conn.done();
@@ -224,7 +224,7 @@ namespace mongo {
             return true;
         }
         
-        log(1) << "       setShardVersion failed!\n" << result.toString() << endl;
+        log(1) << "       setShardVersion failed!\n" << result << endl;
 
         if ( result.getBoolField( "need_authoritative" ) )
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
@@ -241,7 +241,7 @@ namespace mongo {
             return true;
         }
 
-        log() << "     setShardVersion failed: " << result.toString() << endl;
+        log() << "     setShardVersion failed: " << result << endl;
         massert( 10429 , (string)"setShardVersion failed! " + result.jsonString() , 0 );
         return true;
     }

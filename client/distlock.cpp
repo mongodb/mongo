@@ -131,7 +131,7 @@ namespace mongo {
                 BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ){
                     // TODO: maybe this should clear, not sure yet
-                    log() << "lastPing is empty! this could be bad: " << o.toString() << endl;
+                    log() << "lastPing is empty! this could be bad: " << o << endl;
                     conn.done();
                     return false;
                 }
@@ -140,12 +140,12 @@ namespace mongo {
                 elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
 
                 if ( elapsed <= _takeoverMinutes ){
-                    log(1) << "dist_lock lock failed because taken by: " << o.toString() << endl;
+                    log(1) << "dist_lock lock failed because taken by: " << o << endl;
                     conn.done();
                     return false;
                 }
                 
-                log() << "dist_lock forcefully taking over from: " << o.toString() << " elapsed minutes: " << elapsed << endl;
+                log() << "dist_lock forcefully taking over from: " << o << " elapsed minutes: " << elapsed << endl;
                 conn->update( _ns , _id , BSON( "$set" << BSON( "state" << 0 ) ) );
             }
             else if ( o["ts"].type() ){
@@ -203,7 +203,7 @@ namespace mongo {
             
         conn.done();
             
-        log(1) << "dist_lock lock gotLock: " << gotLock << " now: " << now.toString() << endl;
+        log(1) << "dist_lock lock gotLock: " << gotLock << " now: " << now << endl;
 
         if ( ! gotLock )
             return false;
@@ -215,7 +215,7 @@ namespace mongo {
     void DistributedLock::unlock(){
         ScopedDbConnection conn( _conn );
         conn->update( _ns , _id, BSON( "$set" << BSON( "state" << 0 ) ) );
-        log(1) << "dist_lock unlock: " << conn->findOne( _ns , _id ).toString() << endl;
+        log(1) << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
         conn.done();
             
         _state.set( 0 );
