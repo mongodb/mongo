@@ -129,7 +129,7 @@ namespace mongo {
         /** Get the field of the specified name. eoo() is true on the returned 
             element if not found. 
         */
-        BSONElement getField(const StringDataNoSize& name) const;
+        BSONElement getField(const StringData& name) const;
 
         /** Get the field of the specified name. eoo() is true on the returned 
             element if not found. 
