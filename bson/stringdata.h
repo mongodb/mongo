@@ -15,8 +15,7 @@
  *    limitations under the License.
  */
 
-#ifndef UTIL_BSON_STRINGDATA_HEADER
-#define UTIL_BSON_STRINGDATA_HEADER
+#pragma once
 
 #include <string>
 #include <cstring>
@@ -35,10 +34,10 @@ namespace mongo {
         const unsigned    size;
 
         StringData( const char* c ) 
-            : data(c), size(strlen(c)) {}
+            : data(c), size((unsigned) strlen(c)) {}
 
         StringData( const string& s )
-            : data(s.c_str()), size(s.size()) {}
+            : data(s.c_str()), size((unsigned) s.size()) {}
         
         struct LiteralTag {};
         template<size_t N>
@@ -66,4 +65,3 @@ namespace mongo {
 
 } // namespace mongo
 
-#endif  // UTIL_BSON_STRINGDATA_HEADER
