@@ -277,10 +277,6 @@ namespace mongo {
             return buf.str();
         }
         
-        operator string() const {
-            return toString();
-        }
-
         bool between( double min , double max , double val , double fudge=0) const {
             return val + fudge >= min && val <= max + fudge;
         }

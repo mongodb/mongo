@@ -131,7 +131,7 @@ namespace mongo {
         
         const IndexSpec& getSpec() const;
 
-        operator string() const {
+        string toString() const {
             return info.obj().toString();
         }
     };

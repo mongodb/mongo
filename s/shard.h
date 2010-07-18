@@ -153,11 +153,11 @@ namespace mongo {
         ShardStatus( const Shard& shard , const BSONObj& obj );
 
         friend ostream& operator << (ostream& out, const ShardStatus& s) {
-            out << (string)s;
+            out << s.toString();
             return out;
         }
 
-        operator string() const {
+        string toString() const {
             stringstream ss;
             ss << "shard: " << _shard << " mapped: " << _mapped << " writeLock: " << _writeLock; 
             return ss.str();

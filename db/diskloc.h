@@ -86,7 +86,6 @@ namespace mongo {
             ss << hex << fileNo << ':' << ofs;
             return ss.str();
         }
-        operator string() const { return toString(); }
 
         BSONObj toBSONObj() const {
             return BSON( "file" << fileNo << "offset" << ofs );

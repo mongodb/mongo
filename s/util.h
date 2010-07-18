@@ -80,7 +80,6 @@ namespace mongo {
             return ss.str(); 
         }
         operator unsigned long long() const { return _combined; }
-        operator string() const { return toString(); }
 
         ShardChunkVersion& operator=( const BSONElement& elem ){
             switch ( elem.type() ){
