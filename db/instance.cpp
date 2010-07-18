@@ -598,7 +598,7 @@ namespace mongo {
             {
                 readlock lk(rsoplog);
                 BSONObj o;
-                if( Helpers::getFirst(rsoplog.c_str(), o) )
+                if( Helpers::getFirst(rsoplog, o) )
                     return true;
             }
         }

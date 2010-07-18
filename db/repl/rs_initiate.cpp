@@ -123,8 +123,8 @@ namespace mongo {
                    it is ok if the initiating member has *other* data than that.
                    */
                 BSONObj o;
-                if( Helpers::getFirst(rsoplog.c_str(), o) ) { 
-                    errmsg = rsoplog + " is not empty on the initiating member.  cannot initiate.";
+                if( Helpers::getFirst(rsoplog, o) ) { 
+                    errmsg = rsoplog + string(" is not empty on the initiating member.  cannot initiate.");
                     return false;
                 }
             }

@@ -90,7 +90,7 @@ namespace mongo {
         Record *r;
         DEV assert( logNS == 0 );
         {
-            const char *logns = rsoplog.c_str();
+            const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
                 Client::Context ctx( logns , dbpath, 0, false);
                 localDB = ctx.db();
@@ -273,7 +273,7 @@ namespace mongo {
 
         bool rs = !cmdLine.replSet.empty();
         if( rs )
-            ns = rsoplog.c_str();
+            ns = rsoplog;
 
         Client::Context ctx(ns);
         

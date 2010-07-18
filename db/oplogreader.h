@@ -27,6 +27,10 @@ namespace mongo {
             return conn()->findOne(ns, q);
         }
 
+        BSONObj getLastOp(const char *ns) { 
+            return findOne(ns, Query().sort( BSON( "$natural" << -1 ) ));
+        }
+
         /* ok to call if already connected */
         bool connect(string hostname);
 

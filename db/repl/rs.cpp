@@ -183,7 +183,7 @@ namespace mongo {
         assert( lastOpTimeWritten.isNull() );
         readlock lk(rsoplog);
         BSONObj o;
-        if( Helpers::getLast(rsoplog.c_str(), o) ) { 
+        if( Helpers::getLast(rsoplog, o) ) { 
             cout << "TEMP " << o.toString() << endl;
             lastOpTimeWritten = o["ts"]._opTime();
             uassert(13290, "bad replSet oplog entry?", !lastOpTimeWritten.isNull());
