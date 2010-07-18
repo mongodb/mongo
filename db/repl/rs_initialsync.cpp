@@ -18,6 +18,7 @@
 #include "../client.h"
 #include "../../client/dbclient.h"
 #include "rs.h"
+#include "../oplogreader.h"
 
 namespace mongo {
 
@@ -25,6 +26,9 @@ namespace mongo {
 
     void ReplSetImpl::syncDoInitialSync() { 
         log() << "replSet syncDoInitialSync" << rsLog;
+
+        OplogReader r;
+
         sethbmsg("initial sync drop all databases");
         dropAllDatabasesExceptLocal();
         sethbmsg("initial sync - not yet implemented");

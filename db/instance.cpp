@@ -198,7 +198,7 @@ namespace mongo {
             QueryResult * msgdata = (QueryResult *) b.buf();
             b.decouple();
             QueryResult *qr = msgdata;
-            qr->_resultFlags() = QueryResult::ResultFlag_ErrSet;
+            qr->_resultFlags() = ResultFlag_ErrSet;
             qr->len = b.len();
             qr->setOperation(opReply);
             qr->cursorId = 0;

@@ -22,7 +22,6 @@
 #include "../pch.h"
 #include "dbclient.h"
 #include "redef_macros.h"
-
 #include "../db/dbmessage.h"
 #include "../db/matcher.h"
 
@@ -62,8 +61,6 @@ namespace mongo {
         BSONObj _extra;
         BSONObj _orderObject;
     };
-
-
 
     /**
      * this is a cursor that works over a set of servers

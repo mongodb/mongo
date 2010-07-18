@@ -285,14 +285,14 @@ namespace mongo {
 
         b.skip(sizeof(QueryResult));
         
-        int resultFlags = QueryResult::ResultFlag_AwaitCapable;
+        int resultFlags = ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
 
         if ( !cc ) {
             log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
-            resultFlags = QueryResult::ResultFlag_CursorNotFound;
+            resultFlags = ResultFlag_CursorNotFound;
         }
         else {
             if ( pass == 0 )

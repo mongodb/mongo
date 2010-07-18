@@ -97,7 +97,7 @@ namespace mongo {
             return (opts & QueryOption_CursorTailable) != 0;
         }
         
-        /** see QueryResult::ResultFlagType (db/dbmessage.h) for flag values 
+        /** see ResultFlagType (constants.h) for flag values 
             mostly these flags are for internal purposes - 
             ResultFlag_ErrSet is the possible exception to that
         */

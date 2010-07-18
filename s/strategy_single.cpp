@@ -70,7 +70,7 @@ namespace mongo {
                 BSONObjBuilder err;
                 e.getInfo().append( err );
                 BSONObj errObj = err.done();
-                replyToQuery(QueryResult::ResultFlag_ErrSet, r.p() , r.m() , errObj);
+                replyToQuery(ResultFlag_ErrSet, r.p() , r.m() , errObj);
                 return;
             }
 

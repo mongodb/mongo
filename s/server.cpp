@@ -92,7 +92,7 @@ namespace mongo {
                 log() << "UserException: " << e.what() << endl;
                 if ( r.expectResponse() ){
                     BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
-                    replyToQuery( QueryResult::ResultFlag_ErrSet, p , m , err );
+                    replyToQuery( ResultFlag_ErrSet, p , m , err );
                 }
             }
         }
