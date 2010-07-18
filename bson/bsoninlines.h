@@ -75,11 +75,11 @@ namespace mongo {
         return false;
     }
 
-    inline BSONElement BSONObj::getField(const StringDataNoSize& name) const {
+    inline BSONElement BSONObj::getField(const StringData& name) const {
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
-            if ( strcmp(e.fieldName(), name.data) == 0 )
+            if ( strcmp(e.fieldName(), name.data()) == 0 )
                 return e;
         }
         return BSONElement();
