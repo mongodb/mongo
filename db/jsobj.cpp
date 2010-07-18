@@ -674,9 +674,9 @@ namespace mongo {
     void BSONObj::getFieldsDotted(const StringData& name, BSONElementSet &ret ) const {
         BSONElement e = getField( name );
         if ( e.eoo() ) {
-            const char *p = strchr(name.data, '.');
+            const char *p = strchr(name.data(), '.');
             if ( p ) {
-                string left(name.data, p-name.data);
+                string left(name.data(), p-name.data());
                 const char* next = p+1;
                 BSONElement e = getField( left.c_str() );
 

@@ -79,7 +79,7 @@ namespace mongo {
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
-            if ( strcmp(e.fieldName(), name.data) == 0 )
+            if ( strcmp(e.fieldName(), name.data()) == 0 )
                 return e;
         }
         return BSONElement();
