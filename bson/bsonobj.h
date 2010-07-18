@@ -21,6 +21,7 @@
 #include <list>
 #include <vector>
 #include "util/builder.h"
+#include "stringdata.h"
 
 namespace mongo {
 
@@ -119,7 +120,7 @@ namespace mongo {
 
         /** Like getFieldDotted(), but expands multikey arrays and returns all matching objects
          */
-        void getFieldsDotted(const char *name, BSONElementSet &ret ) const;
+        void getFieldsDotted(const StringData& name, BSONElementSet &ret ) const;
         /** Like getFieldDotted(), but returns first array encountered while traversing the
             dotted fields of name.  The name variable is updated to represent field
             names with respect to the returned element. */
@@ -128,14 +129,7 @@ namespace mongo {
         /** Get the field of the specified name. eoo() is true on the returned 
             element if not found. 
         */
-        BSONElement getField(const char *name) const;
-
-        /** Get the field of the specified name. eoo() is true on the returned 
-            element if not found. 
-        */
-        BSONElement getField(const string name) const {
-            return getField( name.c_str() );
-        };
+        BSONElement getField(const StringData& name) const;
 
         /** Get the field of the specified name. eoo() is true on the returned 
             element if not found. 
