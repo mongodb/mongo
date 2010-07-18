@@ -45,23 +45,5 @@ namespace mongo {
             : data(&val[0]), size(N-1) {}
     };
 
-    struct StringDataNoSize {
-        // There are two assumptions here that we may want to review then.
-        // 'data' *always* finishes with a null terminator
-        // These assumptions may make it easier to minimize changes to existing code
-        const char* const data;
-
-        StringDataNoSize( const char* c ) 
-            : data(c){}
-
-        StringDataNoSize( const string& s )
-            : data(s.c_str()){}
-
-        StringDataNoSize( const StringData& s )
-            : data( s.data ){
-        }
-        
-    };
-
 } // namespace mongo
 
