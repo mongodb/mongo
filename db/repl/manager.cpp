@@ -75,19 +75,28 @@ namespace mongo {
                 return;
             }
 
-            if( p == p2 && p ) return;
+            if( p == p2 && p ) {
+                return;
+            }
 
             if( p2 ) { 
                 /* someone else thinks they are primary. */
-                if( p == p2 ) // already match
+                if( p == p2 ) { // already match 
                     return;
-                if( p == 0 )
-                    noteARemoteIsPrimary(p2); return;
-                if( p != rs->_self )
-                    noteARemoteIsPrimary(p2); return;
+                }
+                if( p == 0 ) {
+                    noteARemoteIsPrimary(p2); 
+                    return;
+                }
+                if( p != rs->_self ) {
+                    noteARemoteIsPrimary(p2); 
+                    return;
+                }
                 /* we thought we were primary, yet now someone else thinks they are. */
-                if( !rs->elect.aMajoritySeemsToBeUp() )
-                    noteARemoteIsPrimary(p2); return;
+                if( !rs->elect.aMajoritySeemsToBeUp() ) {
+                    noteARemoteIsPrimary(p2); 
+                    return;
+                }
                 /* ignore for now, keep thinking we are master */
                 return;
             }

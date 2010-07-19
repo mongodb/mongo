@@ -20,6 +20,7 @@
 #include "jsobj.h"
 #include "namespace.h"
 #include "../util/message.h"
+#include "../client/constants.h"
 
 namespace mongo {
 
@@ -37,24 +38,6 @@ namespace mongo {
     
 #pragma pack(1)
     struct QueryResult : public MsgData {
-        enum ResultFlagType {
-            /* returned, with zero results, when getMore is called but the cursor id 
-               is not valid at the server. */
-            ResultFlag_CursorNotFound = 1,   
-
-            /* { $err : ... } is being returned */
-            ResultFlag_ErrSet = 2,           
-
-            /* Have to update config from the server, usually $err is also set */
-            ResultFlag_ShardConfigStale = 4,  
-
-            /* for backward compatability: this let's us know the server supports 
-               the QueryOption_AwaitData option. if it doesn't, a repl slave client should sleep 
-               a little between getMore's.
-            */
-            ResultFlag_AwaitCapable = 8
-        };
-
         long long cursorId;
         int startingFrom;
         int nReturned;
@@ -225,7 +208,7 @@ namespace mongo {
                             ) {
         BufBuilder b(32768);
         b.skip(sizeof(QueryResult));
-        b.append(data, size);
+        b.appendBuf(data, size);
         QueryResult *qr = (QueryResult *) b.buf();
         qr->_resultFlags() = queryResultFlags;
         qr->len = b.len();
@@ -260,7 +243,7 @@ namespace mongo {
     inline void replyToQuery(int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj) {
         BufBuilder b;
         b.skip(sizeof(QueryResult));
-        b.append((void*) obj.objdata(), obj.objsize());
+        b.appendBuf((void*) obj.objdata(), obj.objsize());
         QueryResult* msgdata = (QueryResult *) b.buf();
         b.decouple();
         QueryResult *qr = msgdata;

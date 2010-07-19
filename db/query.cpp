@@ -233,7 +233,7 @@ namespace mongo {
         anObjBuilder.append("errmsg", "db assertion failure");
         anObjBuilder.append("ok", 0.0);
         BSONObj x = anObjBuilder.done();
-        b.append((void*) x.objdata(), x.objsize());
+        b.appendBuf((void*) x.objdata(), x.objsize());
         return true;
     }
 
@@ -285,14 +285,14 @@ namespace mongo {
 
         b.skip(sizeof(QueryResult));
         
-        int resultFlags = QueryResult::ResultFlag_AwaitCapable;
+        int resultFlags = ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
 
         if ( !cc ) {
             log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
-            resultFlags = QueryResult::ResultFlag_CursorNotFound;
+            resultFlags = ResultFlag_CursorNotFound;
         }
         else {
             if ( pass == 0 )
@@ -302,7 +302,7 @@ namespace mongo {
 
             if( pass == 0 ) {
                 StringBuilder& ss = curop.debug().str;
-                ss << " getMore: " << cc->query << " ";
+                ss << " getMore: " << cc->query.toString() << " ";
             }
             
             start = cc->pos;
@@ -880,7 +880,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
             BSONObjBuilder cmdResBuf;
             if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
-                ss << " command: " << jsobj;
+                ss << " command: " << jsobj.toString();
                 curop.markCommand();
                 auto_ptr< QueryResult > qr;
                 qr.reset( (QueryResult *) bb.buf() );
@@ -1067,7 +1067,7 @@ namespace mongo {
                 ss << " ntoskip:" << ntoskip;
             if ( dbprofile )
                 ss << " \nquery: ";
-            ss << jsobj << ' ';
+            ss << jsobj.toString() << ' ';
         }
         ss << " nreturned:" << n;
         return exhaust;

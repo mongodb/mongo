@@ -671,12 +671,12 @@ namespace mongo {
         return -1;
     }
 
-    void BSONObj::getFieldsDotted(const char *name, BSONElementSet &ret ) const {
+    void BSONObj::getFieldsDotted(const StringData& name, BSONElementSet &ret ) const {
         BSONElement e = getField( name );
         if ( e.eoo() ) {
-            const char *p = strchr(name, '.');
+            const char *p = strchr(name.data(), '.');
             if ( p ) {
-                string left(name, p-name);
+                string left(name.data(), p-name.data());
                 const char* next = p+1;
                 BSONElement e = getField( left.c_str() );
 

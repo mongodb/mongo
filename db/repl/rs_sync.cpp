@@ -21,17 +21,30 @@
 
 namespace mongo {
 
-    void dropAllDatabasesExceptLocal();
-
-    void ReplSetImpl::syncDoInitialSync() { 
-        log() << "replSet syncDoInitialSync" << rsLog;
-        sethbmsg("initial sync drop all databases");
-        dropAllDatabasesExceptLocal();
-        sethbmsg("initial sync - not yet implemented");
+    void startSyncThread() { 
+        Client::initThread("rs_sync");
+        theReplSet->syncThread();
     }
 
-    void syncThread() { 
-        Client::initThread("rs_sync");
+    void ReplSetImpl::_syncThread() {
+        if( isPrimary() ) 
+            return;
+
+
+
+    }
+
+    void ReplSetImpl::syncThread() {
+        while( 1 ) { 
+            try { 
+                // ...
+            }
+            catch(DBException& e) { 
+                log() << "replSet syncThread: " << e.toString() << rsLog;
+                sleepsecs(10);
+            }
+            sleepsecs(2);
+        }
     }
 
 }

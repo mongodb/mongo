@@ -286,7 +286,7 @@ namespace mongo {
             if( authed ) {
                 result.append("remote", replPair->remote);
                 if ( !replPair->info.empty() )
-                    result.append("info", replPair->info);
+                    result.append("info", replPair->info.toString());
             }
         }
         else {
@@ -786,6 +786,7 @@ namespace mongo {
         {
             dbtemprelease t;
             oplogReader.connect(hostName);
+            /* todo use getDatabaseNames() method here */
             bool ok = oplogReader.conn()->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
             massert( 10385 ,  "Unable to get database list", ok );
         }

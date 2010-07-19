@@ -492,6 +492,13 @@ namespace mongo {
         return *this;        
     }
     
+    // TODO write a proper implementation that doesn't do a full copy
+    bool FieldRange::operator<=( const FieldRange &other ) {
+        FieldRange temp = *this;
+        temp -= other;
+        return temp.empty();
+    }
+    
     BSONObj FieldRange::addObj( const BSONObj &o ) {
         _objData.push_back( o );
         return o;

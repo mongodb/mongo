@@ -51,6 +51,9 @@ namespace mongoutils {
         inline string td(string x) { 
             return "<td>" + x + "</td>";
         }
+        inline string th(string x) { 
+            return "<th>" + x + "</th>";
+        }
 
         inline string table(const char *headers[] = 0, bool border = true) { 
             stringstream ss;

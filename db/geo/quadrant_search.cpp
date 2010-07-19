@@ -28,6 +28,9 @@
 #include "../matcher.h"
 #include "core.h"
 
+#define GEOQUADDEBUG(x)
+//#define GEOQUADDEBUG(x) cout << x << endl
+
 /**
  * this is a geo based search piece, which is different than regular geo lookup
  * this is useful when you want to look for something within a region where the ratio is low
@@ -116,9 +119,20 @@ namespace mongo {
             return ss.str();
         }
 
-        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
+        void _add( const BSONObj& obj, const string& root , const BSONElement& e , BSONObjSetDefaultOrder& keys ) const {
+            BSONObjBuilder buf;
+            buf.append( "" , root );
+            if ( e.eoo() )
+                buf.appendNull( "" );
+            else
+                buf.appendAs( e , "" );
+            
+            BSONObj key = buf.obj();
+            GEOQUADDEBUG( obj << "\n\t" << root << "\n\t" << key );
+            keys.insert( key );
+        }
 
-            bool debug = true;
+        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
             
             BSONElement loc = obj.getFieldDotted( _geo );
             if ( loc.eoo() )
@@ -133,21 +147,20 @@ namespace mongo {
                 root = makeString( hash(x) , hash(y) );
             }
             
-            BSONObjBuilder buf;
-            buf.append( "" , root );
             
-            for ( unsigned i=0; i<_other.size(); i++ ){
-                BSONElement e = obj.getFieldDotted( _other[i] );
-                if ( e.eoo() )
-                    buf.appendNull( "" );
-                else
-                    buf.appendAs( e , "" );
+            assert( _other.size() == 1 );
+            
+            BSONElementSet all;
+            obj.getFieldsDotted( _other[0] , all );
+            
+            if ( all.size() == 0 ){
+                _add( obj , root , BSONElement() , keys );
             }
-            
-            BSONObj key = buf.obj();
-            if ( debug ) cout << obj << "\n\t" << root << "\n\t" << key << endl;
-
-            keys.insert( key );
+            else {
+                for ( BSONElementSet::iterator i=all.begin(); i!=all.end(); ++i ){
+                    _add( obj , root , *i , keys );
+                }
+            }
             
         }
             
@@ -191,7 +204,7 @@ namespace mongo {
                     
                     BSONObj key = bb.obj();
                     
-                    cout << "KEY: " << key << endl;
+                    GEOQUADDEBUG( "KEY: " << key );
                     
                     set<DiskLoc> thisPass;
                     BtreeCursor cursor( nsd , idxNo , *getDetails() , key , key , true , 1 );
@@ -199,7 +212,7 @@ namespace mongo {
                         pair<set<DiskLoc>::iterator, bool> p = thisPass.insert( cursor.currLoc() );
                         if ( p.second ){
                             hopper.got( cursor.currLoc() );
-                            cout << "\t" << cursor.current() << endl;
+                            GEOQUADDEBUG( "\t" << cursor.current() );
                             btreeMatches++;
                         }
                         cursor.advance();

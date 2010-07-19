@@ -67,11 +67,11 @@ namespace mongo {
             b.skip( sizeof( QueryResult ) );
             {
                 BSONObj obj = BSON( "$err" << errmsg );
-                b.append( obj.objdata() , obj.objsize() );
+                b.appendBuf( obj.objdata() , obj.objsize() );
             }
             
             QueryResult *qr = (QueryResult*)b.buf();
-            qr->_resultFlags() = QueryResult::ResultFlag_ErrSet | QueryResult::ResultFlag_ShardConfigStale;
+            qr->_resultFlags() = ResultFlag_ErrSet | ResultFlag_ShardConfigStale;
             qr->len = b.len();
             qr->setOperation( opReply );
             qr->cursorId = 0;

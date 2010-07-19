@@ -79,7 +79,7 @@ namespace mongo {
         bool contains( const BSONObj& obj ) const;
 
         string toString() const;
-        operator string() const { return toString(); }
+
         friend ostream& operator << (ostream& out, const Chunk& c){ return (out << c.toString()); }
 
         bool operator==(const Chunk& s) const;
@@ -128,8 +128,6 @@ namespace mongo {
         
         void appendShortVersion( const char * name , BSONObjBuilder& b );
 
-        void ensureIndex();
-        
         void _markModified();
         
         static int MaxChunkSize;
@@ -268,11 +266,6 @@ namespace mongo {
 
         void maybeChunkCollection();
         
-        /**
-         * makes sure the shard index is on all servers
-         */
-        void ensureIndex();
-
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query );
 
         void getAllShards( set<Shard>& all );
@@ -280,7 +273,6 @@ namespace mongo {
         void save();
 
         string toString() const;
-        operator string() const { return toString(); }
 
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;

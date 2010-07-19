@@ -382,6 +382,9 @@
     <ClCompile Include="repl\rs_sync.cpp">
       <Filter>rs</Filter>
     </ClCompile>
+    <ClCompile Include="repl\rs_initialsync.cpp">
+      <Filter>rs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -755,6 +758,9 @@
     </ClInclude>
     <ClInclude Include="..\s\d_logic.h">
       <Filter>sharding</Filter>
+    </ClInclude>
+    <ClInclude Include="oplogreader.h">
+      <Filter>repl_old</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

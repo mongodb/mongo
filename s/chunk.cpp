@@ -512,12 +512,6 @@ namespace mongo {
         _modified = true;
     }
 
-    void Chunk::ensureIndex(){
-        ScopedDbConnection conn( getShard().getConnString() );
-        conn->ensureIndex( _manager->getns() , _manager->getShardKey().key() , _manager->_unique );
-        conn.done();
-    }
-
     string Chunk::toString() const {
         stringstream ss;
         ss << "ns:" << _manager->getns() << " at: " << _shard.toString() << " lastmod: " << _lastmod.toString() << " min: " << _min << " max: " << _max;
@@ -738,19 +732,12 @@ namespace mongo {
         all = _shards;
     }
     
-    void ChunkManager::ensureIndex(){
-        ensureIndex_inlock();
-    }
-    
     void ChunkManager::ensureIndex_inlock(){
-        set<Shard> seen;
-        
-        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
-            ChunkPtr c = i->second;
-            if ( seen.count( c->getShard() ) )
-                continue;
-            seen.insert( c->getShard() );
-            c->ensureIndex();
+        //TODO in parallel?
+        for ( set<Shard>::const_iterator i=_shards.begin(); i!=_shards.end(); ++i ){
+            ScopedDbConnection conn( i->getConnString() );
+            conn->ensureIndex( getns() , getShardKey().key() , _unique );
+            conn.done();
         }
     }
     

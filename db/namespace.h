@@ -139,6 +139,10 @@ namespace mongo {
             return old + "." + local;
         }
 
+        string toString() const {
+            return (string)buf;
+        }
+
         operator string() const {
             return (string)buf;
         }

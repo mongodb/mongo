@@ -192,13 +192,13 @@ namespace mongo {
 
             BufBuilder b;
             b.skip(sizeof(QueryResult));
-            b.append((void*) errObj.objdata(), errObj.objsize());
+            b.appendBuf((void*) errObj.objdata(), errObj.objsize());
 
             // todo: call replyToQuery() from here instead of this!!! see dbmessage.h
             QueryResult * msgdata = (QueryResult *) b.buf();
             b.decouple();
             QueryResult *qr = msgdata;
-            qr->_resultFlags() = QueryResult::ResultFlag_ErrSet;
+            qr->_resultFlags() = ResultFlag_ErrSet;
             qr->len = b.len();
             qr->setOperation(opReply);
             qr->cursorId = 0;
@@ -598,7 +598,7 @@ namespace mongo {
             {
                 readlock lk(rsoplog);
                 BSONObj o;
-                if( Helpers::getFirst(rsoplog.c_str(), o) )
+                if( Helpers::getFirst(rsoplog, o) )
                     return true;
             }
         }

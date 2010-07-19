@@ -601,7 +601,7 @@ namespace mongo {
             _buf = 0;
         }
         
-        operator string() const {
+        string toString() const {
             string s = _buf;
             return s;
         }

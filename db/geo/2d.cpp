@@ -34,6 +34,10 @@
 
 namespace mongo {
 
+    double EARTH_RADIUS_KM = 6371;
+    double EARTH_RADIUS_MILES = EARTH_RADIUS_KM * 0.621371192;
+
+
     GeoBitSets geoBitSets;
 
     const string GEO2DNAME = "2d";
@@ -277,10 +281,6 @@ namespace mongo {
             return buf.str();
         }
         
-        operator string() const {
-            return toString();
-        }
-
         bool between( double min , double max , double val , double fudge=0) const {
             return val + fudge >= min && val <= max + fudge;
         }
@@ -558,7 +558,7 @@ namespace mongo {
                 {
                     Point BNA (-1.5127, 0.6304);
                     Point LAX (-2.0665, 0.5924);
-
+                    
                     double dist1 = spheredist_rad(BNA, LAX);
                     double dist2 = spheredist_rad(LAX, BNA);
 
@@ -566,6 +566,14 @@ namespace mongo {
                     assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
                     assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
                 }
+                {
+                    Point JFK (-73.77694444, 40.63861111 );
+                    Point LAX (-118.40, 33.94);
+                    
+                    double dist = spheredist_deg(JFK, LAX) * EARTH_RADIUS_MILES;
+                    assert( dist > 2469 && dist < 2470 );
+                }
+
             }
         }
     } geoUnitTest;

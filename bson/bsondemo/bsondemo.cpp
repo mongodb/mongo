@@ -57,7 +57,7 @@ int main()
     bo x = bob().append("name", "joe").append("age", 33.7).obj();
 
     /* convert from bson to json */
-    string json = x;
+    string json = x.toString();
     cout << "json for x:" << json << endl;
 
     /* access some fields of bson object x */

@@ -185,11 +185,13 @@ namespace mongo {
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm" 
         char _hbmsg[256];
-        void sethbmsg(string s) { 
+    public:
+        void sethbmsg(string s, int logLevel = 2) { 
             assert(s.size() < sizeof(_hbmsg));
             strcpy(_hbmsg, s.c_str());
+            log(logLevel) << "replSet " << s << rsLog;
         }
-
+    protected:
         bool initFromConfig(ReplSetConfig& c); // true if ok; throws if config really bad; false if config doesn't include self
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
@@ -248,7 +250,11 @@ namespace mongo {
 
     private:
         /* pulling data from primary related - see rs_sync.cpp */
+        void _syncDoInitialSync();
         void syncDoInitialSync();
+    public:
+        void _syncThread();
+        void syncThread();
     };
 
     class ReplSet : public ReplSetImpl { 

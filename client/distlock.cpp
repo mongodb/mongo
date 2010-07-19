@@ -136,7 +136,7 @@ namespace mongo {
                     return false;
                 }
 
-                long elapsed = jsTime() - lastPing["ping"].Date(); // in ms
+                Date_t elapsed = jsTime() - lastPing["ping"].Date(); // in ms
                 elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
 
                 if ( elapsed <= _takeoverMinutes ){

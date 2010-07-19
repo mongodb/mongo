@@ -67,11 +67,18 @@ namespace mongo {
         auto_ptr<DBClientCursor> cursor = 
             conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
         
-        if ( cursor->hasResultFlag( QueryResult::ResultFlag_ShardConfigStale ) ){
+        if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ){
             conn.done();
             throw StaleConfigException( _ns , "ClusteredCursor::query" );
         }
         
+        if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ){
+            conn.done();
+            BSONObj o = cursor->next();
+            throw UserException( o["code"].numberInt() , o["$err"].String() );
+        }
+
+
         cursor->attach( &conn );
 
         conn.done();

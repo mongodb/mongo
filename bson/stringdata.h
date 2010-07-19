@@ -15,8 +15,8 @@
  *    limitations under the License.
  */
 
-#ifndef UTIL_BSON_STRINGDATA_HEADER
-#define UTIL_BSON_STRINGDATA_HEADER
+#ifndef BSON_STRINDATA_HEADER
+#define BSON_STRINDATA_HEADER
 
 #include <string>
 #include <cstring>
@@ -25,27 +25,32 @@ namespace mongo {
 
     using std::string;
 
-    struct StringData {
-        // TODO - Hook this class up in the BSON machinery
-        // There are two assumptions here that we may want to review then.
-        // 'data' *always* finishes with a null terminator
-        // 'size' does *not* account for the null terminator
-        // These assumptions may make it easier to minimize changes to existing code
-        const char* const data;
-        const unsigned    size;
-
+    class StringData {
+    public:
         StringData( const char* c ) 
-            : data(c), size(strlen(c)) {}
+            : _data(c), _size((unsigned) strlen(c)) {}
 
         StringData( const string& s )
-            : data(s.c_str()), size(s.size()) {}
+            : _data(s.c_str()), _size((unsigned) s.size()) {}
         
         struct LiteralTag {};
         template<size_t N>
         StringData( const char (&val)[N], LiteralTag )
-            : data(&val[0]), size(N-1) {}
+            : _data(&val[0]), _size(N-1) {}
+
+        const char* const data() const { return _data; }
+        const unsigned size() const { return _size; }
+
+    private:
+        // TODO - Hook this class up in the BSON machinery
+        // There are two assumptions here that we may want to review then.
+        // '_data' *always* finishes with a null terminator
+        // 'size' does *not* account for the null terminator
+        // These assumptions may make it easier to minimize changes to existing code
+        const char* const _data;
+        const unsigned    _size;
     };
 
 } // namespace mongo
 
-#endif  // UTIL_BSON_STRINGDATA_HEADER
+#endif  // BSON_STRINGDATA_HEADER

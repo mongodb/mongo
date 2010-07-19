@@ -648,7 +648,7 @@ const char * jsconcatcode =
  "by = b[key];}\n"
  "return Math.sqrt( Math.pow( by - ay , 2 ) +\n"
  "Math.pow( bx - ax , 2 ) );}\n"
- "rs = {};\n"
+ "rs = function () { \"try rs.help()\" }\n"
  "rs.help = function () {\n"
  "print(\"\\trs.status()                     { replSetGetStatus : 1 } checks repl set status\");\n"
  "print(\"\\trs.initiate()                   { replSetInitiate : null } initiates set with default settings\");\n"

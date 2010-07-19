@@ -83,6 +83,8 @@ namespace mongo {
     bool UnitTest::running = false;
 
     Nullstream nullstream;
+    vector<Tee*> Logstream::globalTees;
+    
 
     thread_specific_ptr<Logstream> Logstream::tsp;
 
@@ -178,7 +180,7 @@ namespace mongo {
     }
 
     ostream& operator<<( ostream &s, const ThreadSafeString &o ){
-        s << (string)o;
+        s << o.toString();
         return s;
     }
 

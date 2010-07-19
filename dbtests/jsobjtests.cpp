@@ -31,7 +31,7 @@ namespace JsobjTests {
     public:
         void run() {
             BufBuilder b( 0 );
-            b.append( "foo" );
+            b.appendStr( "foo" );
             ASSERT_EQUALS( 4, b.len() );
             ASSERT( strcmp( "foo", b.buf() ) == 0 );
         }
@@ -869,6 +869,19 @@ namespace JsobjTests {
                             << "x" << "p" );
             }
         };
+        class LabelishOr : public LabelBase {
+            BSONObj expected() {
+                return BSON( "$or" << BSON_ARRAY(
+                               BSON("a" << BSON( "$gt" << 1 << "$lte" << "x" ))
+                            << BSON("b" << BSON( "$ne" << 1 << "$ne" << "f" << "$ne" << 22.3 ))
+                            << BSON("x" << "p" )));
+            }
+            BSONObj actual() {
+                return OR( BSON( "a" << GT << 1 << LTE << "x"), 
+                           BSON( "b" << NE << 1 << NE << "f" << NE << 22.3),
+                           BSON( "x" << "p" ) );
+            }
+        };
 
         class Unallowed {
         public:
@@ -1582,13 +1595,13 @@ namespace JsobjTests {
     public:
         void run(){
             StringData a( string( "aaa" ) );
-            ASSERT_EQUALS( 3u , a.size );
+            ASSERT_EQUALS( 3u , a.size() );
 
             StringData b( string( "bbb" ).c_str() );
-            ASSERT_EQUALS( 3u , b.size );
+            ASSERT_EQUALS( 3u , b.size() );
 
             StringData c( StringData( "ccc", StringData::LiteralTag() ) );
-            ASSERT_EQUALS( 3u , c.size );
+            ASSERT_EQUALS( 3u , c.size() );
         }
     };
 
@@ -1660,6 +1673,13 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelDoubleShares >();
             add< ValueStreamTests::LabelSize >();
             add< ValueStreamTests::LabelMulti >();
+            add< ValueStreamTests::LabelishOr >();
+            add< ValueStreamTests::Unallowed >();
+            add< ValueStreamTests::ElementAppend >();
+            add< SubObjectBuilder >();
+            add< DateBuilder >();
+            add< DateNowBuilder >();
+            add< TimeTBuilder >();
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();

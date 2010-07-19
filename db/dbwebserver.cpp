@@ -32,6 +32,7 @@
 #include "background.h"
 #include "commands.h"
 #include "../util/version.h"
+#include "../util/ramlog.h"
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #undef assert
@@ -87,7 +88,9 @@ namespace mongo {
 
     class DbWebServer : public MiniWebServer {
     public:
-        DbWebServer(const string& ip, int port) : MiniWebServer(ip, port) {}
+        DbWebServer(const string& ip, int port) : MiniWebServer(ip, port), ramlog(new RamLog()) {
+            Logstream::get().addGlobalTee( ramlog );
+        }
 
     private:
         // caller locks
@@ -147,6 +150,10 @@ namespace mongo {
             statsSnapshots.outputLockInfoHTML( ss );
 
             BackgroundOperation::dump(ss);
+
+            ss << "</pre><h4>Log:</h4>";
+
+            ramlog->toHTML( ss );
         }
 
         void display( stringstream& ss , double elapsed , const Top::UsageData& usage ){
@@ -209,14 +216,14 @@ namespace mongo {
 
             ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
             ss << "<tr align='left'>"
-               << "<th>Client</th>" 
-               << "<th>OpId</th>" 
+               << th( a("", "Connections to the database, both internal and external.", "Client") )
+               << th( a("http://www.mongodb.org/display/DOCS/Viewing+and+Terminating+Current+Operation", "", "OpId") )
                << "<th>Active</th>" 
                << "<th>LockType</th>"
                << "<th>Waiting</th>"
                << "<th>SecsRunning</th>"
                << "<th>Op</th>"
-               << "<th>NameSpace</th>"
+               << th( a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "", "Namespace") )
                << "<th>Query</th>"
                << "<th>client</th>"
                << "<th>msg</th>"
@@ -791,6 +798,7 @@ namespace mongo {
 
     private:
         static DBDirectClient db;
+        RamLog * ramlog;
     };
 
     DBDirectClient DbWebServer::db;
