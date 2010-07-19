@@ -172,7 +172,7 @@ namespace mongo {
             mem.health = 0.0;
             if( mem.upSince ) {
                 mem.upSince = 0;
-                log() << "replSet info " << h.toString() << " is now down" << rsLog;
+                log() << "replSet info " << h.toString() << " is now down (or slow to respond)" << rsLog;
             }
             mem.lastHeartbeatMsg = msg;
         }

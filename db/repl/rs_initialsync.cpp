@@ -44,8 +44,8 @@ namespace mongo {
                 _syncDoInitialSync();
                 break;
             }
-            catch(DBException&) {
-                log(1) << "replSet initial sync exception; sleep 30 sec" << rsLog;
+            catch(DBException& e) {
+                sethbmsg("initial sync exception " + e.toString(), 0);
                 sleepsecs(30);
             }
         }
@@ -69,13 +69,13 @@ namespace mongo {
     void _logOpObjRS(const BSONObj& op);
 
     void ReplSetImpl::_syncDoInitialSync() { 
-        sethbmsg("initial sync pending");
+        sethbmsg("initial sync pending",0);
 
         assert( !isPrimary() ); // wouldn't make sense if we were.
 
         const Member *cp = currentPrimary();
         if( cp == 0 ) {
-            sethbmsg("initial sync need a member to be primary");
+            sethbmsg("initial sync need a member to be primary",0);
             sleepsecs(15);
             return;
         }
@@ -83,14 +83,14 @@ namespace mongo {
         string masterHostname = cp->h().toString();
         OplogReader r;
         if( !r.connect(masterHostname) ) {
-            sethbmsg( str::stream() << "initial sync couldn't connect to " << cp->h().toString() );
+            sethbmsg( str::stream() << "initial sync couldn't connect to " << cp->h().toString() , 0);
             sleepsecs(15);
             return;
         }
 
         BSONObj lastOp = r.getLastOp(rsoplog);
         if( lastOp.isEmpty() ) { 
-            sethbmsg("initial sync couldn't read remote oplog");
+            sethbmsg("initial sync couldn't read remote oplog", 0);
             sleepsecs(15);
             return;
         }
@@ -104,30 +104,37 @@ namespace mongo {
             isyncassert( "flapping [2]?", !o.isEmpty() );
         }
 
-        sethbmsg("initial sync drop all databases");
+        sethbmsg("initial sync drop all databases", 0);
         dropAllDatabasesExceptLocal();
-        sethbmsg("initial sync - not yet implemented");
+        sethbmsg("initial sync continues");
 
         list<string> dbs = r.conn()->getDatabaseNames();
-        for( list<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) { 
-            if( *i != "local" ) {
-                sethbmsg( str::stream() << "initial sync clone " << *i );
-                if( !clone(masterHostname.c_str(), *i) ) { 
-                    sethbmsg( str::stream() << "initial sync error clone of " << *i << " failed sleeping 5 minutes" );
+        for( list<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
+            string db = *i;
+            if( db != "local" ) {
+                sethbmsg( str::stream() << "initial sync cloning db: " << db , 0);
+                bool ok;
+                {
+                    writelock lk(db);
+                    Client::Context ctx(db);
+                    ok = clone(masterHostname.c_str(), db);
+                }
+                if( !ok ) { 
+                    sethbmsg( str::stream() << "initial sync error clone of " << db << " failed sleeping 5 minutes" ,0);
                     sleepsecs(300);
                     return;
                 }
             }
         }
 
-        sethbmsg("initial sync query minValid");
+        sethbmsg("initial sync query minValid",0);
 
         /* our cloned copy will be strange until we apply oplog events that occurred 
            through the process.  we note that time point here. */
         BSONObj minValid = r.getLastOp(rsoplog);
 
         MemoryMappedFile::flushAll(true);
-        sethbmsg("initial sync clone done first write to oplog still pending");
+        sethbmsg("initial sync clone done first write to oplog still pending",0);
 
         assert( !isPrimary() ); // wouldn't make sense if we were.
 
@@ -143,7 +150,7 @@ namespace mongo {
             _logOpObjRS(lastOp);
         }
         MemoryMappedFile::flushAll(true);
-        sethbmsg("initial sync done");
+        sethbmsg("initial sync done",0);
     }
 
 }

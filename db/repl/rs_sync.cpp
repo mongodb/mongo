@@ -30,8 +30,14 @@ namespace mongo {
         if( isPrimary() ) 
             return;
 
+        /* later, we can sync from up secondaries if we want. tbd. */
+        if( currentPrimary() == 0 )
+            return;
 
-
+        /* do we have anything at all? */
+        if( lastOpTimeWritten.isNull() ) {
+            syncDoInitialSync();
+        }
     }
 
     void ReplSetImpl::syncThread() {
