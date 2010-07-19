@@ -346,7 +346,7 @@ void processMessage( Connection& c , Message& m ){
                 Message response;
                 conn->port().call( m, response );
                 QueryResult *qr = (QueryResult *) response.singleData();
-                if ( !( qr->resultFlags() & ResultFlag_CursorNotFound ) ) {
+                if ( !( qr->resultFlags() & mongo::ResultFlag_CursorNotFound ) ) {
                     if ( qr->cursorId != 0 ) {
                         lastCursor[ c ] = qr->cursorId;
                         return;
@@ -361,7 +361,7 @@ void processMessage( Connection& c , Message& m ){
             long long myCursor = lastCursor[ r ];
             QueryResult *qr = (QueryResult *) m.singleData();
             long long yourCursor = qr->cursorId;
-            if ( ( qr->resultFlags() & ResultFlag_CursorNotFound ) )
+            if ( ( qr->resultFlags() & mongo::ResultFlag_CursorNotFound ) )
                 yourCursor = 0;
             if ( myCursor && !yourCursor )
                 cerr << "Expected valid cursor in sniffed response, found none" << endl;
