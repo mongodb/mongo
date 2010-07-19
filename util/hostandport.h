@@ -49,7 +49,17 @@ namespace mongo {
         /* uses real hostname instead of localhost */
         static HostAndPort Me();
 
-        bool operator<(const HostAndPort& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
+        bool operator<(const HostAndPort& r) const {
+            if( _host < r._host ) 
+                return true;
+            if( _host == r._host )
+                return port() < r.port();
+            return false;
+        }
+
+        bool operator==(const HostAndPort& r) const {
+            return _host == r._host && port() == r.port();
+        }
 
         /* returns true if the host/port combo identifies this process instance. */
         bool isSelf() const;
@@ -62,8 +72,8 @@ namespace mongo {
         operator string() const { return toString(); }
 
         string host() const { return _host; }
-
-        int port() const { return _port >= 0 ? _port : cmdLine.port; }
+        
+        int port() const { return _port >= 0 ? _port : CmdLine::DefaultDBPort; }
 
     private:
         // invariant (except full obj assignment):

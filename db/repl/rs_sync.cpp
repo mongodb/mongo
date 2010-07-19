@@ -36,8 +36,8 @@ namespace mongo {
 
     void ReplSetImpl::syncThread() {
         while( 1 ) { 
-            try { 
-                // ...
+            try {
+                _syncThread();
             }
             catch(DBException& e) { 
                 log() << "replSet syncThread: " << e.toString() << rsLog;

@@ -85,7 +85,7 @@ namespace mongo {
                     return html::green(line);
                 if( str::endsWith(s, " down\n") )
                     return html::yellow(line);
-                return html::blue(line);
+                return line; //html::blue(line);
             }
             
             return line;

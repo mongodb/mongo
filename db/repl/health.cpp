@@ -73,10 +73,14 @@ namespace mongo {
         bool ok = h > 0;
         s << td(h);
         s << td(ago(hbinfo().upSince));
+        bool never = false;
         {
             string h;
             time_t hb = hbinfo().lastHeartbeat;
-            if( hb == 0 ) h = "never"; 
+            if( hb == 0 ) {
+                h = "never";
+                never = true;
+            }
             else h = ago(hb) + " ago";
             s << td(h);
         }
@@ -85,7 +89,7 @@ namespace mongo {
         s << td( grey(hbinfo().lastHeartbeatMsg,!ok) );
         stringstream q;
         q << "/_replSetOplog?" << id();
-        s << td( a(q.str(), "", hbinfo().opTime.toString()) );
+        s << td( a(q.str(), "", never ? "?" : hbinfo().opTime.toString()) );
         s << _tr();
     }
 
