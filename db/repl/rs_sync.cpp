@@ -37,7 +37,10 @@ namespace mongo {
         /* do we have anything at all? */
         if( lastOpTimeWritten.isNull() ) {
             syncDoInitialSync();
+            return; // _syncThread will be recalled, starts from top again in case sync failed.
         }
+
+        /* we have some data.  continue tailing. */
     }
 
     void ReplSetImpl::syncThread() {
