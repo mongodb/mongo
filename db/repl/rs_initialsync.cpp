@@ -95,7 +95,6 @@ namespace mongo {
             return;
         }
         OpTime ts = lastOp["ts"]._opTime();
-        long long h = lastOp["h"].numberLong();
         
         {
             /* make sure things aren't too flappy */

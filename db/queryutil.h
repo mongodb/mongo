@@ -62,6 +62,8 @@ namespace mongo {
         // does not remove fully contained ranges (eg [1,3] - [2,2] doesn't remove anything)
         // in future we can change so that an or on $in:[3] combined with $in:{$gt:2} doesn't scan 3 a second time
         const FieldRange &operator-=( const FieldRange &other );
+        // true iff other includes this
+        bool operator<=( const FieldRange &other );
         BSONElement min() const { assert( !empty() ); return _intervals[ 0 ]._lower._bound; }
         BSONElement max() const { assert( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._bound; }
         bool minInclusive() const { assert( !empty() ); return _intervals[ 0 ]._lower._inclusive; }
@@ -91,6 +93,7 @@ namespace mongo {
                   maxKey.firstElement().woCompare( max(), false ) != 0 );
         }
         bool empty() const { return _intervals.empty(); }
+        void makeEmpty() { _intervals.clear(); }
 		const vector< FieldInterval > &intervals() const { return _intervals; }
         string getSpecial() const { return _special; }
         void setExclusiveBounds() {
@@ -234,20 +237,41 @@ namespace mongo {
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         string getSpecial() const;
         const FieldRangeSet &operator-=( const FieldRangeSet &other ) {
+            int nUnincluded = 0;
+            string unincludedKey;
             map< string, FieldRange >::iterator i = _ranges.begin();
             map< string, FieldRange >::const_iterator j = other._ranges.begin();
-            while( i != _ranges.end() && j != other._ranges.end() ) {
+            while( nUnincluded < 2 && i != _ranges.end() && j != other._ranges.end() ) {
                 int cmp = i->first.compare( j->first );
                 if ( cmp == 0 ) {
-                    i->second -= j->second;
+                    if ( i->second <= j->second ) {
+                        // nothing
+                    } else {
+                        ++nUnincluded;
+                        unincludedKey = i->first;
+                    }
                     ++i;
                     ++j;
                 } else if ( cmp < 0 ) {
                     ++i;
                 } else {
-                    ++j;
+                    // other has a bound we don't, nothing can be done
+                    return *this;
                 }
             }
+            if ( j != other._ranges.end() ) {
+                // other has a bound we don't, nothing can be done
+                return *this;                
+            }
+            if ( nUnincluded > 1 ) {
+                return *this;
+            }
+            if ( nUnincluded == 0 ) {
+                makeEmpty();
+                return *this;
+            }
+            // nUnincluded == 1
+            _ranges[ unincludedKey ] -= other._ranges[ unincludedKey ];
             appendQueries( other );
             return *this;
         }
@@ -281,6 +305,11 @@ namespace mongo {
             for( vector< BSONObj >::const_iterator i = other._queries.begin(); i != other._queries.end(); ++i ) {
                 _queries.push_back( *i );                
             }                        
+        }
+        void makeEmpty() {
+            for( map< string, FieldRange >::iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+                i->second.makeEmpty();
+            }
         }
         void processQueryField( const BSONElement &e, bool optimize );
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
@@ -449,28 +478,17 @@ namespace mongo {
         bool orFinished() const { return _orFound && _orSets.empty(); }
         // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
         // this could invalidate the result of the last topFrs()
-        void popOrClause( const char *firstField, const char *secondField ) {
+        void popOrClause() {
             massert( 13274, "no or clause to pop", !orFinished() );
             const FieldRangeSet &toPop = _orSets.front();
-            if ( toPop.hasRange( firstField ) ) {
-                if ( secondField && toPop.hasRange( secondField ) ) {
-                    // modifying existing front is ok - this is the last time we'll use it
-                    _orSets.front().range( firstField ).setExclusiveBounds();
-                }
-                const FieldRange &r = toPop.range( firstField );
-                list< FieldRangeSet >::iterator i = _orSets.begin();
-                ++i;
-                while( i != _orSets.end() ) {
-                    if ( i->hasRange( firstField ) ) {
-                        i->range( firstField ) -= r;
-                        if( !i->matchPossible() ) {
-                            i = _orSets.erase( i );
-                        } else {    
-                            ++i;
-                        }
-                    } else {
-                        ++i;
-                    }
+            list< FieldRangeSet >::iterator i = _orSets.begin();
+            ++i;
+            while( i != _orSets.end() ) {
+                *i -= toPop;
+                if( !i->matchPossible() ) {
+                    i = _orSets.erase( i );
+                } else {    
+                    ++i;
                 }
             }
             _oldOrSets.push_front( toPop );

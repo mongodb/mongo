@@ -67,7 +67,7 @@ namespace mongo {
             b.skip( sizeof( QueryResult ) );
             {
                 BSONObj obj = BSON( "$err" << errmsg );
-                b.append( obj.objdata() , obj.objsize() );
+                b.appendBuf( obj.objdata() , obj.objsize() );
             }
             
             QueryResult *qr = (QueryResult*)b.buf();

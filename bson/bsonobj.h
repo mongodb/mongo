@@ -82,14 +82,13 @@ namespace mongo {
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
-            b.append(reinterpret_cast<const void *>( objdata() ), objsize());
+            b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
         }
 
         /** Readable representation of a BSON object in an extended JSON-style notation. 
             This is an abbreviated representation which might be used for logging.
         */
         string toString( bool isArray = false, bool full=false ) const;
-        operator string() const { return toString(); }
         
         /** Properly formatted JSON string. 
             @param pretty if true we try to add some lf's and indentation

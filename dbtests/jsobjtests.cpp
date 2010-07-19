@@ -31,7 +31,7 @@ namespace JsobjTests {
     public:
         void run() {
             BufBuilder b( 0 );
-            b.append( "foo" );
+            b.appendStr( "foo" );
             ASSERT_EQUALS( 4, b.len() );
             ASSERT( strcmp( "foo", b.buf() ) == 0 );
         }

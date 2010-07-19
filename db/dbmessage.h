@@ -208,7 +208,7 @@ namespace mongo {
                             ) {
         BufBuilder b(32768);
         b.skip(sizeof(QueryResult));
-        b.append(data, size);
+        b.appendBuf(data, size);
         QueryResult *qr = (QueryResult *) b.buf();
         qr->_resultFlags() = queryResultFlags;
         qr->len = b.len();
@@ -243,7 +243,7 @@ namespace mongo {
     inline void replyToQuery(int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj) {
         BufBuilder b;
         b.skip(sizeof(QueryResult));
-        b.append((void*) obj.objdata(), obj.objsize());
+        b.appendBuf((void*) obj.objdata(), obj.objsize());
         QueryResult* msgdata = (QueryResult *) b.buf();
         b.decouple();
         QueryResult *qr = msgdata;
