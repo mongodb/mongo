@@ -387,7 +387,12 @@ namespace mongo {
         double _y;
     };
 
+
+    extern double EARTH_RADIUS_KM;
+    extern double EARTH_RADIUS_MILES;
+
     // WARNING: _x and _y MUST be longitude and latitude in that order
+    // note: multiply by earth radius for distance
     inline double spheredist_rad( const Point& p1, const Point& p2 ) {
         // this uses the n-vector formula: http://en.wikipedia.org/wiki/N-vector
         // If you try to match the code to the formula, note that I inline the cross-product.
@@ -413,4 +418,5 @@ namespace mongo {
                     Point( p2._x * (M_PI/180), p2._y * (M_PI/180))
                );
     }
+
 }
