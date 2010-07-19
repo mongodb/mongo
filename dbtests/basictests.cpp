@@ -309,7 +309,7 @@ namespace BasicTests {
                 {
                     ThreadSafeString bar;
                     bar = "eliot2";
-                    foo = bar;
+                    foo = bar.toString();
                 }
                 ASSERT_EQUALS( "eliot2" , foo );
             }
