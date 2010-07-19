@@ -44,6 +44,44 @@ namespace mongo {
         uassert(13288, "replSet error write op to db before replSet initialized", str::startsWith(ns, "local.") || *opstr == 'n');
     }
 
+    /** write an op to the oplog that is already built. 
+        todo : make _logOpRS() call this so we don't repeat ourself?
+        */
+    void _logOpObjRS(const BSONObj& op) { 
+        DEV assertInWriteLock();
+
+        const OpTime ts = op["ts"]._opTime();
+        long long h = op["h"].numberLong();
+
+        {
+            const char *logns = rsoplog;
+            if ( rsOplogDetails == 0 ) {
+                Client::Context ctx( logns , dbpath, 0, false);
+                localDB = ctx.db();
+                assert( localDB );
+                rsOplogDetails = nsdetails(logns);
+                massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
+            }
+            Client::Context ctx( "" , localDB, false );
+            {
+                int len = op.objsize();
+                Record *r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
+                memcpy(r->data, op.objdata(), len);
+            }
+            /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
+                     this code (or code in now() maybe) should be improved.
+                     */
+            if( theReplSet ) {
+                if( !(theReplSet->lastOpTimeWritten<ts) ) {
+                    log() << "replSet error possible failover clock skew issue? " << theReplSet->lastOpTimeWritten.toString() << ' ' << endl;
+                }
+                theReplSet->lastOpTimeWritten = ts;
+                theReplSet->h = h;
+                ctx.getClient()->setLastOp( ts.asDate() );
+            }
+        }
+    }
+
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
         static BufBuilder bufbuilder(8*1024);
@@ -104,7 +142,8 @@ namespace mongo {
                      this code (or code in now() maybe) should be improved.
                      */
             if( theReplSet ) {
-                massert(13324, "rs error possible failover clock skew issue?", theReplSet->lastOpTimeWritten < ts);
+                if( !(theReplSet->lastOpTimeWritten<ts) ) 
+                    log() << "replSet ERROR possible failover clock skew issue? " << theReplSet->lastOpTimeWritten << ' ' << ts << endl;
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->h = hNew;
                 ctx.getClient()->setLastOp( ts.asDate() );
@@ -122,7 +161,6 @@ namespace mongo {
         p += obj.objsize();
         *p = EOO;
         
-
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
             log( 6 ) << "logOp:" << temp << endl;
