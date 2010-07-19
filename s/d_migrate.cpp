@@ -47,6 +47,42 @@ using namespace std;
 
 namespace mongo {
 
+    class MoveTimingHelper {
+    public:
+        MoveTimingHelper( const string& where , const string& ns )
+            : _where( where ) , _ns( ns ){
+            _next = 1;
+        }
+
+        ~MoveTimingHelper(){
+            configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
+        }
+        
+        void done( int step ){
+            assert( step == _next++ );
+            
+            stringstream ss;
+            ss << "step" << step;
+            string s = ss.str();
+            
+            cc().curop()->setMessage( s.c_str() );
+            
+            _b.appendNumber( s , _t.millis() );
+            _t.reset();
+        }
+        
+        
+    private:
+        Timer _t;
+
+        string _where;
+        string _ns;
+        
+        int _next;
+        
+        BSONObjBuilder _b;
+    };
+
     class RemoveSaver : public Helpers::RemoveCallback , boost::noncopyable {
     public:
         RemoveSaver( const string& ns , const string& why) : _out(0){
@@ -332,6 +368,7 @@ namespace mongo {
             
             // -------------------------------
             
+            
             // 1.
             string ns = cmdObj.firstElement().str();
             string to = cmdObj["to"].str();
@@ -379,13 +416,14 @@ namespace mongo {
                 configServer.init( configdb );
             }
 
-
+            MoveTimingHelper timing( "from" , ns );
 
             Shard fromShard( from );
             Shard toShard( to );
             
             log() << "got movechunk: " << cmdObj << endl;
-        
+
+            timing.done(1);
             // 2. 
             
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
@@ -425,8 +463,8 @@ namespace mongo {
                 conn.done();
             }
             
+            timing.done(2);
             
-
             // 3.
             MigrateStatusHolder statusHolder( ns , min , max );
             {
@@ -456,6 +494,7 @@ namespace mongo {
                 }
 
             }
+            timing.done( 3 );
             
             // 4. 
             for ( int i=0; i<86400; i++ ){ // don't want a single chunk move to take more than a day
@@ -477,7 +516,8 @@ namespace mongo {
                 if ( res["state"].String() == "steady" )
                     break;
             }
-            
+            timing.done(4);
+
             // 5.
             { 
                 // 5.a
@@ -552,9 +592,11 @@ namespace mongo {
             }
             
             migrateFromStatus.done();
+            timing.done(5);
             // 6. 
             log( LL_WARNING ) << " deleting data before ensuring no more cursors TODO" << endl;
             
+            timing.done(6);
             // 7
             {
                 ShardForceModeBlock sf;
@@ -564,6 +606,8 @@ namespace mongo {
                 log() << "moveChunk deleted: " << num << endl;
                 result.appendNumber( "numDeleted" , num );
             }
+            
+            timing.done(7);
 
             return true;
             
@@ -623,15 +667,17 @@ namespace mongo {
         }
         
         void _go(){
+            MoveTimingHelper timing( "to" , ns );
+            
             assert( active );
             assert( state == READY );
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
-
+            
             ScopedDbConnection conn( from );
             conn->getLastError(); // just test connection
 
-            { // copy indexes
+            { // 1. copy indexes
                 auto_ptr<DBClientCursor> indexes = conn->getIndexes( ns );
                 vector<BSONObj> all;
                 while ( indexes->more() ){
@@ -646,18 +692,22 @@ namespace mongo {
                     BSONObj idx = all[i];
                     theDataFileMgr.insert( system_indexes.c_str() , idx.objdata() , idx.objsize() );
                 }
+                
+                timing.done(1);
             }
-
-            { // delete any data already in range
+            
+            { // 2. delete any data already in range
                 writelock lk( ns );
                 RemoveSaver rs( ns , "preCleanup" );
                 long long num = Helpers::removeRange( ns , min , max , true , false , &rs );
                 if ( num )
                     log( LL_WARNING ) << "moveChunkCmd deleted data already in chunk # objects: " << num << endl;
+
+                timing.done(2);
             }
             
             
-            { // initial bulk clone
+            { // 3. initial bulk clone
                 state = CLONE;
                 auto_ptr<DBClientCursor> cursor = conn->query( ns , Query().minKey( min ).maxKey( max ) , /* QueryOption_Exhaust */ 0 );
                 while ( cursor->more() ){
@@ -668,39 +718,48 @@ namespace mongo {
                     }
                     numCloned++;
                 }
-            }
-            
-            // do bulk of mods
-            state = CATCHUP;
-            while ( true ){
-                BSONObj res;
-                assert( conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) );
-                if ( res["size"].number() == 0 )
-                    break;
-                
-                apply( res );
-            }
-            
-            // wait for commit
-            state = STEADY;
-            while ( state == STEADY || state == COMMIT_START ){
-                sleepmillis( 20 );
 
-                BSONObj res;
-                if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
-                    log() << "_transferMods failed in STEADY state: " << res << endl;
-                    errmsg = res.toString();
-                    state = FAIL;
-                    return;
-                }
-                if ( res["size"].number() > 0 ){
+                timing.done(3);
+            }
+            
+            { // 4. do bulk of mods
+                state = CATCHUP;
+                while ( true ){
+                    BSONObj res;
+                    assert( conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) );
+                    if ( res["size"].number() == 0 )
+                        break;
+                    
                     apply( res );
                 }
 
-                if ( state == COMMIT_START )
-                    break;
+                timing.done(4);
             }
-
+            
+            { // 5. wait for commit
+                state = STEADY;
+                while ( state == STEADY || state == COMMIT_START ){
+                    sleepmillis( 20 );
+                    
+                    BSONObj res;
+                    if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
+                        log() << "_transferMods failed in STEADY state: " << res << endl;
+                        errmsg = res.toString();
+                        state = FAIL;
+                        return;
+                    }
+                    if ( res["size"].number() > 0 ){
+                        apply( res );
+                    }
+                    
+                    if ( state == COMMIT_START )
+                        break;
+                    
+                }
+                
+                timing.done(5);
+            }
+            
             state = DONE;
             conn.done();
         }
