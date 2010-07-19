@@ -706,6 +706,8 @@ int main(int argc, char* argv[], char *envp[] )
         ("maxConns",po::value<int>(), "max number of simultaneous connections")
 		#if !defined(_WIN32)
         ("nounixsocket", "disable listening on unix sockets")
+        #else
+        ("maxWorkingSet",po::value<size_t>(), "limit ram usage in bytes (Vista and higher)")
 		#endif
         ("ipv6", "enable IPv6 support (disabled by default)")
         ;
@@ -989,6 +991,17 @@ int main(int argc, char* argv[], char *envp[] )
         }
         
 #if defined(_WIN32)
+        if (params.count("maxWorkingSet")){
+            size_t minWorkingSet = 50*4096; // 50 pages is the default value
+            size_t maxWorkingSet = params["maxWorkingSet"].as<size_t>();
+
+            bool success = SetProcessWorkingSetSizeEx(GetCurrentProcess(), minWorkingSet, maxWorkingSet, QUOTA_LIMITS_HARDWS_MAX_ENABLE);
+            if (!success){
+                log(LL_ERROR) << "SetProcessWorkingSetSizeEx failed. This doesn't work on WinXP." << endl;
+                dbexit(EXIT_BADOPTIONS);
+            }
+        }
+
         if (params.count("serviceName")){
             string x = params["serviceName"].as<string>();
             windowsServiceName = wstring(x.size(),L' ');
