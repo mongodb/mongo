@@ -263,6 +263,9 @@ namespace mongo {
                     uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
                 }
                 
+                // use fresh shard state
+                Shard::reloadShardInfo(); 
+
                 dist_lock_try lk( &balanceLock , "doing balance round" );
                 if ( ! lk.got() ){
                     log(1) << "skipping balancing round during ongoing split or move activity." << endl;
@@ -294,9 +297,6 @@ namespace mongo {
                 // Just to match the opening statement if in log level 1
                 log(1) << "*** End of balancing round" << endl;        
 
-                // It's possible this shard was removed
-                Shard::reloadShardInfo(); 
-          
                 continue;
             }
         }

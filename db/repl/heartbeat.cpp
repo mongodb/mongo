@@ -76,6 +76,7 @@ namespace mongo {
             }
             result.append("set", theReplSet->name());
             result.append("state", theReplSet->state());
+            result.append("hbmsg", theReplSet->hbmsg());
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             int v = theReplSet->config().version;
             result.append("v", v);
@@ -112,6 +113,11 @@ namespace mongo {
         void doWork() { 
             cout << "TEMP healthpool dowork " << endl;
 
+            if ( !theReplSet ) {
+                log() << "theReplSet not initialized yet, skipping health poll this round" << endl;
+                return;
+            }
+
             HeartbeatInfo mem = m;
             HeartbeatInfo old = mem;
             try { 
@@ -130,7 +136,7 @@ namespace mongo {
                         mem.upSince = mem.lastHeartbeat;
                     }
                     mem.health = 1.0;
-                    mem.lastHeartbeatMsg = "";
+                    mem.lastHeartbeatMsg = info["hbmsg"].String();
                     if( info.hasElement("opTime") )
                         mem.opTime = info["opTime"].Date();
 

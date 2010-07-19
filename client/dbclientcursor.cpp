@@ -104,7 +104,7 @@ namespace mongo {
         QueryResult *qr = (QueryResult *) m->singleData();
         resultFlags = qr->resultFlags();
         
-        if ( qr->resultFlags() & QueryResult::ResultFlag_CursorNotFound ) {
+        if ( qr->resultFlags() & ResultFlag_CursorNotFound ) {
             // cursor id no longer valid at the server.
             assert( qr->cursorId == 0 );
             cursorId = 0; // 0 indicates no longer valid (dead)

@@ -93,7 +93,7 @@ namespace mongo {
 
         void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;
         
-        operator string() const { stringstream ss; ss << "exception: " << code << " " << msg; return ss.str(); }
+        string toString() const { stringstream ss; ss << "exception: " << code << " " << msg; return ss.str(); }
 
         bool empty() const { return msg.empty(); }
                 
@@ -118,8 +118,6 @@ namespace mongo {
             stringstream ss; ss << getCode() << " " << what(); return ss.str();
             return ss.str();
         }
-        
-        operator string() const { return toString(); }
         
         const ExceptionInfo& getInfo() const { return _ei; }
 

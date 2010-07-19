@@ -21,14 +21,6 @@
 
 namespace mongo {
 
-    void dropAllDatabasesExceptLocal();
-
-    void ReplSetImpl::syncDoInitialSync() { 
-        log() << "replSet syncDoInitialSync" << rsLog;
-        dropAllDatabasesExceptLocal();
-
-    }
-
     void syncThread() { 
         Client::initThread("rs_sync");
     }

@@ -48,7 +48,7 @@ namespace mongo {
 
             {
                 QueryResult *qr = (QueryResult *) response.singleData();
-                if ( qr->resultFlags() & QueryResult::ResultFlag_ShardConfigStale ){
+                if ( qr->resultFlags() & ResultFlag_ShardConfigStale ){
                     dbcon.done();
                     throw StaleConfigException( r.getns() , "Strategy::doQuery" );
                 }
@@ -62,7 +62,7 @@ namespace mongo {
             BSONObjBuilder err;
             e.getInfo().append( err );
             BSONObj errObj = err.done();
-            replyToQuery(QueryResult::ResultFlag_ErrSet, r.p() , r.m() , errObj);
+            replyToQuery(ResultFlag_ErrSet, r.p() , r.m() , errObj);
         }
     }
     
@@ -82,7 +82,7 @@ namespace mongo {
     protected:
         string name() { return "WriteBackListener"; }
         WriteBackListener( const string& addr ) : _addr( addr ){
-            cout << "creating WriteBackListener for: " << addr << endl;
+            log() << "creating WriteBackListener for: " << addr << endl;
         }
         
         void run(){

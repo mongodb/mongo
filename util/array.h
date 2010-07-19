@@ -86,7 +86,7 @@ namespace mongo {
                 return _it->_data[_pos];
             }
             
-            operator string() const {
+            string toString() const {
                 stringstream ss;
                 ss << _pos;
                 return ss.str();

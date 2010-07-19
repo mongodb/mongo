@@ -79,7 +79,7 @@ namespace mongo {
         bool contains( const BSONObj& obj ) const;
 
         string toString() const;
-        operator string() const { return toString(); }
+
         friend ostream& operator << (ostream& out, const Chunk& c){ return (out << c.toString()); }
 
         bool operator==(const Chunk& s) const;
@@ -280,7 +280,6 @@ namespace mongo {
         void save();
 
         string toString() const;
-        operator string() const { return toString(); }
 
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;

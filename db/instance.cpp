@@ -198,7 +198,7 @@ namespace mongo {
             QueryResult * msgdata = (QueryResult *) b.buf();
             b.decouple();
             QueryResult *qr = msgdata;
-            qr->_resultFlags() = QueryResult::ResultFlag_ErrSet;
+            qr->_resultFlags() = ResultFlag_ErrSet;
             qr->len = b.len();
             qr->setOperation(opReply);
             qr->cursorId = 0;
@@ -598,7 +598,7 @@ namespace mongo {
             {
                 readlock lk(rsoplog);
                 BSONObj o;
-                if( Helpers::getFirst(rsoplog.c_str(), o) )
+                if( Helpers::getFirst(rsoplog, o) )
                     return true;
             }
         }

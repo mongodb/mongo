@@ -632,7 +632,7 @@ namespace JSTests {
     private:
         void check( const BSONObj &one, const BSONObj &two ) {
             if ( one.woCompare( two ) != 0 ) {
-                static string fail = string( "Assertion failure expected " ) + string( one ) + ", got " + string( two );
+                static string fail = string( "Assertion failure expected " ) + one.toString() + ", got " + two.toString();
                 FAIL( fail.c_str() );
             }
         }

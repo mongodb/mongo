@@ -117,7 +117,7 @@ namespace mongo {
         // TODO: this should be somewhere else probably
         static BSONObj toKeyFormat( const BSONObj& o , BSONObj& key );
 
-        static long long removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield = false );
+        static long long removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield = false , bool maxInclusive = false );
 
         /* Remove all objects from a collection.
         You do not need to set the database before calling.

@@ -122,24 +122,35 @@ namespace mongo {
         return true;
     }
 
-    ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool reload ){
+    ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ){
         scoped_lock lk( _lock );
-
+        
         ChunkManagerPtr m = _shards[ns];
-        if ( m && ! reload )
+        if ( m && ! shouldReload )
             return m;
-
-        uassert( 10181 ,  (string)"not sharded:" + ns , _isSharded( ns ) );
-        if ( m && reload )
+        
+        if ( shouldReload && ! _isSharded( ns ) )
+            reload();
+        
+        massert( 10181 ,  (string)"not sharded:" + ns , _isSharded( ns ) );
+        
+        if ( m && shouldReload ){
             log() << "reloading shard info for: " << ns << endl;
+            reload();
+        }
+        
+        // this means it was sharded and now isn't....
+        // i'm going to return null here
+        // though i'm not 100% sure its a good idea
+        if ( ! _isSharded(ns) )
+            return ChunkManagerPtr();
+        
         m.reset( new ChunkManager( this , ns , _sharded[ ns ].key , _sharded[ns].unique ) );
         _shards[ns] = m;
         return m;
     }
     
     void DBConfig::serialize(BSONObjBuilder& to){
-        scoped_lock lk( _lock );
-
         to.append("_id", _name);
         to.appendBool("partitioned", _shardingEnabled );
         to.append("primary", _primary.getName() );
@@ -157,8 +168,6 @@ namespace mongo {
     }
     
     void DBConfig::unserialize(const BSONObj& from){
-        scoped_lock lk( _lock );
-
         _name = from.getStringField("_id");
         log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
         

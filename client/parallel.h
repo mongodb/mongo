@@ -22,7 +22,6 @@
 #include "../pch.h"
 #include "dbclient.h"
 #include "redef_macros.h"
-
 #include "../db/dbmessage.h"
 #include "../db/matcher.h"
 
@@ -50,7 +49,7 @@ namespace mongo {
 
         string toString() const {
             StringBuilder ss;
-            ss << "server:" << _server << " _extra:" << _extra << " _orderObject:" << _orderObject;
+            ss << "server:" << _server << " _extra:" << _extra.toString() << " _orderObject:" << _orderObject.toString();
             return ss.str();
         }
 
@@ -62,8 +61,6 @@ namespace mongo {
         BSONObj _extra;
         BSONObj _orderObject;
     };
-
-
 
     /**
      * this is a cursor that works over a set of servers

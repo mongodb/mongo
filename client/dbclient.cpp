@@ -498,7 +498,7 @@ namespace mongo {
 
         uassert( 10276 ,  "DBClientBase::findOne: transport error", c.get() );
 
-        if ( c->hasResultFlag( QueryResult::ResultFlag_ShardConfigStale ) )
+        if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
             throw StaleConfigException( ns , "findOne has stale config" );
 
         if ( !c->more() )

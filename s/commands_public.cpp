@@ -167,7 +167,7 @@ namespace mongo {
         class CountCmd : public PublicGridCommand {
         public:
             CountCmd() : PublicGridCommand("count") { }
-            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool l){
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
                 
@@ -179,9 +179,29 @@ namespace mongo {
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     ShardConnection conn( conf->getPrimary() , fullns );
-                    result.append( "n" , (double)conn->count( fullns , filter ) );
+
+                    BSONObj temp;
+                    bool ok = conn->runCommand( dbName , BSON( "count" << collection << "query" << filter ) , temp );
                     conn.done();
-                    return true;
+                    
+                    if ( ok ){
+                        result.append( temp["n"] );
+                        return true;
+                    }
+                    
+                    if ( temp["code"].numberInt() != 13388 ){
+                        errmsg = temp["errmsg"].String();
+                        result.appendElements( temp );
+                        return false;
+                    }
+                    
+                    // this collection got sharded
+                    ChunkManagerPtr cm = conf->getChunkManager( fullns , true );
+                    if ( ! cm ){
+                        errmsg = "should be sharded now";
+                        result.append( "root" , temp );
+                        return false;
+                    }
                 }
                 
                 long long total = 0;
@@ -189,7 +209,10 @@ namespace mongo {
                 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 while ( true ){
-                    massert( 10419 ,  "how could chunk manager be null!" , cm );
+                    if ( ! cm ){
+                        // probably unsharded now
+                        return run( dbName , cmdObj , errmsg , result , l );
+                    }
                     
                     set<Shard> shards;
                     cm->getShardsForQuery( shards , filter );

@@ -57,7 +57,7 @@ namespace mongo {
     class LazyStringImpl : public LazyString {
     public:
         LazyStringImpl( const T &t ) : t_( t ) {}
-        virtual string val() const { return (string)t_; }
+        virtual string val() const { return t_.toString(); }
     private:
         const T& t_;
     };
@@ -75,6 +75,9 @@ namespace mongo {
         }
         virtual ~Nullstream() {}
         virtual Nullstream& operator<<(const char *) {
+            return *this;
+        }
+        virtual Nullstream& operator<<(const string& ) {
             return *this;
         }
         virtual Nullstream& operator<<(char *) {
@@ -152,6 +155,7 @@ namespace mongo {
         LogLevel logLevel;
         static boost::scoped_ptr<ostream> stream;
         static FILE* logfile;
+        static vector<Tee*> globalTees;
     public:
 
         static void setLogFile(FILE* f){
@@ -185,6 +189,8 @@ namespace mongo {
                 scoped_lock lk(mutex);
                 
                 if( t ) t->write(logLevel,s);
+                for ( unsigned i=0; i<globalTees.size(); i++ )
+                    globalTees[i]->write(logLevel,s);
                 
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
@@ -202,6 +208,7 @@ namespace mongo {
 
         /** note these are virtual */
         Logstream& operator<<(const char *x) { ss << x; return *this; }
+        Logstream& operator<<(const string& x) { ss << x; return *this; }
         Logstream& operator<<(char *x)       { ss << x; return *this; }
         Logstream& operator<<(char x)        { ss << x; return *this; }
         Logstream& operator<<(int x)         { ss << x; return *this; }
@@ -247,6 +254,10 @@ namespace mongo {
 
         Logstream& prolog() {
             return *this;
+        }
+        
+        void addGlobalTee( Tee * t ){
+            globalTees.push_back( t );
         }
 
     private:

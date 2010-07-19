@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    const string rsoplog = "local.oplog.rs";
+    const char rsoplog[] = "local.oplog.rs";
 
     /*
     class RSOpTime : public OpTime { 

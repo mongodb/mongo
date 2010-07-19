@@ -35,6 +35,7 @@
 #include "../client/distlock.h"
 
 #include "../util/queue.h"
+#include "../util/unittest.h"
 
 #include "shard.h"
 #include "d_logic.h"
@@ -59,6 +60,12 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; } 
 
     };
+
+    bool isInRange( const BSONObj& obj , const BSONObj& min , const BSONObj& max ){
+        BSONObj k = obj.extractFields( min, true );
+
+        return k.woCompare( min ) >= 0 && k.woCompare( max ) < 0;
+    }
 
 
     class MigrateFromStatus {
@@ -143,11 +150,8 @@ namespace mongo {
                 break;
                 
             }
-
-            BSONObj k = it.extractFields( _min, true );
-
-            if ( k.woCompare( _min ) < 0 ||
-                 k.woCompare( _max ) >= 0 )
+            
+            if ( ! isInRange( it , _min , _max ) )
                 return;
             
             scoped_lock lk( _mutex );
@@ -277,9 +281,9 @@ namespace mongo {
             // -------------------------------
             
             // 1.
-            string ns = cmdObj.firstElement().String();
-            string to = cmdObj["to"].String();
-            string from = cmdObj["from"].String(); // my public address, a tad redundant, but safe
+            string ns = cmdObj.firstElement().str();
+            string to = cmdObj["to"].str();
+            string from = cmdObj["from"].str(); // my public address, a tad redundant, but safe
             BSONObj min  = cmdObj["min"].Obj();
             BSONObj max  = cmdObj["max"].Obj();
             BSONElement shardId = cmdObj["shardId"];
@@ -349,6 +353,7 @@ namespace mongo {
                 maxVersion = x["lastmod"];
 
                 x = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
+                assert( x["shard"].type() );
                 myOldShard = x["shard"].String();
                 
                 if ( myOldShard != fromShard.getName() ){
@@ -372,6 +377,10 @@ namespace mongo {
 
             // 3.
             MigrateStatusHolder statusHolder( ns , min , max );
+            {
+                dblock lk;
+                // this makes sure there wasn't a write inside the .cpp code we can miss
+            }
             
             {
                 
@@ -388,6 +397,7 @@ namespace mongo {
 
                 if ( ! ok ){
                     errmsg = "_recvChunkStart failed: ";
+                    assert( res["errmsg"].type() );
                     errmsg += res["errmsg"].String();
                     result.append( "cause" , res );
                     return false;
@@ -400,12 +410,18 @@ namespace mongo {
                 sleepsecs( 1 ); 
                 ScopedDbConnection conn( to );
                 BSONObj res;
-                conn->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
+                bool ok = conn->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
                 res = res.getOwned();
                 conn.done();
                 
                 log(0) << "_recvChunkStatus : " << res << endl;
                 
+                if ( ! ok ){
+                    errmsg = "_recvChunkStatus error";
+                    result.append( "cause" ,res );
+                    return false;
+                }
+
                 if ( res["state"].String() == "steady" )
                     break;
             }
@@ -559,31 +575,10 @@ namespace mongo {
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
 
-            { // delete any data already in range
-                writelock lk( ns );
-                long long num = Helpers::removeRange( ns , min , max , true );
-                if ( num )
-                    log( LL_WARNING ) << "moveChunkCmd deleted data already in chunk # objects: " << num << endl;
-            }
-
             ScopedDbConnection conn( from );
             conn->getLastError(); // just test connection
-            
-            state = CLONE;
-            {
-                auto_ptr<DBClientCursor> cursor = conn->query( ns , Query().minKey( min ).maxKey( max ) , /* QueryOption_Exhaust */ 0 );
-                while ( cursor->more() ){
-                    BSONObj o = cursor->next();
-                    {
-                        writelock lk( ns );
-                        Helpers::upsert( ns , o );
-                    }
-                    numCloned++;
-                }
-            }
-            
-            {
-                
+
+            { // copy indexes
                 auto_ptr<DBClientCursor> indexes = conn->getIndexes( ns );
                 vector<BSONObj> all;
                 while ( indexes->more() ){
@@ -600,6 +595,28 @@ namespace mongo {
                 }
             }
 
+            { // delete any data already in range
+                writelock lk( ns );
+                long long num = Helpers::removeRange( ns , min , max , true );
+                if ( num )
+                    log( LL_WARNING ) << "moveChunkCmd deleted data already in chunk # objects: " << num << endl;
+            }
+            
+            
+            { // initial bulk clone
+                state = CLONE;
+                auto_ptr<DBClientCursor> cursor = conn->query( ns , Query().minKey( min ).maxKey( max ) , /* QueryOption_Exhaust */ 0 );
+                while ( cursor->more() ){
+                    BSONObj o = cursor->next();
+                    {
+                        writelock lk( ns );
+                        Helpers::upsert( ns , o );
+                    }
+                    numCloned++;
+                }
+            }
+            
+            // do bulk of mods
             state = CATCHUP;
             while ( true ){
                 BSONObj res;
@@ -609,8 +626,8 @@ namespace mongo {
                 
                 apply( res );
             }
-
-
+            
+            // wait for commit
             state = STEADY;
             while ( state == STEADY || state == COMMIT_START ){
                 sleepmillis( 20 );
@@ -661,9 +678,12 @@ namespace mongo {
             if ( xfer["deleted"].isABSONObj() ){
                 writelock lk(ns);
                 Client::Context cx(ns);
-            
-                // TODO:
-                assert(0);
+                
+                BSONObjIterator i( xfer["deleted"].Obj() );
+                while ( i.more() ){
+                    BSONObj id = i.next().Obj();
+                    //Helpers::removeRange( ns , id , id, false , true );
+                }
             }
             
             if ( xfer["reload"].isABSONObj() ){
@@ -779,6 +799,20 @@ namespace mongo {
         }
 
     } recvChunkCommitCommand;
-    
-    
+
+
+    class IsInRangeTest : public UnitTest {
+    public:
+        void run(){
+            BSONObj min = BSON( "x" << 1 );
+            BSONObj max = BSON( "x" << 5 );
+
+            assert( ! isInRange( BSON( "x" << 0 ) , min , max ) );
+            assert( isInRange( BSON( "x" << 1 ) , min , max ) );
+            assert( isInRange( BSON( "x" << 3 ) , min , max ) );
+            assert( isInRange( BSON( "x" << 4 ) , min , max ) );
+            assert( ! isInRange( BSON( "x" << 5 ) , min , max ) );
+            assert( ! isInRange( BSON( "x" << 6 ) , min , max ) );
+        }
+    } isInRangeTest;
 }

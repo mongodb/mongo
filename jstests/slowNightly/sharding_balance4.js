@@ -36,6 +36,10 @@ for ( i=0; i<N*10; i++ ){
 }
 db.getLastError();
 
+s.printChunks( "test.foo" )
+
+check( "initial" )
+
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
 function dist(){
@@ -51,21 +55,34 @@ function dist(){
     return x;
 }
 
-function check(){
+function check( msg ){
     for ( var x in counts ){
         var e = counts[x];
         var z = db.foo.findOne( { _id : parseInt( x ) } )
-        assert( z , "couldn't find : " + x )
-        assert.eq( e , z.x , "count for : " + x )
+        
+        if ( z && z.x == e )
+            continue;
+        
+        sleep( 10000 );
+        
+        var y = db.foo.findOne( { _id : parseInt( x ) } )
+
+        if ( y ){
+            delete y.s;
+        }
+        
+        assert( z , "couldn't find : " + x + " y:" + tojson(y) + " " + msg )
+        assert.eq( e , z.x , "count for : " + x + " y:" + tojson(y) + " " + msg )
     }
 }
 
 function diff(){
     doUpdate( false )
-    
+    db.getLastError();
+
     if ( Math.random() > .99 ){
         db.getLastError()
-        check();
+        //check(); // SERVER-1430  TODO
     }
 
     var x = dist();

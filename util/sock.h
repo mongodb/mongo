@@ -155,10 +155,6 @@ namespace mongo {
             return out;
         }
 
-        operator string() const{
-            return toString();
-        }
-
         // returns one of AF_INET, AF_INET6, or AF_UNIX
         sa_family_t getType() const {
             return sa.ss_family;
