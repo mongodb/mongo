@@ -216,14 +216,14 @@ namespace mongo {
 
             ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
             ss << "<tr align='left'>"
-               << "<th>Client</th>" 
-               << "<th>OpId</th>" 
+               << th( a("", "Connections to the database, both internal and external.", "Client") )
+               << th( a("http://www.mongodb.org/display/DOCS/Viewing+and+Terminating+Current+Operation", "", "OpId") )
                << "<th>Active</th>" 
                << "<th>LockType</th>"
                << "<th>Waiting</th>"
                << "<th>SecsRunning</th>"
                << "<th>Op</th>"
-               << "<th>NameSpace</th>"
+               << th( a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "", "Namespace") )
                << "<th>Query</th>"
                << "<th>client</th>"
                << "<th>msg</th>"
