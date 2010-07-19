@@ -220,12 +220,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         if ( size_payload < m.header()->len ) {
             bytesRemainingInMessage[ c ] = m.header()->len - size_payload;
             messageBuilder[ c ].reset( new BufBuilder() );
-            messageBuilder[ c ]->append( (void*)payload, size_payload );
+            messageBuilder[ c ]->appendBuf( (void*)payload, size_payload );
             return;
         }
     } else {
         bytesRemainingInMessage[ c ] -= size_payload;
-        messageBuilder[ c ]->append( (void*)payload, size_payload );
+        messageBuilder[ c ]->appendBuf( (void*)payload, size_payload );
         if ( bytesRemainingInMessage[ c ] < 0 ) {
             cerr << "Received too many bytes to complete message, resetting buffer" << endl;
             bytesRemainingInMessage[ c ] = 0;

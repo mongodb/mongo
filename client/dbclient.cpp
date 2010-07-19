@@ -654,8 +654,8 @@ namespace mongo {
 
         BufBuilder b;
         int opts = 0;
-        b.append( opts );
-        b.append( ns );
+        b.appendNum( opts );
+        b.appendStr( ns );
         obj.appendSelfToBufBuilder( b );
 
         toSend.setData( dbInsert , b.buf() , b.len() );
@@ -668,8 +668,8 @@ namespace mongo {
         
         BufBuilder b;
         int opts = 0;
-        b.append( opts );
-        b.append( ns );
+        b.appendNum( opts );
+        b.appendStr( ns );
         for( vector< BSONObj >::const_iterator i = v.begin(); i != v.end(); ++i )
             i->appendSelfToBufBuilder( b );
         
@@ -683,13 +683,13 @@ namespace mongo {
 
         BufBuilder b;
         int opts = 0;
-        b.append( opts );
-        b.append( ns );
+        b.appendNum( opts );
+        b.appendStr( ns );
 
         int flags = 0;
         if ( justOne )
             flags |= 1;
-        b.append( flags );
+        b.appendNum( flags );
 
         obj.obj.appendSelfToBufBuilder( b );
 
@@ -701,13 +701,13 @@ namespace mongo {
     void DBClientBase::update( const string & ns , Query query , BSONObj obj , bool upsert , bool multi ) {
 
         BufBuilder b;
-        b.append( (int)0 ); // reserved
-        b.append( ns );
+        b.appendNum( (int)0 ); // reserved
+        b.appendStr( ns );
 
         int flags = 0;
         if ( upsert ) flags |= UpdateOption_Upsert;
         if ( multi ) flags |= UpdateOption_Multi;
-        b.append( flags );
+        b.appendNum( flags );
 
         query.obj.appendSelfToBufBuilder( b );
         obj.appendSelfToBufBuilder( b );
@@ -828,10 +828,10 @@ namespace mongo {
         // see query.h for the protocol we are using here.
         BufBuilder b;
         int opts = queryOptions;
-        b.append(opts);
-        b.append(ns.c_str());
-        b.append(nToSkip);
-        b.append(nToReturn);
+        b.appendNum(opts);
+        b.appendStr(ns.c_str());
+        b.appendNum(nToSkip);
+        b.appendNum(nToReturn);
         query.appendSelfToBufBuilder(b);
         if ( fieldsToReturn )
             fieldsToReturn->appendSelfToBufBuilder(b);
@@ -892,9 +892,9 @@ namespace mongo {
 
     void DBClientConnection::killCursor( long long cursorId ){
         BufBuilder b;
-        b.append( (int)0 ); // reserved
-        b.append( (int)1 ); // number
-        b.append( cursorId );
+        b.appendNum( (int)0 ); // reserved
+        b.appendNum( (int)1 ); // number
+        b.appendNum( cursorId );
         
         Message m;
         m.setData( dbKillCursors , b.buf() , b.len() );

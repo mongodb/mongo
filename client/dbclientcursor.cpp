@@ -41,10 +41,10 @@ namespace mongo {
             assembleRequest( ns, query, nextBatchSize() , nToSkip, fieldsToReturn, opts, toSend );
         } else {
             BufBuilder b;
-            b.append( opts );
-            b.append( ns.c_str() );
-            b.append( nToReturn );
-            b.append( cursorId );
+            b.appendNum( opts );
+            b.appendStr( ns.c_str() );
+            b.appendNum( nToReturn );
+            b.appendNum( cursorId );
             toSend.setData( dbGetMore, b.buf(), b.len() );
         }
         if ( !connector->call( toSend, *m, false ) )
@@ -63,10 +63,10 @@ namespace mongo {
             assert(nToReturn > 0);
         }
         BufBuilder b;
-        b.append(opts);
-        b.append(ns.c_str());
-        b.append(nextBatchSize());
-        b.append(cursorId);
+        b.appendNum(opts);
+        b.appendStr(ns.c_str());
+        b.appendNum(nextBatchSize());
+        b.appendNum(cursorId);
         
         Message toSend;
         toSend.setData(dbGetMore, b.buf(), b.len());
@@ -209,9 +209,9 @@ namespace mongo {
 
             if ( cursorId && _ownCursor ) {
                 BufBuilder b;
-                b.append( (int)0 ); // reserved
-                b.append( (int)1 ); // number
-                b.append( cursorId );
+                b.appendNum( (int)0 ); // reserved
+                b.appendNum( (int)1 ); // number
+                b.appendNum( cursorId );
 
                 Message m;
                 m.setData( dbKillCursors , b.buf() , b.len() );

@@ -82,7 +82,7 @@ namespace mongo {
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
-            b.append(reinterpret_cast<const void *>( objdata() ), objsize());
+            b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
         }
 
         /** Readable representation of a BSON object in an extended JSON-style notation. 

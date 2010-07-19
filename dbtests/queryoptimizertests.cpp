@@ -992,10 +992,10 @@ namespace QueryOptimizerTests {
                 // see query.h for the protocol we are using here.
                 BufBuilder b;
                 int opts = queryOptions;
-                b.append(opts);
-                b.append(ns.c_str());
-                b.append(nToSkip);
-                b.append(nToReturn);
+                b.appendNum(opts);
+                b.appendStr(ns.c_str());
+                b.appendNum(nToSkip);
+                b.appendNum(nToReturn);
                 query.appendSelfToBufBuilder(b);
                 if ( fieldsToReturn )
                     fieldsToReturn->appendSelfToBufBuilder(b);

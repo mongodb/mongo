@@ -190,9 +190,9 @@ int main( int argc, const char **argv ) {
         assert( conn.getLastError().empty() );
         
         BufBuilder b;
-        b.append( (int)0 ); // reserved
-        b.append( (int)-1 ); // invalid # of cursors triggers exception
-        b.append( (int)-1 ); // bogus cursor id
+        b.appendNum( (int)0 ); // reserved
+        b.appendNum( (int)-1 ); // invalid # of cursors triggers exception
+        b.appendNum( (int)-1 ); // bogus cursor id
         
         Message m;
         m.setData( dbKillCursors, b.buf(), b.len() );

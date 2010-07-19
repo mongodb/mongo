@@ -172,7 +172,7 @@ namespace mongo {
             if ( doneSetup == 1717 ) {
                 BufBuilder b(512);
                 time_t_to_String( time(0) , b.grow(20) );
-                b.append( ss.str() );
+                b.appendStr( ss.str() );
                 const char *s = b.buf();
                 
                 string threadName = getThreadName();

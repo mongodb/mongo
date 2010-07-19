@@ -1899,7 +1899,7 @@ namespace mongo {
         // anObjBuilder.append("ok", ok);
         anObjBuilder.append("ok", ok?1.0:0.0);
         BSONObj x = anObjBuilder.done();
-        b.append((void*) x.objdata(), x.objsize());
+        b.appendBuf((void*) x.objdata(), x.objsize());
 
         return true;
     }
