@@ -60,7 +60,7 @@ namespace mongo {
                 localDB = ctx.db();
                 assert( localDB );
                 rsOplogDetails = nsdetails(logns);
-                massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
+                massert(13389, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
             }
             Client::Context ctx( "" , localDB, false );
             {
