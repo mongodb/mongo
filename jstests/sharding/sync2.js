@@ -60,12 +60,18 @@ for ( i=1; i<hashes.length; i++ ){
         continue;
     
     assert.eq( hashes[0].numCollections , hashes[i].numCollections , "num collections" );
+    
+    var bad = false;
 
     for ( var k in hashes[0].collections ){
         if ( hashes[0].collections[k] == 
              hashes[i].collections[k] )
             continue;
         
+        if ( k == "mongos" )
+            continue;
+        
+        bad = true;
         print( "collection " + k + " is different" );
         
         print( "----" );
@@ -74,8 +80,9 @@ for ( i=1; i<hashes.length; i++ ){
         s._connections[i].getDB( "config" ).getCollection( k ).find().sort( { _id : 1 } ).forEach( printjsononeline );
         print( "----" );
     }
-    
-    throw "hashes different";
+
+    if ( bad )
+        throw "hashes different";
 }
 
 s.stop();
