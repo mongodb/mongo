@@ -682,7 +682,7 @@ namespace mongo {
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ){
                     BSONObj id = i.next().Obj();
-                    //Helpers::removeRange( ns , id , id, false , true );
+                    Helpers::removeRange( ns , id , id, false , true );
                 }
             }
             
