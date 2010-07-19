@@ -166,6 +166,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         ( "test" , "just run unit tests" )
         ( "upgrade" , "upgrade meta data version" )
         ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
+        ( "ipv6", "enable IPv6 support (disabled by default)" )
         ;
     
 
@@ -186,6 +187,10 @@ int main(int argc, char* argv[], char *envp[] ) {
 
     if ( params.count( "chunkSize" ) ){
         Chunk::MaxChunkSize = params["chunkSize"].as<int>() * 1024 * 1024;
+    }
+
+    if ( params.count( "ipv6" ) ){
+        enableIPv6();
     }
 
     if ( params.count( "test" ) ){

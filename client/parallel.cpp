@@ -72,6 +72,13 @@ namespace mongo {
             throw StaleConfigException( _ns , "ClusteredCursor::query" );
         }
         
+        if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ){
+            conn.done();
+            BSONObj o = cursor->next();
+            throw UserException( o["code"].numberInt() , o["$err"].String() );
+        }
+
+
         cursor->attach( &conn );
 
         conn.done();
