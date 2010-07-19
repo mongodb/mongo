@@ -74,7 +74,7 @@ namespace mongo {
             b.append("$diskLoc", loc->toBSONObj());
             b.done();
         } else {
-            bb.append((void*) js.objdata(), js.objsize());
+            bb.appendBuf((void*) js.objdata(), js.objsize());
         }
     }
     

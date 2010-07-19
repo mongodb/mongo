@@ -684,19 +684,6 @@ namespace QueryOptimizerTests {
             virtual BSONObj obj() const { return BSONObj(); }
         };
         
-        class SetDiff {
-        public:
-            void run() {
-                FieldRangeSet frs1( "", fromjson( "{a:5,c:{$in:[6,7]},e:{$in:[7,8]},f:8}" ) );
-                FieldRangeSet frs2( "", fromjson( "{b:5,c:6,d:7,e:7}" ) );
-                frs1 -= frs2;
-                ASSERT_EQUALS( BSON( "a" << 5 << "c" << 7 << "e" << 8 << "f" << 8 ), frs1.simplifiedQuery() );
-                FieldRangeSet frs3( "", fromjson( "{a:5}" ) );                
-                frs1 -= frs3;
-                ASSERT( !frs1.matchPossible() );
-            }
-        };
-        
         class SetIntersect {
         public:
             void run() {
@@ -1005,10 +992,10 @@ namespace QueryOptimizerTests {
                 // see query.h for the protocol we are using here.
                 BufBuilder b;
                 int opts = queryOptions;
-                b.append(opts);
-                b.append(ns.c_str());
-                b.append(nToSkip);
-                b.append(nToReturn);
+                b.appendNum(opts);
+                b.appendStr(ns.c_str());
+                b.appendNum(nToSkip);
+                b.appendNum(nToReturn);
                 query.appendSelfToBufBuilder(b);
                 if ( fieldsToReturn )
                     fieldsToReturn->appendSelfToBufBuilder(b);
@@ -1685,7 +1672,6 @@ namespace QueryOptimizerTests {
             add< FieldRangeTests::Diff63 >();
             add< FieldRangeTests::DiffMulti1 >();
             add< FieldRangeTests::DiffMulti2 >();
-            add< FieldRangeTests::SetDiff >();
             add< FieldRangeTests::SetIntersect >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();

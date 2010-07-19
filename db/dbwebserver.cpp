@@ -151,7 +151,8 @@ namespace mongo {
 
             BackgroundOperation::dump(ss);
 
-            ss << "<h3>Log</h3>\n";
+            ss << "</pre><h4>Log:</h4>";
+
             ramlog->toHTML( ss );
         }
 

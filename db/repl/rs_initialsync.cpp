@@ -20,6 +20,7 @@
 #include "rs.h"
 #include "../oplogreader.h"
 #include "../../util/mongoutils/str.h"
+#include "../dbhelpers.h"
 
 namespace mongo {
 
@@ -50,6 +51,23 @@ namespace mongo {
         }
     }
 
+    static bool stillHave(OplogReader& r, OpTime t, long long h) { 
+        cout << "not yet implemented" << endl;
+        return false;
+    }
+
+    bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
+				   bool slaveOk, bool useReplAuth, bool snapshot);
+
+    /* todo : progress metering to sethbmsg. */
+    static bool clone(const char *master, string db) {
+        string err;
+        return cloneFrom(master, err, db, false, 
+            /*slaveok later can be true*/ false, true, false);
+    }
+
+    void _logOpObjRS(const BSONObj& op);
+
     void ReplSetImpl::_syncDoInitialSync() { 
         sethbmsg("initial sync pending");
 
@@ -62,28 +80,70 @@ namespace mongo {
             return;
         }
 
+        string masterHostname = cp->h().toString();
         OplogReader r;
-        if( !r.connect(cp->h().toString()) ) {
+        if( !r.connect(masterHostname) ) {
             sethbmsg( str::stream() << "initial sync couldn't connect to " << cp->h().toString() );
             sleepsecs(15);
             return;
         }
 
         BSONObj lastOp = r.getLastOp(rsoplog);
+        if( lastOp.isEmpty() ) { 
+            sethbmsg("initial sync couldn't read remote oplog");
+            sleepsecs(15);
+            return;
+        }
         OpTime ts = lastOp["ts"]._opTime();
-        long long h = lastOp["h"].numberLong();
         
         {
             /* make sure things aren't too flappy */
             sleepsecs(5);
             isyncassert( "flapping?", currentPrimary() == cp );
+            BSONObj o = r.getLastOp(rsoplog);
+            isyncassert( "flapping [2]?", !o.isEmpty() );
         }
 
         sethbmsg("initial sync drop all databases");
         dropAllDatabasesExceptLocal();
         sethbmsg("initial sync - not yet implemented");
 
+        list<string> dbs = r.conn()->getDatabaseNames();
+        for( list<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) { 
+            if( *i != "local" ) {
+                sethbmsg( str::stream() << "initial sync clone " << *i );
+                if( !clone(masterHostname.c_str(), *i) ) { 
+                    sethbmsg( str::stream() << "initial sync error clone of " << *i << " failed sleeping 5 minutes" );
+                    sleepsecs(300);
+                    return;
+                }
+            }
+        }
+
+        sethbmsg("initial sync query minValid");
+
+        /* our cloned copy will be strange until we apply oplog events that occurred 
+           through the process.  we note that time point here. */
+        BSONObj minValid = r.getLastOp(rsoplog);
+
+        MemoryMappedFile::flushAll(true);
+        sethbmsg("initial sync clone done first write to oplog still pending");
+
         assert( !isPrimary() ); // wouldn't make sense if we were.
+
+        {
+            writelock lk("local.");
+            Helpers::putSingleton("local.replset.minvalid", minValid);
+            // write an op from the primary to our oplog that existed when 
+            // we started cloning.  that will be our starting point.
+            //
+            // todo : handle case where lastOp on the primary has rolled back.  may have to just 
+            //        reclone, but don't get stuck with manual error at least...
+            //
+            _logOpObjRS(lastOp);
+        }
+        MemoryMappedFile::flushAll(true);
+        sethbmsg("initial sync done");
     }
 
 }

@@ -21,6 +21,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <boost/shared_ptr.hpp>
+#include "../stringdata.h"
 
 namespace mongo {
 
@@ -70,35 +71,38 @@ namespace mongo {
         /* assume ownership of the buffer - you must then free() it */
         void decouple() { data = 0; }
 
-        template<class T> void append(T j) {
-            *((T*)grow(sizeof(T))) = j;
+        void appendNum(char j){
+            *((char*)grow(sizeof(char))) = j;
         }
-        void append(short j) {
-            append<short>(j);
+        void appendNum(short j) {
+            *((short*)grow(sizeof(short))) = j;
         }
-        void append(int j) {
-            append<int>(j);
+        void appendNum(int j) {
+            *((int*)grow(sizeof(int))) = j;
         }
-        void append(unsigned j) {
-            append<unsigned>(j);
+        void appendNum(unsigned j) {
+            *((unsigned*)grow(sizeof(unsigned))) = j;
         }
-        void append(bool j) {
-            append<bool>(j);
+        void appendNum(bool j) {
+            *((bool*)grow(sizeof(bool))) = j;
         }
-        void append(double j) {
-            append<double>(j);
+        void appendNum(double j) {
+            *((double*)grow(sizeof(double))) = j;
+        }
+        void appendNum(long long j) {
+            *((long long*)grow(sizeof(long long))) = j;
+        }
+        void appendNum(unsigned long long j) {
+            *((unsigned long long*)grow(sizeof(unsigned long long))) = j;
         }
 
-        void append(const void *src, size_t len) {
+        void appendBuf(const void *src, size_t len) {
             memcpy(grow((int) len), src, len);
         }
 
-        void append(const char *str) {
-            append((void*) str, strlen(str)+1);
-        }
-        
-        void append(const std::string &str) {
-            append( (void *)str.c_str(), str.length() + 1 );
+        void appendStr(const StringData &str) {
+            const int len = str.size() + 1;
+            memcpy(grow(len), str.data(), len);
         }
 
         int len() const {

@@ -114,7 +114,7 @@ namespace mongo {
             cout << "TEMP healthpool dowork " << endl;
 
             if ( !theReplSet ) {
-                log() << "theReplSet not initialized yet, skipping health poll this round" << endl;
+                log() << "theReplSet not initialized yet, skipping health poll this round" << rsLog;
                 return;
             }
 

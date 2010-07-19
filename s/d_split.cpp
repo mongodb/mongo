@@ -139,7 +139,7 @@ namespace mongo {
             long long keyCount = 0;
             if (( dataSize > 0 ) && ( recCount > 0 )){
                 const long long avgRecSize = dataSize / recCount;
-                keyCount = 0.9 * maxChunkSize / avgRecSize;
+                keyCount = 90 * maxChunkSize / (100 * avgRecSize);
             }
 
             // We traverse the index and add the keyCount-th key to the result vector. If that key
