@@ -1037,5 +1037,21 @@ namespace mongo {
 
     } cmdListDatabases;
 
+    class CmdCloseAllDatabases : public Command {
+    public:
+        CmdCloseAllDatabases() : Command("closeAllDatabases", false , "closeAllDatabases" ) {}
+        virtual bool logTheOp() { return false; }
+        virtual bool slaveOk() const { return true; }
+        virtual bool slaveOverrideOk() { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; } 
+        virtual void help( stringstream& help ) const { help << "Not supported sharded"; }
+        
+        bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {
+            errmsg = "closeAllDatabases isn't supported through mongos";
+            return false;
+        }
+    } cmdCloseAllDatabases;
+
 
 } // namespace mongo
