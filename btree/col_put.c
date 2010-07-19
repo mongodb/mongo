@@ -68,7 +68,7 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 		repl->data = WT_REPL_DELETED_VALUE;
 
 		/* Schedule the workQ to insert the WT_REPL structure. */
-		__wt_bt_update_serial(toc, page,
+		__wt_bt_update_serial(toc, page, toc->srch_write_gen,
 		    WT_COL_SLOT(page, toc->srch_ip), new_repl, repl, ret);
 	} else if (toc->srch_repl == NULL) {		/* #2 */
 		/* Allocate a page expansion array as necessary. */
@@ -84,7 +84,7 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 		repl->data = WT_REPL_DELETED_VALUE;
 
 		/* Schedule the workQ to link in the WT_COL_EXPAND structure. */
-		__wt_bt_rcc_expand_serial(toc, page,
+		__wt_bt_rcc_expand_serial(toc, page, toc->srch_write_gen,
 		    WT_COL_SLOT(page, toc->srch_ip), new_expcol, exp, ret);
 		goto done;
 	} else {					/* #3 */
@@ -94,7 +94,7 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 
 		/* Schedule the workQ to insert the WT_REPL structure. */
 		__wt_bt_rcc_expand_repl_serial(
-		    toc, page, toc->srch_exp, repl, ret);
+		    toc, page, toc->srch_write_gen, toc->srch_exp, repl, ret);
 	}
 
 	if (0) {
@@ -130,8 +130,12 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc)
 	WT_PAGE *page;
 	WT_COL_EXPAND **new_exp, *exp;
 	int slot;
+	u_int16_t write_gen;
 
-	__wt_bt_rcc_expand_unpack(toc, page, slot, new_exp, exp);
+	__wt_bt_rcc_expand_unpack(toc, page, write_gen, slot, new_exp, exp);
+
+	/* Check the page's write-generation, then update it. */
+	WT_PAGE_WRITE_GEN_CHECK(page);
 
 	/*
 	 * If the page does not yet have an expansion array, our caller passed
@@ -149,7 +153,9 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc)
 	exp->next = page->expcol[slot];
 	WT_MEMORY_FLUSH;
 	page->expcol[slot] = exp;
-	WT_PAGE_MODIFY_SET_AND_FLUSH(page);
+	WT_PAGE_MODIFY_SET(page);
+	/* Depend on workQ's memory flush before scheduling thread proceeds. */
+
 	return (0);
 }
 
@@ -164,8 +170,12 @@ __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
 	WT_PAGE *page;
 	WT_COL_EXPAND *exp;
 	WT_REPL *repl;
+	u_int16_t write_gen;
 
-	__wt_bt_rcc_expand_repl_unpack(toc, page, exp, repl);
+	__wt_bt_rcc_expand_repl_unpack(toc, page, write_gen, exp, repl);
+
+	/* Check the page's write-generation, then update it. */
+	WT_PAGE_WRITE_GEN_CHECK(page);
 
 	/*
 	 * Insert the new WT_REPL as the first item in the forward-linked list
@@ -175,6 +185,8 @@ __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
 	repl->next = exp->repl;
 	WT_MEMORY_FLUSH;
 	exp->repl = repl;
-	WT_PAGE_MODIFY_SET_AND_FLUSH(page);
+	WT_PAGE_MODIFY_SET(page);
+	/* Depend on workQ's memory flush before scheduling thread proceeds. */
+
 	return (0);
 }

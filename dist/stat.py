@@ -25,8 +25,15 @@ method_stats = {}
 import api_class
 api = api_class.methods
 for l in sorted(api.iteritems()):
-	if not l[1].config.count('noauto'):
-		method_stats[l[0].replace('.', '_').upper()] = Stat([], l[0])
+	if l[1].config.count('noauto'):
+		continue
+	# Stat counter per method.
+	method_stats[l[0].replace('.', '_').upper()] = Stat([], l[0])
+
+	# Stat counter of restarts per method.
+	if l[1].config.count('restart'):
+		method_stats[l[0].replace('.', '_').upper() +
+		    '_RESTART'] = Stat([], l[0] + ' method restarts')
 
 # print_def --
 #	Print the #defines for the stat.h file.

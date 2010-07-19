@@ -221,7 +221,7 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 63, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 67, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].desc =
 	    "db.btree_compare_dup_get";
@@ -245,8 +245,10 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_CLOSE].desc = "db.close";
 	stats[WT_STAT_DB_COLUMN_SET].desc = "db.column_set";
 	stats[WT_STAT_DB_COL_DEL].desc = "db.col_del";
+	stats[WT_STAT_DB_COL_DEL_RESTART].desc = "db.col_del method restarts";
 	stats[WT_STAT_DB_COL_GET].desc = "db.col_get";
 	stats[WT_STAT_DB_COL_PUT].desc = "db.col_put";
+	stats[WT_STAT_DB_COL_PUT_RESTART].desc = "db.col_put method restarts";
 	stats[WT_STAT_DB_DUMP].desc = "db.dump";
 	stats[WT_STAT_DB_ERRCALL_GET].desc = "db.errcall_get";
 	stats[WT_STAT_DB_ERRCALL_SET].desc = "db.errcall_set";
@@ -257,8 +259,10 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_HUFFMAN_SET].desc = "db.huffman_set";
 	stats[WT_STAT_DB_OPEN].desc = "db.open";
 	stats[WT_STAT_DB_ROW_DEL].desc = "db.row_del";
+	stats[WT_STAT_DB_ROW_DEL_RESTART].desc = "db.row_del method restarts";
 	stats[WT_STAT_DB_ROW_GET].desc = "db.row_get";
 	stats[WT_STAT_DB_ROW_PUT].desc = "db.row_put";
+	stats[WT_STAT_DB_ROW_PUT_RESTART].desc = "db.row_put method restarts";
 	stats[WT_STAT_DB_STAT_CLEAR].desc = "db.stat_clear";
 	stats[WT_STAT_DB_STAT_PRINT].desc = "db.stat_print";
 	stats[WT_STAT_DB_SYNC].desc = "db.sync";
@@ -317,8 +321,10 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_CLOSE].v = 0;
 	stats[WT_STAT_DB_COLUMN_SET].v = 0;
 	stats[WT_STAT_DB_COL_DEL].v = 0;
+	stats[WT_STAT_DB_COL_DEL_RESTART].v = 0;
 	stats[WT_STAT_DB_COL_GET].v = 0;
 	stats[WT_STAT_DB_COL_PUT].v = 0;
+	stats[WT_STAT_DB_COL_PUT_RESTART].v = 0;
 	stats[WT_STAT_DB_DUMP].v = 0;
 	stats[WT_STAT_DB_ERRCALL_GET].v = 0;
 	stats[WT_STAT_DB_ERRCALL_SET].v = 0;
@@ -329,8 +335,10 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_HUFFMAN_SET].v = 0;
 	stats[WT_STAT_DB_OPEN].v = 0;
 	stats[WT_STAT_DB_ROW_DEL].v = 0;
+	stats[WT_STAT_DB_ROW_DEL_RESTART].v = 0;
 	stats[WT_STAT_DB_ROW_GET].v = 0;
 	stats[WT_STAT_DB_ROW_PUT].v = 0;
+	stats[WT_STAT_DB_ROW_PUT_RESTART].v = 0;
 	stats[WT_STAT_DB_STAT_CLEAR].v = 0;
 	stats[WT_STAT_DB_STAT_PRINT].v = 0;
 	stats[WT_STAT_DB_SYNC].v = 0;

@@ -97,7 +97,7 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags)
 
 	/* The caller may have dirtied the page. */
 	if (LF_ISSET(WT_MODIFIED))
-		WT_PAGE_MODIFY_SET_AND_FLUSH(page);
+		WT_PAGE_MODIFY_SET(page);
 
 	__wt_page_out(toc, page);
 }

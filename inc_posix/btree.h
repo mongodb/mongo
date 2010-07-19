@@ -162,25 +162,63 @@ struct __wt_page {
 	u_int32_t lru;			/* Read generation */
 
 	/*
-	 * The page modified flag is not a bit-flag because it's not locked and
-	 * we don't want to lose an update because of a read-modify-write cycle.
-	 * Any thread of control holding a hazard reference can set the modify
-	 * flag (and we don't care if they race, since it's an atomic update).
-	 * The write must be flushed before the hazard reference is released, so
-	 * we do it explicitly: the thread setting the modified flag may be the
-	 * workQ thread, the thread with the hazard reference is not involved.
+	 * The page modified flag is set by the workQ thread when it modifies
+	 * a page: this means (1) the page has a hazard reference, and (2) no
+	 * other thread is modifying the page when the modified field is set.
+	 * For those reasons, the modified field doesn't need to be an atomic
+	 * set, and could even bit a bit flag, but it's not one for now -- I
+	 * don't want to introduce a bug where an update is lost because of a
+	 * read-modify-write cycle.
+	 *
+	 * The modified set must be flushed before the page's hazard reference
+	 * is released and the cache drain server is able to select this page.
+	 * We rely on the memory flush in the workQ server loop (which happens
+	 * before control returns to the calling thread, that is, before control
+	 * returns to the thread that's holding the hazard reference), so there
+	 * is no need to flush explicitly.
 	 */
-	wt_atomic_t modified;		/* Page is modified */
+	u_int16_t modified;		/* Page is modified */
 #define	WT_PAGE_MODIFY_ISSET(p)						\
 	((p)->modified)
-#define	WT_PAGE_MODIFY_SET_AND_FLUSH(p) do {				\
+#define	WT_PAGE_MODIFY_SET(p) do {					\
 	(p)->modified = 1;						\
-	WT_MEMORY_FLUSH;						\
 } while (0);
-#define	WT_PAGE_MODIFY_CLR_AND_FLUSH(p) do {				\
+#define	WT_PAGE_MODIFY_CLR(p) do {					\
 	(p)->modified = 0;						\
-	WT_MEMORY_FLUSH;						\
 } while (0);
+
+	/*
+	 * The page's write-generation value is used to detect workQ changes
+	 * scheduled, but based on out-of-date information.  If two threads
+	 * of control update a single entry on a page, they could both search
+	 * the page in state A, and schedule the change for the workQ.  Since
+	 * the workQ performs the changes serially, one of the changes would
+	 * happen after the page was modified, and so the search state would
+	 * no longer be applicable.
+	 *
+	 * The write generation number is updated before the workQ modifies
+	 * a page, and the page search routines copy the write generation
+	 * number in the WT_TOC structure before searching the page.  Based
+	 * on this, the workQ can examine the write generation number and if
+	 * it isn't current, return WT_RESTART to restart the operation.
+	 *
+	 * The write-generation value could be moved to a per-entry basis if
+	 * there's enough contention for a page.
+	 *
+	 * XXX
+	 * 64KB seems big enough: at some point we're going to have to clean
+	 * up pages as soon as there have been sufficient modifications to
+	 * make our linked lists too slow to search.
+	 */
+	u_int16_t write_gen;		/* Write generation */
+#define	WT_PAGE_WRITE_GEN(p)						\
+	((p)->write_gen)
+#define	WT_PAGE_WRITE_GEN_CHECK(p) do {					\
+	if (write_gen != (p)->write_gen)				\
+		return (WT_RESTART);					\
+	(++(p)->write_gen);						\
+	WT_MEMORY_FLUSH;						\
+} while (0)
 
 	/*
 	 * Each disk page entry is referenced by an array of WT_ROW/WT_COL

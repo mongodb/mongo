@@ -141,11 +141,13 @@ struct __wt_toc {
 
 					/* Search return values: */
 	WT_PAGE  *srch_page;		/*    page */
+	u_int16_t srch_write_gen;	/*    page's write-generation */
 	void	 *srch_ip;		/*    WT_{COL,ROW} index */
 	WT_REPL	 *srch_repl;		/*    WT_REPL array index */
-					/* Reepat-compress column store only: */
+					/* Repeat-compress column store only: */
 	WT_COL_EXPAND *srch_exp;	/*    WT_COL_EXPAND array index */
 	u_int16_t srch_rcc_offset;	/*    WT_COL index record offset */
+
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.

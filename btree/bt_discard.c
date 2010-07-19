@@ -138,9 +138,12 @@ done:	/*
 	 * not correct, because we're either the Db.sync method and holding a
 	 * hazard reference and we finish our write before releasing our hazard
 	 * reference, or we're the cache drain server and no other thread can
-	 * discard the page.
+	 * discard the page.  Flush the change explicitly in case we're the
+	 * Db.sync method, and the cache drain server needs to know the page
+	 * is clean.
 	 */
-	WT_PAGE_MODIFY_CLR_AND_FLUSH(page);
+	WT_PAGE_MODIFY_CLR(page);
+	WT_MEMORY_FLUSH;
 
 	F_CLR(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
 	return (ret);

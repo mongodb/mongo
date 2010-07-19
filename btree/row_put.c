@@ -41,8 +41,8 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 	repl->data = WT_REPL_DELETED_VALUE;
 
 	/* Schedule the workQ to insert the WT_REPL structure. */
-	__wt_bt_update_serial(toc,
-	    page, WT_ROW_SLOT(page, toc->srch_ip), new_repl, repl, ret);
+	__wt_bt_update_serial(toc, page, toc->srch_write_gen,
+	    WT_ROW_SLOT(page, toc->srch_ip), new_repl, repl, ret);
 
 	if (0) {
 err:		if (repl != NULL)
@@ -68,9 +68,13 @@ __wt_bt_update_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 	WT_REPL **new_repl, *repl;
+	u_int16_t write_gen;
 	int slot;
 
-	__wt_bt_update_unpack(toc, page, slot, new_repl, repl);
+	__wt_bt_update_unpack(toc, page, write_gen, slot, new_repl, repl);
+
+	/* Check the page's write-generation, then update it. */
+	WT_PAGE_WRITE_GEN_CHECK(page);
 
 	/*
 	 * If the page does not yet have a replacement array, our caller passed
@@ -88,6 +92,8 @@ __wt_bt_update_serial_func(WT_TOC *toc)
 	repl->next = page->repl[slot];
 	WT_MEMORY_FLUSH;
 	page->repl[slot] = repl;
-	WT_PAGE_MODIFY_SET_AND_FLUSH(page);
+	WT_PAGE_MODIFY_SET(page);
+	/* Depend on workQ's memory flush before scheduling thread proceeds. */
+
 	return (0);
 }

@@ -24,7 +24,7 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	WT_REPL *repl;
 	u_int64_t record_cnt;
 	u_int32_t addr, size, i;
-	u_int16_t rcc_offset;
+	u_int16_t write_gen, rcc_offset;
 	int ret;
 
 	toc->srch_page = NULL;			/* Return values. */
@@ -32,6 +32,7 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	toc->srch_repl = repl = NULL;
 	toc->srch_exp = exp = NULL;
 	toc->srch_rcc_offset = rcc_offset = 0;
+	toc->srch_write_gen = 0;
 
 	db = toc->db;
 	idb = db->idb;
@@ -44,6 +45,9 @@ restart:
 
 	/* Search the tree. */
 	for (record_cnt = 0;;) {
+		/* Save the write generation value before the search. */
+		write_gen = WT_PAGE_WRITE_GEN(page);
+
 		/* Walk the page looking for the record. */
 		switch (page->hdr->type) {
 		case WT_PAGE_COL_FIX:
@@ -158,6 +162,7 @@ done:	/*
 	toc->srch_repl = repl;
 	toc->srch_exp = exp;
 	toc->srch_rcc_offset = rcc_offset;
+	toc->srch_write_gen = write_gen;
 	return (0);
 
 notfound:

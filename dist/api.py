@@ -206,8 +206,7 @@ def func_method_getset(a, f):
 
 	# Count the call.
 	s = a.handle + '_' + a.method
-	f.write(
-	    '\tWT_STAT_INCR(ienv->method_stats, ' + s.upper() + ');\n')
+	f.write('\tWT_STAT_INCR(ienv->method_stats, ' + s.upper() + ');\n')
 
 	# If the function is hand-coded, just call it.
 	if extfunc:
@@ -304,8 +303,9 @@ def func_method(a, f):
 
 	# Method call statistics -- we put the update inside the lock just to
 	# make the stat value a little more precise.
-	s = a.handle + '_' + a.method
-	f.write('\tWT_STAT_INCR(ienv->method_stats, ' + s.upper() + ');\n')
+	stat = a.handle + '_' + a.method
+	stat = stat.upper()
+	f.write('\tWT_STAT_INCR(ienv->method_stats, ' + stat + ');\n')
 
 	# Call the underlying method function, handling restart as necessary.
 	f.write('\t')
@@ -323,7 +323,9 @@ def func_method(a, f):
 		if not toc or not l.count('toc/'):
 			f.write(', ' + l.split('/')[0])
 	if restart:
-		f.write(')) == WT_RESTART)\n\t\t;\n')
+		f.write(')) == WT_RESTART)\n')
+		f.write('\t\tWT_STAT_INCR(ienv->method_stats, ' +
+		    stat + '_RESTART);\n')
 	else:
 		f.write(');\n')
 

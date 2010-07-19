@@ -22,6 +22,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	WT_ROW *rip;
 	WT_REPL *repl;
 	u_int32_t addr, base, indx, limit, size;
+	u_int16_t write_gen;
 	int cmp, isleaf, ret;
 
 	toc->srch_page = NULL;			/* Return values. */
@@ -29,6 +30,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	toc->srch_repl = repl = NULL;
 	toc->srch_exp = NULL;
 	toc->srch_rcc_offset = 0;
+	toc->srch_write_gen = 0;
 
 	db = toc->db;
 	idb = db->idb;
@@ -39,6 +41,9 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 restart:
 	/* Search the tree. */
 	for (page = idb->root_page;;) {
+		/* Save the write generation value before the search. */
+		write_gen = WT_PAGE_WRITE_GEN(page);
+
 		isleaf = page->hdr->type == WT_PAGE_ROW_LEAF;
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
@@ -129,6 +134,7 @@ restart:
 	toc->srch_page = page;
 	toc->srch_ip = rip;
 	toc->srch_repl = repl;
+	toc->srch_write_gen = write_gen;
 	return (0);
 
 err:	if (page != idb->root_page)
