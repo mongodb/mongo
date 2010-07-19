@@ -49,7 +49,8 @@ extern "C" {
 
 /*******************************************
  * Forward structure declarations -- not all are needed by wiredtiger.h, but
- * enough are that it's easier to keep them all here.
+ * it's easier to keep them in one place and incrementally increase the risk
+ * of stepping on the application's name space.
  *******************************************/
 struct __db;			typedef struct __db DB;
 struct __dbc;			typedef struct __dbc DBC;
@@ -59,19 +60,25 @@ struct __idb;			typedef struct __idb IDB;
 struct __idbc;			typedef struct __idbc IDBC;
 struct __ienv;			typedef struct __ienv IENV;
 
+struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
+struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_col;		typedef struct __wt_col WT_COL;
 struct __wt_col_expand;		typedef struct __wt_col_expand WT_COL_EXPAND;
+struct __wt_fh;			typedef struct __wt_fh WT_FH;
 struct __wt_flist;		typedef struct __wt_flist WT_FLIST;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
+struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
 struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
 struct __wt_off;		typedef struct __wt_off WT_OFF;
 struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
+struct __wt_page_entry;		typedef struct __wt_page_entry WT_PAGE_ENTRY;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_repl;		typedef struct __wt_repl WT_REPL;
 struct __wt_row;		typedef struct __wt_row WT_ROW;
 struct __wt_row_insert;		typedef struct __wt_row_insert WT_ROW_INSERT;
+struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
 
 /*******************************************
