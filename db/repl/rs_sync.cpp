@@ -21,8 +21,30 @@
 
 namespace mongo {
 
-    void syncThread() { 
+    void startSyncThread() { 
         Client::initThread("rs_sync");
+        theReplSet->syncThread();
+    }
+
+    void ReplSetImpl::_syncThread() {
+        if( isPrimary() ) 
+            return;
+
+
+
+    }
+
+    void ReplSetImpl::syncThread() {
+        while( 1 ) { 
+            try { 
+                // ...
+            }
+            catch(DBException& e) { 
+                log() << "replSet syncThread: " << e.toString() << rsLog;
+                sleepsecs(10);
+            }
+            sleepsecs(2);
+        }
     }
 
 }

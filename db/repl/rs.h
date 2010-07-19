@@ -252,6 +252,9 @@ namespace mongo {
         /* pulling data from primary related - see rs_sync.cpp */
         void _syncDoInitialSync();
         void syncDoInitialSync();
+    public:
+        void _syncThread();
+        void syncThread();
     };
 
     class ReplSet : public ReplSetImpl { 

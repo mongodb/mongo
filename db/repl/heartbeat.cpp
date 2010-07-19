@@ -192,6 +192,8 @@ namespace mongo {
         task::repeat(shared_ptr<task::Task>(task), 2000);
     }
 
+    void startSyncThread();
+
     /** called during repl set startup.  caller expects it to return fairly quickly. 
         note ReplSet object is only created once we get a config - so this won't run 
         until the initiation.
@@ -209,6 +211,8 @@ namespace mongo {
         }*/
 
         mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+
+        boost::thread t(startSyncThread);
     }
 
 }

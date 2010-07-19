@@ -204,7 +204,7 @@ namespace mongo {
         }
         _myState = STARTUP2;
         startThreads();
-        newReplUp();
+        newReplUp(); // oplog.cpp
     }
 
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
