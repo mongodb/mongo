@@ -1045,7 +1045,8 @@ Geo.distance = function( a , b ){
                       Math.pow( bx - ax , 2 ) );
 }
 
-rs = {};
+rs = function () { "try rs.help()" }
+
 rs.help = function () {
     print("\trs.status()                     { replSetGetStatus : 1 } checks repl set status");
     print("\trs.initiate()                   { replSetInitiate : null } initiates set with default settings");

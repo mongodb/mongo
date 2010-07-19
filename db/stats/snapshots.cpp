@@ -104,8 +104,8 @@ namespace mongo {
         ss << "</table>\n";
         */
 
-        ss << "\n</pre>\n<div style=\"background-color:#bbb; color:#000\">" << "% time in write lock, historically, by 4 sec periods</div><div>";
-        //ss << "\n</pre>\n" << "<h4>% time in write lock, historically, by 4 sec periods</h4>\n<p>";
+        //ss << "\n</pre>\n<div style=\"background-color:#bbb; color:#000\">" << "% time in write lock, historically, by 4 sec periods</div><div>";
+        ss << "\n</pre>\n" << "<h4>% time in write lock, by 4 sec periods:</h4>\n<div>";
         for ( int i=0; i<numDeltas(); i++ ){
             SnapshotDelta d( getPrev(i+1) , getPrev(i) );
             unsigned e = (unsigned) d.elapsed() / 1000;
