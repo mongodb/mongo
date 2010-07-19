@@ -3,6 +3,7 @@
 import os
 import sys
 import re
+import utils
 
 def getAllSourceFiles( arr=None , prefix="." ):
     if arr is None:
@@ -43,6 +44,8 @@ def assignErrorCodes():
                 out.close()
 
 
+codes = []
+
 def readErrorCodes( callback ):
     ps = [ re.compile( "([um]asser(t|ted)) *\( *(\d+)" ) ,
            re.compile( "(User|Msg)Exceptio(n)\( *(\d+)" )
@@ -52,6 +55,7 @@ def readErrorCodes( callback ):
         for line in open( x ):
             for p in ps:               
                 for m in p.findall( line ):
+                    codes.append( ( x , lineNum , line , m[2] ) )
                     callback( x , lineNum , line , m[2] )
             lineNum = lineNum + 1
             
@@ -78,8 +82,57 @@ def checkErrorCodes():
     readErrorCodes( checkDups )
     return len( errors ) == 0 
 
+def getBestMessage( err , start ):
+    err = err.partition( start )[2]
+    if not err:
+        return ""
+    err = err.partition( "\"" )[2]
+    if not err:
+        return ""
+    err = err.rpartition( "\"" )[0]
+    if not err:
+        return ""
+    return err
+    
+def genErrorOutput():
+    
+    g = utils.getGitVersion()
+    
+    if os.path.exists( "docs/errors.md" ):
+        i = open( "docs/errors.md" , "r" )
+        
+        
+    out = open( "docs/errors.md" , 'w' )
+    out.write( "MongoDB Error Codes\n==========\n\n\n" )
+
+    prev = ""
+    seen = {}
+    
+    codes.sort( key=lambda x: x[0]+"-"+x[3] )
+    for f,l,line,num in codes:
+        if num in seen:
+            continue
+        seen[num] = True
+
+        if f.startswith( "./" ):
+            f = f[2:]
+
+        if f != prev:
+            out.write( "\n\n" )
+            out.write( f + "\n----\n" )
+            prev = f
+
+        url = "http://github.com/mongodb/mongo/blob/" + g + "/" + f + "#L" + str(l)
+        
+        out.write( "* " + str(num) + " [code](" + url + ") " + getBestMessage( line , str(num) ) + "\n" )
+        
+    out.write( "\n" )
+    out.close()
+
 if __name__ == "__main__":
     ok = checkErrorCodes()
     print( "ok:" + str( ok ) )
     print( "next: " + str( getNextCode() ) )
+    if ok:
+        genErrorOutput()
 
