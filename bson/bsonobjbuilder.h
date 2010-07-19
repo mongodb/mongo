@@ -728,5 +728,17 @@ namespace mongo {
         appendArray( fieldName, arrBuilder.done() );
         return *this;
     }
+
+    // $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT 6));
+    inline BSONObj OR(const BSONObj& a, const BSONObj& b)
+        { return BSON( "$or" << BSON_ARRAY(a << b) ); }
+    inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c)
+        { return BSON( "$or" << BSON_ARRAY(a << b << c) ); }
+    inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d)
+        { return BSON( "$or" << BSON_ARRAY(a << b << c << d) ); }
+    inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d, const BSONObj& e)
+        { return BSON( "$or" << BSON_ARRAY(a << b << c << d << e) ); }
+    inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d, const BSONObj& e, const BSONObj& f)
+        { return BSON( "$or" << BSON_ARRAY(a << b << c << d << e << f) ); }
     
 }
