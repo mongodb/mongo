@@ -738,6 +738,7 @@ int main(int argc, char* argv[], char *envp[] )
 	sharding_options.add_options()
 		("configsvr", "declare this is a config db of a cluster")
 		("shardsvr", "declare this is a shard db of a cluster")
+        ("noMoveParanoia" , "turn off paranoid saving of data for moveChunk.  this is on by default for now, but default will switch" )
 		;
 
     hidden_options.add_options()
@@ -987,7 +988,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("ipv6")){
             enableIPv6();
         }
-        
+        if (params.count("noMoveParanoia")){
+            cmdLine.moveParanoia = false;
+        }
 #if defined(_WIN32)
         if (params.count("serviceName")){
             string x = params["serviceName"].as<string>();
