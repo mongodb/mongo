@@ -269,14 +269,14 @@ sendmore:
                             string ns = dbresponse.exhaust; // before reset() free's it...
                             m.reset();
                             BufBuilder b(512);
-                            b.append((int) 0 /*size set later in appendData()*/);
-                            b.append(header->id);
-                            b.append(header->responseTo);
-                            b.append((int) dbGetMore);
-                            b.append((int) 0);
-                            b.append(ns);
-                            b.append((int) 0); // ntoreturn
-                            b.append(cursorid);
+                            b.appendNum((int) 0 /*size set later in appendData()*/);
+                            b.appendNum(header->id);
+                            b.appendNum(header->responseTo);
+                            b.appendNum((int) dbGetMore);
+                            b.appendNum((int) 0);
+                            b.appendStr(ns);
+                            b.appendNum((int) 0); // ntoreturn
+                            b.appendNum(cursorid);
                             m.appendData(b.buf(), b.len());
                             b.decouple();
                             DEV log() << "exhaust=true sending more" << endl;

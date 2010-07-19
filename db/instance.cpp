@@ -192,7 +192,7 @@ namespace mongo {
 
             BufBuilder b;
             b.skip(sizeof(QueryResult));
-            b.append((void*) errObj.objdata(), errObj.objsize());
+            b.appendBuf((void*) errObj.objdata(), errObj.objsize());
 
             // todo: call replyToQuery() from here instead of this!!! see dbmessage.h
             QueryResult * msgdata = (QueryResult *) b.buf();

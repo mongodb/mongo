@@ -64,7 +64,7 @@ namespace mongo {
         while ( _cursor->more() ){
             BSONObj o = _cursor->next();
 
-            b.append( (void*)o.objdata() , o.objsize() );
+            b.appendBuf( (void*)o.objdata() , o.objsize() );
             num++;
             
             if ( b.len() > maxSize ){
