@@ -297,6 +297,7 @@ namespace mongo {
                 // Just to match the opening statement if in log level 1
                 log(1) << "*** End of balancing round" << endl;        
 
+                sleepsecs( 30 ); // sleep a fair amount b/c of error
                 continue;
             }
         }
