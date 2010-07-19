@@ -117,7 +117,13 @@ namespace mongo {
         // TODO: this should be somewhere else probably
         static BSONObj toKeyFormat( const BSONObj& o , BSONObj& key );
 
-        static long long removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield = false , bool maxInclusive = false );
+        class RemoveCallback {
+        public:
+            virtual ~RemoveCallback(){}
+            virtual void goingToDelete( const BSONObj& o ) = 0;
+        };
+
+        static long long removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield = false , bool maxInclusive = false , RemoveCallback * callback = 0 );
 
         /* Remove all objects from a collection.
         You do not need to set the database before calling.

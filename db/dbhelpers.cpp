@@ -241,7 +241,7 @@ namespace mongo {
         return me.obj();
     }
     
-    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive ){
+    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback ){
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
         BSONObj maxClean = toKeyFormat( max , keyb );
@@ -267,6 +267,9 @@ namespace mongo {
             DiskLoc rloc = c->currLoc();
             BSONObj key = c->currKey();
 
+            if ( callback )
+                callback->goingToDelete( c->current() );
+            
             c->advance();
             c->noteLocation();
             
