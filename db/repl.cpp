@@ -286,7 +286,7 @@ namespace mongo {
             if( authed ) {
                 result.append("remote", replPair->remote);
                 if ( !replPair->info.empty() )
-                    result.append("info", replPair->info);
+                    result.append("info", replPair->info.toString());
             }
         }
         else {
