@@ -74,9 +74,19 @@ config(void)
 	g.key_cnt = 0;
 
 	/* Fill in random values for the rest of the run. */
-	for (cp = c; cp->name != NULL; ++cp)
-		if (!(cp->flags & (C_FIXED | C_IGNORE)))
-			*cp->v = CONF_RAND(cp);
+	for (cp = c; cp->name != NULL; ++cp) {
+		if (cp->flags & (C_FIXED | C_IGNORE))
+			continue;
+
+		*cp->v = CONF_RAND(cp);
+		/*
+		 * Boolean flags are 0 or 1, but only set 1 in N where the
+		 * variable's min/max values are 1 and N.  Set the flag if
+		 * we rolled a 1, otherwise don't.
+		 */
+		if (cp->flags & C_BOOL)
+			*cp->v = *cp->v == 1 ? 1 : 0;
+	}
 }
 
 /*
