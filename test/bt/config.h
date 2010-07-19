@@ -20,7 +20,7 @@ typedef struct {
 	u_int32_t	 *v;			/* Value for this run */
 } CONFIG;
 
-/* Get a random value between a config min/max pair. */
+/* Get a random value between a config min/max pair (inclusive for both min & max). */
 #define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->max)
 
 static CONFIG c[] = {
