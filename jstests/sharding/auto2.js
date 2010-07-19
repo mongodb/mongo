@@ -127,4 +127,8 @@ for ( i=0; i<20; i++ ){
 
 print( "checkpoint G")
 
+assert.throws( function(){ s.getDB( "test" ).foo.find().sort( { s : 1 } ).forEach( printjsononeline ) } )
+
+print( "checkpoint H")
+
 s.stop();
