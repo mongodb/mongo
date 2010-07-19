@@ -20,6 +20,7 @@
 #include "rs.h"
 #include "../oplogreader.h"
 #include "../../util/mongoutils/str.h"
+#include "../dbhelpers.h"
 
 namespace mongo {
 
@@ -119,6 +120,13 @@ namespace mongo {
                 }
             }
         }
+
+        sethbmsg("initial sync query minValid");
+
+        /* our cloned copy will be strange until we apply oplog events that occurred 
+           through the process.  we note that time point here. */
+        BSONObj minValid = r.getLastOp(rsoplog);
+
         MemoryMappedFile::flushAll(true);
         sethbmsg("initial sync clone done first write to oplog still pending");
 
@@ -126,6 +134,7 @@ namespace mongo {
 
         {
             writelock lk("local.");
+            Helpers::putSingleton("local.replset.minvalid", minValid);
             // write an op from the primary to our oplog that existed when 
             // we started cloning.  that will be our starting point.
             //
