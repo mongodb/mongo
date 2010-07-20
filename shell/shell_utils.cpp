@@ -155,7 +155,7 @@ namespace mongo {
                 stringstream ss;
                 ss << num;
                 string name = ss.str();
-                lst.append( name.c_str(), b.done() );
+                lst.append( name, b.done() );
                 num++;
                 i++;
             }
