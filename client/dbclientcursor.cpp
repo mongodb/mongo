@@ -42,7 +42,7 @@ namespace mongo {
         } else {
             BufBuilder b;
             b.appendNum( opts );
-            b.appendStr( ns.c_str() );
+            b.appendStr( ns );
             b.appendNum( nToReturn );
             b.appendNum( cursorId );
             toSend.setData( dbGetMore, b.buf(), b.len() );
@@ -64,7 +64,7 @@ namespace mongo {
         }
         BufBuilder b;
         b.appendNum(opts);
-        b.appendStr(ns.c_str());
+        b.appendStr(ns);
         b.appendNum(nextBatchSize());
         b.appendNum(cursorId);
         

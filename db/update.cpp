@@ -237,7 +237,7 @@ namespace mongo {
                 }
 
                 while( i.more() ) {
-                    bb.appendAs( i.next() , bb.numStr( n - 1 ).c_str() );
+                    bb.appendAs( i.next() , bb.numStr( n - 1 ) );
                     n++;
                 }
             }

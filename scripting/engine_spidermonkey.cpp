@@ -324,39 +324,39 @@ namespace mongo {
             assert( s[0] == '/' );
             s = s.substr(1);
             string::size_type end = s.rfind( '/' );
-            b.appendRegex( name.c_str() , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
+            b.appendRegex( name , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
         }
 
         void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO , const TraverseStack& stack=TraverseStack() ){
             //cout << "name: " << name << "\t" << typeString( val ) << " oldType: " << oldType << endl;
             switch ( JS_TypeOfValue( _context , val ) ){
 
-            case JSTYPE_VOID: b.appendUndefined( name.c_str() ); break;
-            case JSTYPE_NULL: b.appendNull( name.c_str() ); break;
+            case JSTYPE_VOID: b.appendUndefined( name ); break;
+            case JSTYPE_NULL: b.appendNull( name ); break;
 
             case JSTYPE_NUMBER: {
                 double d = toNumber( val );
                 if ( oldType == NumberInt && ((int)d) == d )
-                    b.append( name.c_str() , (int)d );
+                    b.append( name , (int)d );
                 else
-                    b.append( name.c_str() , d );
+                    b.append( name , d );
                 break;
             }
-            case JSTYPE_STRING: b.append( name.c_str() , toString( val ) ); break;
-            case JSTYPE_BOOLEAN: b.appendBool( name.c_str() , toBoolean( val ) ); break;
+            case JSTYPE_STRING: b.append( name , toString( val ) ); break;
+            case JSTYPE_BOOLEAN: b.appendBool( name , toBoolean( val ) ); break;
 
             case JSTYPE_OBJECT: {
                 JSObject * o = JSVAL_TO_OBJECT( val );
                 if ( ! o || o == JSVAL_NULL ){
-                    b.appendNull( name.c_str() );
+                    b.appendNull( name );
                 }
                 else if ( ! appendSpecialDBObject( this , b , name , val , o ) ){
                     BSONObj sub = toObject( o , stack );
                     if ( JS_IsArrayObject( _context , o ) ){
-                        b.appendArray( name.c_str() , sub );
+                        b.appendArray( name , sub );
                     }
                     else {
-                        b.append( name.c_str() , sub );
+                        b.append( name , sub );
                     }
                 }
                 break;
@@ -368,7 +368,7 @@ namespace mongo {
                     appendRegex( b , name , s );
                 }
                 else {
-                    b.appendCode( name.c_str() , getFunctionCode( val ).c_str() );
+                    b.appendCode( name , getFunctionCode( val ).c_str() );
                 }
                 break;
             }

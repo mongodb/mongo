@@ -1877,7 +1877,7 @@ namespace mongo {
             }
             else {
                 closeDatabase( name.c_str() , path );
-                bb.append( bb.numStr( n++ ).c_str() , name );
+                bb.append( bb.numStr( n++ ) , name );
             }
         }
         bb.done();

@@ -34,7 +34,7 @@ namespace mongo {
     Append a timestamp element to the object being ebuilt.
     @param time - in millis (but stored in seconds)
     */
-    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( const char *fieldName , unsigned long long time , unsigned int inc ){
+    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( const StringData& fieldName , unsigned long long time , unsigned int inc ){
         OpTime t( (unsigned) (time / 1000) , inc );
         appendTimestamp( fieldName , t.asDate() );
         return *this; 

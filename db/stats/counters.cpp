@@ -135,7 +135,7 @@ namespace mongo {
         {
             mongo::mutex::scoped_lock lk( _mutex );
             for ( map<string,long long>::iterator i=_counts.begin(); i!=_counts.end(); i++ ){
-                b.appendNumber( i->first.c_str() , i->second );
+                b.appendNumber( i->first , i->second );
             }
         }
         return b.obj();

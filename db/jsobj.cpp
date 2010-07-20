@@ -993,7 +993,7 @@ namespace mongo {
                 nested2dotted(b, e.embeddedObject(), newbase);
             }else{
                 string newbase = base + e.fieldName();
-                b.appendAs(e, newbase.c_str());
+                b.appendAs(e, newbase);
             }
         }
     }

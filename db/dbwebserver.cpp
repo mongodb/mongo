@@ -585,7 +585,7 @@ namespace mongo {
                 BSONObj co;
                 {
                     BSONObjBuilder b;
-                    b.append( cmd.c_str() , 1 );
+                    b.append( cmd , 1 );
                     
                     if ( cmd == "serverStatus" && params["repl"].type() ){
                         b.append( "repl" , atoi( params["repl"].valuestr() ) );
@@ -598,9 +598,9 @@ namespace mongo {
                 
                 BSONObjBuilder sub;
                 if ( ! c->run( "admin.$cmd" , co , errmsg , sub , false ) )
-                    buf.append( cmd.c_str() , errmsg );
+                    buf.append( cmd , errmsg );
                 else
-                    buf.append( cmd.c_str() , sub.obj() );
+                    buf.append( cmd , sub.obj() );
             }
             
             responseMsg = buf.obj().jsonString();
@@ -707,9 +707,9 @@ namespace mongo {
                 // TODO: this is how i guess if something is a number.  pretty lame right now
                 double number = strtod( val , &temp );
                 if ( temp != val )
-                    queryBuilder.append( field.c_str() , number );
+                    queryBuilder.append( field , number );
                 else
-                    queryBuilder.append( field.c_str() , val );
+                    queryBuilder.append( field , val );
             }
 
             BSONObj query = queryBuilder.obj();

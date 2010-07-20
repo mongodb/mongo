@@ -161,7 +161,7 @@ namespace mongo {
                 BSONObjBuilder temp;
                 temp.append( "key" , i->second.key.key() );
                 temp.appendBool( "unique" , i->second.unique );
-                a.append( i->first.c_str() , temp.obj() );
+                a.append( i->first , temp.obj() );
             }
             to.append( "sharded" , a.obj() );
         }
