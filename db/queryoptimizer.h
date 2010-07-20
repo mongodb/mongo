@@ -55,6 +55,7 @@ namespace mongo {
         shared_ptr<Cursor> newCursor( const DiskLoc &startLoc = DiskLoc() , int numWanted=0 ) const;
         shared_ptr<Cursor> newReverseCursor() const;
         BSONObj indexKey() const;
+        bool willScanTable() const { return !index_ && fbs_.matchPossible(); }
         const char *ns() const { return fbs_.ns(); }
         NamespaceDetails *nsd() const { return d; }
         BSONObj originalQuery() const { return _originalQuery; }
@@ -275,7 +276,7 @@ namespace mongo {
         shared_ptr< T > runOpOnce( T &op ) {
             return dynamic_pointer_cast< T >( runOpOnce( static_cast< QueryOp& >( op ) ) );
         }       
-        bool mayRunMore() const { return _or ? !_fros.orFinished() : _i == 0; }
+        bool mayRunMore() const { return _or ? ( !_tableScanned && !_fros.orFinished() ) : _i == 0; }
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         // just report this when only one query op
         bool usingPrerecordedPlan() const {
@@ -298,6 +299,7 @@ namespace mongo {
         bool _bestGuessOnly;
         BSONObj _hint;
         bool _mayYield;
+        bool _tableScanned;
     };
     
     class MultiCursor : public Cursor {
