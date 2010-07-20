@@ -649,7 +649,7 @@ namespace mongo {
         if ( fields.isEmpty() ) {
             BSONObjBuilder b;
             for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
-                b.append( i->first.c_str(), 1 );
+                b.append( i->first, 1 );
             }
             fields = b.obj();
         }
