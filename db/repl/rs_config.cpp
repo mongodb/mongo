@@ -59,7 +59,7 @@ namespace mongo {
     }
     
     /*static*/ 
-    void ReplSetConfig::receivedNewConfig(BSONObj cfg) { 
+    /*void ReplSetConfig::receivedNewConfig(BSONObj cfg) { 
         if( theReplSet )
             return; // this is for initial setup only, so far. todo
 
@@ -69,7 +69,7 @@ namespace mongo {
         if( theReplSet ) 
             return;
         c.saveConfigLocally(bo());
-    }
+    }*/
 
     bo ReplSetConfig::MemberCfg::asBson() const { 
         bob b;

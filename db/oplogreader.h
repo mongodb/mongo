@@ -34,9 +34,9 @@ namespace mongo {
         /* ok to call if already connected */
         bool connect(string hostname);
 
-        void getReady() {
+        void tailCheck() {
             if( cursor.get() && cursor->isDead() ) { 
-                log() << "repl: old cursor isDead, initiating a new one" << endl;
+                log() << "repl: old cursor isDead, will initiate a new one" << endl;
                 reset();
             }
         }

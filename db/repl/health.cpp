@@ -69,6 +69,7 @@ namespace mongo {
             u << "http://" << h().host() << ':' << (h().port() + 1000) << "/_replSet";
             s << td( a(u.str(), "", fullName()) );
         }
+        s << td( id() );
         double h = hbinfo().health;
         bool ok = h > 0;
         s << td(h);
@@ -100,6 +101,7 @@ namespace mongo {
         if( s == RS_RECOVERING ) return a("", "recovering/resyncing; after recovery usually auto-transitions to secondary", "RECOVERING");
         if( s == RS_FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "RS_FATAL");
         if( s == RS_STARTUP2 ) return a("", "loaded config, still determining who is primary", "RS_STARTUP2");
+        if( s == RS_ARBITER ) return a("", "this server is an arbiter only", "ARBITER");
         return "";
     }
 
@@ -109,7 +111,8 @@ namespace mongo {
         if( s == RS_SECONDARY ) return "SECONDARY";
         if( s == RS_RECOVERING ) return "RECOVERING";
         if( s == RS_FATAL ) return "FATAL";
-        if( s == RS_STARTUP2 ) return "RS_STARTUP2";
+        if( s == RS_STARTUP2 ) return "STARTUP2";
+        if( s == RS_ARBITER ) return "ARBITER";
         return "";
     }
 
@@ -200,7 +203,8 @@ namespace mongo {
                 bo o = c->next();
             }
             if( !x.empty() ) {
-                ss << "\n...\n\n" << x;
+                ss << "<tr><td>...</td><td></td><td></td><td></td><td></td></tr>\n" << x;
+                //ss << "\n...\n\n" << x;
             }
         }
         ss << _table();
@@ -209,7 +213,13 @@ namespace mongo {
         if( !otEnd.isNull() ) {
             ss << "<p>Log length in time: ";
             unsigned d = otEnd.getSecs() - otFirst.getSecs();
-            ss << d / 3600.0 << " hours</p>\n";
+            double h = d / 3600.0;
+            ss.precision(3);
+            if( h < 72 )
+                ss << h << " hours";
+            else 
+                ss << h / 24.0 << " days";
+            ss << "</p>\n";
         }
         ss << p("Current time: " + time_t_to_String_short(time(0)));
     }
@@ -220,7 +230,9 @@ namespace mongo {
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
         s << _table();
 
-        const char *h[] = {"Member", "Up", 
+        const char *h[] = {"Member", 
+            "<a title=\"member id in the replset config\">id</a>", 
+            "Up", 
             "<a title=\"length of time we have been continuously connected to the other member with no reconnects\">cctime</a>", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 
@@ -236,6 +248,7 @@ namespace mongo {
             stringstream s;
             /* self row */
             s << tr() << td(_self->fullName() + " (me)") <<
+                td(_self->id()) <<
                 td("1") << 
                 td(ago(started)) << 
                 td("") << 

@@ -99,7 +99,7 @@ namespace mongo {
 
                 log() << "replSet replSetReconfig all members seem up" << rsLog;
 
-                theReplSet->haveNewConfig(newConfig);
+                theReplSet->haveNewConfig(newConfig, true);
                 ReplSet::startupStatusMsg = "replSetReconfig'd";
             }
             catch( DBException& e ) { 

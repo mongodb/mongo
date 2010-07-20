@@ -239,7 +239,7 @@ namespace mongo {
             } else {
                 assert( !rs.lockedByMe() ); // bad to go to sleep locked
                 unsigned ms = ((unsigned) rand()) % 1000 + 50;
-                DEV log() << "replSet tie " << nTies << " sleeping a little " << ms << rsLog;
+                DEV log() << "replSet tie " << nTies << " sleeping a little " << ms << "ms" << rsLog;
                 sleptLast = true;
                 sleepmillis(ms);
                 throw RetryAfterSleepException();

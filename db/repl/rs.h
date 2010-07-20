@@ -67,7 +67,7 @@ namespace mongo {
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
-        void msgReceivedNewConfig(BSONObj) { assert(false); }
+        void msgReceivedNewConfig(BSONObj);
         void msgCheckNewState();
     };
 
@@ -229,6 +229,7 @@ namespace mongo {
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
+        bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         const Member *_currentPrimary;
         Member *_self;        
         List1<Member> _members; /* all members of the set EXCEPT self. */
@@ -277,8 +278,10 @@ namespace mongo {
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
         void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
 
-        /* we have a new config (reconfig) - apply it. */
-        void haveNewConfig(ReplSetConfig& c);
+        /* we have a new config (reconfig) - apply it. 
+           @param comment write a no-op comment to the oplog about it.  only makes sense if one is primary and initiating the reconf.
+        */
+        void haveNewConfig(ReplSetConfig& c, bool comment);
 
         /* if we delete old configs, this needs to assure locking. currently we don't so it is ok. */
         const ReplSetConfig& getConfig() { return config(); }

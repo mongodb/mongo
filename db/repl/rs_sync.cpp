@@ -118,8 +118,12 @@ namespace mongo {
                     }
                 }
             }
-            if( !r.haveCursor() )
+            r.tailCheck();
+            if( !r.haveCursor() ) {
+                log() << "replSet TEMP end syncTail pass with " << hn << rsLog;
+                // TODO : reuse our cnonection to the primary.
                 return;
+            }
             if( currentPrimary() != primary )
                 return;
             // looping back is ok because this is a tailable cursor
@@ -154,6 +158,11 @@ namespace mongo {
             catch(DBException& e) { 
                 log() << "replSet syncThread: " << e.toString() << rsLog;
                 sleepsecs(10);
+            }
+            catch(...) { 
+                sethbmsg("unexpected exception in syncThread()");
+                // TODO : SET NOT SECONDARY here.
+                sleepsecs(60);
             }
             sleepsecs(2);
         }

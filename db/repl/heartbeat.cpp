@@ -111,7 +111,7 @@ namespace mongo {
 
         string name() { return "ReplSetHealthPollTask"; }
         void doWork() { 
-            cout << "TEMP healthpool dowork " << endl;
+            //cout << "TEMP healthpool dowork " << endl;
 
             if ( !theReplSet ) {
                 log() << "theReplSet not initialized yet, skipping health poll this round" << rsLog;
@@ -156,7 +156,7 @@ namespace mongo {
                 down(mem, "connect/transport error");             
             }
             m = mem;
-            cout << "TEMP sending msgupdatehbinfo" << mem.hbstate << endl;
+            //cout << "TEMP sending msgupdatehbinfo" << mem.hbstate << endl;
             theReplSet->mgr->send( boost::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
 
             static time_t last = 0;

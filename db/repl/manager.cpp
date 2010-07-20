@@ -54,9 +54,14 @@ namespace mongo {
     }
 
     void Manager::noteARemoteIsPrimary(const Member *m) { 
+        if( rs->currentPrimary() == m )
+            return;
         rs->_currentPrimary = m;
         rs->_self->lhb() = "";
-        rs->_myState = RS_RECOVERING;
+        if( rs->iAmArbiterOnly() )
+            rs->changeState(RS_ARBITER);
+        else
+            rs->changeState(RS_RECOVERING);
     }
 
     /** called as the health threads get new results */
@@ -100,6 +105,11 @@ namespace mongo {
                 /* ignore for now, keep thinking we are master */
                 return;
             }
+
+            if( rs->iAmArbiterOnly() )
+                return;
+
+            /* TODO : CHECK PRIORITY HERE.  can't be elected if priority zero. */
 
             if( p ) { 
                 /* we are already primary, and nothing significant out there has changed. */

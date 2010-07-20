@@ -80,7 +80,7 @@ namespace mongo {
                 if( !ok && !res["rs"].trueValue() ) {
                     if( !res.isEmpty() )
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
-                    uasserted(13144, "need all members up to initiate, not ok: " + i->h.toString());
+                    uasserted(13144, "need members up to initiate/reconfig, not ok: " + i->h.toString());
                 }
             }
             if( initial ) {

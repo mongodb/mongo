@@ -1119,7 +1119,7 @@ namespace mongo {
         log(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
 
         bool tailing = true;
-        oplogReader.getReady();
+        oplogReader.tailCheck();
 
         if ( replPair && replPair->state == ReplPair::State_Master ) {
             dblock lk;
