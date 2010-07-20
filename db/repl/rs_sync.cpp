@@ -68,6 +68,16 @@ namespace mongo {
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) { 
+                if( lastOpTimeWritten < ts ) { 
+                    log() << "replSet ERROR too stale to catch up, at least from primary " << hn << rsLog;
+                    log() << "replSet our last optime : " << lastOpTimeWritten.toStringPretty() << rsLog;
+                    log() << "replSet oldest at " << hn << " : " << ts.toStringPretty() << rsLog;
+                    log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
+                    sethbmsg("sync exception too stale to catch up");
+                    sleepsecs(120);
+                    return;
+                }
+
                 log() << "replSet rollback not yet implemented!" << rsLog;
                 log() << "replSet ts: " << lastOpTimeWritten.toStringPretty() << ' ' << ts.toStringPretty() << rsLog;
                 log() << "replSet h:  " << lastH << ' ' << h << rsLog;

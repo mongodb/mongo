@@ -24,7 +24,7 @@ check( 1, 2, { $or: [ { a: { $gt:2,$lte:3 } }, { a: 2 } ] } );
 
 check( 1, 1, { $or: [ { b: { $gte:1,$lte:3 } }, { b: 2 } ] } );
 check( 1, 1, { $or: [ { b: { $gte:2,$lte:3 } }, { b: 2 } ] } );
-//check( 1, 2, { $or: [ { b: { $gt:2,$lte:3 } }, { b: 2 } ] } );
+check( 1, 1, { $or: [ { b: { $gt:2,$lte:3 } }, { b: 2 } ] } );
 
 check( 1, 1, { $or: [ { a: { $gte:1,$lte:3 } }, { a: 2, b: 2 } ] } );
 check( 1, 2, { $or: [ { a: { $gte:1,$lte:3 }, b:3 }, { a: 2 } ] } );
