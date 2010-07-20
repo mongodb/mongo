@@ -158,6 +158,10 @@ namespace mongo {
             _orConstraints.push_back( frv );
         }
         
+        void popOrClause() {
+            _orMatchers.pop_front();
+        }
+        
         bool sameCriteriaCount( const Matcher &other ) const;
         
     private:
@@ -220,8 +224,11 @@ namespace mongo {
         Matcher& docMatcher() { return *_docMatcher; }
 
         // once this is called, shouldn't use this matcher for matching any more
-        void addOrConstraint( const shared_ptr< FieldRangeVector > &frv ) {
+        void advanceOrClause( const shared_ptr< FieldRangeVector > &frv ) {
             _docMatcher->addOrConstraint( frv );
+            // TODO this is not an optimal optimization, since we could skip an entire
+            // or clause (if a match is impossible) between calls to advanceOrClause()
+            _docMatcher->popOrClause();
         }
         
         CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {

@@ -122,7 +122,7 @@ namespace mongo {
         */
         QueryOp *createChild() {
             if( _orConstraint.get() ) {
-                _matcher->addOrConstraint( _orConstraint );
+                _matcher->advanceOrClause( _orConstraint );
                 _orConstraint.reset();
             }
             QueryOp *ret = _createChild();
