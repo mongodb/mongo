@@ -21,14 +21,23 @@
 
 namespace mongo {
 
+
+    /*
+        RS_STARTUP    serving still starting up, or still trying to initiate the set
+        RS_PRIMARY    this server thinks it is primary
+        RS_SECONDARY  this server thinks it is a secondary (slave mode)
+        RS_RECOVERING recovering/resyncing; after recovery usually auto-transitions to secondary
+        RS_FATAL      something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.
+        RS_STARTUP2   loaded config, still determining who is primary
+    */
     enum MemberState { 
-        STARTUP,
-        PRIMARY,
-        SECONDARY,
-        RECOVERING,
-        FATAL,
-        STARTUP2,
-        UNKNOWN /* remote node not yet reached */
+        RS_STARTUP,
+        RS_PRIMARY,
+        RS_SECONDARY,
+        RS_RECOVERING,
+        RS_FATAL,
+        RS_STARTUP2,
+        RS_UNKNOWN /* remote node not yet reached */
     };
 
     /* this is supposed to be just basic information on a member, 
@@ -50,7 +59,7 @@ namespace mongo {
     };
 
     inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id) { 
-          hbstate = UNKNOWN;
+          hbstate = RS_UNKNOWN;
           health = -1.0;
           lastHeartbeat = upSince = 0; 
     }

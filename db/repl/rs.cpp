@@ -31,18 +31,24 @@ namespace mongo {
 
     void ReplSetImpl::assumePrimary() { 
         writelock lk("admin."); // so we are synchronized with _logOp() 
-        _myState = PRIMARY;
+        _myState = RS_PRIMARY;
         _currentPrimary = _self;
         log(2) << "replSet self is now primary" << rsLog;
     }
 
+    void ReplSetImpl::changeState(MemberState s) { 
+        /* TODO LOCKING */
+        /* TODO call this don't touch mystate directly */
+        _myState = s;
+    }
+
     void ReplSetImpl::relinquish() { 
-        if( state() == PRIMARY ) {
-            _myState = RECOVERING;
+        if( state() == RS_PRIMARY ) {
+            _myState = RS_RECOVERING;
             log() << "replSet info relinquished primary state" << rsLog;
         }
-        else if( state() == STARTUP2 )
-            _myState = RECOVERING;
+        else if( state() == RS_STARTUP2 )
+            _myState = RS_RECOVERING;
     }
 
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) { 
@@ -154,7 +160,7 @@ namespace mongo {
         memset(_hbmsg, 0, sizeof(_hbmsg));
         *_hbmsg = '.'; // temp...just to see
         lastH = 0;
-        _myState = STARTUP;
+        _myState = RS_STARTUP;
         _currentPrimary = 0;
 
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
@@ -202,7 +208,7 @@ namespace mongo {
             dbexit( EXIT_REPLICATION_ERROR );
             return;
         }
-        _myState = STARTUP2;
+        _myState = RS_STARTUP2;
         startThreads();
         newReplUp(); // oplog.cpp
     }
@@ -356,7 +362,7 @@ namespace mongo {
     void ReplSetImpl::_fatal() 
     { 
         //lock l(this);
-        _myState = FATAL; 
+        _myState = RS_FATAL; 
         sethbmsg("fatal error");
         log() << "replSet error fatal error, stopping replication" << rsLog; 
     }

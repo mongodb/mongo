@@ -92,24 +92,24 @@ namespace mongo {
         s << td( a(q.str(), "", never ? "?" : hbinfo().opTime.toString()) );
         s << _tr();
     }
-
+    
     string ReplSetImpl::stateAsHtml(MemberState s) { 
-        if( s == STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
-        if( s == PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
-        if( s == SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
-        if( s == RECOVERING ) return a("", "recovering/resyncing; after recovery usually auto-transitions to secondary", "RECOVERING");
-        if( s == FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "FATAL");
-        if( s == STARTUP2 ) return a("", "loaded config, still determining who is primary", "STARTUP2");
+        if( s == RS_STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
+        if( s == RS_PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
+        if( s == RS_SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
+        if( s == RS_RECOVERING ) return a("", "recovering/resyncing; after recovery usually auto-transitions to secondary", "RECOVERING");
+        if( s == RS_FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "RS_FATAL");
+        if( s == RS_STARTUP2 ) return a("", "loaded config, still determining who is primary", "RS_STARTUP2");
         return "";
     }
 
     string ReplSetImpl::stateAsStr(MemberState s) { 
-        if( s == STARTUP ) return "STARTUP";
-        if( s == PRIMARY ) return "PRIMARY";
-        if( s == SECONDARY ) return "SECONDARY";
-        if( s == RECOVERING ) return "RECOVERING";
-        if( s == FATAL ) return "FATAL";
-        if( s == STARTUP2 ) return "STARTUP2";
+        if( s == RS_STARTUP ) return "STARTUP";
+        if( s == RS_PRIMARY ) return "PRIMARY";
+        if( s == RS_SECONDARY ) return "SECONDARY";
+        if( s == RS_RECOVERING ) return "RECOVERING";
+        if( s == RS_FATAL ) return "FATAL";
+        if( s == RS_STARTUP2 ) return "RS_STARTUP2";
         return "";
     }
 

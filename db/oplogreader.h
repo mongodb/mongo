@@ -64,6 +64,10 @@ namespace mongo {
             assert( cursor.get() );
             return cursor->more();
         }
+        bool moreInCurrentBatch() { 
+            assert( cursor.get() );
+            return cursor->moreInCurrentBatch();
+        }
 
         /* old mongod's can't do the await flag... */
         bool awaitCapable() { 

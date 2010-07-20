@@ -159,8 +159,8 @@ namespace mongo {
 
         /* todo thread */
         void msgUpdateHBInfo(HeartbeatInfo);
-        bool isPrimary() const { return _myState == PRIMARY; }
-        bool isSecondary() const { return _myState == SECONDARY; }
+        bool isPrimary() const { return _myState == RS_PRIMARY; }
+        bool isSecondary() const { return _myState == RS_SECONDARY; }
 
         //bool initiated() const { return curOpTime.initiated(); }
 
@@ -175,11 +175,12 @@ namespace mongo {
 
     private:
         Consensus elect;
-        bool ok() const { return _myState != FATAL; }
+        bool ok() const { return _myState != RS_FATAL; }
 
         void relinquish();
         void assumePrimary();
         void loadLastOpTimeWritten();
+        void changeState(MemberState s);
 
     protected:
         // "heartbeat message"

@@ -78,18 +78,50 @@ namespace mongo {
         // TODO : switch state to secondary here when appropriate...
 
         while( 1 ) { 
-            while( r.more() ) { 
-                BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
-                {
-                    writelock lk("");
-                    syncApply(o);
-                    _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
+            while( 1 ) {
+                if( !r.moreInCurrentBatch() ) { 
+                    /* we need to occasionally check some things. between 
+                       batches is probably a good time. */
+
+                    /* perhaps we should check this earlier? but not before the rollback checks. */
+                    if( state() == RS_RECOVERING ) { 
+                        /* can we go to RS_SECONDARY state?  we can if not too old and not minvalid */
+                        bool golive = false;
+                        {
+                            readlock lk("local.replset.minvalid");
+                            BSONObj mv;
+                            if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
+                                if( mv["ts"]._opTime() < lastOpTimeWritten ) { 
+                                    golive=true;
+                                }
+                            }
+                            else 
+                                golive = true; /* must have been the original member */
+                        }
+                        if( golive )
+                            changeState(RS_SECONDARY);
+
+                        /* todo: too stale capability */
+                    }
+
+                    if( currentPrimary() != primary ) 
+                        return;
+                }
+                if( !r.more() )
+                    break;
+                { 
+                    BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
+                    {
+                        writelock lk("");
+                        syncApply(o);
+                        _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
+                    }
                 }
             }
             if( !r.haveCursor() )
-                break;
+                return;
             if( currentPrimary() != primary )
-                break;
+                return;
             // looping back is ok because this is a tailable cursor
         }
     }

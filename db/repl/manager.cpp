@@ -33,7 +33,7 @@ namespace mongo {
         Member *m = rs->head();
         Member *p = 0;
         while( m ) {
-            if( m->state() == PRIMARY ) {
+            if( m->state() == RS_PRIMARY ) {
                 if( p ) throw "twomasters"; // our polling is asynchronous, so this is often ok.
                 p = m;
             }
@@ -56,7 +56,7 @@ namespace mongo {
     void Manager::noteARemoteIsPrimary(const Member *m) { 
         rs->_currentPrimary = m;
         rs->_self->lhb() = "";
-        rs->_myState = RECOVERING;
+        rs->_myState = RS_RECOVERING;
     }
 
     /** called as the health threads get new results */
