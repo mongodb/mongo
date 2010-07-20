@@ -106,6 +106,13 @@ __wt_db_btree_pagesize_set_verify(DB *db, u_int32_t allocsize,
 		return (WT_ERROR);
 	}
 
+	if (intlmin > intlmax || leafmin > leafmax) {
+		__wt_api_db_errx(db,
+		    "minimum sizes must be less than or equal to "
+		    "maximum sizes");
+		return (WT_ERROR);
+	}
+
 	/*
 	 * Limit allocation units to 256MB, and page sizes to 128MB.  There's
 	 * no reason (other than testing) we can't support larger sizes (any
