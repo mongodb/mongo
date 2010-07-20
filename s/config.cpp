@@ -518,6 +518,8 @@ namespace mongo {
     }
 
     void ConfigServer::logChange( const string& what , const string& ns , const BSONObj& detail ){
+        assert( _primary.ok() );
+
         static bool createdCapped = false;
         static AtomicUInt num;
         
