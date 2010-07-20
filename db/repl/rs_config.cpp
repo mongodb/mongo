@@ -184,13 +184,19 @@ namespace mongo {
             try {
                 try { 
                     m._id = (int) mobj["_id"].Number();
-                } catch(...) { throw "_id must be numeric"; }
+                } catch(...) { 
+                    /* TODO: use of string exceptions may be problematic for reconfig case! */
+                    throw "_id must be numeric"; 
+                }
                 string s;
                 try {
                     s = mobj["host"].String();
                     m.h = HostAndPort(s);
                 }
-                catch(...) { throw "bad or missing host field?"; }
+                catch(...) { 
+                    throw "bad or missing host field?"; 
+                }
+                uassert(13393, "can't use localhost in member names", !m.h.isLocalHost());
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");
                 if( mobj.hasElement("priority") )
                     m.priority = mobj["priority"].Number();

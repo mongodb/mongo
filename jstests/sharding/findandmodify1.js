@@ -1,25 +1,34 @@
-s = new ShardingTest( "find_and_modify_sharded" , 2 );
+s = new ShardingTest( "find_and_modify_sharded" , 2 , 2);
 
 s.adminCommand( { enablesharding : "test" } );
 db = s.getDB( "test" );
 primary = s.getServer( "test" ).getDB( "test" );
-seconday = s.getOther( primary ).getDB( "test" );
+secondary = s.getOther( primary ).getDB( "test" );
 
 numObjs = 20;
 
 s.adminCommand( { shardcollection : "test.stuff"  , key : {_id:1} } );
 
+// pre-split the collection so to avoid interference from balancer
+s.adminCommand( { split: "test.stuff" , middle : { _id : numObjs/2 } } );
+s.adminCommand( { movechunk : "test.stuff" , find : { _id : numObjs/2 } , to : secondary.getMongo().name } ) ;
+
 for (var i=0; i < numObjs; i++){
     db.stuff.insert({_id: i});
 }
+db.getLastError()
 
-for (var i=0; i < numObjs; i+=2){
+// put two docs in each chunk (avoid the split in 0, since there are no docs less than 0)
+for (var i=2; i < numObjs; i+=2){
+    if (i == numObjs/2)
+        continue;
     s.adminCommand( { split: "test.stuff"  , middle : {_id: i} } );
 }
 
-for (var i=0; i < numObjs; i+=4){
-    s.adminCommand( { movechunk : "test.stuff" , find : {_id: i} , to : seconday.getMongo().name } );
-}
+s.printChunks();
+assert.eq( numObjs/2, s.config.chunks.count(), "split failed" );
+assert.eq( numObjs/4, s.config.chunks.count({ shard: "shard0" }) );
+assert.eq( numObjs/4, s.config.chunks.count({ shard: "shard1" }) ); 
 
 // update
 for (var i=0; i < numObjs; i++){
