@@ -53,7 +53,7 @@ class Import : public Tool {
             return;
 
         // TODO: other types?
-        b.append( fieldName.c_str() , data );
+        b.append( fieldName , data );
     }
     
     BSONObj parseLine( char * line ){
