@@ -18,12 +18,19 @@
 #include "../client.h"
 #include "../../client/dbclient.h"
 #include "rs.h"
+#include "../repl.h"
 
 namespace mongo {
 
     void startSyncThread() { 
         Client::initThread("rs_sync");
         theReplSet->syncThread();
+    }
+
+    void ReplSetImpl::syncTail() { 
+        // todo : locking...
+        OplogReader r;
+//        r.connect(
     }
 
     void ReplSetImpl::_syncThread() {
@@ -41,6 +48,7 @@ namespace mongo {
         }
 
         /* we have some data.  continue tailing. */
+        syncTail();
     }
 
     void ReplSetImpl::syncThread() {
