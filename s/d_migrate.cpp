@@ -879,7 +879,7 @@ namespace mongo {
             }
             
             if ( ! configServer.ok() )
-                configServer.init( cmdObj["confidServer"].String() );
+                configServer.init( cmdObj["configServer"].String() );
 
             migrateStatus.prepare();
 
