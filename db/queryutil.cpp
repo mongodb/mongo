@@ -888,7 +888,7 @@ namespace mongo {
                 case Array:{
                     BSONObjBuilder subb;
                     appendArray(subb , e.embeddedObject(), true);
-                    b.appendArray(b.numStr(i++).c_str(), subb.obj());
+                    b.appendArray(b.numStr(i++), subb.obj());
                     break;
                 }
                 case Object:{
@@ -902,7 +902,7 @@ namespace mongo {
                 }
                 default:
                     if (_include)
-                        b.appendAs(e, b.numStr(i++).c_str());
+                        b.appendAs(e, b.numStr(i++));
             }
         }
     }

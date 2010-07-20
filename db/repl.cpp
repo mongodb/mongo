@@ -579,7 +579,7 @@ namespace mongo {
         int n = 0;
         for ( set<string>::iterator i = addDbNextPass.begin(); i != addDbNextPass.end(); i++ ) {
             n++;
-            dbsNextPassBuilder.appendBool(i->c_str(), 1);
+            dbsNextPassBuilder.appendBool(*i, 1);
         }
         if ( n )
             b.append("dbsNextPass", dbsNextPassBuilder.done());
@@ -588,7 +588,7 @@ namespace mongo {
         n = 0;
         for ( set<string>::iterator i = incompleteCloneDbs.begin(); i != incompleteCloneDbs.end(); i++ ) {
             n++;
-            incompleteCloneDbsBuilder.appendBool(i->c_str(), 1);
+            incompleteCloneDbsBuilder.appendBool(*i, 1);
         }
         if ( n )
             b.append("incompleteCloneDbs", incompleteCloneDbsBuilder.done());
