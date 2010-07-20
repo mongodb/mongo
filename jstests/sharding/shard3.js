@@ -37,7 +37,7 @@ assert.eq( 3 , primary.find().itcount() + secondary.find().itcount() , "blah 3" 
 assert.eq( 3 , a.find().toArray().length , "normal B" );
 assert.eq( 3 , b.find().toArray().length , "other B" );
 
-printjson( a._db._adminCommand( "shardingState" ) );
+printjson( primary._db._adminCommand( "shardingState" ) );
 
 // --- filtering ---
 
