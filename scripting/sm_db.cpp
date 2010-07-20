@@ -1005,39 +1005,39 @@ namespace mongo {
         if ( JS_InstanceOf( c->_context , o , &object_id_class , 0 ) ){
             OID oid;
             oid.init( c->getString( o , "str" ) );
-            b.append( name.c_str() , oid );
+            b.append( name , oid );
             return true;
         }
 
         if ( JS_InstanceOf( c->_context , o , &minkey_class , 0 ) ){
-            b.appendMinKey( name.c_str() );
+            b.appendMinKey( name );
             return true;
         }
 
         if ( JS_InstanceOf( c->_context , o , &maxkey_class , 0 ) ){
-            b.appendMaxKey( name.c_str() );
+            b.appendMaxKey( name );
             return true;
         }
         
         if ( JS_InstanceOf( c->_context , o , &timestamp_class , 0 ) ){
-            b.appendTimestamp( name.c_str() , (unsigned long long)c->getNumber( o , "t" ) , (unsigned int )c->getNumber( o , "i" ) );
+            b.appendTimestamp( name , (unsigned long long)c->getNumber( o , "t" ) , (unsigned int )c->getNumber( o , "i" ) );
             return true;
         }
 
         if ( JS_InstanceOf( c->_context , o , &numberlong_class , 0 ) ){
-            b.append( name.c_str() , c->toNumberLongUnsafe( o ) );
+            b.append( name , c->toNumberLongUnsafe( o ) );
             return true;
         }
         
         if ( JS_InstanceOf( c->_context , o , &dbpointer_class , 0 ) ){
-            b.appendDBRef( name.c_str() , c->getString( o , "ns" ).c_str() , c->toOID( c->getProperty( o , "id" ) ) );
+            b.appendDBRef( name , c->getString( o , "ns" ).c_str() , c->toOID( c->getProperty( o , "id" ) ) );
             return true;
         }
         
         if ( JS_InstanceOf( c->_context , o , &bindata_class , 0 ) ){
             void *holder = JS_GetPrivate( c->_context , o );
             const char *data = ( ( BinDataHolder * )( holder ) )->c_;
-            b.appendBinData( name.c_str() , 
+            b.appendBinData( name , 
                              (int)(c->getNumber( o , "len" )) , (BinDataType)((char)(c->getNumber( o , "type" ) ) ) , 
                              data
                              );
@@ -1049,21 +1049,21 @@ namespace mongo {
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             if ( d ){
-                b.appendDate( name.c_str() , Date_t(d) );
+                b.appendDate( name , Date_t(d) );
                 return true;
             }
         }
 #elif defined( XULRUNNER )
         if ( JS_InstanceOf( c->_context , o, globalSMEngine->_dateClass , 0 ) ){
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
-            b.appendDate( name.c_str() , Date_t(d) );
+            b.appendDate( name , Date_t(d) );
             return true;
         }
 #else
         if ( JS_InstanceOf( c->_context , o, &js_DateClass , 0 ) ){
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             //TODO: make signed
-            b.appendDate( name.c_str() , Date_t((unsigned long long)d) );
+            b.appendDate( name , Date_t((unsigned long long)d) );
             return true;
         }
 #endif
@@ -1072,7 +1072,7 @@ namespace mongo {
         if ( JS_InstanceOf( c->_context , o , &dbquery_class , 0 ) ||
              JS_InstanceOf( c->_context , o , &mongo_class , 0 ) || 
              JS_InstanceOf( c->_context , o , &db_collection_class , 0 ) ){
-            b.append( name.c_str() , c->toString( val ) );
+            b.append( name , c->toString( val ) );
             return true;
         }
 

@@ -395,31 +395,31 @@ namespace mongo {
     void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth ){
         
         if ( value->IsString() ){
-            b.append( sname.c_str() , toSTLString( value ).c_str() );
+            b.append( sname , toSTLString( value ).c_str() );
             return;
         }
         
         if ( value->IsFunction() ){
-            b.appendCode( sname.c_str() , toSTLString( value ).c_str() );
+            b.appendCode( sname , toSTLString( value ).c_str() );
             return;
         }
     
         if ( value->IsNumber() ){
             if ( value->IsInt32() )
-                b.append( sname.c_str(), int( value->ToInt32()->Value() ) );
+                b.append( sname, int( value->ToInt32()->Value() ) );
             else
-                b.append( sname.c_str() , value->ToNumber()->Value() );
+                b.append( sname , value->ToNumber()->Value() );
             return;
         }
     
         if ( value->IsArray() ){
             BSONObj sub = v8ToMongo( value->ToObject() , depth );
-            b.appendArray( sname.c_str() , sub );
+            b.appendArray( sname , sub );
             return;
         }
     
         if ( value->IsDate() ){
-            b.appendDate( sname.c_str() , Date_t(v8::Date::Cast( *value )->NumberValue()) );
+            b.appendDate( sname , Date_t(v8::Date::Cast( *value )->NumberValue()) );
             return;
         }
 
@@ -434,15 +434,15 @@ namespace mongo {
             if ( obj->InternalFieldCount() && obj->GetInternalField( 0 )->IsNumber() ) {
                 switch( obj->GetInternalField( 0 )->ToInt32()->Value() ) { // NOTE Uint32's Value() gave me a linking error, so going with this instead
                     case Timestamp:
-                        b.appendTimestamp( sname.c_str(),
+                        b.appendTimestamp( sname,
                                           Date_t( obj->Get( v8::String::New( "t" ) )->ToNumber()->Value() ),
                                           obj->Get( v8::String::New( "i" ) )->ToInt32()->Value() );
                         return;
                     case MinKey:
-                        b.appendMinKey( sname.c_str() );
+                        b.appendMinKey( sname );
                         return;
                     case MaxKey:
-                        b.appendMaxKey( sname.c_str() );
+                        b.appendMaxKey( sname );
                         return;
                     default:
                         assert( "invalid internal field" == 0 );
@@ -453,13 +453,13 @@ namespace mongo {
                 s = s.substr( 1 );
                 string r = s.substr( 0 , s.rfind( "/" ) );
                 string o = s.substr( s.rfind( "/" ) + 1 );
-                b.appendRegex( sname.c_str() , r.c_str() , o.c_str() );
+                b.appendRegex( sname , r.c_str() , o.c_str() );
             }
             else if ( value->ToObject()->GetPrototype()->IsObject() &&
                       value->ToObject()->GetPrototype()->ToObject()->HasRealNamedProperty( v8::String::New( "isObjectId" ) ) ){
                 OID oid;
                 oid.init( toSTLString( value ) );
-                b.appendOID( sname.c_str() , &oid );
+                b.appendOID( sname , &oid );
             }
             else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__NumberLong" ) ).IsEmpty() ) {
                 // TODO might be nice to potentially speed this up with an indexed internal
@@ -475,42 +475,42 @@ namespace mongo {
                     (unsigned)( it->Get( v8::String::New( "bottom" ) )->ToInt32()->Value() );        
                 }
                 
-                b.append( sname.c_str(), val );
+                b.append( sname, val );
             }
             else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__DBPointer" ) ).IsEmpty() ) {
                 OID oid;
                 oid.init( toSTLString( value->ToObject()->Get( v8::String::New( "id" ) ) ) );
                 string ns = toSTLString( value->ToObject()->Get( v8::String::New( "ns" ) ) );
-                b.appendDBRef( sname.c_str(), ns.c_str(), oid );                
+                b.appendDBRef( sname, ns.c_str(), oid );                
             }
             else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__BinData" ) ).IsEmpty() ) {
                 int len = obj->Get( v8::String::New( "len" ) )->ToInt32()->Value();
                 v8::String::Utf8Value data( obj->Get( v8::String::New( "data" ) ) );
                 const char *dataArray = *data;
                 assert( data.length() == len );
-                b.appendBinData( sname.c_str(),
+                b.appendBinData( sname,
                                 len,
                                 mongo::BinDataType( obj->Get( v8::String::New( "type" ) )->ToInt32()->Value() ),
                                 dataArray );
             } else {
                 BSONObj sub = v8ToMongo( value->ToObject() , depth );
-                b.append( sname.c_str() , sub );
+                b.append( sname , sub );
             }
             return;
         }
     
         if ( value->IsBoolean() ){
-            b.appendBool( sname.c_str() , value->ToBoolean()->Value() );
+            b.appendBool( sname , value->ToBoolean()->Value() );
             return;
         }
     
         else if ( value->IsUndefined() ){
-            b.appendUndefined( sname.c_str() );
+            b.appendUndefined( sname );
             return;
         }
     
         else if ( value->IsNull() ){
-            b.appendNull( sname.c_str() );
+            b.appendNull( sname );
             return;
         }
 
