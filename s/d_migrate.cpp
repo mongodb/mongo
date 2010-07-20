@@ -480,7 +480,8 @@ namespace mongo {
                                             BSON( "_recvChunkStart" << ns <<
                                                   "from" << from <<
                                                   "min" << min <<
-                                                  "max" << max
+                                                  "max" << max <<
+                                                  "configServer" << configServer.modelServer()
                                                   ) , 
                                             res );
                 conn.done();
@@ -871,11 +872,14 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }  // this is so don't have to do locking internally
 
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-
+            
             if ( migrateStatus.active ){
                 errmsg = "migrate already in progress";
                 return false;
             }
+            
+            if ( ! configServer.ok() )
+                configServer.init( cmdObj["confidServer"].String() );
 
             migrateStatus.prepare();
 

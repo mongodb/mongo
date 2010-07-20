@@ -188,9 +188,8 @@ namespace mongo {
 
         ConfigServer();
         ~ConfigServer();
-
+        
         bool ok(){
-            // TODO: check can connect
             return _primary.ok();
         }
         
