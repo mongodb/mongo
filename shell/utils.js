@@ -1052,6 +1052,7 @@ rs.help = function () {
     print("\trs.initiate()                   { replSetInitiate : null } initiates set with default settings");
     print("\trs.initiate(cfg)                { replSetInitiate : cfg } initiates set with configuration cfg");
     print("\trs.add(hostportstr)             add a new member to the set with default attributes");
+    print("\trs.add(membercfgobj)            add a new member to the set with extra attributes");
     print("\trs.conf()                       return configuration from local.system.replset");
     print();
     print("\tdb.isMaster()                   check who is primary");
