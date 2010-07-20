@@ -568,7 +568,8 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/profile1.js",
                                    "jstests/mr3.js",
                                    "jstests/indexh.js",
-                                   "jstests/apitest_db.js"] );
+                                   "jstests/apitest_db.js",
+                                   "jstests/evalb.js"] );
         
         // some tests can't be run in parallel with each other
         var serialTestsArr = [ "jstests/fsync.js",
@@ -584,8 +585,8 @@ if ( typeof _threadInject != "undefined" ){
         files.forEach(
                       function(x) {
                       
-                      if ( /_runner/.test(x.name) ||
-                          /_lodeRunner/.test(x.name) ||
+                      if ( ( /[\/\\]_/.test(x.name) ) ||
+                          ( ! /\.js$/.test(x.name ) ) ||
                           ( x.name in skipTests ) ||
                           ( x.name in serialTests ) ||
                           ! /\.js$/.test(x.name ) ){ 
