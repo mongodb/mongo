@@ -52,6 +52,14 @@ namespace mongo {
                                   );
         }
 
+        void tailingQueryGTE(const char *ns, OpTime t) {
+            BSONObjBuilder q;
+            q.appendDate("$gte", t.asDate());
+            BSONObjBuilder query;
+            query.append("ts", q.done());
+            tailingQuery(ns, query.done());
+        }
+
         bool more() { 
             assert( cursor.get() );
             return cursor->more();
@@ -66,6 +74,8 @@ namespace mongo {
             if( cursor.get() )
                 cursor->peek(v,n);
         }
+
+        BSONObj nextSafe() { return cursor->nextSafe(); }
 
         BSONObj next() { 
             return cursor->next();

@@ -153,7 +153,7 @@ namespace mongo {
     {
         memset(_hbmsg, 0, sizeof(_hbmsg));
         *_hbmsg = '.'; // temp...just to see
-        h = 0;
+        lastH = 0;
         _myState = STARTUP;
         _currentPrimary = 0;
 

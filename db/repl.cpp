@@ -932,7 +932,8 @@ namespace mongo {
         bool empty = ctx.db()->isEmpty();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
-        log( 6 ) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
+        if( logLevel >= 6 )
+            log(6) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
         
         // always apply admin command command
         // this is a bit hacky -- the semantics of replication/commands aren't well specified

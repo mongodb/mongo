@@ -165,7 +165,7 @@ namespace mongo {
         //bool initiated() const { return curOpTime.initiated(); }
 
         OpTime lastOpTimeWritten;
-        long long h;
+        long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
     private:
         unsigned _selfId; // stored redundantly we hit this a lot
 
@@ -254,6 +254,7 @@ namespace mongo {
         void syncDoInitialSync();
         void _syncThread();
         void syncTail();
+        void syncApply(const BSONObj &o);
     public:
         void syncThread();
     };

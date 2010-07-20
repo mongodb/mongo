@@ -35,6 +35,8 @@ namespace mongo {
 
     void createOplog();
 
+    void _logOpObjRS(const BSONObj& op);
+
     /** Write operation to the log (local.oplog.$main)
       
        @param opstr

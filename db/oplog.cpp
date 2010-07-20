@@ -76,7 +76,7 @@ namespace mongo {
                     log() << "replSet error possible failover clock skew issue? " << theReplSet->lastOpTimeWritten.toString() << ' ' << endl;
                 }
                 theReplSet->lastOpTimeWritten = ts;
-                theReplSet->h = h;
+                theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts.asDate() );
             }
         }
@@ -97,7 +97,7 @@ namespace mongo {
         long long hNew;
         if( theReplSet ) { 
             massert(13312, "replSet error : logOp() but not primary?", theReplSet->isPrimary());
-            hNew = (theReplSet->h * 131 + ts.asLL()) * 17 + theReplSet->selfId();
+            hNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         }
         else {
             // must be initiation
@@ -145,7 +145,7 @@ namespace mongo {
                 if( !(theReplSet->lastOpTimeWritten<ts) ) 
                     log() << "replSet ERROR possible failover clock skew issue? " << theReplSet->lastOpTimeWritten << ' ' << ts << endl;
                 theReplSet->lastOpTimeWritten = ts;
-                theReplSet->h = hNew;
+                theReplSet->lastH = hNew;
                 ctx.getClient()->setLastOp( ts.asDate() );
             }
         }

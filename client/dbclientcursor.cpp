@@ -149,7 +149,7 @@ namespace mongo {
     }
 
     BSONObj DBClientCursor::next() {
-        assert( more() );
+        DEV assert( more() );
         if ( !_putBack.empty() ) {
             BSONObj ret = _putBack.top();
             _putBack.pop();

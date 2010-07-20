@@ -27,10 +27,71 @@ namespace mongo {
         theReplSet->syncThread();
     }
 
+    void ReplSetImpl::syncApply(const BSONObj &o) {
+        //const char *op = o.getStringField("op");
+        
+        char db[MaxDatabaseLen];
+        const char *ns = o.getStringField("ns");
+        nsToDatabase(ns, db);
+
+        if ( *ns == '.' || *ns == 0 ) {
+            log() << "replSet skipping bad op in oplog: " << o.toString() << endl;
+            return;
+        }
+
+        Client::Context ctx(ns);
+        ctx.getClient()->curop()->reset();
+
+        /* todo : if this asserts, do we want to ignore or not? */
+        applyOperation_inlock(o);
+    }
+
     void ReplSetImpl::syncTail() { 
-        // todo : locking...
+        // todo : locking vis a vis the mgr...
+
+        const Member *primary = currentPrimary();
+        if( primary == 0 ) return;
+        string hn = primary->h().toString();
         OplogReader r;
-//        r.connect(
+        if( !r.connect(primary->h().toString()) ) { 
+            log(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
+            return;
+        }
+
+        r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
+        assert( r.haveCursor() );
+        assert( r.awaitCapable() );
+
+        {
+            BSONObj o = r.nextSafe();
+            OpTime ts = o["ts"]._opTime();
+            long long h = o["h"].numberLong();
+            if( ts != lastOpTimeWritten || h != lastH ) { 
+                log() << "replSet rollback not yet implemented!" << rsLog;
+                log() << "replSet " << lastOpTimeWritten.toStringPretty() << ' ' << ts.toStringPretty() << rsLog;
+                log() << "replSet " << lastH << ' ' << h << rsLog;
+                sleepsecs(60);
+                return;
+            }
+        }
+
+        // TODO : switch state to secondary here when appropriate...
+
+        while( 1 ) { 
+            while( r.more() ) { 
+                BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
+                {
+                    writelock lk("");
+                    syncApply(o);
+                    _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
+                }
+            }
+            if( !r.haveCursor() )
+                break;
+            if( currentPrimary() != primary )
+                break;
+            // looping back is ok because this is a tailable cursor
+        }
     }
 
     void ReplSetImpl::_syncThread() {
