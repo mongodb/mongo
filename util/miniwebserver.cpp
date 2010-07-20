@@ -75,7 +75,7 @@ namespace mongo {
             if ( eq == string::npos )
                 continue;
 
-            b.append( urlDecode(cur.substr(0,eq)).c_str() , urlDecode(cur.substr(eq+1) ) );
+            b.append( urlDecode(cur.substr(0,eq)) , urlDecode(cur.substr(eq+1) ) );
         }
         
         params = b.obj();
