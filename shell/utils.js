@@ -1061,6 +1061,8 @@ rs.help = function () {
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
 rs.add = function (hostport) {
+    var cfg = hostport;
+
     var local = db.getSisterDB("local");
     assert(local.system.replset.count() == 1, "error: local.system.replset unexpected (or empty) contents");
     var c = local.system.replset.findOne();
@@ -1069,7 +1071,9 @@ rs.add = function (hostport) {
     var max = 0;
     for (var i in c.members)
         if (c.members[i]._id > max) max = c.members[i]._id;
-    c.members.push({ _id: max + 1, host: hostport });
+    if (isString(hostport))
+        cfg = { _id: max + 1, host: hostport };
+    c.members.push(cfg);
     return db._adminCommand({ replSetReconfig: c });
 }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }

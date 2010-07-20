@@ -224,7 +224,7 @@ namespace mongo {
             "<a title=\"length of time we have been continuously connected to the other member with no reconnects\">cctime</a>", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 
-            "<a title=\"how up to date this server is; write operations are sequentially numbered\">opord</a>", 
+            "<a title=\"how up to date this server is; write operations are sequentially numbered.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">opord</a>", 
             0};
         s << table(h);
 
@@ -235,10 +235,10 @@ namespace mongo {
         {
             stringstream s;
             /* self row */
-            s << tr() << td(_self->fullName()) <<
+            s << tr() << td(_self->fullName() + " (me)") <<
                 td("1") << 
                 td(ago(started)) << 
-                td("(self)") << 
+                td("") << 
                 td(ToString(_self->config().votes)) << 
                 td(stateAsHtml(_myState));
             s << td( _self->lhb() );

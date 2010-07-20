@@ -68,8 +68,8 @@ namespace mongo {
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) { 
                 log() << "replSet rollback not yet implemented!" << rsLog;
-                log() << "replSet " << lastOpTimeWritten.toStringPretty() << ' ' << ts.toStringPretty() << rsLog;
-                log() << "replSet " << lastH << ' ' << h << rsLog;
+                log() << "replSet ts: " << lastOpTimeWritten.toStringPretty() << ' ' << ts.toStringPretty() << rsLog;
+                log() << "replSet h:  " << lastH << ' ' << h << rsLog;
                 sleepsecs(60);
                 return;
             }
@@ -91,7 +91,7 @@ namespace mongo {
                             readlock lk("local.replset.minvalid");
                             BSONObj mv;
                             if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
-                                if( mv["ts"]._opTime() < lastOpTimeWritten ) { 
+                                if( mv["ts"]._opTime() <= lastOpTimeWritten ) { 
                                     golive=true;
                                 }
                             }
