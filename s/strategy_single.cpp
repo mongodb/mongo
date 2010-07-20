@@ -54,8 +54,8 @@ namespace mongo {
                     }
                     
                     string commandName = q.query.firstElement().fieldName();
-                    if (  ! _commandsSafeToPass.count( commandName ) )
-                        log() << "passing through unknown command: " << commandName << " " << q.query << endl;
+
+                    uassert(13390, "unrecognized command: " + commandName, _commandsSafeToPass.count(commandName) != 0);
                 }
 
                 lateAssert = true;
