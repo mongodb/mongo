@@ -957,7 +957,7 @@ namespace mongo {
                 
                 BSONObjBuilder all;
                 for ( unsigned i=0; i<errors.size(); i++ ){
-                    all.append( all.numStr( i ).c_str() , errors[i].c_str() );
+                    all.append( all.numStr( i ) , errors[i].c_str() );
                 }
                 result.appendArray( "errs" , all.obj() );
                 return true;
