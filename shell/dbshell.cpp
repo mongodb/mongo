@@ -51,6 +51,7 @@ using mongo::BSONElement;
 string historyFile;
 bool gotInterrupted = 0;
 bool inMultiLine = 0;
+static volatile bool atPrompt = true;
 
 #if defined(USE_READLINE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
 #define CTRLC_HANDLE
@@ -163,6 +164,18 @@ void intr( int sig ){
 void killOps() {
     if ( mongo::shellUtils::_nokillop || mongo::shellUtils::_allMyUris.size() == 0 )
         return;
+
+    if (!atPrompt){
+        cout << endl << "do you want to kill the current op on the server? (y/n): ";
+        cout.flush();
+
+        char yn;
+        cin >> yn;
+
+        if (yn != 'y' && yn != 'Y')
+            return;
+    }
+
     vector< string > uris;
     for( map< const void*, string >::iterator i = mongo::shellUtils::_allMyUris.begin(); i != mongo::shellUtils::_allMyUris.end(); ++i )
         uris.push_back( i->second );
@@ -197,14 +210,18 @@ void quitNicely( int sig ){
 #endif
 
 char * shellReadline( const char * prompt , int handlesigint = 0 ){
+    atPrompt = true;
 #ifdef USE_READLINE
 
     rl_bind_key('\t',rl_complete);
 
 
 #ifdef CTRLC_HANDLE
-    if ( ! handlesigint )
-        return readline( prompt );
+    if ( ! handlesigint ){
+        char* ret = readline( prompt );
+        atPrompt = false;
+        return ret;
+    }
     if ( setjmp( jbuf ) ){
         gotInterrupted = 1;
         sigrelse(SIGINT);
@@ -216,6 +233,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
 
     char * ret = readline( prompt );
         signal( SIGINT , quitNicely );
+    atPrompt = false;
     return ret;
 #else
     printf("%s", prompt); cout.flush();
@@ -224,6 +242,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
     int len = strlen( buf );
     if ( len )
         buf[len-1] = 0;
+    atPrompt = false;
     return l;
 #endif
 }
