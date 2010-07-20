@@ -135,8 +135,9 @@ namespace mongo {
                          1 == write(fd, "", 1) );
                 lseek(fd, 0, SEEK_SET);
                 
-                long z = 256 * 1024;
-                char buf[z];
+                const long z = 256 * 1024;
+                const boost::scoped_array<char> buf_holder (new char[z]);
+                char* buf = buf_holder.get();
                 memset(buf, 0, z);
                 long left = size;
                 while ( left > 0 ) {
