@@ -30,7 +30,7 @@ namespace mongo {
     ReplSet *theReplSet = 0;
 
     void ReplSetImpl::assumePrimary() { 
-        assert( !iAmArbiterOnly() );
+        assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp() 
         _myState = RS_PRIMARY;
         _currentPrimary = _self;
@@ -71,7 +71,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMasterHost(const Member *m, vector<string>& hosts, vector<string>& passives, vector<string>& arbiters) {
-        if( m->hot() ) {
+        if( m->potentiallyHot() ) {
             hosts.push_back(m->h().toString());
         }
         else if( !m->config().arbiterOnly ) {
@@ -234,7 +234,8 @@ namespace mongo {
             }
             if( me == 0 ) {
                 // log() << "replSet config : " << _cfg->toString() << rsLog;
-                log() << "replSet warning can't find self in the repl set configuration" << rsLog;
+                log() << "replSet warning can't find self in the repl set configuration:" << rsLog;
+                log() << c.toString() << rsLog;
                 return false;
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
@@ -259,10 +260,9 @@ namespace mongo {
             Member *mi;
             if( m.h.isSelf() ) {
                 assert( _self == 0 );
-                mi = _self = new Member(m.h, m._id, &m);
-                _selfId = m._id;
+                mi = _self = new Member(m.h, m._id, &m, true);
             } else {
-                mi = new Member(m.h, m._id, &m);
+                mi = new Member(m.h, m._id, &m, false);
                 _members.push(mi);
                 startHealthTaskFor(mi);
             }

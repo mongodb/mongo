@@ -54,8 +54,8 @@ namespace mongo {
             string s = string(cmdObj.getStringField("replSetHeartbeat"))+'/';
             if( !startsWith(cmdLine.replSet, s ) ) {
                 errmsg = "repl set names do not match";
-                cout << "cmdline: " << cmdLine.replSet << endl;
-                cout << "s: " << s << endl;
+                log() << "cmdline: " << cmdLine.replSet << endl;
+                log() << "s: " << s << endl;
                 result.append("mismatch", true);
                 return false;
             }
@@ -179,15 +179,17 @@ namespace mongo {
     };
 
     void ReplSetImpl::endOldHealthTasks() { 
+        unsigned sz = healthTasks.size();
         for( set<ReplSetHealthPollTask*>::iterator i = healthTasks.begin(); i != healthTasks.end(); i++ )
             (*i)->halt();
         healthTasks.clear();
-        cout << "cleared old tasks " << healthTasks.size() << endl;
+        if( sz ) 
+            DEV log() << "replSet debug: cleared old tasks " << sz << endl;
     }
 
     void ReplSetImpl::startHealthTaskFor(Member *m) {
         ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
-        cout << "TEMP starting healthtask thread " << m->h().toString() << endl;
+        //DEV log() << "TEMP starting healthtask thread " << m->h().toString() << endl;
         healthTasks.insert(task);
         task::repeat(shared_ptr<task::Task>(task), 2000);
     }

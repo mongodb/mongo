@@ -22,10 +22,12 @@
 #include "instance.h"
 #include "dbhelpers.h"
 #include "../util/background.h"
+#include "../util/mongoutils/str.h"
 #include "../client/dbclient.h"
 
-
 namespace mongo {
+
+    using namespace mongoutils;
 
     class SlaveTracking : public BackgroundJob {
     public:
@@ -171,7 +173,7 @@ namespace mongo {
         if ( lastOp.isNull() )
             return;
         
-        assert( strstr( ns , "local.oplog.$" ) == ns );
+        assert( str::startsWith(ns, "local.oplog.") );
         
         Client * c = curop.getClient();
         assert(c);

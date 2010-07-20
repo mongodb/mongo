@@ -33,7 +33,7 @@ namespace mongo {
         Member *m = rs->head();
         Member *p = 0;
         while( m ) {
-            if( m->state() == RS_PRIMARY ) {
+            if( m->state() == RS_PRIMARY && m->hbinfo().up() ) {
                 if( p ) throw "twomasters"; // our polling is asynchronous, so this is often ok.
                 p = m;
             }
@@ -72,6 +72,11 @@ namespace mongo {
             if( busyWithElectSelf ) return;
 
             const Member *p = rs->currentPrimary();
+            if( p && !p->hbinfo().up() ) {
+                assert( p != rs->_self );
+                p = rs->_currentPrimary = 0;
+            }
+
             const Member *p2;
             try { p2 = findOtherPrimary(); }
             catch(string s) { 
@@ -84,7 +89,7 @@ namespace mongo {
                 return;
             }
 
-            if( p2 ) { 
+            if( p2 ) {
                 /* someone else thinks they are primary. */
                 if( p == p2 ) { // already match 
                     return;
@@ -106,7 +111,7 @@ namespace mongo {
                 return;
             }
 
-            if( rs->iAmArbiterOnly() )
+            if( !rs->iAmPotentiallyHot() ) // if not we never try to be primary
                 return;
 
             /* TODO : CHECK PRIORITY HERE.  can't be elected if priority zero. */

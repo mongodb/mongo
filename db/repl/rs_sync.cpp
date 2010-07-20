@@ -25,6 +25,7 @@ namespace mongo {
     void startSyncThread() { 
         Client::initThread("rs_sync");
         theReplSet->syncThread();
+        cc().shutdown();
     }
 
     void ReplSetImpl::syncApply(const BSONObj &o) {

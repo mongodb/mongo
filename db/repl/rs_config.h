@@ -49,7 +49,7 @@ namespace mongo {
             bool arbiterOnly;
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
-            bool hot() const { 
+            bool potentiallyHot() const { 
                 return !arbiterOnly && priority > 0;
             }
         };

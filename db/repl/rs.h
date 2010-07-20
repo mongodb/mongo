@@ -39,8 +39,7 @@ namespace mongo {
     /* member of a replica set */
     class Member : public List1<Member>::Base {
     public:
-        Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c);
-
+        Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
         string fullName() const { return h().toString(); }
         const ReplSetConfig::MemberCfg& config() const { return *_config; }
         const HeartbeatInfo& hbinfo() const { return _hbinfo; }
@@ -48,7 +47,7 @@ namespace mongo {
         MemberState state() const { return _hbinfo.hbstate; }
         const HostAndPort& h() const { return _h; }
         unsigned id() const { return _hbinfo.id(); }
-        bool hot() const { return _config->hot(); }
+        bool potentiallyHot() const { return _config->potentiallyHot(); } // not arbiter, not priority 0
 
         void summarizeAsHtml(stringstream& s) const;
         friend class ReplSetImpl;
@@ -167,8 +166,6 @@ namespace mongo {
         OpTime lastOpTimeWritten;
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
     private:
-        unsigned _selfId; // stored redundantly we hit this a lot
-
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();
         void startHealthTaskFor(Member *m);
@@ -230,12 +227,13 @@ namespace mongo {
         const Member* currentPrimary() const { return _currentPrimary; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
+        bool iAmPotentiallyHot() const { return myConfig().potentiallyHot(); }
         const Member *_currentPrimary;
         Member *_self;        
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
-        unsigned selfId() const { return _selfId; }
+        unsigned selfId() const { return _self->id(); }
         shared_ptr<Manager> mgr;
 
     private:
@@ -323,8 +321,12 @@ namespace mongo {
 
     /** inlines ----------------- */
 
-    inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 
-        _config(c), _h(h), _hbinfo(ord) { }
+    inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) : 
+        _config(c), _h(h), _hbinfo(ord) { 
+            if( self ) { 
+                _hbinfo.health = 1.0;
+            }
+    }
 
     inline bool ReplSet::isMaster(const char *client) {         
         /* todo replset */

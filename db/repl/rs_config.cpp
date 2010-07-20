@@ -294,7 +294,7 @@ namespace mongo {
         uassert(13109, "multiple rows in " + rsConfigNs + " not supported", !c->more());
         from(o);
         _ok = true;
-        log(level) << "replSet load config ok from " << h.toString() << rsLog;
+        log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
     }
 
 }

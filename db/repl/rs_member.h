@@ -38,7 +38,8 @@ namespace mongo {
         RS_FATAL,
         RS_STARTUP2,
         RS_UNKNOWN, /* remote node not yet reached */
-        RS_ARBITER
+        RS_ARBITER,
+        RS_DOWN /* node not reachable for a report */
     };
 
     /* this is supposed to be just basic information on a member, 

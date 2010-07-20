@@ -102,6 +102,7 @@ namespace mongo {
         if( s == RS_FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "RS_FATAL");
         if( s == RS_STARTUP2 ) return a("", "loaded config, still determining who is primary", "RS_STARTUP2");
         if( s == RS_ARBITER ) return a("", "this server is an arbiter only", "ARBITER");
+        if( s == RS_DOWN ) return a("", "member is down, slow, or unreachable", "DOWN");
         return "";
     }
 
@@ -113,6 +114,7 @@ namespace mongo {
         if( s == RS_FATAL ) return "FATAL";
         if( s == RS_STARTUP2 ) return "STARTUP2";
         if( s == RS_ARBITER ) return "ARBITER";
+        if( s == RS_DOWN ) return "DOWN";
         return "";
     }
 
@@ -170,6 +172,13 @@ namespace mongo {
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
         static const char *h[] = {"ts","h","op","ns","rest",0};
+
+        ss << "<style type=\"text/css\" media=\"screen\">"
+            "table { font-size:75% }\n"
+//            "th { background-color:#bbb; color:#000 }\n"
+//            "td,th { padding:.25em }\n"
+            "</style>\n";
+        
         ss << table(h, true);
         //ss << "<pre>\n";
         int n = 0;
@@ -203,7 +212,7 @@ namespace mongo {
                 bo o = c->next();
             }
             if( !x.empty() ) {
-                ss << "<tr><td>...</td><td></td><td></td><td></td><td></td></tr>\n" << x;
+                ss << "<tr><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>\n" << x;
                 //ss << "\n...\n\n" << x;
             }
         }
