@@ -43,7 +43,7 @@ namespace mongo {
 
         bool haveCursor() { return cursor.get() != 0; }
 
-        void tailingQuery(const char *ns, BSONObj& query) { 
+        void tailingQuery(const char *ns, const BSONObj& query) { 
             assert( !haveCursor() );
             log(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
             cursor = _conn->query( ns, query, 0, 0, 0, 
