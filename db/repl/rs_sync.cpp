@@ -145,6 +145,8 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncThread() {
+        if( myConfig().arbiterOnly )
+            return;
         while( 1 ) { 
             try {
                 _syncThread();

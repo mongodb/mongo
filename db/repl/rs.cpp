@@ -109,6 +109,8 @@ namespace mongo {
             if( m )
                 b.append("primary", m->h().toString());
         }
+        if( myConfig().arbiterOnly )
+            b.append("arbiterOnly", true);
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */

@@ -294,6 +294,7 @@ namespace mongo {
 
     void Consensus::electSelf() {
         assert( !rs.lockedByMe() );
+        assert( !rs.myConfig().arbiterOnly );
         try { 
             _electSelf(); 
         } 
