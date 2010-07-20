@@ -227,7 +227,9 @@ namespace mongo {
     };
     
     inline Client& cc() { 
-        return *currentClient.get();
+        Client * c = currentClient.get();
+        assert( c );
+        return *c;
     }
 
     /* each thread which does db operations has a Client object in TLS.  
