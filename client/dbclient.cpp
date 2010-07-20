@@ -829,7 +829,7 @@ namespace mongo {
         BufBuilder b;
         int opts = queryOptions;
         b.appendNum(opts);
-        b.appendStr(ns.c_str());
+        b.appendStr(ns);
         b.appendNum(nToSkip);
         b.appendNum(nToReturn);
         query.appendSelfToBufBuilder(b);
