@@ -32,8 +32,10 @@ using namespace mongoutils;
 
 namespace mongo { 
 
-    /* throws */ 
-    void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg) {
+    /* throws 
+       @param initial - 
+    */ 
+    void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ )
             if( i->h.isSelf() )
@@ -47,7 +49,7 @@ namespace mongo {
                 bool ok = false;
                 try {
                     int theirVersion = -1000;
-                    ok = requestHeartbeat(cfg._id, i->h.toString(), res, -1, theirVersion, true); 
+                    ok = requestHeartbeat(cfg._id, i->h.toString(), res, -1, theirVersion, initial/*check if empty*/); 
                     if( theirVersion >= cfg.version ) { 
                         stringstream ss;
                         ss << "replSet member " << i->h.toString() << " has too new a config version (" << theirVersion << ") to reconfigure";
@@ -81,9 +83,11 @@ namespace mongo {
                     uasserted(13144, "need all members up to initiate, not ok: " + i->h.toString());
                 }
             }
-            bool hasData = res["hasData"].Bool();
-            uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.", 
-                !hasData || i->h.isSelf());
+            if( initial ) {
+                bool hasData = res["hasData"].Bool();
+                uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.", 
+                    !hasData || i->h.isSelf());
+            }
         }
     }
 
@@ -177,7 +181,7 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 
-                checkAllMembersUpForConfigChange(newConfig);
+                checkAllMembersUpForConfigChange(newConfig, true);
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
