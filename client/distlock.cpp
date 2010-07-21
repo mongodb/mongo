@@ -100,7 +100,7 @@ namespace mongo {
         
     } distLockPinger;
     
-    DistributedLock::DistributedLock( const ConnectionString& conn , const string& name , int takeoverMinutes )
+    DistributedLock::DistributedLock( const ConnectionString& conn , const string& name , unsigned takeoverMinutes )
         : _conn(conn),_name(name),_takeoverMinutes(takeoverMinutes){
         _id = BSON( "_id" << name );
         _ns = "config.locks";

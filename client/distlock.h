@@ -34,7 +34,7 @@ namespace mongo {
         /**
          * @param takeoverMinutes how long before we steal lock in minutes
          */
-        DistributedLock( const ConnectionString& conn , const string& name , int takeoverMinutes = 10 );
+        DistributedLock( const ConnectionString& conn , const string& name , unsigned takeoverMinutes = 10 );
 
         int getState(){
             return _state.get();
@@ -50,7 +50,7 @@ namespace mongo {
     private:
         ConnectionString _conn;
         string _name;
-        int _takeoverMinutes;
+        unsigned _takeoverMinutes;
         
         string _ns;
         BSONObj _id;

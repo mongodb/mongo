@@ -227,6 +227,11 @@ namespace mongo {
                       bool considerFieldName=true) const;
         
 
+        bool operator<( const BSONObj& other ) const { return woCompare( other ) < 0; }
+        bool operator<=( const BSONObj& other ) const { return woCompare( other ) <= 0; }
+        bool operator>( const BSONObj& other ) const { return woCompare( other ) > 0; }
+        bool operator>=( const BSONObj& other ) const { return woCompare( other ) >= 0; }
+
         /**
          * @param useDotted whether to treat sort key fields as possibly dotted and expand into them
          */
