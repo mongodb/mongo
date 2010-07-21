@@ -258,12 +258,12 @@ namespace mongo {
             /* self row */
             s << tr() << td(_self->fullName() + " (me)") <<
                 td(_self->id()) <<
-                td("1") << 
+  	        td("1") <<  //up
                 td(ago(started)) << 
-                td("") << 
+	        td("") << // last heartbeat
                 td(ToString(_self->config().votes)) << 
                 td(stateAsHtml(_myState));
-            s << td( _self->lhb() );
+            s << td( _hbmsg );
             stringstream q;
             q << "/_replSetOplog?" << _self->id();
             s << td( a(q.str(), "", theReplSet->lastOpTimeWritten.toString()) );
