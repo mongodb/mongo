@@ -1051,6 +1051,7 @@ namespace mongo {
                     return i;                    
                 }
             }
+            bool first = true;
             while( _i[ i ] < (int)_v._ranges[ i ].intervals().size() ) {
                 int x = _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._bound.woCompare( jj, false );
                 if ( reverse ) {
@@ -1061,6 +1062,9 @@ namespace mongo {
                     break;
                 }
                 if ( x > 0 ) {
+                    if ( i == 0 && first ) {
+                        break; // the value of 1st field won't go backward
+                    }
                     if ( !_v._ranges[ i ].intervals()[ _i[ i ] ].equality() ) {
                         x = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound.woCompare( jj, false );
                         if ( reverse ) {
@@ -1081,7 +1085,7 @@ namespace mongo {
                 }
                 ++_i[ i ];
                 setZero( i + 1 );
-                // mark need to check lower bound?
+                first = false;
             }
             int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
             if ( diff > 1 || ( !eq && diff == 1 ) ) {
