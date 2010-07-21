@@ -86,6 +86,8 @@ namespace mongo {
 
 		virtual BSONObj getLastErrorDetailed();
 
+        virtual bool callRead( Message& toSend , Message& response );
+
     private:
         SyncClusterConnection( SyncClusterConnection& prev );
         string _toString() const;        

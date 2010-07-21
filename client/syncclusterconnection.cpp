@@ -148,6 +148,11 @@ namespace mongo {
         _conns.push_back( c );
     }
 
+    bool SyncClusterConnection::callRead( Message& toSend , Message& response ){
+        // TODO: need to save state of which one to go back to somehow...
+        return _conns[0]->callRead( toSend , response );
+    }
+
     BSONObj SyncClusterConnection::findOne(const string &ns, Query query, const BSONObj *fieldsToReturn, int queryOptions) {
         
         if ( ns.find( ".$cmd" ) != string::npos ){
@@ -158,7 +163,7 @@ namespace mongo {
             if ( lockType > 0 ){ // write $cmd
                 string errmsg;
                 if ( ! prepare( errmsg ) )
-                    throw UserException( 13104 , (string)"SyncClusterConnection::insert prepare failed: " + errmsg );
+                    throw UserException( 13104 , (string)"SyncClusterConnection::findOne prepare failed: " + errmsg );
                 
                 vector<BSONObj> all;
                 for ( size_t i=0; i<_conns.size(); i++ ){
@@ -327,7 +332,15 @@ namespace mongo {
     }
     
     void SyncClusterConnection::say( Message &toSend ){
-        assert(0);
+        string errmsg;
+        if ( ! prepare( errmsg ) )
+            throw UserException( 13397 , (string)"SyncClusterConnection::say prepare failed: " + errmsg );
+
+        for ( size_t i=0; i<_conns.size(); i++ ){
+            _conns[i]->say( toSend );
+        }
+        
+        _checkLast();
     }
     
     void SyncClusterConnection::sayPiggyBack( Message &toSend ){

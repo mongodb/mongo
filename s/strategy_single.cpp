@@ -81,18 +81,14 @@ namespace mongo {
         
             log(3) << "single getmore: " << ns << endl;
 
-            ShardConnection dbcon( r.primaryShard() , ns );
-            DBClientBase& _c = dbcon.conn();
-
-            // TODO 
-            DBClientConnection &c = dynamic_cast<DBClientConnection&>(_c);
+            ShardConnection conn( r.primaryShard() , ns );
 
             Message response;
-            bool ok = c.port().call( r.m() , response);
+            bool ok = conn->callRead( r.m() , response);
             uassert( 10204 , "dbgrid: getmore: error calling db", ok);
-            r.reply( response , c.getServerAddress() );
+            r.reply( response , conn->getServerAddress() );
         
-            dbcon.done();
+            conn.done();
 
         }
         
