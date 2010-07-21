@@ -7,7 +7,7 @@ for( i = 0; i < 100000; ++i ) {
 }
 assert.eq( 100000, db[ baseName ].count() );
 
-spawn = startMongoProgramNoConnect( "mongo", "--port", myPort(), "--eval", "db." + baseName + ".update( {}, {$set:{i:\"abcdefghijkl\"}}, false, true ); db." + baseName + ".count();" );
+spawn = startMongoProgramNoConnect( "mongo", "--autokillop", "--port", myPort(), "--eval", "db." + baseName + ".update( {}, {$set:{i:\"abcdefghijkl\"}}, false, true ); db." + baseName + ".count();" );
 sleep( 100 );
 stopMongoProgramByPid( spawn );
 sleep( 100 );

@@ -52,6 +52,8 @@ string historyFile;
 bool gotInterrupted = 0;
 bool inMultiLine = 0;
 static volatile bool atPrompt = false; // can eval before getting to prompt
+bool autoKillOp = false;
+
 
 #if defined(USE_READLINE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
 #define CTRLC_HANDLE
@@ -168,14 +170,17 @@ void killOps() {
     if ( atPrompt )
         return;
 
-    cout << endl << "do you want to kill the current op on the server? (y/n): ";
-    cout.flush();
+    if ( !autoKillOp ) {
+        cout << endl << "do you want to kill the current op on the server? (y/n): ";
+        cout.flush();
 
-    char yn;
-    cin >> yn;
+        char yn;
+        cin >> yn;
 
-    if (yn != 'y' && yn != 'Y')
-        return;
+        if (yn != 'y' && yn != 'Y')
+            return;
+    }
+
 
     vector< string > uris;
     for( map< const void*, string >::iterator i = mongo::shellUtils::_allMyUris.begin(); i != mongo::shellUtils::_allMyUris.end(); ++i )
@@ -447,6 +452,7 @@ int _main(int argc, char* argv[]) {
         ("dbaddress", po::value<string>(), "dbaddress")
         ("files", po::value< vector<string> >(), "files")
         ("nokillop", "nokillop") // for testing, kill op will also be disabled automatically if the tests starts a mongo program
+        ("autokillop", "autokillop") // for testing, will kill op without prompting
         ;
 
     positional_options.add("dbaddress", 1);
@@ -506,6 +512,9 @@ int _main(int argc, char* argv[]) {
     }
     if (params.count("nokillop")) {
         mongo::shellUtils::_nokillop = true;
+    }
+    if (params.count("autokillop")) {
+        autoKillOp = true;
     }
     
     /* This is a bit confusing, here are the rules:
