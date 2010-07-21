@@ -71,7 +71,9 @@ namespace mongo {
     }
     
     void DBConfig::enableSharding(){
+        scoped_lock lk( _lock );
         _shardingEnabled = true; 
+        _save();
     }
     
     ChunkManagerPtr DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique ){
@@ -93,8 +95,8 @@ namespace mongo {
         info.reset( new ChunkManager( this , ns , fieldsAndOrder , unique ) );
         info->maybeChunkCollection();
         _shards[ns] = info;
+        _save();
         return info;
-
     }
 
     bool DBConfig::removeSharding( const string& ns ){
@@ -115,9 +117,10 @@ namespace mongo {
         
         _sharded.erase( i );
         _shards.erase( ns );
+        _save();
         return true;
     }
-
+    
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ){
         scoped_lock lk( _lock );
         
@@ -144,6 +147,12 @@ namespace mongo {
         m.reset( new ChunkManager( this , ns , _sharded[ ns ].key , _sharded[ns].unique ) );
         _shards[ns] = m;
         return m;
+    }
+
+    void DBConfig::setPrimary( string s ){
+        scoped_lock lk( _lock );
+        _primary.reset( s );
+        _save();
     }
     
     void DBConfig::serialize(BSONObjBuilder& to){
@@ -200,11 +209,6 @@ namespace mongo {
             return false;
         unserialize( o );
         return true;
-    }
-    
-    void DBConfig::save(){
-        scoped_lock lk( _lock );
-        _save();
     }
     
     void DBConfig::_save(){
@@ -370,7 +374,7 @@ namespace mongo {
                         cc->_primary = Shard::pick();
                     
                     if ( cc->_primary.ok() ){
-                        cc->save();
+                        cc->_save();
                         log() << "\t put [" << database << "] on: " << cc->_primary.toString() << endl;
                     }
                     else {

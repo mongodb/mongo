@@ -115,13 +115,10 @@ namespace mongo {
             return _primary;
         }
         
-        void setPrimary( string s ){
-            _primary.reset( s );
-        }
+        void setPrimary( string s );
 
         bool load();
         bool reload();
-        void save(); // TODO make private
         
         bool dropDatabase( string& errmsg );
 
@@ -142,7 +139,7 @@ namespace mongo {
 
         bool _load();
         bool _reload();
-        void _save(); // TODO make private
+        void _save();
 
         
         /**
