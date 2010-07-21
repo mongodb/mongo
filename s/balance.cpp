@@ -137,36 +137,17 @@ namespace mongo {
 
         //
         // 1. Check whether there is any sharded collection to be balanced by querying
-        // the ShardsNS::database collection
-        //
-        // { "_id" : "test", "partitioned" : true, "primary" : "shard0",
-        //   "sharded" : {
-        //       "test.images" : { "key" : { "_id" : 1 }, "unique" : false },
-        //       ...  
-        //   }
-        // }
+        // the ShardsNS::collections collection
         //
 
-        auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::database , BSON( "partitioned" << true ) );
+        auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::collection , BSONObj() );
         vector< string > collections;
         while ( cursor->more() ){
-            BSONObj db = cursor->next();
+            BSONObj col = cursor->next();
 
-            // A database may be partitioned but not yet have a sharded collection. 
-            // 'cursor' will point to docs that do not contain the "sharded" key. Since 
-            // there'd be nothing to balance, we want to skip those here.
-
-            BSONElement shardedColls = db["sharded"];
-            if ( shardedColls.eoo() ){
-                log(2) << "skipping database with no sharded collection (" << db["_id"].str() << ")" << endl;
-                continue;
-            }
-            
-            BSONObjIterator i( shardedColls.Obj() );
-            while ( i.more() ){
-                BSONElement e = i.next();
-                collections.push_back( e.fieldName() );
-            }
+            // sharded collections will have a shard "key".
+            if ( ! col["key"].eoo() )
+                collections.push_back( col["_id"].String() );
         }
         cursor.reset();
 
@@ -272,10 +253,17 @@ namespace mongo {
                     conn.done();
 
                     sleepsecs( 30 ); // no need to wake up soon
-
                     continue;
                 }
                         
+                if ( ! grid.shouldBalance() ) {
+                    log(1) << "skipping balancing round because balancing is disabled" << endl;;
+                    conn.done();
+
+                    sleepsecs( 30 );
+                    continue;
+                }
+
                 log(1) << "*** start balancing round" << endl;        
 
                 vector<CandidateChunkPtr> candidateChunks;

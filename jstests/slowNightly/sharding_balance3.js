@@ -41,7 +41,7 @@ while ( diff() == initialDiff ){
 
 print("* A");
 print( "disabling the balancer" );
-s.config.settings.update( { _id : "balancer" }, { $set : { stopped : true } } );
+s.config.settings.update( { _id : "balancer" }, { $set : { stopped : true } } , true );
 s.config.settings.find().forEach( printjson );
 print("* B");
 
@@ -52,6 +52,6 @@ var currDiff = diff();
 assert.repeat( function(){
     var d = diff();
     return d != currDiff;
-} , "balance with stopped flag should not have happened" , 1000 * 30 , 5000 );
+} , "balance with stopped flag should not have happened" , 1000 * 60 , 5000 );
 
 s.stop()

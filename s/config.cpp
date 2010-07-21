@@ -377,34 +377,6 @@ namespace mongo {
     
     /* --- Grid --- */
     
-    bool Grid::knowAboutShard( const string& name ) const{
-        ShardConnection conn( configServer.getPrimary() , "" );
-        BSONObj shard = conn->findOne( ShardNS::shard , BSON( "host" << name ) );
-        conn.done();
-        return ! shard.isEmpty();
-    }
-
-    string Grid::getNewShardName() const{
-        ShardConnection conn( configServer.getPrimary() , "" );
-
-        string shardName;
-        int count = 0; 
-        BSONObj o = conn->findOne( ShardNS::shard , Query( fromjson ( "{_id: /^shard/}" ) ).sort(  BSON( "_id" << -1 ) ) ); 
-        if ( ! o.isEmpty() ) {
-            string last = o["_id"].String();
-            istringstream is( last.substr( 5 ) );
-            is >> count;
-            count++;
-        }                                                                                                               
-        if (count < 9999) {
-            stringstream ss;
-            ss << "shard" << setfill('0') << setw(4) << count;
-            shardName = ss.str();
-        }
-        conn.done();
-        return shardName;
-    }
-
     DBConfigPtr Grid::getDBConfig( string database , bool create ){
         {
             string::size_type i = database.find( "." );
@@ -455,6 +427,43 @@ namespace mongo {
         scoped_lock l( _lock );
         _databases.erase( database );
         
+    }
+
+    bool Grid::knowAboutShard( const string& name ) const{
+        ShardConnection conn( configServer.getPrimary() , "" );
+        BSONObj shard = conn->findOne( ShardNS::shard , BSON( "host" << name ) );
+        conn.done();
+        return ! shard.isEmpty();
+    }
+
+    string Grid::getNewShardName() const{
+        ShardConnection conn( configServer.getPrimary() , "" );
+
+        string shardName;
+        int count = 0; 
+        BSONObj o = conn->findOne( ShardNS::shard , Query( fromjson ( "{_id: /^shard/}" ) ).sort(  BSON( "_id" << -1 ) ) ); 
+        if ( ! o.isEmpty() ) {
+            string last = o["_id"].String();
+            istringstream is( last.substr( 5 ) );
+            is >> count;
+            count++;
+        }                                                                                                               
+        if (count < 9999) {
+            stringstream ss;
+            ss << "shard" << setfill('0') << setw(4) << count;
+            shardName = ss.str();
+        }
+        conn.done();
+        return shardName;
+    }
+
+    bool Grid::shouldBalance() const {
+        ShardConnection conn( configServer.getPrimary() , "" );
+
+        // look for the stop balancer marker
+        BSONObj stopMarker = conn->findOne( ShardNS::settings, BSON( "_id" << "balancer" << "stopped" << true ) );
+        conn.done();
+        return stopMarker.isEmpty();
     }
 
     unsigned long long Grid::getNextOpTime() const {

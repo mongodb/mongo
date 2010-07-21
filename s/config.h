@@ -126,7 +126,7 @@ namespace mongo {
         ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique );
         
         /**
-         * @return whether or not this partition is partitioned
+         * @return whether or not the 'ns' collection is partitioned
          */
         bool isSharded( const string& ns );
         
@@ -215,15 +215,20 @@ namespace mongo {
         void removeDB( string db );
 
         /**
-         * returns true if the config database knows about a host 'name'
+         * @return true if the config database knows about a host 'name'
          */
         bool knowAboutShard( const string& name ) const;
         
         /**
-         * returns the next available shard name or an empty string, if there are
+         * @return the next available shard name or an empty string, if there are
          * no more shard names available.
          */
         string getNewShardName() const;
+
+        /**
+         * @return true if the chunk balancing functionality is enabled
+         */
+        bool shouldBalance() const;
 
         unsigned long long getNextOpTime() const;
 
