@@ -427,7 +427,8 @@ namespace mongo {
             m.setData(md, true);
             return true;
 
-        } catch ( const SocketException & ) {
+        } catch ( const SocketException & e ) {
+            log(_logLevel) << "SocketException: " << e << endl;
             m.reset();
             return false;
         }

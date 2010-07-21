@@ -251,7 +251,7 @@ namespace mongo {
                 ScopedDbConnection fromconn( config->getPrimary() );
 
                 config->setPrimary( s.getConnString() );
-                config->save( true );
+                config->save();
 
                 log() << "movePrimary:  dropping " << dbname << " from old" << endl;
 
@@ -289,7 +289,7 @@ namespace mongo {
                 log() << "enabling sharding on: " << dbname << endl;
 
                 config->enableSharding();
-                config->save( true );
+                config->save();
 
                 return true;
             }
@@ -405,7 +405,7 @@ namespace mongo {
                 tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
                 config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
-                config->save( true );
+                config->save();
 
                 result << "collectionsharded" << ns;
                 return true;

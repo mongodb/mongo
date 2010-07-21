@@ -48,10 +48,6 @@ namespace mongo {
 
     /* --- DBConfig --- */
 
-    string DBConfig::modelServer() {
-        return configServer.modelServer();
-    }
-    
     bool DBConfig::isSharded( const string& ns ){
         if ( ! _shardingEnabled )
             return false;
@@ -130,13 +126,13 @@ namespace mongo {
             return m;
         
         if ( shouldReload && ! _isSharded( ns ) )
-            reload();
+            _reload();
         
         massert( 10181 ,  (string)"not sharded:" + ns , _isSharded( ns ) );
         
         if ( m && shouldReload ){
             log() << "reloading shard info for: " << ns << endl;
-            reload();
+            _reload();
         }
         
         // this means it was sharded and now isn't....
@@ -168,9 +164,9 @@ namespace mongo {
     }
     
     void DBConfig::unserialize(const BSONObj& from){
-        _name = from.getStringField("_id");
         log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
-        
+        assert( _name == from["_id"].String() );
+
         _shardingEnabled = from.getBoolField("partitioned");
         _primary.reset( from.getStringField("primary") );
         
@@ -188,19 +184,57 @@ namespace mongo {
             }
         }
     }
-    
-    bool DBConfig::reload(){
-        // TODO: i don't think is 100% correct
-        return doload();
-    }
-    
-    bool DBConfig::doload(){
-        BSONObjBuilder b;
-        b.append("_id", _name.c_str());
-        BSONObj q = b.done();
-        return load(q);
+
+    bool DBConfig::load(){
+        scoped_lock lk( _lock );
+        return _load();
     }
 
+    bool DBConfig::_load(){
+        ScopedDbConnection conn( configServer.modelServer() );
+        
+        BSONObj o = conn->findOne( ShardNS::database , BSON( "_id" << _name ) );
+        conn.done();
+
+        if ( o.isEmpty() )
+            return false;
+        unserialize( o );
+        return true;
+    }
+    
+    void DBConfig::save(){
+        scoped_lock lk( _lock );
+        _save();
+    }
+    
+    void DBConfig::_save(){
+        ScopedDbConnection conn( configServer.modelServer() );
+        
+        BSONObj n;
+        {
+            BSONObjBuilder b;
+            serialize(b);
+            n = b.obj();
+        }
+        
+        conn->update( ShardNS::database , BSON( "_id" << _name ) , n , true );
+        string err = conn->getLastError();
+        conn.done();
+        
+        uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
+    }
+
+    
+    bool DBConfig::reload(){
+        scoped_lock lk( _lock );
+        return _reload();
+    }
+    
+    bool DBConfig::_reload(){
+        // TODO: i don't think is 100% correct
+        return _load();
+    }
+    
     bool DBConfig::dropDatabase( string& errmsg ){
         /**
          * 1) make sure everything is up
@@ -221,7 +255,12 @@ namespace mongo {
         
         // 2
         grid.removeDB( _name );
-        remove( true );
+        {
+            ScopedDbConnection conn( configServer.modelServer() );
+            conn->remove( ShardNS::database , BSON( "_id" << _name ) );
+            conn.done();
+        }
+
         if ( ! configServer.allUp( errmsg ) ){
             log() << "error removing from config server even after checking!" << endl;
             return 0;
@@ -320,7 +359,7 @@ namespace mongo {
         DBConfigPtr& cc = _databases[database];
         if ( !cc ){
             cc.reset(new DBConfig( database ));
-            if ( ! cc->doload() ){
+            if ( ! cc->load() ){
                 if ( create ){
                     // note here that cc->primary == 0.
                     log() << "couldn't find database [" << database << "] in config db" << endl;
@@ -576,7 +615,7 @@ namespace mongo {
             b.appendBool( "partitioned" , true );
             b << "primary" << "myserver";
             
-            DBConfig c;
+            DBConfig c( "abc" );
             testInOut( c , b.obj() );
         }
 
@@ -592,7 +631,7 @@ namespace mongo {
             
             b.append( "sharded" , a.obj() );
 
-            DBConfig c;
+            DBConfig c("abc");
             testInOut( c , b.obj() );
             assert( c.isSharded( "abc.foo" ) );
             assert( ! c.isSharded( "abc.food" ) );
