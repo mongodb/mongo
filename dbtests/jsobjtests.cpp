@@ -1606,6 +1606,27 @@ namespace JsobjTests {
         }
     };
 
+    class CompareOps {
+    public:
+        void run(){
+            
+            BSONObj a = BSON("a"<<1);
+            BSONObj b = BSON("a"<<1);
+            BSONObj c = BSON("a"<<2);
+            BSONObj d = BSON("a"<<3);
+            BSONObj e = BSON("a"<<4);
+            BSONObj f = BSON("a"<<4);
+
+            ASSERT( ! ( a < b ) );
+            ASSERT( a <= b );
+            ASSERT( a < c );
+            
+            ASSERT( f > d );
+            ASSERT( f >= e );
+            ASSERT( ! ( f > e ) );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1712,6 +1733,7 @@ namespace JsobjTests {
             add< BSONFieldTests >();
             add< BSONForEachTest >();
             add< StringDataTest >();
+            add< CompareOps >();
         }
     } myall;
     
