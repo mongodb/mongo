@@ -155,8 +155,10 @@ __wt_cache_destroy(ENV *env)
 	 */
 	for (i = 0; i < cache->hb_size; ++i)
 		for (j = WT_CACHE_ENTRY_CHUNK, e = cache->hb[i];;) {
-			if (e->state != WT_EMPTY)
+			if (e->state != WT_EMPTY) {
+				WT_ASSERT(env, !WT_PAGE_MODIFY_ISSET(e->page));
 				__wt_bt_page_discard(env, e->page);
+			}
 			WT_CACHE_ENTRY_NEXT(e, j);
 		}
 
