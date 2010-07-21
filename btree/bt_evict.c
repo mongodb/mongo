@@ -371,7 +371,7 @@ __wt_drain_write(WT_TOC *toc)
 
 		WT_VERBOSE(env, WT_VERB_CACHE, (env,
 		    "cache reconciling element/page/addr %p/%p/%lu",
-		    e, page, (u_long)page->addr));
+		    e, page, (u_long)e->addr));
 
 		/*
 		 * We're using our WT_TOC handle, it needs to reference the
