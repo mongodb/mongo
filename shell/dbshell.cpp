@@ -51,7 +51,7 @@ using mongo::BSONElement;
 string historyFile;
 bool gotInterrupted = 0;
 bool inMultiLine = 0;
-static volatile bool atPrompt = true;
+static volatile bool atPrompt = false; // can eval before getting to prompt
 
 #if defined(USE_READLINE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
 #define CTRLC_HANDLE
@@ -165,16 +165,17 @@ void killOps() {
     if ( mongo::shellUtils::_nokillop || mongo::shellUtils::_allMyUris.size() == 0 )
         return;
 
-    if (!atPrompt){
-        cout << endl << "do you want to kill the current op on the server? (y/n): ";
-        cout.flush();
+    if ( atPrompt )
+        return;
 
-        char yn;
-        cin >> yn;
+    cout << endl << "do you want to kill the current op on the server? (y/n): ";
+    cout.flush();
 
-        if (yn != 'y' && yn != 'Y')
-            return;
-    }
+    char yn;
+    cin >> yn;
+
+    if (yn != 'y' && yn != 'Y')
+        return;
 
     vector< string > uris;
     for( map< const void*, string >::iterator i = mongo::shellUtils::_allMyUris.begin(); i != mongo::shellUtils::_allMyUris.end(); ++i )
