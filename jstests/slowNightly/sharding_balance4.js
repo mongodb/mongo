@@ -1,5 +1,4 @@
-// sharding_balance3.js
-
+// sharding_balance4.js
 
 s = new ShardingTest( "slow_sharding_balance3" , 2 , 2 , 1 , { chunksize : 1 } )
 
@@ -88,12 +87,12 @@ function diff(){
     var x = dist();
     if ( Math.random() > .999 )
         printjson( x )
-    return Math.max( x.shard0 , x.shard1 ) - Math.min( x.shard0 , x.shard1 );
+    return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
 function sum(){
     var x = dist();
-    return x.shard0 + x.shard1;
+    return x.shard0000 + x.shard0001;
 }
 
 assert.lt( 20 , diff() ,"initial load" );

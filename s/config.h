@@ -172,8 +172,8 @@ namespace mongo {
         Grid() : _lock("Grid") { }
 
         /**
-           gets the config the db.
-           will return an empty DBConfig if not in db already
+         * gets the config the db.
+         * will return an empty DBConfig if not in db already
          */
         DBConfigPtr getDBConfig( string ns , bool create=true);
         
@@ -182,10 +182,20 @@ namespace mongo {
          * on next getDBConfig call will fetch from db
          */
         void removeDB( string db );
+
+        /**
+         * returns true if the config database knows about a host 'name'
+         */
+        bool knowAboutShard( const string& name ) const;
         
-        bool knowAboutShard( string name ) const;
-        
+        /**
+         * returns the next available shard name or an empty string, if there are
+         * no more shard names available.
+         */
+        string getNewShardName() const;
+
         unsigned long long getNextOpTime() const;
+
     private:
         map<string, DBConfigPtr > _databases;
         mongo::mutex _lock; // TODO: change to r/w lock ??

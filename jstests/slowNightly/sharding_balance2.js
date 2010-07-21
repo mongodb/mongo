@@ -38,7 +38,7 @@ assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 function diff(){
     var x = s.chunkCounts( "foo" );
     printjson( x )
-    return Math.max( x.shard0 , x.shard1 ) - Math.min( x.shard0 , x.shard1 );
+    return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
 assert.lt( 10 , diff() );

@@ -19,8 +19,8 @@ for ( i=0; i<N; i++ )
 
 x = db.foo.stats();
 assert.eq( N , x.count , "total count" )
-assert.eq( N / 2 , x.shards.shard0.count , "count on shard0" )
-assert.eq( N / 2 , x.shards.shard1.count , "count on shard0" )
+assert.eq( N / 2 , x.shards.shard0000.count , "count on shard0000" )
+assert.eq( N / 2 , x.shards.shard0001.count , "count on shard0001" )
 
 start = new Date()
 

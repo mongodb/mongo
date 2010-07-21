@@ -27,12 +27,12 @@ assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 function diff(){
     var x = s.chunkCounts( "foo" );
     printjson( x )
-    return Math.max( x.shard0 , x.shard1 ) - Math.min( x.shard0 , x.shard1 );
+    return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
 function sum(){
     var x = s.chunkCounts( "foo" );
-    return x.shard0 + x.shard1;
+    return x.shard0000 + x.shard0001;
 }
 
 assert.lt( 20 , diff() , "big differential here" );
@@ -44,12 +44,12 @@ assert.soon( function(){
 } , "balance didn't happen" , 1000 * 60 * 3 , 5000 );
     
 var chunkCount = sum();
-s.adminCommand( { removeshard: "shard0" } );
+s.adminCommand( { removeshard: "shard0000" } );
 
 assert.soon( function(){
     printjson(s.chunkCounts( "foo" ));
     s.config.shards.find().forEach(function(z){printjson(z);});
-    return chunkCount == s.config.chunks.count({shard: "shard1"});
+    return chunkCount == s.config.chunks.count({shard: "shard0001"});
 } , "removeshard didn't happen" , 1000 * 60 * 3 , 5000 );
 
 s.stop();

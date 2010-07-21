@@ -624,7 +624,6 @@ namespace mongo {
                 ScopedDbConnection conn( configServer.getPrimary() );
                 
                 string host = cmdObj.firstElement().valuestrsafe();
-                
                 if ( host == "localhost" || host.find( "localhost:" ) == 0 ||
                      host == "127.0.0.1" || host.find( "127.0.0.1:" ) == 0 ){
                     if ( ! cmdObj["allowLocal"].trueValue() ){
@@ -634,22 +633,22 @@ namespace mongo {
                         return false;
                     }
                 }
-                
                 if ( host.find( ":" ) == string::npos ){
                     stringstream ss;
                     ss << host << ":" << CmdLine::ShardServerPort;
                     host = ss.str();
                 }
                 
-                string name = "";
-                if ( cmdObj["name"].type() == String )
+                string name;
+                if ( cmdObj["name"].type() == String ) {
                     name = cmdObj["name"].valuestrsafe();
-                
-                if ( name.size() == 0 ){
-                    stringstream ss;
-                    ss << "shard";
-                    ss << conn->count( "config.shards" );
-                    name = ss.str();
+                } else {
+                    name = grid.getNewShardName();
+                    if ( name.empty() ){
+                        result.append( "msg" , "cant generate new shard name" );
+                        conn.done();
+                        return false;
+                    }
                 }
 
                 BSONObj shard;
