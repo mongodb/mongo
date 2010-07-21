@@ -28,14 +28,9 @@ namespace mongo {
     // ----- Strategy ------
 
     void Strategy::doWrite( int op , Request& r , const Shard& shard ){
-        ShardConnection dbcon( shard , r.getns() );
-        DBClientBase &_c = dbcon.conn();
-
-        /* TODO FIX - do not case and call DBClientBase::say() */
-        DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
-        c.port().say( r.m() );
-        
-        dbcon.done();
+        ShardConnection conn( shard , r.getns() );
+        conn->say( r.m() );
+        conn.done();
     }
 
     void Strategy::doQuery( Request& r , const Shard& shard ){

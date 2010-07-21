@@ -119,7 +119,7 @@ namespace mongo {
     public:
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-
+        
         virtual bool isFailed() const {
             return false;
         }
@@ -135,8 +135,12 @@ namespace mongo {
             // don't need to piggy back when connected locally
             return say( toSend );
         }
-
+        
         virtual void killCursor( long long cursorID );
+        
+        virtual bool callRead( Message& toSend , Message& response ){
+            return call( toSend , response );
+        }
     };
 
     extern int lockFile;

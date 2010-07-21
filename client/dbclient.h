@@ -726,6 +726,11 @@ namespace mongo {
                     n++;
             return n;
         }
+
+        virtual bool callRead( Message& toSend , Message& response ) = 0;
+        // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
+        virtual void say( Message& toSend  ) = 0;
+        
     }; // DBClientBase
     
     class DBClientPaired;
@@ -831,15 +836,20 @@ namespace mongo {
         
         virtual void killCursor( long long cursorID );
 
+        virtual bool callRead( Message& toSend , Message& response ){
+            return call( toSend , response );
+        }
+
+        virtual void say( Message &toSend );
+
     protected:
         friend class SyncClusterConnection;
         virtual void recv( Message& m );
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );
-        virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend );
         virtual void checkResponse( const char *data, int nReturned );
     };
-
+    
     /** Use this class to connect to a replica pair of servers.  The class will manage
        checking for which server in a replica pair is master, and do failover automatically.
 
@@ -926,13 +936,17 @@ namespace mongo {
         
         DBClientConnection& masterConn();
         DBClientConnection& slaveConn();
-
+        
         /* TODO - not yet implemented. mongos may need these. */
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { assert(false); return false; }
         virtual void say( Message &toSend ) { assert(false); }
         virtual void sayPiggyBack( Message &toSend ) { assert(false); }
         virtual void checkResponse( const char *data, int nReturned ) { assert(false); }
         
+        virtual bool callRead( Message& toSend , Message& response ){
+            return call( toSend , response );
+        }
+
         bool isFailed() const {
             // TODO: this really should check isFailed on current master as well
             return master < Left;
