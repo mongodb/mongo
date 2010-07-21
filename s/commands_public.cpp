@@ -164,6 +164,41 @@ namespace mongo {
             }
         } renameCollectionCmd;
 
+        class CopyDBCmd : public PublicGridCommand {
+        public:
+            CopyDBCmd() : PublicGridCommand( "copydb" ){}
+            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string todb = cmdObj.getStringField("todb");
+                uassert(13397, "need a todb argument", !todb.empty());
+                
+                DBConfigPtr confTo = grid.getDBConfig( todb );
+                uassert(13398, "cant copy to sharded DB", !confTo->isShardingEnabled());
+
+                string fromhost = cmdObj.getStringField("fromhost");
+                if (!fromhost.empty()){
+                    return adminPassthrough( confTo , cmdObj , result );
+                } else {
+                    string fromdb = cmdObj.getStringField("fromdb");
+                    uassert(13399, "need a fromdb argument", !fromdb.empty());
+
+                    DBConfigPtr confFrom = grid.getDBConfig( fromdb , false );
+                    uassert(13400, "don't know where source DB is", confFrom);
+                    uassert(13401, "cant copy from sharded DB", !confFrom->isShardingEnabled());
+
+                    BSONObjBuilder b;
+                    BSONForEach(e, cmdObj){
+                        if (strcmp(e.fieldName(), "fromhost") != 0)
+                            b.append(e);
+                    }
+                    b.append("fromhost", confFrom->getPrimary().getConnString());
+                    BSONObj fixed = b.obj();
+
+                    return adminPassthrough( confTo , fixed , result );
+                }
+
+            }
+        }copyDBCmd;
+
         class CountCmd : public PublicGridCommand {
         public:
             CountCmd() : PublicGridCommand("count") { }

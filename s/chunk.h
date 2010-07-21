@@ -290,6 +290,11 @@ namespace mongo {
             return _sequenceNumber;
         }
         
+        void getInfo( BSONObjBuilder& b ){
+            b.append( "key" , _key.key() );
+            b.appendBool( "unique" , _unique );
+        }
+        
         /**
          * @param me - so i don't get deleted before i'm done
          */

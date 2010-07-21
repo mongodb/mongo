@@ -59,7 +59,7 @@ namespace mongo {
 
         // --- from DBClientInterface
 
-        virtual BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn, int queryOptions);
+        virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions);
 
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                const BSONObj *fieldsToReturn, int queryOptions, int batchSize );

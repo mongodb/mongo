@@ -32,9 +32,12 @@
 namespace mongo {
 
     struct ShardNS {
-        static string database;
         static string shard;
+        
+        static string database;
+        static string collection;
         static string chunk;
+
         static string mongos;
         static string settings;
     };
@@ -61,26 +64,51 @@ namespace mongo {
     class ChunkManager;
     typedef shared_ptr<ChunkManager> ChunkManagerPtr;
     
-    class CollectionInfo {
-    public:
-        CollectionInfo( ShardKeyPattern _key = BSONObj() , bool _unique = false ) : 
-            key( _key ) , unique( _unique ){}
-
-        ShardKeyPattern key;
-        bool unique;
-    };
-    
     /**
      * top level configuration for a database
      */
     class DBConfig  {
+
+        struct CollectionInfo {
+            CollectionInfo(){
+                _dirty = false;
+                _dropped = false;
+            }
+            
+            CollectionInfo( DBConfig * db , const BSONObj& in );
+            
+            bool isSharded() const {
+                return _cm.get();
+            }
+            
+            ChunkManagerPtr getCM() const {
+                return _cm;
+            }
+
+            void shard( DBConfig * db , const string& ns , const ShardKeyPattern& key , bool unique );
+            void unshard();
+
+            bool isDirty() const { return _dirty; }
+            bool wasDropped() const { return _dropped; }
+            
+            void save( const string& ns , DBClientBase* conn );
+            
+
+        private:
+            ChunkManagerPtr _cm;
+            bool _dirty;
+            bool _dropped;
+        };
+        
+        typedef map<string,CollectionInfo> Collections;
+        
     public:
 
         DBConfig( string name ) 
             : _name( name ) , 
               _primary("config","") , 
               _shardingEnabled(false), 
-              _lock("DBConfig") { 
+              _lock("DBConfig"){
             assert( name.size() );
         }
         virtual ~DBConfig(){}
@@ -115,13 +143,10 @@ namespace mongo {
             return _primary;
         }
         
-        void setPrimary( string s ){
-            _primary.reset( s );
-        }
+        void setPrimary( string s );
 
         bool load();
         bool reload();
-        void save(); // TODO make private
         
         bool dropDatabase( string& errmsg );
 
@@ -129,7 +154,11 @@ namespace mongo {
 
         // lockless loading
         void serialize(BSONObjBuilder& to);
-        void unserialize(const BSONObj& from);
+
+        /**
+         * if i need save in new format
+         */
+        bool unserialize(const BSONObj& from);
 
     protected:
 
@@ -142,7 +171,7 @@ namespace mongo {
 
         bool _load();
         bool _reload();
-        void _save(); // TODO make private
+        void _save();
 
         
         /**
@@ -154,8 +183,10 @@ namespace mongo {
         Shard _primary; // e.g. localhost , mongo.foo.com:9999
         bool _shardingEnabled;
         
-        map<string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
-        map<string,ChunkManagerPtr> _shards; // this will only have entries for things that have been looked at
+        //map<string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
+        //map<string,ChunkManagerPtr> _shards; // this will only have entries for things that have been looked at
+
+        Collections _collections;
 
         mongo::mutex _lock; // TODO: change to r/w lock ??
 

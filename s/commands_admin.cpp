@@ -226,9 +226,7 @@ namespace mongo {
                     errmsg = "that server isn't known to me";
                     return false;
                 }
-
-                ScopedDbConnection conn( configServer.getPrimary() );
-
+                
                 log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString() 
                       << " to: " << s.toString() << endl;
 
@@ -236,22 +234,21 @@ namespace mongo {
 
                 ScopedDbConnection toconn( s.getConnString() );
 
-                // TODO AARON - we need a clone command which replays operations from clone start to now
-                //              using a seperate smaller oplog
+                // TODO ERH - we need a clone command which replays operations from clone start to now
+                //            can just use local.oplog.$main
                 BSONObj cloneRes;
                 bool worked = toconn->runCommand( dbname.c_str() , BSON( "clone" << config->getPrimary().getConnString() ) , cloneRes );
                 toconn.done();
+
                 if ( ! worked ){
                     log() << "clone failed" << cloneRes << endl;
                     errmsg = "clone failed";
-                    conn.done();
                     return false;
                 }
 
                 ScopedDbConnection fromconn( config->getPrimary() );
 
                 config->setPrimary( s.getConnString() );
-                config->save();
 
                 log() << "movePrimary:  dropping " << dbname << " from old" << endl;
 
@@ -260,7 +257,6 @@ namespace mongo {
 
                 result << "primary " << s.toString();
 
-                conn.done();
                 return true;
             }
         } movePrimary;
@@ -289,7 +285,6 @@ namespace mongo {
                 log() << "enabling sharding on: " << dbname << endl;
 
                 config->enableSharding();
-                config->save();
 
                 return true;
             }
@@ -405,7 +400,6 @@ namespace mongo {
                 tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
                 config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
-                config->save();
 
                 result << "collectionsharded" << ns;
                 return true;

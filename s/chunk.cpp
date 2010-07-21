@@ -799,8 +799,6 @@ namespace mongo {
 
         // clean up database meta-data
         uassert( 10176 ,  "no sharding data?" , _config->removeSharding( _ns ) );
-        _config->save();
-        
         
         // remove chunk data
         static Chunk temp(0);

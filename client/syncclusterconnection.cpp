@@ -153,7 +153,7 @@ namespace mongo {
         return _conns[0]->callRead( toSend , response );
     }
 
-    BSONObj SyncClusterConnection::findOne(const string &ns, Query query, const BSONObj *fieldsToReturn, int queryOptions) {
+    BSONObj SyncClusterConnection::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
         
         if ( ns.find( ".$cmd" ) != string::npos ){
             string cmdName = query.obj.firstElement().fieldName();
