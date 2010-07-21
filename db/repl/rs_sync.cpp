@@ -78,10 +78,7 @@ namespace mongo {
                     return;
                 }
 
-                log() << "replSet rollback not yet implemented!" << rsLog;
-                log() << "replSet ts: " << lastOpTimeWritten.toStringPretty() << ' ' << ts.toStringPretty() << rsLog;
-                log() << "replSet h:  " << lastH << ' ' << h << rsLog;
-                sleepsecs(60);
+                syncRollback(r);
                 return;
             }
         }

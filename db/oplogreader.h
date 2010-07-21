@@ -15,7 +15,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> cursor;
     public:
 
-        void reset() {
+        void resetCursor() {
             cursor.reset();
         }
         void resetConnection() {
@@ -37,7 +37,7 @@ namespace mongo {
         void tailCheck() {
             if( cursor.get() && cursor->isDead() ) { 
                 log() << "repl: old cursor isDead, will initiate a new one" << endl;
-                reset();
+                resetCursor();
             }
         }
 

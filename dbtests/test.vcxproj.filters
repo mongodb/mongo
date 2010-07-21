@@ -674,6 +674,15 @@
     <ClCompile Include="..\s\d_split.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\repl\rs_rollback.cpp">
+      <Filter>replsets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\repl\rs_sync.cpp">
+      <Filter>replsets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\repl\rs_initialsync.cpp">
+      <Filter>replsets</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

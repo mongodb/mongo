@@ -1072,7 +1072,7 @@ namespace mongo {
             dblock lk;
             setLastSavedLocalTs( nextLastSavedLocalTs() );
             save();
-            oplogReader.reset();
+            oplogReader.resetCursor();
         }
     }
     
