@@ -1,4 +1,4 @@
-@file rs_rollback.cpp
+/* @file rs_rollback.cpp
 * 
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -59,10 +59,40 @@
 
 namespace mongo {
 
+    using namespace bson;
+
     static void syncRollbackFindCommonPoint(DBClientConnection *us, DBClientConnection *them) { 
+        throw "test";
+        const Query q = Query().sort( BSON( "$natural" << -1 ) );
+        const bo fields = BSON( "ts" << 1 << "h" << 1 );
+        
+        auto_ptr<DBClientCursor> u = us->query(rsoplog, q, 0, 0, &fields, 0, 0);
+        auto_ptr<DBClientCursor> t = them->query(rsoplog, q, 0, 0, &fields, 0, 0);
+
+        if( !u->more() ) throw "our oplog empty or unreadable";
+        if( !t->more() ) throw "remote oplog empty or unreadable";
+
+        BSONObj ourObj = u->nextSafe();
+        BSONObj theirObj = t->nextSafe();
+
+        {
+            OpTime ourTime = ourObj["ts"]._opTime();
+            OpTime theirTime = theirObj["ts"]._opTime();
+            long long diff = (long long) ourTime.getSecs() - ((long long) theirTime.getSecs());
+            /* diff could be positive, negative, or zero */
+            log() << "replSet syncRollback diff in end of log times : " << diff << " seconds" << rsLog;
+//            if(
+        }
+
+        if( 0 ) while( 1 ) {
+
+        }
     }
 
     void ReplSetImpl::syncRollback(OplogReader&r) { 
+        assert( !lockedByMe() );
+        assert( !dbMutex.atLeastReadLocked() );
+
         sethbmsg("syncRollback 1");
         {
             r.resetCursor();
@@ -73,8 +103,15 @@ namespace mongo {
                 return;
             }
             sethbmsg("syncRollback 2 FindCommonPoint");
-            syncRollbackFindCommonPoint(&us, r.conn());
+            try {
+                syncRollbackFindCommonPoint(&us, r.conn());
+            }
+            catch( const char *p ) { 
+                sethbmsg(string("syncRollback 2 error ") + p);
+                return;
+            }
         }
+
 
     }
 
