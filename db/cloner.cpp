@@ -294,7 +294,8 @@ namespace mongo {
                 const char *from_name = e.valuestr();
 
                 if( strstr(from_name, ".system.") ) { 
-                    /* system.users is cloned -- but nothing else from system. */
+                    /* system.users and s.js is cloned -- but nothing else from system.
+                     * system.indexes is handled specially at the end*/
                     if( legalClientSystemNS( from_name , true ) == 0 ){
                         log(2) << "\t\t not cloning because system collection" << endl;
                         continue;
