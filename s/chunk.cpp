@@ -120,19 +120,23 @@ namespace mongo {
                 return _manager->getShardKey().extractKey( end );
         }
         
+        BSONObj cmd = BSON( "medianKey" << _manager->getns()
+                            << "keyPattern" << _manager->getShardKey().key()
+                            << "min" << getMin()
+                            << "max" << getMax() );
+
         ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
-        if ( ! conn->runCommand( "admin" , BSON( "medianKey" << _manager->getns()
-                                                 << "keyPattern" << _manager->getShardKey().key()
-                                                 << "min" << getMin()
-                                                 << "max" << getMax()
-                                                 ) , result ) ){
+        if ( ! conn->runCommand( "admin" , cmd , result ) ){
             stringstream ss;
             ss << "medianKey command failed: " << result;
             uassert( 10164 ,  ss.str() , 0 );
         }
 
-        BSONObj median = result.getObjectField( "median" );
+        BSONObj median = result.getObjectField( "median" ).getOwned();
+        conn.done();
+
+
         if (median == getMin()){
             Query q;
             q.minKey(_min).maxKey(_max);
@@ -141,10 +145,16 @@ namespace mongo {
             median = conn->findOne(_manager->getns(), q);
             median = _manager->getShardKey().extractKey( median );
         }
-
-        conn.done();
         
-        return median.getOwned();
+        if ( median < getMin() || median >= getMax() ){
+            stringstream ss;
+            ss << "medianKey returned value out of range.  " 
+               << " cmd: " << cmd 
+               << " result: " << result;
+            uasserted( 13394 , ss.str() );
+        }
+        
+        return median;
     }
 
     void Chunk::pickSplitVector( vector<BSONObj>* splitPoints ) const { 
@@ -349,7 +359,7 @@ namespace mongo {
         if ( size < myMax )
             return false;
         
-        log() << "autosplitting " << _manager->getns() << " size: " << size << " shard: " << toString() << endl;
+        log() << "autosplitting " << _manager->getns() << " size: " << size << " shard: " << toString() << " on: " << splitPoint << endl;
         vector<BSONObj> splitPoints;
         splitPoints.push_back( splitPoint );
         ChunkPtr newShard = multiSplit( splitPoints );
