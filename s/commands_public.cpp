@@ -169,7 +169,7 @@ namespace mongo {
             CopyDBCmd() : PublicGridCommand( "copydb" ){}
             bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string todb = cmdObj.getStringField("todb");
-                uassert(13397, "need a todb argument", !todb.empty());
+                uassert(13402, "need a todb argument", !todb.empty());
                 
                 DBConfigPtr confTo = grid.getDBConfig( todb );
                 uassert(13398, "cant copy to sharded DB", !confTo->isShardingEnabled());
