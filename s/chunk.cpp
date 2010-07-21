@@ -225,6 +225,14 @@ namespace mongo {
             log(4) << "splitPoint: " << splitPoint << endl;
             nextPoint = (++i != m.end()) ? i->getOwned() : _max.getOwned();
             log(4) << "nextPoint: " << nextPoint << endl;
+
+            if ( nextPoint <= splitPoint) {
+                stringstream ss;
+                ss << "multiSplit failing because keys min: " << splitPoint << " and max: " << nextPoint
+                   << " do not define a valid chunk";
+                uasserted( 13395, ss.str() );
+            }
+
             ChunkPtr s( new Chunk( _manager, splitPoint , nextPoint , _shard) );
             s->_markModified();
             newChunks.push_back(s);

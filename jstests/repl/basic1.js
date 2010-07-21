@@ -126,6 +126,17 @@ assert.eq( { _id : "fun" , a : { b : { c : { x : 6848 , y : 911 } } } } , as.b.f
 check( "b 4" );
 
 
+// lots of indexes
+
+am.lotOfIndexes.insert( { x : 1 } )
+for ( i=0; i<200; i++ ){
+    var idx = {}
+    idx["x"+i] = 1;
+    am.lotOfIndexes.ensureIndex( idx );
+}
+
+assert.eq( am.lotOfIndexes.getIndexes().length , as.lotOfIndexes.getIndexes().length , "lots of indexes" )
+
 
 rt.stop();
 

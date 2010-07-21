@@ -80,7 +80,25 @@ namespace mongo {
                 return false;
             }
 
-            result.append( "median", c.prettyKey( c.currKey() ) );
+            BSONObj median = c.prettyKey( c.currKey() );
+            result.append( "median", median );
+
+            int x = median.woCompare( min , BSONObj() , false );
+            int y = median.woCompare( max , BSONObj() , false );
+            if ( x == 0 || y == 0 ){
+                // its on an edge, ok
+            }
+            else if ( x < 0 && y < 0 ){
+                log( LL_ERROR ) << "median error (1) min: " << min << " max: " << max << " median: " << median << endl;
+                errmsg = "median error 1";
+                return false;
+            }
+            else if ( x > 0 && y > 0 ){
+                log( LL_ERROR ) << "median error (2) min: " << min << " max: " << max << " median: " << median << endl;
+                errmsg = "median error 2";
+                return false;
+            }
+
             return true;
         }
     } cmdMedianKey;
