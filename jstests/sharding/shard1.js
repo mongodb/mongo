@@ -19,8 +19,13 @@ s.adminCommand( { enablesharding : "test" } );
 assert.eq( 3 , db.foo.find().length() , "after partitioning count failed" );
 
 s.adminCommand( shardCommand );
-dbconfig = s.config.databases.findOne( { _id : "test" } );
-assert.eq( dbconfig.sharded["test.foo"] , { key : { num : 1 } , unique : false } , "Sharded content" );
+
+cconfig = s.config.collections.findOne( { _id : "test.foo" } );
+delete cconfig.lastmod
+delete cconfig.dropped
+assert.eq( cconfig , { _id : "test.foo" , key : { num : 1 } , unique : false } , "Sharded content" );
+
+s.config.collections.find().forEach( printjson )
 
 assert.eq( 1 , s.config.chunks.count() , "num chunks A");
 si = s.config.chunks.findOne();
