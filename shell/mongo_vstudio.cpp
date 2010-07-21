@@ -654,6 +654,7 @@ const char * jsconcatcode =
  "print(\"\\trs.initiate()                   { replSetInitiate : null } initiates set with default settings\");\n"
  "print(\"\\trs.initiate(cfg)                { replSetInitiate : cfg } initiates set with configuration cfg\");\n"
  "print(\"\\trs.add(hostportstr)             add a new member to the set with default attributes\");\n"
+ "print(\"\\trs.add(membercfgobj)            add a new member to the set with extra attributes\");\n"
  "print(\"\\trs.conf()                       return configuration from local.system.replset\");\n"
  "print();\n"
  "print(\"\\tdb.isMaster()                   check who is primary\");\n"
