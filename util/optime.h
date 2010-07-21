@@ -136,6 +136,9 @@ namespace mongo {
         bool operator<=(const OpTime& r) const { 
             return *this < r || *this == r;
         }
+        bool operator>(const OpTime& r) const { 
+            return !(*this <= r);
+        }
     };
 #pragma pack()
     

@@ -61,8 +61,12 @@ namespace mongo {
 
     using namespace bson;
 
-    static void syncRollbackFindCommonPoint(DBClientConnection *us, DBClientConnection *them) { 
-        throw "test";
+    struct HowToFixUp {
+        list<bo> toRefetch;
+        OpTime commonPoint;
+    };
+
+    static void syncRollbackFindCommonPoint(DBClientConnection *us, DBClientConnection *them, HowToFixUp& h) { 
         const Query q = Query().sort( BSON( "$natural" << -1 ) );
         const bo fields = BSON( "ts" << 1 << "h" << 1 );
         
@@ -73,19 +77,55 @@ namespace mongo {
         if( !t->more() ) throw "remote oplog empty or unreadable";
 
         BSONObj ourObj = u->nextSafe();
+        OpTime ourTime = ourObj["ts"]._opTime();
         BSONObj theirObj = t->nextSafe();
+        OpTime theirTime = theirObj["ts"]._opTime();
 
-        {
-            OpTime ourTime = ourObj["ts"]._opTime();
-            OpTime theirTime = theirObj["ts"]._opTime();
+        if( 1 ) {
             long long diff = (long long) ourTime.getSecs() - ((long long) theirTime.getSecs());
             /* diff could be positive, negative, or zero */
-            log() << "replSet syncRollback diff in end of log times : " << diff << " seconds" << rsLog;
-//            if(
+            log() << "replSet TEMP info syncRollback diff in end of log times : " << diff << " seconds" << rsLog;
+            /*if( diff > 3600 ) { 
+                log() << "replSet syncRollback too long a time period for a rollback. sleeping 1 minute" << rsLog;
+                sleepsecs(60);
+                throw "error not willing to roll back more than one hour of data";
+            }*/
         }
 
-        if( 0 ) while( 1 ) {
-
+        unsigned long long totSize = 0;
+        unsigned long long scanned = 0;
+        while( 1 ) {
+            scanned++;
+            /* todo add code to assure no excessive scanning for too long */
+            if( ourTime == theirTime ) { 
+                if( ourObj["h"].Long() == theirObj["h"].Long() ) { 
+                    // found the point back in time where we match.
+                    // todo : check a few more just to be careful about hash collisions.
+                    log() << "replSet rollback found matching events at " << ourTime.toStringPretty() << rsLog;
+                    log() << "replSet scanned : " << scanned << rsLog;
+                    log() << "replSet TODO finish " << rsLog;
+                    h.commonPoint = ourTime;
+                    return;
+                }
+                theirObj = t->nextSafe();
+                theirTime = theirObj["ts"]._opTime();
+                ourObj = u->nextSafe();
+                ourTime = ourObj["ts"]._opTime();
+            }
+            else if( theirTime > ourTime ) { 
+                /* todo: we could hit beginning of log here.  exception thrown is ok but not descriptive, so fix up */
+                theirObj = t->nextSafe();
+                theirTime = theirObj["ts"]._opTime();
+            }
+            else { 
+                // theirTime < ourTime
+                totSize += ourObj.objsize();
+                if( totSize > 512 * 1024 * 1024 )
+                    throw "rollback too large";
+                h.toRefetch.push_back( ourObj.getOwned() );
+                ourObj = u->nextSafe();
+                ourTime = ourObj["ts"]._opTime();
+            }
         }
     }
 
@@ -93,6 +133,7 @@ namespace mongo {
         assert( !lockedByMe() );
         assert( !dbMutex.atLeastReadLocked() );
 
+        HowToFixUp how;
         sethbmsg("syncRollback 1");
         {
             r.resetCursor();
@@ -102,17 +143,24 @@ namespace mongo {
                 sethbmsg("syncRollback connect to self failure" + errmsg);
                 return;
             }
+
             sethbmsg("syncRollback 2 FindCommonPoint");
             try {
-                syncRollbackFindCommonPoint(&us, r.conn());
+                syncRollbackFindCommonPoint(&us, r.conn(), how);
             }
             catch( const char *p ) { 
                 sethbmsg(string("syncRollback 2 error ") + p);
+                sleepsecs(10);
                 return;
+            }
+            catch( DBException& e ) { 
+                sethbmsg(string("syncRollback 2 exception ") + e.toString() + "; sleeping 1 min");
+                sleepsecs(60);
+                throw;
             }
         }
 
-
+        sethbmsg("replSet syncRollback 3 FINISH");
     }
 
 }

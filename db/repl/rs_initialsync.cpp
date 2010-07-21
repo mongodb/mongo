@@ -51,11 +51,6 @@ namespace mongo {
         }
     }
 
-    static bool stillHave(OplogReader& r, OpTime t, long long h) { 
-        cout << "not yet implemented" << endl;
-        return false;
-    }
-
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth, bool snapshot);
 

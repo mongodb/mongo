@@ -288,7 +288,6 @@ public:
         return woCompare( r , true ) == 0;
     }
 
-
     /** Well ordered comparison.
         @return <0: l<r. 0:l==r. >0:l>r
         order by type, field name, and field value.
@@ -544,6 +543,5 @@ private:
         fieldNameSize_ = 0;
         totalSize = 1;
     }
-
 
 }
