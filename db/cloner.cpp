@@ -37,11 +37,10 @@ namespace mongo {
         auto_ptr< DBClientWithCommands > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
                   bool masterSameProcess, bool slaveOk, Query q = Query());
-        void replayOpLog( DBClientCursor *c, const BSONObj &query );
         struct Fun;
     public:
         Cloner() { }
-
+        
         /* slaveOk     - if true it is ok if the source of the data is !ismaster.
            useReplAuth - use the credentials we normally use as a replication slave for the cloning
            snapshot    - use $snapshot mode for copying collections.  note this should not be used when it isn't required, as it will be slower.
@@ -49,8 +48,8 @@ namespace mongo {
         */
         void setConnection( DBClientWithCommands *c ) { conn.reset( c ); }
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot);
-        bool startCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, string& errmsg, bool logForRepl, bool copyIndexes, int logSizeMb, long long &cursorId );
-        bool finishCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, long long cursorId, string &errmsg );
+
+        bool copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes = true );
     };
 
     /* for index info object:
@@ -197,6 +196,36 @@ namespace mongo {
             }
         }
     }
+
+    bool Cloner::copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes ){
+        auto_ptr<DBClientConnection> myconn;
+        myconn.reset( new DBClientConnection() );
+        if ( ! myconn->connect( from , errmsg ) )
+            return false;
+
+        conn.reset( myconn.release() );
+        
+        writelock lk(ns); // TODO: make this lower down
+        Client::Context ctx(ns);
+
+        { // config
+            string temp = ctx.db()->name + ".system.namespaces";
+            BSONObj config = conn->findOne( temp , BSON( "name" << ns ) );
+            if ( config["options"].isABSONObj() )
+                if ( ! userCreateNS( ns.c_str() , config["options"].Obj() , errmsg, true , 0 ) )
+                    return false;
+        }
+        
+        { // main data
+            copy( ns.c_str() , ns.c_str() , false , true , false , true , Query(query).snapshot() );
+        }
+        
+        { // indexes
+            string temp = ctx.db()->name + ".system.indexes";
+            copy( temp.c_str() , temp.c_str() , true , true , false , true , BSON( "ns" << ns ) );
+        }
+        return true;
+    }
     
     extern bool inDBRepair;
     void ensureIdIndexForNewNs(const char *ns);
@@ -335,121 +364,6 @@ namespace mongo {
 
         return true;
     }
-
-    bool Cloner::startCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, string &errmsg, bool logForRepl, bool copyIndexes, int logSizeMb, long long &cursorId ) {
-        char db[256];
-        nsToDatabase( ns, db );
-
-        NamespaceDetails *nsd = nsdetails( ns );
-        if ( nsd ){
-            /** note: its ok to clone into a collection, but only if the range you're copying 
-                doesn't exist on this server */
-            string err;
-            if ( runCount( ns , BSON( "query" << query ) , err ) > 0 ){
-                log() << "WARNING: data already exists for: " << ns << " in range : " << query << " deleting..." << endl;
-                deleteObjects( ns , query , false , logForRepl , false );
-            }
-        }
-
-        {
-            dbtemprelease r;
-            auto_ptr< DBClientConnection > c( new DBClientConnection() );
-            if ( !c->connect( fromhost, errmsg ) )
-                return false;
-            if( !replAuthenticate(c.get()) )
-                return false;
-            conn = c;
-
-            // Start temporary op log
-            BSONObjBuilder cmdSpec;
-            cmdSpec << "logCollection" << ns << "start" << 1;
-            if ( logSizeMb != INT_MIN )
-                cmdSpec << "logSizeMb" << logSizeMb;
-            BSONObj info;
-            if ( !conn->runCommand( db, cmdSpec.done(), info ) ) {
-                errmsg = "logCollection failed: " + info.toString();
-                return false;
-            }
-        }
-        
-        if ( ! nsd ) {
-            BSONObj spec = conn->findOne( string( db ) + ".system.namespaces", BSON( "name" << ns ) );
-            if ( !userCreateNS( ns, spec.getObjectField( "options" ), errmsg, true ) )
-                return false;
-        }
-
-        copy( ns, ns, false, logForRepl, false, false, query );
-
-        if ( copyIndexes ) {
-            string indexNs = string( db ) + ".system.indexes";
-            copy( indexNs.c_str(), indexNs.c_str(), true, logForRepl, false, false, BSON( "ns" << ns << "name" << NE << "_id_" ) );
-        }
-        
-        auto_ptr< DBClientCursor > c;
-        {
-            dbtemprelease r;
-            string logNS = "local.temp.oplog." + string( ns );
-            c = conn->query( logNS.c_str(), Query(), 0, 0, 0, QueryOption_CursorTailable );
-        }
-        if ( c->more() ) {
-            replayOpLog( c.get(), query );
-            cursorId = c->getCursorId();
-            massert( 10291 ,  "Expected valid tailing cursor", cursorId != 0 );
-        } else {
-            massert( 10292 ,  "Did not expect valid cursor for empty query result", c->getCursorId() == 0 );
-            cursorId = 0;
-        }
-        c->decouple();
-        return true;
-    }
-    
-    void Cloner::replayOpLog( DBClientCursor *c, const BSONObj &query ) {
-        Matcher matcher( query );
-        while( 1 ) {
-            BSONObj op;
-            {
-                dbtemprelease t;
-                if ( !c->more() )
-                    break;
-                op = c->next();
-            }
-            // For sharding v1.0, we don't allow shard key updates -- so just
-            // filter each insert by value.
-            if ( op.getStringField( "op" )[ 0 ] != 'i' || matcher.matches( op.getObjectField( "o" ) ) )
-                ReplSource::applyOperation( op );
-        }        
-    }
-    
-    bool Cloner::finishCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, long long cursorId, string &errmsg ) {
-        char db[256];
-        nsToDatabase( ns, db );
-
-        auto_ptr< DBClientCursor > cur;
-        {
-            dbtemprelease r;
-            auto_ptr< DBClientConnection > c( new DBClientConnection() );
-            if ( !c->connect( fromhost, errmsg ) )
-                return false;
-            if( !replAuthenticate(c.get()) )
-                return false;
-            conn = c;            
-            string logNS = "local.temp.oplog." + string( ns );
-            if ( cursorId != 0 )
-                cur = conn->getMore( logNS.c_str(), cursorId );
-            else
-                cur = conn->query( logNS.c_str(), Query() );
-        }
-        replayOpLog( cur.get(), query );
-        {
-            dbtemprelease t;
-            BSONObj info;
-            if ( !conn->runCommand( db, BSON( "logCollection" << ns << "validateComplete" << 1 ), info ) ) {
-                errmsg = "logCollection failed: " + info.toString();
-                return false;
-            }
-        }
-        return true;
-    }
     
     /* slaveOk     - if true it is ok if the source of the data is !ismaster.
        useReplAuth - use the credentials we normally use as a replication slave for the cloning
@@ -494,7 +408,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual LockType locktype() const { return NONE; }
         CmdCloneCollection() : Command("cloneCollection") { }
         virtual void help( stringstream &help ) const {
             help << "{ cloneCollection: <namespace>, from: <host> [,query: <query_filter>] [,copyIndexes:<bool>] }"
@@ -512,7 +426,7 @@ namespace mongo {
             {
                 HostAndPort h(fromhost);
                 if( h.isSelf() ) { 
-                    errmsg = "can't copy from self";
+                    errmsg = "can't cloneCollection from self";
                     return false;
                 }
             }
@@ -524,124 +438,18 @@ namespace mongo {
             BSONObj query = cmdObj.getObjectField("query");
             if ( query.isEmpty() )
                 query = BSONObj();
+            
             BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
             bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
-            // Will not be used if doesn't exist.
-            int logSizeMb = cmdObj.getIntField( "logSizeMb" );
             
-            /* replication note: we must logOp() not the command, but the cloned data -- if the slave
-             were to clone it would get a different point-in-time and not match.
-             */
-            Client::Context ctx( collection );
-            
-            log() << "cloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << " logSizeMb: " << logSizeMb << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
+            log() << "cloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost 
+                  << " query: " << query << " " << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
             
             Cloner c;
-            long long cursorId;
-            if ( !c.startCloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl, copyIndexes, logSizeMb, cursorId ) )
-                return false;
-            return c.finishCloneCollection( fromhost.c_str(), collection.c_str(), query, cursorId, errmsg);
+            return c.copyCollection( fromhost , collection , query, errmsg , copyIndexes );
         }
     } cmdclonecollection;
 
-    class CmdStartCloneCollection : public Command {
-    public:
-        virtual bool slaveOk() const {
-            return false;
-        }
-        virtual LockType locktype() const { return WRITE; }
-        CmdStartCloneCollection() : Command("startCloneCollection") { }
-        virtual void help( stringstream &help ) const {
-            help << " example: { startCloneCollection: <collection ns>, from: <hostname>, query: <query> }";
-            help << ", returned object includes a finishToken field, the value of which may be passed to the finishCloneCollection command";
-        }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string fromhost = cmdObj.getStringField("from");
-            if ( fromhost.empty() ) {
-                errmsg = "missing from spec";
-                return false;
-            }
-            string collection = cmdObj.getStringField("startCloneCollection");
-            if ( collection.empty() ) {
-                errmsg = "missing startCloneCollection spec";
-                return false;
-            }
-            BSONObj query = cmdObj.getObjectField("query");
-            if ( query.isEmpty() )
-                query = BSONObj();
-            BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
-            bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
-            // Will not be used if doesn't exist.
-            int logSizeMb = cmdObj.getIntField( "logSizeMb" );
-            
-            /* replication note: we must logOp() not the command, but the cloned data -- if the slave
-             were to clone it would get a different point-in-time and not match.
-             */
-            Client::Context ctx(collection);
-            
-            log() << "startCloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
-            
-            Cloner c;
-            long long cursorId;
-            bool res = c.startCloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl, copyIndexes, logSizeMb, cursorId );
-            
-            if ( res ) {
-                BSONObjBuilder b;
-                b << "fromhost" << fromhost;
-                b << "collection" << collection;
-                b << "query" << query;
-                b.appendDate( "cursorId", cursorId );
-                BSONObj token = b.done();
-                result << "finishToken" << token;
-            }
-            return res;
-        }
-    } cmdstartclonecollection;
-    
-    class CmdFinishCloneCollection : public Command {
-    public:
-        virtual bool slaveOk() const {
-            return false;
-        }
-        virtual LockType locktype() const { return WRITE; }
-        CmdFinishCloneCollection() : Command("finishCloneCollection") { }
-        virtual void help( stringstream &help ) const {
-            help << " example: { finishCloneCollection: <finishToken> }";
-        }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            BSONObj fromToken = cmdObj.getObjectField("finishCloneCollection");
-            if ( fromToken.isEmpty() ) {
-                errmsg = "missing finishCloneCollection finishToken spec";
-                return false;
-            }
-            string fromhost = fromToken.getStringField( "fromhost" );
-            if ( fromhost.empty() ) {
-                errmsg = "missing fromhost spec";
-                return false;
-            }
-            string collection = fromToken.getStringField("collection");
-            if ( collection.empty() ) {
-                errmsg = "missing collection spec";
-                return false;
-            }
-            BSONObj query = fromToken.getObjectField("query");
-            if ( query.isEmpty() ) {
-                query = BSONObj();
-            }
-            long long cursorId = 0;
-            BSONElement cursorIdToken = fromToken.getField( "cursorId" );
-            if ( cursorIdToken.type() == Date ) {
-                cursorId = cursorIdToken._numberLong();
-            }
-            
-            Client::Context ctx( collection );
-            
-            log() << "finishCloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
-            
-            Cloner c;
-            return c.finishCloneCollection( fromhost.c_str(), collection.c_str(), query, cursorId, errmsg );
-        }
-    } cmdfinishclonecollection;
 
     thread_specific_ptr< DBClientConnection > authConn_;
     /* Usage:

@@ -476,7 +476,7 @@ namespace mongo {
         void reset();
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
     public:
-        NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount(), _cll_enabled() { }
+        NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount(){ }
         /* _get() is not threadsafe -- see get_inlock() comments */
         static NamespaceDetailsTransient& _get(const char *ns);
         /* use get_w() when doing write operations */
@@ -555,19 +555,6 @@ namespace mongo {
         void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, long long nScanned ) {
             _qcCache[ pattern ] = make_pair( indexKey, nScanned );
         }
-
-        /* for collection-level logging -- see CmdLogCollection ----------------- */ 
-        /* assumed to be in write lock for this */
-    private:
-        string _cll_ns; // "local.temp.oplog." + _ns;
-        bool _cll_enabled;
-        void cllDrop(); // drop _cll_ns
-    public:
-        string cllNS() const { return _cll_ns; }
-        bool cllEnabled() const { return _cll_enabled; }
-        void cllStart( int logSizeMb = 256 ); // begin collection level logging
-        void cllInvalidate();
-        bool cllValidateComplete();
 
     }; /* NamespaceDetailsTransient */
 

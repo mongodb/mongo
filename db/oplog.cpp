@@ -293,15 +293,6 @@ namespace mongo {
         }
         
         logOpForSharding( opstr , ns , obj , patt );
-
-        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
-        if ( t.cllEnabled() ) {
-            try {
-                _logOpOld(opstr, ns, t.cllNS().c_str(), obj, patt, b);
-            } catch ( const DBException & ) {
-                t.cllInvalidate();
-            }
-        }
     }    
 
     void createOplog() {
@@ -379,58 +370,6 @@ namespace mongo {
         MemoryMappedFile::flushAll(true);
         log() << "******" << endl;
     }
-
-    class CmdLogCollection : public Command {
-    public:
-        virtual bool slaveOk() const {
-            return false;
-        }
-        virtual LockType locktype() const { return WRITE; }
-        CmdLogCollection() : Command( "logCollection" ) {}
-        virtual void help( stringstream &help ) const {
-            help << "examples: { logCollection: <collection ns>, start: 1 }, "
-                 << "{ logCollection: <collection ns>, validateComplete: 1 }";
-        }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string logCollection = cmdObj.getStringField( "logCollection" );
-            if ( logCollection.empty() ) {
-                errmsg = "missing logCollection spec";
-                return false;
-            }
-            bool start = !cmdObj.getField( "start" ).eoo();
-            bool validateComplete = !cmdObj.getField( "validateComplete" ).eoo();
-            if ( start ? validateComplete : !validateComplete ) {
-                errmsg = "Must specify exactly one of start:1 or validateComplete:1";
-                return false;
-            }
-            int logSizeMb = cmdObj.getIntField( "logSizeMb" );
-            NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( logCollection.c_str() );
-            if ( start ) {
-                if ( t.cllNS().empty() ) {
-                    if ( logSizeMb == INT_MIN ) {
-                        t.cllStart();
-                    } else {
-                        t.cllStart( logSizeMb );
-                    }
-                } else {
-                    errmsg = "Log already started for ns: " + logCollection;
-                    return false;
-                }
-            } else {
-                if ( t.cllNS().empty() ) {
-                    errmsg = "No log to validateComplete for ns: " + logCollection;
-                    return false;
-                } else {
-                    if ( !t.cllValidateComplete() ) {
-                        errmsg = "Oplog failure, insufficient space allocated";
-                        return false;
-                    }
-                }
-            }
-            log() << "started logCollection with cmd obj: " << cmdObj << endl;
-            return true;
-        }
-    } cmdlogcollection;
 
     // -------------------------------------
 
