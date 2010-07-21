@@ -71,14 +71,19 @@ namespace mongo {
     };
     
     /**
-     * top level grid configuration for an entire database
-     * TODO: use shared_ptr for ChunkManager
+     * top level configuration for a database
      */
-    class DBConfig : public Model {
+    class DBConfig  {
     public:
 
-        DBConfig( string name = "" ) : _name( name ) , _primary("config","") , 
-            _shardingEnabled(false), _lock("DBConfig") { }
+        DBConfig( string name ) 
+            : _name( name ) , 
+              _primary("config","") , 
+              _shardingEnabled(false), 
+              _lock("DBConfig") { 
+            assert( name.size() );
+        }
+        virtual ~DBConfig(){}
         
         string getName(){ return _name; };
 
@@ -114,18 +119,18 @@ namespace mongo {
             _primary.reset( s );
         }
 
+        bool load();
         bool reload();
-
+        void save(); // TODO make private
+        
         bool dropDatabase( string& errmsg );
 
-        virtual string modelServer();
-        
         // model stuff
 
-        virtual const char * getNS(){ return "config.databases"; }
-        virtual void serialize(BSONObjBuilder& to);
-        virtual void unserialize(const BSONObj& from);
-        
+        // lockless loading
+        void serialize(BSONObjBuilder& to);
+        void unserialize(const BSONObj& from);
+
     protected:
 
         /** 
@@ -134,8 +139,11 @@ namespace mongo {
         bool _isSharded( const string& ns );
 
         bool _dropShardedCollections( int& num, set<Shard>& allServers , string& errmsg );
-        
-        bool doload();
+
+        bool _load();
+        bool _reload();
+        void _save(); // TODO make private
+
         
         /**
            @return true if there was sharding info to remove
