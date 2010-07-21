@@ -59,6 +59,23 @@ namespace mongo {
             return;
         }
 
+        /* first make sure we are not hopelessly out of sync by being very stale. */
+        {
+            BSONObj remoteOldestOp = r.findOne(rsoplog, Query());
+            OpTime ts = remoteOldestOp["ts"]._opTime();
+            DEV log() << "remoteOldestOp: " << ts.toStringPretty() << endl;
+            else log(3) << "remoteOldestOp: " << ts.toStringPretty() << endl;
+            if( lastOpTimeWritten < ts ) { 
+                log() << "replSet error too stale to catch up, at least from primary " << hn << rsLog;
+                log() << "replSet our last optime : " << lastOpTimeWritten.toStringPretty() << rsLog;
+                log() << "replSet oldest at " << hn << " : " << ts.toStringPretty() << rsLog;
+                log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
+                sethbmsg("error too stale to catch up");
+                sleepsecs(120);
+                return;
+            }
+        }
+
         r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
         assert( r.haveCursor() );
         assert( r.awaitCapable() );
@@ -68,15 +85,10 @@ namespace mongo {
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) { 
-                if( lastOpTimeWritten < ts ) { 
-                    log() << "replSet error too stale to catch up, at least from primary " << hn << rsLog;
-                    log() << "replSet our last optime : " << lastOpTimeWritten.toStringPretty() << rsLog;
-                    log() << "replSet oldest at " << hn << " : " << ts.toStringPretty() << rsLog;
-                    log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
-                    sethbmsg("error too stale to catch up");
-                    sleepsecs(120);
-                    return;
-                }
+                log() << "TEMP " << lastOpTimeWritten.toStringPretty() << endl;
+                log() << "TEMP " << ts.toStringPretty() << endl;
+                /*
+                }*/
 
                 syncRollback(r);
                 return;
