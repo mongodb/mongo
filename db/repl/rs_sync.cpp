@@ -73,7 +73,7 @@ namespace mongo {
                     log() << "replSet our last optime : " << lastOpTimeWritten.toStringPretty() << rsLog;
                     log() << "replSet oldest at " << hn << " : " << ts.toStringPretty() << rsLog;
                     log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
-                    sethbmsg("error too stale to catch up");x
+                    sethbmsg("error too stale to catch up");
                     sleepsecs(120);
                     return;
                 }
