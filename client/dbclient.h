@@ -330,7 +330,7 @@ namespace mongo {
            @return a single object that matches the query.  if none do, then the object is empty
            @throws AssertionException
         */
-        virtual BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
 
     };
@@ -894,7 +894,7 @@ namespace mongo {
 
         /** throws userassertion "no master found" */
         virtual
-        BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /** insert */
         virtual void insert( const string &ns , BSONObj obj ) {

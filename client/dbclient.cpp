@@ -492,7 +492,7 @@ namespace mongo {
 		return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
 	}
 
-    BSONObj DBClientInterface::findOne(const string &ns, Query query, const BSONObj *fieldsToReturn, int queryOptions) {
+    BSONObj DBClientInterface::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
@@ -1021,7 +1021,7 @@ namespace mongo {
         return checkMaster().query(a,b,c,d,e,f,g);
     }
 
-    BSONObj DBClientPaired::findOne(const string &a, Query b, const BSONObj *c, int d) {
+    BSONObj DBClientPaired::findOne(const string &a, const Query& b, const BSONObj *c, int d) {
         return checkMaster().findOne(a,b,c,d);
     }
 

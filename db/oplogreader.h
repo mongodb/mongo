@@ -23,7 +23,7 @@ namespace mongo {
             _conn.reset();
         }
         DBClientConnection* conn() { return _conn.get(); }
-        BSONObj findOne(const char *ns, Query& q) { 
+        BSONObj findOne(const char *ns, const Query& q) { 
             return conn()->findOne(ns, q);
         }
 
