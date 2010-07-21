@@ -460,6 +460,7 @@
     <ClCompile Include="repl\manager.cpp" />
     <ClCompile Include="repl\rs_initialsync.cpp" />
     <ClCompile Include="repl\rs_initiate.cpp" />
+    <ClCompile Include="repl\rs_rollback.cpp" />
     <ClCompile Include="repl\rs_sync.cpp" />
     <ClCompile Include="repl_block.cpp" />
     <ClCompile Include="storage.cpp" />

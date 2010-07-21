@@ -385,6 +385,9 @@
     <ClCompile Include="repl\rs_initialsync.cpp">
       <Filter>rs</Filter>
     </ClCompile>
+    <ClCompile Include="repl\rs_rollback.cpp">
+      <Filter>rs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

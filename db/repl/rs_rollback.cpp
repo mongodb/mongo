@@ -34,7 +34,7 @@
 
    The design is "keep P".  One could argue here that "keep F" has some merits, however, in most cases P 
    will have significantly more data.  Also note that P may have a proper subset of F's stream if there were 
-   no subsequent writes!
+   no subsequent writes.
 
    For now the model is simply : get F back in sync with P.  If P was really behind or something, we should have 
    just chosen not to fail over anyway.
@@ -51,19 +51,15 @@
     find an event in common. 'd'.
     undo our events beyond that by: 
       (1) taking copy from other server of those objects
-      (2) do not consider copy valid until we pass the original end point (e.g. g) in time
+      (2) do not consider copy valid until we pass reach an optime after when we fetched the new version of object 
           -- i.e., reset minvalid.
-      (3) skip operations on objects that are previous in time to our capture of the object.
-
-a b c d e f
-a b c
-a b c d e.g 
+      (3) we could skip operations on objects that are previous in time to our capture of the object as an optimization.
 
 */
 
 namespace mongo {
 
-  void ReplSetImpl::syncRollback(OplogReader&r, ...) { 
+  void ReplSetImpl::syncRollback(OplogReader&r) { 
   }
 
 }

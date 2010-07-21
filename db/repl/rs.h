@@ -32,6 +32,7 @@ namespace mongo {
 
     struct Target;
     class ReplSetImpl;
+    class OplogReader;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
@@ -255,6 +256,7 @@ namespace mongo {
         void _syncThread();
         void syncTail();
         void syncApply(const BSONObj &o);
+        void syncRollback(OplogReader& r);
     public:
         void syncThread();
     };
