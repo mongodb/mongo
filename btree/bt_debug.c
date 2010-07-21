@@ -530,7 +530,6 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		size = WT_ITEM_LEN(item);
 		break;
 	case WT_ITEM_DEL:
-		hp = NULL;
 		p = (u_int8_t *)"deleted";
 		size = 7;
 		break;
@@ -544,7 +543,9 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		size = ovfl->size;
 		break;
 	case WT_ITEM_OFF:
-		return (0);
+		p = (u_int8_t *)"offpage";
+		size = 7;
+		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
