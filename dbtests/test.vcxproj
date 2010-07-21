@@ -264,7 +264,10 @@
     <ClCompile Include="..\db\repl\heartbeat.cpp" />
     <ClCompile Include="..\db\repl\manager.cpp" />
     <ClCompile Include="..\db\repl\rs.cpp" />
+    <ClCompile Include="..\db\repl\rs_initialsync.cpp" />
     <ClCompile Include="..\db\repl\rs_initiate.cpp" />
+    <ClCompile Include="..\db\repl\rs_rollback.cpp" />
+    <ClCompile Include="..\db\repl\rs_sync.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>

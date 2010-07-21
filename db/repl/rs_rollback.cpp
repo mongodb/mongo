@@ -1,4 +1,4 @@
-/* @file rs_rollback.cpp
+@file rs_rollback.cpp
 * 
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -59,14 +59,22 @@
 
 namespace mongo {
 
-    static void syncRollbackFindCommonPoint(OplogReader& us, OplogReader& them) { 
+    static void syncRollbackFindCommonPoint(DBClientConnection *us, DBClientConnection *them) { 
     }
 
     void ReplSetImpl::syncRollback(OplogReader&r) { 
-        sethbmsg("syncRollback");
-        r.resetCursor();
-
-        sethbmsg("syncRollbackFindCommonPoint");
+        sethbmsg("syncRollback 1");
+        {
+            r.resetCursor();
+            DBClientConnection us(false, 0, 0);
+            string errmsg;
+            if( !us.connect(HostAndPort::me().toString(),errmsg) ) { 
+                sethbmsg("syncRollback connect to self failure" + errmsg);
+                return;
+            }
+            sethbmsg("syncRollback 2 FindCommonPoint");
+            syncRollbackFindCommonPoint(&us, r.conn());
+        }
 
     }
 

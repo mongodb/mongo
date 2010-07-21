@@ -2,13 +2,13 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="repl\replset_commands.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="repl\rs_config.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="repl\health.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="btree.cpp">
       <Filter>db\btree</Filter>
@@ -17,7 +17,7 @@
       <Filter>db\btree</Filter>
     </ClCompile>
     <ClCompile Include="repl\consensus.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="..\client\connpool.cpp">
       <Filter>client</Filter>
@@ -29,7 +29,7 @@
       <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="repl\manager.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcreposix.c">
       <Filter>util\pcre</Filter>
@@ -104,7 +104,7 @@
       <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="repl\rs_initiate.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\vars.cpp">
       <Filter>util\concurrency</Filter>
@@ -113,7 +113,7 @@
       <Filter>util\concurrency</Filter>
     </ClCompile>
     <ClCompile Include="repl\heartbeat.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="..\scripting\engine_spidermonkey.cpp">
       <Filter>scripting</Filter>
@@ -128,7 +128,7 @@
       <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="repl\rs.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="oplog.cpp">
       <Filter>repl_old</Filter>
@@ -380,21 +380,21 @@
       <Filter>sharding</Filter>
     </ClCompile>
     <ClCompile Include="repl\rs_sync.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="repl\rs_initialsync.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
     <ClCompile Include="repl\rs_rollback.cpp">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClInclude>
     <ClInclude Include="repl\health.h">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClInclude>
     <ClInclude Include="..\bson\bsonelement.h">
       <Filter>bson</Filter>
@@ -421,7 +421,7 @@
       <Filter>db\btree</Filter>
     </ClInclude>
     <ClInclude Include="repl\connections.h">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClInclude>
     <ClInclude Include="..\client\connpool.h">
       <Filter>client</Filter>
@@ -439,7 +439,7 @@
       <Filter>util\pcre</Filter>
     </ClInclude>
     <ClInclude Include="repl\rsmember.h">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClInclude>
     <ClInclude Include="..\util\concurrency\list.h">
       <Filter>util\concurrency</Filter>
@@ -460,7 +460,7 @@
       <Filter>util\concurrency</Filter>
     </ClInclude>
     <ClInclude Include="repl\multicmd.h">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClInclude>
     <ClInclude Include="..\util\concurrency\msg.h">
       <Filter>util\concurrency</Filter>
@@ -508,10 +508,10 @@
       <Filter>client</Filter>
     </ClInclude>
     <ClInclude Include="repl\rs_optime.h">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClInclude>
     <ClInclude Include="repl\rs.h">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </ClInclude>
     <ClInclude Include="..\util\optime.h">
       <Filter>repl_old</Filter>
@@ -797,12 +797,6 @@
     <Filter Include="scripting">
       <UniqueIdentifier>{6b78f34f-e6b0-49e4-b04e-6478c3a3c077}</UniqueIdentifier>
     </Filter>
-    <Filter Include="rs">
-      <UniqueIdentifier>{3b73f786-d352-446f-a5f5-df49384baf7a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="rs\test stuff">
-      <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
-    </Filter>
     <Filter Include="db\storage engine">
       <UniqueIdentifier>{d565a775-7a99-4860-b25f-441e1655b7c6}</UniqueIdentifier>
     </Filter>
@@ -830,28 +824,34 @@
     <Filter Include="sharding">
       <UniqueIdentifier>{03b0d798-b13d-48f4-930d-ca827e2a3f00}</UniqueIdentifier>
     </Filter>
+    <Filter Include="replSets">
+      <UniqueIdentifier>{3b73f786-d352-446f-a5f5-df49384baf7a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="replSets\test stuff">
+      <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="repl\notes.txt">
-      <Filter>rs</Filter>
+      <Filter>replSets</Filter>
     </None>
     <None Include="..\util\mongoutils\README">
       <Filter>util\mongoutils</Filter>
     </None>
     <None Include="repl\testing.js">
-      <Filter>rs\test stuff</Filter>
+      <Filter>replSets\test stuff</Filter>
     </None>
     <None Include="repl\test.html">
-      <Filter>rs\test stuff</Filter>
+      <Filter>replSets\test stuff</Filter>
     </None>
     <None Include="..\SConstruct">
       <Filter>db</Filter>
     </None>
     <None Include="..\jstests\rs\rs_basic.js">
-      <Filter>rs\test stuff</Filter>
+      <Filter>replSets\test stuff</Filter>
     </None>
     <None Include="..\jstests\rs\test_framework.js">
-      <Filter>rs\test stuff</Filter>
+      <Filter>replSets\test stuff</Filter>
     </None>
     <None Include="mongo.ico">
       <Filter>Resource Files</Filter>
