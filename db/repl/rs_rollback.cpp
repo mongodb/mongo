@@ -59,7 +59,15 @@
 
 namespace mongo {
 
-  void ReplSetImpl::syncRollback(OplogReader&r) { 
-  }
+    static void syncRollbackFindCommonPoint(OplogReader& us, OplogReader& them) { 
+    }
+
+    void ReplSetImpl::syncRollback(OplogReader&r) { 
+        sethbmsg("syncRollback");
+        r.resetCursor();
+
+        sethbmsg("syncRollbackFindCommonPoint");
+
+    }
 
 }
