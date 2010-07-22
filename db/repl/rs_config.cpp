@@ -194,7 +194,7 @@ namespace mongo {
                     m.h = HostAndPort(s);
                 }
                 catch(...) { 
-                    throw "bad or missing host field?"; 
+                    throw string("bad or missing host field? ") + mobj.toString();
                 }
                 uassert(13393, "can't use localhost in member names", !m.h.isLocalHost());
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");

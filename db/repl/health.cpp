@@ -242,7 +242,7 @@ namespace mongo {
         const char *h[] = {"Member", 
             "<a title=\"member id in the replset config\">id</a>", 
             "Up", 
-            "<a title=\"length of time we have been continuously connected to the other member with no reconnects\">cctime</a>", 
+            "<a title=\"length of time we have been continuously connected to the other member with no reconnects (for self, shows uptime)\">cctime</a>", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 
             "<a title=\"how up to date this server is; write operations are sequentially numbered.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">opord</a>", 

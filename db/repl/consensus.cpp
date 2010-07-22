@@ -205,6 +205,9 @@ namespace mongo {
     }
 
     void Consensus::_electSelf() {
+        if( time(0) < steppedDown ) 
+            return;
+
         {
             const OpTime ord = theReplSet->lastOpTimeWritten;
             if( ord == 0 ) { 

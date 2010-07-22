@@ -34,23 +34,35 @@ namespace mongo {
         writelock lk("admin."); // so we are synchronized with _logOp() 
         _myState = RS_PRIMARY;
         _currentPrimary = _self;
-        log(2) << "replSet self is now primary" << rsLog;
+        log(2) << "replSet self (" << _self->id() << ") is now primary" << rsLog;
     }
 
     void ReplSetImpl::changeState(MemberState s) { 
-        /* TODO LOCKING */
+        /* TODO LOCKING ? */
         /* TODO call this don't touch mystate directly */
         _myState = s;
     }
 
     void ReplSetImpl::relinquish() { 
         if( state() == RS_PRIMARY ) {
-            _myState = RS_RECOVERING;
+            changeState(RS_RECOVERING);
             log() << "replSet info relinquished primary state" << rsLog;
         }
         else if( state() == RS_STARTUP2 ) {
-            _myState = RS_RECOVERING;
+            // ? add comment
+            changeState(RS_RECOVERING);
         }
+    }
+
+    bool ReplSetImpl::_stepDown() { 
+        lock lk(this);
+        if( isPrimary() ) { 
+            changeState(RS_RECOVERING);
+            elect.steppedDown = time(0) + 60;
+            log() << "replSet info stepped down as primary" << rsLog;
+            return true;
+        }
+        return false;
     }
 
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) { 
