@@ -58,6 +58,11 @@ namespace mongo {
 
         ShardConnection conn( server , _ns );
         
+        if ( conn.setVersion() ){
+            conn.done();
+            throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+        }
+
         if ( logLevel >= 5 ){
             log(5) << "ClusteredCursor::query (" << type() << ") server:" << server 
                    << " ns:" << _ns << " query:" << q << " num:" << num << 

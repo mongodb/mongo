@@ -115,7 +115,7 @@ namespace mongo {
                 uassert( 10195 ,  "too many attempts to update config, failing" , attempt < 5 );
                 
                 sleepsecs( attempt );
-                reset( true );
+                reset( ! staleConfig.justConnection() );
                 _d.markReset();
                 process( attempt + 1 );
                 return;
