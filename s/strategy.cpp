@@ -125,7 +125,7 @@ namespace mongo {
                         DBConfigPtr db = grid.getDBConfig( ns );
                         ShardChunkVersion needVersion( data["version"] );
                         
-                        log(1) << "writeback needVersion : " << needVersion.toString() << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
+                        log(1) << "writeback id: " << lastID << " needVersion : " << needVersion.toString() << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
                         
                         if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ){
                             // this means when the write went originally, the version was old
