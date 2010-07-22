@@ -176,7 +176,7 @@ namespace mongo {
         //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
         //    addMemberIfMissing(*i);
 
-        log() << "replSet startup : trying to load config from various servers..." << rsLog;
+        log() << "replSet beginning startup..." << rsLog;
 
         loadConfig();
 
@@ -334,16 +334,16 @@ namespace mongo {
                         startupStatus = EMPTYCONFIG;
                         startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)";
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
-                        log() << "replSet have you ran replSetInitiate yet?" << rsLog;
+                        log() << "replSet   have you ran replSetInitiate yet?" << rsLog;
                         if( _seeds->size() == 0 )
-                            log() << "replSet no seed hosts were specified on the command line - that might be the issue" << rsLog;
-                        log() << "replSet sleeping 20sec and will try again." << rsLog;
+                            log() << "replSet   no seed hosts were specified on the --replSet command line - that might be the issue" << rsLog;
+                        log() << "replSet   sleeping 20sec and will try again." << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
                         startupStatusMsg = "can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)";
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed." << rsLog;
-                        log() << "replSet sleeping 20sec and will try again." << rsLog;
+                        log() << "replSet   sleeping 20sec and will try again." << rsLog;
                     }
 
                     sleepsecs(10);
