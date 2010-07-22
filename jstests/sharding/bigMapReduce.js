@@ -1,5 +1,3 @@
-// This is meant to be a reproduction script for case SERVER-1400, but
-// it produces inconsistent results for me.
 s = new ShardingTest( "bigMapReduce" , 2 , 1 , 1 , { chunksize : 1 } );
 
 s.adminCommand( { enablesharding : "test" } )
@@ -12,8 +10,8 @@ for (j=0; j<50; j++) for (i=0; i<512; i++){ db.foo.save({y:str})}
 
 function map() { emit('count', 1); } 
 function reduce(key, values) { return Array.sum(values) } 
-out = db.foo.mapReduce(map, reduce) 
 
-print("1>>>>")
-printjson(">>>>"+out) // this ought to have an errmsg
-print("<<<<1")
+//out = db.foo.mapReduce(map, reduce) 
+//printjson(out) // SERVER-1400
+
+s.stop()
