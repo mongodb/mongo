@@ -34,7 +34,7 @@ namespace mongo {
         if( !expr ) { 
             string m = str::stream() << "initial sync " << msg;
             theReplSet->sethbmsg(m, 0);
-            uasserted(13388, m);
+            uasserted(13404, m);
         }
     }
 

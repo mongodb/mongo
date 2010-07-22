@@ -223,5 +223,4 @@ namespace mongo {
         _writeLock = 0; // TODO
     }
 
-
 }

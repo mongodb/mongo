@@ -27,7 +27,7 @@
  */
 
 namespace mongo {
-    
+
     struct ShardChunkVersion {
         union {
             struct {
@@ -108,14 +108,17 @@ namespace mongo {
      */
     class StaleConfigException : public AssertionException {
     public:
-        StaleConfigException( const string& ns , const string& raw)
-            : AssertionException( (string)"ns: " + ns + " " + raw , 9996 ){
+        StaleConfigException( const string& ns , const string& raw , bool justConnection = false )
+            : AssertionException( (string)"ns: " + ns + " " + raw , 9996 ) , _justConnection(justConnection){
         }
         
         virtual ~StaleConfigException() throw(){}
 
         virtual void appendPrefix( stringstream& ss ) const { ss << "StaleConfigException: "; }
+
+        bool justConnection() const { return _justConnection; }
     private:
+        bool _justConnection;
     };
 
     bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false , int tryNumber = 1 );

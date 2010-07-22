@@ -315,6 +315,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
  
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            LastError *le = lastError.disableForCommand();
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
 
             bool authoritative = cmdObj.getBoolField( "authoritative" );

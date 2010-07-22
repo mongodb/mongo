@@ -34,23 +34,35 @@ namespace mongo {
         writelock lk("admin."); // so we are synchronized with _logOp() 
         _myState = RS_PRIMARY;
         _currentPrimary = _self;
-        log(2) << "replSet self is now primary" << rsLog;
+        log(2) << "replSet self (" << _self->id() << ") is now primary" << rsLog;
     }
 
     void ReplSetImpl::changeState(MemberState s) { 
-        /* TODO LOCKING */
+        /* TODO LOCKING ? */
         /* TODO call this don't touch mystate directly */
         _myState = s;
     }
 
     void ReplSetImpl::relinquish() { 
         if( state() == RS_PRIMARY ) {
-            _myState = RS_RECOVERING;
+            changeState(RS_RECOVERING);
             log() << "replSet info relinquished primary state" << rsLog;
         }
         else if( state() == RS_STARTUP2 ) {
-            _myState = RS_RECOVERING;
+            // ? add comment
+            changeState(RS_RECOVERING);
         }
+    }
+
+    bool ReplSetImpl::_stepDown() { 
+        lock lk(this);
+        if( isPrimary() ) { 
+            changeState(RS_RECOVERING);
+            elect.steppedDown = time(0) + 60;
+            log() << "replSet info stepped down as primary" << rsLog;
+            return true;
+        }
+        return false;
     }
 
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) { 
@@ -176,7 +188,7 @@ namespace mongo {
         //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
         //    addMemberIfMissing(*i);
 
-        log() << "replSet startup : trying to load config from various servers..." << rsLog;
+        log() << "replSet beginning startup..." << rsLog;
 
         loadConfig();
 
@@ -334,16 +346,16 @@ namespace mongo {
                         startupStatus = EMPTYCONFIG;
                         startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)";
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
-                        log() << "replSet have you ran replSetInitiate yet?" << rsLog;
+                        log() << "replSet   have you ran replSetInitiate yet?" << rsLog;
                         if( _seeds->size() == 0 )
-                            log() << "replSet no seed hosts were specified on the command line - that might be the issue" << rsLog;
-                        log() << "replSet sleeping 20sec and will try again." << rsLog;
+                            log() << "replSet   no seed hosts were specified on the --replSet command line - that might be the issue" << rsLog;
+                        log() << "replSet   sleeping 20sec and will try again." << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
                         startupStatusMsg = "can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)";
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed." << rsLog;
-                        log() << "replSet sleeping 20sec and will try again." << rsLog;
+                        log() << "replSet   sleeping 20sec and will try again." << rsLog;
                     }
 
                     sleepsecs(10);

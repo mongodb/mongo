@@ -84,13 +84,21 @@ namespace mongo {
         };
         Atomic<LastYea> ly;
         unsigned yea(unsigned memberId); // throws VoteException
+        void electionFailed(unsigned meid);
         void _electSelf();
         bool weAreFreshest(bool& allUp, int& nTies);
         bool sleptLast; // slept last elect() pass
     public:
         Consensus(ReplSetImpl *t) : rs(*t) { 
             sleptLast = false;
+            steppedDown = 0;
         }
+
+        /* if we've stepped down, this is when we are allowed to try to elect ourself again. 
+           todo: handle possible weirdnesses at clock skews etc.
+        */
+        time_t steppedDown;
+
         int totalVotes() const;
         bool aMajoritySeemsToBeUp() const;
         void electSelf();
@@ -178,6 +186,9 @@ namespace mongo {
         bool ok() const { return _myState != RS_FATAL; }
 
         void relinquish();
+    protected:
+        bool _stepDown();
+    private:
         void assumePrimary();
         void loadLastOpTimeWritten();
         void changeState(MemberState s);
@@ -271,8 +282,9 @@ namespace mongo {
 
     class ReplSet : public ReplSetImpl { 
     public:
-        ReplSet(string cfgString) : ReplSetImpl(cfgString) { 
-        }
+        ReplSet(string cfgString) : ReplSetImpl(cfgString) {  }
+
+        bool stepDown() { return _stepDown(); }
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }

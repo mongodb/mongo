@@ -49,6 +49,7 @@ namespace mongo {
     v8::Handle<v8::Value> internalCursorCons(const v8::Arguments& args);
     v8::Handle<v8::Value> internalCursorNext(const v8::Arguments& args);
     v8::Handle<v8::Value> internalCursorHasNext(const v8::Arguments& args);
+    v8::Handle<v8::Value> internalCursorObjsLeftInBatch(const v8::Arguments& args);
     
     // DB members
     

@@ -23,6 +23,7 @@
 #include "../client/connpool.h"
 #include "../client/parallel.h"
 #include "../db/commands.h"
+#include "../db/query.h"
 
 #include "config.h"
 #include "chunk.h"
@@ -127,8 +128,8 @@ namespace mongo {
                 log() << "DROP DATABASE: " << dbName << endl;
 
                 if ( ! conf ){
-                    log(1) << "  passing though drop database for: " << dbName << endl;
-                    return passthrough( conf , cmdObj , result );
+                    result.append( "info" , "database didn't exist" );
+                    return true;
                 }
                 
                 if ( ! conf->dropDatabase( errmsg ) )
@@ -224,7 +225,7 @@ namespace mongo {
                         return true;
                     }
                     
-                    if ( temp["code"].numberInt() != 13388 ){
+                    if ( temp["code"].numberInt() != StaleConfigInContextCode ){
                         errmsg = temp["errmsg"].String();
                         result.appendElements( temp );
                         return false;
@@ -277,7 +278,7 @@ namespace mongo {
                             continue;
                         }
                         
-                        if ( 13388 == temp["code"].numberInt() ){
+                        if ( StaleConfigInContextCode == temp["code"].numberInt() ){
                             // my version is old
                             total = 0;
                             shardCounts.clear();
@@ -295,6 +296,7 @@ namespace mongo {
                         break;
                 }
                 
+                total = applySkipLimit( total , cmdObj );
                 result.appendNumber( "n" , total );
                 BSONObjBuilder temp( result.subobjStart( "shards" ) );
                 for ( map<string,long long>::iterator i=shardCounts.begin(); i!=shardCounts.end(); ++i )
@@ -330,6 +332,7 @@ namespace mongo {
                 long long size=0;
                 long long storageSize=0;
                 int nindexes=0;
+                bool warnedAboutIndexes = false;
                 for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ){
                     ShardConnection conn( *i , fullns );
                     BSONObj res;
@@ -343,10 +346,25 @@ namespace mongo {
                     size += res["size"].numberLong();
                     storageSize += res["storageSize"].numberLong();
 
-                    if (nindexes)
-                        massert(12595, "nindexes should be the same on all shards!", nindexes == res["nindexes"].numberInt());
-                    else
-                        nindexes = res["nindexes"].numberInt();
+                    int myIndexes = res["nindexes"].numberInt();
+
+                    if ( nindexes == 0 ){
+                        nindexes = myIndexes;
+                    }
+                    else if ( nindexes == myIndexes ){
+                        // no-op
+                    }
+                    else {
+                        // hopefully this means we're building an index
+                        
+                        if ( myIndexes > nindexes )
+                            nindexes = myIndexes;
+                        
+                        if ( ! warnedAboutIndexes ){
+                            result.append( "warning" , "indexes don't all match - ok if ensureIndex is running" );
+                            warnedAboutIndexes = true;
+                        }
+                    }
 
                     shardStats.append(i->getName(), res);
                 }

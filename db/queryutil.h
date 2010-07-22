@@ -563,4 +563,6 @@ namespace mongo {
     /** returns the upper bound of a query that matches prefix */
     string simpleRegexEnd( string prefix );
 
+    long long applySkipLimit( long long num , const BSONObj& cmd );
+
 } // namespace mongo

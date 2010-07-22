@@ -82,6 +82,7 @@ namespace mongo {
                 log(5) << "client id: " << hex << r.getClientId() << "\t" << r.getns() << "\t" << dec << r.op() << endl;
             }
             try {
+                r.init();
                 setClientId( r.getClientId() );
                 r.process();
             }

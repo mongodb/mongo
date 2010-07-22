@@ -199,6 +199,8 @@ namespace mongo {
             b.decouple();
             QueryResult *qr = msgdata;
             qr->_resultFlags() = ResultFlag_ErrSet;
+            if ( e.getCode() == StaleConfigInContextCode )
+                qr->_resultFlags() |= ResultFlag_ShardConfigStale;
             qr->len = b.len();
             qr->setOperation(opReply);
             qr->cursorId = 0;
@@ -257,13 +259,6 @@ namespace mongo {
         
         globalOpCounters.gotOp( op , isCommand );
         
-        if ( handlePossibleShardedMessage( m , dbresponse ) ){
-            /* important to do this before we lock
-               so if a message has to be forwarded, doesn't block for that
-            */
-            return true;
-        }
-
         Client& c = cc();
         
         auto_ptr<CurOp> nestedOp;
@@ -278,6 +273,13 @@ namespace mongo {
         OpDebug& debug = currentOp.debug();
         StringBuilder& ss = debug.str;
         ss << opToString( op ) << " ";
+
+        if ( handlePossibleShardedMessage( c, currentOp , debug , m , dbresponse ) ){
+            /* important to do this before we lock
+               so if a message has to be forwarded, doesn't block for that
+            */
+            return true;
+        }
 
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;

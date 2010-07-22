@@ -82,6 +82,8 @@ namespace mongo {
             return s.str();
         }
         
+        string toString() const { return str(); }
+
         static OID gen() { OID o; o.init(); return o; }
         
         static unsigned staticMachine(){ return _machine; }
@@ -100,6 +102,10 @@ namespace mongo {
         Date_t asDateT() { return asTimeT() * (long long)1000; }
         
         bool isSet() const { return a || b; }
+        
+        int compare( const OID& other ) const { return memcmp( data , other.data , 12 ); }
+        
+        bool operator<( const OID& other ) const { return compare( other ) < 0; }
     };
 #pragma pack()
 

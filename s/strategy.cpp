@@ -81,8 +81,16 @@ namespace mongo {
         }
         
         void run(){
+            OID lastID;
             int secsToSleep = 0;
             while ( Shard::isMember( _addr ) ){
+                
+                if ( lastID.isSet() ){
+                    scoped_lock lk( _seenWritebacksLock );
+                    _seenWritebacks.insert( lastID );
+                    lastID.clear();
+                }
+
                 try {
                     ScopedDbConnection conn( _addr );
                     
@@ -104,7 +112,11 @@ namespace mongo {
                     BSONObj data = result.getObjectField( "data" );
                     if ( data.getBoolField( "writeBack" ) ){
                         string ns = data["ns"].valuestrsafe();
-
+                        {
+                            BSONElement e = data["id"];
+                            if ( e.type() == jstOID )
+                                lastID = e.OID();
+                        }
                         int len;
 
                         Message m( (void*)data["msg"].binData( len ) , false );
@@ -113,18 +125,19 @@ namespace mongo {
                         DBConfigPtr db = grid.getDBConfig( ns );
                         ShardChunkVersion needVersion( data["version"] );
                         
-                        log(1) << "writeback needVersion : " << needVersion.toString() << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
+                        log(1) << "writeback id: " << lastID << " needVersion : " << needVersion.toString() << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
                         
                         if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ){
                             // this means when the write went originally, the version was old
                             // if we're here, it means we've already updated the config, so don't need to do again
-                            db->getChunkManager( ns , true ); // TEMP TEMP TEMP ERH
+                            //db->getChunkManager( ns , true ); // SERVER-1349
                         }
                         else {
                             db->getChunkManager( ns , true );
                         }
                         
                         Request r( m , 0 );
+                        r.init();
                         r.process();
                     }
                     else {
@@ -158,22 +171,47 @@ namespace mongo {
         string _addr;
 
         static map<string,WriteBackListener*> _cache;
-        static mongo::mutex _lock;
+        static mongo::mutex _cacheLock;
+        
+        static set<OID> _seenWritebacks;
+        static mongo::mutex _seenWritebacksLock;
         
     public:
         static void init( DBClientBase& conn ){
-            scoped_lock lk( _lock );
+            scoped_lock lk( _cacheLock );
             WriteBackListener*& l = _cache[conn.getServerAddress()];
             if ( l )
                 return;
             l = new WriteBackListener( conn.getServerAddress() );
             l->go();
         }
+        
 
+        static void waitFor( const OID& oid ){
+            Timer t;
+            for ( int i=0; i<5000; i++ ){
+                {
+                    scoped_lock lk( _seenWritebacksLock );
+                    if ( _seenWritebacks.count( oid ) )
+                        return;
+                }
+                sleepmillis( 10 );
+            }
+            stringstream ss;
+            ss << "didn't get writeback for: " << oid << " after: " << t.millis() << " ms";
+            uasserted( 13403 , ss.str() );
+        }
     };
 
+    void waitForWriteback( const OID& oid ){
+        WriteBackListener::waitFor( oid );
+    }
+    
     map<string,WriteBackListener*> WriteBackListener::_cache;
-    mongo::mutex WriteBackListener::_lock("WriteBackListener");
+    mongo::mutex WriteBackListener::_cacheLock("WriteBackListener");
+
+    set<OID> WriteBackListener::_seenWritebacks;
+    mongo::mutex WriteBackListener::_seenWritebacksLock( "WriteBackListener::seen" );
     
     /**
      * @return true if had to do something

@@ -128,4 +128,24 @@ namespace mongo {
         }
     } cmdReplSetFreeze;
 
+    class CmdReplSetStepDown: public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "Step down as primary.  Will not try to reelect self or 1 minute.\n";
+            help << "(If another member with same priority takes over in the meantime, it will stay primary.)\n";
+            help << "http://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+        }
+
+        CmdReplSetStepDown() : ReplSetCommand("replSetStepDown", true) { }
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) )
+                return false;
+            if( !theReplSet->isPrimary() ) {
+                errmsg = "not primary so can't step down";
+                return false;
+            }
+            return theReplSet->stepDown();
+        }
+    } cmdReplSetStepDown;
+
 }

@@ -46,6 +46,7 @@ namespace mongo {
         ic->InstanceTemplate()->SetInternalFieldCount( 1 );
         ic->PrototypeTemplate()->Set( v8::String::New("next") , FunctionTemplate::New( internalCursorNext ) );
         ic->PrototypeTemplate()->Set( v8::String::New("hasNext") , FunctionTemplate::New( internalCursorHasNext ) );
+        ic->PrototypeTemplate()->Set( v8::String::New("objsLeftInBatch") , FunctionTemplate::New( internalCursorObjsLeftInBatch ) );
         proto->Set( v8::String::New( "internalCursor" ) , ic );
         
 
@@ -407,6 +408,18 @@ namespace mongo {
             ret = cursor->more();
         }
         return Boolean::New( ret );
+    }
+
+    v8::Handle<v8::Value> internalCursorObjsLeftInBatch(const v8::Arguments& args){
+        mongo::DBClientCursor * cursor = getCursor( args );
+        if ( ! cursor )
+            return v8::Number::New( (double) 0 );
+        int ret;
+        {
+            v8::Unlocker u;
+            ret = cursor->objsLeftInBatch();
+        }
+        return v8::Number::New( (double) ret );
     }
 
 

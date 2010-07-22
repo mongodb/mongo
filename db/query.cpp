@@ -489,7 +489,7 @@ namespace mongo {
         ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
     };
-    
+
     /* { count: "collectionname"[, query: <query>] }
        returns -1 on ns does not exist error.
     */    
@@ -501,21 +501,10 @@ namespace mongo {
             return -1;
         }
         BSONObj query = cmd.getObjectField("query");
-
+        
         // count of all objects
         if ( query.isEmpty() ){
-            long long num = d->nrecords;
-            num = num - cmd["skip"].numberLong();
-            if ( num < 0 ) {
-                num = 0;
-            }
-            if ( cmd["limit"].isNumber() ){
-                long long limit = cmd["limit"].numberLong();
-                if ( limit < num ){
-                    num = limit;
-                }
-            }
-            return num;
+            return applySkipLimit( d->nrecords , cmd );
         }
         MultiPlanScanner mps( ns, query, BSONObj(), 0, true, BSONObj(), BSONObj(), false, true );
         CountOp original( ns , cmd );
@@ -528,7 +517,7 @@ namespace mongo {
         }
         return res->count();
     }
-
+    
     class ExplainBuilder {
     public:
         ExplainBuilder() : _i() {}

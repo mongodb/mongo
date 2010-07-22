@@ -37,7 +37,7 @@
 namespace mongo {
 
     Request::Request( Message& m, AbstractMessagingPort* p ) : 
-        _m(m) , _d( m ) , _p(p){
+        _m(m) , _d( m ) , _p(p) , _didInit(false){
         
         assert( _d.getns() );
         _id = _m.header()->id;
@@ -46,9 +46,15 @@ namespace mongo {
         _clientInfo = ClientInfo::get( _clientId );
         _clientInfo->newRequest( p );
         
+    }
+    
+    void Request::init(){
+        if ( _didInit )
+            return;
+        _didInit = true;
         reset();
     }
-
+    
     void Request::reset( bool reload ){
         if ( _m.operation() == dbKillCursors ){
             return;
@@ -71,6 +77,8 @@ namespace mongo {
     }
     
     Shard Request::primaryShard() const {
+        assert( _didInit );
+            
         if ( _chunkManager ){
             if ( _chunkManager->numChunks() > 1 )
                 throw UserException( 8060 , "can't call primaryShard on a sharded collection" );
@@ -82,7 +90,7 @@ namespace mongo {
     }
     
     void Request::process( int attempt ){
-
+        init();
         int op = _m.operation();
         assert( op > dbMsg );
         
@@ -115,7 +123,7 @@ namespace mongo {
                 uassert( 10195 ,  "too many attempts to update config, failing" , attempt < 5 );
                 
                 sleepsecs( attempt );
-                reset( true );
+                reset( ! staleConfig.justConnection() );
                 _d.markReset();
                 process( attempt + 1 );
                 return;
@@ -143,6 +151,7 @@ namespace mongo {
     }
 
     void Request::reply( Message & response , const string& fromServer ){
+        assert( _didInit );
         long long cursor =response.header()->getCursor();
         if ( cursor ){
             cursorCache.storeRef( fromServer , cursor );
