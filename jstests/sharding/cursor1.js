@@ -38,8 +38,8 @@ s.adminCommand( { movechunk : "test.foo" , find : { _id : 5 } , to : secondary.g
 assert.eq( 2, s.config.chunks.count() );
  
 // the cursors should not have been affected
-assert.eq( numObjs , cursor1.itcount() );
-assert.eq( numObjs , cursor2.itcount() );
-assert.eq( numObjs , cursor3.itcount() );
+assert.eq( numObjs , cursor1.itcount() , "c1" );
+assert.eq( numObjs , cursor2.itcount() , "c2" );
+assert.eq( numObjs , cursor3.itcount() , "c3" );
 
 s.stop()
