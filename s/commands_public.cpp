@@ -216,7 +216,7 @@ namespace mongo {
                     ShardConnection conn( conf->getPrimary() , fullns );
 
                     BSONObj temp;
-                    bool ok = conn->runCommand( dbName , BSON( "count" << collection << "query" << filter ) , temp );
+                    bool ok = conn->runCommand( dbName , cmdObj , temp );
                     conn.done();
                     
                     if ( ok ){
