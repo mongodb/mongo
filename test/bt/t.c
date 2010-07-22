@@ -102,8 +102,8 @@ main(int argc, char *argv[])
 		if (g.c_duplicates_pct != 0)
 			goto skip_ops;
 
+						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {		
-						/* Read random records */
 			switch (g.c_database_type) {
 			case ROW:
 				if (wts_read_row_scan())
