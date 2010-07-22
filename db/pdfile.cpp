@@ -1612,12 +1612,15 @@ namespace mongo {
 namespace mongo {
 
     void dropAllDatabasesExceptLocal() { 
+        writelock lk("");
+
         vector<string> n;
         getDatabaseNames(n);
         if( n.size() == 0 ) return;
         log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
-            if( *i != "local" ) { 
+            if( *i != "local" ) {
+                Client::Context ctx(*i);
                 dropDatabase(*i);
             }
         }
@@ -1625,6 +1628,7 @@ namespace mongo {
 
     void dropDatabase(string db) {
         log(1) << "dropDatabase " << db << endl;
+        assert( cc().database() );
         assert( cc().database()->name == db );
 
         BackgroundOperation::assertNoBgOpInProgForDb(db.c_str());

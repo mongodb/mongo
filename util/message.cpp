@@ -380,7 +380,7 @@ namespace mongo {
     bool MessagingPort::recv(Message& m) {
         try {
         again:
-            mmm( out() << "*  recv() sock:" << this->sock << endl; )
+            mmm( log() << "*  recv() sock:" << this->sock << endl; )
             int len = -1;
             
             char *lenbuf = (char *) &len;
@@ -416,7 +416,7 @@ namespace mongo {
             md->len = len;
             
             if ( len <= 0 ) {
-                out() << "got a length of " << len << ", something is wrong" << endl;
+                log() << "got a length of " << len << ", something is wrong" << endl;
                 return false;
             }
             
@@ -443,38 +443,38 @@ namespace mongo {
     }
 
     bool MessagingPort::call(Message& toSend, Message& response) {
-        mmm( out() << "*call()" << endl; )
+        mmm( log() << "*call()" << endl; )
         MSGID old = toSend.header()->id;
         say(/*to,*/ toSend);
         while ( 1 ) {
             bool ok = recv(response);
             if ( !ok )
                 return false;
-            //out() << "got response: " << response.data->responseTo << endl;
+            //log() << "got response: " << response.data->responseTo << endl;
             if ( response.header()->responseTo == toSend.header()->id )
                 break;
-            out() << "********************" << endl;
-            out() << "ERROR: MessagingPort::call() wrong id got:" << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << endl;
-            out() << "  toSend op: " << toSend.operation() << " old id:" << (unsigned)old << endl;
-            out() << "  response msgid:" << (unsigned)response.header()->id << endl;
-            out() << "  response len:  " << (unsigned)response.header()->len << endl;
-            out() << "  response op:  " << response.operation() << endl;
-            out() << "  farEnd: " << farEnd << endl;
+            log() << "********************" << endl;
+            log() << "ERROR: MessagingPort::call() wrong id got:" << hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << endl;
+            log() << "  toSend op: " << toSend.operation() << " old id:" << (unsigned)old << endl;
+            log() << "  response msgid:" << (unsigned)response.header()->id << endl;
+            log() << "  response len:  " << (unsigned)response.header()->len << endl;
+            log() << "  response op:  " << response.operation() << endl;
+            log() << "  farEnd: " << farEnd << endl;
             assert(false);
             response.reset();
         }
-        mmm( out() << "*call() end" << endl; )
+        mmm( log() << "*call() end" << endl; )
         return true;
     }
 
     void MessagingPort::say(Message& toSend, int responseTo) {
         assert( !toSend.empty() );
-        mmm( out() << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
+        mmm( log() << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
         toSend.header()->id = nextMessageId();
         toSend.header()->responseTo = responseTo;
 
         if ( piggyBackData && piggyBackData->len() ) {
-            mmm( out() << "*     have piggy back" << endl; )
+            mmm( log() << "*     have piggy back" << endl; )
             if ( ( piggyBackData->len() + toSend.header()->len ) > 1300 ) {
                 // won't fit in a packet - so just send it off
                 piggyBackData->flush();
