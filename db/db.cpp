@@ -929,6 +929,11 @@ int main(int argc, char* argv[], char *envp[] )
             cmdLine.only = params["only"].as<string>().c_str();
         }
         if (params.count("pairwith")) {
+            cout << "***********************************\n"
+                 << "WARNING WARNING WARNING\n"
+                 << " replica pairs are deprecated\n"
+                 << " see: http://www.mongodb.org/display/DOCS/Replica+Pairs \n" 
+                 << "***********************************" << endl;
             string paired = params["pairwith"].as<string>();
             if (params.count("arbiter")) {
                 string arbiter = params["arbiter"].as<string>();
