@@ -332,6 +332,7 @@ namespace mongo {
                 long long size=0;
                 long long storageSize=0;
                 int nindexes=0;
+                bool warnedAboutIndexes = false;
                 for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ){
                     ShardConnection conn( *i , fullns );
                     BSONObj res;
@@ -345,10 +346,25 @@ namespace mongo {
                     size += res["size"].numberLong();
                     storageSize += res["storageSize"].numberLong();
 
-                    if (nindexes)
-                        massert(12595, "nindexes should be the same on all shards!", nindexes == res["nindexes"].numberInt());
-                    else
-                        nindexes = res["nindexes"].numberInt();
+                    int myIndexes = res["nindexes"].numberInt();
+
+                    if ( nindexes == 0 ){
+                        nindexes = myIndexes;
+                    }
+                    else if ( nindexes == myIndexes ){
+                        // no-op
+                    }
+                    else {
+                        // hopefully this means we're building an index
+                        
+                        if ( myIndexes > nindexes )
+                            nindexes = myIndexes;
+                        
+                        if ( ! warnedAboutIndexes ){
+                            result.append( "warning" , "indexes don't all match - ok if ensureIndex is running" );
+                            warnedAboutIndexes = true;
+                        }
+                    }
 
                     shardStats.append(i->getName(), res);
                 }
