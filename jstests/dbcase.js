@@ -6,10 +6,12 @@ a.dropDatabase();
 b.dropDatabase();
 
 a.foo.save( { x : 1 } )
-assert.eq( 0 , db.getLastErrorObj().code || 0 , "A" )
+z = db.getLastErrorObj();
+assert.eq( 0 , z.code || 0 , "A : " + tojson(z) )
 
 b.foo.save( { x : 1 } )
-assert.eq( 13297 , db.getLastErrorObj().code || 0 , "A" )
+z = db.getLastErrorObj();
+assert.eq( 13297 , z.code || 0 , "B : " + tojson(z) )
 
 a.dropDatabase();
 b.dropDatabase();

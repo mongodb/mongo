@@ -22,6 +22,11 @@
 
 namespace mongo {
 
+    enum CommonErrorCodes {
+        DatabaseDifferCaseCode = 13297 ,
+        StaleConfigInContextCode = 13388
+    };
+
 	/* these are manipulated outside of mutexes, so be careful */
     struct Assertion {
         Assertion() {

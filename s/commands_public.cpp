@@ -128,8 +128,8 @@ namespace mongo {
                 log() << "DROP DATABASE: " << dbName << endl;
 
                 if ( ! conf ){
-                    log(1) << "  passing though drop database for: " << dbName << endl;
-                    return passthrough( conf , cmdObj , result );
+                    result.append( "info" , "database didn't exist" );
+                    return true;
                 }
                 
                 if ( ! conf->dropDatabase( errmsg ) )

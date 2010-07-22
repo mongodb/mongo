@@ -223,6 +223,4 @@ namespace mongo {
         _writeLock = 0; // TODO
     }
 
-
-    const int StaleConfigInContextCode = 13388;
 }
