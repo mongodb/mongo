@@ -838,6 +838,7 @@ __wt_bt_page_discard_repl_list(ENV *env, WT_REPL *repl)
 		 */
 		upd = *(WT_DATA_UPDATE **)
 		    ((u_int8_t *)repl - sizeof(WT_DATA_UPDATE *));
+		WT_ASSERT(env, upd->out < upd->in);
 		if (++upd->out == upd->in)
 			__wt_free(env, upd, upd->len);
 	} while ((repl = a) != NULL);
