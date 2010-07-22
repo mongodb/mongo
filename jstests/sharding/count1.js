@@ -50,6 +50,14 @@ assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "total count with co
 assert.eq( "allan,bob,eliot,joe,mark,sara" ,  db.foo.find().sort( { name : 1 } ).toArray().map( function(z){ return z.name; } ) , "sort 1" );
 assert.eq( "sara,mark,joe,eliot,bob,allan" ,  db.foo.find().sort( { name : -1 } ).toArray().map( function(z){ return z.name; } ) , "sort 2" );
 
+assert.eq( 2 , db.foo.find().limit(2).itcount() , "LS1" )
+assert.eq( 2 , db.foo.find().skip(2).limit(2).itcount() , "LS2" )
+assert.eq( 1 , db.foo.find().skip(5).limit(2).itcount() , "LS3" )
+assert.eq( 6 , db.foo.find().limit(2).count() , "LSC1" )
+assert.eq( 2 , db.foo.find().limit(2).size() , "LSC2" )
+assert.eq( 2 , db.foo.find().skip(2).limit(2).size() , "LSC3" )
+assert.eq( 1 , db.foo.find().skip(5).limit(2).size() , "LSC4" )
+
 s.stop();
 
 

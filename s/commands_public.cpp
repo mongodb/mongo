@@ -23,6 +23,7 @@
 #include "../client/connpool.h"
 #include "../client/parallel.h"
 #include "../db/commands.h"
+#include "../db/query.h"
 
 #include "config.h"
 #include "chunk.h"
@@ -295,6 +296,7 @@ namespace mongo {
                         break;
                 }
                 
+                total = applySkipLimit( total , cmdObj );
                 result.appendNumber( "n" , total );
                 BSONObjBuilder temp( result.subobjStart( "shards" ) );
                 for ( map<string,long long>::iterator i=shardCounts.begin(); i!=shardCounts.end(); ++i )

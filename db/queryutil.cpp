@@ -1163,4 +1163,28 @@ namespace mongo {
             }
         }
     } simple_regex_unittest;
+
+
+    long long applySkipLimit( long long num , const BSONObj& cmd ){
+        BSONElement s = cmd["skip"];
+        BSONElement l = cmd["limit"];
+        
+        if ( s.isNumber() ){
+            num = num - s.numberLong();
+            if ( num < 0 ) {
+                num = 0;
+            }
+        }
+        
+        if ( l.isNumber() ){
+            long long limit = l.numberLong();
+            if ( limit < num ){
+                num = limit;
+            }
+        }
+
+        return num;        
+    }
+    
+
 } // namespace mongo
