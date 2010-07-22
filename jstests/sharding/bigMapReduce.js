@@ -11,7 +11,7 @@ for (j=0; j<50; j++) for (i=0; i<512; i++){ db.foo.save({y:str})}
 function map() { emit('count', 1); } 
 function reduce(key, values) { return Array.sum(values) } 
 
-//out = db.foo.mapReduce(map, reduce) 
-//printjson(out) // SERVER-1400
+out = db.foo.mapReduce(map, reduce) 
+printjson(out) // SERVER-1400
 
 s.stop()
