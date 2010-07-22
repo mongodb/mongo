@@ -62,7 +62,9 @@ namespace mongo {
     using namespace bson;
 
     struct HowToFixUp {
+        // todo make this just the _id value not the whole bo we got (not that it's large anyway)
         list<bo> toRefetch;
+
         OpTime commonPoint;
     };
 
@@ -129,6 +131,43 @@ namespace mongo {
         }
     }
 
+    static void fix(const be& _id) { 
+    }
+
+   void ReplSetImpl::syncFixUp(HowToFixUp& h, DBClientConnection *them) {
+       // fetch all first so we aren't interrupted.
+       unsigned long long totSize = 0;
+       map</*the _id*/be,bo> items;
+       for( list<bo>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) { 
+           const bo& o = *i;
+
+           if( o["op"].String() == "n" )
+               continue;
+
+           be _id = o["_id"];
+           if( _id.eoo() ) {
+               log() << "replSet sync item in oplog has no _id; skipping. " << i->toString() << rsLog;
+               continue;
+           }
+           if( items.count(_id) )
+               continue;
+
+           {
+               string ns = o["ns"].String();
+               bo goodVersion = them->findOne(ns, bob().append(_id).done());
+               totSize += goodVersion.objsize();
+               // assert on totSize...
+
+               // note result might be eoo, indicating we should delete.
+               items.insert(pair<be,bo>(_id, goodVersion.getOwned()));
+           }
+       }
+
+       // update them
+
+       // clean up oplog
+   }
+
     void ReplSetImpl::syncRollback(OplogReader&r) { 
         assert( !lockedByMe() );
         assert( !dbMutex.atLeastReadLocked() );
@@ -160,7 +199,10 @@ namespace mongo {
             }
         }
 
-        sethbmsg("replSet syncRollback 3 FINISH");
+        sethbmsg("replSet syncRollback 3");
+        syncFixUp(how, r.conn());
+
+        sethbmsg("replSet syncRollback 4 FINISH");
     }
 
 }

@@ -30,7 +30,9 @@
 
 namespace mongo {
 
+    struct HowToFixUp;
     struct Target;
+    class DBClientConnection;
     class ReplSetImpl;
     class OplogReader;
     extern bool replSet; // true if using repl sets
@@ -262,6 +264,7 @@ namespace mongo {
         void syncTail();
         void syncApply(const BSONObj &o);
         void syncRollback(OplogReader& r);
+        void syncFixUp(HowToFixUp& h, DBClientConnection*);
     public:
         void syncThread();
     };
