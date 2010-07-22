@@ -116,6 +116,16 @@ DBQuery.prototype.next = function(){
     return ret;
 }
 
+DBQuery.prototype.objsLeftInBatch = function(){
+    this._exec();
+
+    var ret = this._cursor.objsLeftInBatch();
+    if ( ret.$err )
+        throw "error: " + tojson( ret );
+
+    return ret;
+}
+
 DBQuery.prototype.toArray = function(){
     if ( this._arr )
         return this._arr;
