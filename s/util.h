@@ -27,6 +27,8 @@
  */
 
 namespace mongo {
+
+    extern const int StaleConfigInContextCode;
     
     struct ShardChunkVersion {
         union {

@@ -225,7 +225,7 @@ namespace mongo {
                         return true;
                     }
                     
-                    if ( temp["code"].numberInt() != 13388 ){
+                    if ( temp["code"].numberInt() != StaleConfigInContextCode ){
                         errmsg = temp["errmsg"].String();
                         result.appendElements( temp );
                         return false;
@@ -278,7 +278,7 @@ namespace mongo {
                             continue;
                         }
                         
-                        if ( 13388 == temp["code"].numberInt() ){
+                        if ( StaleConfigInContextCode == temp["code"].numberInt() ){
                             // my version is old
                             total = 0;
                             shardCounts.clear();

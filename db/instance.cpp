@@ -199,6 +199,8 @@ namespace mongo {
             b.decouple();
             QueryResult *qr = msgdata;
             qr->_resultFlags() = ResultFlag_ErrSet;
+            if ( e.getCode() == StaleConfigInContextCode )
+                qr->_resultFlags() |= ResultFlag_ShardConfigStale;
             qr->len = b.len();
             qr->setOperation(opReply);
             qr->cursorId = 0;

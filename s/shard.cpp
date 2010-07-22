@@ -224,4 +224,5 @@ namespace mongo {
     }
 
 
+    const int StaleConfigInContextCode = 13388;
 }
