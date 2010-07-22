@@ -38,7 +38,8 @@ namespace mongo {
             if you want to exhaust whatever data has been fetched to the client already but 
             then perhaps stop.
         */
-        bool moreInCurrentBatch() { _assertIfNull(); return !_putBack.empty() || pos < nReturned; }
+        int objsLeftInBatch() const { _assertIfNull(); return _putBack.size() + nReturned - pos; }
+        bool moreInCurrentBatch() { return objsLeftInBatch() > 0; }
 
         /** next
 		   @return next object in the result cursor.
@@ -179,7 +180,7 @@ namespace mongo {
         string _scopedHost;
 
         // Don't call from a virtual function
-        void _assertIfNull() { uassert(13348, "connection died", this); }
+        void _assertIfNull() const { uassert(13348, "connection died", this); }
     };
     
     /** iterate over objects in current batch only - will not cause a network call

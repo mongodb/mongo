@@ -384,8 +384,6 @@ def expandSuites(suites):
             (globstr, usedb) = ('auth/*.js', False)
         elif suite == 'smokeSharding':
             (globstr, usedb) = ('sharding/*.js', False)
-        elif suite == 'smokeShardingJs':
-            (globstr, usedb) = ('_runner_sharding_passthrough.js', True)
         elif suite == 'smokeTool':
             (globstr, usedb) = ('tool/*.js', False)
         # well, the above almost works for everything...
