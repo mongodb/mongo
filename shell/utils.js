@@ -1046,7 +1046,7 @@ Geo.distance = function( a , b ){
                       Math.pow( bx - ax , 2 ) );
 }
 
-rs = function () { "try rs.help()" }
+rs = function () { return "try rs.help()"; }
 
 rs.help = function () {
     print("\trs.status()                     { replSetGetStatus : 1 } checks repl set status");
@@ -1054,30 +1054,37 @@ rs.help = function () {
     print("\trs.initiate(cfg)                { replSetInitiate : cfg } initiates set with configuration cfg");
     print("\trs.add(hostportstr)             add a new member to the set with default attributes");
     print("\trs.add(membercfgobj)            add a new member to the set with extra attributes");
+    print("\trs.addArb(hostportstr)          add a new member which is arbiterOnly:true");
+    print("\trs.stepDown()                   step down as primary (momentarily)");
     print("\trs.conf()                       return configuration from local.system.replset");
     print();
     print("\tdb.isMaster()                   check who is primary");
     print();
-    print("\tsee also http://<host>:28017/_replSet for additional diagnostic info");
+    print("\tsee also http://<mongod_host>:28017/_replSet for additional diagnostic info");
 }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
-rs.add = function (hostport) {
+rs.add = function (hostport, arb) {
     var cfg = hostport;
 
     var local = db.getSisterDB("local");
-    assert(local.system.replset.count() == 1, "error: local.system.replset unexpected (or empty) contents");
+    assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
     var c = local.system.replset.findOne();
     assert(c, "no config object retrievable from local.system.replset");
     c.version++;
     var max = 0;
     for (var i in c.members)
         if (c.members[i]._id > max) max = c.members[i]._id;
-    if (isString(hostport))
+    if (isString(hostport)) {
         cfg = { _id: max + 1, host: hostport };
+        if (arb)
+            cfg.arbiterOnly = true;
+    }
     c.members.push(cfg);
     return db._adminCommand({ replSetReconfig: c });
 }
+rs.stepDown = function () { return db._adminCommand({ replSetStepDown: 1 }); }
+rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
 
 help = shellHelper.help = function (x) {
@@ -1125,10 +1132,10 @@ help = shellHelper.help = function (x) {
     }
     print("\t" + "db.help()                    help on db methods");
     print("\t" + "db.mycoll.help()             help on collection methods");
+    print("\t" + "rs.help()                    help on replica set methods");
     print("\t" + "help connect                 connecting to a db help");
     print("\t" + "help admin                   administrative help");
     print("\t" + "help misc                    misc things to know");
-    print("\t" + "rs.help()                    help on replica set methods");
     print();
     print("\t" + "show dbs                     show database names");
     print("\t" + "show collections             show collections in current database");
