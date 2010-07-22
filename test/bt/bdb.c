@@ -76,10 +76,10 @@ bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 	DB *db;
 	int ret;
 
-	*notfoundp = 0;
-	key_gen(&key, keyno);
-
 	db = g.bdb_db;
+	*notfoundp = 0;
+
+	key_gen(&key, keyno);
 
 	if ((ret = db->get(db, NULL, &key, &data, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {
@@ -96,16 +96,43 @@ bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 }
 
 int
+bdb_put(u_int64_t keyno, void *arg_data, u_int32_t arg_size, int *notfoundp)
+{
+	static DBT key, data;
+	DB *db;
+	int ret;
+
+	db = g.bdb_db;
+	*notfoundp = 0;
+
+	key_gen(&key, keyno);
+	data.data = arg_data;
+	data.size = arg_size;
+
+	if ((ret = db->put(db, NULL, &key, &data, 0)) != 0) {
+		if (ret == DB_NOTFOUND) {
+			*notfoundp = 1;
+			return (0);
+		}
+		db->err(db, ret, "bdb_put: {%.*s}{%.*s}",
+		    (int)key.size, (char *)key.data,
+		    (int)data.size, (char *)data.data);
+		return (1);
+	}
+	return (0);
+}
+
+int
 bdb_del(u_int64_t keyno, int *notfoundp)
 {
 	static DBT key;
 	DB *db;
 	int ret;
 
-	*notfoundp = 0;
-	key_gen(&key, keyno);
-
 	db = g.bdb_db;
+	*notfoundp = 0;
+
+	key_gen(&key, keyno);
 
 	if ((ret = db->del(db, NULL, &key, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {
