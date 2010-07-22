@@ -78,7 +78,7 @@ for ( i=1; i<hashes.length; i++ ){
              hashes[i].collections[k] )
             continue;
         
-        if ( k == "mongos" || k == "changelog" )
+        if ( k == "mongos" || k == "changelog" || k == "locks" )
             continue;
         
         bad = true;
