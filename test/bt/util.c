@@ -65,7 +65,7 @@ key_gen(DBT *key, u_int64_t keyno)
 }
 
 void
-data_gen(DBT *data)
+data_gen(DBT *data, int grow_ok)
 {
 	static size_t blen;
 	static u_int r;
@@ -116,7 +116,8 @@ data_gen(DBT *data)
 	case VAR:
 	case ROW:
 		p = buf;
-		len = MMRAND(g.c_data_min, g.c_data_max);
+		len = grow_ok ?
+		    MMRAND(g.c_data_min, g.c_data_max) : 100;
 		break;
 	}
 
