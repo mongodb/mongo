@@ -84,6 +84,7 @@ namespace mongo {
         };
         Atomic<LastYea> ly;
         unsigned yea(unsigned memberId); // throws VoteException
+        void electionFailed(unsigned meid);
         void _electSelf();
         bool weAreFreshest(bool& allUp, int& nTies);
         bool sleptLast; // slept last elect() pass

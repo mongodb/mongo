@@ -85,10 +85,6 @@ namespace mongo {
                 return;
             }
 
-            if( p == p2 && p ) {
-                return;
-            }
-
             if( p2 ) {
                 /* someone else thinks they are primary. */
                 if( p == p2 ) { // already match 
@@ -98,6 +94,7 @@ namespace mongo {
                     noteARemoteIsPrimary(p2); 
                     return;
                 }
+                // todo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                 if( p != rs->_self ) {
                     noteARemoteIsPrimary(p2); 
                     return;

@@ -40,7 +40,16 @@ namespace mongo {
         operator T() const { 
             scoped_lock lk(_atomicMutex);
             return val; }
-
+        
+        /** example:
+              Atomic<int> q;
+              ...
+              {
+                Atomic<int>::tran t(q);
+                if( q.ref() > 0 ) 
+                    q.ref()--;
+              }
+        */
         class tran : private scoped_lock {
             Atomic<T>& _a;
         public:
