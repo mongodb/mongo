@@ -42,6 +42,9 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	env = toc->env;
 	hdr = page->hdr;
 
+	WT_VERBOSE(env, WT_VERB_CACHE,
+	    (env, "reconcile page/addr %p/%lu", page, (u_long)page->addr));
+
 	/* If the page isn't dirty, we're done. */
 	WT_ASSERT(toc->env, WT_PAGE_MODIFY_ISSET(page));
 
@@ -219,7 +222,7 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			data = cip->data;		/* On-page data */
 
 		if (len > new->space_avail) {
-			fprintf(stderr, "PAGE GREW, SPLIT\n");
+			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
 
@@ -330,7 +333,8 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			}
 
 			if (len > new->space_avail) {
-				fprintf(stderr, "PAGE GREW, SPLIT\n");
+				fprintf(stderr,
+				    "PAGE %lu SPLIT\n", (u_long)page->addr);
 				__wt_abort(toc->env);
 			}
 
@@ -479,7 +483,7 @@ deleted:		data->data = NULL;
 			break;
 		}
 		if (len > new->space_avail) {
-			fprintf(stderr, "PAGE GREW, SPLIT\n");
+			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
 		switch (data_loc) {
@@ -588,10 +592,41 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				WT_ITEM_TYPE_SET(&data_item, type);
 			key_loc = KEY_NONE;
 		} else if (WT_KEY_PROCESS(rip)) {
-			key->data = rip->key;
+			/*
+			 * If the page's key required processing, but was never
+			 * processed, rip->key points to the WT_ITEM structure,
+			 * and we can copy it directly from the original page..
+			 */
+onpage:			key->data = rip->key;
 			key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->key));
 			key_loc = KEY_ON_PAGE;
+		} else if (WT_ROW_KEY_ON_PAGE(page, rip)) {
+			/*
+			 * If the key is on the original page, we can find the
+			 * original WT_ITEM structure (messy, but we'd rather
+			 * not build a new WT_ITEM structure, that's slow).
+			 * This test comes after the WT_KEY_PROCESS test because
+			 * keys requiring processing will return true for being
+			 * "on the page".
+			 */
+			rip->key = (u_int8_t *)rip->key - sizeof(WT_ITEM);
+			goto onpage;
 		} else {
+			/*
+			 * We're left with keys that required processing and
+			 * which were processed, and so point to allocated
+			 * memory somewhere.   Since Btree keys are immutable,
+			 * we know the right WT_ITEM structure is somewhere on
+			 * the page, but we don't know where.  Instead, build
+			 * a complete new WT_ITEM structure, which is slow (for
+			 * example, overflow, Huffman-encoded keys).  Possible
+			 * alternatives might be to (1) walk the original page
+			 * at the same time we walk the in-memory page to find
+			 * the original WT_ITEM structures, or (2) whenever we
+			 * process a key, save a reference to the original
+			 * WT_ITEM structure somewhere (but preferably without
+			 * growing the WT_ROW structure to do so).
+			 */
 			key->data = rip->key;
 			key->size = rip->size;
 			WT_RET(__wt_bt_build_key_item(
@@ -619,7 +654,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			break;
 		}
 		if (len > new->space_avail) {
-			fprintf(stderr, "PAGE GREW, SPLIT\n");
+			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
 
@@ -633,7 +668,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		case KEY_OFF_PAGE:
 			memcpy(new->first_free, &key_item, sizeof(key_item));
 			memcpy(new->first_free +
-			    sizeof(key_item), key->data, key->size);
+			    sizeof(WT_ITEM), key->data, key->size);
 			new->first_free += WT_ITEM_SPACE_REQ(key->size);
 			new->space_avail -= WT_ITEM_SPACE_REQ(key->size);
 			++hdr->u.entries;
@@ -651,10 +686,11 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		case DATA_OFF_PAGE:
 			memcpy(new->first_free, &data_item, sizeof(data_item));
 			memcpy(new->first_free +
-			    sizeof(data_item), data->data, data->size);
+			    sizeof(WT_ITEM), data->data, data->size);
 			new->first_free += WT_ITEM_SPACE_REQ(data->size);
 			new->space_avail -= WT_ITEM_SPACE_REQ(data->size);
 			++hdr->u.entries;
+			break;
 		}
 		++new->records;
 	}
@@ -673,7 +709,7 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 {
 	WT_ROW *rip;
 	u_int32_t i;
-	void *bp, *ep, *last_key;
+	void *last_key;
 
 	WT_ASSERT(env, page->modified == 0);
 	WT_ENV_FCHK_ASSERT(
@@ -693,15 +729,14 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 		 * Only handle the first key entry for duplicate key/data pairs,
 		 * the others reference the same memory.
 		 */
-		bp = (u_int8_t *)page->hdr;
-		ep = (u_int8_t *)bp + page->size;
 		last_key = NULL;
-		WT_INDX_FOREACH(page, rip, i)
-			if (rip->key != last_key &&
-			    (rip->key < bp || rip->key >= ep)) {
-				last_key = rip->key;
+		WT_INDX_FOREACH(page, rip, i) {
+			if (rip->key == last_key)
+				continue;
+			last_key = rip->key;
+			if (!WT_ROW_KEY_ON_PAGE(page, rip))
 				__wt_free(env, rip->key, rip->size);
-			}
+		}
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
@@ -717,6 +752,7 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	/* Free the modified/deletion replacements array. */
 	if (page->repl != NULL)
 		__wt_bt_page_discard_repl(env, page);
+
 	/* Free the repeat-count compressed column store expansion array. */
 	if (page->expcol != NULL)
 		__wt_bt_page_discard_expcol(env, page);
@@ -783,18 +819,26 @@ __wt_bt_page_discard_expcol(ENV *env, WT_PAGE *page)
 
 /*
  * __wt_bt_page_discard_repl_list --
- *	Walk a WT_REPL forward-linked list and free the data it references
- *	and the structure itself.
+ *	Walk a WT_REPL forward-linked list and free the per-thread combination
+ *	of a WT_REPL structure and its associated data.
  */
 static void
 __wt_bt_page_discard_repl_list(ENV *env, WT_REPL *repl)
 {
+	WT_DATA_UPDATE *upd;
 	WT_REPL *a;
 
 	do {
-		if (!WT_REPL_DELETED_ISSET(repl->data))
-			__wt_free(env, repl->data, repl->size);
 		a = repl->next;
-		__wt_free(env, repl, sizeof(WT_REPL));
+
+		/*
+		 * The bytes immediately before the WT_REPL structure are a
+		 * pointer to the per-thread WT_DATA_UPDATE structure in
+		 * which this WT_REPL and its associated data are stored.
+		 */
+		upd = *(WT_DATA_UPDATE **)
+		    ((u_int8_t *)repl - sizeof(WT_DATA_UPDATE *));
+		if (++upd->out == upd->in)
+			__wt_free(env, upd, upd->len);
 	} while ((repl = a) != NULL);
 }
