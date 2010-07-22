@@ -100,6 +100,10 @@ namespace mongo {
         Date_t asDateT() { return asTimeT() * (long long)1000; }
         
         bool isSet() const { return a || b; }
+
+        int compare( const OID& other ) const { return memcmp( data , other.data , 12 ); }
+        
+        bool operator<( const OID& other ) const { return compare( other ) < 0; }
     };
 #pragma pack()
 
