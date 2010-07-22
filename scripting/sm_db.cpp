@@ -99,6 +99,13 @@ namespace mongo {
         return JS_TRUE;
     }
 
+    JSBool internal_cursor_objsLeftInBatch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+        DBClientCursor *cursor = getCursor( cx, obj );
+        Convertor c(cx);
+        *rval = c.toval((double) cursor->objsLeftInBatch() );
+        return JS_TRUE;
+    }
+
     JSBool internal_cursor_next(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
         DBClientCursor *cursor = getCursor( cx, obj );
         if ( ! cursor->more() ){
@@ -114,6 +121,7 @@ namespace mongo {
 
     JSFunctionSpec internal_cursor_functions[] = {
         { "hasNext" , internal_cursor_hasNext , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "objsLeftInBatch" , internal_cursor_objsLeftInBatch , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "next" , internal_cursor_next , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };

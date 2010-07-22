@@ -28,11 +28,16 @@ namespace mongo {
         string msg;
         enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
         OID upsertedId;
+        OID writebackId;
         long long nObjects;
         int nPrev;
         bool valid;
         bool overridenById;
         bool disabled;
+        void writeback( OID& oid ){
+            reset( true );
+            writebackId = oid;
+        }
         void raiseError(int _code , const char *_msg) {
             reset( true );
             code = _code;
@@ -63,6 +68,7 @@ namespace mongo {
             valid = _valid;
             disabled = false;
             upsertedId.clear();
+            writebackId.clear();
         }
         void appendSelf( BSONObjBuilder &b );
         static LastError noError;

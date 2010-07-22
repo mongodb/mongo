@@ -42,7 +42,7 @@ using namespace std;
 
 namespace mongo {
 
-    bool handlePossibleShardedMessage( Message &m, DbResponse &dbresponse ){
+    bool handlePossibleShardedMessage( Client& c, CurOp& curop , OpDebug& debug , Message &m, DbResponse &dbresponse ){
         if ( ! shardingState.enabled() )
             return false;
 
@@ -59,7 +59,7 @@ namespace mongo {
         if ( shardVersionOk( ns , errmsg ) ){
             return false;
         }
-
+        
         log() << "shardVersionOk failed  ns:" << ns << " " << errmsg << endl;
         
         if ( doesOpGetAResponse( op ) ){
@@ -87,14 +87,19 @@ namespace mongo {
             return true;
         }
         
+        OID writebackID;
+        writebackID.init();
+        lastError.getSafe()->writeback( writebackID );
+
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
         
         log() << "got write with an old config - writing back ns: " << ns << endl;
-
+        
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );
         b.append( "ns" , ns );
+        b.append( "id" , writebackID );
         b.appendTimestamp( "version" , shardingState.getVersion( ns ) );
         b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );

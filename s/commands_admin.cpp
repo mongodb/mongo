@@ -863,6 +863,23 @@ namespace mongo {
                 help << "check for an error on the last command executed";
             }
             CmdShardingGetLastError() : Command("getLastError" , false , "getlasterror") { }
+            
+            void addWriteBack( vector<OID>& all , const BSONObj& o ){
+                BSONElement e = o["writeback"];
+
+                if ( e.type() == jstOID )
+                    all.push_back( e.OID() );
+            }
+            
+            void handleWriteBacks( vector<OID>& all ){
+                if ( all.size() == 0 )
+                    return;
+                
+                for ( unsigned i=0; i<all.size(); i++ ){
+                    waitForWriteback( all[i] );
+                }
+            }
+            
             virtual bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 LastError *le = lastError.disableForCommand();
                 {
@@ -880,6 +897,11 @@ namespace mongo {
                     result.appendNull( "err" );
                     return true;
                 }
+
+                //log() << "getlasterror enter: " << shards->size() << endl;
+
+
+                vector<OID> writebacks;
                 
                 // handle single server
                 if ( shards->size() == 1 ){
@@ -888,9 +910,11 @@ namespace mongo {
                     ShardConnection conn( theShard , "" );
                     BSONObj res;
                     bool ok = conn->runCommand( dbName , cmdObj , res );
+                    //log() << "\t" << res << endl;
                     result.appendElements( res );
                     conn.done();
                     result.append( "singleShard" , theShard );
+                    addWriteBack( writebacks , res );
                     
                     // hit other machines just to block
                     for ( set<string>::const_iterator i=client->sinceLastGetError().begin(); i!=client->sinceLastGetError().end(); ++i ){
@@ -899,10 +923,11 @@ namespace mongo {
                             continue;
                         
                         ShardConnection conn( temp , "" );
-                        conn->getLastError();
+                        addWriteBack( writebacks , conn->getLastErrorDetailed() );
                         conn.done();
                     }
                     client->clearSinceLastGetError();
+                    handleWriteBacks( writebacks );
                     return ok;
                 }
                 
@@ -918,6 +943,7 @@ namespace mongo {
                     ShardConnection conn( theShard , "" );
                     BSONObj res;
                     bool ok = conn->runCommand( dbName , cmdObj , res );
+                    addWriteBack( writebacks, res );
                     string temp = DBClientWithCommands::getLastErrorString( res );
                     if ( ok == false || temp.size() )
                         errors.push_back( temp );
@@ -936,13 +962,14 @@ namespace mongo {
                         continue;
                     
                     ShardConnection conn( temp , "" );
-                    conn->getLastError();
+                    addWriteBack( writebacks, conn->getLastErrorDetailed() );
                     conn.done();
                 }
                 client->clearSinceLastGetError();
 
                 if ( errors.size() == 0 ){
                     result.appendNull( "err" );
+                    handleWriteBacks( writebacks );
                     return true;
                 }
                 
@@ -953,6 +980,7 @@ namespace mongo {
                     all.append( all.numStr( i ) , errors[i].c_str() );
                 }
                 result.appendArray( "errs" , all.obj() );
+                handleWriteBacks( writebacks );
                 return true;
             }
         } cmdGetLastError;
