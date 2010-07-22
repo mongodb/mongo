@@ -33,7 +33,7 @@ namespace mongo {
         Member *m = rs->head();
         Member *p = 0;
         while( m ) {
-            if( m->state() == RS_PRIMARY && m->hbinfo().up() ) {
+            if( m->state().primary() && m->hbinfo().up() ) {
                 if( p ) throw "twomasters"; // our polling is asynchronous, so this is often ok.
                 p = m;
             }
@@ -54,14 +54,10 @@ namespace mongo {
     }
 
     void Manager::noteARemoteIsPrimary(const Member *m) { 
-        if( rs->currentPrimary() == m )
+        if( rs->box.getPrimary() == m )
             return;
-        rs->_currentPrimary = m;
         rs->_self->lhb() = "";
-        if( rs->iAmArbiterOnly() )
-            rs->changeState(RS_ARBITER);
-        else
-            rs->changeState(RS_RECOVERING);
+        rs->box.set(rs->iAmArbiterOnly() ? MemberState::RS_ARBITER : MemberState::RS_RECOVERING, m);
     }
 
     /** called as the health threads get new results */
@@ -71,17 +67,18 @@ namespace mongo {
 
             if( busyWithElectSelf ) return;
 
-            const Member *p = rs->currentPrimary();
+            const Member *p = rs->box.getPrimary();
             if( p && !p->hbinfo().up() ) {
                 assert( p != rs->_self );
-                p = rs->_currentPrimary = 0;
+                p = 0;
+                rs->box.setOtherPrimary(0);
             }
 
             const Member *p2;
             try { p2 = findOtherPrimary(); }
             catch(string s) { 
                 /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
-                log() << "replSet warning DIAG TODO 2primary" << s << rsLog;
+                log() << "replSet warning DIAG 2 primary" << s << rsLog;
                 return;
             }
 

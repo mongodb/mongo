@@ -96,7 +96,7 @@ namespace mongo {
 
         long long hNew;
         if( theReplSet ) { 
-            massert(13312, "replSet error : logOp() but not primary?", theReplSet->isPrimary());
+            massert(13312, "replSet error : logOp() but not primary?", theReplSet->box.getState().primary());
             hNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         }
         else {

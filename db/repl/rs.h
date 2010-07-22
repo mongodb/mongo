@@ -151,6 +151,45 @@ namespace mongo {
 
     class ReplSetHealthPollTask;
 
+    /* safe container for our state that keeps member pointer and state variables always aligned */
+    class StateBox : boost::noncopyable {
+    public:
+        struct SP { // SP is like pair<MemberState,const Member *> but nicer
+            SP() : state(MemberState::RS_STARTUP), primary(0) { }
+            MemberState state;
+            const Member *primary;
+        };
+        const SP get() { 
+            scoped_lock lk(m);
+            return sp;
+        }
+        MemberState getState() const { return sp.state; }
+        const Member* getPrimary() const { return sp.primary; }
+        void change(MemberState s) { 
+            scoped_lock lk(m);
+            sp.state = s;
+            // note : we don't correct primary if RS_PRIMARY was set here.  that must be done upstream.
+        }
+        void set(MemberState s, const Member *p) { 
+            scoped_lock lk(m);
+            sp.state = s; sp.primary = p;
+        }
+        void setSelfPrimary(const Member *self) { 
+            scoped_lock lk(m);
+            sp.state = MemberState::RS_PRIMARY;
+            sp.primary = self;
+        }
+        void setOtherPrimary(const Member *mem) { 
+            scoped_lock lk(m);
+            assert( !sp.state.primary() );
+            sp.primary = mem;
+        }
+        StateBox() : m("StateBox") { }
+    private:
+        mutex m;
+        SP sp;
+    };
+
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
              singleton and long lived.
@@ -169,10 +208,8 @@ namespace mongo {
 
         /* todo thread */
         void msgUpdateHBInfo(HeartbeatInfo);
-        bool isPrimary() const { return _myState == RS_PRIMARY; }
-        bool isSecondary() const { return _myState == RS_SECONDARY; }
 
-        //bool initiated() const { return curOpTime.initiated(); }
+        StateBox box;
 
         OpTime lastOpTimeWritten;
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
@@ -183,7 +220,7 @@ namespace mongo {
 
     private:
         Consensus elect;
-        bool ok() const { return _myState != RS_FATAL; }
+        bool ok() const { return !box.getState().fatal(); }
 
         void relinquish();
     protected:
@@ -214,7 +251,7 @@ namespace mongo {
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
         const ReplSetConfig& config() { return *_cfg; }
         string name() const { return _name; } /* @return replica set's logical name */
-        MemberState state() const { return _myState; }        
+        MemberState state() const { return box.getState(); }
         void _fatal();
         void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
         void _summarizeAsHtml(stringstream&) const;        
@@ -230,8 +267,6 @@ namespace mongo {
         void _go();
 
     private:
-
-        MemberState _myState;
         string _name;
         const vector<HostAndPort> *_seeds;
         ReplSetConfig *_cfg;
@@ -243,11 +278,9 @@ namespace mongo {
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;
-        const Member* currentPrimary() const { return _currentPrimary; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const { return myConfig().potentiallyHot(); }
-        const Member *_currentPrimary;
         Member *_self;        
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
@@ -352,7 +385,7 @@ namespace mongo {
 
     inline bool ReplSet::isMaster(const char *client) {         
         /* todo replset */
-        return isPrimary();
+        return box.getState().primary();
     }
 
 }
