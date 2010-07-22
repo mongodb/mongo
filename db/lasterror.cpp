@@ -59,6 +59,8 @@ namespace mongo {
             b.appendBool( "updatedExisting", updatedExisting == True );
         if ( upsertedId.isSet() )
             b.append( "upserted" , upsertedId );
+        if ( writebackId.isSet() )
+            b.append( "writeback" , writebackId );
         b.appendNumber( "n", nObjects );
     }
 
