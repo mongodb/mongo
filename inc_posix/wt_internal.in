@@ -71,38 +71,21 @@ extern "C" {
 #define	WT_TOC_GEN_SET(toc)						\
 	(toc)->gen = (toc)->env->ienv->api_gen
 
-/*******************************************
- * Memory reference tracking information.
- *******************************************/
-#define	WT_FLIST_MAX	50
-
 /*
- * WT_FLIST --
- *	A structure to track memory references with API generations.
+ * WT_DATA_UPDATE --
+ *	A structure to accumulate database changes on a per-thread basis.
  */
-struct __wt_flist {
-	TAILQ_ENTRY(__wt_flist) q;		/* Linked list */
+struct __wt_data_update {
+	u_int32_t len;				/* Buffer original size */
+	u_int8_t *first_free;			/* Buffer's first free byte */
+	u_int32_t space_avail;			/* Buffer's available memory */
 
-	u_int32_t gen;				/* API generation */
-
-	struct {				/* Memory references */
-		void *p;
-		u_int32_t len;
-	} ref[WT_FLIST_MAX];
-	u_int	  cnt;
+	u_int16_t in;				/* Buffer chunks in use */
+	u_int16_t out;				/* Buffer chunks not in use */
 };
 
-#define	WT_FLIST_INSERT(toc, __p, __l) do {				\
-	WT_FLIST *__fp = (toc)->flist;					\
-	if (__fp == NULL || __fp->cnt == WT_FLIST_MAX)			\
-		__wt_flist_insert(toc, __p, __l);			\
-	else {								\
-		__fp->ref[__fp->cnt].p = (__p);				\
-		__fp->ref[__fp->cnt].len = (__l);			\
-		++__fp->cnt;						\
-	}								\
-	__p = NULL;							\
-} while (0)
+#define	WT_UPDATE_DEF_DATA	(8 * 1024)	/* *KB is the default */
+#define	WT_UPDATE_MAX_DATA	(32 * 1024)	/* Max data we'll buffer */
 
 /*******************************************
  * Cursor handle information that doesn't persist.
@@ -193,14 +176,6 @@ struct __ienv {
 	 * be able to easily copy and search it when draining the cache.
 	 */
 	WT_PAGE **hazard;		/* Hazard references array */
-
-	/*
-	 * WiredTiger has a thread that frees memory lazily once it's known that
-	 * no more references exist.  The workQ thread owns the queue of memory
-	 * references used by that thread.
-	 */
-	TAILQ_HEAD(			/* Free list queue */
-	    __wt_flisth, __wt_flist) flistq;
 
 	WT_CACHE  *cache;		/* Page cache */
 
