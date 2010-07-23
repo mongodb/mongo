@@ -302,6 +302,7 @@ namespace mongo {
                     BSONObj it;
                     if ( Helpers::findById( cc() , _ns.c_str() , t, it ) ){
                         arr.append( it );
+                        size += it.objsize();
                     }
                 }
                 else {
