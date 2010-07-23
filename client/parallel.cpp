@@ -32,7 +32,7 @@ namespace mongo {
         _ns = q.ns;
         _query = q.query.copy();
         _options = q.queryOptions;
-        _fields = q.fields;
+        _fields = q.fields.copy();
         _batchSize = q.ntoreturn;
         if ( _batchSize == 1 )
             _batchSize = 2;
@@ -182,7 +182,7 @@ namespace mongo {
     
     // --------  FilteringClientCursor -----------
     FilteringClientCursor::FilteringClientCursor( const BSONObj filter )
-        : _matcher( filter ) , _done( false ){
+        : _matcher( filter ) , _done( true ){
     }
 
     FilteringClientCursor::FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter )
