@@ -1063,6 +1063,7 @@ rs.help = function () {
     print("\tsee also http://<mongod_host>:28017/_replSet for additional diagnostic info");
 }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
+rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
