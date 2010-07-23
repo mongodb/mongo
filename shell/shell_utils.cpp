@@ -823,8 +823,9 @@ namespace mongo {
 
         BSONObj getHostName(const BSONObj& a){
             uassert( 13411, "getHostName accepts no arguments", a.nFields() == 0 );
-            char buf[HOST_NAME_MAX+1];
-            assert(gethostname(buf, HOST_NAME_MAX+1) == 0);
+            char buf[260]; // HOST_NAME_MAX is usually 255
+            assert(gethostname(buf, 260) == 0);
+            buf[259] = '\0';
             return BSON("" << buf);
 
         }
