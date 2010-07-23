@@ -279,13 +279,13 @@ namespace mongo {
             if( m.h.isSelf() ) {
                 assert( _self == 0 );
                 mi = _self = new Member(m.h, m._id, &m, true);
-                if( mi->id() == oldPrimaryId )
+                if( (int)mi->id() == oldPrimaryId )
                     box.setSelfPrimary(mi);
             } else {
                 mi = new Member(m.h, m._id, &m, false);
                 _members.push(mi);
                 startHealthTaskFor(mi);
-                if( mi->id() == oldPrimaryId )
+                if( (int)mi->id() == oldPrimaryId )
                     box.setOtherPrimary(mi);
             }
         }
