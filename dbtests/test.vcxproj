@@ -259,7 +259,7 @@
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
-    <ClCompile Include="..\db\geo\quadrant_search.cpp" />
+    <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
     <ClCompile Include="..\db\repl\heartbeat.cpp" />
     <ClCompile Include="..\db\repl\manager.cpp" />
