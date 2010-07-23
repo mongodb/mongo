@@ -226,9 +226,22 @@ namespace mongo {
                 }
             }
             else {
-                ChunkPtr c = manager->findChunk( chunkFinder );
-                doWrite( dbUpdate , r , c->getShard() );
-                c->splitIfShould( d.msg().header()->dataLen() );
+                int left = 5;
+                while ( true ){
+                    try {
+                        ChunkPtr c = manager->findChunk( chunkFinder );
+                        doWrite( dbUpdate , r , c->getShard() );
+                        c->splitIfShould( d.msg().header()->dataLen() );
+                        break;
+                    }
+                    catch ( StaleConfigException& e ){
+                        if ( left <= 0 )
+                            throw e;
+                        left--;
+                        log() << "update failed b/c of StaleConfigException, retrying" << endl;
+                        r.reset( false );
+                    }
+                }
             }
 
         }
@@ -242,11 +255,26 @@ namespace mongo {
             BSONObj pattern = d.nextJsObj();
 
             set<Shard> shards;
-            manager->getShardsForQuery( shards , pattern );
-            log(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
-            if ( shards.size() == 1 ){
-                doWrite( dbDelete , r , *shards.begin() );
-                return;
+            int left = 5;
+            
+            while ( true ){
+                try {
+                    manager->getShardsForQuery( shards , pattern );
+                    log(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
+                    if ( shards.size() == 1 ){
+                        doWrite( dbDelete , r , *shards.begin() );
+                        return;
+                    }
+                    break;
+                }
+                catch ( StaleConfigException& e ){
+                    if ( left <= 0 )
+                        throw e;
+                    left--;
+                    log() << "update failed b/c of StaleConfigException, retrying" << endl;
+                    r.reset( false );
+                    shards.clear();
+                }
             }
             
             if ( justOne && ! pattern.hasField( "_id" ) )

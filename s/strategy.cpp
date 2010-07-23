@@ -31,10 +31,14 @@ namespace mongo {
         ShardConnection conn( shard , r.getns() );
         if ( ! checkVersion )
             conn.donotCheckVersion();
+        else if ( conn.setVersion() ){
+            conn.done();
+            throw StaleConfigException( r.getns() , "doWRite" , true );
+        }
         conn->say( r.m() );
         conn.done();
     }
-
+    
     void Strategy::doQuery( Request& r , const Shard& shard ){
         try{
             ShardConnection dbcon( shard , r.getns() );
