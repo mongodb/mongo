@@ -52,7 +52,7 @@ namespace mongo {
 #ifdef _WIN32
     inline int close(int fd) { return _close(fd); }
     inline int read(int fd, void* buf, size_t size) { return _read(fd, buf, size); }
-    inline int pipe(int fds[2]) { return _pipe(fds, 1024, _O_TEXT | _O_NOINHERIT); }
+    inline int pipe(int fds[2]) { return _pipe(fds, 4096, _O_TEXT | _O_NOINHERIT); }
 #endif
 
     namespace shellUtils {
@@ -439,11 +439,11 @@ namespace mongo {
                 try {
                 // This assumes there aren't any 0's in the mongo program output.
                 // Hope that's ok.
-                char buf[ 1024 ];
-                char temp[ 1024 ];
+                char buf[ 4096 ];
+                char temp[ 4096 ];
                 char *start = buf;
                 while( 1 ) {
-                    int lenToRead = 1023 - ( start - buf );
+                    int lenToRead = 4095 - ( start - buf );
                     int ret = read( pipe_, (void *)start, lenToRead );
                     if( mongo::goingAway )
                         break;
