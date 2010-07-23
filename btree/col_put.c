@@ -9,6 +9,18 @@
 
 #include "wt_internal.h"
 
+static int __wt_db_col_update(WT_TOC *, u_int64_t, DBT *);
+
+/*
+ * __wt_db_col_put --
+ *	Db.put method.
+ */
+int
+__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
+{
+	return (__wt_db_col_update(toc, recno, data));
+}
+
 /*
  * __wt_db_col_del --
  *	Db.col_del method.
@@ -16,15 +28,14 @@
 int
 __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 {
-	WT_RET(__wt_db_col_update(toc, recno, NULL));
-	return (0);
+	return (__wt_db_col_update(toc, recno, NULL));
 }
 
 /*
  * __wt_db_col_update --
  *	Column store delete and update.
  */
-int
+static int
 __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data)
 {
 	ENV *env;
