@@ -600,11 +600,11 @@ sendmore:
     void initAndListen(int listenPort, const char *appserverLoc = NULL) {
         try { _initAndListen(listenPort, appserverLoc); }
         catch ( std::exception &e ) {
-            problem() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
+            log() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
         catch ( int& n ){
-            problem() << "exception in initAndListen int: " << n << ", terminating" << endl;
+            log() << "exception in initAndListen int: " << n << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
         catch(...) {
