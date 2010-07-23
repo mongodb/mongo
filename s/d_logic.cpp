@@ -56,13 +56,11 @@ namespace mongo {
         DbMessage d(m);        
         if ( op == dbUpdate ){
             if ( d.getInt(0) & UpdateOption_Broadcast ){
-                assert(0);
                 return false;
             }
         }
         else if ( op == dbDelete ){
             if ( d.getInt(0) & RemoveOption_Broadcast ){
-                assert(0);
                 return false;
             }
         }
