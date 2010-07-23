@@ -444,6 +444,7 @@ namespace mongo {
                 char *start = buf;
                 while( 1 ) {
                     int lenToRead = 4095 - ( start - buf );
+                    assert( lenToRead > 0 );
                     int ret = read( pipe_, (void *)start, lenToRead );
                     if( mongo::goingAway )
                         break;
