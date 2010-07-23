@@ -1194,15 +1194,21 @@ namespace mongo {
             DbMessage d(m);
             ss << " ns: " << d.getns();
             switch ( m.operation() ){
-            case dbUpdate:
-                ss << " flags: " << d.pullInt() << " query: " << d.nextJsObj();
+            case dbUpdate: {
+                int flags = d.pullInt();
+                BSONObj q = d.nextJsObj();
+                ss << " flags: " << flags << " query: " << q;
                 break;
+            }
             case dbInsert:
                 ss << d.nextJsObj();
                 break;
-            case dbDelete:
-                ss << " flags: " << d.pullInt() << " query: " << d.nextJsObj();
+            case dbDelete: {
+                int flags = d.pullInt();
+                BSONObj q = d.nextJsObj();
+                ss << " flags: " << flags << " query: " << q;
                 break;
+            }
             default:
                 ss << " CANNOT HANDLE YET";
             }
