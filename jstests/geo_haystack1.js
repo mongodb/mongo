@@ -1,5 +1,5 @@
 
-t = db.geo_search1
+t = db.geo_haystack1
 t.drop()
 
 function distance( a , b ){
@@ -42,7 +42,7 @@ for ( x=0; x<20; x++ ){
     }
 }
 
-t.ensureIndex( { loc : "geosearch" , z : 1 } , { bucketSize : .7 } );
+t.ensureIndex( { loc : "geoHaystack" , z : 1 } , { bucketSize : .7 } );
 
 for ( i=0; i<queries.length; i++ ){
     print( "---------" );

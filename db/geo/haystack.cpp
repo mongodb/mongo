@@ -1,4 +1,4 @@
-// index_geosearch.cpp
+// db/geo/haystack.cpp
 
 /**
  *    Copyright (C) 2008 10gen Inc.
@@ -39,11 +39,11 @@
  */
 namespace mongo {
     
-    string GEOSEARCHNAME = "geosearch";
+    string GEOSEARCHNAME = "geoHaystack";
     
-    class GeoQuandrantSearchHopper {
+    class GeoHaystackSearchHopper {
     public:
-        GeoQuandrantSearchHopper( const BSONObj& n , double maxDistance , unsigned limit , const string& geoField )
+        GeoHaystackSearchHopper( const BSONObj& n , double maxDistance , unsigned limit , const string& geoField )
             : _near( n ) , _maxDistance( maxDistance ) , _limit( limit ) , _geoField(geoField){
             
         }
@@ -69,11 +69,11 @@ namespace mongo {
         vector<DiskLoc> _locs;
     };
 
-    class GeoQuandrantSearchIndex : public IndexType {
+    class GeoHaystackSearchIndex : public IndexType {
         
     public:
             
-        GeoQuandrantSearchIndex( const IndexPlugin* plugin , const IndexSpec* spec )
+        GeoHaystackSearchIndex( const IndexPlugin* plugin , const IndexSpec* spec )
             : IndexType( plugin , spec ){
              
             BSONElement e = spec->info["bucketSize"];
@@ -185,7 +185,7 @@ namespace mongo {
             }
             int scale = (int)ceil( maxDistance / _bucketSize );
                 
-            GeoQuandrantSearchHopper hopper(n,maxDistance,limit,_geo);
+            GeoHaystackSearchHopper hopper(n,maxDistance,limit,_geo);
                 
             long long btreeMatches = 0;
 
@@ -246,21 +246,21 @@ namespace mongo {
         double _bucketSize;
     };
         
-    class GeoQuandrantSearchIndexPlugin : public IndexPlugin {
+    class GeoHaystackSearchIndexPlugin : public IndexPlugin {
     public:
-        GeoQuandrantSearchIndexPlugin() : IndexPlugin( GEOSEARCHNAME ){
+        GeoHaystackSearchIndexPlugin() : IndexPlugin( GEOSEARCHNAME ){
         }
         
         virtual IndexType* generate( const IndexSpec* spec ) const {
-            return new GeoQuandrantSearchIndex( this , spec );
+            return new GeoHaystackSearchIndex( this , spec );
         }
 
     } nameIndexPlugin;
 
 
-    class GeoQuandrantSearchCommand : public Command {
+    class GeoHaystackSearchCommand : public Command {
         public:
-        GeoQuandrantSearchCommand() : Command( "geoSearch" ){}
+        GeoHaystackSearchCommand() : Command( "geoSearch" ){}
         virtual LockType locktype() const { return READ; } 
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
@@ -288,7 +288,7 @@ namespace mongo {
             int idxNum = idxs[0];
             
             IndexDetails& id = d->idx( idxNum );
-            GeoQuandrantSearchIndex * si = (GeoQuandrantSearchIndex*)id.getSpec().getType();
+            GeoHaystackSearchIndex * si = (GeoHaystackSearchIndex*)id.getSpec().getType();
             assert( &id == si->getDetails() );         
                 
             BSONElement n = cmdObj["near"];
