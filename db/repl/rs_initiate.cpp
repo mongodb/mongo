@@ -140,7 +140,6 @@ namespace mongo {
             }
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
                 result.append("startupStatus", ReplSet::startupStatus);
-                //result.append("startupStatusMsg", ReplSet::startupStatusMsg);
                 errmsg = "all members and seeds must be reachable to initiate set";
                 result.append("info", cmdLine.replSet);
                 return false;
