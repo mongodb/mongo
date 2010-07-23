@@ -135,15 +135,16 @@ namespace mongo {
     //static void fix(const be& _id) { 
     //}
 
+    struct X { 
+        const bson::bo *op;
+        bson::bo goodVersionOfObject;
+    };
+
    void ReplSetImpl::syncFixUp(HowToFixUp& h, DBClientConnection *them) {
        // fetch all first so we aren't interrupted.
 
        unsigned long long totSize = 0;
 
-       struct X { 
-           const bo *op;
-           bo goodVersionOfObject;
-       };
        map</*the _id field*/be,X> items;
 
        for( list<bo>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) { 
