@@ -48,6 +48,7 @@ import re
 import parser
 
 mongoRepo = os.getcwd() #'./'
+testPath = None
 
 mongodExecutable = "./mongod"
 mongodPort = "32000"
@@ -273,7 +274,7 @@ def runTest(test):
     t1=time.time()
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
-    r = call(argv)
+    r = call(argv, cwd=testPath)
     t2=time.time()
     print "                " + str((t2-t1)*1000) + "ms"
     if r != 0:
@@ -401,7 +402,8 @@ def expandSuites(suites):
             paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
             if os.sys.platform == "win32":
                 paths = [path+'.exe' for path in paths]
-            tests += [(os.path.join(mongoRepo, path), False) for path in paths]
+            # hack
+            tests += [(testPath and path or os.path.join(mongoRepo, path), False) for path in paths]
         elif suite == 'mongosTest':
             if os.sys.platform == "win32":
                 program = 'mongos.exe'
@@ -428,6 +430,9 @@ def main():
     # th we don't have the freedom to run from anyplace.
 #    parser.add_option('--mongo-repo', dest='mongoRepo', default=None,
 #                      help='Top-level directory of mongo checkout to use.  (default: script will make a guess)')
+    parser.add_option('--test-path', dest='testPath', default=None,
+                      help="Path to the test executables to run "
+                      "(currently only used for smokeClient)")
     parser.add_option('--mongod', dest='mongodExecutable', #default='./mongod',
                       help='Path to mongod to run (default "./mongod")')
     parser.add_option('--port', dest='mongodPort', default="32000",
@@ -469,7 +474,8 @@ def main():
 
     print tests
 
-    global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest, smallOplog, smokeDbPrefix
+    global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest, smallOplog, smokeDbPrefix, testPath
+    testPath = options.testPath
     mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, 'mongod')
     mongodPort = options.mongodPort if options.mongodPort else mongodPort
     shellExecutable = options.shellExecutable if options.shellExecutable else os.path.join(mongoRepo, 'mongo')
