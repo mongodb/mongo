@@ -406,7 +406,7 @@ methods['db.col_put'] = Api(
 	'db.col_put',
 	'method, colonly, rdonly, restart, toc',
 	['toc/WT_TOC *@S',
-	 'recno/u_int64_t *@S',
+	 'recno/u_int64_t @S',
 	 'data/DBT *@S',
 	 'flags/u_int32_t @S'],
 	['__NONE__'],
