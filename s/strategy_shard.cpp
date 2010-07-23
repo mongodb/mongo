@@ -238,8 +238,10 @@ namespace mongo {
                         if ( left <= 0 )
                             throw e;
                         left--;
-                        log() << "update failed b/c of StaleConfigException, retrying" << endl;
+                        log() << "update failed b/c of StaleConfigException, retrying " 
+                              << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
                         r.reset( false );
+                        manager = r.getChunkManager();
                     }
                 }
             }
@@ -271,9 +273,11 @@ namespace mongo {
                     if ( left <= 0 )
                         throw e;
                     left--;
-                    log() << "update failed b/c of StaleConfigException, retrying" << endl;
+                    log() << "update failed b/c of StaleConfigException, retrying " 
+                          << " left:" << left << " ns: " << r.getns() << " patt: " << pattern << endl;
                     r.reset( false );
                     shards.clear();
+                    manager = r.getChunkManager();
                 }
             }
             

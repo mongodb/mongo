@@ -369,6 +369,7 @@ class InstallSetup:
         self.headers = False
         self.bannerDir = None
         self.headerRoot = "include"
+        self.clientTestsDir = None
 
     def justClient(self):
         self.binaries = False
@@ -376,6 +377,7 @@ class InstallSetup:
         self.headers = True
         self.bannerDir = "distsrc/client/"
         self.headerRoot = ""
+        self.clientTestsDir = "client/examples/"
         
 installSetup = InstallSetup()
 if distBuild:
@@ -1520,6 +1522,15 @@ if installSetup.bannerDir:
         if x.find( "~" ) >= 0:
             continue
         env.Install( installDir , full )
+
+if installSetup.clientTestsDir:
+    for x in os.listdir( installSetup.clientTestsDir ):
+        full = installSetup.clientTestsDir + "/" + x
+        if os.path.isdir( full ):
+            continue
+        if x.find( "~" ) >= 0:
+            continue
+        env.Install( installDir + '/' + installSetup.clientTestsDir , full )
 
 #final alias
 env.Alias( "install" , installDir )
