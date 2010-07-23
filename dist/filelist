@@ -8,6 +8,7 @@ btree/bt_close.c
 btree/bt_cmp.c
 btree/bt_debug.c
 btree/bt_desc.c
+btree/bt_discard.c
 btree/bt_dump.c
 btree/bt_misc.c
 btree/bt_open.c
@@ -18,11 +19,9 @@ btree/bt_ret.c
 btree/bt_stat.c
 btree/bt_sync.c
 btree/bt_vrfy.c
-btree/col_del.c
 btree/col_get.c
 btree/col_put.c
 btree/col_srch.c
-btree/row_del.c
 btree/row_get.c
 btree/row_put.c
 btree/row_srch.c

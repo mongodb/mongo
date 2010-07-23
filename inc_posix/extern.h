@@ -31,6 +31,8 @@ int
 __wt_bt_desc_write_root(WT_TOC *toc, u_int32_t root_addr, u_int32_t root_size);
 int
 __wt_bt_desc_write(WT_TOC *toc);
+void
+__wt_bt_page_discard(ENV *env, WT_PAGE *page);
 int
 __wt_db_dump(WT_TOC *toc,
     FILE *stream, void (*f)(const char *, u_int64_t), u_int32_t flags);
@@ -72,8 +74,6 @@ int
 __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt);
 int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page);
-void
-__wt_bt_page_discard(ENV *env, WT_PAGE *page);
 int
 __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
@@ -91,29 +91,25 @@ __wt_bt_verify(
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 int
-__wt_db_col_del(WT_TOC *toc, u_int64_t recno);
+__wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data);
 int
-__wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data);
+__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data);
+int
+__wt_db_col_del(WT_TOC *toc, u_int64_t recno);
 int
 __wt_bt_rcc_expand_serial_func(WT_TOC *toc);
 int
 __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc);
 int
-__wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data);
-int
-__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data);
-int
 __wt_bt_search_col(WT_TOC *toc, u_int64_t recno);
-int
-__wt_db_row_del(WT_TOC *toc, DBT *key);
-int
-__wt_db_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert);
-int
-__wt_bt_update_serial_func(WT_TOC *toc);
 int
 __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
 int
 __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
+int
+__wt_db_row_del(WT_TOC *toc, DBT *key);
+int
+__wt_bt_update_serial_func(WT_TOC *toc);
 int
 __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags);
 void

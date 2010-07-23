@@ -60,6 +60,8 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 
 --- Module:   ../btree/bt_desc.c (C)
 
+--- Module:   ../btree/bt_discard.c (C)
+
 --- Module:   ../btree/bt_dump.c (C)
                                                                          _
 			dp->p(last_key->data, last_key->size, dp->stream);
@@ -104,9 +106,9 @@ _
 ../btree/bt_reconcile.c  168  Info 830: Location cited in prior message
                                           _
 		if (len > new->space_avail) {
-../btree/bt_reconcile.c  481  Warning 644: Variable 'len' (line 432) may not
+../btree/bt_reconcile.c  482  Warning 644: Variable 'len' (line 433) may not
     have been initialized
-../btree/bt_reconcile.c  432  Info 830: Location cited in prior message
+../btree/bt_reconcile.c  433  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_ret.c (C)
                                              _
@@ -185,23 +187,9 @@ _
 			bit_set(vs->fragbits, ffc);
 ../btree/bt_vrfy.c  1093  Info 702: Shift right of signed quantity (int)
 
---- Module:   ../btree/col_del.c (C)
-
 --- Module:   ../btree/col_get.c (C)
 
 --- Module:   ../btree/col_put.c (C)
-_
-}
-../btree/col_put.c  23  Warning 550: Symbol 'toc' (line 17) not accessed
-../btree/col_put.c  17  Info 830: Location cited in prior message
-_
-}
-../btree/col_put.c  23  Warning 550: Symbol 'recnop' (line 17) not accessed
-../btree/col_put.c  17  Info 830: Location cited in prior message
-_
-}
-../btree/col_put.c  23  Warning 550: Symbol 'data' (line 17) not accessed
-../btree/col_put.c  17  Info 830: Location cited in prior message
 
 --- Module:   ../btree/col_srch.c (C)
                                                                                _
@@ -219,33 +207,9 @@ _
 ../btree/col_srch.c  79  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
---- Module:   ../btree/row_del.c (C)
-
 --- Module:   ../btree/row_get.c (C)
 
 --- Module:   ../btree/row_put.c (C)
-_
-}
-../btree/row_put.c  103  Warning 550: Symbol 'toc' (line 19) not accessed
-../btree/row_put.c  19  Info 830: Location cited in prior message
-_
-}
-../btree/row_put.c  103  Warning 550: Symbol 'key' (line 19) not accessed
-../btree/row_put.c  19  Info 830: Location cited in prior message
-_
-}
-../btree/row_put.c  103  Warning 550: Symbol 'data' (line 19) not accessed
-../btree/row_put.c  19  Info 830: Location cited in prior message
-_
-}
-../btree/row_put.c  142  Warning 550: Symbol 'toc' (line 110) not accessed
-../btree/row_put.c  110  Info 830: Location cited in prior message
-
-    --- Wrap-up for Module: ../btree/row_put.c
-
-Warning 528: Symbol '__wt_bt_repl_serial_func(struct __wt_toc *)' (line 110,
-    file ../btree/row_put.c) not referenced
-../btree/row_put.c  110  Info 830: Location cited in prior message
 
 --- Module:   ../btree/row_srch.c (C)
                                                                            _
@@ -355,8 +319,6 @@ _
 	((void (*)(void *, const char *))cb)(handle, s);
 ../support/err.c  51  Warning 611: Suspicious cast
 
---- Module:   ../support/flist.c (C)
-
 --- Module:   ../support/hazard.c (C)
 
 --- Module:   ../support/huffman.c (C)
@@ -374,6 +336,8 @@ _
 		mask = (u_int8_t)(1 << bitpos);
 ../support/huffman.c  568  Info 701: Shift left of signed quantity (int)
 
+--- Module:   ../support/pow.c (C)
+
 --- Module:   ../support/prime.c (C)
 
 --- Module:   ../support/progress.c (C)
@@ -383,5 +347,7 @@ _
 --- Module:   ../support/stat.c (C)
 
 --- Module:   ../support/strerror.c (C)
+
+--- Module:   ../support/update.c (C)
 
 --- Module:   ../support/version.c (C)
