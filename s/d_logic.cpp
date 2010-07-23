@@ -52,9 +52,22 @@ namespace mongo {
              || op == dbGetMore  // cursors are weird
              )
             return false;
-
         
-        const char *ns = m.singleData()->_data + 4;
+        DbMessage d(m);        
+        if ( op == dbUpdate ){
+            if ( d.getInt(0) & UpdateOption_Broadcast ){
+                assert(0);
+                return false;
+            }
+        }
+        else if ( op == dbDelete ){
+            if ( d.getInt(0) & RemoveOption_Broadcast ){
+                assert(0);
+                return false;
+            }
+        }
+
+        const char *ns = d.getns();
         string errmsg;
         if ( shardVersionOk( ns , errmsg ) ){
             return false;

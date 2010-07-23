@@ -220,6 +220,11 @@ namespace mongo {
         }
 
         static void sync();
+
+        void donotCheckVersion(){
+            _setVersion = false;
+            _finishedInit = true;
+        }
         
     private:
         void _init();

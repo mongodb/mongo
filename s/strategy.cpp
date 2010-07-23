@@ -27,8 +27,10 @@ namespace mongo {
 
     // ----- Strategy ------
 
-    void Strategy::doWrite( int op , Request& r , const Shard& shard ){
+    void Strategy::doWrite( int op , Request& r , const Shard& shard , bool checkVersion ){
         ShardConnection conn( shard , r.getns() );
+        if ( ! checkVersion )
+            conn.donotCheckVersion();
         conn->say( r.m() );
         conn.done();
     }
