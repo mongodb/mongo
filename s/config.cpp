@@ -375,6 +375,15 @@ namespace mongo {
         return true;
     }
     
+    void DBConfig::getAllShards(set<Shard>& shards) const{
+        shards.insert(getPrimary());
+        for (Collections::const_iterator it(_collections.begin()), end(_collections.end()); it != end; ++it){
+            if (it->second.isSharded()){
+                it->second.getCM()->getAllShards(shards);
+            } // TODO: handle collections on non-primary shard
+        }
+    }
+
     /* --- Grid --- */
     
     DBConfigPtr Grid::getDBConfig( string database , bool create ){
