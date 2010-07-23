@@ -641,9 +641,6 @@
     <ClCompile Include="..\db\geo\2d.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\geo\quadrant_search.cpp">
-      <Filter>db\cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\chunk.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
@@ -682,6 +679,9 @@
     </ClCompile>
     <ClCompile Include="..\db\repl\rs_initialsync.cpp">
       <Filter>replsets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\haystack.cpp">
+      <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

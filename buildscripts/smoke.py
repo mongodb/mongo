@@ -138,7 +138,12 @@ class mongod(object):
             self.port += 1
             self.slave = True
         if os.path.exists ( dirName ):
-            call( ["python", "buildscripts/cleanbb.py", dirName] )
+            if 'slave' in self.kwargs:
+                argv = ["python", "buildscripts/cleanbb.py", '--nokill', dirName] 
+
+            else:
+                argv = ["python", "buildscripts/cleanbb.py", dirName]
+            call( argv )
         utils.ensureDir( dirName )
         argv = [mongodExecutable, "--port", str(self.port), "--dbpath", dirName]
         if self.kwargs.get('smallOplog'):

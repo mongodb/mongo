@@ -259,4 +259,6 @@ namespace mongo {
         dbresponse.responseTo = m.header()->id;
     }
 
+    string debugString( Message& m );
+
 } // namespace mongo

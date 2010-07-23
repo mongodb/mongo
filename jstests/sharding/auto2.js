@@ -1,6 +1,6 @@
 // auto2.js
 
-s = new ShardingTest( "auto2" , 2 , 1 , 2 );
+s = new ShardingTest( "auto2" , 2 , 5 , 2 );
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
@@ -35,8 +35,13 @@ print( "done inserting data" );
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
 s.printChunks();
 
-counta = s._connections[0].getDB( "test" ).foo.count(); 
-countb = s._connections[1].getDB( "test" ).foo.count(); 
+function doCountsGlobal(){
+    counta = s._connections[0].getDB( "test" ).foo.count(); 
+    countb = s._connections[1].getDB( "test" ).foo.count(); 
+    return counta + countb;
+}
+
+doCountsGlobal()
 
 assert( counta > 0 , "diff1" );
 assert( countb > 0 , "diff2" );
@@ -50,13 +55,13 @@ for ( i=0; i<j*100; i++ ){
     if ( ! x ){
         missing.push( i );
         print( "can't find: " + i );
-        sleep( 1000 );
+        sleep( 5000 );
         x = coll.findOne( { num : i } );
         if ( ! x ){
             print( "still can't find: " + i );
             
             for ( var zzz=0; zzz<s._connections.length; zzz++ ){
-                if ( s._connections[zzz].getDB( "test" ).foo.findOne( { num : 1 } ) ){
+                if ( s._connections[zzz].getDB( "test" ).foo.findOne( { num : i } ) ){
                     print( "found on wrong server: " + s._connections[zzz] );
                 }
             }
@@ -65,10 +70,12 @@ for ( i=0; i<j*100; i++ ){
     }
 }
 
+
+
 s.printChangeLog();
 
 print( "missing: " + tojson( missing ) )
-assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
+assert.soon( function(z){ return doCountsGlobal() == j * 100; } , "from each a:" + counta + " b:" + countb + " i:" + i );
 print( "checkpoint B.a" )
 s.printChunks();
 assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );

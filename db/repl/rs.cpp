@@ -97,7 +97,7 @@ namespace mongo {
         bool isp = sp.state.primary();
         b.append("ismaster", isp);
         b.append("secondary", sp.state.secondary());
-        b.append("msg", "replica sets not yet fully implemented. do not use yet. v1.5.6=alpha");
+        b.append("msg", "replica sets in alpha, do not use in production. v1.5.6=alpha");
         {
             vector<string> hosts, passives, arbiters;
             _fillIsMasterHost(_self, hosts, passives, arbiters);

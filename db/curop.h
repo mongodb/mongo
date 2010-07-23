@@ -25,6 +25,7 @@
 
 namespace mongo { 
 
+    /* lifespan is different than CurOp because of recursives with DBDirectClient */
     class OpDebug {
     public:
         StringBuilder str;

@@ -3,6 +3,7 @@ import sys
 import os
 import utils
 import time
+from optparse import OptionParser
 
 cwd = os.getcwd();
 if cwd.find("buildscripts" ) > 0 :
@@ -45,12 +46,14 @@ def killprocs( signal="" ):
     return killed
 
 
-def cleanup( root ):
+def cleanup( root , nokill ):
     
-
-    if killprocs() > 0:
-        time.sleep(3)
-        killprocs("-9")
+    if nokill:
+        print "nokill requested, not killing anybody"
+    else:
+        if killprocs() > 0:
+            time.sleep(3)
+            killprocs("-9")
 
     # delete all regular files, directories can stay
     # NOTE: if we delete directories later, we can't delete diskfulltest
@@ -62,7 +65,12 @@ def cleanup( root ):
 
 
 if __name__ == "__main__":
+    parser = OptionParser(usage="read the script")
+    parser.add_option("--nokill", dest='nokill', default=False, action='store_true')
+    (options, args) = parser.parse_args()
+
     root = "/data/db/"
-    if len( sys.argv ) > 1:
-        root = sys.argv[1]
-    cleanup( root )
+    if len(args) > 0:
+        root = args[0]
+        
+    cleanup( root , options.nokill )

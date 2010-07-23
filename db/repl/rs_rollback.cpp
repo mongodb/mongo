@@ -20,6 +20,7 @@
 #include "../../client/dbclient.h"
 #include "rs.h"
 #include "../repl.h"
+#include "../query.h"
 
 /* Scenarios
 
@@ -69,7 +70,7 @@ namespace mongo {
     };
 
     static void syncRollbackFindCommonPoint(DBClientConnection *us, DBClientConnection *them, HowToFixUp& h) { 
-        const Query q = Query().sort( BSON( "$natural" << -1 ) );
+        const Query q = Query().sort(reverseNaturalObj);
         const bo fields = BSON( "ts" << 1 << "h" << 1 );
         
         auto_ptr<DBClientCursor> u = us->query(rsoplog, q, 0, 0, &fields, 0, 0);
@@ -134,10 +135,18 @@ namespace mongo {
     //static void fix(const be& _id) { 
     //}
 
+    struct X { 
+        const bson::bo *op;
+        bson::bo goodVersionOfObject;
+    };
+
    void ReplSetImpl::syncFixUp(HowToFixUp& h, DBClientConnection *them) {
        // fetch all first so we aren't interrupted.
+
        unsigned long long totSize = 0;
-       map</*the _id*/be,bo> items;
+
+       map</*the _id field*/be,X> items;
+
        for( list<bo>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) { 
            const bo& o = *i;
 
@@ -146,6 +155,7 @@ namespace mongo {
 
            be _id = o["_id"];
            if( _id.eoo() ) {
+               /* todo1.6? */
                log() << "replSet sync item in oplog has no _id; skipping. " << i->toString() << rsLog;
                continue;
            }
@@ -153,19 +163,57 @@ namespace mongo {
                continue;
 
            {
+               /* TODO : slow.  lots of round trips. */
                string ns = o["ns"].String();
-               bo goodVersion = them->findOne(ns, bob().append(_id).done());
-               totSize += goodVersion.objsize();
-               // assert on totSize...
+               X x;
+               x.op = &o;
+               x.goodVersionOfObject = them->findOne(ns, bob().append(_id).done()).getOwned();
+               totSize += x.goodVersionOfObject.objsize();
+               uassert( 13410, "replSet too much data to roll back", totSize < 200 * 1024 * 1024 );
 
                // note result might be eoo, indicating we should delete.
-               items.insert(pair<be,bo>(_id, goodVersion.getOwned()));
+               items.insert(pair<be,X>(_id, x));
            }
        }
 
        // update them
+       sethbmsg(str::stream() << "syncRollback 4 n:" << h.toRefetch.size());
+
+       bool warn = false;
+
+       {
+           writelock lk("");
+           for( map<be,X>::iterator i = items.begin(); i != items.end(); i++ ) {
+               bo pattern = i->first.wrap(); // { _id : ... }
+               X& x = i->second;
+               const char *ns = x.op->getStringField("ns");
+               try { 
+                   assert( *ns );
+                   // todo: lots of overhead in context, this can be faster
+                   Client::Context c(ns, dbpath, 0, /*doauth*/false);
+                   if( x.goodVersionOfObject.isEmpty() ) {
+                       // wasn't on the primary; delete.
+                       /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
+                       deleteObjects(ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
+                   }
+                   else {
+                       // todo faster...
+                       OpDebug debug;
+                       _updateObjects(/*god*/true, ns, x.goodVersionOfObject, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug);
+                   }
+               }
+               catch(DBException& e) { 
+                   log() << "replSet exception in rollback ns:" << ns << ' ' << pattern.toString() << ' ' << e.toString() << rsLog;
+                   warn = true;
+               }
+           }
+       }
 
        // clean up oplog
+       if( warn ) 
+           sethbmsg("issues during syncRollback, see log");
+       else
+           sethbmsg("syncRollback done");
    }
 
     void ReplSetImpl::syncRollback(OplogReader&r) { 
@@ -201,8 +249,6 @@ namespace mongo {
 
         sethbmsg("replSet syncRollback 3");
         syncFixUp(how, r.conn());
-
-        sethbmsg("replSet syncRollback 4 FINISH");
     }
 
 }
