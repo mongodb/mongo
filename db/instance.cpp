@@ -465,7 +465,7 @@ namespace mongo {
         assert(*ns);
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
         int flags = d.pullInt();
-        bool justOne = flags & 1;
+        bool justOne = flags & RemoveOption_JustOne;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
         {

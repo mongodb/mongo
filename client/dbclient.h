@@ -80,7 +80,18 @@ namespace mongo {
 
         /** Update multiple documents (if multiple documents match query expression). 
            (Default is update a single document and stop.) */
-        UpdateOption_Multi = 1 << 1
+        UpdateOption_Multi = 1 << 1,
+
+        /** flag from mongo saying this update went everywhere */
+        UpdateOption_Broadcast = 1 << 2
+    };
+
+    enum RemoveOptions {
+        /** only delete one option */
+        RemoveOption_JustOne = 1 << 0,
+
+        /** flag from mongo saying this update went everywhere */
+        RemoveOption_Broadcast = 1 << 1
     };
 
     class DBClientBase;

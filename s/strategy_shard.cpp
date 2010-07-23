@@ -174,8 +174,7 @@ namespace mongo {
             bool upsert = flags & UpdateOption_Upsert;
             bool multi = flags & UpdateOption_Multi;
 
-            if ( multi )
-                uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! upsert );
+            uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! ( upsert && multi ) );
 
             if ( upsert && !(manager->hasShardKey(toupdate) ||
                              (toupdate.firstElement().fieldName()[0] == '$' && manager->hasShardKey(query))))

@@ -688,7 +688,7 @@ namespace mongo {
 
         int flags = 0;
         if ( justOne )
-            flags |= 1;
+            flags |= RemoveOption_JustOne;
         b.appendNum( flags );
 
         obj.obj.appendSelfToBufBuilder( b );
