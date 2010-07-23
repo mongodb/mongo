@@ -346,13 +346,13 @@ static int __wt_api_db_col_get(
 static int __wt_api_db_col_put(
 	DB *db,
 	WT_TOC *toc,
-	u_int64_t *recno,
+	u_int64_t recno,
 	DBT *data,
 	u_int32_t flags);
 static int __wt_api_db_col_put(
 	DB *db,
 	WT_TOC *toc,
-	u_int64_t *recno,
+	u_int64_t recno,
 	DBT *data,
 	u_int32_t flags)
 {
@@ -1261,7 +1261,7 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t ))
 	    __wt_db_lockout;
 	db->col_put = (int (*)
-	    (DB *, WT_TOC *, u_int64_t *, DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t ))
 	    __wt_db_lockout;
 	db->column_set = (int (*)
 	    (DB *, u_int32_t , const char *, u_int32_t ))
