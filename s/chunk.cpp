@@ -744,6 +744,21 @@ namespace mongo {
         }
     }
 
+    void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max){
+        uassert(13405, "min must have shard key", hasShardKey(min));
+        uassert(13406, "max must have shard key", hasShardKey(max));
+
+        ChunkRangeMap::const_iterator it = _chunkRanges.upper_bound(min);
+        ChunkRangeMap::const_iterator end = _chunkRanges.lower_bound(max);
+
+        for (; it!=end; ++ it){
+            shards.insert(it->second->getShard());
+
+            // once we know we need to visit all shards no need to keep looping
+            if (shards.size() == _shards.size())
+                break;
+        }
+    }
 
     void ChunkManager::getAllShards( set<Shard>& all ){
         rwlock lk( _lock , false ); 

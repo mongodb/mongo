@@ -35,7 +35,7 @@ namespace mongo {
         
         class PublicGridCommand : public Command {
         public:
-            PublicGridCommand( const char * n ) : Command( n ){
+            PublicGridCommand( const char* n, const char* oldname=NULL ) : Command( n, false, oldname ){
             }
             virtual bool slaveOk() const {
                 return true;
@@ -65,6 +65,79 @@ namespace mongo {
                 return ok;
             }
         };
+
+        class RunOnAllShardsCommand : public Command {
+        public:
+            RunOnAllShardsCommand(const char* n, const char* oldname=NULL) : Command(n, false, oldname) {}
+
+            virtual bool slaveOk() const { return true; }
+            virtual bool adminOnly() const { return false; }
+
+            // all grid commands are designed not to lock
+            virtual LockType locktype() const { return NONE; } 
+
+
+            // default impl uses all shards for DB
+            virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards){
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                conf->getAllShards(shards);
+            }
+            
+            virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {}
+
+            // don't override
+            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& output, bool){
+                set<Shard> shards;
+                getShards(dbName, cmdObj, shards);
+
+                list< shared_ptr<Future::CommandResult> > futures;
+                for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ){
+                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj ) );
+                }
+                
+                vector<BSONObj> results;
+                BSONObjBuilder subobj (output.subobjStart("raw"));
+                BSONObjBuilder errors;
+                for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ){
+                    shared_ptr<Future::CommandResult> res = *i;
+                    if ( ! res->join() ){
+                        errors.appendAs(res->result()["errmsg"], res->getServer());
+                    }
+                    results.push_back( res->result() );
+                    subobj.append( res->getServer() , res->result() );
+                }
+
+                subobj.done();
+
+                BSONObj errobj = errors.done();
+                if (! errobj.isEmpty()){
+                    errmsg = errobj.toString(false, true);
+                    return false;
+                }
+                
+                aggregateResults(results, output);
+                return true;
+            }
+
+        };
+
+        class AllShardsCollectionCommand : public RunOnAllShardsCommand {
+        public:
+            AllShardsCollectionCommand(const char* n, const char* oldname=NULL) : RunOnAllShardsCommand(n, oldname) {}
+
+            virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards){
+                string fullns = dbName + '.' + cmdObj.firstElement().valuestrsafe();
+                
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    shards.insert(conf->getShard(fullns));
+                } else {
+                    conf->getChunkManager(fullns)->getAllShards(shards);
+                }
+            }
+        };
+
         
         class NotAllowedOnShardedCollectionCmd : public PublicGridCommand {
         public:
@@ -86,6 +159,62 @@ namespace mongo {
         };
         
         // ----
+
+        class DropIndexesCmd : public AllShardsCollectionCommand {
+        public:
+            DropIndexesCmd() :  AllShardsCollectionCommand("dropIndexes", "deleteIndexes") {}
+        } dropIndexesCmd;
+
+        class ReIndexCmd : public AllShardsCollectionCommand {
+        public:
+            ReIndexCmd() :  AllShardsCollectionCommand("reIndex") {}
+        } reIndexCmd;
+
+        class ValidateCmd : public AllShardsCollectionCommand {
+        public:
+            ValidateCmd() :  AllShardsCollectionCommand("validate") {}
+        } validateCmd;
+
+        class RepairDatabaseCmd : public RunOnAllShardsCommand {
+        public:
+            RepairDatabaseCmd() :  RunOnAllShardsCommand("repairDatabase") {}
+        } repairDatabaseCmd;
+
+        class DBStatsCmd : public RunOnAllShardsCommand {
+        public:
+            DBStatsCmd() :  RunOnAllShardsCommand("dbstats") {}
+
+            virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
+                long long objects = 0;
+                long long dataSize = 0;
+                long long storageSize = 0;
+                long long numExtents = 0;
+                long long indexes = 0;
+                long long indexSize = 0;
+                long long fileSize = 0;
+
+                for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it != end; ++it){
+                    const BSONObj& b = *it;
+                    objects     += b["objects"].numberLong();
+                    dataSize    += b["dataSize"].numberLong();
+                    storageSize += b["storageSize"].numberLong();
+                    numExtents  += b["numExtents"].numberLong();
+                    indexes     += b["indexes"].numberLong();
+                    indexSize   += b["indexSize"].numberLong();
+                    fileSize    += b["fileSize"].numberLong();
+                }
+
+                //result.appendNumber( "collections" , ncollections ); //TODO: need to find a good way to get this
+                output.appendNumber( "objects" , objects );
+                output.append      ( "avgObjSize" , double(dataSize) / double(objects) );
+                output.appendNumber( "dataSize" , dataSize );
+                output.appendNumber( "storageSize" , storageSize);
+                output.appendNumber( "numExtents" , numExtents );
+                output.appendNumber( "indexes" , indexes );
+                output.appendNumber( "indexSize" , indexSize );
+                output.appendNumber( "fileSize" , fileSize );
+            }
+        } DBStatsCmdObj;
 
         class DropCmd : public PublicGridCommand {
         public:
@@ -419,6 +548,59 @@ namespace mongo {
             }
 
         } findAndModifyCmd;
+
+        class DataSizeCmd : public PublicGridCommand {
+        public:
+            DataSizeCmd() : PublicGridCommand("dataSize", "datasize") { }
+            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string fullns = cmdObj.firstElement().String();
+                
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result);
+                }
+                
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
+                massert( 13407 ,  "how could chunk manager be null!" , cm );
+                
+                BSONObj min = cmdObj.getObjectField( "min" );
+                BSONObj max = cmdObj.getObjectField( "max" );
+                BSONObj keyPattern = cmdObj.getObjectField( "keyPattern" );
+
+                uassert(13408,  "keyPattern must equal shard key", cm->getShardKey().key() == keyPattern);
+
+                // yes these are doubles...
+                double size = 0;
+                double numObjects = 0;
+                int millis = 0;
+
+                set<Shard> shards;
+                cm->getShardsForRange(shards, min, max);
+                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ){
+                    ShardConnection conn( *i , fullns );
+                    BSONObj res;
+                    bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                    conn.done();
+                    
+                    if ( ! ok ){
+                        result.appendElements( res );
+                        return false;
+                    }
+
+                    size       += res["size"].number();
+                    numObjects += res["numObjects"].number();
+                    millis     += res["millis"].numberInt();
+
+                }
+
+                result.append( "size", size );
+                result.append( "numObjects" , numObjects );
+                result.append( "millis" , millis );
+                return true;
+            }
+
+        } DataSizeCmd;
 
         class ConvertToCappedCmd : public NotAllowedOnShardedCollectionCmd  {
         public:

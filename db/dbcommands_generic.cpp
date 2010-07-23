@@ -167,6 +167,11 @@ namespace mongo {
             BSONObjBuilder b( result.subobjStart( "commands" ) );
             for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ){
                 Command * c = i->second;
+
+                // don't show oldnames
+                if (i->first != c->name)
+                    continue;
+
                 BSONObjBuilder temp( b.subobjStart( c->name.c_str() ) );
 
                 {
