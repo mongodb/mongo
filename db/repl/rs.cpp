@@ -190,10 +190,16 @@ namespace mongo {
 
         loadConfig();
 
-        for( Member *m = head(); m; m = m->next() )
+        unsigned sss = seedSet.size();
+        for( Member *m = head(); m; m = m->next() ) {
             seedSet.erase(m->h());
+        }
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
-            log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+            if( i->isSelf() ) {
+                if( sss == 1 ) 
+                    log(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
+            } else
+                log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
     }
 
