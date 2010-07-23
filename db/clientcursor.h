@@ -338,6 +338,8 @@ public:
 
         static void informAboutToDeleteBucket(const DiskLoc& b);
         static void aboutToDelete(const DiskLoc& dl);
+
+        static void find( const string& ns , set<CursorId>& all );
     };
 
     class ClientCursorMonitor : public BackgroundJob {

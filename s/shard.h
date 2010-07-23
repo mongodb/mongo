@@ -220,6 +220,19 @@ namespace mongo {
         }
 
         static void sync();
+
+        void donotCheckVersion(){
+            _setVersion = false;
+            _finishedInit = true;
+        }
+
+        /**
+           this just passes through excpet it checks for stale configs
+         */
+        bool runCommand( const string& db , const BSONObj& cmd , BSONObj& res );
+
+        /** checks all of my thread local connections for the version of this ns */
+        static void checkMyConnectionVersions( const string &  ns );
         
     private:
         void _init();

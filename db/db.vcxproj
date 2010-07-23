@@ -452,7 +452,7 @@
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="geo\2d.cpp" />
-    <ClCompile Include="geo\quadrant_search.cpp" />
+    <ClCompile Include="geo\haystack.cpp" />
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />

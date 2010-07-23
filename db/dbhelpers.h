@@ -1,4 +1,8 @@
-// dbhelpers.h
+/* @file dbhelpers.h
+
+   db helpers are helper functions and classes that let us easily manipulate the local
+   database instance in-proc.
+*/
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -14,10 +18,6 @@
 *
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-/* db helpers are helper functions and classes that let us easily manipulate the local
-   database instance.
 */
 
 #pragma once
@@ -99,8 +99,7 @@ namespace mongo {
         static void putSingleton(const char *ns, BSONObj obj);
         static void putSingletonGod(const char *ns, BSONObj obj, bool logTheOp);
         static bool getFirst(const char *ns, BSONObj& result) { return getSingleton(ns, result); }
-        static bool getLast(const char *ns, BSONObj& result); // get last object int he collection; e.g. {$natural : -1}
-        
+        static bool getLast(const char *ns, BSONObj& result); // get last object int he collection; e.g. {$natural : -1}        
 
         /**
          * you have to lock
@@ -122,7 +121,7 @@ namespace mongo {
             virtual ~RemoveCallback(){}
             virtual void goingToDelete( const BSONObj& o ) = 0;
         };
-
+        /* removeRange: operation is oplog'd */
         static long long removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield = false , bool maxInclusive = false , RemoveCallback * callback = 0 );
 
         /* Remove all objects from a collection.

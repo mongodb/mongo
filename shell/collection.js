@@ -355,8 +355,10 @@ DBCollection.prototype.validate = function() {
 
     res.valid = false;
 
-    if ( res.result ){
-        var str = "-" + tojson( res.result );
+    var raw = res.result || res.raw;
+
+    if ( raw ){
+        var str = "-" + tojson( raw );
         res.valid = ! ( str.match( /exception/ ) || str.match( /corrupt/ ) );
 
         var p = /lastExtentSize:(\d+)/;

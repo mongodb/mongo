@@ -93,6 +93,7 @@ namespace mongo {
         BSONObj _query;
         int _options;
         BSONObj _fields;
+        int _batchSize;
 
         bool _done;
     };

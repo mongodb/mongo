@@ -71,6 +71,9 @@ namespace mongo {
         /* assume ownership of the buffer - you must then free() it */
         void decouple() { data = 0; }
 
+        void appendChar(char j){
+            *((char*)grow(sizeof(char))) = j;
+        }
         void appendNum(char j){
             *((char*)grow(sizeof(char))) = j;
         }

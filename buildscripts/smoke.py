@@ -47,7 +47,8 @@ import shutil
 import re
 import parser
 
-mongoRepo = './'
+mongoRepo = os.getcwd() #'./'
+testPath = None
 
 mongodExecutable = "./mongod"
 mongodPort = "32000"
@@ -137,7 +138,12 @@ class mongod(object):
             self.port += 1
             self.slave = True
         if os.path.exists ( dirName ):
-            call( ["python", "buildscripts/cleanbb.py", dirName] )
+            if 'slave' in self.kwargs:
+                argv = ["python", "buildscripts/cleanbb.py", '--nokill', dirName] 
+
+            else:
+                argv = ["python", "buildscripts/cleanbb.py", dirName]
+            call( argv )
         utils.ensureDir( dirName )
         argv = [mongodExecutable, "--port", str(self.port), "--dbpath", dirName]
         if self.kwargs.get('smallOplog'):
@@ -237,9 +243,19 @@ def checkDbHashes(master, slave):
             lost_in_master.append(db)
     replicated_dbs += master.dict.keys()
 
+# Blech.
+def skipTest(path):
+    if smallOplog:
+        if os.path.basename(path) in ["cursor8.js", "indexh.js"]:
+            return True
+    return False
+
 def runTest(test):
     (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
+    if skipTest(path):
+        print "skippping " + path
+        return
     if ext == ".js":
         argv=[shellExecutable, "--port", mongodPort]
         if not usedb:
@@ -263,7 +279,7 @@ def runTest(test):
     t1=time.time()
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
-    r = call(argv)
+    r = call(argv, cwd=testPath)
     t2=time.time()
     print "                " + str((t2-t1)*1000) + "ms"
     if r != 0:
@@ -386,8 +402,6 @@ def expandSuites(suites):
             (globstr, usedb) = ('auth/*.js', False)
         elif suite == 'smokeSharding':
             (globstr, usedb) = ('sharding/*.js', False)
-        elif suite == 'smokeShardingJs':
-            (globstr, usedb) = ('_runner_sharding_passthrough.js', True)
         elif suite == 'smokeTool':
             (globstr, usedb) = ('tool/*.js', False)
         # well, the above almost works for everything...
@@ -395,7 +409,8 @@ def expandSuites(suites):
             paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
             if os.sys.platform == "win32":
                 paths = [path+'.exe' for path in paths]
-            tests += [(os.path.join(mongoRepo, path), False) for path in paths]
+            # hack
+            tests += [(testPath and path or os.path.join(mongoRepo, path), False) for path in paths]
         elif suite == 'mongosTest':
             if os.sys.platform == "win32":
                 program = 'mongos.exe'
@@ -406,12 +421,12 @@ def expandSuites(suites):
             raise Exception('unknown test suite %s' % suite)
 
         if globstr:
-            globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '')+globstr
+            globstr = os.path.join(mongoRepo, (os.path.join(('jstests/' if globstr.endswith('.js') else ''), globstr)))
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
     if not tests:
-        raise Exception( "no tests specified" )
+        raise Exception( "no tests found" )
     return tests
 
 def main():
@@ -422,6 +437,9 @@ def main():
     # th we don't have the freedom to run from anyplace.
 #    parser.add_option('--mongo-repo', dest='mongoRepo', default=None,
 #                      help='Top-level directory of mongo checkout to use.  (default: script will make a guess)')
+    parser.add_option('--test-path', dest='testPath', default=None,
+                      help="Path to the test executables to run "
+                      "(currently only used for smokeClient)")
     parser.add_option('--mongod', dest='mongodExecutable', #default='./mongod',
                       help='Path to mongod to run (default "./mongod")')
     parser.add_option('--port', dest='mongodPort', default="32000",
@@ -461,7 +479,10 @@ def main():
 #                if os.path.samefile('/', prefix): 
 #                    raise Exception("couldn't guess the mongo repository path")
 
-    global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest, smallOplog, smokeDbPrefix
+    print tests
+
+    global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest, smallOplog, smokeDbPrefix, testPath
+    testPath = options.testPath
     mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, 'mongod')
     mongodPort = options.mongodPort if options.mongodPort else mongodPort
     shellExecutable = options.shellExecutable if options.shellExecutable else os.path.join(mongoRepo, 'mongo')
@@ -478,6 +499,8 @@ def main():
                 tests = f.readlines()
     tests = [t.rstrip('\n') for t in tests]
 
+    if not tests:
+        raise Exception( "no tests specified" )
     # If we're in suite mode, tests is a list of names of sets of tests.
     if options.mode == 'suite':
         # Suites: smoke, smokePerf, smokeJs, smokeQuota, smokeJsPerf,

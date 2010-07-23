@@ -656,10 +656,11 @@ namespace mongo {
         BSONObj key = _key.extractKey(obj);
         
         {
+            rwlock lk( _lock , false ); 
+            
             BSONObj foo;
             ChunkPtr c;
             {
-                rwlock lk( _lock , false ); 
                 ChunkMap::iterator it = _chunkMap.upper_bound(key);
                 if (it != _chunkMap.end()){
                     foo = it->first;
@@ -675,7 +676,7 @@ namespace mongo {
                 PRINT(*c);
                 PRINT(key);
                 
-                _reload();
+                _reload_inlock();
                 massert(13141, "Chunk map pointed to incorrect chunk", false);
             }
         }
@@ -687,7 +688,7 @@ namespace mongo {
         }
         
         log() << "ChunkManager: couldn't find chunk for: " << key << " going to retry" << endl;
-        _reload();
+        _reload_inlock();
         return findChunk( obj , true );
     }
 
@@ -744,6 +745,21 @@ namespace mongo {
         }
     }
 
+    void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max){
+        uassert(13405, "min must have shard key", hasShardKey(min));
+        uassert(13406, "max must have shard key", hasShardKey(max));
+
+        ChunkRangeMap::const_iterator it = _chunkRanges.upper_bound(min);
+        ChunkRangeMap::const_iterator end = _chunkRanges.lower_bound(max);
+
+        for (; it!=end; ++ it){
+            shards.insert(it->second->getShard());
+
+            // once we know we need to visit all shards no need to keep looping
+            if (shards.size() == _shards.size())
+                break;
+        }
+    }
 
     void ChunkManager::getAllShards( set<Shard>& all ){
         rwlock lk( _lock , false ); 

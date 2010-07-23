@@ -184,6 +184,17 @@ namespace mongo {
 
 #endif
 
+    class rwlock_try_write {
+        RWLock& _l;
+    public:
+        struct exception { };
+        rwlock_try_write(RWLock& l, int millis = 0) : _l(l) {
+            if( !l.lock_try(millis) ) throw exception();
+        }
+        ~rwlock_try_write() { _l.unlock(); }
+    };
+
+    /* scoped lock */
     struct rwlock {
         rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false )
             : _lock( (RWLock&)lock ) , _write( write ){

@@ -23,8 +23,8 @@
 namespace mongo { 
 
     extern bool __destroyingStatics;
-
     class mutex;
+
     // only used on _DEBUG builds:
     class MutexDebugger { 
         typedef const char * mid; // mid = mutex ID

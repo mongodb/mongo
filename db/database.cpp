@@ -55,7 +55,7 @@ namespace mongo {
                 
                 stringstream ss;
                 ss << "db already exists with different case other: [" << others[i] << "] me [" << nm << "]";
-                uasserted( 13297 , ss.str() );
+                uasserted( DatabaseDifferCaseCode , ss.str() );
             }
         }
 

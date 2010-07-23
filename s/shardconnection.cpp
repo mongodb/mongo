@@ -30,10 +30,10 @@ namespace mongo {
     class ClientConnections : boost::noncopyable {
     public:
         struct Status : boost::noncopyable {
-            Status() : created(0){}
-            
-            std::stack<DBClientBase*> avail;
-            long long created;
+            Status() : created(0), avail(0){}
+
+            long long created;            
+            DBClientBase* avail;
         };
 
 
@@ -61,10 +61,9 @@ namespace mongo {
                 string addr = i->first;
                 Status* ss = i->second;
                 assert( ss );
-                std::stack<DBClientBase*>& s = ss->avail;
-                while ( ! s.empty() ){
-                    pool.release( addr , s.top() );
-                    s.pop();
+                if ( ss->avail ){
+                    pool.release( addr , ss->avail );
+                    ss->avail = 0;
                 }
                 delete ss;
             }
@@ -77,11 +76,11 @@ namespace mongo {
             if ( ! s )
                 s = new Status();
             
-            debug() << "WANT ONE pool empty: " << s->avail.empty() << endl;
+            debug() << "WANT ONE pool avail: " << s->avail << endl;
             
-            if ( ! s->avail.empty() ){
-                DBClientBase* c = s->avail.top();
-                s->avail.pop();
+            if ( s->avail ){
+                DBClientBase* c = s->avail;
+                s->avail = 0;
                 debug( s , addr ) << "GOT  " << c << endl;
                 pool.onHandedOut( c );
                 return c;
@@ -96,11 +95,11 @@ namespace mongo {
             scoped_lock lk( _mutex );
             Status* s = _hosts[addr];
             assert( s );
-            if ( s->avail.size() > 0 ){
+            if ( s->avail ){
                 delete conn;
                 return;
             }
-            s->avail.push( conn );
+            s->avail = conn;
             debug( s , addr ) << "PUSHING: " << conn << endl;
         }
         
@@ -109,17 +108,25 @@ namespace mongo {
             for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ){
                 string addr = i->first;
                 Status* ss = i->second;
-                assert( ss );
-                std::stack<DBClientBase*>& s = ss->avail;
-                while ( ! s.empty() ){
-                    DBClientBase* conn = s.top();
-                    conn->getLastError();
-                    pool.release( addr , conn );
-                    s.pop();
+
+                if ( ss->avail ){
+                    ss->avail->getLastError();
+                    pool.release( addr , ss->avail );
+                    ss->avail = 0;
                 }
                 delete ss;
             }
             _hosts.clear();
+        }
+
+        void checkVersions( const string& ns ){
+            scoped_lock lk( _mutex );
+            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ){
+                Status* ss = i->second;
+                assert( ss );
+                if ( ss->avail )
+                    checkShardVersion( *ss->avail , ns );
+            }
         }
         
         map<string,Status*> _hosts;
@@ -194,6 +201,25 @@ namespace mongo {
 
     void ShardConnection::sync(){
         ClientConnections::get()->sync();
+    }
+
+    bool ShardConnection::runCommand( const string& db , const BSONObj& cmd , BSONObj& res ){
+        assert( _conn );
+        bool ok = _conn->runCommand( db , cmd , res );
+        if ( ! ok ){
+            if ( res["code"].numberInt() == StaleConfigInContextCode ){
+                string big = res["errmsg"].String();
+                string ns,raw;
+                massert( 13409 , (string)"can't parse ns from: " + big  , StaleConfigException::parse( big , ns , raw ) );
+                done();
+                throw StaleConfigException( ns , raw );
+            }
+        }
+        return ok;
+    }
+
+    void ShardConnection::checkMyConnectionVersions( const string & ns ){
+        ClientConnections::get()->checkVersions( ns );
     }
 
     ShardConnection::~ShardConnection() {

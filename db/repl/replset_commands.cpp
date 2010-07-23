@@ -49,17 +49,28 @@ namespace mongo {
     } cmdReplSetGetStatus;
 
     class CmdReplSetReconfig : public ReplSetCommand {
+        RWLock mutex; /* we don't need rw but we wanted try capability. :-( */
     public:
         virtual void help( stringstream &help ) const {
             help << "Adjust configuration of a replica set\n";
             help << "{ replSetReconfig : config_object }";
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
-        CmdReplSetReconfig() : ReplSetCommand("replSetReconfig") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        CmdReplSetReconfig() : ReplSetCommand("replSetReconfig"), mutex("rsreconfig") { }
+        virtual bool run(const string& a, BSONObj& b, string& errmsg, BSONObjBuilder& c, bool d) {
+            try { 
+                rwlock_try_write lk(mutex);
+                return _run(a,b,errmsg,c,d);
+            }
+            catch(rwlock_try_write::exception&) { }
+            errmsg = "a replSetReconfig is already in progress";
+            return false;
+        }
+    private:
+        bool _run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) ) 
                 return false;
-            if( !theReplSet->isPrimary() ) { 
+            if( !theReplSet->box.getState().primary() ) { 
                 errmsg = "replSetReconfig command must be sent to the current replica set primary.";
                 return false;
             }
@@ -127,5 +138,25 @@ namespace mongo {
             return false;
         }
     } cmdReplSetFreeze;
+
+    class CmdReplSetStepDown: public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "Step down as primary.  Will not try to reelect self or 1 minute.\n";
+            help << "(If another member with same priority takes over in the meantime, it will stay primary.)\n";
+            help << "http://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+        }
+
+        CmdReplSetStepDown() : ReplSetCommand("replSetStepDown", true) { }
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) )
+                return false;
+            if( !theReplSet->box.getState().primary() ) {
+                errmsg = "not primary so can't step down";
+                return false;
+            }
+            return theReplSet->stepDown();
+        }
+    } cmdReplSetStepDown;
 
 }

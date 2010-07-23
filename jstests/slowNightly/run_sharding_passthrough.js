@@ -52,18 +52,28 @@ files.forEach(
 	// getnonce logout medianKey profile reIndex repairDatabase
 	// reseterror splitVector validate
 
-	// These all fail due to missing commands:
-	if (/[\/\\](apitest_db|apitest_dbcollection|auth1|auth2|basic1|basic2|capped1|capped3|capped4|copydb-auth|cursor6|datasize|datasize2|dbadmin|dbhash|drop|dropIndex|error3|evalb|find1|find3|in5|index1|index10|index2|index.*|jni1|jni2|jni3|jni4|jni8|median|multi2|profile1|recstore|remove|remove2|repair|sort1|sort2|sort4|sort5|sort_numeric|splitvector|unique2|update)\.js$/.test(x.name)) {
-	    print(" !!!!!!!!!!!!!!! skipping test that fails under sharding (missing command) " + x.name)	    
+     /* missing commands :
+     * forceerror and switchtoclienterrors
+     * cloneCollectionAsCapped
+     * splitvector
+     * profile (apitest_db, cursor6, evalb)
+     * copydbgetnonce
+     * dbhash
+     * medianKey
+     * clean (apitest_dbcollection)
+     * logout and getnonce
+     */
+	if (/[\/\\](error3|capped3|splitvector|apitest_db|cursor6|copydb-auth|profile1|dbhash|median|apitest_dbcollection|evalb|auth1|auth2)\.js$/.test(x.name)) {
+	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
 	// These are bugs (some might be fixed now):
-	if (/[\/\\](apply_ops1|count5|cursor8|dbcase|or4|shellkillop|update4)\.js$/.test(x.name)) {
+	if (/[\/\\](apply_ops1|count5|cursor8|or4|shellkillop|update4)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
 	// These aren't supposed to get run under sharding:
-	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|remove5|update4)\.js$/.test(x.name)) {
+	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4)\.js$/.test(x.name)) {
 	    print(" >>>>>>>>>>>>>>> skipping test that would fail under sharding " + x.name)	    
 	    return;
 	}

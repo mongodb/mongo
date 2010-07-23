@@ -31,26 +31,36 @@ namespace mongo {
 
     void ReplSetImpl::assumePrimary() { 
         assert( iAmPotentiallyHot() );
-        writelock lk("admin."); // so we are synchronized with _logOp() 
-        _myState = RS_PRIMARY;
-        _currentPrimary = _self;
-        log(2) << "replSet self is now primary" << rsLog;
+        writelock lk("admin."); // so we are synchronized with _logOp()
+        box.setSelfPrimary(_self);
+        log(2) << "replSet self (" << _self->id() << ") is now primary" << rsLog;
     }
 
     void ReplSetImpl::changeState(MemberState s) { 
-        /* TODO LOCKING */
-        /* TODO call this don't touch mystate directly */
-        _myState = s;
+        // todo check if primary ptr needs settings or removing???
+        box.change(s);
     }
 
     void ReplSetImpl::relinquish() { 
-        if( state() == RS_PRIMARY ) {
-            _myState = RS_RECOVERING;
+        if( box.getState().primary() ) {
+            changeState(MemberState::RS_RECOVERING);
             log() << "replSet info relinquished primary state" << rsLog;
         }
-        else if( state() == RS_STARTUP2 ) {
-            _myState = RS_RECOVERING;
+        else if( box.getState().startup2() ) {
+            // ? add comment
+            changeState(MemberState::RS_RECOVERING);
         }
+    }
+
+    bool ReplSetImpl::_stepDown() { 
+        lock lk(this);
+        if( box.getState().primary() ) { 
+            changeState(MemberState::RS_RECOVERING);
+            elect.steppedDown = time(0) + 60;
+            log() << "replSet info stepped down as primary" << rsLog;
+            return true;
+        }
+        return false;
     }
 
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) { 
@@ -83,10 +93,11 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMaster(BSONObjBuilder& b) {
-        bool isp = isPrimary();
+        const StateBox::SP sp = box.get();
+        bool isp = sp.state.primary();
         b.append("ismaster", isp);
-        b.append("secondary", isSecondary());
-        b.append("msg", "replica sets not yet fully implemented. do not use yet. v1.5.6=alpha");
+        b.append("secondary", sp.state.secondary());
+        b.append("msg", "replica sets in alpha, do not use in production. v1.5.6=alpha");
         {
             vector<string> hosts, passives, arbiters;
             _fillIsMasterHost(_self, hosts, passives, arbiters);
@@ -107,7 +118,7 @@ namespace mongo {
         }
 
         if( !isp ) { 
-            const Member *m = currentPrimary();
+            const Member *m = sp.primary;
             if( m )
                 b.append("primary", m->h().toString());
         }
@@ -164,8 +175,7 @@ namespace mongo {
         memset(_hbmsg, 0, sizeof(_hbmsg));
         *_hbmsg = '.'; // temp...just to see
         lastH = 0;
-        _myState = RS_STARTUP;
-        _currentPrimary = 0;
+        changeState(MemberState::RS_STARTUP);
 
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
         set<HostAndPort> seedSet;
@@ -180,10 +190,16 @@ namespace mongo {
 
         loadConfig();
 
-        for( Member *m = head(); m; m = m->next() )
+        unsigned sss = seedSet.size();
+        for( Member *m = head(); m; m = m->next() ) {
             seedSet.erase(m->h());
+        }
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
-            log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+            if( i->isSelf() ) {
+                if( sss == 1 ) 
+                    log(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
+            } else
+                log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
     }
 
@@ -212,7 +228,8 @@ namespace mongo {
             dbexit( EXIT_REPLICATION_ERROR );
             return;
         }
-        _myState = RS_STARTUP2;
+
+        changeState(MemberState::RS_STARTUP2);
         startThreads();
         newReplUp(); // oplog.cpp
     }
@@ -252,8 +269,15 @@ namespace mongo {
 
         endOldHealthTasks();
 
-        int oldPrimaryId = currentPrimary() ? currentPrimary()->id() : -1;
-        _currentPrimary = 0;
+
+
+        int oldPrimaryId = -1;
+        {
+            const Member *p = box.getPrimary();
+            if( p ) 
+                oldPrimaryId = p->id();
+        }
+        box.setOtherPrimary(0);
         _self = 0;
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
@@ -261,13 +285,15 @@ namespace mongo {
             if( m.h.isSelf() ) {
                 assert( _self == 0 );
                 mi = _self = new Member(m.h, m._id, &m, true);
+                if( (int)mi->id() == oldPrimaryId )
+                    box.setSelfPrimary(mi);
             } else {
                 mi = new Member(m.h, m._id, &m, false);
                 _members.push(mi);
                 startHealthTaskFor(mi);
+                if( (int)mi->id() == oldPrimaryId )
+                    box.setOtherPrimary(mi);
             }
-            if( mi->id() == oldPrimaryId )
-                _currentPrimary = mi;
         }
         return true;
     }
@@ -373,7 +399,7 @@ namespace mongo {
     void ReplSetImpl::_fatal() 
     { 
         //lock l(this);
-        _myState = RS_FATAL; 
+        box.set(MemberState::RS_FATAL, 0);
         sethbmsg("fatal error");
         log() << "replSet error fatal error, stopping replication" << rsLog; 
     }
@@ -389,6 +415,10 @@ namespace mongo {
         try { 
             initFromConfig(newConfig);
             log() << "replSet replSetReconfig new config saved locally" << rsLog;
+        }
+        catch(DBException& e) { 
+            log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
+            _fatal();
         }
         catch(...) { 
             log() << "replSet error unexpected exception in haveNewConfig()" << rsLog;

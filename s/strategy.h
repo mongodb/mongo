@@ -33,7 +33,7 @@ namespace mongo {
         virtual void writeOp( int op , Request& r ) = 0;
         
     protected:
-        void doWrite( int op , Request& r , const Shard& shard );
+        void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
         void doQuery( Request& r , const Shard& shard );
         
         void insert( const Shard& shard , const char * ns , const BSONObj& obj );
@@ -44,6 +44,7 @@ namespace mongo {
     extern Strategy * SHARDED;
 
     bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result );
-
+    
+    void waitForWriteback( const OID& oid );
 }
 

@@ -267,8 +267,8 @@ namespace mongo {
         void maybeChunkCollection();
         
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query );
-
         void getAllShards( set<Shard>& all );
+        void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max); // [min, max)
 
         void save();
 

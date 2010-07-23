@@ -160,6 +160,8 @@ namespace mongo {
          */
         bool unserialize(const BSONObj& from);
 
+        void getAllShards(set<Shard>& shards) const;
+
     protected:
 
         /** 

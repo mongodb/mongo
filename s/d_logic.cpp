@@ -42,7 +42,7 @@ using namespace std;
 
 namespace mongo {
 
-    bool handlePossibleShardedMessage( Message &m, DbResponse &dbresponse ){
+    bool handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ){
         if ( ! shardingState.enabled() )
             return false;
 
@@ -52,17 +52,20 @@ namespace mongo {
              || op == dbGetMore  // cursors are weird
              )
             return false;
-
         
-        const char *ns = m.singleData()->_data + 4;
+        DbMessage d(m);        
+        const char *ns = d.getns();
         string errmsg;
         if ( shardVersionOk( ns , errmsg ) ){
             return false;
         }
 
+        dbtempreleasecond unlock;
+        
         log() << "shardVersionOk failed  ns:" << ns << " " << errmsg << endl;
         
         if ( doesOpGetAResponse( op ) ){
+            assert( dbresponse );
             BufBuilder b( 32768 );
             b.skip( sizeof( QueryResult ) );
             {
@@ -82,19 +85,24 @@ namespace mongo {
             Message * resp = new Message();
             resp->setData( qr , true );
             
-            dbresponse.response = resp;
-            dbresponse.responseTo = m.header()->id;
+            dbresponse->response = resp;
+            dbresponse->responseTo = m.header()->id;
             return true;
         }
         
+        OID writebackID;
+        writebackID.init();
+        lastError.getSafe()->writeback( writebackID );
+
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
         
         log() << "got write with an old config - writing back ns: " << ns << endl;
-
+        log() << debugString( m ) << endl;
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );
         b.append( "ns" , ns );
+        b.append( "id" , writebackID );
         b.appendTimestamp( "version" , shardingState.getVersion( ns ) );
         b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );

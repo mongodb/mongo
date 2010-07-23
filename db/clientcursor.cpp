@@ -357,6 +357,16 @@ namespace mongo {
         client.shutdown();
     }
 
+    void ClientCursor::find( const string& ns , set<CursorId>& all ){
+        recursive_scoped_lock lock(ccmutex);
+        
+        for ( CCById::iterator i=clientCursorsById.begin(); i!=clientCursorsById.end(); ++i ){
+            if ( i->second->ns == ns )
+                all.insert( i->first );
+        }
+    }
+
+
     ClientCursorMonitor clientCursorMonitor;
 
 } // namespace mongo

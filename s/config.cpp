@@ -375,6 +375,15 @@ namespace mongo {
         return true;
     }
     
+    void DBConfig::getAllShards(set<Shard>& shards) const{
+        shards.insert(getPrimary());
+        for (Collections::const_iterator it(_collections.begin()), end(_collections.end()); it != end; ++it){
+            if (it->second.isSharded()){
+                it->second.getCM()->getAllShards(shards);
+            } // TODO: handle collections on non-primary shard
+        }
+    }
+
     /* --- Grid --- */
     
     DBConfigPtr Grid::getDBConfig( string database , bool create ){
@@ -397,6 +406,24 @@ namespace mongo {
                     // note here that cc->primary == 0.
                     log() << "couldn't find database [" << database << "] in config db" << endl;
                     
+                    { // lets check case
+                        ScopedDbConnection conn( configServer.modelServer() );
+                        BSONObjBuilder b;
+                        b.appendRegex( "_id" , (string)"^" + database + "$" , "i" );
+                        BSONObj d = conn->findOne( ShardNS::database , b.obj() );
+                        conn.done();
+
+                        if ( ! d.isEmpty() ){
+                            cc.reset();
+                            stringstream ss;
+                            ss <<  "can't have 2 databases that just differ on case " 
+                               << " have: " << d["_id"].String()
+                               << " want to add: " << database;
+
+                            uasserted( DatabaseDifferCaseCode ,ss.str() );
+                        }
+                    }
+
                     if ( database == "admin" )
                         cc->_primary = configServer.getPrimary();
                     else
@@ -409,7 +436,7 @@ namespace mongo {
                     else {
                         cc.reset();
                         log() << "\t can't find a shard to put new db on" << endl;
-                        uassert( 10185 ,  "can't find a shard to put new db on" , 0 );
+                        uasserted( 10185 ,  "can't find a shard to put new db on" );
                     }
                 }
                 else {

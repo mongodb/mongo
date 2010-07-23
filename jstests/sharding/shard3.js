@@ -135,4 +135,32 @@ s.printShardingStatus();
 s.printCollectionInfo( "test.foo" , "after dropDatabase call 1" );
 assert.eq( 0 , doCounts( "after dropDatabase called" ) )
 
+// ---- retry commands SERVER-1471 ----
+
+s.adminCommand( { enablesharding : "test2" } );
+s.adminCommand( { shardcollection : "test2.foo" , key : { num : 1 } } );
+a = s.getDB( "test2" ).foo;
+b = s2.getDB( "test2" ).foo;
+a.save( { num : 1 } );
+a.save( { num : 2 } );
+a.save( { num : 3 } );
+
+
+assert.eq( 1 , s.onNumShards( "foo" , "test2" ) , "B on 1 shards" );
+assert.eq( 3 , a.count() , "Ba" );
+assert.eq( 3 , b.count() , "Bb" );
+
+s.adminCommand( { split : "test2.foo" , middle : { num : 2 } } );
+s.adminCommand( { movechunk : "test2.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test2" ) ).name } );
+
+assert.eq( 2 , s.onNumShards( "foo" , "test2" ) , "B on 2 shards" );
+
+x = a.stats()
+printjson( x )
+y = b.stats()
+printjson( y )
+
+
+
+
 s.stop();

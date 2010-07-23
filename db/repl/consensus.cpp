@@ -101,6 +101,17 @@ namespace mongo {
         return rs._self->config().votes;
     }
 
+    /* we vote for ourself at start of election.  once it fails, we can cancel the lease we had in 
+       place instead of leaving it for a long time.
+       */
+    void Consensus::electionFailed(unsigned meid) {
+        Atomic<LastYea>::tran t(ly);
+        LastYea &L = t.ref();
+        DEV assert( L.who == meid ); // this may not always always hold, so be aware, but adding for now as a quick sanity test
+        if( L.who == meid )
+            L.when = 0;
+    }
+
     /* todo: threading **************** !!!!!!!!!!!!!!!! */
     void Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder* _b) { 
         BSONObjBuilder& b = *_b;
@@ -205,6 +216,9 @@ namespace mongo {
     }
 
     void Consensus::_electSelf() {
+        if( time(0) < steppedDown ) 
+            return;
+
         {
             const OpTime ord = theReplSet->lastOpTimeWritten;
             if( ord == 0 ) { 
@@ -248,48 +262,57 @@ namespace mongo {
         sleptLast = false;
 
         time_t start = time(0);
-        int tally = yea( me.id() );
-        log() << "replSet info electSelf" << rsLog;
+        unsigned meid = me.id();
+        int tally = yea( meid );
+        bool success = false;
+        try {
+            log() << "replSet info electSelf " << meid << rsLog;
 
-        BSONObj electCmd = BSON(
-               "replSetElect" << 1 <<
-               "set" << rs.name() << 
-               "who" << me.fullName() << 
-               "whoid" << me.hbinfo().id() << 
-               "cfgver" << rs._cfg->version << 
-               "round" << OID::gen() /* this is just for diagnostics */
-            );
+            BSONObj electCmd = BSON(
+                   "replSetElect" << 1 <<
+                   "set" << rs.name() << 
+                   "who" << me.fullName() << 
+                   "whoid" << me.hbinfo().id() << 
+                   "cfgver" << rs._cfg->version << 
+                   "round" << OID::gen() /* this is just for diagnostics */
+                );
 
-        int configVersion;
-        list<Target> L;
-        rs.getTargets(L, configVersion);
-        multiCommand(electCmd, L);
+            int configVersion;
+            list<Target> L;
+            rs.getTargets(L, configVersion);
+            multiCommand(electCmd, L);
 
-        {
-            RSBase::lock lk(&rs);
-            for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
-                DEV log() << "replSet elect res: " << i->result.toString() << rsLog;
-                if( i->ok ) {
-                    int v = i->result["vote"].Int();
-                    tally += v;
+            {
+                RSBase::lock lk(&rs);
+                for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
+                    DEV log() << "replSet elect res: " << i->result.toString() << rsLog;
+                    if( i->ok ) {
+                        int v = i->result["vote"].Int();
+                        tally += v;
+                    }
                 }
+                if( tally*2 <= totalVotes() ) {
+                    log() << "replSet couldn't elect self, only received " << tally << " votes" << rsLog;
+                }
+                else if( time(0) - start > 30 ) {
+                    // defensive; should never happen as we have timeouts on connection and operation for our conn
+                    log() << "replSet too much time passed during our election, ignoring result" << rsLog;
+                }
+                else if( configVersion != rs.config().version ) { 
+                    log() << "replSet config version changed during our election, ignoring result" << rsLog;
+                }
+                else {
+                    /* succeeded. */
+                    log() << "replSet election succeeded, assuming primary role" << rsLog;
+                    success = true;
+                    rs.assumePrimary();
+                } 
             }
-            if( tally*2 <= totalVotes() ) {
-                log() << "replSet couldn't elect self, only received " << tally << " votes" << rsLog;
-            }
-            else if( time(0) - start > 30 ) {
-                // defensive; should never happen as we have timeouts on connection and operation for our conn
-                log() << "replSet too much time passed during our election, ignoring result" << rsLog;
-            }
-            else if( configVersion != rs.config().version ) { 
-                log() << "replSet config version changed during our election, ignoring result" << rsLog;
-            }
-            else {
-                /* succeeded. */
-                log() << "replSet election succeeded, assuming primary role" << rsLog;
-                rs.assumePrimary();
-            } 
+        } catch( std::exception& ) { 
+            if( !success ) electionFailed(meid);
+            throw;
         }
+        if( !success ) electionFailed(meid);
     }
 
     void Consensus::electSelf() {

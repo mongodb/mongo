@@ -600,11 +600,11 @@ sendmore:
     void initAndListen(int listenPort, const char *appserverLoc = NULL) {
         try { _initAndListen(listenPort, appserverLoc); }
         catch ( std::exception &e ) {
-            problem() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
+            log() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
         catch ( int& n ){
-            problem() << "exception in initAndListen int: " << n << ", terminating" << endl;
+            log() << "exception in initAndListen int: " << n << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
         catch(...) {
@@ -929,6 +929,11 @@ int main(int argc, char* argv[], char *envp[] )
             cmdLine.only = params["only"].as<string>().c_str();
         }
         if (params.count("pairwith")) {
+            cout << "***********************************\n"
+                 << "WARNING WARNING WARNING\n"
+                 << " replica pairs are deprecated\n"
+                 << " see: http://www.mongodb.org/display/DOCS/Replica+Pairs \n" 
+                 << "***********************************" << endl;
             string paired = params["pairwith"].as<string>();
             if (params.count("arbiter")) {
                 string arbiter = params["arbiter"].as<string>();

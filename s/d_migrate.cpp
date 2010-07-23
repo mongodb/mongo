@@ -133,6 +133,46 @@ namespace mongo {
         ofstream* _out;
         
     };
+    
+    struct OldDataCleanup {
+        string ns;
+        BSONObj min;
+        BSONObj max;
+        set<CursorId> initial;
+        void doRemove(){
+            ShardForceModeBlock sf;
+            writelock lk(ns);
+            RemoveSaver rs(ns,"post-cleanup");
+            long long num = Helpers::removeRange( ns , min , max , true , false , &rs );
+            log() << "moveChunk deleted: " << num << endl;
+        }
+    };
+    
+    void cleanupOldData( OldDataCleanup cleanup ){
+        Client::initThread( "cleanupOldData");
+        Timer t;
+        while ( t.seconds() < 600 ){ // 10 minutes
+            sleepmillis( 20 );
+            
+            set<CursorId> now;
+            ClientCursor::find( cleanup.ns , now );            
+            
+            set<CursorId> left;
+            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ){
+                CursorId id = *i;
+                if ( now.count(id) )
+                    left.insert( id );
+            }
+            
+            if ( left.size() == 0 )
+                break;
+            cleanup.initial = left;
+        }
+        
+        cleanup.doRemove();
+
+        cc().shutdown();
+    }
 
     class ChunkCommandHelper : public Command {
     public:
@@ -262,6 +302,7 @@ namespace mongo {
                     BSONObj it;
                     if ( Helpers::findById( cc() , _ns.c_str() , t, it ) ){
                         arr.append( it );
+                        size += it.objsize();
                     }
                 }
                 else {
@@ -543,7 +584,7 @@ namespace mongo {
                                                 BSON( "_recvChunkCommit" << 1 ) ,
                                                 res );
                     conn.done();
-
+                    log() << "moveChunk commit result: " << res << endl;
                     if ( ! ok ){
                         log() << "_recvChunkCommit failed: " << res << endl;
                         errmsg = "_recvChunkCommit failed!";
@@ -594,21 +635,27 @@ namespace mongo {
             
             migrateFromStatus.done();
             timing.done(5);
-            // 6. 
-            log( LL_WARNING ) << " deleting data before ensuring no more cursors TODO" << endl;
+
             
-            timing.done(6);
-            // 7
-            {
-                ShardForceModeBlock sf;
-                writelock lk(ns);
-                RemoveSaver rs(ns,"post-cleanup");
-                long long num = Helpers::removeRange( ns , min , max , true , false , &rs );
-                log() << "moveChunk deleted: " << num << endl;
-                result.appendNumber( "numDeleted" , num );
+            { // 6.
+                OldDataCleanup c;
+                c.ns = ns;
+                c.min = min.getOwned();
+                c.max = max.getOwned();
+                ClientCursor::find( ns , c.initial );
+                if ( c.initial.size() ){
+                    log() << "forking for cleaning up chunk data" << endl;
+                    boost::thread t( boost::bind( &cleanupOldData , c ) );
+                }
+                else {
+                    log() << "doing delete inline" << endl;
+                    // 7.
+                    c.doRemove();
+                }
+                    
+                
             }
-            
-            timing.done(7);
+            timing.done(6);            
 
             return true;
             
@@ -740,8 +787,6 @@ namespace mongo {
             { // 5. wait for commit
                 state = STEADY;
                 while ( state == STEADY || state == COMMIT_START ){
-                    sleepmillis( 20 );
-                    
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
                         log() << "_transferMods failed in STEADY state: " << res << endl;
@@ -749,13 +794,14 @@ namespace mongo {
                         state = FAIL;
                         return;
                     }
-                    if ( res["size"].number() > 0 ){
-                        apply( res );
-                    }
+
+                    if ( res["size"].number() > 0 && apply( res ) )
+                        continue;
                     
                     if ( state == COMMIT_START )
                         break;
-                    
+
+                    sleepmillis( 10 );
                 }
                 
                 timing.done(5);
@@ -767,8 +813,6 @@ namespace mongo {
 
         void status( BSONObjBuilder& b ){
             b.appendBool( "active" , active );
-            if ( ! active )
-                return;
 
             b.append( "ns" , ns );
             b.append( "from" , from );
@@ -788,7 +832,9 @@ namespace mongo {
 
         }
 
-        void apply( const BSONObj& xfer ){
+        bool apply( const BSONObj& xfer ){
+            bool didAnything = false;
+            
             if ( xfer["deleted"].isABSONObj() ){
                 writelock lk(ns);
                 Client::Context cx(ns);
@@ -799,6 +845,7 @@ namespace mongo {
                 while ( i.more() ){
                     BSONObj id = i.next().Obj();
                     Helpers::removeRange( ns , id , id, false , true , &rs );
+                    didAnything = true;
                 }
             }
             
@@ -810,8 +857,11 @@ namespace mongo {
                 while ( i.more() ){
                     BSONObj it = i.next().Obj();
                     Helpers::upsert( ns , it );
+                    didAnything = true;
                 }
             }
+
+            return didAnything;
         }
         
         string stateString(){

@@ -369,6 +369,7 @@ class InstallSetup:
         self.headers = False
         self.bannerDir = None
         self.headerRoot = "include"
+        self.clientTestsDir = None
 
     def justClient(self):
         self.binaries = False
@@ -376,6 +377,7 @@ class InstallSetup:
         self.headers = True
         self.bannerDir = "distsrc/client/"
         self.headerRoot = ""
+        self.clientTestsDir = "client/examples/"
         
 installSetup = InstallSetup()
 if distBuild:
@@ -468,8 +470,8 @@ if force32:
 if force64:
     processor = "x86_64"
 
-DEFAULT_INSTALl_DIR = "/usr/local"
-installDir = DEFAULT_INSTALl_DIR
+DEFAULT_INSTALL_DIR = "/usr/local"
+installDir = DEFAULT_INSTALL_DIR
 nixLibPrefix = "lib"
 
 distName = GetOption( "distname" )
@@ -515,7 +517,7 @@ if "darwin" == os.sys.platform:
     if force64:
         env.Append( CPPPATH=["/usr/64/include"] )
         env.Append( LIBPATH=["/usr/64/lib"] )
-        if installDir == DEFAULT_INSTALl_DIR and not distBuild:
+        if installDir == DEFAULT_INSTALL_DIR and not distBuild:
             installDir = "/usr/64/"
     else:
         env.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
@@ -1286,7 +1288,6 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ] )
-    addSmoketest( "smokeShardingJs", [ "mongo", "mongod", "mongos" ] )    
     addSmoketest( "smokeJsPerf", [ "mongo" ] )
     addSmoketest("smokeJsSlowNightly", [add_exe("mongo")])
     addSmoketest("smokeJsSlowWeekly", [add_exe("mongo")])
@@ -1490,10 +1491,6 @@ if not noshell:
 env.Alias( "all" , allBinaries )
 env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongos" ) ] )
 
-# NOTE: In some cases scons gets confused between installation targets and build
-# dependencies.  Here, we use InstallAs instead of Install to prevent such confusion
-# on a case-by-case basis.
-
 #headers
 if installSetup.headers:
     for id in [ "", "util/", "util/mongoutils/", "util/concurrency/", "db/" , "db/stats/" , "db/repl/" , "client/" , "bson/", "bson/util/" , "s/" , "scripting/" ]:
@@ -1521,6 +1518,15 @@ if installSetup.bannerDir:
         if x.find( "~" ) >= 0:
             continue
         env.Install( installDir , full )
+
+if installSetup.clientTestsDir:
+    for x in os.listdir( installSetup.clientTestsDir ):
+        full = installSetup.clientTestsDir + "/" + x
+        if os.path.isdir( full ):
+            continue
+        if x.find( "~" ) >= 0:
+            continue
+        env.Install( installDir + '/' + installSetup.clientTestsDir , full )
 
 #final alias
 env.Alias( "install" , installDir )

@@ -174,8 +174,7 @@ namespace mongo {
             bool upsert = flags & UpdateOption_Upsert;
             bool multi = flags & UpdateOption_Multi;
 
-            if ( multi )
-                uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! upsert );
+            uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! ( upsert && multi ) );
 
             if ( upsert && !(manager->hasShardKey(toupdate) ||
                              (toupdate.firstElement().fieldName()[0] == '$' && manager->hasShardKey(query))))
@@ -220,14 +219,31 @@ namespace mongo {
             if ( multi ){
                 set<Shard> shards;
                 manager->getShardsForQuery( shards , chunkFinder );
+                int * x = (int*)(r.d().afterNS());
+                x[0] |= UpdateOption_Broadcast;
                 for ( set<Shard>::iterator i=shards.begin(); i!=shards.end(); i++){
-                    doWrite( dbUpdate , r , *i );
+                    doWrite( dbUpdate , r , *i , false );
                 }
             }
             else {
-                ChunkPtr c = manager->findChunk( chunkFinder );
-                doWrite( dbUpdate , r , c->getShard() );
-                c->splitIfShould( d.msg().header()->dataLen() );
+                int left = 5;
+                while ( true ){
+                    try {
+                        ChunkPtr c = manager->findChunk( chunkFinder );
+                        doWrite( dbUpdate , r , c->getShard() );
+                        c->splitIfShould( d.msg().header()->dataLen() );
+                        break;
+                    }
+                    catch ( StaleConfigException& e ){
+                        if ( left <= 0 )
+                            throw e;
+                        left--;
+                        log() << "update failed b/c of StaleConfigException, retrying " 
+                              << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
+                        r.reset( false );
+                        manager = r.getChunkManager();
+                    }
+                }
             }
 
         }
@@ -241,18 +257,37 @@ namespace mongo {
             BSONObj pattern = d.nextJsObj();
 
             set<Shard> shards;
-            manager->getShardsForQuery( shards , pattern );
-            log(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
-            if ( shards.size() == 1 ){
-                doWrite( dbDelete , r , *shards.begin() );
-                return;
+            int left = 5;
+            
+            while ( true ){
+                try {
+                    manager->getShardsForQuery( shards , pattern );
+                    log(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
+                    if ( shards.size() == 1 ){
+                        doWrite( dbDelete , r , *shards.begin() );
+                        return;
+                    }
+                    break;
+                }
+                catch ( StaleConfigException& e ){
+                    if ( left <= 0 )
+                        throw e;
+                    left--;
+                    log() << "update failed b/c of StaleConfigException, retrying " 
+                          << " left:" << left << " ns: " << r.getns() << " patt: " << pattern << endl;
+                    r.reset( false );
+                    shards.clear();
+                    manager = r.getChunkManager();
+                }
             }
             
             if ( justOne && ! pattern.hasField( "_id" ) )
                 throw UserException( 8015 , "can only delete with a non-shard key pattern if can delete as many as we find" );
             
             for ( set<Shard>::iterator i=shards.begin(); i!=shards.end(); i++){
-                doWrite( dbDelete , r , *i );
+                int * x = (int*)(r.d().afterNS());
+                x[0] |= RemoveOption_Broadcast;
+                doWrite( dbDelete , r , *i , false );
             }
         }
         

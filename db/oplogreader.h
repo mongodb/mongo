@@ -4,6 +4,7 @@
 
 #include "../client/dbclient.h"
 #include "../client/constants.h"
+#include "dbhelpers.h"
 
 namespace mongo {
 
@@ -28,7 +29,7 @@ namespace mongo {
         }
 
         BSONObj getLastOp(const char *ns) { 
-            return findOne(ns, Query().sort( BSON( "$natural" << -1 ) ));
+            return findOne(ns, Query().sort(reverseNaturalObj));
         }
 
         /* ok to call if already connected */

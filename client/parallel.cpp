@@ -32,7 +32,11 @@ namespace mongo {
         _ns = q.ns;
         _query = q.query.copy();
         _options = q.queryOptions;
-        _fields = q.fields;
+        _fields = q.fields.copy();
+        _batchSize = q.ntoreturn;
+        if ( _batchSize == 1 )
+            _batchSize = 2;
+
         _done = false;
     }
 
@@ -41,6 +45,8 @@ namespace mongo {
         _query = q.getOwned();
         _options = options;
         _fields = fields.getOwned();
+        _batchSize = 0;
+
         _done = false;
     }
 
@@ -58,6 +64,11 @@ namespace mongo {
 
         ShardConnection conn( server , _ns );
         
+        if ( conn.setVersion() ){
+            conn.done();
+            throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+        }
+
         if ( logLevel >= 5 ){
             log(5) << "ClusteredCursor::query (" << type() << ") server:" << server 
                    << " ns:" << _ns << " query:" << q << " num:" << num << 
@@ -65,7 +76,7 @@ namespace mongo {
         }
         
         auto_ptr<DBClientCursor> cursor = 
-            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
+            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize );
         
         if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ){
             conn.done();
@@ -171,7 +182,7 @@ namespace mongo {
     
     // --------  FilteringClientCursor -----------
     FilteringClientCursor::FilteringClientCursor( const BSONObj filter )
-        : _matcher( filter ) , _done( false ){
+        : _matcher( filter ) , _done( true ){
     }
 
     FilteringClientCursor::FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter )
