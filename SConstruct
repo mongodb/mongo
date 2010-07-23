@@ -1491,10 +1491,6 @@ if not noshell:
 env.Alias( "all" , allBinaries )
 env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongos" ) ] )
 
-# NOTE: In some cases scons gets confused between installation targets and build
-# dependencies.  Here, we use InstallAs instead of Install to prevent such confusion
-# on a case-by-case basis.
-
 #headers
 if installSetup.headers:
     for id in [ "", "util/", "util/mongoutils/", "util/concurrency/", "db/" , "db/stats/" , "db/repl/" , "client/" , "bson/", "bson/util/" , "s/" , "scripting/" ]:
