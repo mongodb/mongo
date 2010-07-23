@@ -1627,6 +1627,23 @@ if installDir[-1] != "/":
     env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
     env.AlwaysBuild( "s3dist" )
 
+
+# client dist
+def build_and_test_client(env, target, source):
+    from subprocess import call
+
+    call("scons", cwd=installDir)
+    tests = call(["python", "buildscripts/smoke.py",
+                  "--test-path", installDir, "smokeClient"])
+    if not tests:
+        return False
+    else:
+        return True
+env.Alias("clientBuild", [mongod, installDir], [build_and_test_client])
+env.AlwaysBuild("clientBuild")
+env.Alias("clientDist", ["clientBuild", "dist"], [])
+env.AlwaysBuild("clientDist")
+
 def clean_old_dist_builds(env, target, source):
     prefix = "mongodb-%s-%s" % (platform, processor)
     filenames = sorted(os.listdir("."))
