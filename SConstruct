@@ -470,8 +470,8 @@ if force32:
 if force64:
     processor = "x86_64"
 
-DEFAULT_INSTALl_DIR = "/usr/local"
-installDir = DEFAULT_INSTALl_DIR
+DEFAULT_INSTALL_DIR = "/usr/local"
+installDir = DEFAULT_INSTALL_DIR
 nixLibPrefix = "lib"
 
 distName = GetOption( "distname" )
@@ -517,7 +517,7 @@ if "darwin" == os.sys.platform:
     if force64:
         env.Append( CPPPATH=["/usr/64/include"] )
         env.Append( LIBPATH=["/usr/64/lib"] )
-        if installDir == DEFAULT_INSTALl_DIR and not distBuild:
+        if installDir == DEFAULT_INSTALL_DIR and not distBuild:
             installDir = "/usr/64/"
     else:
         env.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
