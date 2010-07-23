@@ -36,7 +36,6 @@ assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "basic count after s
 
 s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : secondary.getMongo().name } );
 
-
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 3 , secondary.foo.find().toArray().length , "secondary count" );
 assert.eq( 3 , primary.foo.find().sort( { name : 1 } ).toArray().length , "primary count sorted" );

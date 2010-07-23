@@ -95,26 +95,26 @@ namespace mongo {
     }
     
     string ReplSetImpl::stateAsHtml(MemberState s) { 
-        if( s == RS_STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
-        if( s == RS_PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
-        if( s == RS_SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
-        if( s == RS_RECOVERING ) return a("", "recovering/resyncing; after recovery usually auto-transitions to secondary", "RECOVERING");
-        if( s == RS_FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "RS_FATAL");
-        if( s == RS_STARTUP2 ) return a("", "loaded config, still determining who is primary", "RS_STARTUP2");
-        if( s == RS_ARBITER ) return a("", "this server is an arbiter only", "ARBITER");
-        if( s == RS_DOWN ) return a("", "member is down, slow, or unreachable", "DOWN");
+        if( s.s == MemberState::RS_STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
+        if( s.s == MemberState::RS_PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
+        if( s.s == MemberState::RS_SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
+        if( s.s == MemberState::RS_RECOVERING ) return a("", "recovering/resyncing; after recovery usually auto-transitions to secondary", "RECOVERING");
+        if( s.s == MemberState::RS_FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "RS_FATAL");
+        if( s.s == MemberState::RS_STARTUP2 ) return a("", "loaded config, still determining who is primary", "RS_STARTUP2");
+        if( s.s == MemberState::RS_ARBITER ) return a("", "this server is an arbiter only", "ARBITER");
+        if( s.s == MemberState::RS_DOWN ) return a("", "member is down, slow, or unreachable", "DOWN");
         return "";
     }
 
     string ReplSetImpl::stateAsStr(MemberState s) { 
-        if( s == RS_STARTUP ) return "STARTUP";
-        if( s == RS_PRIMARY ) return "PRIMARY";
-        if( s == RS_SECONDARY ) return "SECONDARY";
-        if( s == RS_RECOVERING ) return "RECOVERING";
-        if( s == RS_FATAL ) return "FATAL";
-        if( s == RS_STARTUP2 ) return "STARTUP2";
-        if( s == RS_ARBITER ) return "ARBITER";
-        if( s == RS_DOWN ) return "DOWN";
+        if( s.s == MemberState::RS_STARTUP ) return "STARTUP";
+        if( s.s == MemberState::RS_PRIMARY ) return "PRIMARY";
+        if( s.s == MemberState::RS_SECONDARY ) return "SECONDARY";
+        if( s.s == MemberState::RS_RECOVERING ) return "RECOVERING";
+        if( s.s == MemberState::RS_FATAL ) return "FATAL";
+        if( s.s == MemberState::RS_STARTUP2 ) return "STARTUP2";
+        if( s.s == MemberState::RS_ARBITER ) return "ARBITER";
+        if( s.s == MemberState::RS_DOWN ) return "DOWN";
         return "";
     }
 
@@ -262,7 +262,7 @@ namespace mongo {
                 td(ago(started)) << 
 	        td("") << // last heartbeat
                 td(ToString(_self->config().votes)) << 
-                td(stateAsHtml(_myState));
+                td(stateAsHtml(box.getState()));
             s << td( _hbmsg );
             stringstream q;
             q << "/_replSetOplog?" << _self->id();
@@ -320,7 +320,7 @@ namespace mongo {
         }
         b.append("set", name());
         b.appendTimeT("date", time(0));
-        b.append("myState", _myState);
+        b.append("myState", box.getState().s);
         b.append("members", v);
     }
 

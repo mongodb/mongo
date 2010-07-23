@@ -59,7 +59,7 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) ) 
                 return false;
-            if( !theReplSet->isPrimary() ) { 
+            if( !theReplSet->box.getState().primary() ) { 
                 errmsg = "replSetReconfig command must be sent to the current replica set primary.";
                 return false;
             }
@@ -140,7 +140,7 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            if( !theReplSet->isPrimary() ) {
+            if( !theReplSet->box.getState().primary() ) {
                 errmsg = "not primary so can't step down";
                 return false;
             }

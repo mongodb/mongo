@@ -50,7 +50,7 @@ namespace mongo {
     void ReplSetImpl::syncTail() { 
         // todo : locking vis a vis the mgr...
 
-        const Member *primary = currentPrimary();
+        const Member *primary = box.getPrimary();
         if( primary == 0 ) return;
         string hn = primary->h().toString();
         OplogReader r;
@@ -104,7 +104,7 @@ namespace mongo {
                        batches is probably a good time. */
 
                     /* perhaps we should check this earlier? but not before the rollback checks. */
-                    if( state() == RS_RECOVERING ) { 
+                    if( state().recovering() ) { 
                         /* can we go to RS_SECONDARY state?  we can if not too old and not minvalid */
                         bool golive = false;
                         {
@@ -119,12 +119,12 @@ namespace mongo {
                                 golive = true; /* must have been the original member */
                         }
                         if( golive )
-                            changeState(RS_SECONDARY);
+                            changeState(MemberState::RS_SECONDARY);
 
                         /* todo: too stale capability */
                     }
 
-                    if( currentPrimary() != primary ) 
+                    if( box.getPrimary() != primary ) 
                         return;
                 }
                 if( !r.more() )
@@ -144,18 +144,19 @@ namespace mongo {
                 // TODO : reuse our cnonection to the primary.
                 return;
             }
-            if( currentPrimary() != primary )
+            if( box.getPrimary() != primary )
                 return;
             // looping back is ok because this is a tailable cursor
         }
     }
 
     void ReplSetImpl::_syncThread() {
-        if( isPrimary() ) 
+        StateBox::SP sp = box.get();
+        if( sp.state.primary() )
             return;
 
         /* later, we can sync from up secondaries if we want. tbd. */
-        if( currentPrimary() == 0 )
+        if( sp.primary == 0 )
             return;
 
         /* do we have anything at all? */

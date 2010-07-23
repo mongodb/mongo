@@ -984,7 +984,7 @@ namespace mongo {
                 "determine data size for a set of data in a certain range"
                 "\nexample: { datasize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
                 "\nkeyPattern, min, and max parameters are optional."
-                "\nnot: This command may take a while to run";
+                "\nnote: This command may take a while to run";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string ns = jsobj.firstElement().String();

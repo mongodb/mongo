@@ -131,8 +131,8 @@ namespace mongo {
         }
     }
 
-    static void fix(const be& _id) { 
-    }
+    //static void fix(const be& _id) { 
+    //}
 
    void ReplSetImpl::syncFixUp(HowToFixUp& h, DBClientConnection *them) {
        // fetch all first so we aren't interrupted.

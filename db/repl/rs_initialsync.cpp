@@ -66,9 +66,10 @@ namespace mongo {
     void ReplSetImpl::_syncDoInitialSync() { 
         sethbmsg("initial sync pending",0);
 
-        assert( !isPrimary() ); // wouldn't make sense if we were.
+        StateBox::SP sp = box.get();
+        assert( !sp.state.primary() ); // wouldn't make sense if we were.
 
-        const Member *cp = currentPrimary();
+        const Member *cp = sp.primary;
         if( cp == 0 ) {
             sethbmsg("initial sync need a member to be primary",0);
             sleepsecs(15);
@@ -94,7 +95,7 @@ namespace mongo {
         {
             /* make sure things aren't too flappy */
             sleepsecs(5);
-            isyncassert( "flapping?", currentPrimary() == cp );
+            isyncassert( "flapping?", box.getPrimary() == cp );
             BSONObj o = r.getLastOp(rsoplog);
             isyncassert( "flapping [2]?", !o.isEmpty() );
         }
@@ -131,7 +132,7 @@ namespace mongo {
         MemoryMappedFile::flushAll(true);
         sethbmsg("initial sync clone done first write to oplog still pending",0);
 
-        assert( !isPrimary() ); // wouldn't make sense if we were.
+        assert( !box.getState().primary() ); // wouldn't make sense if we were.
 
         {
             writelock lk("local.");

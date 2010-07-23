@@ -30,16 +30,30 @@ namespace mongo {
         RS_FATAL      something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.
         RS_STARTUP2   loaded config, still determining who is primary
     */
-    enum MemberState { 
-        RS_STARTUP,
-        RS_PRIMARY,
-        RS_SECONDARY,
-        RS_RECOVERING,
-        RS_FATAL,
-        RS_STARTUP2,
-        RS_UNKNOWN, /* remote node not yet reached */
-        RS_ARBITER,
-        RS_DOWN /* node not reachable for a report */
+    struct MemberState { 
+        enum MS { 
+            RS_STARTUP,
+            RS_PRIMARY,
+            RS_SECONDARY,
+            RS_RECOVERING,
+            RS_FATAL,
+            RS_STARTUP2,
+            RS_UNKNOWN, /* remote node not yet reached */
+            RS_ARBITER,
+            RS_DOWN /* node not reachable for a report */
+        } s;
+
+        MemberState(MS ms = RS_UNKNOWN) : s(ms) { }
+        explicit MemberState(int ms) : s((MS) ms) { }
+
+        bool primary() const { return s == RS_PRIMARY; }
+        bool secondary() const { return s == RS_SECONDARY; }
+        bool recovering() const { return s == RS_RECOVERING; }
+        bool startup2() const { return s == RS_STARTUP2; }
+        bool fatal() const { return s == RS_FATAL; }
+
+        bool operator==(const MemberState& r) const { return s == r.s; }
+        bool operator!=(const MemberState& r) const { return s != r.s; }
     };
 
     /* this is supposed to be just basic information on a member, 
@@ -61,7 +75,6 @@ namespace mongo {
     };
 
     inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id) { 
-          hbstate = RS_UNKNOWN;
           health = -1.0;
           lastHeartbeat = upSince = 0; 
     }

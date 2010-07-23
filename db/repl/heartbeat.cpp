@@ -75,7 +75,7 @@ namespace mongo {
                 return false;
             }
             result.append("set", theReplSet->name());
-            result.append("state", theReplSet->state());
+            result.append("state", theReplSet->state().s);
             result.append("hbmsg", theReplSet->hbmsg());
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             int v = theReplSet->config().version;
@@ -128,7 +128,7 @@ namespace mongo {
                 {
                     be state = info["state"];
                     if( state.ok() )
-                        mem.hbstate = (MemberState) state.Int();
+                        mem.hbstate = MemberState(state.Int());
                 }
                 if( ok ) {
                     if( mem.upSince == 0 ) {

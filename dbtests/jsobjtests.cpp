@@ -1603,6 +1603,11 @@ namespace JsobjTests {
             StringData c( "ccc", StringData::LiteralTag() );
             ASSERT_EQUALS( 3u , c.size() );
 
+            // TODO update test when second parm takes StringData too
+            BSONObjBuilder builder;
+            builder.append( c, "value");
+            ASSERT_EQUALS( builder.obj() , BSON( c.data() << "value" ) );
+
         }
     };
 

@@ -33,7 +33,7 @@ namespace mongo {
         Member *m = rs->head();
         Member *p = 0;
         while( m ) {
-            if( m->state() == RS_PRIMARY && m->hbinfo().up() ) {
+            if( m->state().primary() && m->hbinfo().up() ) {
                 if( p ) throw "twomasters"; // our polling is asynchronous, so this is often ok.
                 p = m;
             }
@@ -54,14 +54,10 @@ namespace mongo {
     }
 
     void Manager::noteARemoteIsPrimary(const Member *m) { 
-        if( rs->currentPrimary() == m )
+        if( rs->box.getPrimary() == m )
             return;
-        rs->_currentPrimary = m;
         rs->_self->lhb() = "";
-        if( rs->iAmArbiterOnly() )
-            rs->changeState(RS_ARBITER);
-        else
-            rs->changeState(RS_RECOVERING);
+        rs->box.set(rs->iAmArbiterOnly() ? MemberState::RS_ARBITER : MemberState::RS_RECOVERING, m);
     }
 
     /** called as the health threads get new results */
@@ -71,23 +67,25 @@ namespace mongo {
 
             if( busyWithElectSelf ) return;
 
-            const Member *p = rs->currentPrimary();
+            const Member *p = rs->box.getPrimary();
             if( p && !p->hbinfo().up() ) {
                 assert( p != rs->_self );
-                p = rs->_currentPrimary = 0;
+                p = 0;
+                rs->box.setOtherPrimary(0);
             }
 
             const Member *p2;
             try { p2 = findOtherPrimary(); }
             catch(string s) { 
                 /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
-                log() << "replSet warning DIAG TODO 2primary" << s << rsLog;
+                log() << "replSet warning DIAG 2 primary" << s << rsLog;
                 return;
             }
 
             if( p2 ) {
                 /* someone else thinks they are primary. */
-                if( p == p2 ) { // already match 
+                if( p == p2 ) { 
+                    // we thought the same; all set.
                     return;
                 }
                 if( p == 0 ) {
@@ -96,15 +94,30 @@ namespace mongo {
                 }
                 // todo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                 if( p != rs->_self ) {
+                    // switch primary from oldremotep->newremotep2
                     noteARemoteIsPrimary(p2); 
                     return;
                 }
                 /* we thought we were primary, yet now someone else thinks they are. */
                 if( !rs->elect.aMajoritySeemsToBeUp() ) {
+                    /* we can't see a majority.  so the other node is probably the right choice. */
                     noteARemoteIsPrimary(p2); 
                     return;
                 }
-                /* ignore for now, keep thinking we are master */
+                /* ignore for now, keep thinking we are master. 
+                   this could just be timing (we poll every couple seconds) or could indicate 
+                   a problem?  if it happens consistently for a duration of time we should 
+                   alert the sysadmin.
+                */
+                return;
+            }
+
+            /* didn't find anyone who wants to be primary */
+
+            if( p ) { 
+                /* we are already primary, and nothing significant out there has changed. */
+                /* TODO: if !aMajoritySeemsToBeUp, relinquish */
+                assert( p == rs->_self );
                 return;
             }
 
@@ -113,20 +126,13 @@ namespace mongo {
 
             /* TODO : CHECK PRIORITY HERE.  can't be elected if priority zero. */
 
-            if( p ) { 
-                /* we are already primary, and nothing significant out there has changed. */
-                /* todo: if !aMajoritySeemsToBeUp, relinquish */
-                assert( p == rs->_self );
-                return;
-            }
-
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !rs->elect.aMajoritySeemsToBeUp() ) { 
-                rs->_self->lhb() = "can't see a majority, won't consider electing self";
+                rs->sethbmsg("can't see a majority, won't consider electing self",2);
                 return;
             }
 
-            rs->_self->lhb() = "";
+            rs->sethbmsg("",9);
             busyWithElectSelf = true; // don't try to do further elections & such while we are already working on one.
         }
         try { 
