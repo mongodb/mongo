@@ -42,7 +42,7 @@ using namespace std;
 
 namespace mongo {
 
-    bool handlePossibleShardedMessage( Client& c, CurOp& curop , OpDebug& debug , Message &m, DbResponse &dbresponse ){
+    bool handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ){
         if ( ! shardingState.enabled() )
             return false;
 
@@ -54,26 +54,18 @@ namespace mongo {
             return false;
         
         DbMessage d(m);        
-        if ( op == dbUpdate ){
-            if ( d.getInt(0) & UpdateOption_Broadcast ){
-                return false;
-            }
-        }
-        else if ( op == dbDelete ){
-            if ( d.getInt(0) & RemoveOption_Broadcast ){
-                return false;
-            }
-        }
-
         const char *ns = d.getns();
         string errmsg;
         if ( shardVersionOk( ns , errmsg ) ){
             return false;
         }
+
+        dbtempreleasecond unlock;
         
         log() << "shardVersionOk failed  ns:" << ns << " " << errmsg << endl;
         
         if ( doesOpGetAResponse( op ) ){
+            assert( dbresponse );
             BufBuilder b( 32768 );
             b.skip( sizeof( QueryResult ) );
             {
@@ -93,8 +85,8 @@ namespace mongo {
             Message * resp = new Message();
             resp->setData( qr , true );
             
-            dbresponse.response = resp;
-            dbresponse.responseTo = m.header()->id;
+            dbresponse->response = resp;
+            dbresponse->responseTo = m.header()->id;
             return true;
         }
         

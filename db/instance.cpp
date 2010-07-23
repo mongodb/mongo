@@ -274,21 +274,15 @@ namespace mongo {
         StringBuilder& ss = debug.str;
         ss << opToString( op ) << " ";
 
-        if ( handlePossibleShardedMessage( c, currentOp , debug , m , dbresponse ) ){
-            /* important to do this before we lock
-               so if a message has to be forwarded, doesn't block for that
-            */
-            return true;
-        }
-
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
         
         if ( op == dbQuery ) {
-            receivedQuery(c , dbresponse, m ); //zzz
+            if ( handlePossibleShardedMessage( m , &dbresponse ) )
+                return true;
+            receivedQuery(c , dbresponse, m );
         }
         else if ( op == dbGetMore ) {
-            //DEV log = true;
             if ( ! receivedGetMore(dbresponse, m, currentOp) )
                 log = true;
         }
@@ -442,6 +436,7 @@ namespace mongo {
         assert( query.objsize() + toupdate.objsize() < m.header()->dataLen() );
         bool upsert = flags & UpdateOption_Upsert;
         bool multi = flags & UpdateOption_Multi;
+        bool broadcast = flags & UpdateOption_Broadcast;
         {
             string s = query.toString();
             /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. 
@@ -453,6 +448,10 @@ namespace mongo {
         }        
 
         mongolock lk(1);
+
+        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+            return;
+
         Client::Context ctx( ns );
 
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
@@ -466,6 +465,7 @@ namespace mongo {
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
+        bool broadcast = flags & RemoveOption_Broadcast;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
         {
@@ -475,8 +475,10 @@ namespace mongo {
         }        
 
         writelock lk(ns);
+        if ( ! broadcast & handlePossibleShardedMessage( m , 0 ) )
+            return;
         Client::Context ctx(ns);
-
+        
         long long n = deleteObjects(ns, pattern, justOne, true);
         lastError.getSafe()->recordDelete( n );
     }
@@ -543,6 +545,10 @@ namespace mongo {
         op.debug().str << ns;
 
         writelock lk(ns);
+
+        if ( handlePossibleShardedMessage( m , 0 ) )
+            return;
+
         Client::Context ctx(ns);		
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
