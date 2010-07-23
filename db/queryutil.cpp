@@ -22,6 +22,7 @@
 #include "pdfile.h"
 #include "queryoptimizer.h"
 #include "../util/unittest.h"
+#include "dbmessage.h"
 
 namespace mongo {
     extern BSONObj staticNull;
@@ -1185,6 +1186,30 @@ namespace mongo {
 
         return num;        
     }
-    
+
+    string debugString( Message& m ){
+        stringstream ss;
+        ss << "op: " << opToString( m.operation() ) << " len: " << m.size();
+        if ( m.operation() >= 2000 && m.operation() < 2100 ){
+            DbMessage d(m);
+            ss << " ns: " << d.getns();
+            switch ( m.operation() ){
+            case dbUpdate:
+                ss << " flags: " << d.pullInt() << " query: " << d.nextJsObj();
+                break;
+            case dbInsert:
+                ss << d.nextJsObj();
+                break;
+            case dbDelete:
+                ss << " flags: " << d.pullInt() << " query: " << d.nextJsObj();
+                break;
+            default:
+                ss << " CANNOT HANDLE YET";
+            }
+                    
+                
+        }
+        return ss.str();
+    }    
 
 } // namespace mongo
