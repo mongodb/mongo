@@ -34,6 +34,8 @@ namespace mongo {
         _options = q.queryOptions;
         _fields = q.fields;
         _batchSize = q.ntoreturn;
+        if ( _batchSize == 1 )
+            _batchSize = 2;
 
         _done = false;
     }
