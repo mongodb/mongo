@@ -34,13 +34,6 @@ serial['bt_rcc_expand_repl'] = Serial(
 	 'WT_COL_EXPAND */exp',
 	 'WT_REPL */repl'])
 
-serial['bt_replace'] = Serial(
-	'bt_replace',
-	'WT_WORKQ_SPIN',
-	['WT_ROW */indx',
-	 'void */data',
-	 'u_int32_t/size'])
-
 serial['bt_update'] = Serial(
 	'bt_update',
 	'WT_WORKQ_SPIN',
@@ -56,11 +49,6 @@ serial['cache_in'] = Serial(
 	['u_int32_t/addr',
 	 'u_int32_t/size',
 	 'WT_PAGE **/pagep'])
-
-serial['flist_free'] = Serial(
-	'flist_free',
-	'WT_WORKQ_SPIN',
-	['WT_FLIST */flistp'])
 
 # func_serial --
 #	Loop through the serial dictionary and output #defines to schedule

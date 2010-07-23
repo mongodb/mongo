@@ -48,25 +48,6 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	WT_ROW * indx;
-	void * data;
-	u_int32_t size;
-} __wt_bt_replace_args;
-#define	 __wt_bt_replace_serial(toc, _indx, _data, _size, ret) do {\
-	__wt_bt_replace_args _args;\
-	_args.indx = _indx;\
-	_args.data = _data;\
-	_args.size = _size;\
-	(ret) = __wt_toc_serialize_func(\
-	    toc, WT_WORKQ_SPIN, __wt_bt_replace_serial_func, &_args);\
-} while (0)
-#define	__wt_bt_replace_unpack(toc, _indx, _data, _size) do {\
-	_indx = ((__wt_bt_replace_args *)(toc)->wq_args)->indx;\
-	_data = ((__wt_bt_replace_args *)(toc)->wq_args)->data;\
-	_size = ((__wt_bt_replace_args *)(toc)->wq_args)->size;\
-} while (0)
-
-typedef struct {
 	WT_PAGE * page;
 	u_int16_t write_gen;
 	int slot;
@@ -108,17 +89,4 @@ typedef struct {
 	_addr = ((__wt_cache_in_args *)(toc)->wq_args)->addr;\
 	_size = ((__wt_cache_in_args *)(toc)->wq_args)->size;\
 	_pagep = ((__wt_cache_in_args *)(toc)->wq_args)->pagep;\
-} while (0)
-
-typedef struct {
-	WT_FLIST * flistp;
-} __wt_flist_free_args;
-#define	 __wt_flist_free_serial(toc, _flistp, ret) do {\
-	__wt_flist_free_args _args;\
-	_args.flistp = _flistp;\
-	(ret) = __wt_toc_serialize_func(\
-	    toc, WT_WORKQ_SPIN, __wt_flist_free_serial_func, &_args);\
-} while (0)
-#define	__wt_flist_free_unpack(toc, _flistp) do {\
-	_flistp = ((__wt_flist_free_args *)(toc)->wq_args)->flistp;\
 } while (0)
