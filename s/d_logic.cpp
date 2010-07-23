@@ -98,7 +98,7 @@ namespace mongo {
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
         
         log() << "got write with an old config - writing back ns: " << ns << endl;
-        
+        log() << debugString( m ) << endl;
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );
         b.append( "ns" , ns );

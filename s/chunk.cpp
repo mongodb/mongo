@@ -656,10 +656,11 @@ namespace mongo {
         BSONObj key = _key.extractKey(obj);
         
         {
+            rwlock lk( _lock , false ); 
+            
             BSONObj foo;
             ChunkPtr c;
             {
-                rwlock lk( _lock , false ); 
                 ChunkMap::iterator it = _chunkMap.upper_bound(key);
                 if (it != _chunkMap.end()){
                     foo = it->first;
@@ -675,7 +676,7 @@ namespace mongo {
                 PRINT(*c);
                 PRINT(key);
                 
-                _reload();
+                _reload_inlock();
                 massert(13141, "Chunk map pointed to incorrect chunk", false);
             }
         }
@@ -687,7 +688,7 @@ namespace mongo {
         }
         
         log() << "ChunkManager: couldn't find chunk for: " << key << " going to retry" << endl;
-        _reload();
+        _reload_inlock();
         return findChunk( obj , true );
     }
 

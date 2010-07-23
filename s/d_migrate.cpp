@@ -584,7 +584,7 @@ namespace mongo {
                                                 BSON( "_recvChunkCommit" << 1 ) ,
                                                 res );
                     conn.done();
-
+                    log() << "moveChunk commit result: " << res << endl;
                     if ( ! ok ){
                         log() << "_recvChunkCommit failed: " << res << endl;
                         errmsg = "_recvChunkCommit failed!";
@@ -787,8 +787,6 @@ namespace mongo {
             { // 5. wait for commit
                 state = STEADY;
                 while ( state == STEADY || state == COMMIT_START ){
-                    sleepmillis( 20 );
-                    
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
                         log() << "_transferMods failed in STEADY state: " << res << endl;
@@ -796,13 +794,14 @@ namespace mongo {
                         state = FAIL;
                         return;
                     }
-                    if ( res["size"].number() > 0 ){
-                        apply( res );
-                    }
+
+                    if ( res["size"].number() > 0 && apply( res ) )
+                        continue;
                     
                     if ( state == COMMIT_START )
                         break;
-                    
+
+                    sleepmillis( 10 );
                 }
                 
                 timing.done(5);
@@ -814,8 +813,6 @@ namespace mongo {
 
         void status( BSONObjBuilder& b ){
             b.appendBool( "active" , active );
-            if ( ! active )
-                return;
 
             b.append( "ns" , ns );
             b.append( "from" , from );
@@ -835,7 +832,9 @@ namespace mongo {
 
         }
 
-        void apply( const BSONObj& xfer ){
+        bool apply( const BSONObj& xfer ){
+            bool didAnything = false;
+            
             if ( xfer["deleted"].isABSONObj() ){
                 writelock lk(ns);
                 Client::Context cx(ns);
@@ -846,6 +845,7 @@ namespace mongo {
                 while ( i.more() ){
                     BSONObj id = i.next().Obj();
                     Helpers::removeRange( ns , id , id, false , true , &rs );
+                    didAnything = true;
                 }
             }
             
@@ -857,8 +857,11 @@ namespace mongo {
                 while ( i.more() ){
                     BSONObj it = i.next().Obj();
                     Helpers::upsert( ns , it );
+                    didAnything = true;
                 }
             }
+
+            return didAnything;
         }
         
         string stateString(){
