@@ -22,7 +22,6 @@
 
 namespace mongo {
 
-
     /**
      * Database represents a database database
      * Each database database has its own set of files -- dbname.ns, dbname.0, dbname.1, ...

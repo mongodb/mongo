@@ -193,7 +193,7 @@ namespace mongo {
         if ( doauth )
             _auth( lockState );
 
-        {
+        if ( _client->_curOp->getOp() != dbGetMore ){ // getMore's are special and should be handled else where
             string errmsg;
             if ( ! shardVersionOk( _ns , errmsg ) ){
                 msgasserted( StaleConfigInContextCode , (string)"shard version not ok in Client::Context: " + errmsg );

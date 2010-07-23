@@ -413,13 +413,13 @@ namespace mongo {
     v8::Handle<v8::Value> internalCursorObjsLeftInBatch(const v8::Arguments& args){
         mongo::DBClientCursor * cursor = getCursor( args );
         if ( ! cursor )
-            return V8::Number::New( (double) 0 );
+            return v8::Number::New( (double) 0 );
         int ret;
         {
             v8::Unlocker u;
             ret = cursor->objsLeftInBatch();
         }
-        return V8::Number::New( (double) ret );
+        return v8::Number::New( (double) ret );
     }
 
 

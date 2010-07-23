@@ -137,6 +137,7 @@ namespace mongo {
                         }
                         
                         Request r( m , 0 );
+                        r.init();
                         r.process();
                     }
                     else {

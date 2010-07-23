@@ -35,7 +35,7 @@ namespace mongo {
         Request( Message& m, AbstractMessagingPort* p );
 
         // ---- message info -----
-
+        
 
         const char * getns() const {
             return _d.getns();
@@ -53,13 +53,16 @@ namespace mongo {
         }
 
         DBConfigPtr getConfig() const {
+            assert( _didInit );
             return _config;
         }
         bool isShardingEnabled() const {
+            assert( _didInit );
             return _config->isShardingEnabled();
         }
         
         ChunkManagerPtr getChunkManager() const {
+            assert( _didInit );
             return _chunkManager;
         }
         
@@ -87,10 +90,11 @@ namespace mongo {
 
         void gotInsert();
 
+        void init();
+
         void reset( bool reload=false );
         
     private:
-        
         Message& _m;
         DbMessage _d;
         AbstractMessagingPort* _p;
@@ -103,6 +107,8 @@ namespace mongo {
         ClientInfo * _clientInfo;
 
         OpCounters* _counter;
+
+        bool _didInit;
     };
 
     typedef map<int,ClientInfo*> ClientCache;

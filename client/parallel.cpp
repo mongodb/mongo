@@ -33,6 +33,8 @@ namespace mongo {
         _query = q.query.copy();
         _options = q.queryOptions;
         _fields = q.fields;
+        _batchSize = q.ntoreturn;
+
         _done = false;
     }
 
@@ -41,6 +43,8 @@ namespace mongo {
         _query = q.getOwned();
         _options = options;
         _fields = fields.getOwned();
+        _batchSize = 0;
+
         _done = false;
     }
 
@@ -70,7 +74,7 @@ namespace mongo {
         }
         
         auto_ptr<DBClientCursor> cursor = 
-            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
+            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize );
         
         if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ){
             conn.done();
