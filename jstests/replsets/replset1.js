@@ -2,8 +2,8 @@
 doTest = function( signal ) {
 
     // Replica set testing API
-    // Create a new replica set test. Specify set name, host, and the number of nodes you want.
-    var replTest = new ReplSetTest( {name: 'testSet', host: 'arete.local', nodes: 3} );
+    // Create a new replica set test. Specify set name and the number of nodes you want.
+    var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes

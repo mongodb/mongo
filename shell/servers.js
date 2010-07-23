@@ -859,14 +859,11 @@ function skipIfTestingReplication(){
 
 // ReplSetTest
 ReplSetTest = function( opts ){
-    if( !opts.host )
-      throw("ReplSetTest requires a host name.");
-
     if( !opts.nodes || opts.nodes < 2 )
       throw("ReplSetTest requires at least two nodes.");
 
     this.name  = opts.name || "testReplSet";
-    this.host  = opts.host;
+    this.host  = opts.host || getHostName();
     this.numNodes = opts.nodes || 3;
 
     this.ports = allocatePorts( this.numNodes );
