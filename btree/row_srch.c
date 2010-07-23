@@ -118,19 +118,22 @@ restart:
 		}
 	}
 
-	/* If we didn't find an exact match, we're done. */
-	if (cmp != 0) {
-		/* XXX: In the future, check for an inserted key/data item. */
-		ret = WT_NOTFOUND;
-		goto err;
-	}
-
-	/* Check for a deleted item. */
-	if ((repl = WT_ROW_REPL(page, rip)) != NULL)
-		if (WT_REPL_DELETED_ISSET(repl->data)) {
+	/*
+	 * If inserting a new entry, return the smallest key on the page
+	 * less-than-or-equal-to the specified key.
+	 */
+	if (!LF_ISSET(WT_INSERT)) {
+		if (cmp != 0) {			/* No match */
 			ret = WT_NOTFOUND;
 			goto err;
 		}
+						/* Deleted match. */
+		if ((repl = WT_ROW_REPL(page, rip)) != NULL)
+			if (WT_REPL_DELETED_ISSET(repl->data)) {
+				ret = WT_NOTFOUND;
+				goto err;
+			}
+	}
 	toc->srch_page = page;
 	toc->srch_ip = rip;
 	toc->srch_repl = repl;

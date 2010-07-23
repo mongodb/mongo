@@ -93,17 +93,21 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 int
 __wt_db_col_del(WT_TOC *toc, u_int64_t recno);
 int
+__wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data);
+int
 __wt_bt_rcc_expand_serial_func(WT_TOC *toc);
 int
 __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc);
 int
 __wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data);
 int
-__wt_db_col_put(WT_TOC *toc, u_int64_t *recnop, DBT *data);
+__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data);
 int
 __wt_bt_search_col(WT_TOC *toc, u_int64_t recno);
 int
 __wt_db_row_del(WT_TOC *toc, DBT *key);
+int
+__wt_db_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert);
 int
 __wt_bt_update_serial_func(WT_TOC *toc);
 int
@@ -343,14 +347,6 @@ int
 __wt_db_lockout(DB *db);
 int
 __wt_env_lockout(ENV *env);
-void
-__wt_workq_flist(ENV *env);
-void
-__wt_flist_insert(WT_TOC *toc, void *p, u_int32_t len);
-int
-__wt_flist_sched(WT_TOC *toc);
-int
-__wt_flist_free_serial_func(WT_TOC *toc);
 int
 __wt_hazard_set(WT_TOC *toc, WT_CACHE_ENTRY *e, WT_PAGE *page);
 void
@@ -372,6 +368,8 @@ int
 __wt_huffman_decode(void *huffman_arg,
     u_int8_t *from, u_int32_t from_len,
     void *top, u_int32_t *to_len, u_int32_t *out_bytes_used);
+u_int32_t
+__wt_nlpo2(u_int32_t x);
 u_int32_t
 __wt_prime(u_int32_t n);
 void
@@ -403,3 +401,5 @@ int
 __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp);
 void
 __wt_stat_clear_method_stats(WT_STATS *stats);
+int
+__wt_update_alloc(WT_TOC *toc, u_int32_t size, void *retp);

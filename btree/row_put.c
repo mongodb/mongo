@@ -16,6 +16,17 @@
 int
 __wt_db_row_del(WT_TOC *toc, DBT *key)
 {
+	WT_RET(__wt_db_row_update(toc, key, NULL, 0));
+	return (0);
+}
+
+/*
+ * __wt_db_row_update --
+ *	Row store delete and update.
+ */
+int
+__wt_db_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
+{
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
@@ -28,7 +39,7 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 	repl = NULL;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_bt_search_row(toc, key, 0));
+	WT_RET(__wt_bt_search_row(toc, key, insert ? WT_INSERT : 0));
 	page = toc->srch_page;
 
 	/* Allocate a page replacement array as necessary. */
@@ -37,19 +48,21 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 		    env, page->indx_count, sizeof(WT_REPL *), &new_repl));
 
 	/* Allocate a WT_REPL structure and fill it in. */
-	WT_ERR(__wt_calloc(env, 1, sizeof(WT_REPL), &repl));
-	repl->data = WT_REPL_DELETED_VALUE;
+	WT_ERR(__wt_update_alloc(
+	    toc, sizeof(WT_REPL) + (data == NULL ? 0 : data->size), &repl));
+	if (data == NULL)
+		repl->data = WT_REPL_DELETED_VALUE;
+	else {
+		repl->data = (u_int8_t *)repl + sizeof(WT_REPL);
+		repl->size = data->size;
+		memcpy(repl->data, data->data, data->size);
+	}
 
 	/* Schedule the workQ to insert the WT_REPL structure. */
 	__wt_bt_update_serial(toc, page, toc->srch_write_gen,
 	    WT_ROW_SLOT(page, toc->srch_ip), new_repl, repl, ret);
 
-	if (0) {
-err:		if (repl != NULL)
-			__wt_free(env, repl, sizeof(WT_REPL));
-	}
-
-	/* Free any replacement array unless the workQ used it. */
+err:	/* Free any replacement array unless the workQ used it. */
 	if (new_repl != NULL && new_repl != page->repl)
 		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 

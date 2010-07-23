@@ -122,7 +122,7 @@ struct __wt_page_desc {
 
 /*
  * WT_REPL --
- *	Modification/deletion for a WT_{COL,ROW} entry.
+ *	Updates/deletes for a WT_{COL,ROW} entry.
  */
 struct __wt_repl {
 	/* In-memory deletes are flagged by an illegal data pointer value. */
@@ -178,14 +178,9 @@ struct __wt_page {
 	 * is no need to flush explicitly.
 	 */
 	u_int16_t modified;		/* Page is modified */
-#define	WT_PAGE_MODIFY_ISSET(p)						\
-	((p)->modified)
-#define	WT_PAGE_MODIFY_SET(p) do {					\
-	(p)->modified = 1;						\
-} while (0);
-#define	WT_PAGE_MODIFY_CLR(p) do {					\
-	(p)->modified = 0;						\
-} while (0);
+#define	WT_PAGE_MODIFY_ISSET(p)		((p)->modified)
+#define	WT_PAGE_MODIFY_SET(p)		((p)->modified = 1)
+#define	WT_PAGE_MODIFY_CLR(p)		((p)->modified = 0)
 
 	/*
 	 * The page's write-generation value is used to detect workQ changes
@@ -473,6 +468,14 @@ struct __wt_col_expand {
 #define	WT_INDX_FOREACH(page, ip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
+
+/*
+ * WT_ROW_KEY_ON_PAGE --
+ * Macro returns if a WT_ROW structure's key references on-page data.
+ */
+#define	WT_ROW_KEY_ON_PAGE(page, rip)					\
+	((u_int8_t *)(rip)->key >= (u_int8_t *)(page)->hdr &&		\
+	    (u_int8_t *)(rip)->key < (u_int8_t *)(page)->hdr + (page)->size)
 
 /*
  * WT_REPL_FOREACH --
