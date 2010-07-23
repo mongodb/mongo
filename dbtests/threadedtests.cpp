@@ -132,6 +132,12 @@ namespace ThreadedTests {
     class LockTest {
     public:
         void run(){
+            // quick atomicint wrap test
+            // MSGID likely assumes this semantic
+            AtomicUInt counter = 0xffffffff;
+            counter++;
+            ASSERT( counter == 0 );
+
             writelocktry lk( "" , 0 );
             ASSERT( lk.got() );
         }

@@ -47,7 +47,7 @@ import shutil
 import re
 import parser
 
-mongoRepo = './'
+mongoRepo = os.getcwd() #'./'
 
 mongodExecutable = "./mongod"
 mongodPort = "32000"
@@ -237,9 +237,19 @@ def checkDbHashes(master, slave):
             lost_in_master.append(db)
     replicated_dbs += master.dict.keys()
 
+# Blech.
+def skipTest(path):
+    if smallOplog:
+        if os.path.basename(path) in ["cursor8.js", "indexh.js"]:
+            return True
+    return False
+
 def runTest(test):
     (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
+    if skipTest(path):
+        print "skippping " + path
+        return
     if ext == ".js":
         argv=[shellExecutable, "--port", mongodPort]
         if not usedb:
@@ -402,12 +412,12 @@ def expandSuites(suites):
             raise Exception('unknown test suite %s' % suite)
 
         if globstr:
-            globstr = mongoRepo+('jstests/' if globstr.endswith('.js') else '')+globstr
+            globstr = os.path.join(mongoRepo, (os.path.join(('jstests/' if globstr.endswith('.js') else ''), globstr)))
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
     if not tests:
-        raise Exception( "no tests specified" )
+        raise Exception( "no tests found" )
     return tests
 
 def main():
@@ -457,6 +467,8 @@ def main():
 #                if os.path.samefile('/', prefix): 
 #                    raise Exception("couldn't guess the mongo repository path")
 
+    print tests
+
     global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest, smallOplog, smokeDbPrefix
     mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, 'mongod')
     mongodPort = options.mongodPort if options.mongodPort else mongodPort
@@ -474,6 +486,8 @@ def main():
                 tests = f.readlines()
     tests = [t.rstrip('\n') for t in tests]
 
+    if not tests:
+        raise Exception( "no tests specified" )
     # If we're in suite mode, tests is a list of names of sets of tests.
     if options.mode == 'suite':
         # Suites: smoke, smokePerf, smokeJs, smokeQuota, smokeJsPerf,
