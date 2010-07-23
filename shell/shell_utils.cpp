@@ -820,6 +820,14 @@ namespace mongo {
             return BSON( "" << false );
 #endif
         }
+
+        BSONObj getHostName(const BSONObj& a){
+            uassert( 13410, "getHostName accepts no arguments", a.nFields() == 0 );
+            char buf[HOST_NAME_MAX+1];
+            assert(gethostname(buf, HOST_NAME_MAX+1) == 0);
+            return BSON("" << buf);
+
+        }
         
         void installShellUtils( Scope& scope ){
             theScope = &scope;
@@ -843,6 +851,7 @@ namespace mongo {
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
             scope.injectNative( "waitProgram" , WaitProgram );
 
+            scope.injectNative( "getHostName" , getHostName );
             scope.injectNative( "removeFile" , removeFile );
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "ls" , ls );
