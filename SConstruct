@@ -1633,12 +1633,8 @@ def build_and_test_client(env, target, source):
     from subprocess import call
 
     call("scons", cwd=installDir)
-    tests = call(["python", "buildscripts/smoke.py",
-                  "--test-path", installDir, "smokeClient"])
-    if not tests:
-        return False
-    else:
-        return True
+    return bool(call(["python", "buildscripts/smoke.py",
+                      "--test-path", installDir, "smokeClient"]))
 env.Alias("clientBuild", [mongod, installDir], [build_and_test_client])
 env.AlwaysBuild("clientBuild")
 env.Alias("clientDist", ["clientBuild", "dist"], [])
