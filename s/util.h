@@ -109,16 +109,34 @@ namespace mongo {
     class StaleConfigException : public AssertionException {
     public:
         StaleConfigException( const string& ns , const string& raw , bool justConnection = false )
-            : AssertionException( (string)"ns: " + ns + " " + raw , 9996 ) , _justConnection(justConnection){
+            : AssertionException( (string)"ns: " + ns + " " + raw , 9996 ) , 
+              _justConnection(justConnection) ,
+              _ns(ns){
         }
         
         virtual ~StaleConfigException() throw(){}
-
+        
         virtual void appendPrefix( stringstream& ss ) const { ss << "StaleConfigException: "; }
-
+        
         bool justConnection() const { return _justConnection; }
+        
+        string getns() const { return _ns; }
+
+        static bool parse( const string& big , string& ns , string& raw ){
+            string::size_type start = big.find( '[' );
+            if ( start == string::npos )
+                return false;
+            string::size_type end = big.find( ']' ,start );
+            if ( end == string::npos )
+                return false;
+            
+            ns = big.substr( start + 1 , ( end - start ) - 1 );
+            raw = big.substr( end + 1 );
+            return true;
+        }
     private:
         bool _justConnection;
+        string _ns;
     };
 
     bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false , int tryNumber = 1 );

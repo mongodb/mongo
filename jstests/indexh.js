@@ -1,4 +1,4 @@
-skipIfTestingReplication();
+// This should get skipped when testing replication
 
 t = db.jstests_indexh;
 

@@ -445,7 +445,9 @@ namespace mongo {
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    result.append( "ns" , fullns );
                     result.appendBool("sharded", false);
+                    result.append( "primary" , conf->getPrimary().getName() );
                     return passthrough( conf , cmdObj , result);
                 }
                 result.appendBool("sharded", true);
@@ -465,7 +467,7 @@ namespace mongo {
                 for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ){
                     ShardConnection conn( *i , fullns );
                     BSONObj res;
-                    if ( ! conn->runCommand( dbName , cmdObj , res ) ){
+                    if ( ! conn.runCommand( dbName , cmdObj , res ) ){
                         errmsg = "failed on shard: " + res.toString();
                         return false;
                     }

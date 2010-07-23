@@ -635,12 +635,9 @@ namespace mongo {
             
             migrateFromStatus.done();
             timing.done(5);
-            // 6. 
-            log( LL_WARNING ) << " deleting data before ensuring no more cursors TODO" << endl;
+
             
-            timing.done(6);
-            
-            { // 7.
+            { // 6.
                 OldDataCleanup c;
                 c.ns = ns;
                 c.min = min.getOwned();
@@ -651,12 +648,14 @@ namespace mongo {
                     boost::thread t( boost::bind( &cleanupOldData , c ) );
                 }
                 else {
+                    log() << "doing delete inline" << endl;
+                    // 7.
                     c.doRemove();
                 }
                     
                 
             }
-            
+            timing.done(6);            
 
             return true;
             

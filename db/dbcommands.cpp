@@ -1080,7 +1080,8 @@ namespace mongo {
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string ns = dbname + "." + jsobj.firstElement().valuestr();
-
+            Client::Context cx( ns );
+            
             NamespaceDetails * nsd = nsdetails( ns.c_str() );
             if ( ! nsd ){
                 errmsg = "ns not found";

@@ -44,20 +44,34 @@ namespace mongo {
                     
                     if ( handleSpecialNamespaces( r , q ) )
                         return;
-
-                    BSONObjBuilder builder;
-                    bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
-                    if ( ok ) {
-                        BSONObj x = builder.done();
-                        replyToQuery(0, r.p(), r.m(), x);
-                        return;
+                    
+                    int loops = 5;
+                    while ( true ){
+                        try {
+                            BSONObjBuilder builder;
+                            bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
+                            if ( ok ) {
+                                BSONObj x = builder.done();
+                                replyToQuery(0, r.p(), r.m(), x);
+                                return;
+                            }
+                            break;
+                        }
+                        catch ( StaleConfigException& e ){
+                            if ( loops <= 0 )
+                                throw e;
+                            
+                            loops--;
+                            log() << "retrying command: " << q.query << endl;
+                            ShardConnection::checkMyConnectionVersions( e.getns() );
+                        }
                     }
                     
                     string commandName = q.query.firstElement().fieldName();
 
                     uassert(13390, "unrecognized command: " + commandName, _commandsSafeToPass.count(commandName) != 0);
                 }
-
+                
                 lateAssert = true;
                 doQuery( r , r.primaryShard() );
             }
