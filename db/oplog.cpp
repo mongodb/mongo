@@ -324,7 +324,7 @@ namespace mongo {
             if( rs ) return;
 
             DBDirectClient c;
-            BSONObj lastOp = c.findOne( ns, Query().sort( BSON( "$natural" << -1 ) ) );
+            BSONObj lastOp = c.findOne( ns, Query().sort(reverseNaturalObj) );
             if ( !lastOp.isEmpty() ) {
                 OpTime::setLast( lastOp[ "ts" ].date() );
             }

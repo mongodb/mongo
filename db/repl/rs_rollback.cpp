@@ -69,7 +69,7 @@ namespace mongo {
     };
 
     static void syncRollbackFindCommonPoint(DBClientConnection *us, DBClientConnection *them, HowToFixUp& h) { 
-        const Query q = Query().sort( BSON( "$natural" << -1 ) );
+        const Query q = Query().sort(reverseNaturalObj);
         const bo fields = BSON( "ts" << 1 << "h" << 1 );
         
         auto_ptr<DBClientCursor> u = us->query(rsoplog, q, 0, 0, &fields, 0, 0);
@@ -156,7 +156,7 @@ namespace mongo {
                string ns = o["ns"].String();
                bo goodVersion = them->findOne(ns, bob().append(_id).done());
                totSize += goodVersion.objsize();
-               // assert on totSize...
+               uassert( 13410, "replSet too much data to roll back", totSize < 200 * 1024 * 1024 );
 
                // note result might be eoo, indicating we should delete.
                items.insert(pair<be,bo>(_id, goodVersion.getOwned()));
@@ -164,6 +164,11 @@ namespace mongo {
        }
 
        // update them
+       sethbmsg(str::stream() << "syncRollback 4 n:" << h.toRefetch.size());
+
+       for( map<be,bo>::iterator i = items.begin(); i != items.end(); i++ ) {
+
+       }
 
        // clean up oplog
    }
@@ -202,7 +207,7 @@ namespace mongo {
         sethbmsg("replSet syncRollback 3");
         syncFixUp(how, r.conn());
 
-        sethbmsg("replSet syncRollback 4 FINISH");
+        sethbmsg("replSet syncRollback FINISH");
     }
 
 }
