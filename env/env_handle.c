@@ -97,8 +97,6 @@ __wt_ienv_config_default(ENV *env)
 	WT_RET(__wt_calloc(env,
 	   env->toc_size * env->hazard_size, sizeof(WT_PAGE *), &ienv->hazard));
 
-	TAILQ_INIT(&ienv->flistq);		/* Free memory list */
-
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_env_stats(env, &ienv->stats));
 	WT_RET(__wt_stat_alloc_method_stats(env, &ienv->method_stats));

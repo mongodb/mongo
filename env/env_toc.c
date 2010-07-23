@@ -83,10 +83,6 @@ __wt_wt_toc_close(WT_TOC *toc)
 	__wt_free(env, toc->tmp1.data, toc->tmp1.mem_size);
 	__wt_free(env, toc->tmp2.data, toc->tmp2.mem_size);
 
-	/* Free any memory we've been accumulating. */
-	if (toc->flist != NULL)
-		WT_TRET(__wt_flist_sched(toc));
-
 	/* Unlock and destroy the thread's mutex. */
 	if (toc->mtx != NULL) {
 		__wt_unlock(env, toc->mtx);

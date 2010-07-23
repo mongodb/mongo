@@ -18,7 +18,6 @@ __wt_workq_srvr(void *arg)
 {
 	ENV *env;
 	IENV *ienv;
-	WT_FLIST *fp;
 	WT_TOC **tp, *toc;
 	u_int32_t low_gen;
 	int chk_read, nowork, read_priority;
@@ -76,11 +75,6 @@ __wt_workq_srvr(void *arg)
 			}
 		}
 
-		/* Check if we can free some memory. */
-		if ((fp = TAILQ_FIRST(&ienv->flistq)) != NULL &&
-		    (low_gen == UINT32_MAX || low_gen > fp->gen))
-			__wt_workq_flist(env);
-
 		/* If a read is scheduled, check on the read server. */
 		if (chk_read)
 			__wt_workq_read_server(env, read_priority);
@@ -103,10 +97,6 @@ __wt_workq_srvr(void *arg)
 			}
 		}
 	}
-
-	/* Free any remaining memory. */
-	if ((fp = TAILQ_FIRST(&ienv->flistq)) != NULL)
-		__wt_workq_flist(env);
 
 	return (NULL);
 }
