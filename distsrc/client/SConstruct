@@ -35,6 +35,8 @@ elif "linux2" == os.sys.platform:
 if nix:
     env.Append( CPPFLAGS=" -O3" )
 
+boostLibs = [ "thread" , "filesystem" , "system" ]
+env.Prepend( LIBS =["boost_%s-mt"%(lib) for lib in boostLibs ] )
 allClientFiles = []
 allClientFiles += Glob( "mongo/*.cpp" )
 allClientFiles += Glob( "mongo/client/*.cpp" )
@@ -46,3 +48,21 @@ allClientFiles += Glob( "mongo/util/*.cpp" )
 allClientFiles += Glob( "mongo/util/*.c" )
 
 env.Library( "mongoclient" , allClientFiles )
+env.SharedLibrary( "mongoclient" , allClientFiles )
+
+clientTests = []
+clientEnv = env.Clone();
+#clientEnv.Append( CPPPATH=["../"] )
+clientEnv.Prepend( LIBS=[ "mongoclient"]+["boost_%s-mt"%(lib) for lib in boostLibs ] )
+
+clientEnv.Prepend( LIBPATH=["."] )
+#clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
+l = clientEnv[ "LIBS" ]
+
+# examples
+clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
