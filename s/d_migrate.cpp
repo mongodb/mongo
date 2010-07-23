@@ -138,23 +138,27 @@ namespace mongo {
         string ns;
         BSONObj min;
         BSONObj max;
+        set<CursorId> initial;
+        void doRemove(){
+            ShardForceModeBlock sf;
+            writelock lk(ns);
+            RemoveSaver rs(ns,"post-cleanup");
+            long long num = Helpers::removeRange( ns , min , max , true , false , &rs );
+            log() << "moveChunk deleted: " << num << endl;
+        }
     };
     
     void cleanupOldData( OldDataCleanup cleanup ){
-        Client::initThread( "moveChunkPostClean" );
-        
-        set<CursorId> initial;
-        ClientCursor::find( cleanup.ns , initial );
-        
+        Client::initThread( "cleanupOldData");
         Timer t;
         while ( t.seconds() < 600 ){ // 10 minutes
             sleepmillis( 20 );
-
+            
             set<CursorId> now;
             ClientCursor::find( cleanup.ns , now );            
-
+            
             set<CursorId> left;
-            for ( set<CursorId>::iterator i=initial.begin(); i!=initial.end(); ++i ){
+            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ){
                 CursorId id = *i;
                 if ( now.count(id) )
                     left.insert( id );
@@ -162,18 +166,14 @@ namespace mongo {
             
             if ( left.size() == 0 )
                 break;
-            initial = left;
+            cleanup.initial = left;
         }
         
-        ShardForceModeBlock sf;
-        writelock lk(cleanup.ns);
-        RemoveSaver rs(cleanup.ns,"post-cleanup");
-        long long num = Helpers::removeRange( cleanup.ns , cleanup.min , cleanup.max , true , false , &rs );
-        log() << "moveChunk deleted: " << num << endl;
+        cleanup.doRemove();
 
         cc().shutdown();
     }
-    
+
     class ChunkCommandHelper : public Command {
     public:
         ChunkCommandHelper( const char * name ) 
@@ -638,13 +638,22 @@ namespace mongo {
             log( LL_WARNING ) << " deleting data before ensuring no more cursors TODO" << endl;
             
             timing.done(6);
-
+            
             { // 7.
                 OldDataCleanup c;
                 c.ns = ns;
                 c.min = min.getOwned();
                 c.max = max.getOwned();
-                boost::thread t( boost::bind( &cleanupOldData , c ) );
+                ClientCursor::find( ns , c.initial );
+                if ( c.initial.size() ){
+                    log() << "forking for cleaning up chunk data" << endl;
+                    boost::thread t( boost::bind( &cleanupOldData , c ) );
+                }
+                else {
+                    c.doRemove();
+                }
+                    
+                
             }
             
 
