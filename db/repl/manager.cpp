@@ -68,10 +68,13 @@ namespace mongo {
             if( busyWithElectSelf ) return;
 
             const Member *p = rs->box.getPrimary();
-            if( p && !p->hbinfo().up() ) {
-                assert( p != rs->_self );
-                p = 0;
-                rs->box.setOtherPrimary(0);
+            if( p && p != rs->_self ) {
+                if( !p->hbinfo().up() || 
+                    !p->hbinfo().hbstate.primary() ) 
+                {
+                    p = 0;
+                    rs->box.setOtherPrimary(0);
+                }
             }
 
             const Member *p2;
@@ -117,7 +120,12 @@ namespace mongo {
             if( p ) { 
                 /* we are already primary, and nothing significant out there has changed. */
                 /* TODO: if !aMajoritySeemsToBeUp, relinquish */
-                assert( p == rs->_self );
+
+                if( p != rs->_self ) { 
+                    rs->sethbmsg("error p != rs->self in checkNewState");
+                    log() << "replSet " << p->fullName() << rsLog;
+                    log() << "replSet " << rs->_self->fullName() << rsLog;
+                }
                 return;
             }
 
@@ -128,7 +136,8 @@ namespace mongo {
 
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !rs->elect.aMajoritySeemsToBeUp() ) { 
-                rs->sethbmsg("can't see a majority, won't consider electing self",2);
+                static int n;
+                log(++n <= 5 ? 0 : 1) << "replSet can't see a majority, won't consider electing self";
                 return;
             }
 

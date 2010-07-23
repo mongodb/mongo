@@ -159,7 +159,7 @@ namespace mongo {
     /**
      * @return true if we took care of the message and nothing else should be done
      */
-    bool handlePossibleShardedMessage( Client& c, CurOp& op , OpDebug& debug , Message &m, DbResponse &dbresponse );
+    bool handlePossibleShardedMessage( Message &m, DbResponse * dbresponse );
 
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 

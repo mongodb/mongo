@@ -1063,6 +1063,7 @@ rs.help = function () {
     print("\tsee also http://<mongod_host>:28017/_replSet for additional diagnostic info");
 }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
+rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
@@ -1083,7 +1084,7 @@ rs.add = function (hostport, arb) {
     c.members.push(cfg);
     return db._adminCommand({ replSetReconfig: c });
 }
-rs.stepDown = function () { return db._adminCommand({ replSetStepDown: 1 }); }
+rs.stepDown = function () { return db._adminCommand({ replSetStepDown:true}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
 
