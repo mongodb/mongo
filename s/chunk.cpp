@@ -340,12 +340,23 @@ namespace mongo {
     bool Chunk::_splitIfShould( long dataWritten ){
         _dataWritten += dataWritten;
         
-        int myMax = MaxChunkSize;
+        // split faster in early chunks helps spread out an initial load better
+        int splitThreshold;
+        const int minChunkSize = 1 << 20;  // 1 MBytes
+        int numChunks = getManager()->numChunks();
+        if ( numChunks < 10 ){
+            splitThreshold = max( MaxChunkSize / 4 , minChunkSize );
+        } else if ( numChunks < 20 ){
+            splitThreshold = max( MaxChunkSize / 2 , minChunkSize );
+        } else {
+            splitThreshold = max( MaxChunkSize , minChunkSize );
+        }
+        
         if ( minIsInf() || maxIsInf() ){
-            myMax = (int)( (double)myMax * .9 );
+            splitThreshold = (int) ((double)splitThreshold * .9);
         }
 
-        if ( _dataWritten < myMax / 5 )
+        if ( _dataWritten < splitThreshold / 5 )
             return false;
         
         if ( ! chunkSplitLock.lock_try(0) )
@@ -364,10 +375,12 @@ namespace mongo {
         }
 
         long size = getPhysicalSize();
-        if ( size < myMax )
+        if ( size < splitThreshold )
             return false;
         
-        log() << "autosplitting " << _manager->getns() << " size: " << size << " shard: " << toString() << " on: " << splitPoint << endl;
+        log() << "autosplitting " << _manager->getns() << " size: " << size << " shard: " << toString() 
+              << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")" << endl;
+
         vector<BSONObj> splitPoints;
         splitPoints.push_back( splitPoint );
         ChunkPtr newShard = multiSplit( splitPoints );
