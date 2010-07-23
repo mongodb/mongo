@@ -343,9 +343,6 @@
     <ClCompile Include="geo\2d.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
-    <ClCompile Include="geo\quadrant_search.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="dbcommands_generic.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
@@ -387,6 +384,9 @@
     </ClCompile>
     <ClCompile Include="repl\rs_rollback.cpp">
       <Filter>replSets</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\haystack.cpp">
+      <Filter>db\geo</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

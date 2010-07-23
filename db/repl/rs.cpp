@@ -410,6 +410,10 @@ namespace mongo {
             initFromConfig(newConfig);
             log() << "replSet replSetReconfig new config saved locally" << rsLog;
         }
+        catch(DBException& e) { 
+            log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
+            _fatal();
+        }
         catch(...) { 
             log() << "replSet error unexpected exception in haveNewConfig()" << rsLog;
             _fatal();
