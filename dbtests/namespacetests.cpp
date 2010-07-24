@@ -682,9 +682,6 @@ namespace NamespaceTests {
         class TruncateCapped : public Base {
         public:
             void run() {
-                if( 1 ) 
-                    return;
-
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 

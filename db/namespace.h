@@ -254,7 +254,7 @@ namespace mongo {
         IndexDetails _indexes[NIndexesBase];
     public:
         int capped;
-        int max; // max # of objects for a capped table.
+        int max; // max # of objects for a capped table.  TODO: should this be 64 bit? 
         double paddingFactor; // 1.0 = no padding.
         int flags;
         DiskLoc capExtent;
@@ -438,7 +438,7 @@ namespace mongo {
         DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
 
         bool inCapExtent( const DiskLoc &dl ) const;
-        void checkMigrate();
+        void cappedCheckMigrate();
         long long storageSize( int * numExtents = 0 );
 
     private:
@@ -453,6 +453,7 @@ namespace mongo {
         DiskLoc __stdAlloc(int len);
         DiskLoc __capAlloc(int len);
         DiskLoc _alloc(const char *ns, int len);
+        DiskLoc cappedAlloc(const char *ns, int len); // capped collections
         void compact(); // combine adjacent deleted records
         DiskLoc &firstDeletedInCapExtent();
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
@@ -606,8 +607,8 @@ namespace mongo {
                 return 0;
             Namespace n(ns);
             NamespaceDetails *d = ht->get(n);
-            if ( d )
-                d->checkMigrate();
+            if ( d && d->capped )
+                d->cappedCheckMigrate();
             return d;
         }
 
