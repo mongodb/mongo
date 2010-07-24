@@ -301,9 +301,12 @@ namespace mongo {
         CmdProfile() : Command("profile") {}
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
-            result.append("was", (double) cc().database()->profile);
+            result.append("was", cc().database()->profile);
+            result.append("slowms", cmdLine.slowMS );
+
             int p = (int) e.number();
             bool ok = false;
+            
             if ( p == -1 )
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
