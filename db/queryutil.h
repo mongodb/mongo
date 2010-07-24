@@ -496,7 +496,9 @@ namespace mongo {
         }
         FieldRangeSet *topFrs() const {
             FieldRangeSet *ret = new FieldRangeSet( _baseSet );
-            *ret &= _orSets.front();
+            if (_orSets.size()){
+                *ret &= _orSets.front();
+            }
             return ret;
         }
         void allClausesSimplified( vector< BSONObj > &ret ) const {
@@ -507,6 +509,8 @@ namespace mongo {
             }
         }
         string getSpecial() const { return _baseSet.getSpecial(); }
+
+        bool moreOrClauses() const { return !_orSets.empty(); }
     private:
         FieldRangeSet _baseSet;
         list< FieldRangeSet > _orSets;

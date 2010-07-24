@@ -509,6 +509,7 @@ MongodRunner.prototype.port = function() { return this.port_; }
 
 MongodRunner.prototype.toString = function() { return [ this.port_, this.dbpath_, this.peer_, this.arbiter_ ].toString(); }
 
+
 ReplPair = function( left, right, arbiter ) {
     this.left_ = left;
     this.leftC_ = null;
@@ -656,7 +657,6 @@ ReplPair.prototype.toString = function() {
     return ret;
 }
 
-
 ToolTest = function( name ){
     this.name = name;
     this.port = allocatePorts(1)[0];
@@ -706,6 +706,7 @@ ToolTest.prototype.runTool = function(){
 
     runMongoProgram.apply( null , a );
 }
+
 
 ReplTest = function( name, ports ){
     this.name = name;
@@ -853,5 +854,235 @@ function skipIfTestingReplication(){
     if (testingReplication) {
 	print( "skipping" );
 	quit(0);
+    }
+}
+
+// ReplSetTest
+ReplSetTest = function( opts ){
+    if( !opts.nodes || opts.nodes < 2 )
+      throw("ReplSetTest requires at least two nodes.");
+
+    this.name  = opts.name || "testReplSet";
+    this.host  = opts.host || getHostName();
+    this.numNodes = opts.nodes || 3;
+
+    this.ports = allocatePorts( this.numNodes );
+
+    this.nodes = [];
+    this.nodeIds = {};
+    this.initLiveNodes();
+}
+
+// Here we store a reference to all reachable nodes.
+ReplSetTest.prototype.initLiveNodes = function(){
+    this.liveNodes = {master: null, slaves: []};
+    this.nodeIds   = {};
+}
+
+ReplSetTest.prototype.getNodeId = function(node) {
+    return this.nodeIds[node];
+}
+
+ReplSetTest.prototype.getPort = function( n ){
+    return this.ports[ n ];
+}
+
+ReplSetTest.prototype.getPath = function( n ){
+    var p = "/data/db/" + this.name + "-";
+    p += n.toString();
+    return p;
+}
+
+ReplSetTest.prototype.getReplSetConfig = function() {
+    var cfg = {};
+
+    cfg['_id']  = this.name;
+    cfg.members = [];
+
+    for(i=0; i<this.ports.length; i++) {
+        member = {};
+        member['_id']  = i;
+        member['host'] = this.host + ":" + this.ports[i];
+        cfg.members.push(member);
+    }
+
+    return cfg;
+}
+
+ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
+
+    if ( ! extra )
+        extra = {};
+
+    if ( ! extra.oplogSize )
+        extra.oplogSize = "2";
+
+    var a = []
+
+    if ( putBinaryFirst )
+        a.push( "mongod" )
+
+    a.push( "--replSet" );
+
+    replSetString = this.name + "/";
+    hosts = [];
+    for(i=0; i<this.ports.length; i++) {
+
+      // Don't include this node in the replica set list
+      if(this.ports[i] == this.ports[n]) {
+        continue;
+      }
+
+      var str = this.host + ":" + this.ports[i];
+      hosts.push(str);
+    }
+    replSetString += hosts.join(",");
+
+    a.push( replSetString )
+
+    a.push( "--noprealloc", "--smallfiles" );
+
+    a.push( "--port" );
+    a.push( this.getPort( n ) );
+
+    a.push( "--dbpath" );
+    a.push( this.getPath( n ) );
+
+    for ( var k in extra ){
+        var v = extra[k];
+        a.push( "--" + k );
+        if ( v != null )
+            a.push( v );
+    }
+
+    return a;
+}
+
+ReplSetTest.prototype.startSet = function() {
+    var nodes = [];
+    print( "Starting Set" );
+
+    for(n=0; n<this.ports.length; n++) {
+        node = this.start(n);
+        nodes.push(node);
+    }
+
+    this.nodes = nodes;
+    return this.nodes;
+}
+
+ReplSetTest.prototype.callIsMaster = function() {
+  var master = null;
+  this.initLiveNodes();
+  for(var i=0; i<this.nodes.length; i++) {
+
+    try {
+      var n = this.nodes[i].getDB('admin').runCommand({ismaster:1});
+
+      if(n['ismaster'] == true) {
+        master = this.nodes[i];
+        this.liveNodes.master = master;
+        this.nodeIds[master] = i;
+      }
+      else {
+        this.liveNodes.slaves.push(this.nodes[i]);
+        this.nodeIds[this.nodes[i]] = i;
+      }
+
+    }
+    catch(err) {
+      print("Could not call ismaster on node " + i);
+    }
+  }
+
+  return master || false;
+}
+
+ReplSetTest.prototype.getMaster = function( timeout ) {
+  var tries = 0;
+  var sleepTime = 500;
+  var t = timeout || 000;
+  var master = null;
+
+  master = this.attempt({context: this, timeout: 60000, desc: "Finding master"}, this.callIsMaster);
+  return master;
+}
+
+// Pass this method a function to call repeatedly until
+// that function returns true. Example:
+//   attempt({timeout: 20000, desc: "get master"}, function() { // return false until success })
+ReplSetTest.prototype.attempt = function( opts, func ) {
+    var timeout = opts.timeout || 1000;
+    var tries   = 0;
+    var sleepTime = 500;
+    var result = null;
+    var context = opts.context || this;
+
+    while((result = func.apply(context)) == false) {
+        tries += 1;
+        sleep(sleepTime);
+        if( tries * sleepTime > timeout) {
+            throw('[' + opts['desc'] + ']' + " timed out");
+        }
+    }
+
+    return result;
+}
+
+ReplSetTest.prototype.initiate = function( cfg ) {
+    var master = this.nodes[0].getDB("admin");
+    var config = cfg || this.getReplSetConfig();
+    printjson(config);
+
+    this.attempt({timeout: 10000, desc: "Initiate replica pair"}, function() {
+        var result = master.runCommand({replSetInitiate: config});
+        return result['ok'] == 1;
+    });
+}
+
+ReplSetTest.prototype.awaitReplication = function() {
+   this.getMaster();
+
+   latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']['t']
+
+   this.attempt({context: this, timeout: 10000, desc: "awaiting replication"},
+       function() {
+           var synced = true;
+           for(var i=0; i<this.liveNodes.slaves.length; i++) {
+             var slave = this.liveNodes.slaves[i];
+             slave.getDB("admin").getMongo().setSlaveOk();
+             var log = slave.getDB("local")['replset.minvalid'];
+             if(log.find().hasNext()) {
+               synced == synced && log.find().next()['ts']['t'];
+             }
+             else {
+               synced = false;
+             }
+           }
+           print("Synced = " + synced);
+           return synced;
+   });
+}
+
+ReplSetTest.prototype.start = function( n , options , restart ){
+    var lockFile = this.getPath( n ) + "/mongod.lock";
+    removeFile( lockFile );
+    var o = this.getOptions( n , options , restart );
+    print( o );
+    if ( restart )
+        return startMongoProgram.apply( null , o );
+    else {
+        return startMongod.apply( null , o );
+    }
+}
+
+ReplSetTest.prototype.stop = function( n , signal ){
+    print('*** ' + this.name + " completed successfully ***");
+    return stopMongod( this.getPort( n ) , signal || 15 );
+}
+
+ReplSetTest.prototype.stopSet = function() {
+    for(i=0; i<this.ports.length; i++) {
+        this.stop(n);
     }
 }

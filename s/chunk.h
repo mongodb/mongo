@@ -112,7 +112,6 @@ namespace mongo {
          */
         bool splitIfShould( long dataWritten );
         
-
         /*
          * moves either this shard or newShard if it makes sense too
          * @return whether or not a shard was moved
@@ -254,7 +253,7 @@ namespace mongo {
 
         string getns() const { return _ns; }
         
-        int numChunks(){ rwlock lk( _lock , false ); return _chunkMap.size(); }
+        int numChunks() const { rwlock lk( _lock , false ); return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj );
 
         ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
@@ -326,7 +325,7 @@ namespace mongo {
 
         unsigned long long _sequenceNumber;
         
-        RWLock _lock;
+        mutable RWLock _lock;
 
         // This should only be called from Chunk after it has been migrated
         void _migrationNotification(Chunk* c);

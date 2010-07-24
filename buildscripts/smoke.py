@@ -396,6 +396,8 @@ def expandSuites(suites):
             (globstr, usedb) = ('clone/*.js', False)
         elif suite == 'smokeRepl':
             (globstr, usedb) = ('repl/*.js', False)
+        elif suite == 'smokeReplSets':
+            (globstr, usedb) = ('replsets/*.js', False)
         elif suite == 'smokeAuth':
             (globstr, usedb) = ('auth/*.js', False)
         elif suite == 'smokeSharding':

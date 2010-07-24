@@ -467,7 +467,7 @@ namespace mongo {
                         strcpy( temp, last );
                         strcpy( buf, temp );
                     } else {
-                        assert( strlen( buf ) <= 1023 );
+                        assert( strlen( buf ) <= 4095 );
                     }
                     start = buf + strlen( buf );
                 }    
@@ -820,6 +820,15 @@ namespace mongo {
             return BSON( "" << false );
 #endif
         }
+
+        BSONObj getHostName(const BSONObj& a){
+            uassert( 13411, "getHostName accepts no arguments", a.nFields() == 0 );
+            char buf[260]; // HOST_NAME_MAX is usually 255
+            assert(gethostname(buf, 260) == 0);
+            buf[259] = '\0';
+            return BSON("" << buf);
+
+        }
         
         void installShellUtils( Scope& scope ){
             theScope = &scope;
@@ -843,6 +852,7 @@ namespace mongo {
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
             scope.injectNative( "waitProgram" , WaitProgram );
 
+            scope.injectNative( "getHostName" , getHostName );
             scope.injectNative( "removeFile" , removeFile );
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "ls" , ls );
