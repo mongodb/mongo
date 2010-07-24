@@ -1,3 +1,9 @@
+mongodb (1.5.6) unstable; urgency=low
+
+  * sharding lots of changes, see http://jira.mongodb.org/browse/SERVER/fixforversion/10179
+
+ -- Richard Kreuter <richard@10gen.com>  Sat, 24 Jul 2010 16:56:28 -0500
+
 mongodb (1.5.5) unstable; urgency=low
 
   * sharding lots of changes, see http://jira.mongodb.org/browse/SERVER/fixforversion/10157
