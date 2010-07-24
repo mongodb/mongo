@@ -21,8 +21,10 @@ db.getLastError();
 
 primary = s.getServer( "test" ).getDB( "test" );
 
+counts = []
+
 s.printChunks();
-assert.eq( 1 , s.config.chunks.count() );
+counts.push( s.config.chunks.count() );
 assert.eq( 100 , primary.foo.count() );
 
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
@@ -32,14 +34,14 @@ for ( ; i<200; i++ ){
 }
 
 s.printChunks()
-assert.eq( 1 , s.config.chunks.count() );
+counts.push( s.config.chunks.count() );
 
 for ( ; i<400; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
 s.printChunks();
-assert.lte( 3 , s.config.chunks.count() , "shard didn't split A " );
+counts.push( s.config.chunks.count() );
 
 for ( ; i<700; i++ ){
     coll.save( { num : i , s : bigString } );
@@ -47,7 +49,13 @@ for ( ; i<700; i++ ){
 db.getLastError();
 
 s.printChunks();
-assert.lte( 4 , s.config.chunks.count() , "shard didn't split B " );
+counts.push( s.config.chunks.count() );
 
+assert( counts[counts.length-1] > counts[0] , "counts 1 : " + tojson( counts ) )
+sorted = counts.slice(0)
+Array.sort( sorted )
+assert.eq( counts , sorted , "counts 2 : " + tojson( counts ) )
+
+print( counts )
 
 s.stop();
