@@ -103,8 +103,8 @@ namespace mongo {
             memcpy(grow((int) len), src, len);
         }
 
-        void appendStr(const StringData &str) {
-            const int len = str.size() + 1;
+        void appendStr(const StringData &str , bool includeEOO = true ) {
+            const int len = str.size() + ( includeEOO ? 1 : 0 );
             memcpy(grow(len), str.data(), len);
         }
 
