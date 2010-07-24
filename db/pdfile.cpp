@@ -1353,7 +1353,7 @@ namespace mongo {
             }
         }        
     }
-    
+
     /* note: if god==true, you may pass in obuf of NULL and then populate the returned DiskLoc 
              after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
     */

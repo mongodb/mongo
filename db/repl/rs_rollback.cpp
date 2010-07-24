@@ -132,9 +132,6 @@ namespace mongo {
         }
     }
 
-    //static void fix(const be& _id) { 
-    //}
-
     struct X { 
         const bson::bo *op;
         bson::bo goodVersionOfObject;
@@ -210,6 +207,9 @@ namespace mongo {
        }
 
        // clean up oplog
+
+
+       // done
        if( warn ) 
            sethbmsg("issues during syncRollback, see log");
        else
