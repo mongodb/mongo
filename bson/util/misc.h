@@ -27,7 +27,7 @@ namespace mongo {
 
     inline void time_t_to_String(time_t t, char *buf) {
 #if defined(_WIN32)
-        ctime_s(buf, 64, &t);
+        ctime_s(buf, 32, &t);
 #else
         ctime_r(&t, buf);
 #endif
