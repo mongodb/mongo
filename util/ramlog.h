@@ -47,11 +47,9 @@ namespace mongo {
             else h = (h+1) % N;
         }
 
-        vector<const char *> get() const {
-            vector<const char *> v;
+        void get( vector<const char*>& v) const {
             for( unsigned x=0, i=h; x++ < n; i=(i+1)%N )
                 v.push_back(lines[i]);
-            return v;
         }
 
         static int repeats(const vector<const char *>& v, int i) { 
@@ -107,9 +105,11 @@ namespace mongo {
         }
 
         void toHTML(stringstream& s) {
+            vector<const char*> v;
+            get( v );
+
             bool first = true;
             s << "<pre>\n";
-            vector<const char *> v = get();
             for( int i = 0; i < (int)v.size(); i++ ) {
                 assert( strlen(v[i]) > 20 );
                 int r = repeats(v, i);

@@ -180,27 +180,36 @@ namespace mongo {
         void flush(Tee *t = 0) {
             // this ensures things are sane
             if ( doneSetup == 1717 ) {
-                BufBuilder b(512);
-                time_t_to_String( time(0) , b.grow(20) );
-                b.appendStr( ss.str() );
-                const char *s = b.buf();
-                
+                string msg = ss.str();
                 string threadName = getThreadName();
                 const char * type = logLevelToString(logLevel);
-
-                StringBuilder sb;
+                
+                int spaceNeeded = msg.size() + 64 + threadName.size();
+                int bufSize = 128;
+                while ( bufSize < spaceNeeded )
+                    bufSize += 128;
+                
+                BufBuilder b(bufSize);
+                time_t_to_String( time(0) , b.grow(20) );
                 if (!threadName.empty()){
-                    sb << "[" << threadName << "] ";
+                    b.appendChar( '[' );
+                    b.appendStr( threadName , false );
+                    b.appendChar( ']' );
+                    b.appendChar( ' ' );
                 }
-                sb << type << ( type[0] ? ": " : "" );
-                sb << s;
-                string out = sb.str();
+                if ( type[0] ){
+                    b.appendStr( type , false );
+                    b.appendStr( ": " , false );
+                }
+                b.appendStr( msg );
+                
+                string out( b.buf() , b.len() );
 
                 scoped_lock lk(mutex);
                 
-                if( t ) t->write(logLevel,s);
+                if( t ) t->write(logLevel,out);
                 for ( unsigned i=0; i<globalTees.size(); i++ )
-                    globalTees[i]->write(logLevel,s);
+                    globalTees[i]->write(logLevel,out);
                 
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
