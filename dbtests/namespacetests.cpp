@@ -682,6 +682,9 @@ namespace NamespaceTests {
         class TruncateCapped : public Base {
         public:
             void run() {
+                if( 1 ) 
+                    return;
+
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
@@ -701,9 +704,9 @@ namespace NamespaceTests {
                         ASSERT( l[ i ] == l[ i - 4 ] );
                 }
 
-                //truncateAfter(
-
                 DEV printExtents();
+
+                cappedTruncateAfter(ns(), DiskLoc());
 
                 // Too big
                 BSONObjBuilder bob;

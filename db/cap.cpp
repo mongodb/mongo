@@ -236,7 +236,18 @@ namespace mongo {
         return loc;
     }
 
-    void truncateAfter(DiskLoc d) { 
+    /* TODO : slow implementation to get us going.  fix later! */
+    void cappedTruncateAfter(const char *ns, DiskLoc l) {
+        NamespaceDetails *d = nsdetails(ns);
+        /*
+        ReverseCappedCursor c(d);
+        while( c.ok() ) { 
+            DiskLoc d = c.currLoc();
+            if( d == l ) 
+                break;
+            c.advance();
+        }
+        */
     }
 
 }

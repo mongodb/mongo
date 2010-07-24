@@ -460,6 +460,8 @@ namespace mongo {
     }; // NamespaceDetails
 #pragma pack()
 
+    void cappedTruncateAfter(const char *n, DiskLoc);
+
     /* NamespaceDetailsTransient
 
        these are things we know / compute about a namespace that are transient -- things
