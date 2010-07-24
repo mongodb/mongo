@@ -27,7 +27,7 @@ assert.eq( 100 , primary.foo.count() );
 
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
 
-for ( ; i<100; i++ ){
+for ( ; i<200; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
@@ -39,9 +39,9 @@ for ( ; i<400; i++ ){
 }
 
 s.printChunks();
-//assert.lte( 3 , s.config.chunks.count() , "shard didn't split A " );
+assert.lte( 3 , s.config.chunks.count() , "shard didn't split A " );
 
-for ( ; i<600; i++ ){
+for ( ; i<700; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 db.getLastError();

@@ -218,7 +218,6 @@ namespace mongo {
                 continue;
             }
 
-            massert( 10344 ,  "Capped collection full and delete not allowed", cappedMayDelete() );
             DiskLoc fr = theCapExtent()->firstRecord;
             theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true); // ZZZZZZZZZZZZ
             compact();
