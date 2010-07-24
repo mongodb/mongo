@@ -467,7 +467,7 @@ namespace mongo {
                         strcpy( temp, last );
                         strcpy( buf, temp );
                     } else {
-                        assert( strlen( buf ) <= 1023 );
+                        assert( strlen( buf ) <= 4095 );
                     }
                     start = buf + strlen( buf );
                 }    
