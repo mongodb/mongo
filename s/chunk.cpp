@@ -719,43 +719,55 @@ namespace mongo {
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
         rwlock lk( _lock , false ); 
+        DEV PRINT(query);
 
         //TODO look into FieldRangeSetOr
-        FieldRangeSet frs(_ns.c_str(), query, false);
-        uassert(13088, "no support for special queries yet", frs.getSpecial().empty());
+        FieldRangeOrSet fros(_ns.c_str(), query, false);
+        uassert(13088, "no support for special queries yet", fros.getSpecial().empty());
 
-        {
-            // special case if most-significant field isn't in query
-            FieldRange range = frs.range(_key.key().firstElement().fieldName());
-            if (!range.nontrivial()){
-                getAllShards(shards);
-                return;
-            }
-        }
-
-        BoundList ranges = frs.indexBounds(_key.key(), 1);
-        for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it){
-            BSONObj minObj = it->first.replaceFieldNames(_key.key());
-            BSONObj maxObj = it->second.replaceFieldNames(_key.key());
-
-            ChunkRangeMap::const_iterator min, max;
-            min = _chunkRanges.upper_bound(minObj);
-            max = _chunkRanges.upper_bound(maxObj);
-
-            assert(min != _chunkRanges.ranges().end());
-
-            // make max non-inclusive like end iterators
-            if(max != _chunkRanges.ranges().end())
-                ++max;
-
-            for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
-                shards.insert(it->second->getShard());
+        do {
+            boost::scoped_ptr<FieldRangeSet> frs (fros.topFrs());
+            {
+                // special case if most-significant field isn't in query
+                FieldRange range = frs->range(_key.key().firstElement().fieldName());
+                if ( !range.nontrivial() ){
+                    DEV PRINT(range.nontrivial());
+                    getAllShards(shards);
+                    return;
+                }
             }
 
-            // once we know we need to visit all shards no need to keep looping
-            if (shards.size() == _shards.size())
-                break;
-        }
+            BoundList ranges = frs->indexBounds(_key.key(), 1);
+            for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it){
+                BSONObj minObj = it->first.replaceFieldNames(_key.key());
+                BSONObj maxObj = it->second.replaceFieldNames(_key.key());
+
+                DEV PRINT(minObj);
+                DEV PRINT(maxObj);
+
+                ChunkRangeMap::const_iterator min, max;
+                min = _chunkRanges.upper_bound(minObj);
+                max = _chunkRanges.upper_bound(maxObj);
+
+                assert(min != _chunkRanges.ranges().end());
+
+                // make max non-inclusive like end iterators
+                if(max != _chunkRanges.ranges().end())
+                    ++max;
+
+                for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
+                    shards.insert(it->second->getShard());
+                }
+
+                // once we know we need to visit all shards no need to keep looping
+                //if (shards.size() == _shards.size())
+                    //return;
+            }
+
+            if (fros.moreOrClauses())
+                fros.popOrClause();
+
+        } while (fros.moreOrClauses());
     }
 
     void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max){
