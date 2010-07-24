@@ -58,4 +58,6 @@ assert.eq( counts , sorted , "counts 2 : " + tojson( counts ) )
 
 print( counts )
 
+printjson( db.stats() )
+
 s.stop();
