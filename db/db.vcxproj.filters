@@ -388,6 +388,9 @@
     <ClCompile Include="geo\haystack.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
+    <ClCompile Include="cap.cpp">
+      <Filter>db\core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

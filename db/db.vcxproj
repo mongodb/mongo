@@ -450,6 +450,7 @@
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
+    <ClCompile Include="cap.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />

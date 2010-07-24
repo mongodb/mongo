@@ -52,6 +52,8 @@ namespace mongo {
                 if( repeat == 0 )
                     break;
                 sleepmillis(repeat);
+                if( inShutdown() )
+                    break;
             }
         }
 
