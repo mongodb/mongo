@@ -579,7 +579,7 @@ namespace mongo {
 
             massert( 10344 ,  "Capped collection full and delete not allowed", cappedMayDelete() );
             DiskLoc fr = theCapExtent()->firstRecord;
-            theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
+            theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true); // ZZZZZZZZZZZZ
             compact();
             if( ++passes > maxPasses ) {
                 log() << "passes ns:" << ns << " len:" << len << " maxPasses: " << maxPasses << '\n';

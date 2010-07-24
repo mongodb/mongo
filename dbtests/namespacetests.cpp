@@ -548,13 +548,13 @@ namespace NamespaceTests {
                 keys.clear();
 
                 id().getKeysFromObject( fromjson( "{a:1,b:null}" ), keys );
-                cout << "YO : " << *(keys.begin()) << endl;
+                //cout << "YO : " << *(keys.begin()) << endl;
                 checkSize(1, keys );
                 keys.clear();
                 
                 id().getKeysFromObject( fromjson( "{a:1,b:[]}" ), keys );
                 checkSize(1, keys );
-                cout << "YO : " << *(keys.begin()) << endl;
+                //cout << "YO : " << *(keys.begin()) << endl;
                 ASSERT_EQUALS( NumberInt , keys.begin()->firstElement().type() );
                 keys.clear();
             }
@@ -613,6 +613,15 @@ namespace NamespaceTests {
                     ++count;
                 return count;
             }
+            void printExtents() const {
+                for ( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext ) {
+                    Extent *e = i.ext();
+                    stringstream ss;
+                    e->dump(ss);
+                    cout << ss.str() << endl;
+                    //cout << "extent: " << i.toString() << " len:" << e->length << endl;
+                }
+            }
             static int min( int a, int b ) {
                 return a < b ? a : b;
             }
@@ -670,17 +679,65 @@ namespace NamespaceTests {
             }
         };
 
+        class TruncateCapped : public Base {
+        public:
+            void run() {
+                if( 1 ) 
+                    return;
+
+                create();
+                ASSERT_EQUALS( 2, nExtents() );
+
+                DEV printExtents();
+
+                BSONObj b = bigObj();
+
+                DiskLoc d;
+                DiskLoc l[ 8 ];
+                for ( int i = 0; i < 8; ++i ) {
+                    d = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
+                    l[i] = d;
+                    ASSERT( !d.isNull() );
+                    cout << l[i].toString() << endl;
+                    ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+                    if ( i > 3 )
+                        ASSERT( l[ i ] == l[ i - 4 ] );
+                }
+
+                //truncateAfter(
+
+                DEV printExtents();
+
+                // Too big
+                BSONObjBuilder bob;
+                bob.append( "a", string( 787, 'a' ) );
+                BSONObj bigger = bob.done();
+                ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
+                ASSERT_EQUALS( 0, nRecords() );
+
+                DEV printExtents();
+
+
+            }
+        private:
+            virtual string spec() const {
+                return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
+            }
+        };
+
         class TwoExtent : public Base {
         public:
             void run() {
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
+
                 BSONObj b = bigObj();
 
                 DiskLoc l[ 8 ];
                 for ( int i = 0; i < 8; ++i ) {
                     l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
+                    cout << l[i].toString() << endl;
                     ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
                     if ( i > 3 )
                         ASSERT( l[ i ] == l[ i - 4 ] );
@@ -788,6 +845,7 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
             add< NamespaceDetailsTests::TwoExtent >();
+            add< NamespaceDetailsTests::TruncateCapped >();
             add< NamespaceDetailsTests::Migrate >();
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();

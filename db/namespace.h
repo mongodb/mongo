@@ -442,6 +442,10 @@ namespace mongo {
         long long storageSize( int * numExtents = 0 );
 
     private:
+        /** This prevents deletion from a capped collection upon wrap around - 
+            so there will be no wrap around, just an exception.  Used to be 
+            used by the temp oplogs that were part of the cloneCollection implementation. 
+            */
         bool cappedMayDelete() const { return !( flags & Flag_CappedDisallowDelete ); }
         Extent *theCapExtent() const { return capExtent.ext(); }
         void advanceCapExtent( const char *ns );
