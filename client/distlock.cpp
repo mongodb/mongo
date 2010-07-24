@@ -48,7 +48,7 @@ namespace mongo {
     
     void distLockPingThread( ConnectionString addr ){
         static int loops = 0;
-        while(1){
+        while( ! inShutdown() ){
             try {
                 ScopedDbConnection conn( addr );
                 

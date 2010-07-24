@@ -165,18 +165,17 @@ namespace mongo {
     
     void rawOut( const string &s ) {
         if( s.empty() ) return;
-        char now[64];
-        time_t_to_String(time(0), now);
-        now[20] = 0;        
-#if defined(_WIN32)
-        (std::cout << now << " " << s).flush();
-#else
-        int ret;  // avoid compiler warning
-        ret = write( STDOUT_FILENO, now, 20 );
-        ret = write( STDOUT_FILENO, " ", 1 );
-        ret = write( STDOUT_FILENO, s.c_str(), s.length() );
-        fsync( STDOUT_FILENO );        
-#endif
+
+        boost::scoped_array<char> buf_holder(new char[32 + s.size()]);
+        char * buf = buf_holder.get();
+
+        time_t_to_String( time(0) , buf );
+        buf[20] = ' ';
+        strncpy( buf + 21 , s.c_str() , s.size() );
+        buf[21+s.size()] = '\n';
+        buf[21+s.size()+1] = 0;
+
+        Logstream::logLockless( buf );
     }
 
     ostream& operator<<( ostream &s, const ThreadSafeString &o ){

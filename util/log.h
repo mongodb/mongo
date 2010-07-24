@@ -153,11 +153,21 @@ namespace mongo {
         static int doneSetup;
         stringstream ss;
         LogLevel logLevel;
-        static boost::scoped_ptr<ostream> stream;
         static FILE* logfile;
+        static boost::scoped_ptr<ostream> stream;
         static vector<Tee*> globalTees;
     public:
 
+        static void logLockless( const char * s ){
+            if ( doneSetup == 1717 ){
+                fwrite( s , strlen( s ) , 1 , logfile );
+                fflush( logfile );
+            }
+            else {
+                cout << s << endl;
+            }
+        }
+        
         static void setLogFile(FILE* f){
             scoped_lock lk(mutex);
             logfile = f;
