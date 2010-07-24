@@ -397,7 +397,7 @@ if distBuild:
 
 commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
-                 "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
+                 "util/assert_util.cpp" , "util/log.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", 
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ]
 commonFiles += Glob( "util/*.c" )
