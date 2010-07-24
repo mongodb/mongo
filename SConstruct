@@ -751,11 +751,9 @@ if nix:
         env.Append( CPPDEFINES=["USE_GDBSERVER"] )
 
     # pre-compiled headers
-    if False and 'Gch' in dir( env ):
+    if 'Gch' in dir( env ):
         print( "using precompiled headers" )
         env['Gch'] = env.Gch( [ "pch.h" ] )[0]
-        #Depends( "pch.o" , "pch.h.gch" )
-        #SideEffect( "dummyGCHSideEffect" , "pch.h.gch" )
 
 if usev8:
     env.Append( CPPPATH=["../v8/include/"] )

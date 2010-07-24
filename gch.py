@@ -37,6 +37,9 @@ GchShAction = SCons.Action.Action('$GCHSHCOM', '$GCHSHCOMSTR')
 def gen_suffix(env, sources):
     return sources[0].get_suffix() + env['GCHSUFFIX']
 
+def header_path(node):
+    path = node.path
+    return path[:-4] # strip final '.gch'
 
 GchShBuilder = SCons.Builder.Builder(action = GchShAction,
                                      source_scanner = SCons.Scanner.C.CScanner(),
@@ -54,7 +57,7 @@ def static_pch_emitter(target,source,env):
     deps = scanner(source[0], env, path)
 
     if env.has_key('Gch') and env['Gch']:
-        if env['Gch'].path.strip('.gch') in [x.path for x in deps]:
+        if header_path(env['Gch']) in [x.path for x in deps]:
             env.Depends(target, env['Gch'])
 
     return (target, source)
@@ -67,7 +70,7 @@ def shared_pch_emitter(target,source,env):
     deps = scanner(source[0], env, path)
 
     if env.has_key('GchSh') and env['GchSh']:
-        if env['GchSh'].path.strip('.gch') in [x.path for x in deps]:
+        if header_path(env['GchSh']) in [x.path for x in deps]:
             env.Depends(target, env['GchSh'])
     return (target, source)
 
