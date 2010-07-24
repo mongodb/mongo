@@ -248,6 +248,13 @@ AddOption("--smokedbprefix",
           action="store",
           help="prefix to dbpath et al. for smoke tests")
 
+AddOption( "--pch",
+           dest="usePCH",
+           type="string",
+           nargs=0,
+           action="store",
+           help="use precompiled headers to speed up the build (experimental)" )
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -292,6 +299,8 @@ usesm = not GetOption( "usesm" ) is None
 usev8 = not GetOption( "usev8" ) is None
 
 asio = not GetOption( "asio" ) is None
+
+usePCH = not GetOption( "usePCH" ) is None
 
 justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
 
@@ -751,9 +760,12 @@ if nix:
         env.Append( CPPDEFINES=["USE_GDBSERVER"] )
 
     # pre-compiled headers
-    if 'Gch' in dir( env ):
+    if usePCH and 'Gch' in dir( env ):
         print( "using precompiled headers" )
         env['Gch'] = env.Gch( [ "pch.h" ] )[0]
+    elif os.path.exists('pch.h.gch'):
+        print( "removing precompiled headers" )
+        os.unlink('pch.h.gch') # gcc uses the file if it exists
 
 if usev8:
     env.Append( CPPPATH=["../v8/include/"] )
