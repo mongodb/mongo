@@ -14,38 +14,40 @@ coll = db.foo;
 
 var i=0;
 
-for ( ; i<500; i++ ){
+for ( ; i<100; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 db.getLastError();
 
 primary = s.getServer( "test" ).getDB( "test" );
 
+s.printChunks();
 assert.eq( 1 , s.config.chunks.count() );
-assert.eq( 500 , primary.foo.count() );
+assert.eq( 100 , primary.foo.count() );
 
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
 
-for ( ; i<800; i++ ){
+for ( ; i<100; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
+s.printChunks()
 assert.eq( 1 , s.config.chunks.count() );
 
-for ( ; i<1500; i++ ){
+for ( ; i<400; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
-assert.lte( 3 , s.config.chunks.count() , "shard didn't split A " );
 s.printChunks();
+//assert.lte( 3 , s.config.chunks.count() , "shard didn't split A " );
 
-for ( ; i<2800; i++ ){
+for ( ; i<600; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 db.getLastError();
 
-assert.lte( 4 , s.config.chunks.count() , "shard didn't split B " );
 s.printChunks();
+assert.lte( 4 , s.config.chunks.count() , "shard didn't split B " );
 
 
 s.stop();
