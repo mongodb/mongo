@@ -91,20 +91,20 @@ namespace mongo {
             return line;
         }
 
-	/* turn http:... into an anchor */
-	string linkify(const char *s) { 
-	  const char *p = s;
-	  const char *h = strstr(p, "http://");
-	  if( h == 0 ) return s;
+        /* turn http:... into an anchor */
+        string linkify(const char *s) { 
+            const char *p = s;
+            const char *h = strstr(p, "http://");
+            if( h == 0 ) return s;
 	  
-	  const char *sp = h + 7;
-	  while( *sp && *sp != ' ' ) sp++;
+            const char *sp = h + 7;
+            while( *sp && *sp != ' ' ) sp++;
 
-	  string url(h, sp-h);
-	  stringstream ss;
-	  ss << string(s, h-s) << "<a href=\"" << url << "\">" << url << "</a>" << sp;
-	  return ss.str();
-	}
+            string url(h, sp-h);
+            stringstream ss;
+            ss << string(s, h-s) << "<a href=\"" << url << "\">" << url << "</a>" << sp;
+            return ss.str();
+        }
 
         void toHTML(stringstream& s) {
             bool first = true;
@@ -114,7 +114,7 @@ namespace mongo {
                 assert( strlen(v[i]) > 20 );
                 int r = repeats(v, i);
                 if( r < 0 ) {
-		  s << color( linkify( clean(v,i).c_str() ) );
+                    s << color( linkify( clean(v,i).c_str() ) );
                 } 
                 else {
                     stringstream x;
