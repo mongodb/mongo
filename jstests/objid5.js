@@ -14,3 +14,5 @@ if( !x.ok )
 assert( x.oidMachine , "B1" )
 assert.neq( x.oidMachine , y.oidMachine , "B2" )
 assert.eq( x.oidMachine , y.oidMachineOld , "B3" )
+
+assert.eq( 18 , Object.bsonsize( { _id : 7.7 } ) , "C" )

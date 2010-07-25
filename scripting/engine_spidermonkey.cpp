@@ -959,14 +959,25 @@ namespace mongo {
             return JS_FALSE;
         }
         
-        BSONHolder * o = GETHOLDER( cx , JSVAL_TO_OBJECT( argv[ 0 ] ) );
-        double size = 0;
-        if ( o ){
-            size = o->_obj.objsize();
-        }
+        JSObject * o = JSVAL_TO_OBJECT( argv[0] );
+
         Convertor c(cx);
+        double size = 0;
+
+        if ( JS_InstanceOf( cx , o , &bson_ro_class , 0 ) ||
+             JS_InstanceOf( cx , o , &bson_class , 0 ) ){
+            BSONHolder * h = GETHOLDER( cx , o );
+            if ( h ){
+                size = h->_obj.objsize();
+            }
+        }
+        else {
+            BSONObj temp = c.toObject( o );
+            size = temp.objsize();
+        }
+        
         *rval = c.toval( size );
-        return JS_TRUE;
+        return JS_TRUE;        
     }
     
     JSFunctionSpec objectHelpers[] = {
