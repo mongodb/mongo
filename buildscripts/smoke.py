@@ -389,7 +389,7 @@ def expandSuites(suites):
         elif suite == 'smokeJsSlowNightly':
             (globstr, usedb) = ('slowNightly/*.js', True)
         elif suite == 'smokeJsSlowWeekly':
-            (globstr, usedb) = ('slowNightly/*.js', True)
+            (globstr, usedb) = ('slowWeekly/*.js', True)
         elif suite == 'smokeParallel':
             (globstr, usedb) = ('parallel/*.js', True)
         elif suite == 'smokeClone':
