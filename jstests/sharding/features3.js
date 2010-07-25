@@ -16,7 +16,7 @@ s.adminCommand( { moveChunk : "test.foo", find : { _id : 3 } ,to : s.getNonPrima
 
 for ( i=0; i<N; i++ )
     db.foo.insert( { _id : i } )
-
+db.getLastError();
 x = db.foo.stats();
 assert.eq( N , x.count , "total count" )
 assert.eq( N / 2 , x.shards.shard0000.count , "count on shard0000" )
