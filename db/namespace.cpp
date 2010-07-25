@@ -57,7 +57,7 @@ namespace mongo {
         capFirstNewRecord.setInvalid();
         // For capped case, signal that we are doing initial extent allocation.
         if ( capped )
-            deletedList[ 1 ].setInvalid();
+            cappedLastDelRecLastExtent().setInvalid();
 		assert( sizeof(dataFileVersion) == 2 );
 		dataFileVersion = 0;
 		indexFileVersion = 0;
@@ -182,13 +182,13 @@ namespace mongo {
         dassert( dloc.drec() == d );
         DEBUGGING out() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
         if ( capped ) {
-            if ( !deletedList[ 1 ].isValid() ) {
+            if ( !cappedLastDelRecLastExtent().isValid() ) {
                 // Initial extent allocation.  Insert at end.
                 d->nextDeleted = DiskLoc();
-                if ( deletedList[ 0 ].isNull() )
-                    deletedList[ 0 ] = dloc;
+                if ( cappedListOfAllDeletedRecords().isNull() )
+                    cappedListOfAllDeletedRecords() = dloc;
                 else {
-                    DiskLoc i = deletedList[ 0 ];
+                    DiskLoc i = cappedListOfAllDeletedRecords();
                     for (; !i.drec()->nextDeleted.isNull(); i = i.drec()->nextDeleted );
                     i.drec()->nextDeleted = dloc;
                 }
@@ -358,13 +358,6 @@ namespace mongo {
                 return i.ext()->lastRecord;
         }
         return DiskLoc();
-    }
-
-    DiskLoc &NamespaceDetails::firstDeletedInCapExtent() {
-        if ( deletedList[ 1 ].isNull() )
-            return deletedList[ 0 ];
-        else
-            return deletedList[ 1 ].drec()->nextDeleted;
     }
 
     int n_complaints_cap = 0;

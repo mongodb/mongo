@@ -239,12 +239,18 @@ namespace mongo {
 
         /* NOTE: capped collections override the meaning of deleted list.  
                  deletedList[0] points to a list of free records (DeletedRecord's) for all extents in
-                 the namespace.
+                 the capped namespace.
                  deletedList[1] points to the last record in the prev extent.  When the "current extent" 
                  changes, this value is updated.  !deletedList[1].isValid() when this value is not 
                  yet computed.
         */
         DiskLoc deletedList[Buckets];
+
+        DiskLoc& cappedListOfAllDeletedRecords() { return deletedList[0]; }
+        DiskLoc& cappedLastDelRecLastExtent()    { return deletedList[1]; }
+
+        void cappedDumpDelInfo();
+        void dumpExtents();
 
         long long datasize;
         long long nrecords;
@@ -438,6 +444,9 @@ namespace mongo {
         void cappedCheckMigrate();
         long long storageSize( int * numExtents = 0 );
 
+        /** remove rest of the capped collection from this point onward */
+        void cappedTruncateAfter(const char *n, DiskLoc);
+
     private:
         /** This prevents deletion from a capped collection upon wrap around - 
             so there will be no wrap around, just an exception.  Used to be 
@@ -455,8 +464,6 @@ namespace mongo {
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
     }; // NamespaceDetails
 #pragma pack()
-
-    void cappedTruncateAfter(const char *n, DiskLoc);
 
     /* NamespaceDetailsTransient
 

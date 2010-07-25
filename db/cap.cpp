@@ -31,8 +31,8 @@
 
 namespace mongo {
 
-    /* combine adjacent deleted records
-
+    /* combine adjacent deleted records *for the current extent* of the capped collection
+     
        this is O(n^2) but we call it for capped tables where typically n==1 or 2!
        (or 3...there will be a little unused sliver at the end of the extent.)
     */
@@ -78,24 +78,31 @@ namespace mongo {
         }
     }
 
+    DiskLoc &NamespaceDetails::firstDeletedInCapExtent() {
+        if ( cappedLastDelRecLastExtent().isNull() )
+            return cappedListOfAllDeletedRecords();
+        else
+            return cappedLastDelRecLastExtent().drec()->nextDeleted;
+    }
+
     void NamespaceDetails::cappedCheckMigrate() {
         // migrate old NamespaceDetails format
         assert( capped );
         if ( capExtent.a() == 0 && capExtent.getOfs() == 0 ) {
             capFirstNewRecord = DiskLoc();
             capFirstNewRecord.setInvalid();
-            // put all the DeletedRecords in deletedList[ 0 ]
+            // put all the DeletedRecords in cappedListOfAllDeletedRecords()
             for ( int i = 1; i < Buckets; ++i ) {
                 DiskLoc first = deletedList[ i ];
                 if ( first.isNull() )
                     continue;
                 DiskLoc last = first;
                 for (; !last.drec()->nextDeleted.isNull(); last = last.drec()->nextDeleted );
-                last.drec()->nextDeleted = deletedList[ 0 ];
-                deletedList[ 0 ] = first;
+                last.drec()->nextDeleted = cappedListOfAllDeletedRecords();
+                cappedListOfAllDeletedRecords() = first;
                 deletedList[ i ] = DiskLoc();
             }
-            // NOTE deletedList[ 1 ] set to DiskLoc() in above
+            // NOTE cappedLastDelRecLastExtent() set to DiskLoc() in above
 
             // Last, in case we're killed before getting here
             capExtent = firstExtent;
@@ -117,14 +124,14 @@ namespace mongo {
     }
 
     void NamespaceDetails::advanceCapExtent( const char *ns ) {
-        // We want deletedList[ 1 ] to be the last DeletedRecord of the prev cap extent
+        // We want cappedLastDelRecLastExtent() to be the last DeletedRecord of the prev cap extent
         // (or DiskLoc() if new capExtent == firstExtent)
         if ( capExtent == lastExtent )
-            deletedList[ 1 ] = DiskLoc();
+            cappedLastDelRecLastExtent() = DiskLoc();
         else {
             DiskLoc i = firstDeletedInCapExtent();
             for (; !i.isNull() && nextIsInCapExtent( i ); i = i.drec()->nextDeleted );
-            deletedList[ 1 ] = i;
+            cappedLastDelRecLastExtent() = i;
         }
 
         capExtent = theCapExtent()->xnext.isNull() ? firstExtent : theCapExtent()->xnext;
@@ -137,11 +144,11 @@ namespace mongo {
     }
 
     DiskLoc NamespaceDetails::__capAlloc( int len ) {
-        DiskLoc prev = deletedList[ 1 ];
+        DiskLoc prev = cappedLastDelRecLastExtent();
         DiskLoc i = firstDeletedInCapExtent();
         DiskLoc ret;
         for (; !i.isNull() && inCapExtent( i ); prev = i, i = i.drec()->nextDeleted ) {
-            // We need to keep at least one DR per extent in deletedList[ 0 ],
+            // We need to keep at least one DR per extent in cappedListOfAllDeletedRecords(),
             // so make sure there's space to create a DR at the end.
             if ( i.drec()->lengthWithHeaders >= len + 24 ) {
                 ret = i;
@@ -152,7 +159,7 @@ namespace mongo {
         /* unlink ourself from the deleted list */
         if ( !ret.isNull() ) {
             if ( prev.isNull() )
-                deletedList[ 0 ] = ret.drec()->nextDeleted;
+                cappedListOfAllDeletedRecords() = ret.drec()->nextDeleted;
             else
                 prev.drec()->nextDeleted = ret.drec()->nextDeleted;
             ret.drec()->nextDeleted.setInvalid(); // defensive.
@@ -164,8 +171,8 @@ namespace mongo {
 
     DiskLoc NamespaceDetails::cappedAlloc(const char *ns, int len) { 
         // signal done allocating new extents.
-        if ( !deletedList[ 1 ].isValid() )
-            deletedList[ 1 ] = DiskLoc();
+        if ( !cappedLastDelRecLastExtent().isValid() )
+            cappedLastDelRecLastExtent() = DiskLoc();
         
         assert( len < 400000000 );
         int passes = 0;
@@ -235,18 +242,73 @@ namespace mongo {
         return loc;
     }
 
-    /* TODO : slow implementation to get us going.  fix later! */
-    void cappedTruncateAfter(const char *ns, DiskLoc l) {
-        NamespaceDetails *d = nsdetails(ns);
-        /*
-        ReverseCappedCursor c(d);
-        while( c.ok() ) { 
-            DiskLoc d = c.currLoc();
-            if( d == l ) 
-                break;
-            c.advance();
+    void NamespaceDetails::dumpExtents() {
+        cout << "dumpExtents:" << endl;
+        for ( DiskLoc i = firstExtent; !i.isNull(); i = i.ext()->xnext ) {
+            Extent *e = i.ext();
+            stringstream ss;
+            e->dump(ss);
+            cout << ss.str() << endl;
         }
-        */
+    }
+
+    void NamespaceDetails::cappedDumpDelInfo() { 
+        cout << "dl[0]: " << deletedList[0].toString() << endl;
+        for( DiskLoc z = deletedList[0]; !z.isNull(); z = z.drec()->nextDeleted ) { 
+            cout << "  " << z.toString() << " dreclen:" << z.drec()->lengthWithHeaders << ' ' << z.drec()->myExtent(z)->myLoc.toString() << " extent:" << hex << z.drec()->extentOfs << endl;
+        }
+        cout << "dl[1]: " << deletedList[1].toString() << endl;
+    }
+
+    /* TODO : slow (but presumably correct) temp implementation to get us going.  fix later! */
+    void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc l) {
+        assert(false);
+
+        DEV assert( this == nsdetails(ns) );
+
+        list<DiskLoc> dlocs;
+
+        cout << "\nrecs in reverse order:" << endl;
+        {
+            ReverseCappedCursor c(this);
+            while( 1 ) {
+                if( !c.ok() ) { 
+                    // uassert an error, l never found?
+                    break;
+                }
+                DiskLoc d = c.currLoc();
+                cout << d.toString() << " reclen:" << d.rec()->lengthWithHeaders << " extent:" << hex << d.rec()->extentOfs << endl;
+                c.advance();
+                if( l == d )
+                    break;
+                dlocs.push_front(d);
+            }
+        }
+        cout << endl;
+
+        cappedDumpDelInfo();
+
+        for( list<DiskLoc>::iterator i = dlocs.begin(); i != dlocs.end(); i++ ) {
+            DiskLoc d = *i;
+            cout << "deleting " << d.toString() << endl;
+
+            {
+                if( !d.obj().valid() ) { 
+                    cout << d.toString() << endl;
+                }
+            }
+
+            theDataFileMgr.deleteRecord(ns, d.rec(), d, /*cappedok*/true, true);
+        }
+
+        cappedDumpDelInfo();
+
+        compact();
+
+        cout << "*** after:" << endl;
+
+        cappedDumpDelInfo();
+
     }
 
 }

@@ -613,15 +613,6 @@ namespace NamespaceTests {
                     ++count;
                 return count;
             }
-            void printExtents() const {
-                for ( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext ) {
-                    Extent *e = i.ext();
-                    stringstream ss;
-                    e->dump(ss);
-                    cout << ss.str() << endl;
-                    //cout << "extent: " << i.toString() << " len:" << e->length << endl;
-                }
-            }
             static int min( int a, int b ) {
                 return a < b ? a : b;
             }
@@ -684,11 +675,8 @@ namespace NamespaceTests {
             void run() {
                 if( 1 ) 
                     return;
-
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
-
-                DEV printExtents();
 
                 BSONObj b = bigObj();
 
@@ -696,17 +684,19 @@ namespace NamespaceTests {
                 DiskLoc l[ 8 ];
                 for ( int i = 0; i < 8; ++i ) {
                     d = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
+
+                    cout << "\ninsert " << i << " " << d.toString() << endl;
+                    nsdetails(ns())->cappedDumpDelInfo();
+
                     l[i] = d;
                     ASSERT( !d.isNull() );
-                    cout << l[i].toString() << endl;
                     ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
                     if ( i > 3 )
                         ASSERT( l[ i ] == l[ i - 4 ] );
                 }
 
-                DEV printExtents();
-
-                cappedTruncateAfter(ns(), DiskLoc());
+                NamespaceDetails *nsd = nsdetails(ns());
+                nsd->cappedTruncateAfter(ns(), DiskLoc());
 
                 // Too big
                 BSONObjBuilder bob;
@@ -714,10 +704,6 @@ namespace NamespaceTests {
                 BSONObj bigger = bob.done();
                 ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
                 ASSERT_EQUALS( 0, nRecords() );
-
-                DEV printExtents();
-
-
             }
         private:
             virtual string spec() const {
@@ -737,7 +723,6 @@ namespace NamespaceTests {
                 for ( int i = 0; i < 8; ++i ) {
                     l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
-                    cout << l[i].toString() << endl;
                     ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
                     if ( i > 3 )
                         ASSERT( l[ i ] == l[ i - 4 ] );
@@ -760,9 +745,9 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                nsd()->deletedList[ 2 ] = nsd()->deletedList[ 0 ].drec()->nextDeleted.drec()->nextDeleted;
-                nsd()->deletedList[ 0 ].drec()->nextDeleted.drec()->nextDeleted = DiskLoc();
-                nsd()->deletedList[ 1 ].Null();
+                nsd()->deletedList[ 2 ] = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted;
+                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted = DiskLoc();
+                nsd()->cappedLastDelRecLastExtent().Null();
                 NamespaceDetails *d = nsd();
                 zero( &d->capExtent );
                 zero( &d->capFirstNewRecord );
@@ -773,9 +758,9 @@ namespace NamespaceTests {
                 ASSERT( nsd()->capExtent.getOfs() != 0 );
                 ASSERT( !nsd()->capFirstNewRecord.isValid() );
                 int nDeleted = 0;
-                for ( DiskLoc i = nsd()->deletedList[ 0 ]; !i.isNull(); i = i.drec()->nextDeleted, ++nDeleted );
+                for ( DiskLoc i = nsd()->cappedListOfAllDeletedRecords(); !i.isNull(); i = i.drec()->nextDeleted, ++nDeleted );
                 ASSERT_EQUALS( 10, nDeleted );
-                ASSERT( nsd()->deletedList[ 1 ].isNull() );
+                ASSERT( nsd()->cappedLastDelRecLastExtent().isNull() );
             }
         private:
             static void zero( DiskLoc *d ) {

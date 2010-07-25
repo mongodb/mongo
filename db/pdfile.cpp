@@ -1462,7 +1462,7 @@ namespace mongo {
                 }
             }
             if ( loc.isNull() ) {
-                log() << "out of space in datafile " << ns << " capped:" << d->capped << endl;
+                log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->capped << endl;
                 assert(d->capped);
                 return DiskLoc();
             }
