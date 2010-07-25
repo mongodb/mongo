@@ -108,6 +108,7 @@ namespace mongo {
         void setVersion( const string& ns , const ConfigVersion& version );
         
         static ShardedConnectionInfo* get( bool create );
+        static void reset();
         
         bool inForceMode() const { 
             return _forceMode;
