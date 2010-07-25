@@ -849,12 +849,12 @@ namespace mongo {
             c.setProperty( obj, "floatApprox", argv[ 0 ] );
         } else {
             string num = c.toString( argv[ 0 ] );
-            PRINT(num);
+            //PRINT(num);
             const char *numStr = num.c_str();
             long long n;
             try {
                 n = parseLL( numStr );
-                PRINT(n);
+                //PRINT(n);
             } catch ( const AssertionException & ) {
                 smuassert( cx , "could not convert string to long long" , false );                
             }
