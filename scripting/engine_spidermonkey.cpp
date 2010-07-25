@@ -887,13 +887,15 @@ namespace mongo {
     // --- global helpers ---
 
     JSBool native_print( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ){
+        stringstream ss;
         Convertor c( cx );
         for ( uintN i=0; i<argc; i++ ){
             if ( i > 0 )
-                cout << " ";
-            cout << c.toString( argv[i] );
+                ss << " ";
+            ss << c.toString( argv[i] );
         }
-        cout << endl;
+        ss << "\n";
+        Logstream::logLockless( ss.str() );
         return JS_TRUE;
     }
 

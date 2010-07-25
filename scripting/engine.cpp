@@ -96,7 +96,7 @@ namespace mongo {
         path p( filename );
 
         if ( ! exists( p ) ){
-            cout << "file [" << filename << "] doesn't exist" << endl;
+            log() << "file [" << filename << "] doesn't exist" << endl;
             if ( assertOnError )
                 assert( 0 );
             return false;
@@ -116,7 +116,7 @@ namespace mongo {
             }
 
             if (empty){
-                cout << "directory [" << filename << "] doesn't have any *.js files" << endl;
+                log() << "directory [" << filename << "] doesn't have any *.js files" << endl;
                 if ( assertOnError )
                     assert( 0 );
                 return false;
