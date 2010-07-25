@@ -71,8 +71,8 @@ namespace mongo {
                 localtime_r( &_opened , &t );
                 
                 stringstream ss;
-                ss << _path << "." << ( 1900 + t.tm_year ) << "-" << t.tm_mon << "-" << t.tm_mday 
-                   << "_" << t.tm_hour << "-" << t.tm_min << "-" << t.tm_sec;
+                ss << _path << ".";
+                terseCurrentTime( ss , true );
                 string s = ss.str();
                 rename( _path.c_str() , s.c_str() );
 #endif
