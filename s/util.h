@@ -140,5 +140,5 @@ namespace mongo {
     };
 
     bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false , int tryNumber = 1 );
-
+    void resetShardVersion( DBClientBase * conn );
 }

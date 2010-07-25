@@ -62,7 +62,7 @@ namespace mongo {
                 Status* ss = i->second;
                 assert( ss );
                 if ( ss->avail ){
-                    pool.release( addr , ss->avail );
+                    release( addr , ss->avail );
                     ss->avail = 0;
                 }
                 delete ss;
@@ -111,7 +111,7 @@ namespace mongo {
 
                 if ( ss->avail ){
                     ss->avail->getLastError();
-                    pool.release( addr , ss->avail );
+                    release( addr , ss->avail );
                     ss->avail = 0;
                 }
                 delete ss;
@@ -126,6 +126,17 @@ namespace mongo {
                 assert( ss );
                 if ( ss->avail )
                     checkShardVersion( *ss->avail , ns );
+            }
+        }
+
+        void release( const string& addr , DBClientBase * conn ){
+            resetShardVersion( conn );
+            BSONObj res;
+            if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) )
+                pool.release( addr , conn );
+            else {
+                log(LL_ERROR) << " couldn't unset sharding :( " << res << endl;
+                delete conn;
             }
         }
         

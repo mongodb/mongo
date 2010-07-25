@@ -158,13 +158,13 @@ namespace mongo {
         static vector<Tee*> globalTees;
     public:
 
-        static void logLockless( const char * s ){
+        static void logLockless( const StringData& s ){
             if ( doneSetup == 1717 ){
-                fwrite( s , strlen( s ) , 1 , logfile );
+                fwrite( s.data() , s.size() , 1 , logfile );
                 fflush( logfile );
             }
             else {
-                cout << s << endl;
+                cout << s.data() << endl;
             }
         }
         

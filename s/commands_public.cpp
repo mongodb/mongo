@@ -465,9 +465,9 @@ namespace mongo {
                 int nindexes=0;
                 bool warnedAboutIndexes = false;
                 for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ){
-                    ShardConnection conn( *i , fullns );
+                    ScopedDbConnection conn( *i );
                     BSONObj res;
-                    if ( ! conn.runCommand( dbName , cmdObj , res ) ){
+                    if ( ! conn->runCommand( dbName , cmdObj , res ) ){
                         errmsg = "failed on shard: " + res.toString();
                         return false;
                     }
@@ -580,7 +580,7 @@ namespace mongo {
                 set<Shard> shards;
                 cm->getShardsForRange(shards, min, max);
                 for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ){
-                    ShardConnection conn( *i , fullns );
+                    ScopedDbConnection conn( *i );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                     conn.done();

@@ -77,8 +77,6 @@ namespace mongo {
         dbcon.done();
     }
 
-    map< pair<DBClientBase*,string> ,unsigned long long> checkShardVersionLastSequence;
-
     class WriteBackListener : public BackgroundJob {
     protected:
         string name() { return "WriteBackListener"; }
@@ -221,6 +219,37 @@ namespace mongo {
 
     set<OID> WriteBackListener::_seenWritebacks;
     mongo::mutex WriteBackListener::_seenWritebacksLock( "WriteBackListener::seen" );
+
+    struct ConnectionShardStatus {
+        
+        typedef unsigned long long S;
+
+        ConnectionShardStatus() 
+            : _mutex( "ConnectionShardStatus" ){
+        }
+
+        S getSequence( DBClientBase * conn , const string& ns ){
+            scoped_lock lk( _mutex );
+            return _map[conn][ns];
+        }
+
+        void setSequence( DBClientBase * conn , const string& ns , const S& s ){
+            scoped_lock lk( _mutex );
+            _map[conn][ns] = s;
+        }
+
+        void reset( DBClientBase * conn ){
+            scoped_lock lk( _mutex );
+            _map.erase( conn );
+        }
+
+        map<DBClientBase*, map<string,unsigned long long> > _map;
+        mongo::mutex _mutex;
+    } connectionShardStatus;
+
+    void resetShardVersion( DBClientBase * conn ){
+        connectionShardStatus.reset( conn );
+    }
     
     /**
      * @return true if had to do something
@@ -234,7 +263,6 @@ namespace mongo {
         if ( ! conf )
             return false;
         
-        ShardChunkVersion version = 0;
         unsigned long long officialSequenceNumber = 0;
         
         ChunkManagerPtr manager;
@@ -244,10 +272,13 @@ namespace mongo {
             officialSequenceNumber = manager->getSequenceNumber();
         }
 
-        unsigned long long & sequenceNumber = checkShardVersionLastSequence[ make_pair(&conn,ns) ];        
-        if ( sequenceNumber == officialSequenceNumber )
+        unsigned long long sequenceNumber = connectionShardStatus.getSequence(&conn,ns);
+        if ( sequenceNumber == officialSequenceNumber ){
             return false;
+        }
 
+
+        ShardChunkVersion version = 0;
         if ( isSharded ){
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
@@ -261,7 +292,7 @@ namespace mongo {
         if ( setShardVersion( conn , ns , version , authoritative , result ) ){
             // success!
             log(1) << "      setShardVersion success!" << endl;
-            sequenceNumber = officialSequenceNumber;
+            connectionShardStatus.setSequence( &conn , ns , officialSequenceNumber );
             dassert( sequenceNumber == checkShardVersionLastSequence[ make_pair(&conn,ns) ] );
             return true;
         }

@@ -33,5 +33,9 @@ namespace mongo {
         // no-op in mongod
         return false;
     }
+    
+    void resetShardVersion( DBClientBase * conn ){
+        // no-op in mongod
+    }
 
 }

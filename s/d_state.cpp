@@ -248,6 +248,10 @@ namespace mongo {
         return info;
     }
 
+    void ShardedConnectionInfo::reset(){
+        _tl.reset();
+    }
+
     ConfigVersion& ShardedConnectionInfo::getVersion( const string& ns ){
         return _versions[ns];
     }
@@ -302,6 +306,22 @@ namespace mongo {
         return ShardedConnectionInfo::get(false) > 0;
     }
 
+    class UnsetShardingCommand : public MongodShardCommand {
+    public:
+        UnsetShardingCommand() : MongodShardCommand("unsetSharding"){}
+
+        virtual void help( stringstream& help ) const {
+            help << " example: { unsetSharding : 1 } ";
+        }
+        
+        virtual LockType locktype() const { return NONE; } 
+ 
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            ShardedConnectionInfo::reset();
+            return true;
+        } 
+    
+    } unsetShardingCommand;
 
     
     class SetShardVersion : public MongodShardCommand {
