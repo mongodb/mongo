@@ -130,11 +130,14 @@ namespace mongo {
         }
 
         void release( const string& addr , DBClientBase * conn ){
+            resetShardVersion( conn );
             BSONObj res;
             if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) )
                 pool.release( addr , conn );
-            else 
+            else {
                 log(LL_ERROR) << " couldn't unset sharding :( " << res << endl;
+                delete conn;
+            }
         }
         
         map<string,Status*> _hosts;
