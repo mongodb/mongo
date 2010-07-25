@@ -357,6 +357,7 @@ namespace mongo {
             _c->checkLocation();
         }        
         virtual bool supportGetMore() { return true; }
+        virtual bool supportYields() { return _c->supportYields(); }
         // with update we could potentially get the same document on multiple
         // indexes, but update appears to already handle this with seenObjects
         // so we don't have to do anything special here.

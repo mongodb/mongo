@@ -200,9 +200,11 @@ namespace mongo {
 
         struct YieldLock : boost::noncopyable {
             explicit YieldLock( ptr<ClientCursor> cc )
-                : _cc( cc ) , _id( cc->cursorid ) , _doingDeletes( cc->_doingDeletes ) {
-                cc->updateLocation();
-                _unlock.reset(new dbtempreleasecond());
+                : _cc( cc ) , _id( cc->cursorid ) , _doingDeletes( cc->_doingDeletes ), _canYield(cc->c->supportYields()) {
+                if ( _canYield ){
+                    cc->updateLocation();
+                    _unlock.reset(new dbtempreleasecond());
+                }
             }
             ~YieldLock(){
                 if ( _unlock ){
@@ -212,6 +214,9 @@ namespace mongo {
             }
 
             bool stillOk(){
+                if ( ! _canYield )
+                    return true;
+
                 relock();
                 
                 if ( ClientCursor::find( _id , false ) == 0 ){
@@ -224,13 +229,15 @@ namespace mongo {
             }
 
             void relock(){
-                _unlock.reset();
+                if ( _canYield )
+                    _unlock.reset();
             }
             
         private:
             ClientCursor * _cc;
             CursorId _id;
             bool _doingDeletes;
+            bool _canYield;
             
             scoped_ptr<dbtempreleasecond> _unlock;
 

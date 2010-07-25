@@ -941,6 +941,7 @@ namespace mongo {
         }
 
         virtual bool supportGetMore() { return false; }
+        virtual bool supportYields() { return false; }
 
         virtual bool getsetdup(DiskLoc loc){
             return false;

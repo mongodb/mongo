@@ -78,7 +78,8 @@ namespace mongo {
         virtual void checkLocation() { }
         
         virtual bool supportGetMore() = 0;
-
+        virtual bool supportYields() = 0;
+        
         virtual string toString() { return "abstract?"; }
 
         /* used for multikey index traversal to avoid sending back dups. see Matcher::matches().
@@ -171,6 +172,7 @@ namespace mongo {
         virtual bool getsetdup(DiskLoc loc) { return false; }
 
         virtual bool supportGetMore() { return true; }
+        virtual bool supportYields() { return true; }
 
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         

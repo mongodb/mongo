@@ -237,6 +237,8 @@ namespace mongo {
     }
     
     void ClientCursor::prepareToYield( YieldData &data ) {
+        if ( ! c->supportYields() )
+            return;
         // need to store in case 'this' gets deleted
         data._id = cursorid;
         
@@ -280,6 +282,8 @@ namespace mongo {
     }
     
     bool ClientCursor::yield( int micros ) {
+        if ( ! c->supportYields() )
+            return true;
         YieldData data; 
         prepareToYield( data );
         

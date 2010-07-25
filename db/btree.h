@@ -286,6 +286,7 @@ namespace mongo {
         virtual void noteLocation(); // updates keyAtKeyOfs...
         virtual void checkLocation();
         virtual bool supportGetMore() { return true; }
+        virtual bool supportYields() { return true; }
 
         /* used for multikey index traversal to avoid sending back dups. see Matcher::matches().
            if a multikey index traversal:
