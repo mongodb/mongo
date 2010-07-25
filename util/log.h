@@ -203,7 +203,7 @@ namespace mongo {
                 }
                 b.appendStr( msg );
                 
-                string out( b.buf() , b.len() );
+                string out( b.buf() , b.len() - 1);
 
                 scoped_lock lk(mutex);
                 
