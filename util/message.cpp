@@ -426,9 +426,9 @@ namespace mongo {
             
             m.setData(md, true);
             return true;
-
+            
         } catch ( const SocketException & e ) {
-            log(_logLevel) << "SocketException: " << e << endl;
+            log(_logLevel + e.shouldPrint() ? 0 : 1 ) << "SocketException: " << e << endl;
             m.reset();
             return false;
         }
@@ -496,11 +496,11 @@ namespace mongo {
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
                     log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
-                    throw SocketException();                    
+                    throw SocketException( SocketException::SEND_ERROR );                    
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {
                         log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException();                        
+                        throw SocketException( SocketException::SEND_ERROR );                        
                     }
                 }
             } else {
@@ -540,11 +540,11 @@ namespace mongo {
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
                     log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
-                    throw SocketException();                    
+                    throw SocketException( SocketException::SEND_ERROR );                    
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {
                         log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException();                        
+                        throw SocketException( SocketException::SEND_ERROR );                        
                     }
                 }
             } else {
@@ -570,17 +570,17 @@ namespace mongo {
             int ret = ::recv( sock , buf , len , portRecvFlags );
             if ( ret == 0 ) {
                 log(3) << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
-                throw SocketException();
+                throw SocketException( SocketException::CLOSED );
             }
             if ( ret == -1 ) {
                 int e = errno;
                 if ( e != EAGAIN || _timeout == 0 ) {                
                     log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString()<<endl;
-                    throw SocketException();
+                    throw SocketException( SocketException::RECV_ERROR );
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {
                         log(_logLevel) << "MessagingPort recv() remote dead " << farEnd.toString() << endl;
-                        throw SocketException();                        
+                        throw SocketException( SocketException::RECV_ERROR );                        
                     }
                 }
             } else {

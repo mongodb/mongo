@@ -392,7 +392,13 @@ struct OP_GETMORE : public MSGHEADER {
 
     class SocketException : public DBException {
     public:
-        SocketException() : DBException( "socket exception" , 9001 ){}
+        enum Type { CLOSED , RECV_ERROR , SEND_ERROR } type;
+        SocketException( Type t ) : DBException( "socket exception" , 9001 ) , type(t){}
+        
+        bool shouldPrint() const {
+            return type != CLOSED;
+        }
+        
     };
 
     MSGID nextMessageId();
