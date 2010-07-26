@@ -34,6 +34,7 @@ elif "linux2" == os.sys.platform:
 
 if nix:
     env.Append( CPPFLAGS=" -O3" )
+    env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
 boostLibs = [ "thread" , "filesystem" , "system" ]
 env.Prepend( LIBS =["boost_%s-mt"%(lib) for lib in boostLibs ] )

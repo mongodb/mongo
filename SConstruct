@@ -745,6 +745,9 @@ if nix:
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
 
+    if GetOption( "sharedclient" ):
+        env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
+
     if debugBuild:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
