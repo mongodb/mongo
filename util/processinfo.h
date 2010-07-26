@@ -18,6 +18,7 @@
 #pragma once
 
 #include <sys/types.h>
+#include <string>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -58,5 +59,7 @@ namespace mongo {
     private:
         pid_t _pid;
     };
-
+    
+    void writePidFile( const std::string& path );
+    
 }
