@@ -670,16 +670,6 @@ namespace NamespaceTests {
             }
         };
 
-        class TruncateCapped : public Base {
-        public:
-            void run() {
-            }
-        private:
-            virtual string spec() const {
-                return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
-            }
-        };
-
         class TwoExtent : public Base {
         public:
             void run() {
@@ -709,6 +699,71 @@ namespace NamespaceTests {
         private:
             virtual string spec() const {
                 return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
+            }
+        };
+
+        /* test  NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc loc) 
+        */
+        class TruncateCapped : public Base {
+            virtual string spec() const {
+                return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
+            }
+            void pass(int p) {
+                create();
+                ASSERT_EQUALS( 2, nExtents() );
+
+                BSONObj b = bigObj();
+
+                DiskLoc l[ 8 ];
+                for ( int i = 0; i < 8; ++i ) {
+                    l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
+                    ASSERT( !l[ i ].isNull() );
+                    ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+                    if ( i > 3 )
+                        ASSERT( l[ i ] == l[ i - 4 ] );
+                }
+
+                NamespaceDetails *nsd = nsdetails(ns());
+
+                DiskLoc last, first;
+                {
+                    ReverseCappedCursor c(nsd);
+                    last = c.currLoc();
+                    ASSERT( !last.isNull() );
+                }
+                {
+                    ForwardCappedCursor c(nsd);
+                    first = c.currLoc();
+                    ASSERT( !first.isNull() );
+                    ASSERT( first != last ) ;
+                }
+
+                DiskLoc d = l[6];
+                long long n = nsd->nrecords;
+                nsd->cappedTruncateAfter(ns(), d, false);
+                ASSERT_EQUALS( nsd->nrecords , n-1 );
+
+                {
+                    ForwardCappedCursor c(nsd);
+                    ASSERT( first == c.currLoc() );
+                }
+                {
+                    ReverseCappedCursor c(nsd);
+                    ASSERT( last != c.currLoc() ); // old last should be deleted
+                    ASSERT( !last.isNull() );
+                }
+
+                // Too big
+                BSONObjBuilder bob;
+                bob.append( "a", string( 787, 'a' ) );
+                BSONObj bigger = bob.done();
+                ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
+                ASSERT_EQUALS( 0, nRecords() );
+            }
+        public:
+            void run() {
+                log() << "******** NOT RUNNING TruncateCapped test yet ************" << endl;
+                //pass(0);
             }
         };
 

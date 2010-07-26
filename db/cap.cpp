@@ -279,9 +279,11 @@ namespace mongo {
     }
 
     /* everything from loc on, eliminate from the capped collection.
+       @param inclusive if true, deletes loc (i.e. closed or open range)
     */
-    void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc loc) {
-        assert(false); // not done
+    void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc loc, bool inclusive) {
+        //assert(false); // not done
+        log() << "ERROR : cappedTruncateAfter not implemented ***********************" << endl;
         DEV assert( this == nsdetails(ns) );
     }
 
