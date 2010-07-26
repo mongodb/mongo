@@ -1553,10 +1553,7 @@ if installSetup.clientTestsDir:
 env.Alias( "install" , installDir )
 
 # aliases
-if windows:
-    env.Alias( "mongoclient" , "mongoclient.lib" )
-else:
-    env.Alias( "mongoclient" , GetOption( "sharedclient" ) and sharedClientLibName or clientLibName )
+env.Alias( "mongoclient" , GetOption( "sharedclient" ) and sharedClientLibName or clientLibName )
 
 
 #  ---- CONVENIENCE ----
