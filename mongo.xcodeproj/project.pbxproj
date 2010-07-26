@@ -581,6 +581,7 @@
 		93E5B88E10D7FF890044F9E4 /* v8_wrapper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = v8_wrapper.cpp; sourceTree = "<group>"; };
 		93E5B88F10D7FF890044F9E4 /* v8_wrapper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = v8_wrapper.h; sourceTree = "<group>"; };
 		93E6E09F11FDFAAA00EDA451 /* cap.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cap.cpp; sourceTree = "<group>"; };
+		93E6E10A11FE2BBC00EDA451 /* capped6.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped6.js; sourceTree = "<group>"; };
 		93E727090F4B5B5B004F9B5D /* shardkey.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = shardkey.cpp; sourceTree = "<group>"; };
 		93E7270A0F4B5B5B004F9B5D /* shardkey.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = shardkey.h; sourceTree = "<group>"; };
 		93E8A4381173E6480025F7F8 /* or1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or1.js; sourceTree = "<group>"; };
@@ -830,6 +831,7 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				93E6E10A11FE2BBC00EDA451 /* capped6.js */,
 				93C5BC9E11E5B7FE00F9671C /* group6.js */,
 				93C5BC7911E5AE8700F9671C /* in6.js */,
 				938A74BF11D17ECE005265E1 /* numberlong.js */,
