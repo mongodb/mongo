@@ -243,6 +243,11 @@ AddOption("--sharedclient",
           action="store",
           help="build a libmongoclient.so/.dll")
 
+AddOption("--includeheaders",
+          dest="includeheaders",
+          action="store",
+          help="include headers when doing scons install")
+
 AddOption("--smokedbprefix",
           dest="smokedbprefix",
           action="store",
@@ -391,6 +396,9 @@ class InstallSetup:
 installSetup = InstallSetup()
 if distBuild:
     installSetup.bannerDir = "distsrc"
+
+if GetOption( "includeheaders" ):
+    installSetup.headers = True
 
 
 # ------    SOURCE FILE SETUP -----------
