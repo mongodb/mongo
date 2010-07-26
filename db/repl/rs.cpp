@@ -52,6 +52,15 @@ namespace mongo {
         }
     }
 
+    /* look freshly for who is primary - includes relinquishing ourself. */
+    void ReplSetImpl::forgetPrimary() { 
+        if( box.getState().primary() ) 
+            relinquish();
+        else {
+            box.setOtherPrimary(0);
+        }
+    }
+
     bool ReplSetImpl::_stepDown() { 
         lock lk(this);
         if( box.getState().primary() ) { 
@@ -269,15 +278,13 @@ namespace mongo {
 
         endOldHealthTasks();
 
-
-
         int oldPrimaryId = -1;
         {
             const Member *p = box.getPrimary();
             if( p ) 
                 oldPrimaryId = p->id();
         }
-        box.setOtherPrimary(0);
+        forgetPrimary();
         _self = 0;
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;

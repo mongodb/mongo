@@ -62,24 +62,52 @@ namespace mongo {
 
     using namespace bson;
 
-    struct HowToFixUp {
-        // todo make this just the _id value not the whole bo we got (not that it's large anyway)
-        list<bo> toRefetch;
-
-        OpTime commonPoint;
+    struct DocID {
+        const char *ns;
+        be _id;
+        bool operator<(const DocID& d) const { 
+            int c = strcmp(ns, d.ns);
+            if( c < 0 ) return true;
+            if( c > 0 ) return false;
+            return _id < d._id;
+        }
     };
 
-    static void syncRollbackFindCommonPoint(DBClientConnection *us, DBClientConnection *them, HowToFixUp& h) { 
+    struct HowToFixUp {
+        /* note this is a set -- if there are many $inc's on a single document we need to rollback, we only 
+           need to refetch it once. */
+        set<DocID> toRefetch;
+
+        OpTime commonPoint;
+        DiskLoc commonPointOurDiskloc;
+    };
+
+    static void syncRollbackFindCommonPoint(DBClientConnection *them, HowToFixUp& h) { 
+        static time_t last;
+        if( time(0)-last < 60 ) { 
+            // this could put a lot of load on someone else, don't repeat too often
+            sleepsecs(10);
+            throw "findcommonpoint waiting a while before trying again";
+        }
+        last = time(0);
+
+        assert( dbMutex.atLeastReadLocked() );
+        NamespaceDetails *nsd = nsdetails(rsoplog);
+        assert(nsd);
+        Client::Context c(rsoplog, dbpath, 0, false);
+        ReverseCappedCursor u(nsd);
+        if( !u.ok() )
+            throw "our oplog empty or unreadable";
+
         const Query q = Query().sort(reverseNaturalObj);
         const bo fields = BSON( "ts" << 1 << "h" << 1 );
-        
-        auto_ptr<DBClientCursor> u = us->query(rsoplog, q, 0, 0, &fields, 0, 0);
+
+        //auto_ptr<DBClientCursor> u = us->query(rsoplog, q, 0, 0, &fields, 0, 0);
         auto_ptr<DBClientCursor> t = them->query(rsoplog, q, 0, 0, &fields, 0, 0);
 
-        if( !u->more() ) throw "our oplog empty or unreadable";
         if( !t->more() ) throw "remote oplog empty or unreadable";
 
-        BSONObj ourObj = u->nextSafe();
+        BSONObj ourObj = u.current();
         OpTime ourTime = ourObj["ts"]._opTime();
         BSONObj theirObj = t->nextSafe();
         OpTime theirTime = theirObj["ts"]._opTime();
@@ -87,12 +115,11 @@ namespace mongo {
         if( 1 ) {
             long long diff = (long long) ourTime.getSecs() - ((long long) theirTime.getSecs());
             /* diff could be positive, negative, or zero */
-            log() << "replSet TEMP info syncRollback diff in end of log times : " << diff << " seconds" << rsLog;
-            /*if( diff > 3600 ) { 
-                log() << "replSet syncRollback too long a time period for a rollback. sleeping 1 minute" << rsLog;
-                sleepsecs(60);
+            log() << "replSet info syncRollback diff in end of log times : " << diff << " seconds" << rsLog;
+            if( diff > 3600 ) { 
+                log() << "replSet syncRollback too long a time period for a rollback." << rsLog;
                 throw "error not willing to roll back more than one hour of data";
-            }*/
+            }
         }
 
         unsigned long long totSize = 0;
@@ -106,13 +133,15 @@ namespace mongo {
                     // todo : check a few more just to be careful about hash collisions.
                     log() << "replSet rollback found matching events at " << ourTime.toStringPretty() << rsLog;
                     log() << "replSet scanned : " << scanned << rsLog;
-                    log() << "replSet TODO finish " << rsLog;
                     h.commonPoint = ourTime;
+                    h.commonPointOurDiskloc = u.currLoc();
                     return;
                 }
                 theirObj = t->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
-                ourObj = u->nextSafe();
+                u.advance();
+                if( !u.ok() ) throw "reached beginning of local oplog";
+                ourObj = u.current();
                 ourTime = ourObj["ts"]._opTime();
             }
             else if( theirTime > ourTime ) { 
@@ -125,8 +154,26 @@ namespace mongo {
                 totSize += ourObj.objsize();
                 if( totSize > 512 * 1024 * 1024 )
                     throw "rollback too large";
-                h.toRefetch.push_back( ourObj.getOwned() );
-                ourObj = u->nextSafe();
+                const char *op = ourObj.getStringField("op");
+                if( *op != 'n' ) { // n == no-op
+                    DocID d;
+                    d.ns = ourObj.getStringField("ns");
+                    if( *d.ns == 0 ) { 
+                        log() << "replSet WARNING ignoring op on rollback TODO : " << ourObj.toString() << rsLog;
+                    }
+                    else {
+                        d._id = ourObj["_id"];
+                        if( d._id.eoo() ) {
+                            log() << "replSet WARNING ignoring op on rollback no _id TODO : " << ourObj.toString() << rsLog;
+                        }
+                        else { 
+                            h.toRefetch.insert(d);
+                        }
+                    }
+                }
+                u.advance();
+                if( !u.ok() ) throw "reached beginning of local oplog";
+                ourObj = u.current();
                 ourTime = ourObj["ts"]._opTime();
             }
         }
@@ -138,76 +185,75 @@ namespace mongo {
     };
 
    void ReplSetImpl::syncFixUp(HowToFixUp& h, DBClientConnection *them) {
-       // fetch all first so we aren't interrupted.
+       // fetch all first so we needn't handle interruption in a fancy way
 
        unsigned long long totSize = 0;
 
-       map</*the _id field*/be,X> items;
+       list< pair<DocID,bo> > goodVersions;
 
-       for( list<bo>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) { 
-           const bo& o = *i;
+       for( set<DocID>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) { 
+           const DocID& d = *i;
 
-           if( o["op"].String() == "n" )
-               continue;
-
-           be _id = o["_id"];
-           if( _id.eoo() ) {
-               /* todo1.6? */
-               log() << "replSet sync item in oplog has no _id; skipping. " << i->toString() << rsLog;
-               continue;
-           }
-           if( items.count(_id) )
-               continue;
+           assert( !d._id.eoo() );
 
            {
                /* TODO : slow.  lots of round trips. */
-               string ns = o["ns"].String();
-               X x;
-               x.op = &o;
-               x.goodVersionOfObject = them->findOne(ns, bob().append(_id).done()).getOwned();
-               totSize += x.goodVersionOfObject.objsize();
-               uassert( 13410, "replSet too much data to roll back", totSize < 200 * 1024 * 1024 );
+               bo good= them->findOne(d.ns, d._id.wrap()).getOwned();
+               totSize += good.objsize();
+               uassert( 13410, "replSet too much data to roll back", totSize < 300 * 1024 * 1024 );
 
-               // note result might be eoo, indicating we should delete.
-               items.insert(pair<be,X>(_id, x));
+               // note good might be eoo, indicating we should delete it
+               goodVersions.push_back(pair<DocID,bo>(d,good));
            }
        }
 
        // update them
-       sethbmsg(str::stream() << "syncRollback 4 n:" << h.toRefetch.size());
+       sethbmsg(str::stream() << "syncRollback 4 n:" << goodVersions.size());
 
        bool warn = false;
 
-       {
-           writelock lk("");
-           for( map<be,X>::iterator i = items.begin(); i != items.end(); i++ ) {
-               bo pattern = i->first.wrap(); // { _id : ... }
-               X& x = i->second;
-               const char *ns = x.op->getStringField("ns");
-               try { 
-                   assert( *ns );
-                   // todo: lots of overhead in context, this can be faster
-                   Client::Context c(ns, dbpath, 0, /*doauth*/false);
-                   if( x.goodVersionOfObject.isEmpty() ) {
-                       // wasn't on the primary; delete.
-                       /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
-                       deleteObjects(ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
+       assert( !h.commonPointOurDiskloc.isNull() );
+
+       MemoryMappedFile::flushAll(true);
+
+       dbMutex.assertWriteLocked();
+
+       NamespaceDetails *oplogDetails = nsdetails(rsoplog);
+       uassert(13412, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
+
+       for( list<pair<DocID,bo>>::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
+           const DocID& d = i->first;
+           bo pattern = d._id.wrap(); // { _id : ... }
+           try { 
+               assert( d.ns && *d.ns );
+               // todo: lots of overhead in context, this can be faster
+               Client::Context c(d.ns, dbpath, 0, /*doauth*/false);
+               if( i->second.isEmpty() ) {
+                   // wasn't on the primary; delete.
+                   /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
+                   try { 
+                       deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
                    }
-                   else {
-                       // todo faster...
-                       OpDebug debug;
-                       _updateObjects(/*god*/true, ns, x.goodVersionOfObject, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug);
+                   catch(...) { 
+                       log() << "replSet rollback delete failed - todo finish capped collection support ns:" << d.ns << rsLog;
                    }
+                }
+               else {
+                   // todo faster...
+                   OpDebug debug;
+                   _updateObjects(/*god*/true, d.ns, i->second, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug);
                }
-               catch(DBException& e) { 
-                   log() << "replSet exception in rollback ns:" << ns << ' ' << pattern.toString() << ' ' << e.toString() << rsLog;
-                   warn = true;
-               }
+           }
+           catch(DBException& e) { 
+               log() << "replSet exception in rollback ns:" << d.ns << ' ' << pattern.toString() << ' ' << e.toString() << rsLog;
+               warn = true;
            }
        }
 
        // clean up oplog
+       oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
 
+       MemoryMappedFile::flushAll(true);
 
        // done
        if( warn ) 
@@ -220,20 +266,29 @@ namespace mongo {
         assert( !lockedByMe() );
         assert( !dbMutex.atLeastReadLocked() );
 
+        sethbmsg("syncRollback 0");
+
+        writelocktry lk(rsoplog, 20000);
+        if( !lk.got() ) {
+            sethbmsg("syncRollback couldn't get write lock in a reasonable time");
+            sleepsecs(2);
+            return;
+        }
+
         HowToFixUp how;
         sethbmsg("syncRollback 1");
         {
             r.resetCursor();
-            DBClientConnection us(false, 0, 0);
+            /*DBClientConnection us(false, 0, 0);
             string errmsg;
             if( !us.connect(HostAndPort::me().toString(),errmsg) ) { 
                 sethbmsg("syncRollback connect to self failure" + errmsg);
                 return;
-            }
+            }*/
 
             sethbmsg("syncRollback 2 FindCommonPoint");
             try {
-                syncRollbackFindCommonPoint(&us, r.conn(), how);
+                syncRollbackFindCommonPoint(r.conn(), how);
             }
             catch( const char *p ) { 
                 sethbmsg(string("syncRollback 2 error ") + p);
@@ -248,6 +303,7 @@ namespace mongo {
         }
 
         sethbmsg("replSet syncRollback 3");
+
         syncFixUp(how, r.conn());
     }
 
