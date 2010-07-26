@@ -615,8 +615,6 @@ namespace mongo {
                 help << "add a new shard to the system";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection conn( configServer.getPrimary() );
-                
                 string host = cmdObj.firstElement().valuestrsafe();
                 if ( host == "localhost" || host.find( "localhost:" ) == 0 ||
                      host == "127.0.0.1" || host.find( "127.0.0.1:" ) == 0 ){
@@ -633,64 +631,27 @@ namespace mongo {
                     host = ss.str();
                 }
                 
-                string name;
+                string name = "";
                 if ( cmdObj["name"].type() == String ) {
                     name = cmdObj["name"].valuestrsafe();
-                } else {
-                    name = grid.getNewShardName();
-                    if ( name.empty() ){
-                        result.append( "msg" , "cant generate new shard name" );
-                        conn.done();
-                        return false;
-                    }
+                } 
+
+                long long maxSize = 0;
+                if ( cmdObj[ ShardFields::maxSize.name() ].isNumber() ){
+                    maxSize = cmdObj[ ShardFields::maxSize.name() ].numberLong();
+                }
+                
+                if ( ! grid.addShard( &name , host , maxSize , &errmsg ) ){
+                    // addShard filled errmsg
+                    return false;
                 }
 
-                BSONObj shard;
-                {
-                    BSONObjBuilder b;
-                    b.append( "_id" , name );
-                    b.append( "host" , host );
-                    if ( cmdObj[ ShardFields::maxSize.name() ].isNumber() )
-                        b.append( cmdObj[ ShardFields::maxSize.name() ] );
-                    shard = b.obj();
-                }
-
-                BSONObj old = conn->findOne( "config.shards" , BSON( "host" << host ) );
-                if ( ! old.isEmpty() ){
-                    result.append( "msg" , "host already used" );
-                    conn.done();
-                    return false;
-                }
-                
-                try {
-                    ScopedDbConnection newShardConn( host );
-                    newShardConn->getLastError();
-                    newShardConn.done();
-                }
-                catch ( DBException& e ){
-                    errmsg = "couldn't connect to new shard";
-                    result.append( "host" , host );
-                    result.append( "exception" , e.what() );
-                    conn.done();
-                    return false;
-                }
-                
-                log() << "going to add shard: " << shard << endl;
-                conn->insert( "config.shards" , shard );
-                errmsg = conn->getLastError();
-                if ( errmsg.size() ){
-                    log() << "error adding shard: " << shard << " err: " << errmsg << endl;
-                    return false;
-                }
-                result.append( "added" , shard["host"].valuestrsafe() );
-                conn.done();
-                
-                Shard::reloadShardInfo();
-                    
+                result << "shardAdded" << name;
                 return true;
             }
+
         } addServer;
-        
+
         /* See usage docs at:
          * http://www.mongodb.org/display/DOCS/Configuring+Sharding#ConfiguringSharding-Removingashard
          */
