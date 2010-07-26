@@ -896,7 +896,7 @@ namespace mongo {
 
         /** Authorize.  Authorizes both sides of the pair as needed. 
         */
-        bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg);
+        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true );
 
         /** throws userassertion "no master found" */
         virtual
