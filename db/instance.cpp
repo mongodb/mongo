@@ -752,17 +752,16 @@ namespace mongo {
 #endif
     }
 
+#if !defined(_WIN32) && !defined(__sunos__)
     void writePid(int fd) {
-#if !defined(_WIN32) && !defined(__sunos__)
-            stringstream ss;
-            ss << getpid() << endl;
-            string s = ss.str();
-            const char * data = s.c_str();
-            assert ( write( fd, data, strlen( data ) ) );
-#endif
+        stringstream ss;
+        ss << getpid() << endl;
+        string s = ss.str();
+        const char * data = s.c_str();
+        assert ( write( fd, data, strlen( data ) ) );
     }
+
     void acquirePathLock() {
-#if !defined(_WIN32) && !defined(__sunos__)
       string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
 
         bool oldFile = false;
@@ -795,21 +794,11 @@ namespace mongo {
         uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
         writePid( lockFile );
         fsync( lockFile );
-#endif        
     }
-
-    void maybeCreatePidFile() {
-#if !defined(_WIN32) && !defined(__sunos__)
-        if (!(pidfilepath.empty())) {
-            int pidfd;
-            int oflags = O_CREAT|O_TRUNC|O_WRONLY;
-            int omode = S_IRWXU|S_IRWXG|S_IRWXO;
-            string name = boost::filesystem::path( pidfilepath ).native_file_string();
-            assert( ( (pidfd=(open(name.c_str(), oflags, omode))) > -1 ) );
-            writePid(pidfd);
-            assert( close( pidfd ) == 0 );
-        }
-#endif        
+#else
+    void acquirePathLock() {
+        // TODO - this is very bad
     }
+#endif    
     
 } // namespace mongo
