@@ -278,13 +278,71 @@ namespace mongo {
         cout << "dl[1]: " << deletedList[1].toString() << endl;
     }
 
-    /* everything from loc on, eliminate from the capped collection.
-       @param inclusive if true, deletes loc (i.e. closed or open range)
+    /* everything from end on, eliminate from the capped collection.
+       @param inclusive if true, deletes end (i.e. closed or open range)
     */
-    void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc loc, bool inclusive) {
-        //assert(false); // not done
-        log() << "ERROR : cappedTruncateAfter not implemented ***********************" << endl;
+    void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive) {
         DEV assert( this == nsdetails(ns) );
+        assert( cappedLastDelRecLastExtent().isValid() );
+        
+        bool foundLast = false;
+        while( 1 ) {
+            if ( foundLast ) {
+                break;
+            }
+            DiskLoc curr = theCapExtent()->lastRecord;
+            assert( !curr.isNull() );
+            if ( curr == end ) {
+                if ( inclusive ) {
+                    foundLast = true;
+                } else {
+                    break;
+                }
+            }
+            
+            if ( !capLooped() ) {
+                theDataFileMgr.deleteRecord(ns, curr.rec(), curr, true);
+                compact();
+                if ( theCapExtent()->lastRecord.isNull() ) {
+                    assert( !theCapExtent()->xprev.isNull() );
+                    capExtent = theCapExtent()->xprev;
+                    theCapExtent()->assertOk();
+                    if ( capExtent == firstExtent ) {
+                        cappedLastDelRecLastExtent() = DiskLoc();
+                    } else {
+                        // slow - there's no prev ptr for deleted rec
+                        DiskLoc i = cappedListOfAllDeletedRecords();
+                        for( ;
+                            !i.drec()->nextDeleted.isNull() &&
+                            !inCapExtent( i.drec()->nextDeleted );
+                            i = i.drec()->nextDeleted );
+                        assert( !i.drec()->nextDeleted.isNull() ); // I believe there is always at least one drec per extent
+                        cappedLastDelRecLastExtent() = i;
+                    }
+                }
+                continue;
+            }
+
+            theDataFileMgr.deleteRecord(ns, curr.rec(), curr, true);
+            compact();
+            if ( curr == capFirstNewRecord ) { // invalid, but can compare locations
+                capExtent = ( capExtent == firstExtent ) ? lastExtent : theCapExtent()->xprev;
+                theCapExtent()->assertOk();
+                capFirstNewRecord = theCapExtent()->firstRecord;
+                if ( capExtent == firstExtent ) {
+                    cappedLastDelRecLastExtent() = DiskLoc();
+                } else {
+                    // slow - there's no prev ptr for deleted rec
+                    DiskLoc i = cappedListOfAllDeletedRecords();
+                    for( ;
+                        !i.drec()->nextDeleted.isNull() &&
+                        !inCapExtent( i.drec()->nextDeleted );
+                        i = i.drec()->nextDeleted );
+                    assert( !i.drec()->nextDeleted.isNull() ); // I believe there is always at least one drec per extent
+                    cappedLastDelRecLastExtent() = i;
+                }
+            }
+        }
     }
 
 }

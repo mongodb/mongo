@@ -195,6 +195,7 @@ namespace mongo {
             } else {
                 d->nextDeleted = cappedFirstDeletedInCurExtent();
                 cappedFirstDeletedInCurExtent() = dloc;
+                // always compact() after this so order doesn't matter
             }
         } else {
             int b = bucket(d->lengthWithHeaders);
