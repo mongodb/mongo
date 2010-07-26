@@ -394,6 +394,9 @@
     <ClCompile Include="..\util\log.cpp">
       <Filter>util</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\processinfo.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
