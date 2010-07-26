@@ -243,6 +243,11 @@ AddOption("--sharedclient",
           action="store",
           help="build a libmongoclient.so/.dll")
 
+AddOption("--full",
+          dest="full",
+          action="store",
+          help="include client and headers when doing scons install")
+
 AddOption("--smokedbprefix",
           dest="smokedbprefix",
           action="store",
@@ -374,6 +379,7 @@ class InstallSetup:
     
     def default(self):
         self.binaries = True
+        self.libraries = False
         self.clientSrc = False
         self.headers = False
         self.bannerDir = None
@@ -382,6 +388,7 @@ class InstallSetup:
 
     def justClient(self):
         self.binaries = False
+        self.libraries = True
         self.clientSrc = True
         self.headers = True
         self.bannerDir = "distsrc/client/"
@@ -392,6 +399,10 @@ installSetup = InstallSetup()
 if distBuild:
     installSetup.bannerDir = "distsrc"
 
+if GetOption( "full" ):
+    installSetup.headers = True
+    installSetup.libraries = True
+
 
 # ------    SOURCE FILE SETUP -----------
 
@@ -399,7 +410,7 @@ commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.c
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/log.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", 
-                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ]
+                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" , "util/processinfo.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
 
@@ -1513,7 +1524,7 @@ if installSetup.clientSrc:
         env.Install( installDir + "/mongo/" + x.rpartition( "/" )[0] , x )
 
 #lib
-if installSetup.binaries:
+if installSetup.libraries:
     env.Install( installDir + "/" + nixLibPrefix, clientLibName )
     if GetOption( "sharedclient" ): 
         env.Install( installDir + "/" + nixLibPrefix, sharedClientLibName )
@@ -1542,10 +1553,7 @@ if installSetup.clientTestsDir:
 env.Alias( "install" , installDir )
 
 # aliases
-if windows:
-    env.Alias( "mongoclient" , "mongoclient.lib" )
-else:
-    env.Alias( "mongoclient" , "libmongoclient.a" )
+env.Alias( "mongoclient" , GetOption( "sharedclient" ) and sharedClientLibName or clientLibName )
 
 
 #  ---- CONVENIENCE ----

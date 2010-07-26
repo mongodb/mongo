@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "cmdline.h"
 #include "commands.h"
+#include "../util/processinfo.h"
 
 namespace po = boost::program_options;
 
@@ -43,6 +44,7 @@ namespace mongo {
             ("port", po::value<int>(&cmdLine.port), "specify port number")
             ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
             ("logappend" , "append to logpath instead of over-writing" )
+            ("pidfilepath", po::value<string>(), "directory for pidfile (if not set, no pidfile is created)")
 #ifndef _WIN32
             ("fork" , "fork server process" )
 #endif
@@ -168,6 +170,10 @@ namespace mongo {
             string lp = params["logpath"].as<string>();
             uassert( 10033 ,  "logpath has to be non-zero" , lp.size() );
             initLogging( lp , params.count( "logappend" ) );
+        }
+
+        if ( params.count("pidfilepath")) {
+            writePidFile( params["pidfilepath"].as<string>() );
         }
 
         {
