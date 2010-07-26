@@ -221,7 +221,7 @@ namespace mongo {
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
        uassert(13412, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
 
-       for( list<pair<DocID,bo>>::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
+       for( list<pair<DocID,bo> >::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
            const DocID& d = i->first;
            bo pattern = d._id.wrap(); // { _id : ... }
            try { 
