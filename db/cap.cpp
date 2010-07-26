@@ -328,6 +328,7 @@ namespace mongo {
             if ( curr == capFirstNewRecord ) { // invalid, but can compare locations
                 capExtent = ( capExtent == firstExtent ) ? lastExtent : theCapExtent()->xprev;
                 theCapExtent()->assertOk();
+                assert( !theCapExtent()->firstRecord.isNull() );
                 capFirstNewRecord = theCapExtent()->firstRecord;
                 if ( capExtent == firstExtent ) {
                     cappedLastDelRecLastExtent() = DiskLoc();
