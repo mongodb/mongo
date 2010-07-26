@@ -245,7 +245,7 @@ AddOption("--sharedclient",
 
 AddOption("--full",
           dest="full",
-          action="store",
+          action="store_true",
           help="include client and headers when doing scons install")
 
 AddOption("--smokedbprefix",
