@@ -36,10 +36,7 @@ namespace mongo {
         log(2) << "replSet self (" << _self->id() << ") is now primary" << rsLog;
     }
 
-    void ReplSetImpl::changeState(MemberState s) { 
-        // todo check if primary ptr needs settings or removing???
-        box.change(s);
-    }
+    void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
     void ReplSetImpl::relinquish() { 
         if( box.getState().primary() ) {

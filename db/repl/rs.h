@@ -165,20 +165,22 @@ namespace mongo {
         }
         MemberState getState() const { return sp.state; }
         const Member* getPrimary() const { return sp.primary; }
-        void change(MemberState s) { 
+        void change(MemberState s, const Member *self) { 
             scoped_lock lk(m);
             sp.state = s;
-            // note : we don't correct primary if RS_PRIMARY was set here.  that must be done upstream.
+            if( s.primary() ) { 
+                sp.primary = self;
+            }
+            else {
+                if( self == sp.primary )
+                    sp.primary = 0;
+            }
         }
         void set(MemberState s, const Member *p) { 
             scoped_lock lk(m);
             sp.state = s; sp.primary = p;
         }
-        void setSelfPrimary(const Member *self) { 
-            scoped_lock lk(m);
-            sp.state = MemberState::RS_PRIMARY;
-            sp.primary = self;
-        }
+        void setSelfPrimary(const Member *self) { change(MemberState::RS_PRIMARY, self); }
         void setOtherPrimary(const Member *mem) { 
             scoped_lock lk(m);
             assert( !sp.state.primary() );

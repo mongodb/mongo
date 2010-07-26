@@ -64,7 +64,6 @@ namespace mongo {
     void Manager::msgCheckNewState() {
         {
             RSBase::lock lk(rs);
-            // test locking twice???...
 
             if( busyWithElectSelf ) return;
 
