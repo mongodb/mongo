@@ -95,24 +95,46 @@ namespace mongo {
         return view;
     }
 
+    class WindowsFlushable : public MemoryMappedFile::Flushable {
+    public:
+        WindowsFlushable( void * view , HANDLE fd , string filename )
+            : _view(view) , _fd(fd) , _filename(filename){
+            
+        }
+        
+        void flush(){
+            if (!_view || !_fd) 
+                return;
+
+            bool success = FlushViewOfFile(_view, 0); // 0 means whole mapping
+            if (!success){
+                int err = GetLastError();
+                out() << "FlushViewOfFile failed " << err << " file: " << _filename << endl;
+            }
+            
+            success = FlushFileBuffers(_fd);
+            if (!success){
+                int err = GetLastError();
+                out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
+            }
+        }
+        
+        void * _view;
+        HANDLE _fd;
+        string _filename;
+        
+    };
+    
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
-
-        if (!view || !fd) return;
-
-        bool success = FlushViewOfFile(view, 0); // 0 means whole mapping
-        if (!success){
-            int err = GetLastError();
-            out() << "FlushViewOfFile failed " << err << " file: " << _filename << endl;
-        }
-
-        success = FlushFileBuffers(fd);
-        if (!success){
-            int err = GetLastError();
-            out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
-        }
+        
+        WindowsFlushable f( view , fd , _filename );
+        f.flush();
     }
 
+    MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush(){
+        return new WindowsFlushable( view , fd , _filename );
+    }
     void MemoryMappedFile::_lock() {}
     void MemoryMappedFile::_unlock() {}
 

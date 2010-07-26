@@ -106,6 +106,28 @@ namespace mongo {
             problem() << "msync " << errnoWithDescription() << endl;
     }
     
+    class PosixFlushable : public MemoryMappedFile::Flushable {
+    public:
+        PosixFlushable( void * view , HANDLE fd , long len )
+            : _view( view ) , _fd( fd ) , _len(len){
+        }
+
+        void flush(){
+            if ( _view && _fd )
+                if ( msync(_view, _len, MS_SYNC ) )
+                    problem() << "msync " << errnoWithDescription() << endl;
+            
+        }
+
+        void * _view;
+        HANDLE _fd;
+        long _len;
+    };
+
+    MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush(){
+        return new PosixFlushable( view , fd , len );
+    }
+
     void MemoryMappedFile::_lock() {
         if (view) assert(mprotect(view, len, PROT_READ | PROT_WRITE) == 0);
     }

@@ -217,16 +217,26 @@ namespace mongo {
         void removeDB( string db );
 
         /**
+         *
+         * addShard will create a new shard in the grid. It expects a mongod process to be runing
+         * on the provided address.
+         * TODO - add the mongod's databases to the grid
+         *
+         * @param name is an optional string with the name of the shard. if ommited, grid will
+         * generate one and update the parameter.
+         * @param host is the complete address of the machine where the shard will be
+         * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
+         * space usage
+         * @param errMsg is the error description in case the operation failed. 
+         * @return true if shard was successfully added.
+         */
+        bool addShard( string* name , const string& host , long long maxSize , string* errMsg );
+
+        /**
          * @return true if the config database knows about a host 'name'
          */
         bool knowAboutShard( const string& name ) const;
         
-        /**
-         * @return the next available shard name or an empty string, if there are
-         * no more shard names available.
-         */
-        string getNewShardName() const;
-
         /**
          * @return true if the chunk balancing functionality is enabled
          */
@@ -237,6 +247,14 @@ namespace mongo {
     private:
         map<string, DBConfigPtr > _databases;
         mongo::mutex _lock; // TODO: change to r/w lock ??
+
+        /**
+         * @param name is the chose name for the shard. Parameter is mandatory.
+         * @return true if it managed to generate a shard name. May return false if (currently)
+         * 10000 shard 
+         */
+        bool _getNewShardName( string* name) const;
+
     };
 
     class ConfigServer : public DBConfig {

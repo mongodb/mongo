@@ -496,12 +496,12 @@ sendmore:
                 }
                 
                 Date_t start = jsTime();
-                MemoryMappedFile::flushAll( true );
+                int numFiles = MemoryMappedFile::flushAll( true );
                 time_flushing = (int) (jsTime() - start);
 
                 globalFlushCounters.flushed(time_flushing);
 
-                log(1) << "flushing mmap took " << time_flushing << "ms" << endl;
+                log(1) << "flushing mmap took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
             }
         }
         
