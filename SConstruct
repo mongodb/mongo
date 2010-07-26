@@ -243,10 +243,10 @@ AddOption("--sharedclient",
           action="store",
           help="build a libmongoclient.so/.dll")
 
-AddOption("--includeheaders",
-          dest="includeheaders",
+AddOption("--full",
+          dest="full",
           action="store",
-          help="include headers when doing scons install")
+          help="include client and headers when doing scons install")
 
 AddOption("--smokedbprefix",
           dest="smokedbprefix",
@@ -379,6 +379,7 @@ class InstallSetup:
     
     def default(self):
         self.binaries = True
+        self.libraries = False
         self.clientSrc = False
         self.headers = False
         self.bannerDir = None
@@ -387,6 +388,7 @@ class InstallSetup:
 
     def justClient(self):
         self.binaries = False
+        self.libraries = True
         self.clientSrc = True
         self.headers = True
         self.bannerDir = "distsrc/client/"
@@ -397,8 +399,9 @@ installSetup = InstallSetup()
 if distBuild:
     installSetup.bannerDir = "distsrc"
 
-if GetOption( "includeheaders" ):
+if GetOption( "full" ):
     installSetup.headers = True
+    installSetup.libraries = True
 
 
 # ------    SOURCE FILE SETUP -----------
@@ -1521,7 +1524,7 @@ if installSetup.clientSrc:
         env.Install( installDir + "/mongo/" + x.rpartition( "/" )[0] , x )
 
 #lib
-if installSetup.binaries:
+if installSetup.libraries:
     env.Install( installDir + "/" + nixLibPrefix, clientLibName )
     if GetOption( "sharedclient" ): 
         env.Install( installDir + "/" + nixLibPrefix, sharedClientLibName )
@@ -1553,7 +1556,7 @@ env.Alias( "install" , installDir )
 if windows:
     env.Alias( "mongoclient" , "mongoclient.lib" )
 else:
-    env.Alias( "mongoclient" , "libmongoclient.a" )
+    env.Alias( "mongoclient" , GetOption( "sharedclient" ) and sharedClientLibName or clientLibName )
 
 
 #  ---- CONVENIENCE ----
