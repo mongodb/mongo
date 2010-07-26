@@ -245,7 +245,7 @@ AddOption("--sharedclient",
 
 AddOption("--full",
           dest="full",
-          action="store",
+          action="store_true",
           help="include client and headers when doing scons install")
 
 AddOption("--smokedbprefix",
@@ -744,6 +744,9 @@ if nix:
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
+
+    if GetOption( "sharedclient" ):
+        env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
     if debugBuild:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );

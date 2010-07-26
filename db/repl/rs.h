@@ -223,6 +223,8 @@ namespace mongo {
         bool ok() const { return !box.getState().fatal(); }
 
         void relinquish();
+        void forgetPrimary();
+
     protected:
         bool _stepDown();
     private:

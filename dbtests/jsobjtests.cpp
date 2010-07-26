@@ -223,6 +223,9 @@ namespace JsobjTests {
                 BSONElementManipulator( o.firstElement() ).initTimestamp();
                 test = OpTime( o.firstElement().date() );
                 ASSERT( before < test && test < after );
+
+                OpTime x(123,456);
+                ASSERT_EQUALS( 528280977864LL , x.asLL() );
             }
         };
 
@@ -300,7 +303,7 @@ namespace JsobjTests {
                     ASSERT(tmp.hasField("a"));
                     ASSERT(!tmp.hasField("b"));
                     ASSERT(tmp == BSON("a" << 1));
-
+                    
                     //force a realloc
                     BSONArrayBuilder arr;
                     for (int i=0; i < 10000; i++){
@@ -311,7 +314,6 @@ namespace JsobjTests {
                     ASSERT(obj.valid());
                     ASSERT(obj.hasField("a"));
                     ASSERT(obj.hasField("b"));
-                    ASSERT_NOT_EQUALS(obj.objdata() , tmp.objdata());
                 }
             }
         };

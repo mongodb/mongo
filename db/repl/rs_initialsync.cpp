@@ -129,13 +129,15 @@ namespace mongo {
            through the process.  we note that time point here. */
         BSONObj minValid = r.getLastOp(rsoplog);
 
-        MemoryMappedFile::flushAll(true);
         sethbmsg("initial sync clone done first write to oplog still pending",0);
-
+        
         assert( !box.getState().primary() ); // wouldn't make sense if we were.
 
         {
             writelock lk("local.");
+            Client::Context cx( "local." );
+            cx.db()->flushFiles(true);
+            
             Helpers::putSingleton("local.replset.minvalid", minValid);
             // write an op from the primary to our oplog that existed when 
             // we started cloning.  that will be our starting point.
@@ -144,8 +146,9 @@ namespace mongo {
             //        reclone, but don't get stuck with manual error at least...
             //
             _logOpObjRS(lastOp);
+            cx.db()->flushFiles(true);
         }
-        MemoryMappedFile::flushAll(true);
+
         sethbmsg("initial sync done",0);
     }
 

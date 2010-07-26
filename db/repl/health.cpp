@@ -72,7 +72,7 @@ namespace mongo {
         s << td( id() );
         double h = hbinfo().health;
         bool ok = h > 0;
-        s << td(h);
+        s << td(red(str::stream() << h,h == 0));
         s << td(ago(hbinfo().upSince));
         bool never = false;
         {

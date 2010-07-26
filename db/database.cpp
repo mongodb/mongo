@@ -118,4 +118,11 @@ namespace mongo {
         return good == ns.size();
     }
 
+    void Database::flushFiles( bool sync ){
+        dbMutex.assertAtLeastReadLocked();
+        for ( unsigned i=0; i<files.size(); i++ ){
+            files[i]->flush( sync );
+        }
+    }
+
 } // namespace mongo

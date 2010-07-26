@@ -187,6 +187,8 @@ namespace mongo {
                 size += boost::filesystem::file_size( fileName(n) );
             return size;
         }
+
+        void flushFiles( bool sync );
         
         vector<MongoDataFile*> files;
         string name; // "alleyinsider"

@@ -32,6 +32,26 @@ namespace mongo {
 
     using namespace bson;
 
+    bool replSetBlind = false;
+
+    class CmdReplSetTest : public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "Just for testing : do not use.\n";
+        }
+        CmdReplSetTest() : ReplSetCommand("replSetTest", true) { }
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) ) 
+                return false;
+            if( cmdObj.hasElement("blind") ) {
+                replSetBlind = cmdObj.getBoolField("blind");
+                log() << "replSet WARNING via command setting replSetBlind=" << replSetBlind << rsLog;
+                return true;
+            }
+            return false;
+        }
+    } cmdReplSetTest;
+
     class CmdReplSetGetStatus : public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
