@@ -673,37 +673,6 @@ namespace NamespaceTests {
         class TruncateCapped : public Base {
         public:
             void run() {
-                if( 1 ) 
-                    return;
-                create();
-                ASSERT_EQUALS( 2, nExtents() );
-
-                BSONObj b = bigObj();
-
-                DiskLoc d;
-                DiskLoc l[ 8 ];
-                for ( int i = 0; i < 8; ++i ) {
-                    d = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
-
-                    cout << "\ninsert " << i << " " << d.toString() << endl;
-                    nsdetails(ns())->cappedDumpDelInfo();
-
-                    l[i] = d;
-                    ASSERT( !d.isNull() );
-                    ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
-                    if ( i > 3 )
-                        ASSERT( l[ i ] == l[ i - 4 ] );
-                }
-
-                NamespaceDetails *nsd = nsdetails(ns());
-                nsd->cappedTruncateAfter(ns(), DiskLoc());
-
-                // Too big
-                BSONObjBuilder bob;
-                bob.append( "a", string( 787, 'a' ) );
-                BSONObj bigger = bob.done();
-                ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
-                ASSERT_EQUALS( 0, nRecords() );
             }
         private:
             virtual string spec() const {
@@ -727,6 +696,8 @@ namespace NamespaceTests {
                     if ( i > 3 )
                         ASSERT( l[ i ] == l[ i - 4 ] );
                 }
+
+                NamespaceDetails *nsd = nsdetails(ns());
 
                 // Too big
                 BSONObjBuilder bob;

@@ -246,23 +246,38 @@ namespace mongo {
         */
         DiskLoc deletedList[Buckets];
 
-        DiskLoc& cappedListOfAllDeletedRecords() { return deletedList[0]; }
-        DiskLoc& cappedLastDelRecLastExtent()    { return deletedList[1]; }
-
-        void cappedDumpDelInfo();
         void dumpExtents();
 
         long long datasize;
         long long nrecords;
         int lastExtentSize;
         int nIndexes;
+
     private:
         IndexDetails _indexes[NIndexesBase];
+
+    private:
+        Extent *theCapExtent() const { return capExtent.ext(); }
+        void advanceCapExtent( const char *ns );
+        DiskLoc __capAlloc(int len);
+        DiskLoc cappedAlloc(const char *ns, int len);
+        DiskLoc &cappedFirstDeletedInCurExtent();
+        bool nextIsInCapExtent( const DiskLoc &dl ) const;
     public:
+        DiskLoc& cappedListOfAllDeletedRecords() { return deletedList[0]; }
+        DiskLoc& cappedLastDelRecLastExtent()    { return deletedList[1]; }
+        void cappedDumpDelInfo();
+        bool capLooped() const { return capped && capFirstNewRecord.isValid();  }
+        bool inCapExtent( const DiskLoc &dl ) const;
+        void cappedCheckMigrate();
+        void cappedTruncateAfter(const char *n, DiskLoc); /** remove rest of the capped collection from this point onward */
+
         int capped;
+
         int max; // max # of objects for a capped table.  TODO: should this be 64 bit? 
         double paddingFactor; // 1.0 = no padding.
         int flags;
+
         DiskLoc capExtent;
         DiskLoc capFirstNewRecord;
 
@@ -432,7 +447,6 @@ namespace mongo {
         void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
 
         void dumpDeleted(set<DiskLoc> *extents = 0);
-        bool capLooped() const { return capped && capFirstNewRecord.isValid();  }
 
         // Start from firstExtent by default.
         DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
@@ -440,28 +454,13 @@ namespace mongo {
         // Start from lastExtent by default.
         DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
 
-        bool inCapExtent( const DiskLoc &dl ) const;
-        void cappedCheckMigrate();
         long long storageSize( int * numExtents = 0 );
 
-        /** remove rest of the capped collection from this point onward */
-        void cappedTruncateAfter(const char *n, DiskLoc);
-
     private:
-        /** This prevents deletion from a capped collection upon wrap around - 
-            so there will be no wrap around, just an exception.  Used to be 
-            used by the temp oplogs that were part of the cloneCollection implementation. 
-            */
-        Extent *theCapExtent() const { return capExtent.ext(); }
-        void advanceCapExtent( const char *ns );
+        DiskLoc _alloc(const char *ns, int len);
         void maybeComplain( const char *ns, int len ) const;
         DiskLoc __stdAlloc(int len);
-        DiskLoc __capAlloc(int len);
-        DiskLoc _alloc(const char *ns, int len);
-        DiskLoc cappedAlloc(const char *ns, int len); // capped collections
         void compact(); // combine adjacent deleted records
-        DiskLoc &firstDeletedInCapExtent();
-        bool nextIsInCapExtent( const DiskLoc &dl ) const;
     }; // NamespaceDetails
 #pragma pack()
 

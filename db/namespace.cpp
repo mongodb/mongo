@@ -193,8 +193,8 @@ namespace mongo {
                     i.drec()->nextDeleted = dloc;
                 }
             } else {
-                d->nextDeleted = firstDeletedInCapExtent();
-                firstDeletedInCapExtent() = dloc;
+                d->nextDeleted = cappedFirstDeletedInCurExtent();
+                cappedFirstDeletedInCurExtent() = dloc;
             }
         } else {
             int b = bucket(d->lengthWithHeaders);
