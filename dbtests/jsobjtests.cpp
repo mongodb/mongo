@@ -223,6 +223,9 @@ namespace JsobjTests {
                 BSONElementManipulator( o.firstElement() ).initTimestamp();
                 test = OpTime( o.firstElement().date() );
                 ASSERT( before < test && test < after );
+
+                OpTime x(123,456);
+                ASSERT_EQUALS( 528280977864LL , x.asLL() );
             }
         };
 
