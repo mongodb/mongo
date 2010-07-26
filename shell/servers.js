@@ -1072,11 +1072,6 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     });
 }
 
-ReplSetTest.prototype.reInitiate = function( cfg ) {
-  var master  = this.nodes[0].getDB("admin");
-  master.eval('rs.add();');
-}
-
 ReplSetTest.prototype.awaitReplication = function() {
    this.getMaster();
 
