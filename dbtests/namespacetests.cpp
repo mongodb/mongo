@@ -762,8 +762,8 @@ namespace NamespaceTests {
             }
         public:
             void run() {
-                log() << "******** NOT RUNNING TruncateCapped test yet ************" << endl;
-                //pass(0);
+//                log() << "******** NOT RUNNING TruncateCapped test yet ************" << endl;
+                pass(0);
             }
         };
 
