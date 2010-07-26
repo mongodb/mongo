@@ -18,13 +18,27 @@
 #pragma once
 
 namespace mongo {
-
+    
     /* the administrative-ish stuff here */
     class MongoFile : boost::noncopyable { 
+        
+    public:
+        /** Flushable has to fail nicely if the underlying object gets killed */
+        class Flushable {
+        public:
+            virtual ~Flushable(){}
+            virtual void flush() = 0;
+        };
+        
     protected:
         virtual void close() = 0;
         virtual void flush(bool sync) = 0;
-
+        /**
+         * returns a thread safe object that you can call flush on
+         * Flushable has to fail nicely if the underlying object gets killed
+         */
+        virtual Flushable * prepareFlush() = 0;
+        
         void created(); /* subclass must call after create */
         void destroyed(); /* subclass must call in destructor */
 
@@ -145,6 +159,7 @@ namespace mongo {
         void* map(const char *filename, long &length, int options = 0 );
 
         void flush(bool sync);
+        virtual Flushable * prepareFlush();
 
         /*void* viewOfs() {
             return view;
