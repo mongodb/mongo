@@ -115,7 +115,8 @@ namespace mongo {
     /* todo: threading **************** !!!!!!!!!!!!!!!! */
     void Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder* _b) { 
         BSONObjBuilder& b = *_b;
-        log() << "replSet TEMP RECEIVED ELECT MSG " << cmd.toString() << rsLog;
+        DEV log() << "replSet received elect msg " << cmd.toString() << rsLog;
+        else log(2) << "replSet received elect msg " << cmd.toString() << rsLog;
         string set = cmd["set"].String();
         unsigned whoid = cmd["whoid"].Int();
         int cfgver = cmd["cfgver"].Int();

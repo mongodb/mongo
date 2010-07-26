@@ -137,7 +137,7 @@ namespace mongo {
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !rs->elect.aMajoritySeemsToBeUp() ) { 
                 static int n;
-                log(++n <= 5 ? 0 : 1) << "replSet can't see a majority, won't consider electing self";
+                log(++n <= 5 ? 0 : 1) << "replSet can't see a majority, won't consider electing self" << rsLog;
                 return;
             }
 
