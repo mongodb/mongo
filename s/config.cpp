@@ -456,6 +456,70 @@ namespace mongo {
         
     }
 
+    bool Grid::addShard( string* name , const string& host , long long maxSize , string* errMsg ){
+        // errMsg is required but name is optional
+        DEV assert( ! errMsg );
+        string nameInternal;
+        if ( ! name ) {
+            name = &nameInternal;
+        }
+
+        // check whether host exists and is operative
+        try {
+            ScopedDbConnection newShardConn( host );
+            newShardConn->getLastError();
+            newShardConn.done();
+        }
+        catch ( DBException& e ){
+            ostringstream ss;
+            ss << "couldn't connect to new shard ";
+            ss << e.what();
+            *errMsg = ss.str();
+            return false;
+        }
+                
+        // if a name for a shard wasn't provided, pick one.
+        if ( name->empty() && ! _getNewShardName( name ) ){
+            *errMsg = "error generating new shard name";
+            return false;
+        }
+            
+        // build the ConfigDB shard document.
+        BSONObjBuilder b;
+        b.append( "_id" , *name );
+        b.append( "host" , host );
+        if ( maxSize > 0 ){
+            b.append( ShardFields::maxSize.name() , maxSize );
+        }
+        BSONObj shardDoc = b.obj();
+
+        {
+            ScopedDbConnection conn( configServer.getPrimary() );
+                
+            // check whether this host:port is already a known shard
+            BSONObj old = conn->findOne( ShardNS::shard , BSON( "host" << host ) );
+            if ( ! old.isEmpty() ){
+                *errMsg = "host already used";
+                conn.done();
+                return false;
+            }
+
+            log() << "going to add shard: " << shardDoc << endl;
+
+            conn->insert( ShardNS::shard , shardDoc );
+            *errMsg = conn->getLastError();
+            if ( ! errMsg->empty() ){
+                log() << "error adding shard: " << shardDoc << " err: " << *errMsg << endl;
+                return false;
+            }
+
+            conn.done();
+        }
+
+        Shard::reloadShardInfo();
+        return true;
+    }
+        
     bool Grid::knowAboutShard( const string& name ) const{
         ShardConnection conn( configServer.getPrimary() , "" );
         BSONObj shard = conn->findOne( ShardNS::shard , BSON( "host" << name ) );
@@ -463,11 +527,13 @@ namespace mongo {
         return ! shard.isEmpty();
     }
 
-    string Grid::getNewShardName() const{
-        ShardConnection conn( configServer.getPrimary() , "" );
+    bool Grid::_getNewShardName( string* name ) const{
+        DEV assert( ! name );
 
-        string shardName;
+        bool ok = false;
         int count = 0; 
+
+        ShardConnection conn( configServer.getPrimary() , "" );
         BSONObj o = conn->findOne( ShardNS::shard , Query( fromjson ( "{_id: /^shard/}" ) ).sort(  BSON( "_id" << -1 ) ) ); 
         if ( ! o.isEmpty() ) {
             string last = o["_id"].String();
@@ -478,10 +544,12 @@ namespace mongo {
         if (count < 9999) {
             stringstream ss;
             ss << "shard" << setfill('0') << setw(4) << count;
-            shardName = ss.str();
+            *name = ss.str();
+            ok = true;
         }
         conn.done();
-        return shardName;
+
+        return ok;
     }
 
     bool Grid::shouldBalance() const {
