@@ -542,7 +542,6 @@ sendmore:
         }
         
         acquirePathLock();
-        maybeCreatePidFile();
         remove_all( dbpath + "/_tmp/" );
 
         theFileAllocator().start();
@@ -675,9 +674,6 @@ int main(int argc, char* argv[], char *envp[] )
         ("bind_ip", po::value<string>(&bind_ip),
          "comma separated list of ip addresses to listen on - all local ips by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
-#if !defined(_WIN32) && !defined(__sunos__)
-        ("pidfilepath", po::value<string>(&pidfilepath), "directory for pidfile (if not set, no pidfile is created)")
-#endif
         ("directoryperdb", "each database will be stored in a separate directory")
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
         ("cpu", "periodically show cpu and iowait utilization")
