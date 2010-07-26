@@ -166,7 +166,9 @@ namespace mongo {
                 down(mem, "connect/transport error");             
             }
             m = mem;
-            //cout << "TEMP sending msgupdatehbinfo" << mem.hbstate << endl;
+
+            ReplSet *rs = theReplSet;
+
             theReplSet->mgr->send( boost::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
 
             static time_t last = 0;
