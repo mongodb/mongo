@@ -51,7 +51,7 @@ doTest = function( signal ) {
     // Is the new master the same as the old master?
     var new_master_id = replTest.getNodeId( new_master );
 
-    assert( master_id != new_master_id );
+    assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
 }
 
 doTest( 9 );

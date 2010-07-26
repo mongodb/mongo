@@ -873,6 +873,16 @@ ReplSetTest = function( opts ){
     this.initLiveNodes();
 }
 
+// List of nodes as host:port strings.
+ReplSetTest.prototype.nodeList = function() {
+    var list = [];
+    for(var i=0; i<this.ports.length; i++) {
+      list.push( this.host + ":" + this.ports[i]);
+    }
+
+    return list;
+}
+
 // Here we store a reference to all reachable nodes.
 ReplSetTest.prototype.initLiveNodes = function(){
     this.liveNodes = {master: null, slaves: []};
@@ -1008,6 +1018,23 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
   return master;
 }
 
+// Add a node to the test set
+// Run this.reInitiate() to add the
+// node to the config.
+ReplSetTest.prototype.add = function() {
+  var nextPort = this.ports[this.ports.length-1] + 1;
+  print("Next port: " + nextPort);
+  this.ports.push(nextPort);
+  printjson(this.ports);
+  var nextId  = this.nodes.length;
+  printjson(this.nodes);
+  print(nextId);
+  var newNode = this.start(nextId);
+  this.nodes.push(newNode);
+
+  return newNode;
+}
+
 // Pass this method a function to call repeatedly until
 // that function returns true. Example:
 //   attempt({timeout: 20000, desc: "get master"}, function() { // return false until success })
@@ -1029,15 +1056,25 @@ ReplSetTest.prototype.attempt = function( opts, func ) {
     return result;
 }
 
-ReplSetTest.prototype.initiate = function( cfg ) {
-    var master = this.nodes[0].getDB("admin");
-    var config = cfg || this.getReplSetConfig();
-    printjson(config);
+ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
+    var master  = this.nodes[0].getDB("admin");
+    var config  = cfg || this.getReplSetConfig();
+    var cmd     = {};
+    var cmdKey  = initCmd || 'replSetInitiate';
+    var timeout = timeout || 10000;
+    cmd[cmdKey] = config;
+    printjson(cmd);
 
-    this.attempt({timeout: 10000, desc: "Initiate replica pair"}, function() {
-        var result = master.runCommand({replSetInitiate: config});
+    this.attempt({timeout: timeout, desc: "Initiate replica pair"}, function() {
+        var result = master.runCommand(cmd);
+        printjson(result);
         return result['ok'] == 1;
     });
+}
+
+ReplSetTest.prototype.reInitiate = function( cfg ) {
+  var master  = this.nodes[0].getDB("admin");
+  master.eval('rs.add();');
 }
 
 ReplSetTest.prototype.awaitReplication = function() {
