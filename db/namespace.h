@@ -270,7 +270,7 @@ namespace mongo {
         bool capLooped() const { return capped && capFirstNewRecord.isValid();  }
         bool inCapExtent( const DiskLoc &dl ) const;
         void cappedCheckMigrate();
-        void cappedTruncateAfter(const char *n, DiskLoc, bool); /** remove rest of the capped collection from this point onward */
+        void cappedTruncateAfter(const char *ns, DiskLoc after, bool inclusive); /** remove rest of the capped collection from this point onward */
 
         int capped;
 
