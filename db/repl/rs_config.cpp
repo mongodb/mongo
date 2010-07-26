@@ -178,6 +178,8 @@ namespace mongo {
         catch(...) {
             uasserted(13131, "replSet error parsing (or missing) 'members' field in config object");
         }
+
+        int localhosts = 0;
         for( unsigned i = 0; i < members.size(); i++ ) {
             BSONObj mobj = members[i].Obj();
             MemberCfg m;
@@ -196,7 +198,8 @@ namespace mongo {
                 catch(...) { 
                     throw string("bad or missing host field? ") + mobj.toString();
                 }
-                uassert(13393, "can't use localhost in member names", !m.h.isLocalHost());
+                if( m.h.isLocalHost() ) 
+                    localhosts++;
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");
                 if( mobj.hasElement("priority") )
                     m.priority = mobj["priority"].Number();
@@ -221,6 +224,7 @@ namespace mongo {
             ords.insert(m._id);
             this->members.push_back(m);
         }
+        uassert(13393, "can't use localhost in repl set member names except when using it for all members", localhosts == 0 || localhosts == members.size());
         uassert(13117, "bad " + rsConfigNs + " config", !_id.empty());
     }
 

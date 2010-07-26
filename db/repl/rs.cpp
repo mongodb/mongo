@@ -155,7 +155,7 @@ namespace mongo {
                 }
                 uassert(13096, "bad --replSet config string - dups?", seedSet.count(m) == 0 );
                 seedSet.insert(m);
-                uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
+                //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if( m.isSelf() ) {
                     log() << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
                 } else
