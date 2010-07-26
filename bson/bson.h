@@ -49,7 +49,17 @@
 namespace bson { 
     class assertion : public std::exception { 
     public:
-        virtual const char* what() const throw() { return "BsonAssertion"; }
+        assertion( unsigned u , const string& s )
+            : id( u ) , msg( s ){
+            stringstream ss;
+            ss << "BsonAssertion id: " << u << " " << s;
+            full = s.str();
+        }
+        virtual const char* what() const throw() { return full.c_str(); }
+        
+        unsigned id;
+        string msg;
+        string full;
     };
 }
 
@@ -57,14 +67,13 @@ namespace mongo {
 #if !defined(assert) 
     inline void assert(bool expr) {
         if(!expr) { 
-            std::cout << "assertion failure in bson library" << std::endl;
-            throw bson::assertion();
+            throw bson::assertion( 0 , "assertion failure in bson library" );
         }
     }
 #endif
 #if !defined(uassert)
-    inline void uasserted(unsigned msgid, std::string) {
-        throw bson::assertion();
+    inline void uasserted(unsigned msgid, std::string s) {
+        throw bson::assertion( msgid , s );
     }
 
     inline void uassert(unsigned msgid, std::string msg, bool expr) {
@@ -72,13 +81,13 @@ namespace mongo {
             uasserted( msgid , msg );
     }
     inline void msgasserted(int msgid, const char *msg) { 
-        throw bson::assertion();
+        throw bson::assertion( msgid , msg );
     }
     inline void msgasserted(int msgid, const std::string &msg) { msgasserted(msgid, msg.c_str()); }
     inline void massert(unsigned msgid, std::string msg, bool expr) { 
         if(!expr) { 
             std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
-            throw bson::assertion();
+            throw bson::assertion( msgid , msg );
         }
     }
 #endif
