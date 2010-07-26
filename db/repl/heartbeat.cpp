@@ -35,12 +35,17 @@ namespace mongo {
 
     using namespace bson;
 
+    extern bool replSetBlind;
+
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public ReplSetCommand {
     public:
         virtual bool adminOnly() const { return false; }
         CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( replSetBlind ) 
+                return false;
+
             /* we don't call ReplSetCommand::check() here because heartbeat 
                checks many things that are pre-initialization. */
             if( !replSet ) {
@@ -89,6 +94,11 @@ namespace mongo {
 
     /* throws dbexception */
     bool requestHeartbeat(string setName, string memberFullName, BSONObj& result, int myCfgVersion, int& theirCfgVersion, bool checkEmpty) { 
+        if( replSetBlind ) { 
+            //sleepmillis( rand() );
+            return false;
+        }
+
         BSONObj cmd = BSON( "replSetHeartbeat" << setName << "v" << myCfgVersion << "pv" << 1 << "checkEmpty" << checkEmpty );
 
         // we might be talking to ourself - generally not a great idea to do outbound waiting calls in a write lock
