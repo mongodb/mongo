@@ -773,6 +773,8 @@ ReplTest.prototype.start = function( master , options , restart, norepl ){
     var lockFile = this.getPath( master ) + "/mongod.lock";
     removeFile( lockFile );
     var o = this.getOptions( master , options , restart, norepl );
+
+
     if ( restart )
         return startMongoProgram.apply( null , o );
     else
@@ -859,12 +861,9 @@ function skipIfTestingReplication(){
 
 // ReplSetTest
 ReplSetTest = function( opts ){
-    if( !opts.nodes || opts.nodes < 2 )
-      throw("ReplSetTest requires at least two nodes.");
-
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
-    this.numNodes = opts.nodes || 3;
+    this.numNodes = opts.nodes || 0;
 
     this.ports = allocatePorts( this.numNodes );
 
@@ -939,9 +938,9 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     for(i=0; i<this.ports.length; i++) {
 
       // Don't include this node in the replica set list
-      if(this.ports[i] == this.ports[n]) {
-        continue;
-      }
+      //if(this.ports[i] == this.ports[n]) {
+      //  continue;
+      //}
 
       var str = this.host + ":" + this.ports[i];
       hosts.push(str);
@@ -1019,14 +1018,18 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
 }
 
 // Add a node to the test set
-// Run this.reInitiate() to add the
-// node to the config.
-ReplSetTest.prototype.add = function() {
-  var nextPort = this.ports[this.ports.length-1] + 1;
+ReplSetTest.prototype.add = function( config ) {
+  if(this.ports.length == 0) {
+    var nextPort = allocatePorts(1)[0];
+  }
+  else {
+    var nextPort = this.ports[this.ports.length-1] + 1;
+  }
   print("Next port: " + nextPort);
   this.ports.push(nextPort);
   printjson(this.ports);
-  var nextId  = this.nodes.length;
+
+  var nextId = this.nodes.length;
   printjson(this.nodes);
   print(nextId);
   var newNode = this.start(nextId);
@@ -1072,6 +1075,14 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     });
 }
 
+ReplSetTest.prototype.reInitiate = function() {
+    var master  = this.nodes[0];
+    var c = master.getDB("local")['system.replset'].findOne();
+    var config  = this.getReplSetConfig();
+    config.version = c.version + 1;
+    this.initiate( config , 'replSetReconfig' );
+}
+
 ReplSetTest.prototype.awaitReplication = function() {
    this.getMaster();
 
@@ -1091,7 +1102,10 @@ ReplSetTest.prototype.awaitReplication = function() {
                synced = false;
              }
            }
-           print("Synced = " + synced);
+
+           if(synced) {
+             print("Synced = " + synced);
+           }
            return synced;
    });
 }
@@ -1100,6 +1114,8 @@ ReplSetTest.prototype.start = function( n , options , restart ){
     var lockFile = this.getPath( n ) + "/mongod.lock";
     removeFile( lockFile );
     var o = this.getOptions( n , options , restart );
+
+    print("Starting....");
     print( o );
     if ( restart )
         return startMongoProgram.apply( null , o );
@@ -1109,12 +1125,13 @@ ReplSetTest.prototype.start = function( n , options , restart ){
 }
 
 ReplSetTest.prototype.stop = function( n , signal ){
-    print('*** ' + this.name + " completed successfully ***");
-    return stopMongod( this.getPort( n ) , signal || 15 );
+    var port = this.getPort( n );
+    print('*** Shutting down mongod in port ' + port + ' ***');
+    return stopMongod( port , signal || 15 );
 }
 
-ReplSetTest.prototype.stopSet = function() {
-    for(i=0; i<this.ports.length; i++) {
-        this.stop(n);
+ReplSetTest.prototype.stopSet = function( signal ) {
+    for(i=0; i < this.ports.length; i++) {
+        this.stop( i, signal );
     }
 }

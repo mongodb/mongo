@@ -1,5 +1,8 @@
-
 doTest = function( signal ) {
+
+    // Test basic replica set functionality.
+    // -- Replication
+    // -- Failover
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
@@ -31,19 +34,9 @@ doTest = function( signal ) {
     // and slaves in the set and wait until the change has replicated.
     replTest.awaitReplication();
 
-    print("Node Ids");
-    print(replTest.getNodeId( master ))
-    print(replTest.getNodeId(replTest.liveNodes.slaves[0]));
-    print(replTest.getNodeId(replTest.liveNodes.slaves[1]));
-
     // Here's how to stop the master node
     var master_id = replTest.getNodeId( master );
     replTest.stop( master_id );
-
-    sleep(10000);
-
-    // Here's how to restart it
-    replTest.start( master_id, {}, true );
 
     // Now let's see who the new master is:
     var new_master = replTest.getMaster();
@@ -52,6 +45,13 @@ doTest = function( signal ) {
     var new_master_id = replTest.getNodeId( new_master );
 
     assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
+
+    // Here's how to restart a node:
+    replTest.start( master_id, {}, true );
+
+
+    // Shut down the set and finish the test.
+    replTest.stopSet( signal );
 }
 
-doTest( 9 );
+doTest( 15 );
