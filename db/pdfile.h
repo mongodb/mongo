@@ -75,7 +75,9 @@ namespace mongo {
 
         /* return max size an extent may be */
         static int maxSize();
-
+        
+        void flush( bool sync );
+        
     private:
         int defaultSize( const char *filename ) const;
 
