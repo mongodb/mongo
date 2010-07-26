@@ -1769,15 +1769,15 @@ namespace mongo {
         virtual bool requiresAuth() { return true; }
         virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             string coll = cmdObj[ "captrunc" ].valuestrsafe();
-            uassert( 13412, "captrunc must specify a collection", !coll.empty() );
+            uassert( 13416, "captrunc must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             int n = cmdObj.getIntField( "n" );
             bool inc = cmdObj.getBoolField( "inc" );
             NamespaceDetails *nsd = nsdetails( ns.c_str() );
             ReverseCappedCursor c( nsd );
-            massert( 13414, "captrunc invalid collection", c.ok() );
+            massert( 13417, "captrunc invalid collection", c.ok() );
             for( int i = 0; i < n; ++i ) {
-                massert( 13413, "captrunc invalid n", c.advance() );
+                massert( 13418, "captrunc invalid n", c.advance() );
             }
             DiskLoc end = c.currLoc();
             nsd->cappedTruncateAfter( ns.c_str(), end, inc );
