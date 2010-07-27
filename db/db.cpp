@@ -584,7 +584,7 @@ sendmore:
         if( !cmdLine.replSet.empty() ) {
             replSet = true;
             ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine.replSet);
-            boost::thread t(startReplSets, replSetCmdline);
+            boost::thread t( boost::bind( &startReplSets, replSetCmdline) );
         }
 
         listen(listenPort);
