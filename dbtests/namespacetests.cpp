@@ -687,8 +687,6 @@ namespace NamespaceTests {
                         ASSERT( l[ i ] == l[ i - 4 ] );
                 }
 
-                NamespaceDetails *nsd = nsdetails(ns());
-
                 // Too big
                 BSONObjBuilder bob;
                 bob.append( "a", string( 787, 'a' ) );

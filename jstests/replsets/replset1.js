@@ -49,7 +49,6 @@ doTest = function( signal ) {
     // Here's how to restart a node:
     replTest.start( master_id, {}, true );
 
-
     // Shut down the set and finish the test.
     replTest.stopSet( signal );
 }

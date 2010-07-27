@@ -39,21 +39,24 @@ namespace mongo {
         }
         return L;
     }
-
+    
     /* comment MUST only be set when initiating the set by the initiator */
     void ReplSetConfig::saveConfigLocally(bo comment) { 
         check();
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
-        MemoryMappedFile::flushAll(true);
         { 
             writelock lk("");
+            Client::Context cx( rsConfigNs );
+            cx.db()->flushFiles(true);
+
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably
             BSONObj o = asBson();
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() )
                 logOpInitiate(comment);
-            MemoryMappedFile::flushAll(true);
+
+            cx.db()->flushFiles(true);
         }
         DEV log() << "replSet saveConfigLocally done" << rsLog;
     }
@@ -179,7 +182,7 @@ namespace mongo {
             uasserted(13131, "replSet error parsing (or missing) 'members' field in config object");
         }
 
-        int localhosts = 0;
+        unsigned localhosts = 0;
         for( unsigned i = 0; i < members.size(); i++ ) {
             BSONObj mobj = members[i].Obj();
             MemberCfg m;

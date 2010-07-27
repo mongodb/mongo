@@ -46,31 +46,6 @@ namespace mongo {
     extern int otherTraceLevel;
     void flushOpLog( stringstream &ss );
 
-    class CmdShutdown : public Command {
-    public:
-        virtual bool requiresAuth() { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return true; }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual LockType locktype() const { return NONE; } 
-        virtual void help( stringstream& help ) const {
-            help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
-        }
-        CmdShutdown() : Command("shutdown") {}
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            dblock l;
-            cc().shutdown();
-            log() << "terminating, shutdown command received" << endl;
-            dbexit( EXIT_CLEAN ); // this never returns
-            return true;
-        }
-    } cmdShutdown;
-
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
@@ -158,26 +133,6 @@ namespace mongo {
             return true;
         }
     } cmdGetLastError;
-
-    /* for testing purposes only */
-    class CmdForceError : public Command {
-    public:
-        virtual void help( stringstream& help ) const {
-            help << "for testing purposes only.  forces a user assertion exception";
-        }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual LockType locktype() const { return NONE; } 
-        CmdForceError() : Command("forceerror") {}
-        bool run(const string& dbnamne, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            uassert( 10038 , "forced error", false);
-            return true;
-        }
-    } cmdForceError;
 
     class CmdGetPrevError : public Command {
     public:
@@ -1759,6 +1714,31 @@ namespace mongo {
             return true;
         }
     } availableQueryOptionsCmd;    
+    
+    // just for testing
+    class CapTrunc : public Command {
+    public:
+        CapTrunc() : Command( "captrunc" ){}
+        virtual bool slaveOk() const { return false; }
+        virtual LockType locktype() const { return WRITE; }
+        virtual bool requiresAuth() { return true; }
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            string coll = cmdObj[ "captrunc" ].valuestrsafe();
+            uassert( 13416, "captrunc must specify a collection", !coll.empty() );
+            string ns = dbname + "." + coll;
+            int n = cmdObj.getIntField( "n" );
+            bool inc = cmdObj.getBoolField( "inc" );
+            NamespaceDetails *nsd = nsdetails( ns.c_str() );
+            ReverseCappedCursor c( nsd );
+            massert( 13417, "captrunc invalid collection", c.ok() );
+            for( int i = 0; i < n; ++i ) {
+                massert( 13418, "captrunc invalid n", c.advance() );
+            }
+            DiskLoc end = c.currLoc();
+            nsd->cappedTruncateAfter( ns.c_str(), end, inc );
+            return true;
+        }
+    } capTruncCmd;    
     
     /** 
      * this handles

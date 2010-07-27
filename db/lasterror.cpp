@@ -187,11 +187,8 @@ namespace mongo {
     }
 
     void LastErrorHolder::disconnect( int clientId ){
-        if ( ! clientId )
-            return;
-        
-        scoped_lock lock(_idsmutex);
-        _ids.erase( clientId );
+        if ( clientId )
+            remove(clientId);
     }
 
     struct LastErrorHolderTest : public UnitTest {

@@ -352,6 +352,10 @@ namespace mongo {
         header->init(fileNo, size);
     }
 
+    void MongoDataFile::flush( bool sync ){
+        mmf.flush( sync );
+    }
+
     void addNewExtentToNamespace(const char *ns, Extent *e, DiskLoc eloc, DiskLoc emptyLoc, bool capped) { 
         DiskLoc oldExtentLoc;
         NamespaceIndex *ni = nsindex(ns);

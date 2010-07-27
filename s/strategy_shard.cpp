@@ -75,14 +75,19 @@ namespace mongo {
 
             assert( cursor );
             
-            log(5) << "   cursor type: " << cursor->type() << endl;
-            shardedCursorTypes.hit( cursor->type() );
+            try {
+                log(5) << "   cursor type: " << cursor->type() << endl;
+                shardedCursorTypes.hit( cursor->type() );
             
-            if ( query.isExplain() ){
-                BSONObj explain = cursor->explain();
-                replyToQuery( 0 , r.p() , r.m() , explain );
-                delete( cursor );
-                return;
+                if ( query.isExplain() ){
+                    BSONObj explain = cursor->explain();
+                    replyToQuery( 0 , r.p() , r.m() , explain );
+                    delete( cursor );
+                    return;
+                }
+            } catch(...) {
+                delete cursor;
+                throw;
             }
 
             ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));

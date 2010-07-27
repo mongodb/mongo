@@ -387,7 +387,7 @@ namespace mongo {
             int lft = 4;
             recv( lenbuf, lft );
             
-            if ( len < 0 || len > 16000000 ) {
+            if ( len < 16 || len > 16000000 ) { // messages must be large enough for headers
                 if ( len == -1 ) {
                     // Endian check from the database, after connecting, to see what mode server is running in.
                     unsigned foo = 0x10203040;
@@ -415,14 +415,15 @@ namespace mongo {
             assert(md);
             md->len = len;
             
-            if ( len <= 0 ) {
-                log() << "got a length of " << len << ", something is wrong" << endl;
-                return false;
-            }
-            
             char *p = (char *) &md->id;
             int left = len -4;
-            recv( p, left );
+
+            try {
+                recv( p, left );
+            } catch (...) {
+                free(md);
+                throw;
+            }
             
             m.setData(md, true);
             return true;
