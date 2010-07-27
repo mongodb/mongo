@@ -745,7 +745,7 @@ if nix:
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
 
-    if GetOption( "sharedclient" ):
+    if linux and GetOption( "sharedclient" ):
         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
     if debugBuild:
