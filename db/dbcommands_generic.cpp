@@ -190,5 +190,53 @@ namespace mongo {
         }        
 
     } listCommandsCmd;
+    
+    class CmdShutdown : public Command {
+    public:
+        virtual bool requiresAuth() { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return true; }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        virtual LockType locktype() const { return WRITE; } 
+        virtual void help( stringstream& help ) const {
+            help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
+        }
+        CmdShutdown() : Command("shutdown") {}
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            Client * c = currentClient.get();
+            if ( c )
+                c->shutdown();
+            log() << "terminating, shutdown command received" << endl;
+            dbexit( EXIT_CLEAN ); // this never returns
+            return true;
+        }
+    } cmdShutdown;
+
+    /* for testing purposes only */
+    class CmdForceError : public Command {
+    public:
+        virtual void help( stringstream& help ) const {
+            help << "for testing purposes only.  forces a user assertion exception";
+        }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        virtual LockType locktype() const { return NONE; } 
+        CmdForceError() : Command("forceerror") {}
+        bool run(const string& dbnamne, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            uassert( 10038 , "forced error", false);
+            return true;
+        }
+    } cmdForceError;
+
+    
 
 }

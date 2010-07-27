@@ -86,6 +86,7 @@ namespace mongo {
         
         void run(){
             OID lastID;
+            lastID.clear();
             int secsToSleep = 0;
             while ( Shard::isMember( _addr ) ){
                 
@@ -293,7 +294,6 @@ namespace mongo {
             // success!
             log(1) << "      setShardVersion success!" << endl;
             connectionShardStatus.setSequence( &conn , ns , officialSequenceNumber );
-            dassert( sequenceNumber == checkShardVersionLastSequence[ make_pair(&conn,ns) ] );
             return true;
         }
         

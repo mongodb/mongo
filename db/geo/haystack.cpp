@@ -56,7 +56,7 @@ namespace mongo {
         }
 
         int append( BSONArrayBuilder& b ){
-            for ( unsigned i=0; i<_locs.size(); i++ )
+            for ( unsigned i=0; i<_locs.size() && i<_limit; i++ )
                 b.append( _locs[i].obj() );
             return _locs.size();
         }
@@ -172,7 +172,7 @@ namespace mongo {
             
         void searchCommand( NamespaceDetails* nsd , int idxNo ,  
                             const BSONObj& n /*near*/ , double maxDistance , const BSONObj& search , 
-                            BSONObjBuilder& result , unsigned limit = 50 ){
+                            BSONObjBuilder& result , unsigned limit ){
          
             Timer t;
 
@@ -294,12 +294,16 @@ namespace mongo {
             BSONElement n = cmdObj["near"];
             BSONElement maxDistance = cmdObj["maxDistance"];
             BSONElement search = cmdObj["search"];
-            
+
             uassert( 13318 , "near needs to be an array" , n.isABSONObj() );
             uassert( 13319 , "maxDistance needs a number" , maxDistance.isNumber() );
             uassert( 13320 , "search needs to be an object" , search.type() == Object );
+            
+            unsigned limit = 50;
+            if ( cmdObj["limit"].isNumber() )
+                limit = (unsigned)cmdObj["limit"].numberInt();
 
-            si->searchCommand( d , idxNum , n.Obj() , maxDistance.numberDouble() , search.Obj() , result );
+            si->searchCommand( d , idxNum , n.Obj() , maxDistance.numberDouble() , search.Obj() , result , limit );
             
             return 1;
         }

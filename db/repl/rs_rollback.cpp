@@ -82,6 +82,38 @@ namespace mongo {
         DiskLoc commonPointOurDiskloc;
     };
 
+    static void refetch(HowToFixUp& h, const BSONObj& ourObj) { 
+        const char *op = ourObj.getStringField("op");
+        if( *op == 'n' ) 
+            return;
+
+        unsigned long long totSize = 0;
+        totSize += ourObj.objsize();
+        if( totSize > 512 * 1024 * 1024 )
+            throw "rollback too large";
+
+        DocID d;
+        d.ns = ourObj.getStringField("ns");
+        if( *d.ns == 0 ) { 
+            log() << "replSet WARNING ignoring op on rollback TODO : " << ourObj.toString() << rsLog;
+            return;
+        }
+
+        bo o = ourObj.getObjectField(*op=='u' ? "o2" : "o");
+        if( o.isEmpty() ) { 
+            log() << "replSet warning ignoring op on rollback : " << ourObj.toString() << rsLog;
+            return;
+        }
+
+        d._id = o["_id"];
+        if( d._id.eoo() ) {
+            log() << "replSet WARNING ignoring op on rollback no _id TODO : " << ourObj.toString() << rsLog;
+            return;
+        }
+
+        h.toRefetch.insert(d);
+    }
+
     static void syncRollbackFindCommonPoint(DBClientConnection *them, HowToFixUp& h) { 
         static time_t last;
         if( time(0)-last < 60 ) { 
@@ -92,9 +124,9 @@ namespace mongo {
         last = time(0);
 
         assert( dbMutex.atLeastReadLocked() );
+        Client::Context c(rsoplog, dbpath, 0, false);
         NamespaceDetails *nsd = nsdetails(rsoplog);
         assert(nsd);
-        Client::Context c(rsoplog, dbpath, 0, false);
         ReverseCappedCursor u(nsd);
         if( !u.ok() )
             throw "our oplog empty or unreadable";
@@ -122,7 +154,6 @@ namespace mongo {
             }
         }
 
-        unsigned long long totSize = 0;
         unsigned long long scanned = 0;
         while( 1 ) {
             scanned++;
@@ -137,8 +168,12 @@ namespace mongo {
                     h.commonPointOurDiskloc = u.currLoc();
                     return;
                 }
+
+                refetch(h, ourObj);
+
                 theirObj = t->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
+
                 u.advance();
                 if( !u.ok() ) throw "reached beginning of local oplog";
                 ourObj = u.current();
@@ -151,26 +186,7 @@ namespace mongo {
             }
             else { 
                 // theirTime < ourTime
-                totSize += ourObj.objsize();
-                if( totSize > 512 * 1024 * 1024 )
-                    throw "rollback too large";
-                const char *op = ourObj.getStringField("op");
-                if( *op != 'n' ) { // n == no-op
-                    DocID d;
-                    d.ns = ourObj.getStringField("ns");
-                    if( *d.ns == 0 ) { 
-                        log() << "replSet WARNING ignoring op on rollback TODO : " << ourObj.toString() << rsLog;
-                    }
-                    else {
-                        d._id = ourObj["_id"];
-                        if( d._id.eoo() ) {
-                            log() << "replSet WARNING ignoring op on rollback no _id TODO : " << ourObj.toString() << rsLog;
-                        }
-                        else { 
-                            h.toRefetch.insert(d);
-                        }
-                    }
-                }
+                refetch(h, ourObj);
                 u.advance();
                 if( !u.ok() ) throw "reached beginning of local oplog";
                 ourObj = u.current();

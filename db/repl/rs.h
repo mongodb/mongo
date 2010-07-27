@@ -69,6 +69,10 @@ namespace mongo {
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
+        ~Manager() { 
+            log() << "should never be called?" << rsLog;
+            assert(false);
+        }
         void msgReceivedNewConfig(BSONObj);
         void msgCheckNewState();
     };
@@ -108,12 +112,19 @@ namespace mongo {
 
     /** most operations on a ReplSet object should be done while locked. that logic implemented here. */
     class RSBase : boost::noncopyable { 
+    public:
+        const unsigned magic;
+        void assertValid() { assert( magic == 0x12345677 ); }
     private:
         mutex m;
         int _locked;
         ThreadLocalValue<bool> _lockedByMe;
     protected:
-        RSBase() : m("RSBase"), _locked(0) { }
+        RSBase() : magic(0x12345677), m("RSBase"), _locked(0) { }
+        ~RSBase() { 
+            log() << "~RSBase should never be called?" << rsLog;
+            assert(false);
+        }
 
         class lock { 
             RSBase& rsbase;
@@ -165,20 +176,22 @@ namespace mongo {
         }
         MemberState getState() const { return sp.state; }
         const Member* getPrimary() const { return sp.primary; }
-        void change(MemberState s) { 
+        void change(MemberState s, const Member *self) { 
             scoped_lock lk(m);
             sp.state = s;
-            // note : we don't correct primary if RS_PRIMARY was set here.  that must be done upstream.
+            if( s.primary() ) { 
+                sp.primary = self;
+            }
+            else {
+                if( self == sp.primary )
+                    sp.primary = 0;
+            }
         }
         void set(MemberState s, const Member *p) { 
             scoped_lock lk(m);
             sp.state = s; sp.primary = p;
         }
-        void setSelfPrimary(const Member *self) { 
-            scoped_lock lk(m);
-            sp.state = MemberState::RS_PRIMARY;
-            sp.primary = self;
-        }
+        void setSelfPrimary(const Member *self) { change(MemberState::RS_PRIMARY, self); }
         void setOtherPrimary(const Member *mem) { 
             scoped_lock lk(m);
             assert( !sp.state.primary() );
@@ -283,7 +296,9 @@ namespace mongo {
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const { return myConfig().potentiallyHot(); }
+    protected:
         Member *_self;        
+    private:
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
@@ -320,6 +335,11 @@ namespace mongo {
         ReplSet(string cfgString) : ReplSetImpl(cfgString) {  }
 
         bool stepDown() { return _stepDown(); }
+
+        string selfFullName() { 
+            lock lk(this);
+            return _self->fullName();
+        }
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }

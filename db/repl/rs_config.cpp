@@ -264,7 +264,7 @@ namespace mongo {
                 BSONObj cmd = BSON( "replSetHeartbeat" << setname );
                 int theirVersion;
                 BSONObj info;
-                bool ok = requestHeartbeat(setname, h.toString(), info, -2, theirVersion);
+                bool ok = requestHeartbeat(setname, "", h.toString(), info, -2, theirVersion);
                 if( info["rs"].trueValue() ) { 
                     // yes, it is a replicate set, although perhaps not yet initialized
                 }

@@ -124,6 +124,14 @@ s.adminCommand({movechunk:'test.mr', find:{x:3}, to: s.getServer('test').name } 
 
 doMR( "after extra split" );
 
+cmd = { mapreduce : "mr" , map : "emit( " , reduce : "fooz + " };
+
+x = db.runCommand( cmd );
+y = s._connections[0].getDB( "test" ).runCommand( cmd );
+
+printjson( x )
+printjson( y )
+
 // count
 
 db.countaa.save({"regex" : /foo/i})
@@ -132,5 +140,20 @@ db.countaa.save({"regex" : /foo/i})
 assert.eq( 3 , db.countaa.count() , "counta1" );
 assert.eq( 3 , db.countaa.find().itcount() , "counta1" );
 
+x = null; y = null;
+try {
+    x = db.runCommand( "forceerror" )
+}
+catch ( e ){
+    x = e;
+}
+try {
+    y = s._connections[0].getDB( "test" ).runCommand( "forceerror" );
+}
+catch ( e ){
+    y = e;
+}
+
+assert.eq( x , y , "assert format" )
 
 s.stop();

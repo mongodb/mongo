@@ -47,8 +47,8 @@ namespace mongo {
                     
                     int loops = 5;
                     while ( true ){
+                        BSONObjBuilder builder;
                         try {
-                            BSONObjBuilder builder;
                             bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
                             if ( ok ) {
                                 BSONObj x = builder.done();
@@ -64,6 +64,14 @@ namespace mongo {
                             loops--;
                             log() << "retrying command: " << q.query << endl;
                             ShardConnection::checkMyConnectionVersions( e.getns() );
+                        }
+                        catch ( AssertionException& e ){
+                            e.getInfo().append( builder , "assertion" , "assertionCode" );
+                            builder.append( "errmsg" , "db assertion failure" );
+                            builder.append( "ok" , 0 );
+                            BSONObj x = builder.done();
+                            replyToQuery(0, r.p(), r.m(), x);
+                            return;
                         }
                     }
                     
