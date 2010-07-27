@@ -20,6 +20,8 @@
 #include "health.h"
 #include "rs.h"
 #include "rs_config.h"
+#include "../dbwebserver.h"
+#include "../../util/mongoutils/html.h"
 
 namespace mongo { 
 
@@ -29,8 +31,6 @@ namespace mongo {
          replSetHeartbeat - health.cpp
          replSetInitiate  - rs_mod.cpp
     */
-
-    using namespace bson;
 
     bool replSetBlind = false;
 
@@ -178,5 +178,91 @@ namespace mongo {
             return theReplSet->stepDown();
         }
     } cmdReplSetStepDown;
+
+    using namespace bson;
+    using namespace mongoutils::html;
+    extern void fillRsLog(stringstream&);
+
+    class ReplSetHandler : public DbWebHandler {
+    public:
+        ReplSetHandler() : DbWebHandler( "_replSet" , 1 , true ){}
+
+        virtual bool handles( const string& url ) const {
+            return startsWith( url , "/_replSet" );
+        }
+
+        virtual void handle( const char *rq, string url, 
+                             string& responseMsg, int& responseCode,
+                             vector<string>& headers,  const SockAddr &from ){
+            
+            string s = str::after(url, "/_replSetOplog?");
+            if( !s.empty() )
+                responseMsg = _replSetOplog(s);
+            else
+                responseMsg = _replSet();
+            responseCode = 200;
+        }
+
+
+        string _replSetOplog(string parms) { 
+            stringstream s;
+            string t = "Replication oplog";
+            s << start(t);
+            s << p(t);
+
+            if( theReplSet == 0 ) { 
+                if( cmdLine.replSet.empty() ) 
+                    s << p("Not using --replSet");
+                else  {
+                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated") 
+                           + ".<br>" + ReplSet::startupStatusMsg);
+                }
+            }
+            else {
+                try {
+                    theReplSet->getOplogDiagsAsHtml(stringToNum(parms.c_str()), s);
+                }
+                catch(std::exception& e) { 
+                    s << "error querying oplog: " << e.what() << '\n'; 
+                }
+            }
+
+            s << _end();
+            return s.str();
+        }
+
+        /* /_replSet show replica set status in html format */
+        string _replSet() { 
+            stringstream s;
+            s << start("Replica Set Status " + prettyHostName());
+            s << p( a("/", "back", "Home") + " | " + 
+                    a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
+                    a("/replSetGetStatus?text", "", "replSetGetStatus") + " | " +
+                    a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
+                  );
+
+            if( theReplSet == 0 ) { 
+                if( cmdLine.replSet.empty() ) 
+                    s << p("Not using --replSet");
+                else  {
+                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated") 
+                           + ".<br>" + ReplSet::startupStatusMsg);
+                }
+            }
+            else {
+                try {
+                    theReplSet->summarizeAsHtml(s);
+                }
+                catch(...) { s << "error summarizing replset status\n"; }
+            }
+            s << p("Recent replset log activity:");
+            fillRsLog(s);
+            s << _end();
+            return s.str();
+        }
+
+
+
+    } replSetHandler;
 
 }

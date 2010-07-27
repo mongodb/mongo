@@ -56,6 +56,7 @@ namespace mongo {
     };
 
     void webServerThread();
+    string prettyHostName();
 };
 
 

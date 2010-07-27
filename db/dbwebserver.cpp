@@ -44,7 +44,6 @@ namespace mongo {
     using namespace mongoutils::html;
     using namespace bson;
 
-    extern void fillRsLog(stringstream&);
     extern const char *replInfo;
 
     bool getInitialSyncCompleted();
@@ -264,70 +263,6 @@ namespace mongo {
         }
         
     private:
-        string hostname() { 
-            stringstream s;
-            s << getHostName();
-            if( mongo::cmdLine.port != CmdLine::DefaultDBPort ) 
-                s << ':' << mongo::cmdLine.port;
-            return s.str();
-        }
-
-        string _replSetOplog(string parms) { 
-            stringstream s;
-            string t = "Replication oplog";
-            s << start(t);
-            s << p(t);
-
-            if( theReplSet == 0 ) { 
-                if( cmdLine.replSet.empty() ) 
-                    s << p("Not using --replSet");
-                else  {
-                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated") 
-                           + ".<br>" + ReplSet::startupStatusMsg);
-                }
-            }
-            else {
-                try {
-                    theReplSet->getOplogDiagsAsHtml(stringToNum(parms.c_str()), s);
-                }
-                catch(std::exception& e) { 
-                    s << "error querying oplog: " << e.what() << '\n'; 
-                }
-            }
-
-            s << _end();
-            return s.str();
-        }
-
-        /* /_replSet show replica set status in html format */
-        string _replSet() { 
-            stringstream s;
-            s << start("Replica Set Status " + hostname());
-            s << p( a("/", "back", "Home") + " | " + 
-                    a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
-                    a("/replSetGetStatus?text", "", "replSetGetStatus") + " | " +
-                    a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
-                  );
-
-            if( theReplSet == 0 ) { 
-                if( cmdLine.replSet.empty() ) 
-                    s << p("Not using --replSet");
-                else  {
-                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated") 
-                           + ".<br>" + ReplSet::startupStatusMsg);
-                }
-            }
-            else {
-                try {
-                    theReplSet->summarizeAsHtml(s);
-                }
-                catch(...) { s << "error summarizing replset status\n"; }
-            }
-            s << p("Recent replset log activity:");
-            fillRsLog(s);
-            s << _end();
-            return s.str();
-        }
 
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
             if ( from.isLocalHost() )
@@ -429,16 +364,6 @@ namespace mongo {
                     return;
                 }
 
-                if( startsWith(url, "/_replSet") ) {
-                    string s = str::after(url, "/_replSetOplog?");
-                    if( !s.empty() )
-                        responseMsg = _replSetOplog(s);
-                    else
-                        responseMsg = _replSet();
-                    responseCode = 200;
-                    return;
-                }
-
                 /* run a command from the web ui */
                 const char *p = url.c_str();
                 if( *p == '/' ) {
@@ -481,7 +406,7 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << "mongod " << hostname();
+                z << "mongod " << prettyHostName();
                 dbname = z.str();
             }
             ss << start(dbname) << h2(dbname);
@@ -881,6 +806,15 @@ namespace mongo {
     } commandsHandler;
 
     // --- external ----
+
+    string prettyHostName() { 
+        stringstream s;
+        s << getHostName();
+        if( mongo::cmdLine.port != CmdLine::DefaultDBPort ) 
+            s << ':' << mongo::cmdLine.port;
+        return s.str();
+    }
+
 
     DBDirectClient DbWebServer::db;
 
