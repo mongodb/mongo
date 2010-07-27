@@ -19,6 +19,7 @@
 
 #include <map>
 #include "util/atomic_int.h"
+#include "util/misc.h"
 #include "../util/hex.h"
 
 namespace mongo {
@@ -263,7 +264,7 @@ namespace mongo {
             if ( x > 0 && valuestr()[x-1] == 0 )
                 return;
             StringBuilder buf;
-            buf <<  "Invalid dbref/code/string/symbol size: " << x << " strnlen:" << strnlen( valuestr() , x );
+            buf <<  "Invalid dbref/code/string/symbol size: " << x << " strnlen:" << mongo::strnlen( valuestr() , x );
             msgasserted( 10321 , buf.str() );
             break;
         }
@@ -274,7 +275,7 @@ namespace mongo {
             massert( 10323 ,  "Invalid CodeWScope string size", totalSize >= strSizeWNull + 4 + 4 );
             massert( 10324 ,  "Invalid CodeWScope string size",
                      strSizeWNull > 0 &&
-                     (strSizeWNull - 1) == strnlen( codeWScopeCode(), strSizeWNull ) );
+                     (strSizeWNull - 1) == mongo::strnlen( codeWScopeCode(), strSizeWNull ) );
             massert( 10325 ,  "Invalid CodeWScope size", totalSize >= strSizeWNull + 4 + 4 + 4 );
             int objSize = *( int * )( value() + 4 + 4 + strSizeWNull );
             massert( 10326 ,  "Invalid CodeWScope object size", totalSize == 4 + 4 + strSizeWNull + objSize );
@@ -343,10 +344,10 @@ namespace mongo {
         case RegEx:
         {
             const char *p = value();
-            size_t len1 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain );
+            size_t len1 = ( maxLen == -1 ) ? strlen( p ) : mongo::strnlen( p, remain );
             //massert( 10318 ,  "Invalid regex string", len1 != -1 ); // ERH - 4/28/10 - don't think this does anything
             p = p + len1 + 1;
-            size_t len2 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain - len1 - 1 );
+            size_t len2 = ( maxLen == -1 ) ? strlen( p ) : mongo::strnlen( p, remain - len1 - 1 );
             //massert( 10319 ,  "Invalid regex options string", len2 != -1 ); // ERH - 4/28/10 - don't think this does anything
             x = (int) (len1 + 1 + len2 + 1);
         }
