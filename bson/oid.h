@@ -58,7 +58,7 @@ namespace mongo {
 
         /** The object ID output as 24 hex digits. */
         string str() const {
-            return toHex(data, 12);
+            return toHexLower(data, 12);
         }
 
         string toString() const { return str(); }
