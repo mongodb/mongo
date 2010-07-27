@@ -82,5 +82,13 @@ namespace mongo {
             return buf;
         }
     };
-   
+
+    // Like strlen, but only scans up to n bytes.
+    // Returns -1 if no '0' found.
+    inline int strnlen( const char *s, int n ) {
+        for( int i = 0; i < n; ++i )
+            if ( !s[ i ] )
+                return i;
+        return -1;
+    }
 }

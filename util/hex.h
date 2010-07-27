@@ -48,4 +48,20 @@ namespace mongo {
 
         return out.str();
     }
+    
+    inline string toHexLower(const void* inRaw, int len){
+        static const char hexchars[] = "0123456789abcdef";
+
+        StringBuilder out;
+        const char* in = reinterpret_cast<const char*>(inRaw);
+        for (int i=0; i<len; ++i){
+            char c = in[i];
+            char hi = hexchars[(c & 0xF0) >> 4];
+            char lo = hexchars[(c & 0x0F)];
+
+            out << hi << lo;
+        }
+
+        return out.str();
+    }
 }

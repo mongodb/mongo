@@ -185,16 +185,15 @@ namespace mongo {
         }
 #undef SBNUM
 
-        void append( const char * str ){
-            int x = (int) strlen( str );
-            memcpy( _buf.grow( x ) , str , x );
+        void write( const char* buf, int len){
+            memcpy( _buf.grow( len ) , buf , len );
         }
-        StringBuilder& operator<<( const char * str ){
+
+        void append( const StringData& str ){
+            memcpy( _buf.grow( str.size() ) , str.data() , str.size() );
+        }
+        StringBuilder& operator<<( const StringData& str ){
             append( str );
-            return *this;
-        }
-        StringBuilder& operator<<( const std::string& s ){
-            append( s.c_str() );
             return *this;
         }
         

@@ -541,7 +541,7 @@ namespace mongo {
         static string numStr( int i ) {
             if (i>=0 && i<100)
                 return numStrs[i];
-            stringstream o;
+            StringBuilder o;
             o << i;
             return o.str();
         }

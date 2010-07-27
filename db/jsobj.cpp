@@ -49,7 +49,7 @@ namespace mongo {
     DateNowLabeler DATENOW;
 
     string escape( string s , bool escape_slash=false) {
-        stringstream ret;
+        StringBuilder ret;
         for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
             switch ( *i ) {
             case '"':
@@ -78,11 +78,9 @@ namespace mongo {
                 break;
             default:
                 if ( *i >= 0 && *i <= 0x1f ) {
-                    ret << "\\u";
-                    ret << hex;
-                    ret.width( 4 );
-                    ret.fill( '0' );
-                    ret << int( *i );
+                    //TODO: these should be utf16 code-units not bytes
+                    char c = *i;
+                    ret << "\\u00" << toHexLower(&c, 1);
                 } else {
                     ret << *i;
                 }
@@ -114,7 +112,7 @@ namespace mongo {
                 s.precision( 16 );
                 s << number();
             } else {
-                stringstream ss;
+                StringBuilder ss;
                 ss << "Number " << number() << " cannot be represented in JSON";
                 string message = ss.str();
                 massert( 10311 ,  message.c_str(), false );
@@ -259,7 +257,7 @@ namespace mongo {
             break;
 
         default:
-            stringstream ss;
+            StringBuilder ss;
             ss << "Cannot create a properly formatted JSON string with "
             << "element: " << toString() << " of type: " << type();
             string message = ss.str();
@@ -512,7 +510,7 @@ namespace mongo {
 
         if ( isEmpty() ) return "{}";
 
-        stringstream s;
+        StringBuilder s;
         s << "{ ";
         BSONObjIterator i(*this);
         BSONElement e = i.next();
@@ -1240,16 +1238,9 @@ namespace mongo {
     void OID::init( string s ){
         assert( s.size() == 24 );
         const char *p = s.c_str();
-        char buf[3];
-        buf[2] = 0;
         for( int i = 0; i < 12; i++ ) {
-            buf[0] = p[0];
-            buf[1] = p[1];
+            data[i] = fromHex(p);
             p += 2;
-            stringstream ss(buf);
-            unsigned z;
-            ss >> hex >> z;
-            data[i] = z;
         }
     }
 

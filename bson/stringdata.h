@@ -38,6 +38,14 @@ namespace mongo {
         StringData( const char (&val)[N], LiteralTag )
             : _data(&val[0]), _size(N-1) {}
 
+        // Construct a StringData explicitly, for the case where the
+        // length of the string is already known. 'c' must be a
+        // pointer to a null-terminated string, and strlenOfc must be
+        // the length that std::strlen(c) would return, a.k.a the
+        // index of the terminator in c.
+        StringData( const char* c, size_t strlenOfc )
+            : _data(c), _size((unsigned) strlenOfc) {}
+
         const char* const data() const { return _data; }
         const unsigned size() const { return _size; }
 

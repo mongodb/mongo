@@ -47,14 +47,21 @@
 #include <boost/utility.hpp>
 
 namespace bson { 
+
+    using std::string;
+    using std::stringstream;
+
     class assertion : public std::exception { 
     public:
         assertion( unsigned u , const string& s )
             : id( u ) , msg( s ){
-            stringstream ss;
+            StringBuilder ss;
             ss << "BsonAssertion id: " << u << " " << s;
-            full = s.str();
+            full = ss.str();
         }
+
+        virtual ~assertion() throw() {}
+
         virtual const char* what() const throw() { return full.c_str(); }
         
         unsigned id;
