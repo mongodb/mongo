@@ -216,6 +216,27 @@ namespace mongo {
             return true;
         }
     } cmdShutdown;
+
+    /* for testing purposes only */
+    class CmdForceError : public Command {
+    public:
+        virtual void help( stringstream& help ) const {
+            help << "for testing purposes only.  forces a user assertion exception";
+        }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        virtual LockType locktype() const { return NONE; } 
+        CmdForceError() : Command("forceerror") {}
+        bool run(const string& dbnamne, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            uassert( 10038 , "forced error", false);
+            return true;
+        }
+    } cmdForceError;
+
     
 
 }
