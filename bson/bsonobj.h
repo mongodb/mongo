@@ -142,7 +142,7 @@ namespace mongo {
         }
 
         BSONElement operator[] (int field) const { 
-            stringstream ss;
+            StringBuilder ss;
             ss << field;
             string s = ss.str();
             return getField(s.c_str());
@@ -368,8 +368,9 @@ private:
                 _holder.reset( new Holder( data ) );
             _objdata = data;
             if ( ! isValid() ){
-                stringstream ss;
-                ss << "Invalid BSONObj spec size: " << objsize() << " (" << hex << objsize() << dec << ")";
+                StringBuilder ss;
+                int os = objsize();
+                ss << "Invalid BSONObj spec size: " << os << " (" << toHex( &os, 4 ) << ")";
                 try {
                     BSONElement e = firstElement();
                     ss << " first element:" << e.toString() << " ";

@@ -51,7 +51,7 @@ namespace bson {
     public:
         assertion( unsigned u , const string& s )
             : id( u ) , msg( s ){
-            stringstream ss;
+            StringBuilder ss;
             ss << "BsonAssertion id: " << u << " " << s;
             full = s.str();
         }

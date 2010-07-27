@@ -390,7 +390,7 @@ private:
     friend class BSONObj;
     const BSONElement& chk(int t) const { 
         if ( t != type() ){
-            stringstream ss;
+            StringBuilder ss;
             ss << "wrong type for BSONElement (" << fieldName() << ") " << type() << " != " << t;
             uasserted(13111, ss.str() );
         }

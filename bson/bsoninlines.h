@@ -214,7 +214,7 @@ namespace mongo {
     inline string BSONObj::toString( bool isArray, bool full ) const {
         if ( isEmpty() ) return "{}";
 
-        stringstream s;
+        StringBuilder s;
         s << ( isArray ? "[ " : "{ " );
         BSONObjIterator i(*this);
         bool first = true;
@@ -345,7 +345,7 @@ namespace mongo {
         }
         break;
         default: {
-            stringstream ss;
+            StringBuilder ss;
             ss << "BSONElement: bad type " << (int) type();
             string msg = ss.str();
             massert( 10320 , msg.c_str(),false);
@@ -357,7 +357,7 @@ namespace mongo {
     }
 
     inline string BSONElement::toString( bool includeFieldName, bool full ) const {
-        stringstream s;
+        StringBuilder s;
         if ( includeFieldName && type() != EOO )
             s << fieldName() << ": ";
         switch ( type() ) {
