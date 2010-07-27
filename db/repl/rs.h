@@ -69,6 +69,10 @@ namespace mongo {
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
+        ~Manager() { 
+            log() << "should never be called?" << rsLog;
+            assert(false);
+        }
         void msgReceivedNewConfig(BSONObj);
         void msgCheckNewState();
     };
@@ -108,12 +112,19 @@ namespace mongo {
 
     /** most operations on a ReplSet object should be done while locked. that logic implemented here. */
     class RSBase : boost::noncopyable { 
+    public:
+        const unsigned magic;
+        void assertValid() { assert( magic == 0x12345677 ); }
     private:
         mutex m;
         int _locked;
         ThreadLocalValue<bool> _lockedByMe;
     protected:
-        RSBase() : m("RSBase"), _locked(0) { }
+        RSBase() : magic(0x12345677), m("RSBase"), _locked(0) { }
+        ~RSBase() { 
+            log() << "~RSBase should never be called?" << rsLog;
+            assert(false);
+        }
 
         class lock { 
             RSBase& rsbase;
