@@ -25,6 +25,7 @@ namespace mongo {
     /* concurrency: OK/READ */
     struct CmdLine { 
         int port;              // --port
+        string bind_ip;        // --bind_ip
         bool rest;             // --rest
 
         string replSet;        // --replSet <seedlist>

@@ -161,8 +161,6 @@ int main(int argc, char* argv[], char *envp[] ) {
     CmdLine::addGlobalOptions( options , hidden );
     
     options.add_options()
-        ("bind_ip", po::value<string>()->default_value(""),
-         "comma separated list of ip addresses to listen on - all local ips by default")
         ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
         ( "test" , "just run unit tests" )
         ( "upgrade" , "upgrade meta data version" )
@@ -267,7 +265,7 @@ int main(int argc, char* argv[], char *envp[] ) {
 
     MessageServer::Options opts;
     opts.port = cmdLine.port;
-    opts.ipList = params["bind_ip"].as<string>();
+    opts.ipList = cmdLine.bind_ip;
     start(opts);
 
     dbexit( EXIT_CLEAN );

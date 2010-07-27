@@ -55,8 +55,6 @@ namespace mongo {
 
     string dbExecCommand;
 
-    string bind_ip = "";
-
     char *appsrvPath = NULL;
 
     DiagLog _diaglog;

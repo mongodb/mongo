@@ -42,6 +42,7 @@ namespace mongo {
             ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
             ("quiet", "quieter output")
             ("port", po::value<int>(&cmdLine.port), "specify port number")
+            ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
             ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
             ("logappend" , "append to logpath instead of over-writing" )
             ("pidfilepath", po::value<string>(), "directory for pidfile (if not set, no pidfile is created)")

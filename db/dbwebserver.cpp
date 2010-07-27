@@ -44,7 +44,6 @@ namespace mongo {
     using namespace bson;
 
     extern void fillRsLog(stringstream&);
-    extern string bind_ip;
     extern const char *replInfo;
 
     bool getInitialSyncCompleted();
@@ -806,7 +805,7 @@ namespace mongo {
     void webServerThread() {
         Client::initThread("websvr");
         const int p = cmdLine.port + 1000;
-        DbWebServer mini(bind_ip, p);
+        DbWebServer mini(cmdLine.bind_ip, p);
         log() << "web admin interface listening on port " << p << endl;
         mini.initAndListen();
         cc().shutdown();

@@ -52,7 +52,6 @@ namespace mongo {
     /* only off if --nohints */
     extern bool useHints;
 
-    extern string bind_ip;
     extern char *appsrvPath;
     extern int diagLogging;
     extern int lenForNewNsFiles;
@@ -174,7 +173,7 @@ namespace mongo {
     void listen(int port) {
         //testTheDb();
         log() << "waiting for connections on port " << port << endl;
-        OurListener l(bind_ip, port);
+        OurListener l(cmdLine.bind_ip, port);
         l.setAsTimeTracker();
         startReplication();
         if ( !noHttpInterface )
@@ -671,8 +670,6 @@ int main(int argc, char* argv[], char *envp[] )
     CmdLine::addGlobalOptions( general_options , hidden_options );
 
     general_options.add_options()
-        ("bind_ip", po::value<string>(&bind_ip),
-         "comma separated list of ip addresses to listen on - all local ips by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
         ("directoryperdb", "each database will be stored in a separate directory")
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
