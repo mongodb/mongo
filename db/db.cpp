@@ -37,6 +37,7 @@
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
 #include "client.h"
+#include "dbwebserver.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -127,8 +128,6 @@ namespace mongo {
             }
         }
     };
-
-    void webServerThread();
 
 /* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
 // QueryOption_Exhaust

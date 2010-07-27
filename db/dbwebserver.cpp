@@ -34,6 +34,7 @@
 #include "../util/version.h"
 #include "../util/ramlog.h"
 #include <pcrecpp.h>
+#include "dbwebserver.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #undef assert
 #define assert MONGO_assert
@@ -419,7 +420,18 @@ namespace mongo {
         {
             if ( url.size() > 1 ) {
 
-                if ( ! allowed( rq , headers, from ) || url == "/favicon.ico" ) {
+                {
+                    DbWebHandler * handler = DbWebHandler::findHandler( url );
+                    if ( handler ){
+                        if ( handler->requiresREST( url ) && ! cmdLine.rest )
+                            _rejectREST( responseMsg , responseCode , headers );
+                        // TODO: auth here
+                        else
+                            handler->handle( rq , url , responseMsg , responseCode , headers , from );
+                        return;
+                    }
+                }
+                if ( ! allowed( rq , headers, from ) ) {
                     responseCode = 401;
                     headers.push_back( "Content-Type: text/plain" );
                     responseMsg = "not allowed\n";
@@ -434,12 +446,7 @@ namespace mongo {
                 }
 
                 if ( ! cmdLine.rest ) {
-                    responseCode = 403;
-                    stringstream ss;
-                    ss << "REST is not enabled.  use --rest to turn on.\n";
-                    ss << "check that port " << _port << " is secured for the network too.\n";
-                    responseMsg = ss.str();
-                    headers.push_back( "Content-Type: text/plain" );
+                    _rejectREST( responseMsg , responseCode , headers );
                     return;
                 }
 
@@ -794,11 +801,75 @@ namespace mongo {
                 return atoi( e.valuestr() );
             return def;
         }
+        
+        void _rejectREST( string& responseMsg , int& responseCode, vector<string>& headers ){
+                                responseCode = 403;
+                    stringstream ss;
+                    ss << "REST is not enabled.  use --rest to turn on.\n";
+                    ss << "check that port " << _port << " is secured for the network too.\n";
+                    responseMsg = ss.str();
+                    headers.push_back( "Content-Type: text/plain" );
+        }
 
     private:
         static DBDirectClient db;
         RamLog * ramlog;
     };
+
+    // -- handler framework ---
+
+    DbWebHandler::DbWebHandler( const string& name , double priority , bool requiresREST )
+        : _name(name) , _priority(priority) , _requiresREST(requiresREST){
+
+        { // setup strings
+            _defaultUrl = "/";
+            _defaultUrl += name;
+
+            stringstream ss;
+            ss << name << " priority: " << priority << " rest: " << requiresREST;
+            _toString = ss.str();
+        }
+        
+        { // add to handler list
+            if ( ! _handlers )
+                _handlers = new vector<DbWebHandler*>();
+            _handlers->push_back( this );
+            sort( _handlers->begin() , _handlers->end() );
+        }
+    }
+
+    DbWebHandler * DbWebHandler::findHandler( const string& url ){
+        if ( ! _handlers )
+            return 0;
+        
+        for ( unsigned i=0; i<_handlers->size(); i++ ){
+            DbWebHandler * h = (*_handlers)[i];
+            if ( h->handles( url ) )
+                return h;
+        }
+
+        return 0;
+    }
+    
+    vector<DbWebHandler*> * DbWebHandler::_handlers = 0;
+
+    // --- basic handlers ---
+
+    class FavIconHandler : public DbWebHandler {
+    public:
+        FavIconHandler() : DbWebHandler( "favicon.ico" , 0 , false ){}
+
+        virtual void handle( const char *rq, string url, 
+                             string& responseMsg, int& responseCode,
+                             vector<string>& headers,  const SockAddr &from ){
+            responseCode = 404;
+            headers.push_back( "Content-Type: text/plain" );
+            responseMsg = "no favicon\n";
+        }
+
+    } faviconHandler;
+    
+    // --- external ----
 
     DBDirectClient DbWebServer::db;
 
