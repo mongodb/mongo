@@ -294,7 +294,6 @@ namespace mongo {
             // success!
             log(1) << "      setShardVersion success!" << endl;
             connectionShardStatus.setSequence( &conn , ns , officialSequenceNumber );
-            dassert( sequenceNumber == connectionShardStatus.getSequence(&conn,ns) );
             return true;
         }
         
