@@ -174,8 +174,7 @@ namespace mongo {
         }
     }
 
-    /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSetImpl::ReplSetImpl(string cfgString) : elect(this), 
+    ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this), 
         _self(0), 
         mgr( new Manager(this) )
     {
@@ -184,12 +183,7 @@ namespace mongo {
         lastH = 0;
         changeState(MemberState::RS_STARTUP);
 
-        vector<HostAndPort> *seeds = new vector<HostAndPort>;
-        set<HostAndPort> seedSet;
-
-        parseReplsetCmdLine( cfgString , _name ,*seeds , seedSet );
-
-        _seeds = seeds;
+        _seeds = &replSetCmdline.seeds;
         //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
         //    addMemberIfMissing(*i);
 
@@ -197,11 +191,11 @@ namespace mongo {
 
         loadConfig();
 
-        unsigned sss = seedSet.size();
+        unsigned sss = replSetCmdline.seedSet.size();
         for( Member *m = head(); m; m = m->next() ) {
-            seedSet.erase(m->h());
+            replSetCmdline.seedSet.erase(m->h());
         }
-        for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
+        for( set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin(); i != replSetCmdline.seedSet.end(); i++ ) {
             if( i->isSelf() ) {
                 if( sss == 1 ) 
                     log(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
@@ -457,15 +451,15 @@ namespace mongo {
        a separate thread takes over as ReplSetImpl::Manager, and this thread
        terminates.
     */
-    void startReplSets() {
+    void startReplSets(ReplSetCmdline *replSetCmdline) {
         Client::initThread("startReplSets");
         try { 
             assert( theReplSet == 0 );
-            if( cmdLine.replSet.empty() ) {
+            if( replSetCmdline == 0 ) {
                 assert(!replSet);
                 return;
             }
-            (theReplSet = new ReplSet(cmdLine.replSet))->go();
+            (theReplSet = new ReplSet(*replSetCmdline))->go();
         }
         catch(std::exception& e) { 
             log() << "replSet caught exception in startReplSets thread: " << e.what() << rsLog;

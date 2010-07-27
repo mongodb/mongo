@@ -37,6 +37,7 @@
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
 #include "client.h"
+#include "dbwebserver.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -67,7 +68,7 @@ namespace mongo {
 
     void setupSignals();
     void closeAllSockets();
-    void startReplSets();
+    void startReplSets(ReplSetCmdline*);
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
     void exitCleanly( ExitCode code );
@@ -127,8 +128,6 @@ namespace mongo {
             }
         }
     };
-
-    void webServerThread();
 
 /* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
 // QueryOption_Exhaust
@@ -584,7 +583,8 @@ sendmore:
 
         if( !cmdLine.replSet.empty() ) {
             replSet = true;
-            boost::thread t(startReplSets);
+            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine.replSet);
+            boost::thread t( boost::bind( &startReplSets, replSetCmdline) );
         }
 
         listen(listenPort);
