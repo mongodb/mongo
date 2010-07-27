@@ -86,6 +86,7 @@ namespace mongo {
         
         void run(){
             OID lastID;
+            lastID.clear();
             int secsToSleep = 0;
             while ( Shard::isMember( _addr ) ){
                 

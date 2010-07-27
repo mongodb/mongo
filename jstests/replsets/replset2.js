@@ -22,7 +22,7 @@ doTest = function( signal ) {
     // Wait for replication to a single node
     master.getDB("foo").bar.insert({n: 1});
     var result = master.getDB("foo").runCommand({getlasterror: {w: 1, wtimeout: 20000}});
-    assert( result['ok'] == 1, "getLastError with w=2 failed");
+    assert( result['ok'] == 1, "getLastError with w=1 failed");
 
     // Wait for replication two two nodes
     master.getDB("foo").bar.insert({n: 2});
@@ -32,7 +32,7 @@ doTest = function( signal ) {
     // Wait for replication to three nodes
     master.getDB("foo").bar.insert({n: 3});
     var result = master.getDB("foo").runCommand({getlasterror: {w: 3, wtimeout: 20000}});
-    assert( result['ok'] == 1, "getLastError with w=2 failed");
+    assert( result['ok'] == 1, "getLastError with w=3 failed");
 
     replTest.stopSet( signal );
 }

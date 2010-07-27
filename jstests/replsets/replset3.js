@@ -18,6 +18,11 @@ doTest = function( signal ) {
     // Get master node
     var master = replTest.getMaster();
 
+    // Write some data to master
+    // NOTE: this test fails unless we write some data.
+    master.getDB("foo").foo.save({a: 1});
+    master.getDB("foo").runCommand({getlasterror: 1, w:3, wtimeout: 20000});
+
     // Step down master
     master.getDB("admin").runCommand({replSetStepDown: true});
 
@@ -31,12 +36,11 @@ doTest = function( signal ) {
     assert( master != new_master, "Old master shouldn't be equal to new master." );
 
     // Make sure that slaves are still up
-    var result = new_master.runCommand({replSetGetStatus: true});
+    var result = new_master.getDB("admin").runCommand({replSetGetStatus: true});
 
     assert( result['ok'] == 1, "Could not verify that slaves were still up:" + result );
-    printjson( result );
 
     replTest.stopSet( 15 );
 }
 
-// doTest( 15 );
+doTest( 15 );
