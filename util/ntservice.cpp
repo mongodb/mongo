@@ -70,7 +70,7 @@ namespace mongo {
             return false;
         }
 
-		// Make sure it exists first. TODO: Use GetLastError() to investigate why CreateService fails.
+		// Make sure servise doesn't already exist. 
 		// TODO: Check to see if service is in "Deleting" status, suggest the user close down Services MMC snap-ins.
 		SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
 		if ( schService != NULL ) {
