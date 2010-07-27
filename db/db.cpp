@@ -68,7 +68,7 @@ namespace mongo {
 
     void setupSignals();
     void closeAllSockets();
-    void startReplSets();
+    void startReplSets(ReplSetCmdline*);
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
     void exitCleanly( ExitCode code );
@@ -583,7 +583,8 @@ sendmore:
 
         if( !cmdLine.replSet.empty() ) {
             replSet = true;
-            boost::thread t(startReplSets);
+            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine.replSet);
+            boost::thread t(startReplSets, replSetCmdline);
         }
 
         listen(listenPort);

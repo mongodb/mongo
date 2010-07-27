@@ -202,6 +202,19 @@ namespace mongo {
         mutex m;
         SP sp;
     };
+    
+    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet );
+
+    /** Parameter given to the --replSet command line option (parsed).
+        Syntax is "<setname>/<seedhost1>,<seedhost2>"
+        where setname is a name and seedhost is "<host>[:<port>]" */
+    class ReplSetCmdline {
+    public:
+        ReplSetCmdline(string cfgString) { parseReplsetCmdLine(cfgString, setname, seeds, seedSet); }
+        string setname;
+        vector<HostAndPort> seeds;
+        set<HostAndPort> seedSet;
+    };
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
@@ -272,11 +285,8 @@ namespace mongo {
         void _summarizeAsHtml(stringstream&) const;        
         void _summarizeStatus(BSONObjBuilder&) const; // for replSetGetStatus command
 
-        /* cfgString format is 
-           replsetname/host1,host2:port,...
-           where :port is optional.
-           throws exception if a problem initializing. */
-        ReplSetImpl(string cfgString);
+        /* throws exception if a problem initializing. */
+        ReplSetImpl(ReplSetCmdline&);
 
         /* call afer constructing to start - returns fairly quickly after launching its threads */
         void _go();
@@ -332,7 +342,7 @@ namespace mongo {
 
     class ReplSet : public ReplSetImpl { 
     public:
-        ReplSet(string cfgString) : ReplSetImpl(cfgString) {  }
+        ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {  }
 
         bool stepDown() { return _stepDown(); }
 
@@ -391,10 +401,6 @@ namespace mongo {
             return true;
         }
     };
-
-    /** helpers ----------------- */
-    
-    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet );
 
     /** inlines ----------------- */
 
