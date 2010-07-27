@@ -585,7 +585,6 @@ sendmore:
 
         if( !cmdLine.replSet.empty() ) {
             replSet = true;
-            theReplSet = new ReplSet(cmdLine.replSet);
             boost::thread t(startReplSets);
         }
 

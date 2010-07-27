@@ -444,7 +444,7 @@ namespace mongo {
         }
     }
 
-    /* forked as a thread during startup. theReplSet is already defined before fork. 
+    /* forked as a thread during startup 
        it can run quite a while looking for config.  but once found, 
        a separate thread takes over as ReplSetImpl::Manager, and this thread
        terminates.
@@ -452,8 +452,12 @@ namespace mongo {
     void startReplSets() {
         Client::initThread("startReplSets");
         try { 
-            assert( theReplSet );
-            theReplSet->go();
+            assert( theReplSet == 0 );
+            if( cmdLine.replSet.empty() ) {
+                assert(!replSet);
+                return;
+            }
+            (theReplSet = new ReplSet(cmdLine.replSet))->go();
         }
         catch(std::exception& e) { 
             log() << "replSet caught exception in startReplSets thread: " << e.what() << rsLog;
