@@ -253,13 +253,6 @@ namespace mongo {
         case Symbol:
         case mongo::String: {
             int x = valuestrsize();
-            if ( t == mongo::String && x + fieldNameSize() + 5 != size() ){
-                StringBuilder buf;
-                buf << "Invalid string size.   element size: " << size() << " fieldNameSize: " << fieldNameSize() << " valuestrsize(): " << valuestrsize();
-                cout << "ELIOT : " << buf.str() << endl;
-                msgasserted( 13292 , buf.str() );
-            }
-
             if ( x > 0 && valuestr()[x-1] == 0 )
                 return;
             StringBuilder buf;
