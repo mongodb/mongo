@@ -213,8 +213,16 @@ namespace mongo {
 
     inline string BSONObj::toString( bool isArray, bool full ) const {
         if ( isEmpty() ) return "{}";
-
         StringBuilder s;
+        toString(s, isArray, full);
+        return s.str();
+    }
+    inline void BSONObj::toString(StringBuilder& s,  bool isArray, bool full ) const {
+        if ( isEmpty() ){
+            s << "{}";
+            return;
+        }
+
         s << ( isArray ? "[ " : "{ " );
         BSONObjIterator i(*this);
         bool first = true;
@@ -236,10 +244,9 @@ namespace mongo {
                 first = false;
             else
                 s << ", ";
-            s << e.toString( !isArray, full );
+            e.toString(s, !isArray, full );
         }
         s << ( isArray ? " ]" : " }" );
-        return s.str();
     }
 
     extern unsigned getRandomNumber();
@@ -358,11 +365,16 @@ namespace mongo {
 
     inline string BSONElement::toString( bool includeFieldName, bool full ) const {
         StringBuilder s;
+        toString(s, includeFieldName, full);
+        return s.str();
+    }
+    inline void BSONElement::toString(StringBuilder& s, bool includeFieldName, bool full ) const {
         if ( includeFieldName && type() != EOO )
             s << fieldName() << ": ";
         switch ( type() ) {
         case EOO:
-            return "EOO";
+            s << "EOO";
+            break;
         case mongo::Date:
             s << "new Date(" << date() << ')';
             break;
@@ -395,10 +407,10 @@ namespace mongo {
             s << ( boolean() ? "true" : "false" );
             break;
         case Object:
-            s << embeddedObject().toString(false, full);
+            embeddedObject().toString(s, false, full);
             break;
         case mongo::Array:
-            s << embeddedObject().toString(true, full);
+            embeddedObject().toString(s, true, full);
             break;
         case Undefined:
             s << "undefined";
@@ -461,7 +473,6 @@ namespace mongo {
             s << "?type=" << type();
             break;
         }
-        return s.str();
     }
 
     /* return has eoo() true if no match
