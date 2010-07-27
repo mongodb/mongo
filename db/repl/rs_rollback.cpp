@@ -92,9 +92,9 @@ namespace mongo {
         last = time(0);
 
         assert( dbMutex.atLeastReadLocked() );
+        Client::Context c(rsoplog, dbpath, 0, false);
         NamespaceDetails *nsd = nsdetails(rsoplog);
         assert(nsd);
-        Client::Context c(rsoplog, dbpath, 0, false);
         ReverseCappedCursor u(nsd);
         if( !u.ok() )
             throw "our oplog empty or unreadable";
@@ -162,6 +162,12 @@ namespace mongo {
                         log() << "replSet WARNING ignoring op on rollback TODO : " << ourObj.toString() << rsLog;
                     }
                     else {
+
+                        //get the right _id here.
+                        assert(false); //finish...
+
+//                        be = ourObj["o"];
+
                         d._id = ourObj["_id"];
                         if( d._id.eoo() ) {
                             log() << "replSet WARNING ignoring op on rollback no _id TODO : " << ourObj.toString() << rsLog;
