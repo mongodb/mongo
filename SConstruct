@@ -240,7 +240,7 @@ AddOption("--nostrip",
 
 AddOption("--sharedclient",
           dest="sharedclient",
-          action="store",
+          action="store_true",
           help="build a libmongoclient.so/.dll")
 
 AddOption("--full",
