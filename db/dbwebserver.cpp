@@ -393,21 +393,6 @@ namespace mongo {
             return 0;
         }
 
-        string _commands() {
-            stringstream ss;
-            ss << start("Commands List");
-            ss << p( a("/", "back", "Home") );
-            ss << p( "<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n" );
-            const map<string, Command*> *m = Command::commandsByBestName();
-            ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock  A:admin-only<br>\n";
-            ss << table();
-            ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
-            for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) 
-                i->second->htmlHelp(ss);
-            ss << _table() << _end();
-            return ss.str();
-        }
-
         virtual void doRequest(
             const char *rq, // the full request
             string url,
@@ -419,18 +404,7 @@ namespace mongo {
         )
         {
             if ( url.size() > 1 ) {
-
-                {
-                    DbWebHandler * handler = DbWebHandler::findHandler( url );
-                    if ( handler ){
-                        if ( handler->requiresREST( url ) && ! cmdLine.rest )
-                            _rejectREST( responseMsg , responseCode , headers );
-                        // TODO: auth here
-                        else
-                            handler->handle( rq , url , responseMsg , responseCode , headers , from );
-                        return;
-                    }
-                }
+                
                 if ( ! allowed( rq , headers, from ) ) {
                     responseCode = 401;
                     headers.push_back( "Content-Type: text/plain" );
@@ -438,12 +412,17 @@ namespace mongo {
                     return;
                 }              
 
-                if ( url.find( "/_status" ) == 0 ){
-                    headers.push_back( "Content-Type: application/json" );
-                    generateServerStatus( url , responseMsg );
-                    responseCode = 200;
-                    return;
+                {
+                    DbWebHandler * handler = DbWebHandler::findHandler( url );
+                    if ( handler ){
+                        if ( handler->requiresREST( url ) && ! cmdLine.rest )
+                            _rejectREST( responseMsg , responseCode , headers );
+                        else
+                            handler->handle( rq , url , responseMsg , responseCode , headers , from );
+                        return;
+                    }
                 }
+
 
                 if ( ! cmdLine.rest ) {
                     _rejectREST( responseMsg , responseCode , headers );
@@ -456,12 +435,6 @@ namespace mongo {
                         responseMsg = _replSetOplog(s);
                     else
                         responseMsg = _replSet();
-                    responseCode = 200;
-                    return;
-                }
-
-                if( startsWith(url, "/_commands") ) {
-                    responseMsg = _commands();
                     responseCode = 200;
                     return;
                 }
@@ -565,51 +538,6 @@ namespace mongo {
                 responseMsg = "not allowed\n";
                 return;
             }            
-        }
-
-        void generateServerStatus( string url , string& responseMsg ){
-            static vector<string> commands;
-            if ( commands.size() == 0 ){
-                commands.push_back( "serverStatus" );
-                commands.push_back( "buildinfo" );
-            }
-
-            BSONObj params;
-            if ( url.find( "?" ) != string::npos ) {
-                parseParams( params , url.substr( url.find( "?" ) + 1 ) );
-            }
-            
-            BSONObjBuilder buf(1024);
-            
-            for ( unsigned i=0; i<commands.size(); i++ ){
-                string cmd = commands[i];
-
-                Command * c = Command::findCommand( cmd );
-                assert( c );
-                assert( c->locktype() == 0 );
-                
-                BSONObj co;
-                {
-                    BSONObjBuilder b;
-                    b.append( cmd , 1 );
-                    
-                    if ( cmd == "serverStatus" && params["repl"].type() ){
-                        b.append( "repl" , atoi( params["repl"].valuestr() ) );
-                    }
-                    
-                    co = b.obj();
-                }
-                
-                string errmsg;
-                
-                BSONObjBuilder sub;
-                if ( ! c->run( "admin.$cmd" , co , errmsg , sub , false ) )
-                    buf.append( cmd , errmsg );
-                else
-                    buf.append( cmd , sub.obj() );
-            }
-            
-            responseMsg = buf.obj().jsonString();
         }
 
         void handleRESTRequest( const char *rq, // the full request
@@ -869,6 +797,89 @@ namespace mongo {
 
     } faviconHandler;
     
+    class StatusHandler : public DbWebHandler {
+    public:
+        StatusHandler() : DbWebHandler( "_status" , 1 , false ){}
+        
+        virtual void handle( const char *rq, string url, 
+                             string& responseMsg, int& responseCode,
+                             vector<string>& headers,  const SockAddr &from ){
+            headers.push_back( "Content-Type: application/json" );
+            responseCode = 200;
+            
+            static vector<string> commands;
+            if ( commands.size() == 0 ){
+                commands.push_back( "serverStatus" );
+                commands.push_back( "buildinfo" );
+            }
+            
+            BSONObj params;
+            if ( url.find( "?" ) != string::npos ) {
+                MiniWebServer::parseParams( params , url.substr( url.find( "?" ) + 1 ) );
+            }
+            
+            BSONObjBuilder buf(1024);
+            
+            for ( unsigned i=0; i<commands.size(); i++ ){
+                string cmd = commands[i];
+
+                Command * c = Command::findCommand( cmd );
+                assert( c );
+                assert( c->locktype() == 0 );
+                
+                BSONObj co;
+                {
+                    BSONObjBuilder b;
+                    b.append( cmd , 1 );
+                    
+                    if ( cmd == "serverStatus" && params["repl"].type() ){
+                        b.append( "repl" , atoi( params["repl"].valuestr() ) );
+                    }
+                    
+                    co = b.obj();
+                }
+                
+                string errmsg;
+                
+                BSONObjBuilder sub;
+                if ( ! c->run( "admin.$cmd" , co , errmsg , sub , false ) )
+                    buf.append( cmd , errmsg );
+                else
+                    buf.append( cmd , sub.obj() );
+            }
+            
+            responseMsg = buf.obj().jsonString();
+
+        }
+
+    } statusHandler;
+
+    class CommandsHandler : DbWebHandler {
+    public:
+        CommandsHandler() : DbWebHandler( "_commands" , 1 , true ){}
+        
+        virtual void handle( const char *rq, string url, 
+                             string& responseMsg, int& responseCode,
+                             vector<string>& headers,  const SockAddr &from ){
+            headers.push_back( "Content-Type: text/html" );
+            responseCode = 200;
+            
+            stringstream ss;
+            ss << start("Commands List");
+            ss << p( a("/", "back", "Home") );
+            ss << p( "<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n" );
+            const map<string, Command*> *m = Command::commandsByBestName();
+            ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock  A:admin-only<br>\n";
+            ss << table();
+            ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
+            for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) 
+                i->second->htmlHelp(ss);
+            ss << _table() << _end();
+            
+            responseMsg = ss.str();
+        }
+    } commandsHandler;
+
     // --- external ----
 
     DBDirectClient DbWebServer::db;
