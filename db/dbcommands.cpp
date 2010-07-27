@@ -46,31 +46,6 @@ namespace mongo {
     extern int otherTraceLevel;
     void flushOpLog( stringstream &ss );
 
-    class CmdShutdown : public Command {
-    public:
-        virtual bool requiresAuth() { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return true; }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual LockType locktype() const { return NONE; } 
-        virtual void help( stringstream& help ) const {
-            help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
-        }
-        CmdShutdown() : Command("shutdown") {}
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            dblock l;
-            cc().shutdown();
-            log() << "terminating, shutdown command received" << endl;
-            dbexit( EXIT_CLEAN ); // this never returns
-            return true;
-        }
-    } cmdShutdown;
-
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
