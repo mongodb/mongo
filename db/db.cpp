@@ -887,6 +887,11 @@ int main(int argc, char* argv[], char *envp[] )
             removeService = true;
         }
         if (params.count("reinstall")) {
+            if ( ! params.count( "logpath" ) ){
+                cout << "--reinstall has to be used with --logpath" << endl;
+                ::exit(-1);
+            }
+
             reinstallService = true;
         }
         if (params.count("service")) {
