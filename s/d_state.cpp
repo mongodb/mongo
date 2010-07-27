@@ -197,19 +197,19 @@ namespace mongo {
             BSONObj d = cursor->next();
             
             if ( min.isEmpty() ){
-                min = d["min"].Obj();
-                max = d["max"].Obj();
+                min = d["min"].Obj().getOwned();
+                max = d["max"].Obj().getOwned();
                 continue;
             }
 
             if ( max == d["min"].Obj() ){
-                max = d["max"].Obj();
+                max = d["max"].Obj().getOwned();
                 continue;
             }
 
             p->gotRange( min.getOwned() , max.getOwned() );
-            min = d["min"].Obj();
-            max = d["max"].Obj();
+            min = d["min"].Obj().getOwned();
+            max = d["max"].Obj().getOwned();
         }
         assert( ! min.isEmpty() );
         p->gotRange( min.getOwned() , max.getOwned() );
