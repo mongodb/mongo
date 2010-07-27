@@ -285,7 +285,9 @@ namespace mongo {
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const { return myConfig().potentiallyHot(); }
+    protected:
         Member *_self;        
+    private:
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
@@ -322,6 +324,11 @@ namespace mongo {
         ReplSet(string cfgString) : ReplSetImpl(cfgString) {  }
 
         bool stepDown() { return _stepDown(); }
+
+        string selfFullName() { 
+            lock lk(this);
+            return _self->fullName();
+        }
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }

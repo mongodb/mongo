@@ -49,7 +49,7 @@ namespace mongo {
                 bool ok = false;
                 try {
                     int theirVersion = -1000;
-                    ok = requestHeartbeat(cfg._id, i->h.toString(), res, -1, theirVersion, initial/*check if empty*/); 
+                    ok = requestHeartbeat(cfg._id, "", i->h.toString(), res, -1, theirVersion, initial/*check if empty*/); 
                     if( theirVersion >= cfg.version ) { 
                         stringstream ss;
                         ss << "replSet member " << i->h.toString() << " has too new a config version (" << theirVersion << ") to reconfigure";
