@@ -87,8 +87,8 @@ namespace mongo {
 
     class DbWebServer : public MiniWebServer {
     public:
-        DbWebServer(const string& ip, int port) : MiniWebServer(ip, port), ramlog(new RamLog()) {
-            Logstream::get().addGlobalTee( ramlog );
+        DbWebServer(const string& ip, int port) : MiniWebServer(ip, port) {
+            WebStatusPlugin::initAll();
         }
 
     private:
@@ -119,68 +119,12 @@ namespace mongo {
                 ss << '\n';
             }
             
-            auto_ptr<SnapshotDelta> delta = statsSnapshots.computeDelta();
-            if ( delta.get() ){
-                ss << "\n<b>dbtop</b> (occurences|percent of elapsed)\n";
-                ss << "<table border=1 cellpadding=2 cellspacing=0>";
-                ss << "<tr align='left'><th>";
-                ss << a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "namespace") << 
-                    "NS</a></th>"
-                    "<th colspan=2>total</th>"
-                    "<th colspan=2>Reads</th>"
-                    "<th colspan=2>Writes</th>"
-                    "<th colspan=2>Queries</th>"
-                    "<th colspan=2>GetMores</th>"
-                    "<th colspan=2>Inserts</th>"
-                    "<th colspan=2>Updates</th>"
-                    "<th colspan=2>Removes</th>";
-                ss << "</tr>\n";
-                
-                display( ss , (double) delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
-                
-                Top::UsageMap usage = delta->collectionUsageDiff();
-                for ( Top::UsageMap::iterator i=usage.begin(); i != usage.end(); i++ ){
-                    display( ss , (double) delta->elapsed() , i->first , i->second );
-                }
-                
-                ss << "</table>";
-            }
 
             statsSnapshots.outputLockInfoHTML( ss );
 
             BackgroundOperation::dump(ss);
 
-            ss << "</pre><h4>Log:</h4>";
-
-            ramlog->toHTML( ss );
-        }
-
-        void display( stringstream& ss , double elapsed , const Top::UsageData& usage ){
-            ss << "<td>";
-            ss << usage.count;
-            ss << "</td><td>";
-            double per = 100 * ((double)usage.time)/elapsed;
-            ss << setprecision(4) << fixed << per << "%";
-            ss << "</td>";
-        }
-
-        void display( stringstream& ss , double elapsed , const string& ns , const Top::CollectionData& data ){
-            if ( ns != "GLOBAL" && data.total.count == 0 )
-                return;
-            ss << "<tr><th>" << ns << "</th>";
-            
-            display( ss , elapsed , data.total );
-
-            display( ss , elapsed , data.readLock );
-            display( ss , elapsed , data.writeLock );
-
-            display( ss , elapsed , data.queries );
-            display( ss , elapsed , data.getmore );
-            display( ss , elapsed , data.insert );
-            display( ss , elapsed , data.update );
-            display( ss , elapsed , data.remove );
-            
-            ss << "</tr>\n";
+            ss << "</pre>";
         }
 
         void tablecell( stringstream& ss , bool b ){
@@ -200,18 +144,7 @@ namespace mongo {
             ss << "uptime: " << time(0)-started << " seconds\n";
             if ( replAllDead )
                 ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
-            ss << a("", "information on caught assertion exceptions");
-            ss << "assertions:</a>\n";
-            for ( int i = 0; i < 4; i++ ) {
-                if ( lastAssert[i].isSet() ) {
-                    if ( i == 3 ) ss << "uassert";
-                    else if( i == 2 ) ss << "massert";
-                    else if( i == 0 ) ss << "assert";
-                    else if( i == 1 ) ss << "warnassert";
-                    else ss << i;
-                    ss << ' ' << lastAssert[i].toString();
-                }
-            }
+
 
             ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
             ss << "<tr align='left'>"
@@ -364,6 +297,14 @@ namespace mongo {
                 responseMsg = "<html><body>unknown url</body></html>\n";
                 return;
             }
+            
+            // generate home page
+
+            if ( ! allowed( rq , headers, from ) ){
+                responseCode = 401;
+                responseMsg = "not allowed\n";
+                return;
+            }            
 
             responseCode = 200;
             stringstream ss;
@@ -417,16 +358,14 @@ namespace mongo {
                 }
             }
             
-
-            ss << "</pre>\n</body></html>\n";
+            ss << "</pre>\n";
+            
+            WebStatusPlugin::runAll( ss );
+            
+            ss << "</body></html>\n";
             responseMsg = ss.str();
 
-            // we want to return SavedContext from before the authentication was performed
-            if ( ! allowed( rq , headers, from ) ){
-                responseCode = 401;
-                responseMsg = "not allowed\n";
-                return;
-            }            
+
         }
 
         void _rejectREST( string& responseMsg , int& responseCode, vector<string>& headers ){
@@ -438,14 +377,75 @@ namespace mongo {
                     headers.push_back( "Content-Type: text/plain" );
         }
 
-    protected:
-        RamLog * ramlog;
     };
+    // ---
+    
+    bool prisort( const Prioritizable * a , const Prioritizable * b ){
+        return a->priority() < b->priority();
+    }
+
+    // -- status framework ---
+    WebStatusPlugin::WebStatusPlugin( const string& secionName , double priority , const string& subheader ) 
+        : Prioritizable(priority), _name( secionName ) , _subHeading( subheader ) {
+        if ( ! _plugins )
+            _plugins = new vector<WebStatusPlugin*>();
+        _plugins->push_back( this );
+    }
+
+    void WebStatusPlugin::initAll(){
+        if ( ! _plugins )
+            return;
+        
+        sort( _plugins->begin(), _plugins->end() , prisort );
+        
+        for ( unsigned i=0; i<_plugins->size(); i++ )
+            (*_plugins)[i]->init();
+    }
+
+    void WebStatusPlugin::runAll( stringstream& ss ){
+        if ( ! _plugins )
+            return;
+        
+        for ( unsigned i=0; i<_plugins->size(); i++ ){
+            WebStatusPlugin * p = (*_plugins)[i];
+            ss << "<hr>\n" 
+               << "<b>" << p->_name << "</b>";
+            
+            ss << " " << p->_subHeading;
+
+            ss << "<br>\n";
+            
+            p->run(ss);
+        }
+
+    }
+
+    vector<WebStatusPlugin*> * WebStatusPlugin::_plugins = 0;
+
+    // -- basic statuc plugins --
+
+    class LogPlugin : public WebStatusPlugin {
+    public:
+        LogPlugin() : WebStatusPlugin( "Log" , 100 ), _log(0){
+        }
+        
+        virtual void init(){
+            assert( ! _log );
+            _log = new RamLog();
+            Logstream::get().addGlobalTee( _log );
+        }
+
+        virtual void run( stringstream& ss ){
+            _log->toHTML( ss );
+        }
+        RamLog * _log;
+    } logPlugin;
+        
 
     // -- handler framework ---
 
     DbWebHandler::DbWebHandler( const string& name , double priority , bool requiresREST )
-        : _name(name) , _priority(priority) , _requiresREST(requiresREST){
+        : Prioritizable(priority), _name(name) , _requiresREST(requiresREST){
 
         { // setup strings
             _defaultUrl = "/";
@@ -460,7 +460,7 @@ namespace mongo {
             if ( ! _handlers )
                 _handlers = new vector<DbWebHandler*>();
             _handlers->push_back( this );
-            sort( _handlers->begin() , _handlers->end() );
+            sort( _handlers->begin() , _handlers->end() , prisort );
         }
     }
 

@@ -20,6 +20,7 @@
 #include "snapshots.h"
 #include "../client.h"
 #include "../clientcursor.h"
+#include "../dbwebserver.h"
 #include "../../util/mongoutils/html.h"
 
 /**
@@ -151,6 +152,73 @@ namespace mongo {
         
         client.shutdown();
     }
+
+    using namespace mongoutils::html;
+
+    class DBTopStatus : public WebStatusPlugin {
+    public:
+        DBTopStatus() : WebStatusPlugin( "dbtop" , 50 , "(occurences|percent of elapsed)" ){}
+
+        void display( stringstream& ss , double elapsed , const Top::UsageData& usage ){
+            ss << "<td>";
+            ss << usage.count;
+            ss << "</td><td>";
+            double per = 100 * ((double)usage.time)/elapsed;
+            ss << setprecision(4) << fixed << per << "%";
+            ss << "</td>";
+        }
+
+        void display( stringstream& ss , double elapsed , const string& ns , const Top::CollectionData& data ){
+            if ( ns != "GLOBAL" && data.total.count == 0 )
+                return;
+            ss << "<tr><th>" << ns << "</th>";
+            
+            display( ss , elapsed , data.total );
+
+            display( ss , elapsed , data.readLock );
+            display( ss , elapsed , data.writeLock );
+
+            display( ss , elapsed , data.queries );
+            display( ss , elapsed , data.getmore );
+            display( ss , elapsed , data.insert );
+            display( ss , elapsed , data.update );
+            display( ss , elapsed , data.remove );
+            
+            ss << "</tr>\n";
+        }
+
+        void run( stringstream& ss ){
+            auto_ptr<SnapshotDelta> delta = statsSnapshots.computeDelta();
+            if ( ! delta.get() )
+                return;
+            
+            ss << "<table border=1 cellpadding=2 cellspacing=0>";
+            ss << "<tr align='left'><th>";
+            ss << a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "namespace") << 
+                "NS</a></th>"
+                "<th colspan=2>total</th>"
+                "<th colspan=2>Reads</th>"
+                "<th colspan=2>Writes</th>"
+                "<th colspan=2>Queries</th>"
+                "<th colspan=2>GetMores</th>"
+                "<th colspan=2>Inserts</th>"
+                "<th colspan=2>Updates</th>"
+                "<th colspan=2>Removes</th>";
+            ss << "</tr>\n";
+            
+            display( ss , (double) delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
+            
+            Top::UsageMap usage = delta->collectionUsageDiff();
+            for ( Top::UsageMap::iterator i=usage.begin(); i != usage.end(); i++ ){
+                display( ss , (double) delta->elapsed() , i->first , i->second );
+            }
+            
+            ss << "</table>";
+        
+        }
+
+        virtual void init(){}
+    } dbtopStatus;
 
     Snapshots statsSnapshots;
     SnapshotThread snapshotThread;    

@@ -18,15 +18,22 @@
 */
 
 namespace mongo {
+
+    class Prioritizable {
+    public:
+        Prioritizable( double p ) : _priority(p){}
+        double priority() const { return _priority; }
+    private:
+        double _priority;
+    };
     
-    class DbWebHandler {
+    class DbWebHandler : public Prioritizable {
     public:
         DbWebHandler( const string& name , double priority , bool requiresREST );
         virtual ~DbWebHandler(){}
 
         virtual bool handles( const string& url ) const { return url == _defaultUrl; }
-                
-        virtual double priority() const { return _priority; }
+
         virtual bool requiresREST( const string& url ) const { return _requiresREST; }
 
         virtual void handle( const char *rq, // the full request
@@ -38,20 +45,35 @@ namespace mongo {
                              const SockAddr &from
                              ) = 0;
         
-        bool operator<( const DbWebHandler& other ) const { return priority() < other.priority(); }
-        
         string toString() const { return _toString; }
         static DbWebHandler * findHandler( const string& url );
 
     private:
         string _name;
-        double _priority;
         bool _requiresREST;
         
         string _defaultUrl;
         string _toString;
 
         static vector<DbWebHandler*> * _handlers;
+    };
+
+    class WebStatusPlugin : public Prioritizable {
+    public:
+        WebStatusPlugin( const string& secionName , double priority , const string& subheader = "" );
+        virtual ~WebStatusPlugin(){}
+        
+        virtual void run( stringstream& ss ) = 0;
+        /** called when web server stats up */
+        virtual void init() = 0;
+
+        static void initAll();
+        static void runAll( stringstream& ss );
+    private:
+        string _name;
+        string _subHeading;
+        static vector<WebStatusPlugin*> * _plugins;
+        
     };
 
     void webServerThread();
