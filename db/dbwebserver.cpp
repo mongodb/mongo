@@ -261,20 +261,15 @@ namespace mongo {
             }
             ss << "</table>\n";
         }
-        
-    private:
 
+    private:
+        
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
             if ( from.isLocalHost() )
                 return true;
 
-            {
-                readlocktryassert rl("admin.system.users", 10000);
-                if( Helpers::isEmpty("admin.system.users") )
-                    return true;
-            }
-
-            Client::GodScope gs;
+            if ( ! webHaveAdminUsers() )
+                return true;
 
             string auth = getHeader( rq , "Authorization" );
 
@@ -290,7 +285,7 @@ namespace mongo {
                     parms[name] = val;
                 }
 
-                BSONObj user = db.findOne( "admin.system.users" , BSON( "user" << parms["username"] ) );
+                BSONObj user = webGetAdminUser( parms["username"] );
                 if ( ! user.isEmpty() ){
                     string ha1 = user["pwd"].str();
                     string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
@@ -443,9 +438,7 @@ namespace mongo {
                     headers.push_back( "Content-Type: text/plain" );
         }
 
-
-    private:
-        static DBDirectClient db;
+    protected:
         RamLog * ramlog;
     };
 
@@ -678,9 +671,6 @@ namespace mongo {
             s << ':' << mongo::cmdLine.port;
         return s.str();
     }
-
-
-    DBDirectClient DbWebServer::db;
 
     void webServerThread() {
         Client::initThread("websvr");

@@ -44,6 +44,7 @@ namespace mongo {
         
         string toString() const { return _toString; }
         static DbWebHandler * findHandler( const string& url );
+
     private:
         string _name;
         double _priority;
@@ -57,6 +58,13 @@ namespace mongo {
 
     void webServerThread();
     string prettyHostName();
+    
+    /** @return if there are any admin users.  this should not block for long and throw if can't get a lock if needed */
+    bool webHaveAdminUsers();
+    
+    /** @return admin user with this name.  this should not block for long and throw if can't get a lock if needed */
+    BSONObj webGetAdminUser( const string& username );
+
 };
 
 

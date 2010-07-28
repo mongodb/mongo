@@ -23,6 +23,7 @@
 #include "../util/md5.hpp"
 #include "instance.h"
 #include "dbwebserver.h"
+#include "dbhelpers.h"
 
 namespace mongo {
 
@@ -229,5 +230,20 @@ namespace mongo {
         DBDirectClient db;
 
     } restHandler;
-    
+
+    bool webHaveAdminUsers(){
+        readlocktryassert rl("admin.system.users", 10000);
+        Client::Context cx( "admin.system.users" );
+        return ! Helpers::isEmpty("admin.system.users");
+    }
+
+    BSONObj webGetAdminUser( const string& username ){
+        Client::GodScope gs;
+        readlocktryassert rl("admin.system.users", 10000);
+        Client::Context cx( "admin.system.users" );
+        BSONObj user;
+        if ( Helpers::findOne( "admin.system.users" , BSON( "user" << username ) , user ) )
+            return user.copy();
+        return BSONObj();
+    }
 }

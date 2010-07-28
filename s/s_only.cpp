@@ -19,6 +19,7 @@
 #include "../client/dbclient.h"
 #include "../db/dbhelpers.h"
 #include "../db/matcher.h"
+#include "../db/commands.h"
 
 /*
   most a pile of hacks to make linking nicer
@@ -38,4 +39,45 @@ namespace mongo {
     Client::~Client(){ log() << "Client::~Client : this shouldn't be called" << endl; printStackTrace(); }
     bool Client::shutdown(){ assert(!"Client::shutdown() shouldn't be called"); return true; }
 
+    bool webHaveAdminUsers(){
+        return false;
+    }
+
+    BSONObj webGetAdminUser( const string& username ){
+        return BSONObj();
+    }
+    
+    bool execCommand( Command * c ,
+                      Client& client , int queryOptions , 
+                      const char *ns, BSONObj& cmdObj , 
+                      BSONObjBuilder& result, 
+                      bool fromRepl ){
+        assert(c);
+    
+        string dbname = nsToDatabase( ns );
+         
+        if ( cmdObj["help"].trueValue() ){
+            stringstream ss;
+            ss << "help for: " << c->name << " ";
+            c->help( ss );
+            result.append( "help" , ss.str() );
+            result.append( "lockType" , c->locktype() );
+            return true;
+        } 
+
+        if ( c->adminOnly() ){
+            if ( dbname != "admin" ) {
+                result.append( "errmsg" ,  "access denied- use admin db" );
+                log() << "command denied: " << cmdObj.toString() << endl;
+                return false;
+            }
+            log( 2 ) << "command: " << cmdObj << endl;
+        }
+
+        string errmsg;
+        int ok = c->run( dbname , cmdObj , errmsg , result , fromRepl );
+        if ( ! ok )
+            result.append( "errmsg" , errmsg );
+        return ok;
+    }
 }
