@@ -64,7 +64,8 @@ function reset() {
 
 reset();
 
-assert.eq.automsg( "1", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 1 ).itcount()" );
+assert.eq.automsg( "6", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 1 ).itcount()" );
+assert.eq.automsg( "6", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 ).itcount()" );
 
 c = t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 );
 c.next();
