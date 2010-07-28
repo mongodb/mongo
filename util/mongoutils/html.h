@@ -55,6 +55,15 @@ namespace mongoutils {
             return "<th>" + x + "</th>";
         }
 
+        inline void tablecell( stringstream& ss , bool b ){
+            ss << "<td>" << (b ? "<b>X</b>" : "") << "</td>";
+        }
+
+        template< typename T> 
+        inline void tablecell( stringstream& ss , const T& t ){
+            ss << "<td>" << t << "</td>";
+        }
+        
         inline string table(const char *headers[] = 0, bool border = true) { 
             stringstream ss;
             ss << "\n<table " 

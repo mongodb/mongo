@@ -29,6 +29,8 @@
 #include "commands.h"
 #include "instance.h"
 #include "../s/d_logic.h"
+#include "dbwebserver.h"
+#include "../util/mongoutils/html.h"
 
 namespace mongo {
 
@@ -328,6 +330,65 @@ namespace mongo {
 
     } handshakeCmd;
 
+    class ClientListPlugin : public WebStatusPlugin {
+    public:
+        ClientListPlugin() : WebStatusPlugin( "clients" , 20 ){}
+        virtual void init(){}
+        
+        virtual void run( stringstream& ss ){
+            using namespace mongoutils::html;
+
+            ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
+            ss << "<tr align='left'>"
+               << th( a("", "Connections to the database, both internal and external.", "Client") )
+               << th( a("http://www.mongodb.org/display/DOCS/Viewing+and+Terminating+Current+Operation", "", "OpId") )
+               << "<th>Active</th>" 
+               << "<th>LockType</th>"
+               << "<th>Waiting</th>"
+               << "<th>SecsRunning</th>"
+               << "<th>Op</th>"
+               << th( a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "", "Namespace") )
+               << "<th>Query</th>"
+               << "<th>client</th>"
+               << "<th>msg</th>"
+               << "<th>progress</th>"
+
+               << "</tr>\n";
+            {
+                scoped_lock bl(Client::clientsMutex);
+                for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
+                    Client *c = *i;
+                    CurOp& co = *(c->curop());
+                    ss << "<tr><td>" << c->desc() << "</td>";
+                    
+                    tablecell( ss , co.opNum() );
+                    tablecell( ss , co.active() );
+                    tablecell( ss , co.getLockType() );
+                    tablecell( ss , co.isWaitingForLock() );
+                    if ( co.active() )
+                        tablecell( ss , co.elapsedSeconds() );
+                    else
+                        tablecell( ss , "" );
+                    tablecell( ss , co.getOp() );
+                    tablecell( ss , co.getNS() );
+                    if ( co.haveQuery() )
+                        tablecell( ss , co.query() );
+                    else
+                        tablecell( ss , "" );
+                    tablecell( ss , co.getRemoteString() );
+
+                    tablecell( ss , co.getMessage() );
+                    tablecell( ss , co.getProgressMeter().toString() );
+
+
+                    ss << "</tr>\n";
+                }
+            }
+            ss << "</table>\n";
+
+        }
+        
+    } clientListPlugin;
 
     int Client::recommendedYieldMicros( int * writers , int * readers ){
         int num = 0;

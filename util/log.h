@@ -155,7 +155,7 @@ namespace mongo {
         LogLevel logLevel;
         static FILE* logfile;
         static boost::scoped_ptr<ostream> stream;
-        static vector<Tee*> globalTees;
+        static vector<Tee*> * globalTees;
     public:
 
         static void logLockless( const StringData& s ){
@@ -208,8 +208,10 @@ namespace mongo {
                 scoped_lock lk(mutex);
                 
                 if( t ) t->write(logLevel,out);
-                for ( unsigned i=0; i<globalTees.size(); i++ )
-                    globalTees[i]->write(logLevel,out);
+                if ( globalTees ){
+                    for ( unsigned i=0; i<globalTees->size(); i++ )
+                        (*globalTees)[i]->write(logLevel,out);
+                }
                 
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
@@ -276,7 +278,9 @@ namespace mongo {
         }
         
         void addGlobalTee( Tee * t ){
-            globalTees.push_back( t );
+            if ( ! globalTees )
+                globalTees = new vector<Tee*>();
+            globalTees->push_back( t );
         }
 
     private:

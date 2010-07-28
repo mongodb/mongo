@@ -1199,20 +1199,22 @@ namespace mongo {
         }
 
         void localConnect( const char * dbName ){
-            smlock;
-            uassert( 10225 ,  "already setup for external db" , ! _externalSetup );
-            if ( _localConnect ){
-                uassert( 10226 ,  "connected to different db" , _localDBName == dbName );
-                return;
+            {
+                smlock;
+                uassert( 10225 ,  "already setup for external db" , ! _externalSetup );
+                if ( _localConnect ){
+                    uassert( 10226 ,  "connected to different db" , _localDBName == dbName );
+                    return;
+                }
+                
+                initMongoJS( this , _context , _global , true );
+                
+                exec( "_mongo = new Mongo();" );
+                exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
+                
+                _localConnect = true;
+                _localDBName = dbName;
             }
-            
-            initMongoJS( this , _context , _global , true );
-            
-            exec( "_mongo = new Mongo();" );
-            exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
-            
-            _localConnect = true;
-            _localDBName = dbName;
             loadStored();
         }
 

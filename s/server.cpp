@@ -23,6 +23,7 @@
 #include "../util/message_server.h"
 #include "../util/stringutils.h"
 #include "../util/version.h"
+#include "../db/dbwebserver.h"
 
 #include "server.h"
 #include "request.h"
@@ -271,9 +272,11 @@ int main(int argc, char* argv[], char *envp[] ) {
         return configError;
     }
     configServer.reloadSettings();
-    
+
     init();
 
+    boost::thread web( webServerThread );
+    
     MessageServer::Options opts;
     opts.port = cmdLine.port;
     opts.ipList = cmdLine.bind_ip;

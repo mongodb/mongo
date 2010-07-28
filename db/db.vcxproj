@@ -466,6 +466,7 @@
     <ClCompile Include="repl\rs_rollback.cpp" />
     <ClCompile Include="repl\rs_sync.cpp" />
     <ClCompile Include="repl_block.cpp" />
+    <ClCompile Include="restapi.cpp" />
     <ClCompile Include="storage.cpp" />
     <ClCompile Include="..\client\connpool.cpp" />
     <ClCompile Include="..\client\dbclient.cpp" />
