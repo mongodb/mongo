@@ -33,6 +33,7 @@
 #include "chunk.h"
 #include "stats.h"
 #include "cursors.h"
+#include "grid.h"
 
 namespace mongo {
 

@@ -30,6 +30,7 @@
 #include "config.h"
 #include "chunk.h"
 #include "balance.h"
+#include "grid.h"
 
 namespace mongo {
     

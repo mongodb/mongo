@@ -28,6 +28,7 @@
 #include "config.h"
 #include "chunk.h"
 #include "strategy.h"
+#include "grid.h"
 
 namespace mongo {
 

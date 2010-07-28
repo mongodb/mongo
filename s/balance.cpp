@@ -28,6 +28,7 @@
 #include "shard.h"
 #include "config.h"
 #include "chunk.h"
+#include "grid.h"
 
 namespace mongo {
     

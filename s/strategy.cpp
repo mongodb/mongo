@@ -21,7 +21,9 @@
 #include "../util/background.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
+
 #include "server.h"
+#include "grid.h"
 
 namespace mongo {
 

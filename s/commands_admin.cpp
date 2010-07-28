@@ -38,6 +38,7 @@
 
 #include "config.h"
 #include "chunk.h"
+#include "grid.h"
 #include "strategy.h"
 #include "stats.h"
 
