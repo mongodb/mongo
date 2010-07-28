@@ -127,15 +127,6 @@ namespace mongo {
             ss << "</pre>";
         }
 
-        void tablecell( stringstream& ss , bool b ){
-            ss << "<td>" << (b ? "<b>X</b>" : "") << "</td>";
-        }
-
-        template< typename T> 
-        void tablecell( stringstream& ss , const T& t ){
-            ss << "<td>" << t << "</td>";
-        }
-        
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
             ss << mongodVersion() << '\n';
@@ -144,55 +135,6 @@ namespace mongo {
             ss << "uptime: " << time(0)-started << " seconds\n";
             if ( replAllDead )
                 ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
-
-
-            ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
-            ss << "<tr align='left'>"
-               << th( a("", "Connections to the database, both internal and external.", "Client") )
-               << th( a("http://www.mongodb.org/display/DOCS/Viewing+and+Terminating+Current+Operation", "", "OpId") )
-               << "<th>Active</th>" 
-               << "<th>LockType</th>"
-               << "<th>Waiting</th>"
-               << "<th>SecsRunning</th>"
-               << "<th>Op</th>"
-               << th( a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "", "Namespace") )
-               << "<th>Query</th>"
-               << "<th>client</th>"
-               << "<th>msg</th>"
-               << "<th>progress</th>"
-
-               << "</tr>\n";
-            {
-                scoped_lock bl(Client::clientsMutex);
-                for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
-                    Client *c = *i;
-                    CurOp& co = *(c->curop());
-                    ss << "<tr><td>" << c->desc() << "</td>";
-                    
-                    tablecell( ss , co.opNum() );
-                    tablecell( ss , co.active() );
-                    tablecell( ss , co.getLockType() );
-                    tablecell( ss , co.isWaitingForLock() );
-                    if ( co.active() )
-                        tablecell( ss , co.elapsedSeconds() );
-                    else
-                        tablecell( ss , "" );
-                    tablecell( ss , co.getOp() );
-                    tablecell( ss , co.getNS() );
-                    if ( co.haveQuery() )
-                        tablecell( ss , co.query() );
-                    else
-                        tablecell( ss , "" );
-                    tablecell( ss , co.getRemoteString() );
-
-                    tablecell( ss , co.getMessage() );
-                    tablecell( ss , co.getProgressMeter().toString() );
-
-
-                    ss << "</tr>\n";
-                }
-            }
-            ss << "</table>\n";
         }
 
     private:
