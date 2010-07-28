@@ -1657,15 +1657,16 @@ def build_and_test_client(env, target, source):
     from subprocess import call
 
     if GetOption("extrapath") is not None:
-        call(["scons", "--extrapath=" + GetOption("extrapath")], cwd=installDir)
+        scons_command = ["scons", "--extrapath=" + GetOption("extrapath")]
     else:
-        call("scons", cwd=installDir)
+        scons_command = ["scons"]
+
+    call(scons_command + ["libmongoclient.a", "clientTests"], cwd=installDir)
+
     return bool(call(["python", "buildscripts/smoke.py",
                       "--test-path", installDir, "smokeClient"]))
 env.Alias("clientBuild", [mongod, installDir], [build_and_test_client])
 env.AlwaysBuild("clientBuild")
-env.Alias("clientDist", ["clientBuild", "dist"], [])
-env.AlwaysBuild("clientDist")
 
 def clean_old_dist_builds(env, target, source):
     prefix = "mongodb-%s-%s" % (platform, processor)

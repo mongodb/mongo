@@ -54,12 +54,12 @@ allClientFiles += Glob( "mongo/scripting/*.cpp" )
 allClientFiles += Glob( "mongo/util/*.cpp" )
 allClientFiles += Glob( "mongo/util/*.c" )
 
-env.Library( "mongoclient" , allClientFiles )
 env.SharedLibrary( "mongoclient" , allClientFiles )
+env.Library( "mongoclient" , allClientFiles )
 
 clientTests = []
 clientEnv = env.Clone();
-clientEnv.Prepend( LIBS=["mongoclient"])
+clientEnv.Prepend( LIBS=["libmongoclient.a"])
 clientEnv.Prepend( LIBPATH=["."] )
 
 # examples
@@ -69,3 +69,4 @@ clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExa
 clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
+clientEnv.Alias("clientTests", clientTests, [])
