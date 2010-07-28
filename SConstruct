@@ -1407,6 +1407,8 @@ def getSystemInstallName():
     n = platform + "-" + processor
     if static:
         n += "-static"
+    if GetOption("nostrip"):
+        n += "-debugsymbols"
     if nix and os.uname()[2].startswith( "8." ):
         n += "-tiger"
         
