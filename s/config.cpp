@@ -458,7 +458,7 @@ namespace mongo {
 
     bool Grid::addShard( string* name , const string& host , long long maxSize , string* errMsg ){
         // errMsg is required but name is optional
-        DEV assert( ! errMsg );
+        DEV assert( errMsg );
         string nameInternal;
         if ( ! name ) {
             name = &nameInternal;
@@ -528,7 +528,7 @@ namespace mongo {
     }
 
     bool Grid::_getNewShardName( string* name ) const{
-        DEV assert( ! name );
+        DEV assert( name );
 
         bool ok = false;
         int count = 0; 
