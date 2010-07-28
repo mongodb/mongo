@@ -69,10 +69,7 @@ namespace mongo {
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
-        ~Manager() { 
-            log() << "should never be called?" << rsLog;
-            assert(false);
-        }
+        ~Manager();
         void msgReceivedNewConfig(BSONObj);
         void msgCheckNewState();
     };
@@ -313,7 +310,7 @@ namespace mongo {
 
     public:
         unsigned selfId() const { return _self->id(); }
-        shared_ptr<Manager> mgr;
+        Manager *mgr;
 
     private:
         Member* head() const { return _members.head(); }

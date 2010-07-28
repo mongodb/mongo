@@ -1656,7 +1656,10 @@ if installDir[-1] != "/":
 def build_and_test_client(env, target, source):
     from subprocess import call
 
-    call("scons", cwd=installDir)
+    if GetOption("extrapath") is not None:
+        call("scons --extrapath=%s" % GetOption("extrapath"), cwd=installDir)
+    else:
+        call("scons", cwd=installDir)
     return bool(call(["python", "buildscripts/smoke.py",
                       "--test-path", installDir, "smokeClient"]))
 env.Alias("clientBuild", [mongod, installDir], [build_and_test_client])

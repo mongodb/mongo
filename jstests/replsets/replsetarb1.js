@@ -3,11 +3,11 @@
 
 doTest = function( signal ) {
 
-    var replTest = new ReplSetTest( {name: 'testSet', nodes: 3, bridged: true} );
+    var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
     var nodes = replTest.nodeList();
 
     replTest.startSet();
-    replTest.initiate({"_id" : "unicomplex", 
+    replTest.node[0].initiate({"_id" : "unicomplex", 
                 "members" : [
                              {"_id" : 0, "host" : nodes[0], "arbiterOnly" : true}, 
                              {"_id" : 1, "host" : nodes[1]}, 
