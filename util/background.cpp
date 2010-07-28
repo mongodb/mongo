@@ -41,8 +41,11 @@ namespace mongo {
         try {
             us->run();
         }
+        catch ( std::exception& e ){
+            log( LL_ERROR ) << "backgroundjob error: " << e.what() << endl;
+        }
         catch(...) {
-            log() << "uncaught exception in BackgroundJob" << endl;
+            log( LL_ERROR ) << "uncaught exception in BackgroundJob" << endl;
         }
         us->state = Done;
         bool delSelf = us->deleteSelf;
