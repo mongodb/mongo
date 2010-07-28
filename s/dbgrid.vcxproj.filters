@@ -275,6 +275,9 @@
     <ClCompile Include="..\util\log.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="grid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gridconfig.h">
@@ -335,6 +338,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="balancer_policy.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="grid.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

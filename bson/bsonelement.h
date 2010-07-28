@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <string.h>
+#include "util/builder.h"
 
 namespace bson {
     typedef mongo::BSONElement be;

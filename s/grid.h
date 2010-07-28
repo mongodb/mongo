@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 #include "../util/concurrency/mutex.h"
 
 #include "config.h"  // DBConfigPtr

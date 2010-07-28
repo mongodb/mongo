@@ -689,6 +689,15 @@
     <ClCompile Include="..\util\log.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\processinfo.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\grid.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\restapi.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

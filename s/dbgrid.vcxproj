@@ -206,6 +206,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\db\queryutil.cpp" />
+    <ClCompile Include="grid.cpp" />
     <ClCompile Include="request.cpp" />
     <ClCompile Include="shardconnection.cpp" />
     <ClCompile Include="s_only.cpp" />
@@ -512,6 +513,7 @@
   <ItemGroup>
     <ClInclude Include="..\util\version.h" />
     <ClInclude Include="balancer_policy.h" />
+    <ClInclude Include="grid.h" />
     <ClInclude Include="gridconfig.h" />
     <ClInclude Include="griddatabase.h" />
     <ClInclude Include="shard.h" />
