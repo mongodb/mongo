@@ -35,9 +35,16 @@ namespace mongo {
 
     boost::thread_specific_ptr<Client> currentClient;
 
-    Client::Client( const char * s ){ assert(!"Client::Client shouldn't be called"); }
-    Client::~Client(){ log() << "Client::~Client : this shouldn't be called" << endl; printStackTrace(); }
-    bool Client::shutdown(){ assert(!"Client::shutdown() shouldn't be called"); return true; }
+    Client::Client(const char *desc) : 
+      _context(0),
+      _shutdown(false),
+      _desc(desc),
+      _god(0),
+      _lastOp(0)
+    {
+    }
+    Client::~Client(){}
+    bool Client::shutdown(){ return true; }
 
     bool webHaveAdminUsers(){
         return false;

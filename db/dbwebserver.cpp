@@ -301,8 +301,9 @@ namespace mongo {
             _log->toHTML( ss );
         }
         RamLog * _log;
-    } logPlugin;
-        
+    };
+      
+    LogPlugin * logPlugin = new LogPlugin();
 
     // -- handler framework ---
 
