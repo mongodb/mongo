@@ -497,7 +497,7 @@ namespace mongo {
                              vector<string>& headers,  const SockAddr &from ){
             
             string cmd;
-            bool text;
+            bool text = false;
             assert( _cmd( url , cmd , text ) );
             Command * c = _cmd( cmd );
             assert( c );
