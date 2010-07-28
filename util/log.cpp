@@ -32,6 +32,11 @@ using namespace std;
 
 namespace mongo {
 
+    Nullstream nullstream;
+    vector<Tee*>* Logstream::globalTees = 0;
+
+    thread_specific_ptr<Logstream> Logstream::tsp;
+
     class LoggingManager {
     public:
         LoggingManager()

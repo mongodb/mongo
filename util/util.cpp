@@ -82,12 +82,6 @@ namespace mongo {
     vector<UnitTest*> *UnitTest::tests = 0;
     bool UnitTest::running = false;
 
-    Nullstream nullstream;
-    vector<Tee*> Logstream::globalTees;
-    
-
-    thread_specific_ptr<Logstream> Logstream::tsp;
-
     const char *default_getcurns() { return ""; }
     const char * (*getcurns)() = default_getcurns;
 
