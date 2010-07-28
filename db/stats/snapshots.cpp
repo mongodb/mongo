@@ -89,24 +89,7 @@ namespace mongo {
 
     void Snapshots::outputLockInfoHTML( stringstream& ss ){
         scoped_lock lk(_lock);
-        /*
-        ss << "\n<table>";
-        ss << "<tr><th>elapsed(ms)</th><th>% write locked</th></tr>\n";
-        
-        for ( int i=0; i<numDeltas(); i++ ){
-            SnapshotDelta d( getPrev(i+1) , getPrev(i) );
-            ss << "<tr>"
-               << "<td>" << ( d.elapsed() / 1000 ) << "</td>"
-               << "<td>" << (unsigned)(100*d.percentWriteLocked()) << "%</td>"
-               << "</tr>\n"
-                ;
-        }
-        
-        ss << "</table>\n";
-        */
-
-        //ss << "\n</pre>\n<div style=\"background-color:#bbb; color:#000\">" << "% time in write lock, historically, by 4 sec periods</div><div>";
-        ss << "\n</pre>\n" << "<h4>% time in write lock, by 4 sec periods:</h4>\n<div>";
+        ss << "\n<div>";
         for ( int i=0; i<numDeltas(); i++ ){
             SnapshotDelta d( getPrev(i+1) , getPrev(i) );
             unsigned e = (unsigned) d.elapsed() / 1000;
@@ -115,7 +98,7 @@ namespace mongo {
                 ss << '(' << e / 1000.0 << "s)";
             ss << ' ';
         }
-        ss << "</div>\n<pre>";
+        ss << "</div>\n";
     }
 
     void SnapshotThread::run(){
@@ -154,6 +137,22 @@ namespace mongo {
     }
 
     using namespace mongoutils::html;
+
+    class WriteLockStatus : public WebStatusPlugin {
+    public:
+        WriteLockStatus() : WebStatusPlugin( "write lock" , 51 , "% time in write lock, by 4 sec periods" ){}
+        virtual void init(){}
+
+        virtual void run( stringstream& ss ){
+            statsSnapshots.outputLockInfoHTML( ss );
+
+            ss << "<a "
+                  "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\" " 
+                  "title=\"snapshot: was the db in the write lock when this page was generated?\">";
+            ss << "write locked now:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
+        }
+
+    } writeLockStatus;
 
     class DBTopStatus : public WebStatusPlugin {
     public:

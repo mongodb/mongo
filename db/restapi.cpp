@@ -24,8 +24,15 @@
 #include "instance.h"
 #include "dbwebserver.h"
 #include "dbhelpers.h"
+#include "repl.h"
+#include "replpair.h"
+#include "clientcursor.h"
+#include "background.h"
 
 namespace mongo {
+
+    extern const char *replInfo;
+    bool getInitialSyncCompleted();
 
     using namespace bson;
     using namespace mongoutils::html;
@@ -246,4 +253,58 @@ namespace mongo {
             return user.copy();
         return BSONObj();
     }
+
+    class LowLevelMongodStatus : public WebStatusPlugin {
+    public:
+        LowLevelMongodStatus() : WebStatusPlugin( "low level" , 5 , "requires read lock" ){}
+
+        virtual void init(){}
+
+        void _gotLock( int millis , stringstream& ss ){
+            ss << "<pre>\n";
+            ss << "time to get readlock: " << millis << "ms\n";
+            
+            ss << "# databases: " << dbHolder.size() << '\n';
+            
+            if( ClientCursor::byLocSize()>500 )
+                ss << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << '\n';
+            
+            ss << "\nreplication: ";
+            if( *replInfo )
+                ss << "\nreplInfo:  " << replInfo << "\n\n";
+            if( replSet ) {
+                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << cmdLine.replSet << '\n';
+            }
+            if ( replAllDead )
+                ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
+
+            else {
+                ss << "\nmaster: " << replSettings.master << '\n';
+                ss << "slave:  " << replSettings.slave << '\n';
+                if ( replPair ) {
+                    ss << "replpair:\n";
+                    ss << replPair->getInfo();
+                }
+                bool seemCaughtUp = getInitialSyncCompleted();
+                if ( !seemCaughtUp ) ss << "<b>";
+                ss <<   "initialSyncCompleted: " << seemCaughtUp;
+                if ( !seemCaughtUp ) ss << "</b>";
+                ss << '\n';
+            }
+
+            BackgroundOperation::dump(ss);
+            ss << "</pre>\n";
+        }
+
+        virtual void run( stringstream& ss ){
+            Timer t;
+            readlocktry lk( "" , 300 );
+            if ( lk.got() ){
+                _gotLock( t.millis() , ss );
+            }
+            else {
+                ss << "\n<b>timed out getting lock</b>\n";
+            }
+        }
+    } lowLevelMongodStatus;
 }

@@ -24,8 +24,6 @@
 #include "../util/mongoutils/html.h"
 #include "../util/md5.hpp"
 #include "db.h"
-#include "repl.h"
-#include "replpair.h"
 #include "instance.h"
 #include "security.h"
 #include "stats/snapshots.h"
@@ -44,24 +42,7 @@ namespace mongo {
     using namespace mongoutils::html;
     using namespace bson;
 
-    extern const char *replInfo;
-
-    bool getInitialSyncCompleted();
-
     time_t started = time(0);
-
-    /*
-        string toString() {
-            stringstream ss;
-            unsigned long long dt = last - start;
-            ss << dt/1000;
-            ss << '\t';
-            ss << timeLocked/1000 << '\t';
-            if( dt )
-                ss << (timeLocked*100)/dt << '%';
-            return ss.str();
-        }
-    */
 
     struct Timing {
         Timing() {
@@ -69,15 +50,6 @@ namespace mongo {
         }
         unsigned long long start, timeLocked;
     };
-
-    bool _bold;
-    string bold(bool x) {
-        _bold = x;
-        return x ? "<b>" : "";
-    }
-    string bold() {
-        return _bold ? "</b>" : "";
-    }
 
     bool execCommand( Command * c ,
                       Client& client , int queryOptions , 
@@ -92,49 +64,15 @@ namespace mongo {
         }
 
     private:
-        // caller locks
-        void doLockedStuff(stringstream& ss) {
-            ss << "# databases: " << dbHolder.size() << '\n';
-
-            if( ClientCursor::byLocSize()>500 )
-                ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';
-
-            ss << "\nreplication: ";
-            if( *replInfo )
-                ss << "\nreplInfo:  " << replInfo << "\n\n";
-            if( replSet ) {
-                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << cmdLine.replSet << '\n';
-            }
-            else {
-                ss << "\nmaster: " << replSettings.master << '\n';
-                ss << "slave:  " << replSettings.slave << '\n';
-                if ( replPair ) {
-                    ss << "replpair:\n";
-                    ss << replPair->getInfo();
-                }
-                bool seemCaughtUp = getInitialSyncCompleted();
-                if ( !seemCaughtUp ) ss << "<b>";
-                ss <<   "initialSyncCompleted: " << seemCaughtUp;
-                if ( !seemCaughtUp ) ss << "</b>";
-                ss << '\n';
-            }
-            
-
-            statsSnapshots.outputLockInfoHTML( ss );
-
-            BackgroundOperation::dump(ss);
-
-            ss << "</pre>";
-        }
 
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
+            ss << "<pre>";
             ss << mongodVersion() << '\n';
             ss << "git hash: " << gitVersion() << '\n';
             ss << "sys info: " << sysInfo() << '\n';
             ss << "uptime: " << time(0)-started << " seconds\n";
-            if ( replAllDead )
-                ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
+            ss << "</pre>";
         }
 
     private:
@@ -259,7 +197,7 @@ namespace mongo {
             ss << start(dbname) << h2(dbname);
             ss << "<a href=\"/_commands\">List all commands</a> | \n";
             ss << "<a href=\"/_replSet\">Replica set status</a>\n";
-            ss << "<pre>";
+
             //ss << "<a href=\"/_status\">_status</a>";
             {
                 const map<string, Command*> *m = Command::webCommands();
@@ -284,24 +222,6 @@ namespace mongo {
 
             doUnlockedStuff(ss);
 
-            ss << "<a "
-                  "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\" " 
-                  "title=\"snapshot: was the db in the write lock when this page was generated?\">";
-            ss << "write locked:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
-            {
-                Timer t;
-                readlocktry lk( "" , 300 );
-                if ( lk.got() ){
-                    ss << "time to get readlock: " << t.millis() << "ms\n";
-                    doLockedStuff(ss);
-                }
-                else {
-                    ss << "\n<b>timed out getting dblock</b>\n";
-                }
-            }
-            
-            ss << "</pre>\n";
-            
             WebStatusPlugin::runAll( ss );
             
             ss << "</body></html>\n";
