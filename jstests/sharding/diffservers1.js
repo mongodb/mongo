@@ -14,7 +14,7 @@ assert( 3 , test1.count() );
 
 assert( ! s.admin.runCommand( { addshard: "sdd$%" } ).ok , "bad hostname" );
 assert( ! s.admin.runCommand( { addshard: "127.0.0.1:43415" } ).ok , "host not up" );
-assert( ! s.admin.runCommand( { addshard: "127.0.0.1:43415" , allowLocal : true } ).ok , "host not up" );
+assert( ! s.admin.runCommand( { addshard: "10.0.0.1:43415" } ).ok , "allowed shard in IP when config is localhost" );
 
 s.stop();
 

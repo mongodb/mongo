@@ -9,7 +9,7 @@ assert.eq( 1, s.config.shards.count() , "removed server still appears in count" 
 
 // should create a shard0002 shard
 conn = startMongodTest( 29000 );
-assert( s.admin.runCommand( { addshard: "localhost:29000", allowLocal: true } ).ok, "failed to add shard" );
+assert( s.admin.runCommand( { addshard: "localhost:29000" } ).ok, "failed to add shard" );
 assert.eq( 2, s.config.shards.count(), "new server does not appear in count" );
 
 stopMongod( 29000 );

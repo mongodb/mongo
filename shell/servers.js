@@ -187,7 +187,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     if ( ! otherParams.manualAddShard ){
         this._connections.forEach(
             function(z){
-                admin.runCommand( { addshard : z.name , allowLocal : true } );
+                admin.runCommand( { addshard : z.name } );
             }
         );
     }

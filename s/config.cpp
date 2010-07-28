@@ -456,6 +456,14 @@ namespace mongo {
         
     }
 
+    bool Grid::allowLocalHost() const {
+        return _allowLocalShard;
+    }
+
+    void Grid::setAllowLocalHost( bool allow ){
+        _allowLocalShard = allow;
+    }
+
     bool Grid::addShard( string* name , const string& host , long long maxSize , string* errMsg ){
         // errMsg is required but name is optional
         DEV assert( errMsg );

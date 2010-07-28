@@ -72,8 +72,9 @@ namespace mongo {
         operator string() const { return toString(); }
 
         string host() const { return _host; }
-        
+
         int port() const { return _port >= 0 ? _port : CmdLine::DefaultDBPort; }
+        void setPort( int port ) { _port = port; }
 
     private:
         // invariant (except full obj assignment):
