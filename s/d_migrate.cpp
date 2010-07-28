@@ -65,7 +65,11 @@ namespace mongo {
             ss << "step" << step;
             string s = ss.str();
             
-            cc().curop()->setMessage( s.c_str() );
+            CurOp * op = cc().curop();
+            if ( op )
+                op->setMessage( s.c_str() );
+            else 
+                log( LL_WARNING ) << "op is null in MoveTimingHelper::done" << endl;
             
             _b.appendNumber( s , _t.millis() );
             _t.reset();
