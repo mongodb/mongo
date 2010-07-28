@@ -388,7 +388,7 @@ class InstallSetup:
 
     def justClient(self):
         self.binaries = False
-        self.libraries = True
+        self.libraries = False
         self.clientSrc = True
         self.headers = True
         self.bannerDir = "distsrc/client/"
