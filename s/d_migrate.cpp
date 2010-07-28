@@ -778,7 +778,10 @@ namespace mongo {
                 state = CATCHUP;
                 while ( true ){
                     BSONObj res;
-                    assert( conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) );
+                    if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
+                        state = FAIL;
+                        log( LL_ERROR ) << "_transferMods failed: " << res << endl;
+                    }
                     if ( res["size"].number() == 0 )
                         break;
                     
