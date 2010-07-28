@@ -615,22 +615,18 @@ namespace mongo {
                 help << "add a new shard to the system";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string host = cmdObj.firstElement().valuestrsafe();
-                if ( host == "localhost" || host.find( "localhost:" ) == 0 ||
-                     host == "127.0.0.1" || host.find( "127.0.0.1:" ) == 0 ){
-                    if ( ! cmdObj["allowLocal"].trueValue() ){
-                        errmsg = 
-                            "can't use localhost as a shard since all shards need to communicate.  "
-                            "allowLocal to override for testing";
-                        return false;
-                    }
+                HostAndPort shardAddr( cmdObj.firstElement().valuestrsafe() );
+                if ( shardAddr.isLocalHost() != grid.allowLocalHost() ){
+                    errmsg = "can't use localhost as a shard since all shards need to communicate. "
+                             "either use all shards and configdbs in localhost or all in actual IPs " ;
+                    return false;
                 }
-                if ( host.find( ":" ) == string::npos ){
-                    stringstream ss;
-                    ss << host << ":" << CmdLine::ShardServerPort;
-                    host = ss.str();
+
+                // HostAndPort defaults to a different port; adjust if needed.
+                if ( shardAddr.port() == CmdLine::DefaultDBPort ){
+                    shardAddr.setPort( CmdLine::ShardServerPort );
                 }
-                
+
                 string name = "";
                 if ( cmdObj["name"].type() == String ) {
                     name = cmdObj["name"].valuestrsafe();
@@ -641,7 +637,7 @@ namespace mongo {
                     maxSize = cmdObj[ ShardFields::maxSize.name() ].numberLong();
                 }
                 
-                if ( ! grid.addShard( &name , host , maxSize , &errmsg ) ){
+                if ( ! grid.addShard( &name , shardAddr.toString() , maxSize , &errmsg ) ){
                     // addShard filled errmsg
                     return false;
                 }

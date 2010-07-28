@@ -202,19 +202,29 @@ namespace mongo {
      */
     class Grid {
     public:
-        Grid() : _lock("Grid") { }
+        Grid() : _lock( "Grid" ) , _allowLocalShard( true ) { }
 
         /**
          * gets the config the db.
          * will return an empty DBConfig if not in db already
          */
-        DBConfigPtr getDBConfig( string ns , bool create=true);
+        DBConfigPtr getDBConfig( string ns , bool create=true );
         
         /**
          * removes db entry.
          * on next getDBConfig call will fetch from db
          */
         void removeDB( string db );
+
+        /**
+         * @return true if shards and config servers are allowed to use 'localhost' in address
+         */
+        bool allowLocalHost() const;
+
+        /**
+         * @param whether to allow shards and config servers to use 'localhost' in address
+         */
+        void setAllowLocalHost( bool allow );
 
         /**
          *
@@ -245,15 +255,16 @@ namespace mongo {
         unsigned long long getNextOpTime() const;
 
     private:
-        map<string, DBConfigPtr > _databases;
-        mongo::mutex _lock; // TODO: change to r/w lock ??
+        mongo::mutex              _lock;            // protects _databases; TODO: change to r/w lock ??
+        map<string, DBConfigPtr > _databases;       // maps ns to DBConfig's
+        bool                      _allowLocalShard; // can 'localhost' be used in shard addresses?
 
         /**
          * @param name is the chose name for the shard. Parameter is mandatory.
          * @return true if it managed to generate a shard name. May return false if (currently)
          * 10000 shard 
          */
-        bool _getNewShardName( string* name) const;
+        bool _getNewShardName( string* name ) const;
 
     };
 

@@ -40,7 +40,10 @@ if linux:
     env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
 boostLibs = [ "thread" , "filesystem" , "system" ]
-env.Prepend( LIBS =["boost_%s-mt"%(lib) for lib in boostLibs ] )
+conf = Configure(env)
+for lib in boostLibs:
+    if not conf.CheckLib("boost_%s-mt" % lib):
+        conf.CheckLib("boost_%s" % lib)
 allClientFiles = []
 allClientFiles += Glob( "mongo/*.cpp" )
 allClientFiles += Glob( "mongo/client/*.cpp" )
@@ -56,12 +59,8 @@ env.SharedLibrary( "mongoclient" , allClientFiles )
 
 clientTests = []
 clientEnv = env.Clone();
-#clientEnv.Append( CPPPATH=["../"] )
-clientEnv.Prepend( LIBS=[ "mongoclient"]+["boost_%s-mt"%(lib) for lib in boostLibs ] )
-
+clientEnv.Prepend( LIBS=["mongoclient"])
 clientEnv.Prepend( LIBPATH=["."] )
-#clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
-l = clientEnv[ "LIBS" ]
 
 # examples
 clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]

@@ -388,7 +388,7 @@ class InstallSetup:
 
     def justClient(self):
         self.binaries = False
-        self.libraries = True
+        self.libraries = False
         self.clientSrc = True
         self.headers = True
         self.bannerDir = "distsrc/client/"
@@ -1657,7 +1657,7 @@ def build_and_test_client(env, target, source):
     from subprocess import call
 
     if GetOption("extrapath") is not None:
-        call("scons --extrapath=%s" % GetOption("extrapath"), cwd=installDir)
+        call(["scons", "--extrapath=" + GetOption("extrapath")], cwd=installDir)
     else:
         call("scons", cwd=installDir)
     return bool(call(["python", "buildscripts/smoke.py",

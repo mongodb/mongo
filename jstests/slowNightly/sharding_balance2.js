@@ -8,9 +8,9 @@ for ( var i=0; i<names.length; i++ ){
         // We set maxSize of the shard to something artificially low. That mongod would still 
         // allocate and mmap storage as usual but the balancing mongos would not ship any chunk
         // to it.
-        s.adminCommand( { addshard : names[i] , allowLocal : true , maxSize : 1 } );
+        s.adminCommand( { addshard : names[i] , maxSize : 1 } );
     } else {
-        s.adminCommand( { addshard : names[i] , allowLocal : true } );
+        s.adminCommand( { addshard : names[i] } );
     }
 }
 
