@@ -38,12 +38,13 @@ namespace mongo {
             const SockAddr &from
         ) = 0;
 
+        // --- static helpers ----
+
         static void parseParams( BSONObj & params , string query );
         
-    protected:
-        string parseURL( const char * buf );
-        string parseMethod( const char * headers );
-        string getHeader( const char * headers , string name );
+        static string parseURL( const char * buf );
+        static string parseMethod( const char * headers );
+        static string getHeader( const char * headers , string name );
         static const char *body( const char *buf );
 
         static string urlDecode(const char* s);

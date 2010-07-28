@@ -363,9 +363,10 @@ namespace mongo {
                     _rejectREST( responseMsg , responseCode , headers );
                     return;
                 }
-
-                DEV log() << "handle REST request " << url << endl;
-                handleRESTRequest( rq , url , responseMsg , responseCode , headers );
+                
+                responseCode = 404;
+                headers.push_back( "Content-Type: text/html" );
+                responseMsg = "<html><body>unknown url</body></html>\n";
                 return;
             }
 
@@ -433,196 +434,6 @@ namespace mongo {
             }            
         }
 
-        void handleRESTRequest( const char *rq, // the full request
-                                string url,
-                                string& responseMsg,
-                                int& responseCode,
-                                vector<string>& headers // if completely empty, content-type: text/html will be added
-                              ) {
-
-            string::size_type first = url.find( "/" , 1 );
-            if ( first == string::npos ) {
-                responseCode = 400;
-                return;
-            }
-
-            string method = parseMethod( rq );
-            string dbname = url.substr( 1 , first - 1 );
-            string coll = url.substr( first + 1 );
-            string action = "";
-
-            BSONObj params;
-            if ( coll.find( "?" ) != string::npos ) {
-                parseParams( params , coll.substr( coll.find( "?" ) + 1 ) );
-                coll = coll.substr( 0 , coll.find( "?" ) );
-            }
-
-            string::size_type last = coll.find_last_of( "/" );
-            if ( last == string::npos ) {
-                action = coll;
-                coll = "_defaultCollection";
-            }
-            else {
-                action = coll.substr( last + 1 );
-                coll = coll.substr( 0 , last );
-            }
-
-            for ( string::size_type i=0; i<coll.size(); i++ )
-                if ( coll[i] == '/' )
-                    coll[i] = '.';
-
-            string fullns = urlDecode(dbname + "." + coll);
-
-            headers.push_back( (string)"x-action: " + action );
-            headers.push_back( (string)"x-ns: " + fullns );
-
-            bool html = false;
-
-
-            stringstream ss;
-
-            if ( method == "GET" ) {
-                responseCode = 200;
-                html = handleRESTQuery( fullns , action , params , responseCode , ss  );
-            }
-            else if ( method == "POST" ) {
-                responseCode = 201;
-                handlePost( fullns , body( rq ) , params , responseCode , ss  );
-            }
-            else {
-                responseCode = 400;
-                headers.push_back( "X_err: bad request" );
-                ss << "don't know how to handle a [" << method << "]";
-                out() << "don't know how to handle a [" << method << "]" << endl;
-            }
-
-            if( html ) 
-                headers.push_back("Content-Type: text/html;charset=utf-8");
-            else
-                headers.push_back("Content-Type: text/plain;charset=utf-8");
-
-            responseMsg = ss.str();
-        }
-
-        bool handleRESTQuery( string ns , string action , BSONObj & params , int & responseCode , stringstream & out ) {
-            Timer t;
-
-            int html = _getOption( params["html"] , 0 ); 
-            int skip = _getOption( params["skip"] , 0 );
-            int num  = _getOption( params["limit"] , _getOption( params["count" ] , 1000 ) ); // count is old, limit is new
-
-            int one = 0;
-            if ( params["one"].type() == String && tolower( params["one"].valuestr()[0] ) == 't' ) {
-                num = 1;
-                one = 1;
-            }
-
-            BSONObjBuilder queryBuilder;
-
-            BSONObjIterator i(params);
-            while ( i.more() ){
-                BSONElement e = i.next();
-                string name = e.fieldName();
-                if ( ! name.find( "filter_" ) == 0 )
-                    continue;
-
-                string field = name.substr(7);
-                const char * val = e.valuestr();
-
-                char * temp;
-
-                // TODO: this is how i guess if something is a number.  pretty lame right now
-                double number = strtod( val , &temp );
-                if ( temp != val )
-                    queryBuilder.append( field , number );
-                else
-                    queryBuilder.append( field , val );
-            }
-
-            BSONObj query = queryBuilder.obj();
-            auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
-            uassert( 13085 , "query failed for dbwebserver" , cursor.get() );
-
-            if ( one ) {
-                if ( cursor->more() ) {
-                    BSONObj obj = cursor->next();
-                    out << obj.jsonString(Strict,html?1:0) << '\n';
-                }
-                else {
-                    responseCode = 404;
-                }
-                return html != 0;
-            }
-
-            if( html )  {
-                string title = string("query ") + ns;
-                out << start(title) 
-                    << p(title)
-                    << "<pre>";
-            } else {
-                out << "{\n";
-                out << "  \"offset\" : " << skip << ",\n";
-                out << "  \"rows\": [\n";
-            }
-
-            int howMany = 0;
-            while ( cursor->more() ) {
-                if ( howMany++ && html == 0 )
-                    out << " ,\n";
-                BSONObj obj = cursor->next();
-                if( html ) {
-                    if( out.tellp() > 4 * 1024 * 1024 ) {
-                        out << "Stopping output: more than 4MB returned and in html mode\n";
-                        break;
-                    }
-                    out << obj.jsonString(Strict, html?1:0) << "\n\n";
-                }
-                else {
-                    if( out.tellp() > 50 * 1024 * 1024 ) // 50MB limit - we are using ram
-                        break;
-                    out << "    " << obj.jsonString();
-                }
-            }
-
-            if( html ) { 
-                out << "</pre>\n";
-                if( howMany == 0 ) out << p("Collection is empty");
-                out << _end();
-            }
-            else {
-                out << "\n  ],\n\n";
-                out << "  \"total_rows\" : " << howMany << " ,\n";
-                out << "  \"query\" : " << query.jsonString() << " ,\n";
-                out << "  \"millis\" : " << t.millis() << '\n';
-                out << "}\n";
-            }
-
-            return html != 0;
-        }
-
-        // TODO Generate id and revision per couch POST spec
-        void handlePost( string ns, const char *body, BSONObj& params, int & responseCode, stringstream & out ) {
-            try {
-                BSONObj obj = fromjson( body );
-                db.insert( ns.c_str(), obj );
-            } catch ( ... ) {
-                responseCode = 400; // Bad Request.  Seems reasonable for now.
-                out << "{ \"ok\" : false }";
-                return;
-            }
-
-            responseCode = 201;
-            out << "{ \"ok\" : true }";
-        }
-
-        int _getOption( BSONElement e , int def ) {
-            if ( e.isNumber() )
-                return e.numberInt();
-            if ( e.type() == String )
-                return atoi( e.valuestr() );
-            return def;
-        }
-        
         void _rejectREST( string& responseMsg , int& responseCode, vector<string>& headers ){
                                 responseCode = 403;
                     stringstream ss;
@@ -631,6 +442,7 @@ namespace mongo {
                     responseMsg = ss.str();
                     headers.push_back( "Content-Type: text/plain" );
         }
+
 
     private:
         static DBDirectClient db;
