@@ -576,7 +576,7 @@ namespace mongo {
             if ( ret == -1 ) {
                 int e = errno;
                 if ( e != EAGAIN || _timeout == 0 ) {                
-                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString()<<endl;
+                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
                     throw SocketException( SocketException::RECV_ERROR );
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {

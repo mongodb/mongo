@@ -389,7 +389,11 @@ namespace mongo {
             NULL);
         if( errorText ) {
             string x = toUtf8String(errorText);
-            s << x;
+            for( string::iterator i = x.begin(); i != x.end(); i++ ) {
+                if( *i == '\n' || *i == '\r' ) 
+                    break;
+                s << *i;
+            }
             LocalFree(errorText);
         }
         else
