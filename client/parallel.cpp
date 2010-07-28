@@ -54,7 +54,7 @@ namespace mongo {
         _done = true; // just in case
     }
     
-    auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra ){
+    auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra , int skipLeft ){
         uassert( 10017 ,  "cursor already done" , ! _done );
         
         BSONObj q = _query;
@@ -71,12 +71,12 @@ namespace mongo {
 
         if ( logLevel >= 5 ){
             log(5) << "ClusteredCursor::query (" << type() << ") server:" << server 
-                   << " ns:" << _ns << " query:" << q << " num:" << num << 
-                " _fields:" << _fields << " options: " << _options << endl;
+                   << " ns:" << _ns << " query:" << q << " num:" << num 
+                   << " _fields:" << _fields << " options: " << _options << endl;
         }
         
         auto_ptr<DBClientCursor> cursor = 
-            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize );
+            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize == 0 ? 0 : _batchSize + skipLeft );
         
         if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ){
             conn.done();
@@ -321,7 +321,7 @@ namespace mongo {
         int num = 0;
         for ( set<ServerAndQuery>::iterator i = _servers.begin(); i!=_servers.end(); i++ ){
             const ServerAndQuery& sq = *i;
-            _cursors[num++].reset( query( sq._server , 0 , sq._extra ) );
+            _cursors[num++].reset( query( sq._server , 0 , sq._extra , _needToSkip ) );
         }
             
     }
@@ -335,11 +335,13 @@ namespace mongo {
         if ( _needToSkip > 0 ){
             int n = _needToSkip;
             _needToSkip = 0;
-            
+
             while ( n > 0 && more() ){
-                next();
+                BSONObj x = next();
                 n--;
             }
+
+            _needToSkip = n;
         }
         
         for ( int i=0; i<_numServers; i++ ){
