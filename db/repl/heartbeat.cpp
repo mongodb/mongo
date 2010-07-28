@@ -208,7 +208,7 @@ namespace mongo {
         ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
         //DEV log() << "TEMP starting healthtask thread " << m->h().toString() << endl;
         healthTasks.insert(task);
-        task::repeat(shared_ptr<task::Task>(task), 2000);
+        task::repeat(task, 2000);
     }
 
     void startSyncThread();
@@ -218,7 +218,7 @@ namespace mongo {
         until the initiation.
     */
     void ReplSetImpl::startThreads() {
-        task::fork(mgr->taskPtr());
+        task::fork(mgr);
 
         /*Member* m = _members.head();
         while( m ) {

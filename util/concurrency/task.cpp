@@ -37,6 +37,7 @@ namespace mongo {
         Task::Task() { 
             n = 0;
             repeat = 0;
+            deleteSelf = true;
         }
 
         void Task::halt() { repeat = 0; }
@@ -57,20 +58,17 @@ namespace mongo {
             }
         }
 
-        void Task::ending() { me.reset(); }
-
-        void Task::begin(shared_ptr<Task> t) {
-            me = t;
+        void Task::begin() {
             go();
         }
 
-        void fork(shared_ptr<Task> t) { 
-            t->begin(t);
+        void fork(Task *t) { 
+            t->begin();
         }
 
-        void repeat(shared_ptr<Task> t, unsigned millis) { 
+        void repeat(Task *t, unsigned millis) { 
             t->repeat = millis;
-            t->begin(t);
+            t->begin();
         }
 
     }
