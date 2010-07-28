@@ -364,38 +364,6 @@ namespace mongo {
                     return;
                 }
 
-                /* run a command from the web ui */
-                const char *p = url.c_str();
-                if( *p == '/' ) {
-                    const char *h = strstr(p, "?text");
-                    string cmd = p+1;
-                    if( h && h > p+1 ) 
-                        cmd = string(p+1, h-p-1);
-                    const map<string,Command*> *m = Command::webCommands();
-                    if( m && m->count(cmd) ) {
-                        Command *c = m->find(cmd)->second;
-                        Client& client = cc();
-                        BSONObjBuilder result;
-                        BSONObjBuilder b;
-                        b.append(c->name, 1);
-                        BSONObj cmdObj = b.obj();
-                        execCommand(c, client, 0, "admin.", cmdObj, result, false);
-                        responseCode = 200;
-                        string j = result.done().jsonString(JS, h != 0 ? 1 : 0);
-                        if( h == 0 ) { 
-                            headers.push_back( "Content-Type: application/json" );
-                        }
-                        else { 
-                            headers.push_back( "Content-Type: text/plain" );
-                        }
-                        responseMsg = j;
-                        if( h ) 
-                            responseMsg += '\n';
-                        return;
-
-                    }
-                }
-
                 DEV log() << "handle REST request " << url << endl;
                 handleRESTRequest( rq , url , responseMsg , responseCode , headers );
                 return;
@@ -779,9 +747,9 @@ namespace mongo {
 
     } statusHandler;
 
-    class CommandsHandler : DbWebHandler {
+    class CommandListHandler : public DbWebHandler {
     public:
-        CommandsHandler() : DbWebHandler( "_commands" , 1 , true ){}
+        CommandListHandler() : DbWebHandler( "_commands" , 1 , true ){}
         
         virtual void handle( const char *rq, string url, 
                              string& responseMsg, int& responseCode,
@@ -803,6 +771,90 @@ namespace mongo {
             
             responseMsg = ss.str();
         }
+    } commandListHandler;
+
+    class CommandsHandler : public DbWebHandler {
+    public:
+        CommandsHandler() : DbWebHandler( "DUMMY COMMANDS" , 2 , true ){}
+        
+        bool _cmd( const string& url , string& cmd , bool& text ) const {
+            const char * x = url.c_str();
+            
+            if ( x[0] != '/' ){
+                // this should never happen
+                return false;
+            }
+            
+            if ( strchr( x + 1 , '/' ) )
+                return false;
+            
+            x++;
+
+            const char * end = strstr( x , "?text" );
+            if ( end ){
+                text = true;
+                cmd = string( x , end - x );
+            }
+            else {
+                text = false;
+                cmd = string(x);
+            }
+             
+            return true;
+        }
+
+        Command * _cmd( const string& cmd ) const {
+            const map<string,Command*> *m = Command::webCommands();
+            if( ! m )
+                return 0;
+            
+            map<string,Command*>::const_iterator i = m->find(cmd);
+            if ( i == m->end() )
+                return 0;
+            
+            return i->second;
+        }
+
+        virtual bool handles( const string& url ) const { 
+            string cmd;
+            bool text;
+            if ( ! _cmd( url , cmd , text ) )
+                return false;
+
+            return _cmd( cmd );
+        }
+        
+        virtual void handle( const char *rq, string url, 
+                             string& responseMsg, int& responseCode,
+                             vector<string>& headers,  const SockAddr &from ){
+            
+            string cmd;
+            bool text;
+            assert( _cmd( url , cmd , text ) );
+            Command * c = _cmd( cmd );
+            assert( c );
+
+            BSONObj cmdObj = BSON( cmd << 1 );
+            Client& client = cc();
+            
+            BSONObjBuilder result;
+            execCommand(c, client, 0, "admin.", cmdObj , result, false);
+            
+            responseCode = 200;
+            
+            string j = result.done().jsonString(JS, text );
+            responseMsg = j;
+            
+            if( text ){
+                headers.push_back( "Content-Type: text/plain" );
+                responseMsg += '\n';
+            }
+            else {
+                headers.push_back( "Content-Type: application/json" );
+            }
+
+        }
+        
     } commandsHandler;
 
     // --- external ----
