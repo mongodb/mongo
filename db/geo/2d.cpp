@@ -58,6 +58,10 @@ namespace mongo {
     const double EARTH_RADIUS_KM = 6371;
     const double EARTH_RADIUS_MILES = EARTH_RADIUS_KM * 0.621371192;
 
+    enum GeoDistType {
+        GEO_PLAIN,
+        GEO_SPHERE
+    };
 
     GeoBitSets geoBitSets;
 
@@ -1117,13 +1121,14 @@ namespace mongo {
             DONE
         } _state;
 
-        GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() )        
+        GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() , const string& type="$center")
             : GeoBrowse( g , "circle" , filter ){
             
             uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
             BSONObjIterator i(circle);
-            _startPt = Point(i.next());
-            _start = _startPt.hash(g);
+            BSONElement center = i.next();
+            _start = g->_tohash(center);
+            _startPt = Point(center);
             _prefix = _start;
             _maxDistance = i.next().numberDouble();
             uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
@@ -1131,6 +1136,20 @@ namespace mongo {
 
             _state = START;
             _found = 0;
+
+            if (type == "$center"){
+                _type = GEO_PLAIN;
+                _scanDistance = _maxDistance;
+            } else if (type == "$centerSphere") {
+                // current algorithm scans more buckets as you get further from equator
+                uassert(13437, "Spherical distance is currently limited to latitudes from 80S to 80N",
+                                _startPt._y >= -80 && _startPt._y <= 80);
+
+                _type = GEO_SPHERE;
+                _scanDistance = _maxDistance / cos(_startPt._y * (M_PI/180));
+            } else {
+                uassert(13438, "invalid $center query type: " + type, false);
+            }
 
             ok();
         }
@@ -1187,16 +1206,15 @@ namespace mongo {
                     return;
                 }
                 
-
                 Point ll (_g, _prefix);
                 GeoHash trHash = _prefix;
                 trHash.move( 1 , 1 );
                 Point tr (_g, trHash);
                 double sideLen = fabs(tr._x - ll._x);
 
-                if (sideLen > _maxDistance){ // circle must be contained by surrounding squares
-                    if ( (ll._x + _maxDistance < _startPt._x && ll._y + _maxDistance < _startPt._y) && 
-                         (tr._x - _maxDistance > _startPt._x && tr._y - _maxDistance > _startPt._y) )
+                if (sideLen > _scanDistance){ // circle must be contained by surrounding squares
+                    if ( (ll._x + _scanDistance < _startPt._x && ll._y + _scanDistance < _startPt._y) && 
+                         (tr._x - _scanDistance > _startPt._x && tr._y - _scanDistance > _startPt._y) )
                     {
                         GEODEBUG("square fully contains circle");
                         _state = DONE;
@@ -1223,15 +1241,15 @@ namespace mongo {
 
         bool needToCheckBox(const GeoHash& prefix){
             Point ll (_g, prefix);
-            if (fabs(ll._x - _startPt._x) <= _maxDistance) return true;
-            if (fabs(ll._y - _startPt._y) <= _maxDistance) return true;
+            if (fabs(ll._x - _startPt._x) <= _scanDistance) return true;
+            if (fabs(ll._y - _startPt._y) <= _scanDistance) return true;
 
             GeoHash trHash = _prefix;
             trHash.move( 1 , 1 );
             Point tr (_g, trHash);
 
-            if (fabs(tr._x - _startPt._x) <= _maxDistance) return true;
-            if (fabs(tr._y - _startPt._y) <= _maxDistance) return true;
+            if (fabs(tr._x - _startPt._x) <= _scanDistance) return true;
+            if (fabs(tr._y - _startPt._y) <= _scanDistance) return true;
 
             return false;
         }
@@ -1247,14 +1265,24 @@ namespace mongo {
 
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
-            d = _g->distance( _start , h );
+            switch (_type){
+                case GEO_PLAIN: 
+                    d = _g->distance( _start , h );
+                    break;
+                case GEO_SPHERE:
+                    d = _g->distance( _start , h );
+                    break;
+            }
+            
             GEODEBUG( "\t " << h << "\t" << d );
             return d <= _maxDistance;
         }
 
+        GeoDistType _type;
         GeoHash _start;
         Point _startPt;
-        double _maxDistance;
+        double _maxDistance; // user input
+        double _scanDistance; // effected by GeoDistType
         
         int _found;
         
@@ -1428,16 +1456,13 @@ namespace mongo {
                 uassert( 13057 , "$within has to take an object or array" , e.isABSONObj() );
                 e = e.embeddedObject().firstElement();
                 string type = e.fieldName();
-                if ( type == "$center" ){
+                if ( startsWith(type,  "$center") ){
                     uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c;
-                    c.reset( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                    shared_ptr<Cursor> c( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query , type) );
                     return c;   
-                }
-                else if ( type == "$box" ){
+                } else if ( type == "$box" ){
                     uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c;
-                    c.reset( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                    shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
                     return c;   
                 }
                 throw UserException( 13058 , (string)"unknown $with type: " + type );
