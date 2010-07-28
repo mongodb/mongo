@@ -1087,7 +1087,6 @@ namespace mongo {
         enum State {
             START , 
             DOING_EXPAND ,
-            DOING_AROUND ,
             DONE
         } _state;
 
@@ -1123,19 +1122,13 @@ namespace mongo {
                 _state = DOING_EXPAND;
             }
             
-            if ( (_state == DOING_EXPAND) || (_state == DOING_AROUND) ){
+            if (_state == DOING_EXPAND){
                 GEODEBUG( "circle prefix [" << _prefix << "]" );
                 PREFIXDEBUG(_prefix, _g);
 
                 while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
                 while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
 
-                if ( _state == DOING_AROUND ){
-                    GEODEBUG( "\tpast circle bounds");
-                    _state = DONE;
-                    return;
-                }
-                
                 if ( ! _prefix.constrains() ){
                     GEODEBUG( "\t exhausted the btree" );
                     _state = DONE;
@@ -1148,7 +1141,7 @@ namespace mongo {
                     trHash.move( 1 , 1 );
                     Point tr (_g, trHash);
                     if (tr._x - _maxDistance > _startPt._x && tr._y - _maxDistance > _startPt._y){
-                        _state = DOING_AROUND;
+                        _state = DONE;
                     }
                 }
 
