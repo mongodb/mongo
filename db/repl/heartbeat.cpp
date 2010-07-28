@@ -172,8 +172,6 @@ namespace mongo {
             }
             m = mem;
 
-            ReplSet *rs = theReplSet;
-
             theReplSet->mgr->send( boost::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
 
             static time_t last = 0;
