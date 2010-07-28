@@ -96,35 +96,33 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
-    MessagingPort *connGrab = 0;
-    void connThread();
+    void connThread( MessagingPort * p );
 
     class OurListener : public Listener {
     public:
         OurListener(const string &ip, int p) : Listener(ip, p) { }
         virtual void accepted(MessagingPort *mp) {
-            assert( connGrab == 0 );
+
             if ( ! connTicketHolder.tryAcquire() ){
                 log() << "connection refused because too many open connections" << endl;
                 // TODO: would be nice if we notified them...
                 mp->shutdown();
+                delete mp;
                 return;
             }
-            connGrab = mp;
+
             try {
-                boost::thread thr(connThread);
-                while ( connGrab )
-                    sleepmillis(1);
+                boost::thread thr(boost::bind(&connThread,mp));
             }
             catch ( boost::thread_resource_error& ){
                 log() << "can't create new thread, closing connection" << endl;
                 mp->shutdown();
-                connGrab = 0;
+                delete mp;
             }
             catch ( ... ){
                 log() << "unkonwn exception starting connThread" << endl;
                 mp->shutdown();
-                connGrab = 0;
+                delete mp;
             }
         }
     };
@@ -206,7 +204,7 @@ namespace mongo {
        app server will open a pool of threads.
        todo: one day, asio...
     */
-    void connThread()
+    void connThread( MessagingPort * inPort )
     {
         TicketHolderReleaser connTicketReleaser( &connTicketHolder );
         Client::initThread("conn");
@@ -215,8 +213,7 @@ namespace mongo {
         LastError *le = new LastError();
         lastError.reset(le);
 
-        auto_ptr<MessagingPort> dbMsgPort( connGrab );
-        connGrab = 0;
+        auto_ptr<MessagingPort> dbMsgPort( inPort );
         Client& c = cc();
 
         try {
