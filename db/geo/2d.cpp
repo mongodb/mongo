@@ -358,7 +358,7 @@ namespace mongo {
             return (int)(.5+(d*1000));
         }
         
-#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; assert( a == b ); }
+#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; assert( a == GeoHash(b) ); }
 
         void run(){
             assert( ! GeoHash::isBitSet( 0 , 0 ) );
@@ -483,7 +483,7 @@ namespace mongo {
                 GeoHash entry(  "1100110000011100000111000001110000011100000111000001000000000000" );
                 assert( ! entry.hasPrefix( prefix ) );
 
-                entry = "1100110000001100000111000001110000011100000111000001000000000000";
+                entry = GeoHash("1100110000001100000111000001110000011100000111000001000000000000");
                 assert( entry.toString().find( prefix.toString() ) == 0 );
                 assert( entry.hasPrefix( GeoHash( "1100" ) ) );
                 assert( entry.hasPrefix( prefix ) );
@@ -505,8 +505,8 @@ namespace mongo {
 
             {
                 GeoHash a( "11001111" );
-                assert( GeoHash( "11" ) == a.commonPrefix( "11" ) );
-                assert( GeoHash( "11" ) == a.commonPrefix( "11110000" ) );
+                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11") ) );
+                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11110000") ) );
             }
 
             {
@@ -1398,7 +1398,7 @@ namespace mongo {
             GeoSearch gs( g , n , numWanted , filter , maxDistance );
 
             if ( cmdObj["start"].type() == String){
-                GeoHash start = (string) cmdObj["start"].valuestr();
+                GeoHash start ((string) cmdObj["start"].valuestr());
                 gs._start = start;
             }
             

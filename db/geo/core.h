@@ -63,15 +63,15 @@ namespace mongo {
             : _hash(0),_bits(0){
         }
 
-        GeoHash( const char * hash ){
+        explicit GeoHash( const char * hash ){
             init( hash );
         }
 
-        GeoHash( const string& hash ){
+        explicit GeoHash( const string& hash ){
             init( hash );
         }
 
-        GeoHash( const BSONElement& e , unsigned bits=32 ){
+        explicit GeoHash( const BSONElement& e , unsigned bits=32 ){
             _bits = bits;
             if ( e.type() == BinData ){
                 int len = 0;
@@ -347,13 +347,13 @@ namespace mongo {
             g->unhash( hash , _x , _y );
         }
         
-        Point( const BSONElement& e ){
+        explicit Point( const BSONElement& e ){
             BSONObjIterator i(e.Obj());
             _x = i.next().number();
             _y = i.next().number();
         }
 
-        Point( const BSONObj& o ){
+        explicit Point( const BSONObj& o ){
             BSONObjIterator i(o);
             _x = i.next().number();
             _y = i.next().number();
