@@ -29,10 +29,31 @@
 
 #include "core.h"
 
-//#define GEODEBUG(x) cout << x << endl;
-#define GEODEBUG(x) 
-
 namespace mongo {
+
+#if 0
+# define GEODEBUG(x) cout << x << endl;
+    inline void PREFIXDEBUG(GeoHash prefix, const GeoConvert* g){
+        if (!prefix.constrains()) {
+            cout << "\t empty prefix" << endl;
+            return ;
+        }
+
+        Point ll (g, prefix); // lower left
+        prefix.move(1,1);
+        Point tr (g, prefix); // top right
+
+        Point center ( (ll._x+tr._x)/2, (ll._y+tr._y)/2 );
+        double radius = fabs(ll._x - tr._x) / 2;
+
+        cout << "\t ll: " << ll.toString() << " tr: " << tr.toString() 
+             << " center: " << center.toString() << " radius: " << radius << endl;
+
+    }
+#else
+# define GEODEBUG(x) 
+# define PREFIXDEBUG(x, y) 
+#endif
 
     double EARTH_RADIUS_KM = 6371;
     double EARTH_RADIUS_MILES = EARTH_RADIUS_KM * 0.621371192;
@@ -1075,7 +1096,8 @@ namespace mongo {
             
             uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
             BSONObjIterator i(circle);
-            _start = g->_tohash( i.next() );
+            _startPt = Point(i.next());
+            _start = _startPt.hash(g);
             _prefix = _start;
             _maxDistance = i.next().numberDouble();
             uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
@@ -1103,8 +1125,16 @@ namespace mongo {
             
             if ( (_state == DOING_EXPAND) || (_state == DOING_AROUND) ){
                 GEODEBUG( "circle prefix [" << _prefix << "]" );
+                PREFIXDEBUG(_prefix, _g);
+
                 while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
                 while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+
+                if ( _state == DOING_AROUND ){
+                    GEODEBUG( "\tpast circle bounds");
+                    _state = DONE;
+                    return;
+                }
                 
                 if ( ! _prefix.constrains() ){
                     GEODEBUG( "\t exhausted the btree" );
@@ -1112,21 +1142,20 @@ namespace mongo {
                     return;
                 }
                 
-                if ( _g->distance( _prefix , _start ) > _maxDistance ){
-		    GEODEBUG( "\tpast circle bounds");
-                    GeoHash tr = _prefix;
-                    tr.move( 1 , 1 );
-                    if ( _g->distance( tr , _start ) > _maxDistance )
+                Point ll (_g, _prefix);
+                if (ll._x + _maxDistance < _startPt._x && ll._y + _maxDistance < _startPt._y){
+                    GeoHash trHash = _prefix;
+                    trHash.move( 1 , 1 );
+                    Point tr (_g, trHash);
+                    if (tr._x - _maxDistance > _startPt._x && tr._y - _maxDistance > _startPt._y){
                         _state = DOING_AROUND;
+                    }
                 }
+
                 _prefix = _prefix.up();
                 return;
             }
             
-            if ( _state == DOING_AROUND ){
-                _state = DONE;
-                return;
-            }
             /* Clients are expected to use moreToDo before calling
              * fillStack, so DONE is checked for there. If any more
              * State values are defined, you should handle them
@@ -1142,6 +1171,7 @@ namespace mongo {
         }
 
         GeoHash _start;
+        Point _startPt;
         double _maxDistance;
         
         int _found;
