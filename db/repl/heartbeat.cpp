@@ -148,14 +148,14 @@ namespace mongo {
 
                 try {
                     long long t = info["time"].numberLong();
-                    mem.drift = 0;
+                    mem.skew = 0;
                     if( t > after ) 
-                        mem.drift = (int) (t - after);
+                        mem.skew = (int) (t - after);
                     else if( t < before ) 
-                        mem.drift = (int) (t - before); // negative
+                        mem.skew = (int) (t - before); // negative
                 }
                 catch(...) { 
-                    mem.drift = INT_MIN;
+                    mem.skew = INT_MIN;
                 }
 
                 {

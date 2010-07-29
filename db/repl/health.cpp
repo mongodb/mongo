@@ -97,8 +97,8 @@ namespace mongo {
         stringstream q;
         q << "/_replSetOplog?" << id();
         s << td( a(q.str(), "", never ? "?" : hbinfo().opTime.toString()) );
-        if( hbinfo().drift > INT_MIN ) 
-            s << td( grey(str::stream() << hbinfo().drift,!ok) );
+        if( hbinfo().skew > INT_MIN ) 
+            s << td( grey(str::stream() << hbinfo().skew,!ok) );
         else
             s << td("");
         s << _tr();
@@ -257,7 +257,7 @@ namespace mongo {
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 
             "<a title=\"how up to date this server is; write operations are sequentially numbered.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">opord</a>", 
-            "<a title=\"Clock drift in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">drift</a>", 
+            "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">drift</a>", 
             0};
         s << table(h);
 
