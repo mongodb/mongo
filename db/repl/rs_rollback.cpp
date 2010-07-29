@@ -163,7 +163,7 @@ namespace mongo {
                     // found the point back in time where we match.
                     // todo : check a few more just to be careful about hash collisions.
                     log() << "replSet rollback found matching events at " << ourTime.toStringPretty() << rsLog;
-                    log() << "replSet scanned : " << scanned << rsLog;
+                    log() << "replSet rollback findcommonpoint scanned : " << scanned << rsLog;
                     h.commonPoint = ourTime;
                     h.commonPointOurDiskloc = u.currLoc();
                     return;
@@ -207,20 +207,26 @@ namespace mongo {
 
        list< pair<DocID,bo> > goodVersions;
 
-       for( set<DocID>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) { 
-           const DocID& d = *i;
+       try {
+           for( set<DocID>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) { 
+               const DocID& d = *i;
 
-           assert( !d._id.eoo() );
+               assert( !d._id.eoo() );
 
-           {
-               /* TODO : slow.  lots of round trips. */
-               bo good= them->findOne(d.ns, d._id.wrap()).getOwned();
-               totSize += good.objsize();
-               uassert( 13410, "replSet too much data to roll back", totSize < 300 * 1024 * 1024 );
+               {
+                   /* TODO : slow.  lots of round trips. */
+                   bo good= them->findOne(d.ns, d._id.wrap()).getOwned();
+                   totSize += good.objsize();
+                   uassert( 13410, "replSet too much data to roll back", totSize < 300 * 1024 * 1024 );
 
-               // note good might be eoo, indicating we should delete it
-               goodVersions.push_back(pair<DocID,bo>(d,good));
+                   // note good might be eoo, indicating we should delete it
+                   goodVersions.push_back(pair<DocID,bo>(d,good));
+               }
            }
+       }
+       catch(DBException& e) {
+           sethbmsg(str::stream() << "syncRollback re-get objects: " << e.toString(),0);
+           throw e;
        }
 
        // update them
@@ -318,7 +324,7 @@ namespace mongo {
             }
         }
 
-        sethbmsg("replSet syncRollback 3");
+        sethbmsg("replSet syncRollback 3 fixup");
 
         syncFixUp(how, r.conn());
     }

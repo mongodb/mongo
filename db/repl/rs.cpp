@@ -187,7 +187,7 @@ namespace mongo {
         //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
         //    addMemberIfMissing(*i);
 
-        log() << "replSet beginning startup..." << rsLog;
+        log(1) << "replSet beginning startup..." << rsLog;
 
         loadConfig();
 

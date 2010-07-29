@@ -234,12 +234,15 @@ namespace mongo {
             log() << "replSet info not electing self, we are not freshest" << rsLog;
             return;
         }
+
+        rs.sethbmsg("",9);
+
         if( !allUp && time(0) - started < 60 * 5 ) { 
             /* the idea here is that if a bunch of nodes bounce all at once, we don't want to drop data 
                if we don't have to -- we'd rather be offline and wait a little longer instead 
                todo: make this configurable.
                */
-            log() << "replSet info not electing self, not all members up and we have been up less than 5 minutes" << rsLog;
+            rs.sethbmsg("not electing self, not all members up and we have been up less than 5 minutes");
             return;
         }
 
