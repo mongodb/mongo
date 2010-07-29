@@ -45,6 +45,7 @@
 #include <iostream>
 #include <sstream>
 #include <boost/utility.hpp>
+#include "util/builder.h"
 
 namespace bson { 
 
@@ -55,7 +56,7 @@ namespace bson {
     public:
         assertion( unsigned u , const string& s )
             : id( u ) , msg( s ){
-            StringBuilder ss;
+            mongo::StringBuilder ss;
             ss << "BsonAssertion id: " << u << " " << s;
             full = ss.str();
         }
