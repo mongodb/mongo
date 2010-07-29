@@ -85,8 +85,8 @@ namespace mongo {
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) { 
-                log() << "TEMP " << lastOpTimeWritten.toStringPretty() << endl;
-                log() << "TEMP " << ts.toStringPretty() << endl;
+                log() << "TEMP our last op time written: " << lastOpTimeWritten.toStringPretty() << endl;
+                log() << "TEMP primary's GTE: " << ts.toStringPretty() << endl;
                 /*
                 }*/
 

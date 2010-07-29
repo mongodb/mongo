@@ -282,7 +282,12 @@ namespace mongo {
        sethbmsg("syncRollback 6");
 
        // clean up oplog
+       log() << "replSet rollback temp truncate after " << h.commonPoint.toStringPretty() << rsLog;
+       // todo: fatal error if this throws?
        oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
+
+       /* reset cached lastoptimewritten and h value */
+       loadLastOpTimeWritten();
 
        sethbmsg("syncRollback 7");
        MemoryMappedFile::flushAll(true);

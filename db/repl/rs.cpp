@@ -207,7 +207,7 @@ namespace mongo {
     void newReplUp();
 
     void ReplSetImpl::loadLastOpTimeWritten() { 
-        assert( lastOpTimeWritten.isNull() );
+        //assert( lastOpTimeWritten.isNull() );
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog, o) ) { 
