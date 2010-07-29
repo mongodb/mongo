@@ -134,7 +134,7 @@ namespace mongo {
                 size = *((int*)objdata);
             }
             
-            assert( size > 4 & size < 100000000 );
+            assert( size > 4 && size < 100000000 );
             
             _b.appendNum((char) Object);
             _b.appendStr(fieldName);
