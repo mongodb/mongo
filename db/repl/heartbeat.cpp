@@ -89,6 +89,7 @@ namespace mongo {
             result.append("set", theReplSet->name());
             result.append("state", theReplSet->state().s);
             result.append("hbmsg", theReplSet->hbmsg());
+            result.append("time", (int) time(0));
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             int v = theReplSet->config().version;
             result.append("v", v);
@@ -138,8 +139,25 @@ namespace mongo {
             try { 
                 BSONObj info;
                 int theirConfigVersion = -10000;
+
+                time_t before = time(0);
+
                 bool ok = requestHeartbeat(theReplSet->name(), theReplSet->selfFullName(), h.toString(), info, theReplSet->config().version, theirConfigVersion);
-                mem.lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
+
+                time_t after = mem.lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
+
+                try {
+                    long long t = info["time"].numberLong();
+                    mem.drift = 0;
+                    if( t > after ) 
+                        mem.drift = (int) (t - after);
+                    else if( t < before ) 
+                        mem.drift = (int) (t - before); // negative
+                }
+                catch(...) { 
+                    mem.drift = INT_MIN;
+                }
+
                 {
                     be state = info["state"];
                     if( state.ok() )

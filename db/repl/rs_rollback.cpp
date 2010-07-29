@@ -200,12 +200,16 @@ namespace mongo {
         bson::bo goodVersionOfObject;
     };
 
-   void ReplSetImpl::syncFixUp(HowToFixUp& h, DBClientConnection *them) {
+   void ReplSetImpl::syncFixUp(HowToFixUp& h, OplogReader& r) {
+       DBClientConnection *them = r.conn();
+
        // fetch all first so we needn't handle interruption in a fancy way
 
        unsigned long long totSize = 0;
 
        list< pair<DocID,bo> > goodVersions;
+
+       bo newMinValid;
 
        DocID d;
        unsigned long long n = 0;
@@ -226,6 +230,11 @@ namespace mongo {
                    goodVersions.push_back(pair<DocID,bo>(d,good));
                }
            }
+           newMinValid = r.getLastOp(rsoplog);
+           if( newMinValid.isEmpty() ) { 
+               sethbmsg("syncRollback error newMinValid empty?");
+               return;
+           }
        }
        catch(DBException& e) {
            sethbmsg(str::stream() << "syncRollback re-get objects: " << e.toString(),0);
@@ -243,6 +252,10 @@ namespace mongo {
        MemoryMappedFile::flushAll(true);
 
        dbMutex.assertWriteLocked();
+
+       /* we have items we are writing that aren't from a point-in-time.  thus best not to come online until we get to that point 
+          in freshness. */
+       Helpers::putSingleton("local.replset.minvalid", newMinValid);
 
        Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
@@ -341,7 +354,7 @@ namespace mongo {
 
         sethbmsg("replSet syncRollback 3 fixup");
 
-        syncFixUp(how, r.conn());
+        syncFixUp(how, r);
     }
 
 }

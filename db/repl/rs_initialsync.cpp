@@ -136,8 +136,7 @@ namespace mongo {
         {
             writelock lk("local.");
             Client::Context cx( "local." );
-            cx.db()->flushFiles(true);
-            
+            cx.db()->flushFiles(true);            
             Helpers::putSingleton("local.replset.minvalid", minValid);
             // write an op from the primary to our oplog that existed when 
             // we started cloning.  that will be our starting point.
