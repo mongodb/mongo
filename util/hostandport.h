@@ -28,7 +28,7 @@ namespace mongo {
     /** helper for manipulating host:port connection endpoints. 
       */
     struct HostAndPort { 
-        HostAndPort() : _port(-1), _isSelf(NOT_CACHED) { }
+        HostAndPort() : _port(-1) { }
 
         /** From a string hostname[:portnumber] 
             Throws user assertion if bad config string or bad port #.
@@ -36,10 +36,10 @@ namespace mongo {
         HostAndPort(string s);
 
         /** @param p port number. -1 is ok to use default. */
-        HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p), _isSelf(NOT_CACHED) { }
+        HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { }
 
         HostAndPort(const SockAddr& sock ) 
-            : _host( sock.getAddr() ) , _port( sock.getPort() ), _isSelf(NOT_CACHED){
+            : _host( sock.getAddr() ) , _port( sock.getPort() ){
         }
 
         static HostAndPort me() { 
@@ -80,12 +80,6 @@ namespace mongo {
         // invariant (except full obj assignment):
         string _host;
         int _port; // -1 indicates unspecified
-
-        mutable enum {
-            NOT_CACHED = -1,
-            NO = 0,
-            YES = 1
-        } _isSelf;
     };
 
     /** returns true if strings seem to be the same hostname.
@@ -125,7 +119,7 @@ namespace mongo {
         return _host == "localhost" || startsWith(_host.c_str(), "127.") || _host == "::1";
     }
 
-    inline HostAndPort::HostAndPort(string s) : _isSelf(NOT_CACHED) {
+    inline HostAndPort::HostAndPort(string s) {
         const char *p = s.c_str();
         uassert(13110, "HostAndPort: bad config string", *p);
         const char *colon = strrchr(p, ':');
