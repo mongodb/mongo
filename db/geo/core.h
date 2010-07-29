@@ -63,15 +63,15 @@ namespace mongo {
             : _hash(0),_bits(0){
         }
 
-        GeoHash( const char * hash ){
+        explicit GeoHash( const char * hash ){
             init( hash );
         }
 
-        GeoHash( const string& hash ){
+        explicit GeoHash( const string& hash ){
             init( hash );
         }
 
-        GeoHash( const BSONElement& e , unsigned bits=32 ){
+        explicit GeoHash( const BSONElement& e , unsigned bits=32 ){
             _bits = bits;
             if ( e.type() == BinData ){
                 int len = 0;
@@ -305,6 +305,10 @@ namespace mongo {
             return _hash;
         }
 
+        unsigned getBits() const {
+            return _bits;
+        }
+
         GeoHash commonPrefix( const GeoHash& other ) const {
             unsigned i=0;
             for ( ; i<_bits && i<other._bits; i++ ){
@@ -315,6 +319,7 @@ namespace mongo {
             }
             return GeoHash(_hash,i);
         }
+
     private:
 
         void _copy( char * dst , const char * src ) const {
@@ -347,13 +352,13 @@ namespace mongo {
             g->unhash( hash , _x , _y );
         }
         
-        Point( const BSONElement& e ){
+        explicit Point( const BSONElement& e ){
             BSONObjIterator i(e.Obj());
             _x = i.next().number();
             _y = i.next().number();
         }
 
-        Point( const BSONObj& o ){
+        explicit Point( const BSONObj& o ){
             BSONObjIterator i(o);
             _x = i.next().number();
             _y = i.next().number();
@@ -370,7 +375,7 @@ namespace mongo {
             return g->hash( _x , _y );
         }
 
-        double distance( Point& p ) const {
+        double distance( const Point& p ) const {
             double a = _x - p._x;
             double b = _y - p._y;
             return sqrt( ( a * a ) + ( b * b ) );

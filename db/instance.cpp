@@ -290,8 +290,7 @@ namespace mongo {
             int len = strlen(p);
             if ( len > 400 )
                 out() << curTimeMillis() % 10000 <<
-                    " long msg received, len:" << len <<
-                    " ends with: " << p + len - 10 << endl;
+                    " long msg received, len:" << len << endl;
 
             Message *resp = new Message();
             if ( strcmp( "end" , p ) == 0 )
