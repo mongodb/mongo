@@ -161,7 +161,6 @@ namespace mongo {
                 return;
             }
 
-            rs->sethbmsg("",9);
             busyWithElectSelf = true; // don't try to do further elections & such while we are already working on one.
         }
         try { 

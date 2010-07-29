@@ -207,14 +207,17 @@ namespace mongo {
 
        list< pair<DocID,bo> > goodVersions;
 
+       DocID d;
+       unsigned long long n = 0;
        try {
            for( set<DocID>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) { 
-               const DocID& d = *i;
+               d = *i;
 
                assert( !d._id.eoo() );
 
                {
                    /* TODO : slow.  lots of round trips. */
+                   n++;
                    bo good= them->findOne(d.ns, d._id.wrap()).getOwned();
                    totSize += good.objsize();
                    uassert( 13410, "replSet too much data to roll back", totSize < 300 * 1024 * 1024 );
@@ -226,6 +229,7 @@ namespace mongo {
        }
        catch(DBException& e) {
            sethbmsg(str::stream() << "syncRollback re-get objects: " << e.toString(),0);
+           log() << "syncRollback couldn't re-get ns:" << d.ns << " _id:" << d._id << ' ' << n << '/' << h.toRefetch.size() << rsLog;
            throw e;
        }
 
@@ -240,6 +244,7 @@ namespace mongo {
 
        dbMutex.assertWriteLocked();
 
+       Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
        uassert(13412, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
 
@@ -272,9 +277,14 @@ namespace mongo {
            }
        }
 
+       sethbmsg("syncRollback 5");
+       MemoryMappedFile::flushAll(true);
+       sethbmsg("syncRollback 6");
+
        // clean up oplog
        oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
 
+       sethbmsg("syncRollback 7");
        MemoryMappedFile::flushAll(true);
 
        // done
