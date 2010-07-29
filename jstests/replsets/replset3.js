@@ -36,9 +36,19 @@ doTest = function( signal ) {
     assert( master != new_master, "Old master shouldn't be equal to new master." );
 
     // Make sure that slaves are still up
-    var result = new_master.getDB("admin").runCommand({replSetGetStatus: true});
-
+    var result = new_master.getDB("admin").runCommand({replSetGetStatus: 1});
     assert( result['ok'] == 1, "Could not verify that slaves were still up:" + result );
+
+    slaves = replTest.liveNodes.slaves;
+    assert.soon(function() {
+        res = slaves[0].getDB("admin").runCommand({replSetGetStatus: 1})
+        return res.myState == 2;
+    }, "Slave 0 state not ready.");
+
+    assert.soon(function() {
+        res = slaves[1].getDB("admin").runCommand({replSetGetStatus: 1})
+        return res.myState == 2;
+    }, "Slave 1 state not ready.");
 
     replTest.stopSet( 15 );
 }

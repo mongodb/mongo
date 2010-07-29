@@ -47,7 +47,7 @@ doTest = function( signal ) {
     assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
 
     // Here's how to restart a node:
-    replTest.start( master_id, {}, true );
+    replTest.restart( master_id );
 
     // Shut down the set and finish the test.
     replTest.stopSet( signal );

@@ -1145,8 +1145,8 @@ ReplSetTest.prototype.stop = function( n , signal ){
 }
 
 ReplSetTest.prototype.stopSet = function( signal ) {
+    print('*** Shutting down repl set ****' )
     for(i=0; i < this.ports.length; i++) {
         this.stop( i, signal );
     }
-    print('*** Shutting down repl set ****' )
 }
