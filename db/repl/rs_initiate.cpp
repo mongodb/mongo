@@ -37,9 +37,14 @@ namespace mongo {
     */ 
     void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
         int me = 0;
-        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ )
-            if( i->h.isSelf() )
+        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
+            if( i->h.isSelf() ) {
                 me++;
+                if( !i->potentiallyHot() ) { 
+                    uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
+                }
+            }
+        }
         uassert(13278, "bad config?", me <= 1);
         uassert(13279, "can't find self in the replset config", me == 1);
 
