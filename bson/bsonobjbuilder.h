@@ -127,6 +127,22 @@ namespace mongo {
             return *this;
         }
 
+        /** add a subobject as a member */
+        BSONObjBuilder& appendObject(const StringData& fieldName, const char * objdata , int size = 0 ){
+            assert( objdata );
+            if ( size == 0 ){
+                size = *((int*)objdata);
+            }
+            
+            assert( size > 4 & size < 100000000 );
+            
+            _b.appendNum((char) Object);
+            _b.appendStr(fieldName);
+            _b.appendBuf((void*)objdata, size );
+            return *this;
+        }
+
+
         /** add header for a new subobject and return bufbuilder for writing to
             the subobject's body */
         BufBuilder &subobjStart(const StringData& fieldName) {
