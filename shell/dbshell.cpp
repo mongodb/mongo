@@ -79,6 +79,7 @@ void generateCompletions( const string& prefix , vector<string>& all ){
 
 }
 
+#ifdef USE_READLINE
 static char** completionHook(const char* text , int start ,int end ){
     static map<string,string> m;
     
@@ -89,9 +90,7 @@ static char** completionHook(const char* text , int start ,int end ){
     }
     
     if ( all.size() == 0 ){
-#ifdef USE_READLINE
         rl_bind_key('\t',0);
-#endif
         return 0;
     }
     
@@ -116,6 +115,7 @@ static char** completionHook(const char* text , int start ,int end ){
 
     return matches;
 }
+#endif
 
 void shellHistoryInit(){
 #ifdef USE_READLINE
