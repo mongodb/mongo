@@ -60,8 +60,6 @@ namespace mongo {
             return false;
         }
 
-        dbtempreleasecond unlock;
-        
         log() << "shardVersionOk failed  ns:" << ns << " " << errmsg << endl;
         
         if ( doesOpGetAResponse( op ) ){
