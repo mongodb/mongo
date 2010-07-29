@@ -114,6 +114,7 @@ namespace mongo {
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes >= 0 && votes <= 100);
+        uassert(13419, "replica set config : this version of mongo only supports priorities 0 and 1", priority == 0 || priority == 1);
     }
 
     /*static*/ bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) { 
