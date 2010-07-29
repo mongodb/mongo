@@ -80,6 +80,8 @@ namespace mongo {
 
         OpTime commonPoint;
         DiskLoc commonPointOurDiskloc;
+
+        int rbid; // remote server's current rollback sequence #
     };
 
     static void refetch(HowToFixUp& h, const BSONObj& ourObj) { 
@@ -114,6 +116,8 @@ namespace mongo {
         h.toRefetch.insert(d);
     }
 
+    int getRBID(DBClientConnection*);
+
     static void syncRollbackFindCommonPoint(DBClientConnection *them, HowToFixUp& h) { 
         static time_t last;
         if( time(0)-last < 60 ) { 
@@ -135,6 +139,8 @@ namespace mongo {
         const bo fields = BSON( "ts" << 1 << "h" << 1 );
 
         //auto_ptr<DBClientCursor> u = us->query(rsoplog, q, 0, 0, &fields, 0, 0);
+
+	h.rbid = getRBID(them);
         auto_ptr<DBClientCursor> t = them->query(rsoplog, q, 0, 0, &fields, 0, 0);
 
         if( !t->more() ) throw "remote oplog empty or unreadable";
@@ -240,6 +246,13 @@ namespace mongo {
            sethbmsg(str::stream() << "syncRollback re-get objects: " << e.toString(),0);
            log() << "syncRollback couldn't re-get ns:" << d.ns << " _id:" << d._id << ' ' << n << '/' << h.toRefetch.size() << rsLog;
            throw e;
+       }
+
+       sethbmsg("syncRollback 3.5");
+       if( h.rbid != getRBID(r.conn()) ) { 
+	 // our source rolled back itself.  so the data we received isn't necessarily consistent.
+	   sethbmsg("syncRollback rbid on source changed during rollback, cancelling this attempt");
+	   return;
        }
 
        // update them

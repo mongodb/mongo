@@ -22,6 +22,7 @@
 #include "rs_config.h"
 #include "../dbwebserver.h"
 #include "../../util/mongoutils/html.h"
+#include "../../client/dbclient.h"
 
 namespace mongo { 
 
@@ -51,6 +52,29 @@ namespace mongo {
             return false;
         }
     } cmdReplSetTest;
+
+    class CmdReplSetGetRBID : public ReplSetCommand {
+    public:
+        int rbid;
+        virtual void help( stringstream &help ) const {
+	  help << "internal";
+        }
+        CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID", true) { 
+	  rbid = (int) curTimeMillis();
+	}
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) ) 
+                return false;
+	    result.append("rbid",rbid);
+            return true;
+        }
+    } cmdReplSetRBID;
+  using namespace bson;
+    int getRBID(DBClientConnection *c) { 
+      bo info;
+      c->simpleCommand("admin", &info, "replSetGetRBID");
+      return info["rbid"].Number();
+    } 
 
     class CmdReplSetGetStatus : public ReplSetCommand {
     public:
