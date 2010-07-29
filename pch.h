@@ -18,7 +18,8 @@
  *    limitations under the License.
  */
 
-#pragma once
+#ifndef MONGO_PCH_H
+#define MONGO_PCH_H
 
 #if defined(MONGO_EXPOSE_MACROS)
 # define JS_C_STRINGS_ARE_UTF8
@@ -165,3 +166,5 @@ namespace mongo {
     using boost::uint64_t;
 
 } // namespace mongo
+
+#endif // MONGO_PCH_H
