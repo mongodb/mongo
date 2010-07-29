@@ -31,6 +31,7 @@
 #include "../s/d_logic.h"
 #include "dbwebserver.h"
 #include "../util/mongoutils/html.h"
+#include "../util/mongoutils/checksum.h"
 
 namespace mongo {
 
@@ -258,7 +259,7 @@ namespace mongo {
         }
     }
 
-    BSONObj CurOp::infoNoauth() {
+    BSONObj CurOp::infoNoauth( int attempt ) {
         BSONObjBuilder b;
         b.append("opid", _opNum);
         bool a = _active && _start;
@@ -275,9 +276,32 @@ namespace mongo {
         
         b.append("ns", _ns);
         
-        if( haveQuery() ) {
-            b.append("query", query());
+        {
+            int size = querySize();
+            if ( size == 0 ){
+                // do nothing
+            }
+            else if ( size == 1 ){
+                b.append( "query" , _tooBig );
+            }
+            else if ( attempt > 2 ){
+                b.append( "query" , BSON( "err" << "can't get a clean object" ) );
+                log( LL_WARNING ) << "CurOp changing too much to get reading" << endl;
+                         
+            }
+            else {
+                int before = checksum( _queryBuf , size );
+                b.appendObject( "query" , _queryBuf , size );
+                int after = checksum( _queryBuf , size );
+                
+                if ( after != before ){
+                    // this means something changed
+                    // going to retry
+                    return infoNoauth( attempt + 1 );
+                }
+            }
         }
+
         // b.append("inLock",  ??
         stringstream clientStr;
         clientStr << _remote.toString();

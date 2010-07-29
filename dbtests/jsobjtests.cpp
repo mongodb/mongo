@@ -25,6 +25,7 @@
 #include "../db/extsort.h"
 
 #include "dbtests.h"
+#include "../util/mongoutils/checksum.h"
 
 namespace JsobjTests {
     class BufBuilderBasic {
@@ -1634,6 +1635,41 @@ namespace JsobjTests {
         }
     };
 
+    class HashingTest {
+    public:
+        void run(){
+            int N = 100000;
+            BSONObj x = BSON( "name" << "eliot was here" 
+                              << "x" << 5
+                              << "asdasdasdas" << "asldkasldjasldjasldjlasjdlasjdlasdasdasdasdasdasdasd" );
+            
+            {
+                Timer t;
+                for ( int i=0; i<N; i++ )
+                    x.md5();
+                int millis = t.millis();
+                cout << "md5 : " << millis << endl;
+            }
+            
+            {
+                Timer t;
+                for ( int i=0; i<N; i++ )
+                    x.toString();
+                int millis = t.millis();
+                cout << "toString : " << millis << endl;
+            }
+
+            {
+                Timer t;
+                for ( int i=0; i<N; i++ )
+                    checksum( x.objdata() , x.objsize() );
+                int millis = t.millis();
+                cout << "checksum : " << millis << endl;
+            }                
+                
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1741,6 +1777,7 @@ namespace JsobjTests {
             add< BSONForEachTest >();
             add< StringDataTest >();
             add< CompareOps >();
+            add< HashingTest >();
         }
     } myall;
     
