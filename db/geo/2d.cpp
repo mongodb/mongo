@@ -237,7 +237,7 @@ namespace mongo {
             b.move( 1 , 1 );
             unhash( a, ax, ay );
             unhash( b, bx, by );
-            return (abs(ax-bx));
+            return (fabs(ax-bx));
         }
 
         const IndexDetails* getDetails() const {
