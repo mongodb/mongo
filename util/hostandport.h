@@ -124,7 +124,7 @@ namespace mongo {
     }
 
     inline bool HostAndPort::isLocalHost() const { 
-        return _host == "localhost" || _host == "127.0.0.1" || _host == "::1";
+        return _host == "localhost" || startsWith(_host.c_str(), "127.") || _host == "::1";
     }
 
     inline HostAndPort::HostAndPort(string s) {
