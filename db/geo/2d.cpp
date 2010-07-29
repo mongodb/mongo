@@ -1133,7 +1133,14 @@ namespace mongo {
 
                         GeoHash newBox = _prefix;
                         newBox.move(i, j);
-                        getPointsForPrefix(newBox);
+
+                        PREFIXDEBUG(newBox, _g);
+                        if (needToCheckBox(newBox)){
+                            // TODO consider splitting into quadrants
+                            getPointsForPrefix(newBox);
+                        } else  {
+                            GEODEBUG("skipping box");
+                        }
                     }
                 }
 
@@ -1186,6 +1193,21 @@ namespace mongo {
              * State values are defined, you should handle them
              * here. */ 
             assert(0);
+        }
+
+        bool needToCheckBox(const GeoHash& prefix){
+            Point ll (_g, prefix);
+            if (fabs(ll._x - _startPt._x) <= _maxDistance) return true;
+            if (fabs(ll._y - _startPt._y) <= _maxDistance) return true;
+
+            GeoHash trHash = _prefix;
+            trHash.move( 1 , 1 );
+            Point tr (_g, trHash);
+
+            if (fabs(tr._x - _startPt._x) <= _maxDistance) return true;
+            if (fabs(tr._y - _startPt._y) <= _maxDistance) return true;
+
+            return false;
         }
 
         void getPointsForPrefix(const GeoHash& prefix){

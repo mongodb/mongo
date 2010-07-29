@@ -375,7 +375,7 @@ namespace mongo {
             return g->hash( _x , _y );
         }
 
-        double distance( Point& p ) const {
+        double distance( const Point& p ) const {
             double a = _x - p._x;
             double b = _y - p._y;
             return sqrt( ( a * a ) + ( b * b ) );
