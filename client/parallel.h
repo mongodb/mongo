@@ -71,7 +71,10 @@ namespace mongo {
         ClusteredCursor( QueryMessage& q );
         ClusteredCursor( const string& ns , const BSONObj& q , int options=0 , const BSONObj& fields=BSONObj() );
         virtual ~ClusteredCursor();
-
+        
+        /** call before using */
+        void init();
+        
         virtual bool more() = 0;
         virtual BSONObj next() = 0;
         
@@ -82,6 +85,9 @@ namespace mongo {
         virtual BSONObj explain();
 
     protected:
+        
+        virtual void _init() = 0;
+
         auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() , int skipLeft = 0 );
         BSONObj explain( const string& server , BSONObj extraFilter = BSONObj() );
         
@@ -94,6 +100,8 @@ namespace mongo {
         int _options;
         BSONObj _fields;
         int _batchSize;
+
+        bool _didInit;
 
         bool _done;
     };
@@ -190,6 +198,8 @@ namespace mongo {
     private:
         virtual void _explain( map< string,list<BSONObj> >& out );
 
+        void _init(){}
+
         vector<ServerAndQuery> _servers;
         unsigned _serverIndex;
         
@@ -212,7 +222,7 @@ namespace mongo {
         virtual bool more();
         virtual BSONObj next();
         virtual string type() const { return "ParallelSort"; }
-    private:
+    protected:
         void _init();
 
         virtual void _explain( map< string,list<BSONObj> >& out );
