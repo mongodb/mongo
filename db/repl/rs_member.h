@@ -61,7 +61,7 @@ namespace mongo {
     class HeartbeatInfo { 
         unsigned _id;
     public:
-        HeartbeatInfo() : _id(0xffffffff) { }
+        HeartbeatInfo() : _id(0xffffffff),drift(INT_MIN) { }
         HeartbeatInfo(unsigned id);
         bool up() const { return health > 0; }
         unsigned id() const { return _id; }
@@ -71,12 +71,16 @@ namespace mongo {
         time_t lastHeartbeat;
         string lastHeartbeatMsg;
         OpTime opTime;
+        int drift;
+
+        /* true if changed in a way of interest to the repl set manager. */
         bool changed(const HeartbeatInfo& old) const;
     };
 
     inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id) { 
           health = -1.0;
           lastHeartbeat = upSince = 0; 
+          drift = INT_MIN;
     }
 
     inline bool HeartbeatInfo::changed(const HeartbeatInfo& old) const { 
