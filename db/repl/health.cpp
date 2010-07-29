@@ -257,7 +257,7 @@ namespace mongo {
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 
             "<a title=\"how up to date this server is; write operations are sequentially numbered.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">opord</a>", 
-            "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">drift</a>", 
+            "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">skew</a>", 
             0};
         s << table(h);
 
