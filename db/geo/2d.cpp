@@ -29,10 +29,31 @@
 
 #include "core.h"
 
-//#define GEODEBUG(x) cout << x << endl;
-#define GEODEBUG(x) 
-
 namespace mongo {
+
+#if 0
+# define GEODEBUG(x) cout << x << endl;
+    inline void PREFIXDEBUG(GeoHash prefix, const GeoConvert* g){
+        if (!prefix.constrains()) {
+            cout << "\t empty prefix" << endl;
+            return ;
+        }
+
+        Point ll (g, prefix); // lower left
+        prefix.move(1,1);
+        Point tr (g, prefix); // top right
+
+        Point center ( (ll._x+tr._x)/2, (ll._y+tr._y)/2 );
+        double radius = fabs(ll._x - tr._x) / 2;
+
+        cout << "\t ll: " << ll.toString() << " tr: " << tr.toString() 
+             << " center: " << center.toString() << " radius: " << radius << endl;
+
+    }
+#else
+# define GEODEBUG(x) 
+# define PREFIXDEBUG(x, y) 
+#endif
 
     double EARTH_RADIUS_KM = 6371;
     double EARTH_RADIUS_MILES = EARTH_RADIUS_KM * 0.621371192;
@@ -216,7 +237,7 @@ namespace mongo {
             b.move( 1 , 1 );
             unhash( a, ax, ay );
             unhash( b, bx, by );
-            return (abs(ax-bx));
+            return (fabs(ax-bx));
         }
 
         const IndexDetails* getDetails() const {
@@ -358,7 +379,7 @@ namespace mongo {
             return (int)(.5+(d*1000));
         }
         
-#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; assert( a == b ); }
+#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; assert( a == GeoHash(b) ); }
 
         void run(){
             assert( ! GeoHash::isBitSet( 0 , 0 ) );
@@ -483,7 +504,7 @@ namespace mongo {
                 GeoHash entry(  "1100110000011100000111000001110000011100000111000001000000000000" );
                 assert( ! entry.hasPrefix( prefix ) );
 
-                entry = "1100110000001100000111000001110000011100000111000001000000000000";
+                entry = GeoHash("1100110000001100000111000001110000011100000111000001000000000000");
                 assert( entry.toString().find( prefix.toString() ) == 0 );
                 assert( entry.hasPrefix( GeoHash( "1100" ) ) );
                 assert( entry.hasPrefix( prefix ) );
@@ -505,8 +526,8 @@ namespace mongo {
 
             {
                 GeoHash a( "11001111" );
-                assert( GeoHash( "11" ) == a.commonPrefix( "11" ) );
-                assert( GeoHash( "11" ) == a.commonPrefix( "11110000" ) );
+                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11") ) );
+                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11110000") ) );
             }
 
             {
@@ -1075,7 +1096,8 @@ namespace mongo {
             
             uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
             BSONObjIterator i(circle);
-            _start = g->_tohash( i.next() );
+            _startPt = Point(i.next());
+            _start = _startPt.hash(g);
             _prefix = _start;
             _maxDistance = i.next().numberDouble();
             uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
@@ -1100,38 +1122,101 @@ namespace mongo {
                 }
                 _state = DOING_EXPAND;
             }
+
+
+            if ( _state == DOING_AROUND ){
+                // TODO could rework and return rather than looping
+                for (int i=-1; i<=1; i++){
+                    for (int j=-1; j<=1; j++){
+                        if (i == 0 && j == 0)
+                            continue; // main box
+
+                        GeoHash newBox = _prefix;
+                        newBox.move(i, j);
+
+                        PREFIXDEBUG(newBox, _g);
+                        if (needToCheckBox(newBox)){
+                            // TODO consider splitting into quadrants
+                            getPointsForPrefix(newBox);
+                        } else  {
+                            GEODEBUG("skipping box");
+                        }
+                    }
+                }
+
+                _state = DONE;
+                return;
+            }
             
-            if ( (_state == DOING_EXPAND) || (_state == DOING_AROUND) ){
+            if (_state == DOING_EXPAND){
                 GEODEBUG( "circle prefix [" << _prefix << "]" );
+                PREFIXDEBUG(_prefix, _g);
+
                 while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
                 while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
-                
+
                 if ( ! _prefix.constrains() ){
                     GEODEBUG( "\t exhausted the btree" );
                     _state = DONE;
                     return;
                 }
                 
-                if ( _g->distance( _prefix , _start ) > _maxDistance ){
-		    GEODEBUG( "\tpast circle bounds");
-                    GeoHash tr = _prefix;
-                    tr.move( 1 , 1 );
-                    if ( _g->distance( tr , _start ) > _maxDistance )
+
+                Point ll (_g, _prefix);
+                GeoHash trHash = _prefix;
+                trHash.move( 1 , 1 );
+                Point tr (_g, trHash);
+                double sideLen = fabs(tr._x - ll._x);
+
+                if (sideLen > _maxDistance){ // circle must be contained by surrounding squares
+                    if ( (ll._x + _maxDistance < _startPt._x && ll._y + _maxDistance < _startPt._y) && 
+                         (tr._x - _maxDistance > _startPt._x && tr._y - _maxDistance > _startPt._y) )
+                    {
+                        GEODEBUG("square fully contains circle");
+                        _state = DONE;
+                    } else if (_prefix.getBits() > 1){
+                        GEODEBUG("checking surrounding squares");
                         _state = DOING_AROUND;
+                    } else {
+                        GEODEBUG("using simple search");
+                        _prefix = _prefix.up();
+                    }
+                } else {
+                    _prefix = _prefix.up();
                 }
-                _prefix = _prefix.up();
+
                 return;
             }
             
-            if ( _state == DOING_AROUND ){
-                _state = DONE;
-                return;
-            }
             /* Clients are expected to use moreToDo before calling
              * fillStack, so DONE is checked for there. If any more
              * State values are defined, you should handle them
              * here. */ 
             assert(0);
+        }
+
+        bool needToCheckBox(const GeoHash& prefix){
+            Point ll (_g, prefix);
+            if (fabs(ll._x - _startPt._x) <= _maxDistance) return true;
+            if (fabs(ll._y - _startPt._y) <= _maxDistance) return true;
+
+            GeoHash trHash = _prefix;
+            trHash.move( 1 , 1 );
+            Point tr (_g, trHash);
+
+            if (fabs(tr._x - _startPt._x) <= _maxDistance) return true;
+            if (fabs(tr._y - _startPt._y) <= _maxDistance) return true;
+
+            return false;
+        }
+
+        void getPointsForPrefix(const GeoHash& prefix){
+            if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , prefix , _found , this ) ){
+                return;
+            }
+
+            while ( _min.hasPrefix( prefix ) && _min.advance( -1 , _found , this ) );
+            while ( _max.hasPrefix( prefix ) && _max.advance( 1 , _found , this ) );
         }
 
         
@@ -1142,6 +1227,7 @@ namespace mongo {
         }
 
         GeoHash _start;
+        Point _startPt;
         double _maxDistance;
         
         int _found;
@@ -1398,7 +1484,7 @@ namespace mongo {
             GeoSearch gs( g , n , numWanted , filter , maxDistance );
 
             if ( cmdObj["start"].type() == String){
-                GeoHash start = (string) cmdObj["start"].valuestr();
+                GeoHash start ((string) cmdObj["start"].valuestr());
                 gs._start = start;
             }
             
