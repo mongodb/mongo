@@ -117,7 +117,7 @@ namespace mongo {
                 nToSkip(_nToSkip),
                 fieldsToReturn(_fieldsToReturn),
                 opts(queryOptions),
-                batchSize(bs),
+                batchSize(bs==1?2:bs),
                 m(new Message()),
                 cursorId(),
                 nReturned(),

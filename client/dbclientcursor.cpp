@@ -28,14 +28,10 @@ namespace mongo {
 
     int DBClientCursor::nextBatchSize(){
 
-        if ( nToReturn == 0 ){
-            if ( batchSize > 1 )
-                return batchSize;
-            else
-                return 0;
-        }
+        if ( nToReturn == 0 )
+            return batchSize;
 
-        if ( batchSize <= 1 )
+        if ( batchSize == 0 )
             return nToReturn;
         
         return batchSize < nToReturn ? batchSize : nToReturn;
