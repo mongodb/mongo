@@ -152,8 +152,11 @@ namespace mongo {
         }
     };
     
-    void cleanupOldData( OldDataCleanup cleanup ){
+    void _cleanupOldData( OldDataCleanup cleanup ){
         Client::initThread( "cleanupOldData");
+        log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << endl;
+
+        int loops = 0;
         Timer t;
         while ( t.seconds() < 600 ){ // 10 minutes
             sleepmillis( 20 );
@@ -171,11 +174,34 @@ namespace mongo {
             if ( left.size() == 0 )
                 break;
             cleanup.initial = left;
+            
+            if ( ++loops % 20 == 0 ){
+                log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << endl;
+                
+                stringstream ss;
+                for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ){
+                    CursorId id = *i;
+                    ss << id << " ";
+                }
+                log() << " cursors: " << ss.str() << endl;
+            }
         }
         
         cleanup.doRemove();
 
         cc().shutdown();
+    }
+
+    void cleanupOldData( OldDataCleanup cleanup ){
+        try {
+            _cleanupOldData( cleanup );
+        }
+        catch ( std::exception& e ){
+            log() << " error cleaning old data:" << e.what() << endl;
+        }
+        catch ( ... ){
+            log() << " unknown error cleaning old data" << endl;
+        }
     }
 
     class ChunkCommandHelper : public Command {
