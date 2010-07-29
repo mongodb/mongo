@@ -109,7 +109,17 @@ namespace mongo {
     inline string HostAndPort::toString() const {
         stringstream ss;
         ss << _host;
-        if( _port != -1 ) ss << ':' << _port;
+        if( _port != -1 ) ss << ':';
+#if defined(_DEBUG)
+        if( _port == 44444 ) { 
+            log() << "warning: special debug port 44444 used" << endl;
+            ss << 44445;
+        }
+        else
+            ss << _port;
+#else
+        ss << _port;
+#endif
         return ss.str();
     }
 
