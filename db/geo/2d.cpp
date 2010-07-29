@@ -1087,6 +1087,7 @@ namespace mongo {
         enum State {
             START , 
             DOING_EXPAND ,
+            DOING_AROUND ,
             DONE
         } _state;
 
@@ -1121,6 +1122,24 @@ namespace mongo {
                 }
                 _state = DOING_EXPAND;
             }
+
+
+            if ( _state == DOING_AROUND ){
+                // TODO could rework and return rather than looping
+                for (int i=-1; i<=1; i++){
+                    for (int j=-1; j<=1; j++){
+                        if (i == 0 && j == 0)
+                            continue; // main box
+
+                        GeoHash newBox = _prefix;
+                        newBox.move(i, j);
+                        getPointsForPrefix(newBox);
+                    }
+                }
+
+                _state = DONE;
+                return;
+            }
             
             if (_state == DOING_EXPAND){
                 GEODEBUG( "circle prefix [" << _prefix << "]" );
@@ -1135,17 +1154,30 @@ namespace mongo {
                     return;
                 }
                 
+
                 Point ll (_g, _prefix);
-                if (ll._x + _maxDistance < _startPt._x && ll._y + _maxDistance < _startPt._y){
-                    GeoHash trHash = _prefix;
-                    trHash.move( 1 , 1 );
-                    Point tr (_g, trHash);
-                    if (tr._x - _maxDistance > _startPt._x && tr._y - _maxDistance > _startPt._y){
+                GeoHash trHash = _prefix;
+                trHash.move( 1 , 1 );
+                Point tr (_g, trHash);
+                double sideLen = fabs(tr._x - ll._x);
+
+                if (sideLen > _maxDistance){ // circle must be contained by surrounding squares
+                    if ( (ll._x + _maxDistance < _startPt._x && ll._y + _maxDistance < _startPt._y) && 
+                         (tr._x - _maxDistance > _startPt._x && tr._y - _maxDistance > _startPt._y) )
+                    {
+                        GEODEBUG("square fully contains circle");
                         _state = DONE;
+                    } else if (_prefix.getBits() > 1){
+                        GEODEBUG("checking surrounding squares");
+                        _state = DOING_AROUND;
+                    } else {
+                        GEODEBUG("using simple search");
+                        _prefix = _prefix.up();
                     }
+                } else {
+                    _prefix = _prefix.up();
                 }
 
-                _prefix = _prefix.up();
                 return;
             }
             
@@ -1154,6 +1186,15 @@ namespace mongo {
              * State values are defined, you should handle them
              * here. */ 
             assert(0);
+        }
+
+        void getPointsForPrefix(const GeoHash& prefix){
+            if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , prefix , _found , this ) ){
+                return;
+            }
+
+            while ( _min.hasPrefix( prefix ) && _min.advance( -1 , _found , this ) );
+            while ( _max.hasPrefix( prefix ) && _max.advance( 1 , _found , this ) );
         }
 
         

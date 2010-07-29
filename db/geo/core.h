@@ -305,6 +305,10 @@ namespace mongo {
             return _hash;
         }
 
+        unsigned getBits() const {
+            return _bits;
+        }
+
         GeoHash commonPrefix( const GeoHash& other ) const {
             unsigned i=0;
             for ( ; i<_bits && i<other._bits; i++ ){
@@ -315,6 +319,7 @@ namespace mongo {
             }
             return GeoHash(_hash,i);
         }
+
     private:
 
         void _copy( char * dst , const char * src ) const {
