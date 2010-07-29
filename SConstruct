@@ -1393,6 +1393,10 @@ testEnv.AlwaysBuild( "addMongodReqNoJsTargets" )
 testEnv.Alias( "smokeAllNoJs", [ "smoke", "mongosTest", "addMongodReqNoJsTargets" ] )
 testEnv.AlwaysBuild( "smokeAllNoJs" )
 
+
+testEnv.Alias( "smokeReplSets", [] )
+testEnv.AlwaysBuild( "smokeReplSets" )
+
 import atexit
 atexit.register( stopMongodForTests )
 
