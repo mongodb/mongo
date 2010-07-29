@@ -62,7 +62,7 @@ namespace mongo {
         }
 
         /* returns true if the host/port combo identifies this process instance. */
-        bool isSelf() const;
+        bool isSelf() const; // defined in message.cpp
 
         bool isLocalHost() const;
 
@@ -98,23 +98,25 @@ namespace mongo {
         return HostAndPort(h, cmdLine.port);
     }
 
-    inline bool HostAndPort::isSelf() const { 
-        int p = _port == -1 ? CmdLine::DefaultDBPort : _port;
-        if( p != cmdLine.port )
-            return false;
-        
-        return sameHostname(getHostName(), _host) || isLocalHost();
-    }
-
     inline string HostAndPort::toString() const {
         stringstream ss;
         ss << _host;
-        if( _port != -1 ) ss << ':' << _port;
+        if( _port != -1 ) ss << ':';
+#if defined(_DEBUG)
+        if( _port >= 44000 && _port < 44100 ) { 
+            log() << "warning: special debug port 44xxx used" << endl;
+            ss << _port+1;
+        }
+        else
+            ss << _port;
+#else
+        ss << _port;
+#endif
         return ss.str();
     }
 
     inline bool HostAndPort::isLocalHost() const { 
-        return _host == "localhost" || _host == "127.0.0.1" || _host == "::1";
+        return _host == "localhost" || startsWith(_host.c_str(), "127.") || _host == "::1";
     }
 
     inline HostAndPort::HostAndPort(string s) {
