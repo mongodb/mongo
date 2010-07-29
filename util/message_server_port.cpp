@@ -84,7 +84,7 @@ namespace mongo {
         virtual void accepted(MessagingPort * p) {
             
             if ( ! connTicketHolder.tryAcquire() ){
-                log() << "connection refused because too many open connections" << endl;
+                log() << "connection refused because too many open connections: " << connTicketHolder.used() << endl;
 
                 // TODO: would be nice if we notified them...
                 p->shutdown();

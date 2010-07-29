@@ -238,7 +238,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
 #endif
 
     char * ret = readline( prompt );
-        signal( SIGINT , quitNicely );
+    signal( SIGINT , quitNicely );
     atPrompt = false;
     return ret;
 #else

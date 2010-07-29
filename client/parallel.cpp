@@ -38,6 +38,7 @@ namespace mongo {
             _batchSize = 2;
 
         _done = false;
+        _didInit = false;
     }
 
     ClusteredCursor::ClusteredCursor( const string& ns , const BSONObj& q , int options , const BSONObj& fields ){
@@ -48,14 +49,23 @@ namespace mongo {
         _batchSize = 0;
 
         _done = false;
+        _didInit = false;
     }
 
     ClusteredCursor::~ClusteredCursor(){
         _done = true; // just in case
     }
+
+    void ClusteredCursor::init(){
+        if ( _didInit )
+            return;
+        _didInit = true;
+        _init();
+    }
     
     auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra , int skipLeft ){
         uassert( 10017 ,  "cursor already done" , ! _done );
+        assert( _didInit );
         
         BSONObj q = _query;
         if ( ! extra.isEmpty() ){
@@ -301,7 +311,6 @@ namespace mongo {
         : ClusteredCursor( q ) , _servers( servers ){
         _sortKey = sortKey.getOwned();
         _needToSkip = q.ntoskip;
-        _init();
     }
 
     ParallelSortClusteredCursor::ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , const string& ns , 
@@ -310,7 +319,6 @@ namespace mongo {
         : ClusteredCursor( ns , q.obj , options , fields ) , _servers( servers ){
         _sortKey = q.getSort().copy();
         _needToSkip = 0;
-        _init();
     }
 
     void ParallelSortClusteredCursor::_init(){

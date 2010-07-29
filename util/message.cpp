@@ -689,6 +689,35 @@ namespace mongo {
     }
 
     TicketHolder connTicketHolder(20000);
+
+    namespace {
+        map<string, bool> isSelfCache; // host, isSelf
+    }
     
+    bool HostAndPort::isSelf() const { 
+        int p = _port == -1 ? CmdLine::DefaultDBPort : _port;
+
+        if( p != cmdLine.port ){
+            return false;
+        } else if (sameHostname(getHostName(), _host) || isLocalHost()) {
+            return true;
+        } else {
+            map<string, bool>::const_iterator it = isSelfCache.find(_host);
+            if (it != isSelfCache.end()){
+                return it->second;
+            }
+
+            SockAddr addr (_host.c_str(), 0); // port 0 is dynamically assigned
+            SOCKET sock = ::socket(addr.getType(), SOCK_STREAM, 0);
+            assert(sock != INVALID_SOCKET);
+
+            bool ret = (::bind(sock, addr.raw(), addr.addressSize) == 0);
+            isSelfCache[_host] = ret;
+
+            closesocket(sock);
+
+            return ret;
+        }
+    }
 
 } // namespace mongo

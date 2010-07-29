@@ -656,7 +656,7 @@ namespace mongo {
                     
                     ParallelSortClusteredCursor cursor( servers , dbname + "." + shardedOutputCollection ,
                                                         Query().sort( sortKey ) );
-                    
+                    cursor.init();
                     
                     auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbname );
                     s->localConnect( dbname.c_str() );

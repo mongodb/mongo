@@ -794,9 +794,10 @@ ReplTest.prototype.stop = function( master , signal ){
     return stopMongod( this.getPort( master ) , signal || 15 );
 }
 
-allocatePorts = function( n ) {
+allocatePorts = function( n , startPort ) {
     var ret = [];
-    for( var i = 31000; i < 31000 + n; ++i )
+    var start = startPort || 31000;
+    for( var i = start; i < start + n; ++i )
         ret.push( i );
     return ret;
 }
@@ -866,12 +867,35 @@ ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
     this.numNodes = opts.nodes || 0;
+    this.bridged = opts.bridged || false;
+    this.ports = [];
 
-    this.ports = allocatePorts( this.numNodes );
+    this.startPort = opts.startPort || 31000;
+
+    if(this.bridged) {
+        this.bridgePorts = [];
+
+        var allPorts = allocatePorts( this.numNodes * 2 , this.startPort );
+        for(var i=0; i < this.numNodes; i++) {
+            this.ports[i] = allPorts[i*2];
+            this.bridgePorts[i] = allPorts[i*2 + 1];
+        }
+
+        this.initBridges();
+    }
+    else {
+        this.ports = allocatePorts( this.numNodes , startPort );
+    }
 
     this.nodes = [];
     this.nodeIds = {};
     this.initLiveNodes();
+}
+
+ReplSetTest.prototype.initBridges = function() {
+    for(var i=0; i<this.ports.length; i++) {
+        startMongoProgram( "mongobridge", "--port", this.bridgePorts[i], "--dest", this.host + ":" + this.ports[i] );
+    }
 }
 
 // List of nodes as host:port strings.
@@ -913,7 +937,13 @@ ReplSetTest.prototype.getReplSetConfig = function() {
     for(i=0; i<this.ports.length; i++) {
         member = {};
         member['_id']  = i;
-        member['host'] = this.host + ":" + this.ports[i];
+
+        if(this.bridged)
+          var port = this.bridgePorts[i];
+        else
+          var port = this.ports[i];
+
+        member['host'] = this.host + ":" + port;
         cfg.members.push(member);
     }
 
@@ -941,11 +971,19 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     for(i=0; i<this.ports.length; i++) {
 
       // Don't include this node in the replica set list
-      //if(this.ports[i] == this.ports[n]) {
-      //  continue;
-      //}
+      if(this.bridged && this.ports[i] == this.ports[n]) {
+        continue;
+      }
 
-      var str = this.host + ":" + this.ports[i];
+      // Connect on the right port
+      if(this.bridged) {
+        var port = this.bridgePorts[i];
+      }
+      else {
+        var port = this.ports[i];
+      }
+
+      var str = this.host + ":" + port;
       hosts.push(str);
     }
     replSetString += hosts.join(",");
@@ -1025,7 +1063,7 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
 // Add a node to the test set
 ReplSetTest.prototype.add = function( config ) {
   if(this.ports.length == 0) {
-    var nextPort = allocatePorts(1)[0];
+    var nextPort = allocatePorts( 1, this.startPort )[0];
   }
   else {
     var nextPort = this.ports[this.ports.length-1] + 1;
@@ -1145,8 +1183,8 @@ ReplSetTest.prototype.stop = function( n , signal ){
 }
 
 ReplSetTest.prototype.stopSet = function( signal ) {
+    print('*** Shutting down repl set ****' )
     for(i=0; i < this.ports.length; i++) {
         this.stop( i, signal );
     }
-    print('*** Shutting down repl set ****' )
 }
