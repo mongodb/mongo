@@ -332,7 +332,7 @@ namespace mongo {
         void syncTail();
         void syncApply(const BSONObj &o);
         void syncRollback(OplogReader& r);
-        void syncFixUp(HowToFixUp& h, DBClientConnection*);
+        void syncFixUp(HowToFixUp& h, OplogReader& r);
     public:
         void syncThread();
     };

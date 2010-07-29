@@ -105,7 +105,7 @@ namespace mongo {
 
                     /* perhaps we should check this earlier? but not before the rollback checks. */
                     if( state().recovering() ) { 
-                        /* can we go to RS_SECONDARY state?  we can if not too old and not minvalid */
+                        /* can we go to RS_SECONDARY state?  we can if not too old and if minvalid achieved */
                         bool golive = false;
                         {
                             readlock lk("local.replset.minvalid");
@@ -118,8 +118,13 @@ namespace mongo {
                             else 
                                 golive = true; /* must have been the original member */
                         }
-                        if( golive )
+                        if( golive ) {
+                            sethbmsg("recovering->secondary done");
                             changeState(MemberState::RS_SECONDARY);
+                        }
+                        else { 
+                            sethbmsg("recovering; not yet to minValid optime");
+                        }
 
                         /* todo: too stale capability */
                     }
