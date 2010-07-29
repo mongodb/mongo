@@ -429,7 +429,7 @@ namespace mongo {
             return true;
             
         } catch ( const SocketException & e ) {
-            log(_logLevel + e.shouldPrint() ? 0 : 1 ) << "SocketException: " << e << endl;
+            log(_logLevel + (e.shouldPrint() ? 0 : 1) ) << "SocketException: " << e << endl;
             m.reset();
             return false;
         }
