@@ -1311,6 +1311,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeJs", [add_exe("mongo")] )
     addSmoketest( "smokeClone", [ "mongo", "mongod" ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ] )
+    addSmoketest( "smokeReplSets", [ "mongo", "mongod", "mongobridge" ] )
     addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
