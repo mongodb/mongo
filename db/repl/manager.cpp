@@ -151,12 +151,16 @@ namespace mongo {
 
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !rs->elect.aMajoritySeemsToBeUp() ) { 
+                static time_t last;
                 static int n;
-                log(++n <= 5 ? 0 : 1) << "replSet can't see a majority, won't consider electing self" << rsLog;
+                int ll = 0;
+                if( ++n > 5 ) ll++;
+                if( last + 60 > time(0 ) ) ll++;
+                log(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
+                last = time(0);
                 return;
             }
 
-            rs->sethbmsg("",9);
             busyWithElectSelf = true; // don't try to do further elections & such while we are already working on one.
         }
         try { 

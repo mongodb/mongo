@@ -35,7 +35,7 @@ namespace mongo {
         LastError *le = lastError.get();
         if ( le == 0 ) {
             /* might be intentional (non-user thread) */            
-            DEV if( !isShell ) log() << "warning dev: lastError==0 won't report:" << msg << endl;
+            OCCASIONALLY DEV if( !isShell ) log() << "warning dev: lastError==0 won't report:" << msg << endl;
         } else if ( le->disabled ) {
             log() << "lastError disabled, can't report: " << msg << endl;
         } else {

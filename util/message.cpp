@@ -429,7 +429,7 @@ namespace mongo {
             return true;
             
         } catch ( const SocketException & e ) {
-            log(_logLevel + e.shouldPrint() ? 0 : 1 ) << "SocketException: " << e << endl;
+            log(_logLevel + (e.shouldPrint() ? 0 : 1) ) << "SocketException: " << e << endl;
             m.reset();
             return false;
         }
@@ -576,7 +576,7 @@ namespace mongo {
             if ( ret == -1 ) {
                 int e = errno;
                 if ( e != EAGAIN || _timeout == 0 ) {                
-                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString()<<endl;
+                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
                     throw SocketException( SocketException::RECV_ERROR );
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {

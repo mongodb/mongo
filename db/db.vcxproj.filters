@@ -400,6 +400,7 @@
     <ClCompile Include="restapi.cpp">
       <Filter>db</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\grid.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

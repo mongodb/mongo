@@ -214,6 +214,8 @@ namespace mongo {
         lastError.reset(le);
 
         auto_ptr<MessagingPort> dbMsgPort( inPort );
+
+        dbMsgPort->_logLevel = 1;
         Client& c = cc();
 
         try {
