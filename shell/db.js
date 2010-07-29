@@ -535,7 +535,7 @@ DB.prototype.toString = function(){
     return this._name;
 }
 
-DB.prototype.isMaster = function(){ return db.runCommand("isMaster");}
+DB.prototype.isMaster = function(){ return this.runCommand("isMaster");}
 
 DB.prototype.currentOp = function(){
     return db.$cmd.sys.inprog.findOne();
