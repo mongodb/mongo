@@ -1126,6 +1126,10 @@ ReplSetTest.prototype.start = function( n , options , restart ){
     }
 }
 
+ReplSetTest.prototype.restart = function( n , options ){
+    return this.start( n , options , true );
+}
+
 ReplSetTest.prototype.stop = function( n , signal ){
     var port = this.getPort( n );
     print('*** Shutting down mongod in port ' + port + ' ***');
