@@ -864,7 +864,7 @@ const char * jsconcatcode =
  "print(\"\\tdb.getPrevError()\");\n"
  "print(\"\\tdb.getProfilingLevel()\");\n"
  "print(\"\\tdb.getReplicationInfo()\");\n"
- "print(\"\\tdb.getSisterDB(name) get the db at the same server as this onew\");\n"
+ "print(\"\\tdb.getSisterDB(name) get the db at the same server as this one\");\n"
  "print(\"\\tdb.isMaster() check replica primary status\");\n"
  "print(\"\\tdb.killOp(opid) kills the current operation in the db\");\n"
  "print(\"\\tdb.listCommands() lists all the db commands\");\n"
