@@ -1,6 +1,6 @@
 // count1.js
 
-s = new ShardingTest( "count1" , 2 , 10 );
+s = new ShardingTest( "count1" , 2 , 1 );
 db = s.getDB( "test" );
 
 db.bar.save( { n : 1 } )
@@ -18,12 +18,12 @@ secondary = s.getOther( primary ).getDB( "test" );
 
 assert.eq( 1 , s.config.chunks.count() , "sanity check A" );
 
-db.foo.save( { name : "eliot" } )
-db.foo.save( { name : "sara" } )
-db.foo.save( { name : "bob" } )
-db.foo.save( { name : "joe" } )
-db.foo.save( { name : "mark" } )
-db.foo.save( { name : "allan" } )
+db.foo.save( { _id : 1 , name : "eliot" } )
+db.foo.save( { _id : 2 , name : "sara" } )
+db.foo.save( { _id : 3 , name : "bob" } )
+db.foo.save( { _id : 4 , name : "joe" } )
+db.foo.save( { _id : 5 , name : "mark" } )
+db.foo.save( { _id : 6 , name : "allan" } )
 
 assert.eq( 6 , db.foo.find().count() , "basic count" );
 
@@ -46,8 +46,19 @@ assert.eq( 6 , db.foo.find().sort( { name : 1 } ).toArray().length , "total coun
 
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "total count with count() after move" );
 
-assert.eq( "allan,bob,eliot,joe,mark,sara" ,  db.foo.find().sort( { name : 1 } ).toArray().map( function(z){ return z.name; } ) , "sort 1" );
-assert.eq( "sara,mark,joe,eliot,bob,allan" ,  db.foo.find().sort( { name : -1 } ).toArray().map( function(z){ return z.name; } ) , "sort 2" );
+function nameString( c ){
+    var s = "";
+    while ( c.hasNext() ){
+        var o = c.next();
+        if ( s.length > 0 )
+            s += ",";
+        s += o.name;
+    }
+    return s;
+}
+
+assert.eq( "allan,bob,eliot,joe,mark,sara" ,  nameString( db.foo.find().sort( { name : 1 } ) ) , "sort 1" );
+assert.eq( "sara,mark,joe,eliot,bob,allan" ,  nameString( db.foo.find().sort( { name : -1 } ) ) , "sort 2" );
 
 assert.eq( 2 , db.foo.find().limit(2).itcount() , "LS1" )
 assert.eq( 2 , db.foo.find().skip(2).limit(2).itcount() , "LS2" )
@@ -56,6 +67,24 @@ assert.eq( 6 , db.foo.find().limit(2).count() , "LSC1" )
 assert.eq( 2 , db.foo.find().limit(2).size() , "LSC2" )
 assert.eq( 2 , db.foo.find().skip(2).limit(2).size() , "LSC3" )
 assert.eq( 1 , db.foo.find().skip(5).limit(2).size() , "LSC4" )
+
+assert.eq( "allan,bob" , nameString( db.foo.find().sort( { name : 1 } ).limit(2) ) , "LSD1" )
+assert.eq( "bob,eliot" , nameString( db.foo.find().sort( { name : 1 } ).skip(1).limit(2) ) , "LSD2" )
+assert.eq( "joe,mark" , nameString( db.foo.find().sort( { name : 1 } ).skip(3).limit(2) ) , "LSD3" )
+
+assert.eq( "eliot,sara" , nameString( db.foo.find().sort( { _id : 1 } ).limit(2) ) , "LSE1" )
+assert.eq( "sara,bob" , nameString( db.foo.find().sort( { _id : 1 } ).skip(1).limit(2) ) , "LSE2" )
+assert.eq( "joe,mark" , nameString( db.foo.find().sort( { _id : 1 } ).skip(3).limit(2) ) , "LSE3" )
+
+for ( i=0; i<10; i++ ){
+    db.foo.save( { _id : 7 + i , name : "zzz" + i } )
+}
+
+assert.eq( 10 , db.foo.find( { name : { $gt : "z" } } ).itcount() , "LSF1" )
+assert.eq( 10 , db.foo.find( { name : { $gt : "z" } } ).sort( { _id : 1 } ).itcount() , "LSF2" )
+assert.eq( 5 , db.foo.find( { name : { $gt : "z" } } ).sort( { _id : 1 } ).skip(5).itcount() , "LSF3" )
+sleep( 5000 )
+assert.eq( 3 , db.foo.find( { name : { $gt : "z" } } ).sort( { _id : 1 } ).skip(5).limit(3).itcount() , "LSF4" )
 
 s.stop();
 

@@ -271,7 +271,8 @@ def runTest(test):
         elif os.path.basename(path) == 'mongos':
             argv=[path, "--test"]
         else:
-            argv=[path, "--port", mongodPort]
+            argv=[testPath and os.path.abspath(os.path.join(testPath, path)) or path,
+                  "--port", mongodPort]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
     print " *******************************************"

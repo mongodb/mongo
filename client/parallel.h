@@ -82,7 +82,7 @@ namespace mongo {
         virtual BSONObj explain();
 
     protected:
-        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() );
+        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() , int skipLeft = 0 );
         BSONObj explain( const string& server , BSONObj extraFilter = BSONObj() );
         
         static BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
