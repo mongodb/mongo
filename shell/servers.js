@@ -920,52 +920,53 @@ ReplSetTest.prototype.getReplSetConfig = function() {
     return cfg;
 }
 
-ReplSetTest.prototype.getOptions = function (n, extra, putBinaryFirst) {
+ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
-    if (!extra)
+    if ( ! extra )
         extra = {};
 
-    if (!extra.oplogSize)
+    if ( ! extra.oplogSize )
         extra.oplogSize = "2";
 
     var a = []
 
-    if (putBinaryFirst)
-        a.push("mongod")
 
-    a.push("--replSet");
+    if ( putBinaryFirst )
+        a.push( "mongod" )
+
+    a.push( "--replSet" );
 
     replSetString = this.name + "/";
     hosts = [];
-    for (i = 0; i < this.ports.length; i++) {
+    for(i=0; i<this.ports.length; i++) {
 
-        // Don't include this node in the replica set list
-        //if(this.ports[i] == this.ports[n]) {
-        //  continue;
-        //}
+      // Don't include this node in the replica set list
+      //if(this.ports[i] == this.ports[n]) {
+      //  continue;
+      //}
 
-        var str = this.host + ":" + this.ports[i];
-        hosts.push(str);
+      var str = this.host + ":" + this.ports[i];
+      hosts.push(str);
     }
     replSetString += hosts.join(",");
 
-    a.push(replSetString)
+    a.push( replSetString )
 
-    a.push("--rest");
+    a.push( "--noprealloc", "--smallfiles" );
 
-    a.push("--noprealloc", "--smallfiles");
+    a.push( "--rest" );
 
-    a.push("--port");
-    a.push(this.getPort(n));
+    a.push( "--port" );
+    a.push( this.getPort( n ) );
 
-    a.push("--dbpath");
-    a.push(this.getPath(n));
+    a.push( "--dbpath" );
+    a.push( this.getPath( n ) );
 
-    for (var k in extra) {
+    for ( var k in extra ){
         var v = extra[k];
-        a.push("--" + k);
-        if (v != null)
-            a.push(v);
+        a.push( "--" + k );
+        if ( v != null )
+            a.push( v );
     }
 
     return a;
@@ -1040,6 +1041,11 @@ ReplSetTest.prototype.add = function( config ) {
   this.nodes.push(newNode);
 
   return newNode;
+}
+
+ReplSetTest.prototype.remove = function( nodeId ) {
+    this.nodes.splice( nodeId, 1 );
+    this.ports.splice( nodeId, 1 );
 }
 
 // Pass this method a function to call repeatedly until
