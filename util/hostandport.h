@@ -111,9 +111,9 @@ namespace mongo {
         ss << _host;
         if( _port != -1 ) ss << ':';
 #if defined(_DEBUG)
-        if( _port == 44444 ) { 
-            log() << "warning: special debug port 44444 used" << endl;
-            ss << 44445;
+        if( _port >= 44000 && _port < 44100 ) { 
+            log() << "warning: special debug port 44xxx used" << endl;
+            ss << _port+1;
         }
         else
             ss << _port;
