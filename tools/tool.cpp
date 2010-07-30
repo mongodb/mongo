@@ -229,8 +229,9 @@ namespace mongo {
     }
 
     DBClientBase& Tool::conn( bool slaveIfPaired ){
-        if ( _paired && slaveIfPaired )
-            return ((DBClientPaired*)_conn)->slaveConn();
+        // TODO: _paired is deprecated
+        if ( slaveIfPaired && _conn->type() == ConnectionString::SET )
+            return ((DBClientReplicaSet*)_conn)->slaveConn();
         return *_conn;
     }
 
