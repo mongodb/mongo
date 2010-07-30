@@ -1136,7 +1136,7 @@ ReplSetTest.prototype.awaitReplication = function() {
 
    latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']['t']
 
-   this.attempt({context: this, timeout: 10000, desc: "awaiting replication"},
+   this.attempt({context: this, timeout: 30000, desc: "awaiting replication"},
        function() {
            var synced = true;
            for(var i=0; i<this.liveNodes.slaves.length; i++) {
