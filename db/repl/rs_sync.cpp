@@ -119,7 +119,7 @@ namespace mongo {
                                 golive = true; /* must have been the original member */
                         }
                         if( golive ) {
-                            sethbmsg("recovering->secondary done");
+                            sethbmsg("");
                             changeState(MemberState::RS_SECONDARY);
                         }
                         else { 
