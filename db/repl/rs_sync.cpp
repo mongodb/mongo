@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    using namespace bson;
+
     void startSyncThread() { 
         Client::initThread("rs_sync");
         theReplSet->syncThread();
@@ -82,14 +84,39 @@ namespace mongo {
 
         {
             if( !r.more() ) {
+                /* maybe we are ahead and need to roll back? */
+                try {
+                    bo theirLastOp = r.getLastOp(rsoplog);
+                    if( theirLastOp.isEmpty() ) {
+                        log() << "replSet error empty query result from " << hn << " oplog" << rsLog;
+                        sleepsecs(2);
+                        return;
+                    }
+                    OpTime theirTS = theirLastOp["ts"]._opTime();
+                    if( theirTS < lastOpTimeWritten ) { 
+                        log() << "replSet we are ahead of the primary, will try to roll back" << rsLog;
+                        syncRollback(r);
+                        return;
+                    }
+                    /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
+                    log() << "replSet syncTail condition 1" << rsLog;
+                    sleepsecs(1);
+                }
+                catch(DBException& e) { 
+                    log() << "replSet error querying " << hn << ' ' << e.toString() << rsLog;
+                    sleepsecs(2);
+                }
+                return;
+                /*
                 log() << "replSet syncTail error querying oplog >= " << lastOpTimeWritten.toString() << " from " << hn << rsLog;
                 try {
                     log() << "replSet " << hn << " last op: " << r.getLastOp(rsoplog).toString() << rsLog;
                 }
                 catch(...) { }
                 sleepsecs(1);
-                return;
+                return;*/
             }
+
             BSONObj o = r.nextSafe();
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
@@ -127,10 +154,11 @@ namespace mongo {
                         }
                         if( golive ) {
                             sethbmsg("");
+                            log() << "replSet SECONDARY" << rsLog;
                             changeState(MemberState::RS_SECONDARY);
                         }
                         else { 
-                            sethbmsg("recovering; not yet to minValid optime");
+                            sethbmsg("still syncing, not yet to minValid optime");
                         }
 
                         /* todo: too stale capability */
@@ -201,7 +229,7 @@ namespace mongo {
                 _syncThread();
             }
             catch(DBException& e) { 
-                log() << "replSet syncThread: " << e.toString() << rsLog;
+                sethbmsg("syncThread: " + e.toString());
                 sleepsecs(10);
             }
             catch(...) { 

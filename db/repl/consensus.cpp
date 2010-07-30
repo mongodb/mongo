@@ -307,7 +307,7 @@ namespace mongo {
                 }
                 else {
                     /* succeeded. */
-                    log() << "replSet election succeeded, assuming primary role" << rsLog;
+                    log(1) << "replSet election succeeded, assuming primary role" << rsLog;
                     success = true;
                     rs.assumePrimary();
                 } 
