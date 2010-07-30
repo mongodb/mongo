@@ -156,7 +156,6 @@ namespace mongo {
         }
 
         void cell( stringstream& ss , string name , unsigned width , const string& val ){
-            assert( val.size() <= width );
             cellstart( ss , name , width );
             ss << setw(width) << val << " ";
         }
@@ -204,7 +203,7 @@ namespace mongo {
                 int w = b.getFieldDotted( "globalLock.currentQueue.writers" ).numberInt();
                 stringstream temp;
                 temp << r+w << "|" << r << "|" << w;
-                cell( ss , "q t|r|w" , 9 , temp.str() );
+                cell( ss , "q t|r|w" , 10 , temp.str() );
             }
             cell( ss , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
@@ -217,7 +216,7 @@ namespace mongo {
                      << setfill('0') << setw(2) << t.tm_min
                      << ":" 
                      << setfill('0') << setw(2) << t.tm_sec;
-                cell( ss , "time" , 8 , temp.str() );
+                cell( ss , "time" , 10 , temp.str() );
             }
 
             if ( _showHeaders && _rowNum % 20 == 0 ){

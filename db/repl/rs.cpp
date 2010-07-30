@@ -34,7 +34,7 @@ namespace mongo {
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()
         box.setSelfPrimary(_self);
-        log(2) << "replSet self (" << _self->id() << ") is now primary" << rsLog;
+        log() << "replSet PRIMARY" << rsLog; // self (" << _self->id() << ") is now primary" << rsLog;
     }
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
@@ -160,11 +160,11 @@ namespace mongo {
                 catch(...) {
                     uassert(13114, "bad --replSet seed hostname", false);
                 }
-                uassert(13096, "bad --replSet config string - dups?", seedSet.count(m) == 0 );
+                uassert(13096, "bad --replSet command line config string - dups?", seedSet.count(m) == 0 );
                 seedSet.insert(m);
                 //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if( m.isSelf() ) {
-                    log() << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
+                    log(1) << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
                 } else
                     seeds.push_back(m);
                 if( *comma == 0 )
@@ -372,13 +372,11 @@ namespace mongo {
                         log() << "replSet   have you ran replSetInitiate yet?" << rsLog;
                         if( _seeds->size() == 0 )
                             log() << "replSet   no seed hosts were specified on the --replSet command line - that might be the issue" << rsLog;
-                        log() << "replSet   sleeping 20sec and will try again." << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
                         startupStatusMsg = "can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)";
-                        log() << "replSet can't get " << rsConfigNs << " config from self or any seed." << rsLog;
-                        log() << "replSet   sleeping 20sec and will try again." << rsLog;
+                        log() << "replSet can't get " << rsConfigNs << " config from self or any seed (yet)" << rsLog;
                     }
 
                     sleepsecs(10);

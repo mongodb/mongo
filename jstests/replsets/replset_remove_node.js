@@ -40,18 +40,18 @@ doTest = function( signal ) {
         stat = master.getDB("admin").runCommand({replSetGetStatus: 1});
         printjson( stat );
         return stat.myState == 1;
-    }, "Master failed to come up as master.");
+    }, "Master failed to come up as master.", 60000);
 
     // Slaves to be set to 2 (secondary)
     assert.soon(function() {
         stat = slaves[0].getDB("admin").runCommand({replSetGetStatus: 1});
         return stat.myState == 2;
-    }, "Slave failed to come up as slave.");
+    }, "Slave failed to come up as slave.", 60000);
 
     assert.soon(function() {
         stat = slaves[0].getDB("admin").runCommand({replSetGetStatus: 1});
         return stat.members.length == 2;
-    }, "Wrong number of members");
+    }, "Wrong number of members", 60000);
 }
 
 doTest( 15 );

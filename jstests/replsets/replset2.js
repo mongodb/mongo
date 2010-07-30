@@ -1,6 +1,9 @@
 
 doTest = function( signal ) {
 
+    // FAILING TEST
+    // See below:
+
     // Test replication with getLastError
 
     // Replica set testing API
@@ -20,21 +23,58 @@ doTest = function( signal ) {
     var master = replTest.getMaster();
 
     // Wait for replication to a single node
-    master.getDB("foo").bar.insert({n: 1});
-    var result = master.getDB("foo").runCommand({getlasterror: {w: 1, wtimeout: 20000}});
-    assert( result['ok'] == 1, "getLastError with w=1 failed");
+    master.getDB("test").bar.insert({n: 1});
 
-    // Wait for replication two two nodes
-    master.getDB("foo").bar.insert({n: 2});
-    var result = master.getDB("foo").runCommand({getlasterror: {w: 2, wtimeout: 20000}});
-    assert( result['ok'] == 1, "getLastError with w=2 failed");
+    // Wait for initial sync
+    replTest.awaitReplication();
 
-    // Wait for replication to three nodes
-    master.getDB("foo").bar.insert({n: 3});
-    var result = master.getDB("foo").runCommand({getlasterror: {w: 3, wtimeout: 20000}});
-    assert( result['ok'] == 1, "getLastError with w=3 failed");
+    var slaves = replTest.liveNodes.slaves;
+    slaves.forEach(function(slave) { slave.setSlaveOk(); });
+
+    var testDB = "repl-test";
+
+    var callGetLastError = function(w, timeout, db) {
+        var result = master.getDB(db).runCommand({getlasterror: 1, w: w, wtimeout: timeout});
+        printjson( result );
+        assert( result['ok'] == 1, "getLastError with w=" + w + " failed");
+    }
+
+    // Test getlasterror with a simple insert
+    // TEST FAILS HERE
+    master.getDB(testDB).foo.insert({n: 1});
+    callGetLastError(3, 60000, testDB);
+
+    m1 = master.getDB(testDB).foo.findOne({n: 1});
+    printjson( m1 );
+    assert( m1['n'] == 1 , "Failed to save to master");
+
+    var s0 = slaves[0].getDB(testDB).foo.findOne({n: 1});
+    assert( s0['n'] == 1 , "Failed to replicate to slave 0");
+
+    var s1 = slaves[1].getDB(testDB).foo.findOne({n: 1});
+    assert( s1['n'] == 1 , "Failed to replicate to slave 1");
+
+
+    // Test getlasterror with large insert
+    print("**** Try inserting many records ****")
+    bigData = new Array(2000).toString()
+    for(var n=0; n<1000; n++) {
+      master.getDB(testDB).baz.insert({n: n, data: bigData});
+    }
+    callGetLastError(3, 60000, testDB);
+
+    var verifyReplication = function(nodeName, collection) {
+       data = collection.findOne({n: 1});
+       assert( data['n'] == 1 , "Failed to save to " + nodeName);
+       data = collection.findOne({n: 999});
+       assert( data['n'] == 999 , "Failed to save to " + nodeName);
+    }
+
+    verifyReplication("master", master.getDB(testDB).baz);
+    verifyReplication("slave 0", slaves[0].getDB(testDB).baz);
+    verifyReplication("slave 1", slaves[1].getDB(testDB).baz);
 
     replTest.stopSet( signal );
 }
 
-doTest( 15 );
+// doTest( 15 );

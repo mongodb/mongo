@@ -162,37 +162,22 @@ namespace mongo {
         if ( argc > 0 )
             host = c.toString( argv[0] );
         
-        int numCommas = DBClientBase::countCommas( host );
-
-        shared_ptr< DBClientWithCommands > conn;
-        
         string errmsg;
-        if ( numCommas == 0 ){
-            DBClientConnection * c = new DBClientConnection( true );
-            conn.reset( c );
-            if ( ! c->connect( host , errmsg ) ){
-                JS_ReportError( cx , ((string)"couldn't connect: " + errmsg).c_str() );
-                return JS_FALSE;
-            }
-            ScriptEngine::runConnectCallback( *c );
+
+        ConnectionString cs = ConnectionString::parse( host , errmsg );
+        if ( ! cs.isValid() ){
+            JS_ReportError( cx , errmsg.c_str() );
+            return JS_FALSE;
         }
-        else if ( numCommas == 1 ){ // paired
-            DBClientPaired * c = new DBClientPaired();
-            conn.reset( c );
-            if ( ! c->connect( host ) ){
-                JS_ReportError( cx , "couldn't connect to pair" );
-                    return JS_FALSE;
-            }
-        }
-        else if ( numCommas == 2 ){
-            conn.reset( new SyncClusterConnection( host ) );
-        }
-        else {
-            JS_ReportError( cx , "1 (paired) or 2(quorum) commas are allowed" );
+
+        shared_ptr< DBClientWithCommands > conn( cs.connect( errmsg ) );
+        if ( ! conn ){
+            JS_ReportError( cx , errmsg.c_str() );
             return JS_FALSE;
         }
         
-        
+        ScriptEngine::runConnectCallback( *conn );
+
         assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( conn ) ) ) );
         jsval host_val = c.toval( host.c_str() );
         assert( JS_SetProperty( cx , obj , "host" , &host_val ) );

@@ -98,7 +98,7 @@ namespace mongo {
 
     class ConnectionString {
     public:
-        enum ConnectionType { MASTER , SET , SYNC };
+        enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC };
         
         ConnectionString( const HostAndPort& server ){
             _type = MASTER;
@@ -111,13 +111,21 @@ namespace mongo {
             _finishInit();
         }
         
-        ConnectionString( ConnectionType type , const string& s ){
+        ConnectionString( ConnectionType type , const string& s , const string& setName = "" ){
             _type = type;
+            _setName = setName;
             _fillServers( s );
             
             switch ( _type ){
             case MASTER:
                 assert( _servers.size() == 1 );
+                break;
+            case SET:
+                assert( _setName.size() );
+                assert( _servers.size() > 1 );
+                break;
+            case PAIR:
+                assert( _servers.size() == 2 );
                 break;
             default:
                 assert( _servers.size() > 0 );
@@ -137,18 +145,22 @@ namespace mongo {
             }
             _finishInit();
         }
+
+        bool isValid() const { return _type != INVALID; }
         
         string toString() const {
             return _string;
         }
         
-        operator string() const {
-            return toString();
-        }
-        
         DBClientBase* connect( string& errmsg ) const;
 
+        static ConnectionString parse( const string& url , string& errmsg );
+        
     private:
+
+        ConnectionString(){
+            _type = INVALID;
+        }
         
         void _fillServers( string s ){
             string::size_type idx;
@@ -172,8 +184,9 @@ namespace mongo {
         ConnectionType _type;
         vector<HostAndPort> _servers;
         string _string;
+        string _setName;
     };
-
+    
     /**
      * controls how much a clients cares about writes
      * default is NORMAL
@@ -741,10 +754,11 @@ namespace mongo {
         virtual bool callRead( Message& toSend , Message& response ) = 0;
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
         virtual void say( Message& toSend  ) = 0;
-        
+
+        virtual ConnectionString::ConnectionType type() const = 0;
     }; // DBClientBase
     
-    class DBClientPaired;
+    class DBClientReplicaSet;
     
     class ConnectException : public UserException { 
     public:
@@ -756,27 +770,31 @@ namespace mongo {
         This is the main entry point for talking to a simple Mongo setup
     */
     class DBClientConnection : public DBClientBase {
-        DBClientPaired *clientPaired;
+        DBClientReplicaSet *clientSet;
         boost::scoped_ptr<MessagingPort> p;
         boost::scoped_ptr<SockAddr> server;
         bool failed; // true if some sort of fatal error has ever happened
         bool autoReconnect;
         time_t lastReconnectTry;
-        string serverAddress; // remember for reconnects
+        HostAndPort _server; // remember for reconnects
+        string _serverString;
+        int _port;
         void _checkConnection();
         void checkConnection() { if( failed ) _checkConnection(); }
 		map< string, pair<string,string> > authCache;
         int _timeout;
+        
+        bool _connect( string& errmsg );
     public:
 
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure
-           @param cp used by DBClientPaired.  You do not need to specify this parameter
+           @param cp used by DBClientReplicaSet.  You do not need to specify this parameter
            @param timeout tcp timeout in seconds - this is for read/write, not connect.  
            Connect timeout is fixed, but short, at 5 seconds.
          */
-        DBClientConnection(bool _autoReconnect=false, DBClientPaired* cp=0, int timeout=0) :
-                clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _timeout(timeout) { }
+        DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, int timeout=0) :
+                clientSet(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _timeout(timeout) { }
 
         /** Connect to a Mongo database server.
 
@@ -786,9 +804,25 @@ namespace mongo {
            @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
                                  If you use IPv6 you must add a port number ( ::1:27017 )
            @param errmsg any relevant error message will appended to the string
+           @deprecated please use HostAndPort
            @return false if fails to connect.
         */
-        virtual bool connect(const string &serverHostname, string& errmsg);
+        virtual bool connect(const char * hostname, string& errmsg){
+            // TODO: remove this method
+            HostAndPort t( hostname );
+            return connect( t , errmsg );
+        }
+
+        /** Connect to a Mongo database server.
+            
+           If autoReconnect is true, you can try to use the DBClientConnection even when
+           false was returned -- it will try to connect again.
+
+           @param server server to connect to.
+           @param errmsg any relevant error message will appended to the string
+           @return false if fails to connect.
+        */
+        virtual bool connect(const HostAndPort& server, string& errmsg);
 
         /** Connect to a Mongo database server.  Exception throwing version.
             Throws a UserException if cannot connect.
@@ -798,9 +832,9 @@ namespace mongo {
 
            @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
         */
-        void connect(string serverHostname) { 
+        void connect(const string& serverHostname) { 
             string errmsg;
-            if( !connect(serverHostname.c_str(), errmsg) ) 
+            if( !connect(HostAndPort(serverHostname), errmsg) ) 
                 throw ConnectException(string("can't connect ") + errmsg);
         }
 
@@ -831,18 +865,18 @@ namespace mongo {
 
         string toStringLong() const {
             stringstream ss;
-            ss << serverAddress;
+            ss << _serverString;
             if ( failed ) ss << " failed";
             return ss.str();
         }
 
         /** Returns the address of the server */
         string toString() {
-            return serverAddress;
+            return _serverString;
         }
         
         string getServerAddress() const {
-            return serverAddress;
+            return _serverString;
         }
         
         virtual void killCursor( long long cursorID );
@@ -852,49 +886,47 @@ namespace mongo {
         }
 
         virtual void say( Message &toSend );
-
+        virtual bool call( Message &toSend, Message &response, bool assertOk = true );
+        
+        virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }  
     protected:
         friend class SyncClusterConnection;
         virtual void recv( Message& m );
-        virtual bool call( Message &toSend, Message &response, bool assertOk = true );
         virtual void sayPiggyBack( Message &toSend );
         virtual void checkResponse( const char *data, int nReturned );
     };
     
-    /** Use this class to connect to a replica pair of servers.  The class will manage
-       checking for which server in a replica pair is master, and do failover automatically.
-
+    /** Use this class to connect to a replica set of servers.  The class will manage
+       checking for which server in a replica set is master, and do failover automatically.
+       
+       This can also be used to connect to replica pairs since pairs are a subset of sets
+       
 	   On a failover situation, expect at least one operation to return an error (throw 
 	   an exception) before the failover is complete.  Operations are not retried.
     */
-    class DBClientPaired : public DBClientBase {
-        DBClientConnection left,right;
-        enum State {
-            NotSetL=0,
-            NotSetR=1,
-            Left, Right
-        } master;
+    class DBClientReplicaSet : public DBClientBase {
+        string _name;
+        DBClientConnection * _currentMaster;
+        vector<HostAndPort> _servers;
+        vector<DBClientConnection*> _conns;
 
+        
         void _checkMaster();
-        DBClientConnection& checkMaster();
+        DBClientConnection * checkMaster();
 
     public:
-        /** Call connect() after constructing. autoReconnect is always on for DBClientPaired connections. */
-        DBClientPaired();
+        /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
+        DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers );
+        virtual ~DBClientReplicaSet();
 
-        /** Returns false is neither member of the pair were reachable, or neither is
+        /** Returns false if nomember of the set were reachable, or neither is
            master, although,
            when false returned, you can still try to use this connection object, it will
            try reconnects.
            */
-        bool connect(const string &serverHostname1, const string &serverHostname2);
+        bool connect();
 
-        /** Connect to a server pair using a host pair string of the form
-              hostname[:port],hostname[:port]
-              */
-        bool connect(string hostpairstring);
-
-        /** Authorize.  Authorizes both sides of the pair as needed. 
+        /** Authorize.  Authorizes all nodes as needed
         */
         virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true );
 
@@ -909,27 +941,27 @@ namespace mongo {
 
         /** insert */
         virtual void insert( const string &ns , BSONObj obj ) {
-            checkMaster().insert(ns, obj);
+            checkMaster()->insert(ns, obj);
         }
 
         /** insert multiple objects.  Note that single object insert is asynchronous, so this version 
             is only nominally faster and not worth a special effort to try to use.  */
         virtual void insert( const string &ns, const vector< BSONObj >& v ) {
-            checkMaster().insert(ns, v);
+            checkMaster()->insert(ns, v);
         }
 
         /** remove */
         virtual void remove( const string &ns , Query obj , bool justOne = 0 ) {
-            checkMaster().remove(ns, obj, justOne);
+            checkMaster()->remove(ns, obj, justOne);
         }
 
         /** update */
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 ) {
-            return checkMaster().update(ns, query, obj, upsert,multi);
+            return checkMaster()->update(ns, query, obj, upsert,multi);
         }
         
         virtual void killCursor( long long cursorID ){
-            checkMaster().killCursor( cursorID );
+            checkMaster()->killCursor( cursorID );
         }
 
         string toString();
@@ -937,30 +969,27 @@ namespace mongo {
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
         void isntMaster() {
-            master = ( ( master == Left ) ? NotSetR : NotSetL );
+            _currentMaster = 0;
         }
         
-        string getServerAddress() const {
-            return left.getServerAddress() + "," + right.getServerAddress();
-        }
-        
+        string getServerAddress() const;
         
         DBClientConnection& masterConn();
         DBClientConnection& slaveConn();
-        
-        /* TODO - not yet implemented. mongos may need these. */
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { assert(false); return false; }
-        virtual void say( Message &toSend ) { assert(false); }
+
+
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { return checkMaster()->call( toSend , response , assertOk ); }
+        virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
+        virtual bool callRead( Message& toSend , Message& response ){ return checkMaster()->callRead( toSend , response ); }
+
+        virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }  
+
+    protected:                
         virtual void sayPiggyBack( Message &toSend ) { assert(false); }
         virtual void checkResponse( const char *data, int nReturned ) { assert(false); }
         
-        virtual bool callRead( Message& toSend , Message& response ){
-            return call( toSend , response );
-        }
-
         bool isFailed() const {
-            // TODO: this really should check isFailed on current master as well
-            return master < Left;
+            return _currentMaster == 0 || _currentMaster->isFailed();
         }
     };
     

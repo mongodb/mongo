@@ -220,7 +220,7 @@ namespace mongo {
                 x = z.str() + x;
                 if( !c->more() )
                     break;
-                bo o = c->next();
+                o = c->next();
             }
             if( !x.empty() ) {
                 ss << "<tr><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>\n" << x;

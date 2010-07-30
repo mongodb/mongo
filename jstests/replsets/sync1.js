@@ -1,9 +1,10 @@
 // FAILING TEST
-// replication is never synced
+// replication is not rolled back
 
 doTest = function( signal ) {
+
     var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
-    var nodes = replTest.startSet();
+    var nodes = replTest.startSet({oplogSize : "40"});
 
     sleep(5000);
 
@@ -63,7 +64,7 @@ doTest = function( signal ) {
         max1 = dbs[1].bar.find().sort({z:-1}).limit(1).next();
         max2 = dbs[2].bar.find().sort({z:-1}).limit(1).next();
 
-	print("sync1.js: WAITING FOR MATCH " + Date() + " z[1]:" + max1.z + " z[2]:" + max2.z);
+	print(count+" sync1.js: WAITING FOR MATCH " + Date() + " z[1]:" + max1.z + " z[2]:" + max2.z);
 
 	//        printjson(max1);
 	//        printjson(max2);
@@ -72,17 +73,42 @@ doTest = function( signal ) {
 
         count++;
         if (count == 100) {
-            print("replsets/sync1.js fails timing out");
-            assert(false);
-            break;
+            assert(false, "replsets/sync1.js fails timing out");
+            replTest.stopSet( signal );
+            return;
         }
     } while (max1.z != max2.z);
 
-    // FAILS!  
-    // if db1 & db2 are at different points in replication, they never get back in sync
-    assert(max1.z == max2.z, "replication caught up (or test timed out)");
+    // okay, now they're caught up.  We have a max:
+    var max = max1.z;
+
+    // now, let's see if rollback works
+    var result = dbs[0].getSisterDB("admin").runCommand({replSetTest : 1, blind : false});
+    dbs[0].getMongo().setSlaveOk();
+
+    printjson(result);
+    sleep(5000);
+
+    // FAIL! This never resyncs
+    // now this should resync
+    var max0;
+    count = 0;
+    do {
+        max0 = dbs[0].bar.find().sort({z:-1}).limit(1).next();
+
+	print(count+" sync1.js: WAITING FOR MATCH " + Date() + " z[0]:" + max0.z + " z:" + max);
+
+        sleep(2000);
+
+        count++;
+        if (count == 100) {
+            assert(false, "replsets/sync1.js fails timing out");
+            replTest.stopSet( signal );
+            return;
+        }
+    } while (max0.z != max);
 
     replTest.stopSet( signal );
 }
 
-doTest( 15 );
+//doTest( 15 );

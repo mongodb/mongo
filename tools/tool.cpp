@@ -152,24 +152,18 @@ namespace mongo {
             if ( _noconnection ){
                 // do nothing
             }
-            else if ( _host.find( "," ) == string::npos ){
-                DBClientConnection * c = new DBClientConnection( _autoreconnect );
-                _conn = c;
-
+            else {
                 string errmsg;
-                if ( ! c->connect( _host , errmsg ) ){
-                    cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
+
+                ConnectionString cs = ConnectionString::parse( _host , errmsg );
+                if ( ! cs.isValid() ){
+                    cerr << "invalid hostname [" << _host << "] " << errmsg << endl;
                     return -1;
                 }
-            }
-            else {
-                log(1) << "using pairing" << endl;
-                DBClientPaired * c = new DBClientPaired();
-                _paired = true;
-                _conn = c;
-
-                if ( ! c->connect( _host ) ){
-                    cerr << "couldn't connect to paired server: " << _host << endl;
+                
+                _conn = cs.connect( errmsg );
+                if ( ! _conn ){
+                    cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
                     return -1;
                 }
             }
@@ -235,8 +229,9 @@ namespace mongo {
     }
 
     DBClientBase& Tool::conn( bool slaveIfPaired ){
-        if ( _paired && slaveIfPaired )
-            return ((DBClientPaired*)_conn)->slaveConn();
+        // TODO: _paired is deprecated
+        if ( slaveIfPaired && _conn->type() == ConnectionString::SET )
+            return ((DBClientReplicaSet*)_conn)->slaveConn();
         return *_conn;
     }
 

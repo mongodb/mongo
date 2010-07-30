@@ -21,6 +21,7 @@
 #include <iomanip>
 
 #include "../client/connpool.h"
+#include "../util/stringutils.h"
 
 #include "grid.h"
 #include "shard.h"
@@ -118,6 +119,40 @@ namespace mongo {
         try {
             ScopedDbConnection newShardConn( host );
             newShardConn->getLastError();
+
+            // get the shard's local db's listing
+            BSONObj res;
+            bool ok = newShardConn->runCommand( "admin" , BSON( "listDatabases" << 1 ) , res );
+            if ( !ok ){
+                ostringstream ss;
+                ss << "failed listing " << host << " databases:" << res;
+                *errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
+
+            vector<string> dbNames;
+            BSONObjIterator i( res["databases"].Obj() );
+            while ( i.more() ){
+                BSONObj dbEntry = i.next().Obj();
+                const string& dbName = dbEntry["name"].String();
+                if ( ! _isSpecialLocalDB( dbName ) ){
+                    dbNames.push_back( dbName );
+                }
+            }
+
+            // TODO (within SERVER-1292) If the databases aren't duplicate, add them to the grid
+            if ( ! dbNames.empty() ){
+                string dbConcat;
+                joinStringDelim( dbNames, &dbConcat , ',' );
+                ostringstream ss;
+                ss << "cannot add shard " << host << " that has local databases: " << dbConcat;
+                *errMsg = ss.str();
+
+                newShardConn.done();
+                return false;
+            }
+
             newShardConn.done();
         }
         catch ( DBException& e ){
@@ -134,7 +169,7 @@ namespace mongo {
             return false;
         }
             
-        // build the ConfigDB shard document.
+        // build the ConfigDB shard document
         BSONObjBuilder b;
         b.append( "_id" , *name );
         b.append( "host" , host );
@@ -146,7 +181,7 @@ namespace mongo {
         {
             ScopedDbConnection conn( configServer.getPrimary() );
                 
-            // check whether this host:port is already a known shard
+            // check whether this host:port is not an already a known shard
             BSONObj old = conn->findOne( ShardNS::shard , BSON( "host" << host ) );
             if ( ! old.isEmpty() ){
                 *errMsg = "host already used";
@@ -160,6 +195,7 @@ namespace mongo {
             *errMsg = conn->getLastError();
             if ( ! errMsg->empty() ){
                 log() << "error adding shard: " << shardDoc << " err: " << *errMsg << endl;
+                conn.done();
                 return false;
             }
 
@@ -219,6 +255,10 @@ namespace mongo {
         conn.done();
 
         return result["optime"]._numberLong();
+    }
+
+    bool Grid::_isSpecialLocalDB( const string& dbName ){
+        return ( dbName == "local" ) || ( dbName == "admin" ) || ( dbName == "config" );
     }
 
     Grid grid;

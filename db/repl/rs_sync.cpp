@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    using namespace bson;
+
     void startSyncThread() { 
         Client::initThread("rs_sync");
         theReplSet->syncThread();
@@ -81,6 +83,40 @@ namespace mongo {
         assert( r.awaitCapable() );
 
         {
+            if( !r.more() ) {
+                /* maybe we are ahead and need to roll back? */
+                try {
+                    bo theirLastOp = r.getLastOp(rsoplog);
+                    if( theirLastOp.isEmpty() ) {
+                        log() << "replSet error empty query result from " << hn << " oplog" << rsLog;
+                        sleepsecs(2);
+                        return;
+                    }
+                    OpTime theirTS = theirLastOp["ts"]._opTime();
+                    if( theirTS < lastOpTimeWritten ) { 
+                        log() << "replSet we are ahead of the primary, will try to roll back" << rsLog;
+                        syncRollback(r);
+                        return;
+                    }
+                    /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
+                    log() << "replSet syncTail condition 1" << rsLog;
+                    sleepsecs(1);
+                }
+                catch(DBException& e) { 
+                    log() << "replSet error querying " << hn << ' ' << e.toString() << rsLog;
+                    sleepsecs(2);
+                }
+                return;
+                /*
+                log() << "replSet syncTail error querying oplog >= " << lastOpTimeWritten.toString() << " from " << hn << rsLog;
+                try {
+                    log() << "replSet " << hn << " last op: " << r.getLastOp(rsoplog).toString() << rsLog;
+                }
+                catch(...) { }
+                sleepsecs(1);
+                return;*/
+            }
+
             BSONObj o = r.nextSafe();
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
@@ -94,8 +130,6 @@ namespace mongo {
                 return;
             }
         }
-
-        // TODO : switch state to secondary here when appropriate...
 
         while( 1 ) { 
             while( 1 ) {
@@ -119,11 +153,12 @@ namespace mongo {
                                 golive = true; /* must have been the original member */
                         }
                         if( golive ) {
-                            sethbmsg("recovering->secondary done");
+                            sethbmsg("");
+                            log() << "replSet SECONDARY" << rsLog;
                             changeState(MemberState::RS_SECONDARY);
                         }
                         else { 
-                            sethbmsg("recovering; not yet to minValid optime");
+                            sethbmsg("still syncing, not yet to minValid optime");
                         }
 
                         /* todo: too stale capability */
@@ -138,6 +173,16 @@ namespace mongo {
                     BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
                     {
                         writelock lk("");
+
+                        /* if we have become primary, we dont' want to apply things from elsewhere
+                           anymore. assumePrimary is in the db lock so we are safe as long as 
+                           we check after we locked above. */
+                        if( box.getPrimary() != primary ) {
+                            if( box.getState().primary() )
+                                log(0) << "replSet stopping syncTail we are now primary" << rsLog;
+                            return;
+                        }
+
                         syncApply(o);
                         _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
                     }
@@ -157,8 +202,10 @@ namespace mongo {
 
     void ReplSetImpl::_syncThread() {
         StateBox::SP sp = box.get();
-        if( sp.state.primary() )
+        if( sp.state.primary() ) {
+            sleepsecs(1);
             return;
+        }
 
         /* later, we can sync from up secondaries if we want. tbd. */
         if( sp.primary == 0 )
@@ -182,7 +229,7 @@ namespace mongo {
                 _syncThread();
             }
             catch(DBException& e) { 
-                log() << "replSet syncThread: " << e.toString() << rsLog;
+                sethbmsg("syncThread: " + e.toString());
                 sleepsecs(10);
             }
             catch(...) { 
@@ -190,7 +237,7 @@ namespace mongo {
                 // TODO : SET NOT SECONDARY here.
                 sleepsecs(60);
             }
-            sleepsecs(2);
+            sleepsecs(1);
         }
     }
 

@@ -195,8 +195,8 @@ namespace mongo {
                 dbname = z.str();
             }
             ss << start(dbname) << h2(dbname);
-            ss << "<a href=\"/_commands\">List all commands</a> | \n";
-            ss << "<a href=\"/_replSet\">Replica set status</a><br>\n";
+            ss << "<p><a href=\"/_commands\">List all commands</a> | \n";
+            ss << "<a href=\"/_replSet\">Replica set status</a></p>\n";
 
             //ss << "<a href=\"/_status\">_status</a>";
             {
@@ -216,9 +216,11 @@ namespace mongo {
                 }
             }
             ss << '\n';
+	    /*
             ss << "HTTP <a "
                 "title=\"click for documentation on this http interface\""
-                "href=\"http://www.mongodb.org/display/DOCS/Http+Interface\">admin port</a>:" << _port << "\n";
+                "href=\"http://www.mongodb.org/display/DOCS/Http+Interface\">admin port</a>:" << _port << "<p>\n";
+	    */
 
             doUnlockedStuff(ss);
 

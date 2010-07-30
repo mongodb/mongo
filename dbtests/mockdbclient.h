@@ -30,7 +30,11 @@ public:
         return one_;
     }
     virtual
-    bool connect(const string &serverHostname, string& errmsg) {
+    bool connect(const char * serverHostname, string& errmsg) {
+        return connect_;
+    }
+    virtual
+    bool connect(const HostAndPort& , string& errmsg) {
         return connect_;
     }
     virtual

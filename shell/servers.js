@@ -950,6 +950,32 @@ ReplSetTest.prototype.getReplSetConfig = function() {
     return cfg;
 }
 
+ReplSetTest.prototype.getURL = function(){
+    var hosts = [];
+    
+    for(i=0; i<this.ports.length; i++) {
+
+        // Don't include this node in the replica set list
+        if(this.bridged && this.ports[i] == this.ports[n]) {
+            continue;
+        }
+        
+        var port;
+        // Connect on the right port
+        if(this.bridged) {
+            port = this.bridgePorts[i];
+        }
+        else {
+            port = this.ports[i];
+        }
+        
+        var str = this.host + ":" + port;
+        hosts.push(str);
+    }
+    
+    return this.name + "/" + hosts.join(",");
+}
+
 ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
     if ( ! extra )
@@ -966,29 +992,8 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
     a.push( "--replSet" );
 
-    replSetString = this.name + "/";
-    hosts = [];
-    for(i=0; i<this.ports.length; i++) {
 
-      // Don't include this node in the replica set list
-      if(this.bridged && this.ports[i] == this.ports[n]) {
-        continue;
-      }
-
-      // Connect on the right port
-      if(this.bridged) {
-        var port = this.bridgePorts[i];
-      }
-      else {
-        var port = this.ports[i];
-      }
-
-      var str = this.host + ":" + port;
-      hosts.push(str);
-    }
-    replSetString += hosts.join(",");
-
-    a.push( replSetString )
+    a.push( this.getURL() )
 
     a.push( "--noprealloc", "--smallfiles" );
 
@@ -1010,12 +1015,12 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     return a;
 }
 
-ReplSetTest.prototype.startSet = function() {
+ReplSetTest.prototype.startSet = function(options) {
     var nodes = [];
     print( "Starting Set" );
 
     for(n=0; n<this.ports.length; n++) {
-        node = this.start(n);
+        node = this.start(n, options);
         nodes.push(node);
     }
 
@@ -1112,11 +1117,11 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var config  = cfg || this.getReplSetConfig();
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
-    var timeout = timeout || 10000;
+    var timeout = timeout || 30000;
     cmd[cmdKey] = config;
     printjson(cmd);
 
-    this.attempt({timeout: timeout, desc: "Initiate replica pair"}, function() {
+    this.attempt({timeout: timeout, desc: "Initiate replica set"}, function() {
         var result = master.runCommand(cmd);
         printjson(result);
         return result['ok'] == 1;
@@ -1136,11 +1141,19 @@ ReplSetTest.prototype.awaitReplication = function() {
 
    latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']['t']
 
-   this.attempt({context: this, timeout: 10000, desc: "awaiting replication"},
+   this.attempt({context: this, timeout: 30000, desc: "awaiting replication"},
        function() {
            var synced = true;
            for(var i=0; i<this.liveNodes.slaves.length; i++) {
              var slave = this.liveNodes.slaves[i];
+
+             // Continue if we're connected to an arbiter
+             if(res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
+                 if(res.myState == 7) {
+                     continue;
+                 }
+             }
+
              slave.getDB("admin").getMongo().setSlaveOk();
              var log = slave.getDB("local")['replset.minvalid'];
              if(log.find().hasNext()) {
@@ -1158,6 +1171,14 @@ ReplSetTest.prototype.awaitReplication = function() {
    });
 }
 
+/**
+ * Starts up a server.
+ *
+ * @param {int} n server number (0, 1, 2, ...)
+ * @param {object} [options]
+ * @param {boolean} [restart] If false, the data directory will be cleared 
+ * before the server starts.  Defaults to false.
+ */
 ReplSetTest.prototype.start = function( n , options , restart ){
     var lockFile = this.getPath( n ) + "/mongod.lock";
     removeFile( lockFile );
@@ -1172,6 +1193,12 @@ ReplSetTest.prototype.start = function( n , options , restart ){
     }
 }
 
+/**
+ * Restarts a db without clearing the data directory.  If the server is not
+ * stopped first, this function will not work.
+ * 
+ * @param {int} n server number (0, 1, 2, ...)
+ */
 ReplSetTest.prototype.restart = function( n , options ){
     return this.start( n , options , true );
 }
@@ -1183,8 +1210,8 @@ ReplSetTest.prototype.stop = function( n , signal ){
 }
 
 ReplSetTest.prototype.stopSet = function( signal ) {
-    print('*** Shutting down repl set ****' )
     for(i=0; i < this.ports.length; i++) {
         this.stop( i, signal );
     }
+    print('*** Shut down repl set - test worked ****' )
 }

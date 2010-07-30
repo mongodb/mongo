@@ -130,7 +130,7 @@ namespace mongo {
         string name() { return "ReplSetHealthPollTask"; }
         void doWork() { 
             if ( !theReplSet ) {
-                log() << "theReplSet not initialized yet, skipping health poll this round" << rsLog;
+                log(2) << "theReplSet not initialized yet, skipping health poll this round" << rsLog;
                 return;
             }
 
