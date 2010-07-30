@@ -1158,6 +1158,14 @@ ReplSetTest.prototype.awaitReplication = function() {
    });
 }
 
+/**
+ * Starts up a server.
+ *
+ * @param {int} n server number (0, 1, 2, ...)
+ * @param {object} [options]
+ * @param {boolean} [restart] If false, the data directory will be cleared 
+ * before the server starts.  Defaults to false.
+ */
 ReplSetTest.prototype.start = function( n , options , restart ){
     var lockFile = this.getPath( n ) + "/mongod.lock";
     removeFile( lockFile );
@@ -1172,6 +1180,12 @@ ReplSetTest.prototype.start = function( n , options , restart ){
     }
 }
 
+/**
+ * Restarts a db without clearing the data directory.  If the server is not
+ * stopped first, this function will not work.
+ * 
+ * @param {int} n server number (0, 1, 2, ...)
+ */
 ReplSetTest.prototype.restart = function( n , options ){
     return this.start( n , options , true );
 }

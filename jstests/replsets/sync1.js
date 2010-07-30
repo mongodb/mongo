@@ -72,8 +72,7 @@ doTest = function( signal ) {
 
         count++;
         if (count == 100) {
-            print("replsets/sync1.js fails timing out");
-            assert(false);
+            assert(false, "replsets/sync1.js fails timing out");
             break;
         }
     } while (max1.z != max2.z);
