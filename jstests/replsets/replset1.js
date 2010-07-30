@@ -34,6 +34,10 @@ doTest = function( signal ) {
     // and slaves in the set and wait until the change has replicated.
     replTest.awaitReplication();
 
+
+    cppconn = new Mongo( replTest.getURL() ).getDB( "foo" );
+    assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 1" );
+
     // Here's how to stop the master node
     var master_id = replTest.getNodeId( master );
     replTest.stop( master_id );
@@ -45,6 +49,17 @@ doTest = function( signal ) {
     var new_master_id = replTest.getNodeId( new_master );
 
     assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
+
+    
+    { 
+        // this may fail since it has to reconnect
+        try {
+            cppconn.foo.findOne()
+        }
+        catch ( e ){
+        }
+        assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 2" );
+    }
 
     // Here's how to restart a node:
     replTest.restart( master_id );

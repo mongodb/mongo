@@ -1146,6 +1146,14 @@ ReplSetTest.prototype.awaitReplication = function() {
            var synced = true;
            for(var i=0; i<this.liveNodes.slaves.length; i++) {
              var slave = this.liveNodes.slaves[i];
+
+             // Continue if we're connected to an arbiter
+             if(res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
+                 if(res.myState == 7) {
+                     continue;
+                 }
+             }
+
              slave.getDB("admin").getMongo().setSlaveOk();
              var log = slave.getDB("local")['replset.minvalid'];
              if(log.find().hasNext()) {

@@ -141,6 +141,8 @@ namespace mongo {
         virtual bool callRead( Message& toSend , Message& response ){
             return call( toSend , response );
         }
+
+        virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }  
     };
 
     extern int lockFile;
