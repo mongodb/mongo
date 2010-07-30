@@ -39,14 +39,13 @@ doTest = function( signal ) {
         assert( result['ok'] == 1, "getLastError with w=" + w + " failed");
     }
 
-
     // Test getlasterror with a simple insert
     // TEST FAILS HERE
     master.getDB(testDB).foo.insert({n: 1});
-    callGetLastError(3, 100000, testDB);
-
+    callGetLastError(3, 60000, testDB);
 
     m1 = master.getDB(testDB).foo.findOne({n: 1});
+    printjson( m1 );
     assert( m1['n'] == 1 , "Failed to save to master");
 
     var s0 = slaves[0].getDB(testDB).foo.findOne({n: 1});
@@ -56,17 +55,18 @@ doTest = function( signal ) {
     assert( s1['n'] == 1 , "Failed to replicate to slave 1");
 
 
-
     // Test getlasterror with large insert
+    print("**** Try inserting many records ****")
     bigData = new Array(2000).toString()
-    for(var n=0; n<1000; n++)
+    for(var n=0; n<1000; n++) {
       master.getDB(testDB).baz.insert({n: n, data: bigData});
-    callGetLastError(3, 60000);
+    }
+    callGetLastError(3, 60000, testDB);
 
     var verifyReplication = function(nodeName, collection) {
        data = collection.findOne({n: 1});
        assert( data['n'] == 1 , "Failed to save to " + nodeName);
-       m1 = collection.findOne({n: 999});
+       data = collection.findOne({n: 999});
        assert( data['n'] == 999 , "Failed to save to " + nodeName);
     }
 
