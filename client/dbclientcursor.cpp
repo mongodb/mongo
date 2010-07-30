@@ -151,15 +151,19 @@ namespace mongo {
     }
 
     BSONObj DBClientCursor::next() {
-        DEV assert( more() );
+        DEV _assertIfNull();
         if ( !_putBack.empty() ) {
             BSONObj ret = _putBack.top();
             _putBack.pop();
             return ret;
         }
+
+        uassert(13422, "DBClientCursor next() called but more() is false", pos < nReturned);
+
         pos++;
         BSONObj o(data);
         data += o.objsize();
+        /* todo would be good to make data null at end of batch for safety */
         return o;
     }
 

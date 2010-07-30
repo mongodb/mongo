@@ -1112,11 +1112,11 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var config  = cfg || this.getReplSetConfig();
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
-    var timeout = timeout || 10000;
+    var timeout = timeout || 30000;
     cmd[cmdKey] = config;
     printjson(cmd);
 
-    this.attempt({timeout: timeout, desc: "Initiate replica pair"}, function() {
+    this.attempt({timeout: timeout, desc: "Initiate replica set"}, function() {
         var result = master.runCommand(cmd);
         printjson(result);
         return result['ok'] == 1;
@@ -1136,7 +1136,7 @@ ReplSetTest.prototype.awaitReplication = function() {
 
    latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']['t']
 
-   this.attempt({context: this, timeout: 10000, desc: "awaiting replication"},
+   this.attempt({context: this, timeout: 30000, desc: "awaiting replication"},
        function() {
            var synced = true;
            for(var i=0; i<this.liveNodes.slaves.length; i++) {
