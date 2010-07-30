@@ -268,7 +268,8 @@ namespace mongo {
                 _hbmsg[sz] = 0;
                 memcpy(_hbmsg, s.c_str(), sz);
             }
-            log(logLevel) << "replSet " << s << rsLog;
+            if( !s.empty() )
+                log(logLevel) << "replSet " << s << rsLog;
         }
     protected:
         bool initFromConfig(ReplSetConfig& c); // true if ok; throws if config really bad; false if config doesn't include self

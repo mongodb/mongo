@@ -166,8 +166,10 @@ namespace mongo {
 
     void ReplSetImpl::_syncThread() {
         StateBox::SP sp = box.get();
-        if( sp.state.primary() )
+        if( sp.state.primary() ) {
+            sleepsecs(1);
             return;
+        }
 
         /* later, we can sync from up secondaries if we want. tbd. */
         if( sp.primary == 0 )
@@ -199,7 +201,7 @@ namespace mongo {
                 // TODO : SET NOT SECONDARY here.
                 sleepsecs(60);
             }
-            sleepsecs(2);
+            sleepsecs(1);
         }
     }
 
