@@ -158,7 +158,7 @@ namespace mongo {
             return ret;
         }
 
-        uassert(13421, "DBClientCursor next() called but more() is false", pos < nReturned);
+        uassert(13422, "DBClientCursor next() called but more() is false", pos < nReturned);
 
         pos++;
         BSONObj o(data);
