@@ -74,36 +74,12 @@ namespace mongo {
             return c;
         }
         
-        int numCommas = DBClientBase::countCommas( host );
+        string errmsg;
+        ConnectionString cs = ConnectionString::parse( host , errmsg );
+        uassert( 13071 , (string)"invalid hostname [" + host + "]" + errmsg , cs.isValid() );
         
-        if( numCommas == 0 ) {
-            DBClientConnection *cc = new DBClientConnection(true);
-            log(2) << "creating new connection for pool to:" << host << endl;
-            string errmsg;
-            if ( !cc->connect(host.c_str(), errmsg) ) {
-                delete cc;
-                uassert( 11002 ,  (string)"dbconnectionpool: connect failed " + host , false);
-                return 0;
-            }
-            c = cc;
-        }
-        else if ( numCommas == 1 ) { 
-            DBClientPaired *p = new DBClientPaired();
-            if( !p->connect(host) ) { 
-                delete p;
-                uassert( 11003 ,  (string)"dbconnectionpool: connect failed [2] " + host , false);
-                return 0;
-            }
-            c = p;
-        }
-        else if ( numCommas == 2 ) {
-            c = new SyncClusterConnection( host );
-        }
-        else {
-            uassert( 13071 , (string)"invalid hostname [" + host + "]" , 0 );
-            c = 0; // prevents compiler warning
-        }
-        
+        c = cs.connect( errmsg );
+        uassert( 11002 ,  (string)"dbconnectionpool: connect failed " + host + " : " + errmsg , c );
         return _finishCreate( host , c );
     }
 

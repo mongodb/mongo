@@ -98,7 +98,7 @@ namespace mongo {
 
     class ConnectionString {
     public:
-        enum ConnectionType { MASTER , SET , SYNC };
+        enum ConnectionType { INVALID , MASTER , PAIR , SYNC };
         
         ConnectionString( const HostAndPort& server ){
             _type = MASTER;
@@ -137,6 +137,8 @@ namespace mongo {
             }
             _finishInit();
         }
+
+        bool isValid() const { return _type != INVALID; }
         
         string toString() const {
             return _string;
@@ -148,7 +150,13 @@ namespace mongo {
         
         DBClientBase* connect( string& errmsg ) const;
 
+        static ConnectionString parse( const string& url , string& errmsg );
+        
     private:
+
+        ConnectionString(){
+            _type = INVALID;
+        }
         
         void _fillServers( string s ){
             string::size_type idx;
