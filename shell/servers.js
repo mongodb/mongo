@@ -1112,11 +1112,11 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var config  = cfg || this.getReplSetConfig();
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
-    var timeout = timeout || 10000;
+    var timeout = timeout || 30000;
     cmd[cmdKey] = config;
     printjson(cmd);
 
-    this.attempt({timeout: timeout, desc: "Initiate replica pair"}, function() {
+    this.attempt({timeout: timeout, desc: "Initiate replica set"}, function() {
         var result = master.runCommand(cmd);
         printjson(result);
         return result['ok'] == 1;
