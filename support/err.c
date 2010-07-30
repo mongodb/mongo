@@ -207,10 +207,11 @@ int
 __wt_env_lockout(ENV *env)
 {
 	__wt_api_env_errx(env,
-	    "This handle method is not available for some reason: for example, "
-	    "handle methods are restricted after an error, or configuration "
-	    "methods may be restricted after the database or environment have "
-	    "been opened, or operational methods may be restricted until the "
-	    "database or environment has been opened.");
+	    "An unavailable handle method was called; the handle method is "
+	    "not available for some reason, for example, handle methods are "
+	    "restricted after an error, or configuration methods may be "
+	    "restricted after the database or environment have been opened, "
+	    "or operational methods may be restricted until the database or "
+	    "environment has been opened.");
 	return (WT_ERROR);
 }
