@@ -608,7 +608,9 @@ namespace mongo {
                 return;
             }
 
-            _printChunks();
+            if (_chunkMap.size() < 10){ 
+                _printChunks();
+            }
             sleepmillis(10 * (3-tries));
             sleepsecs(10);
         }
@@ -652,6 +654,12 @@ namespace mongo {
         // Make sure there are no gaps or overlaps
         for (ChunkMap::const_iterator it=boost::next(_chunkMap.begin()), end=_chunkMap.end(); it != end; ++it){
             ChunkMap::const_iterator last = prior(it);
+
+            if (!(it->second->getMin() == last->second->getMax())){
+                PRINT(it->second->toString());
+                PRINT(it->second->getMin());
+                PRINT(last->second->getMax());
+            }
             ENSURE(it->second->getMin() == last->second->getMax());
         }
 
