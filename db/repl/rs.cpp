@@ -160,7 +160,7 @@ namespace mongo {
                 catch(...) {
                     uassert(13114, "bad --replSet seed hostname", false);
                 }
-                uassert(13096, "bad --replSet config string - dups?", seedSet.count(m) == 0 );
+                uassert(13096, "bad --replSet command line config string - dups?", seedSet.count(m) == 0 );
                 seedSet.insert(m);
                 //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if( m.isSelf() ) {
