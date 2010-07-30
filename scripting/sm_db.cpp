@@ -176,6 +176,8 @@ namespace mongo {
             return JS_FALSE;
         }
         
+        ScriptEngine::runConnectCallback( *conn );
+
         assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( conn ) ) ) );
         jsval host_val = c.toval( host.c_str() );
         assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
