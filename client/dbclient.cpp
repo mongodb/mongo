@@ -43,27 +43,47 @@ namespace mongo {
             return c;
         }
             
-        case SET: {
+        case PAIR: {
             DBClientPaired *p = new DBClientPaired();
             if( !p->connect( _servers[0] , _servers[1] ) ){
                 delete p;
-                errmsg = "connect failed";
+                errmsg = "connect failed to pair";
                 return 0;
             }
             return p;
         }
             
-        case SYNC:
+        case SYNC: {
             // TODO , don't copy
             list<HostAndPort> l;
             for ( unsigned i=0; i<_servers.size(); i++ )
                 l.push_back( _servers[i] );
             return new SyncClusterConnection( l );
-            
         }
 
+        case INVALID:
+            throw UserException( 13421 , "trying to connect to invalid ConnectionString" );
+            break;
+        }
+        
         assert( 0 );
         return 0;
+    }
+
+    ConnectionString ConnectionString::parse( const string& host , string& errmsg ){
+        int numCommas = DBClientBase::countCommas( host );
+        
+        if( numCommas == 0 ) 
+            return ConnectionString( HostAndPort( host ) );
+        
+        if ( numCommas == 1 ) 
+            return ConnectionString( PAIR , host );
+
+        if ( numCommas == 2 )
+            return ConnectionString( SYNC , host );
+        
+        errmsg = (string)"invalid hostname [" + host + "]";
+        return ConnectionString(); // INVALID
     }
 
     Query& Query::where(const string &jscode, BSONObj scope) { 

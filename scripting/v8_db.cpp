@@ -153,40 +153,15 @@ namespace mongo {
             strcpy( host , "127.0.0.1" );
         }
 
-        DBClientWithCommands * conn = 0;
-        int commas = 0;
-        for ( int i=0; i<255; i++ ){
-            if ( host[i] == ',' )
-                commas++;
-            else if ( host[i] == 0 )
-                break;
-        }
+        string errmsg;
+        ConnectionString cs = ConnectionString::parse( host , errmsg );
+        if ( ! cs.isValid() )
+            return v8::ThrowException( v8::String::New( errmsg.c_str() ) );
         
-        if ( commas == 0 ){
-            DBClientConnection * c = new DBClientConnection( true );
-            string errmsg;
-            if ( ! c->connect( host , errmsg ) ){
-                delete c;
-                string x = "couldn't connect: ";
-                x += errmsg;
-                return v8::ThrowException( v8::String::New( x.c_str() ) );
-            }
-            conn = c;
-        }
-        else if ( commas == 1 ){
-            DBClientPaired * c = new DBClientPaired();
-            if ( ! c->connect( host ) ){
-                delete c;
-                return v8::ThrowException( v8::String::New( "couldn't connect to pair" ) );
-            }
-            conn = c;
-        }
-        else if ( commas == 2 ){
-            conn = new SyncClusterConnection( host );
-        }
-        else {
-            return v8::ThrowException( v8::String::New( "too many commas" ) );
-        }
+        
+        DBClientWithCommands * conn = cs.connect( errmsg );
+        if ( ! conn )
+            return v8::ThrowException( v8::String::New( errmsg.c_str() ) );
         
         Persistent<v8::Object> self = Persistent<v8::Object>::New( args.Holder() );
         self.MakeWeak( conn , destroyConnection );
