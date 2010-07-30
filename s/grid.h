@@ -94,6 +94,11 @@ namespace mongo {
          */
         bool _getNewShardName( string* name ) const;
 
+        /**
+         * @return whether a give dbname is used for shard "local" databases (e.g., admin or local)
+         */
+        static bool _isSpecialLocalDB( const string& dbName );
+
     };
 
     extern Grid grid;
