@@ -1045,7 +1045,7 @@ namespace mongo {
                 string e;
                 _conns[i]->auth( dbname , username , pwd , e , digestPassword );
             }
-            catch ( AssertionException& e ){
+            catch ( AssertionException& ){
             }
         }
 
