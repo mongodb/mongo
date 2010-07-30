@@ -884,7 +884,7 @@ ReplSetTest = function( opts ){
         this.initBridges();
     }
     else {
-        this.ports = allocatePorts( this.numNodes , startPort );
+        this.ports = allocatePorts( this.numNodes , this.startPort );
     }
 
     this.nodes = [];

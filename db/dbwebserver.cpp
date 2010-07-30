@@ -196,7 +196,7 @@ namespace mongo {
             }
             ss << start(dbname) << h2(dbname);
             ss << "<a href=\"/_commands\">List all commands</a> | \n";
-            ss << "<a href=\"/_replSet\">Replica set status</a>\n";
+            ss << "<a href=\"/_replSet\">Replica set status</a><br>\n";
 
             //ss << "<a href=\"/_status\">_status</a>";
             {

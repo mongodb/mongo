@@ -63,15 +63,16 @@ doTest = function( signal ) {
         max1 = dbs[1].bar.find().sort({z:-1}).limit(1).next();
         max2 = dbs[2].bar.find().sort({z:-1}).limit(1).next();
 
-        print("**********************************************");
-        printjson(max1);
-        printjson(max2);
+	print("sync1.js: WAITING FOR MATCH " + Date() + " z[1]:" + max1.z + " z[2]:" + max2.z);
+
+	//        printjson(max1);
+	//        printjson(max2);
 
         sleep(2000);
 
         count++;
-        if (count == 20) {
-            assert(false, 'sync never caught up, giving up');
+        if (count == 100) {
+            assert(false, "replsets/sync1.js fails timing out");
             break;
         }
     } while (max1.z != max2.z);
@@ -83,4 +84,4 @@ doTest = function( signal ) {
     replTest.stopSet( signal );
 }
 
-//doTest( 15 );
+doTest( 15 );

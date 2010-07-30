@@ -73,7 +73,7 @@ namespace mongo {
     int getRBID(DBClientConnection *c) { 
       bo info;
       c->simpleCommand("admin", &info, "replSetGetRBID");
-      return info["rbid"].Number();
+      return info["rbid"].numberInt();
     } 
 
     class CmdReplSetGetStatus : public ReplSetCommand {
