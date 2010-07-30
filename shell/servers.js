@@ -950,6 +950,32 @@ ReplSetTest.prototype.getReplSetConfig = function() {
     return cfg;
 }
 
+ReplSetTest.prototype.getURL = function(){
+    var hosts = [];
+    
+    for(i=0; i<this.ports.length; i++) {
+
+        // Don't include this node in the replica set list
+        if(this.bridged && this.ports[i] == this.ports[n]) {
+            continue;
+        }
+        
+        var port;
+        // Connect on the right port
+        if(this.bridged) {
+            port = this.bridgePorts[i];
+        }
+        else {
+            port = this.ports[i];
+        }
+        
+        var str = this.host + ":" + port;
+        hosts.push(str);
+    }
+    
+    return this.name + "/" + hosts.join(",");
+}
+
 ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
     if ( ! extra )
@@ -966,29 +992,8 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
     a.push( "--replSet" );
 
-    replSetString = this.name + "/";
-    hosts = [];
-    for(i=0; i<this.ports.length; i++) {
 
-      // Don't include this node in the replica set list
-      if(this.bridged && this.ports[i] == this.ports[n]) {
-        continue;
-      }
-
-      // Connect on the right port
-      if(this.bridged) {
-        var port = this.bridgePorts[i];
-      }
-      else {
-        var port = this.ports[i];
-      }
-
-      var str = this.host + ":" + port;
-      hosts.push(str);
-    }
-    replSetString += hosts.join(",");
-
-    a.push( replSetString )
+    a.push( this.getURL() )
 
     a.push( "--noprealloc", "--smallfiles" );
 
@@ -1197,8 +1202,8 @@ ReplSetTest.prototype.stop = function( n , signal ){
 }
 
 ReplSetTest.prototype.stopSet = function( signal ) {
-    print('*** Shutting down repl set ****' )
     for(i=0; i < this.ports.length; i++) {
         this.stop( i, signal );
     }
+    print('*** Shut down repl set - test worked ****' )
 }
