@@ -104,8 +104,6 @@ namespace mongo {
             }
         }
 
-        // TODO : switch state to secondary here when appropriate...
-
         while( 1 ) { 
             while( 1 ) {
                 if( !r.moreInCurrentBatch() ) { 
@@ -147,6 +145,16 @@ namespace mongo {
                     BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
                     {
                         writelock lk("");
+
+                        /* if we have become primary, we dont' want to apply things from elsewhere
+                           anymore. assumePrimary is in the db lock so we are safe as long as 
+                           we check after we locked above. */
+                        if( box.getPrimary() != primary ) {
+                            if( box.getState().primary() )
+                                log(0) << "replSet stopping syncTail we are now primary" << rsLog;
+                            return;
+                        }
+
                         syncApply(o);
                         _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
                     }
