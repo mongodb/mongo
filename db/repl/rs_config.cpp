@@ -223,7 +223,10 @@ namespace mongo {
                 ss << "replSet members[" << i << "] bad config object";
                 uassert(13135, ss.str(), false);
             }
-            uassert(13108, "bad " + rsConfigNs + " config dups?", ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0);
+            if( !(ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0) ) {
+                log() << "replSet " << o.toString() << rsLog;
+                uassert(13108, "bad replset config -- duplicate hosts in the config object?", false);
+            }
             hosts.insert(m.h.toString());
             ords.insert(m._id);
             this->members.push_back(m);
