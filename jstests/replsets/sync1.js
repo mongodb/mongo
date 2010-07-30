@@ -71,7 +71,7 @@ doTest = function( signal ) {
 
         count++;
         if (count == 20) {
-            assert(false);
+            assert(false, 'sync never caught up, giving up');
             break;
         }
     } while (max1.z != max2.z);
