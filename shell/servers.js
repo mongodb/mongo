@@ -1010,12 +1010,12 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     return a;
 }
 
-ReplSetTest.prototype.startSet = function() {
+ReplSetTest.prototype.startSet = function(options) {
     var nodes = [];
     print( "Starting Set" );
 
     for(n=0; n<this.ports.length; n++) {
-        node = this.start(n);
+        node = this.start(n, options);
         nodes.push(node);
     }
 
