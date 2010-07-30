@@ -990,7 +990,7 @@ const char * jsconcatcode =
  "return this._name;}\n"
  "DB.prototype.toString = function(){\n"
  "return this._name;}\n"
- "DB.prototype.isMaster = function(){ return db.runCommand(\"isMaster\");}\n"
+ "DB.prototype.isMaster = function(){ return this.runCommand(\"isMaster\");}\n"
  "DB.prototype.currentOp = function(){\n"
  "return db.$cmd.sys.inprog.findOne();}\n"
  "DB.prototype.currentOP = DB.prototype.currentOp;\n"
