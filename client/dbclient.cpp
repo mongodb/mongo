@@ -903,7 +903,10 @@ namespace mongo {
 
     /* find which server, the left or right, is currently master mode */
     void DBClientReplicaSet::_checkMaster() {
-        log( _logLevel )  <<  "_checkMaster on: " << toString() << endl;
+        
+        bool triedQuickCheck = false;
+        
+        log( _logLevel + 1) <<  "_checkMaster on: " << toString() << endl;
         for ( int retry = 0; retry < 2; retry++ ) {
             for ( unsigned i=0; i<_conns.size(); i++ ){
                 DBClientConnection * c = _conns[i];
@@ -912,16 +915,57 @@ namespace mongo {
                     BSONObj o;
                     c->isMaster(im, &o);
                     
-                    //if ( retry )
+                    if ( retry )
                         log(_logLevel) << "checkmaster: " << c->toString() << ' ' << o << '\n';
                     
+                    string maybePrimary;
+                    if ( o["hosts"].type() == Array ){
+                        if ( o["primary"].type() == String )
+                            maybePrimary = o["primary"].String();
+                        
+                        BSONObjIterator hi(o["hosts"].Obj());
+                        while ( hi.more() ){
+                            string toCheck = hi.next().String();
+                            int found = -1;
+                            for ( unsigned x=0; x<_servers.size(); x++ ){
+                                if ( toCheck == _servers[x].toString() ){
+                                    found = x;
+                                    break;
+                                }
+                            }
+                            
+                            if ( found == -1 ){
+                                HostAndPort h( toCheck );
+                                _servers.push_back( h );
+                                _conns.push_back( new DBClientConnection( true, this ) );
+                                string temp;
+                                _conns[ _conns.size() - 1 ]->connect( h , temp );
+                                log( _logLevel ) << "updated set to: " << toString() << endl;
+                            }
+                            
+                        }
+                    }
+
                     if ( im ) {
                         _currentMaster = c;
                         return;
                     }
+                    
+                    if ( maybePrimary.size() && ! triedQuickCheck ){
+                        for ( unsigned x=0; x<_servers.size(); x++ ){
+                            if ( _servers[i].toString() != maybePrimary )
+                                continue;
+                            triedQuickCheck = true;
+                            _conns[x]->isMaster( im , &o );
+                            if ( im ){
+                                _currentMaster = _conns[x];
+                                return;
+                            }
+                        }
+                    }
                 }
                 catch ( std::exception& e ) {
-                    //if ( retry )
+                    if ( retry )
                         log(_logLevel) << "checkmaster: caught exception " << c->toString() << ' ' << e.what() << endl;
                 }
             }

@@ -38,6 +38,15 @@ doTest = function( signal ) {
     cppconn = new Mongo( replTest.getURL() ).getDB( "foo" );
     assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 1" );
 
+    {
+        // check c++ finding other servers
+        var temp = replTest.getURL();
+        temp = temp.substring( 0 , temp.lastIndexOf( "," ) );
+        temp = new Mongo( temp ).getDB( "foo" );
+        assert.eq( 1000 , temp.foo.findOne().a , "cppconn 1" );        
+    }
+
+
     // Here's how to stop the master node
     var master_id = replTest.getNodeId( master );
     replTest.stop( master_id );
@@ -59,6 +68,7 @@ doTest = function( signal ) {
         catch ( e ){
         }
         assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 2" );
+
     }
 
     // Here's how to restart a node:
