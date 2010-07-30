@@ -83,7 +83,11 @@ doTest = function( signal ) {
     var max = max1.z;
 
     // now, let's see if rollback works
-    var result = dbs[0].runCommand({replSetTest : 1, blind : false});
+    var result = dbs[0].getSisterDB("admin").runCommand({replSetTest : 1, blind : false});
+    dbs[0].getMongo().setSlaveOk();
+
+    printjson(result);
+    sleep(5000);
 
     // FAIL! This never resyncs
     // now this should resync
