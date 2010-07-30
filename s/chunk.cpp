@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "chunk.h"
 #include "config.h"
+#include "grid.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -206,6 +207,10 @@ namespace mongo {
                 ss << "mulitSplit failing because config not up to date" 
                    << " onServer: " << onServer.toString()
                    << " mine: " << mine.toString();
+
+                //reload config
+                grid.getDBConfig(_manager->_ns)->getChunkManager(_manager->_ns, true);
+
                 uasserted( 13387 , ss.str() );
             }
         }
