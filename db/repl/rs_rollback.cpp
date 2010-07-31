@@ -274,6 +274,7 @@ namespace mongo {
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
        uassert(13412, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
 
+       unsigned deletes = 0, updates = 0;
        for( list<pair<DocID,bo> >::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
            const DocID& d = i->first;
            bo pattern = d._id.wrap(); // { _id : ... }
@@ -285,6 +286,7 @@ namespace mongo {
                    // wasn't on the primary; delete.
                    /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
                    try { 
+                       deletes++;
                        deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
                    }
                    catch(...) { 
@@ -294,16 +296,17 @@ namespace mongo {
                else {
                    // todo faster...
                    OpDebug debug;
+                   updates++;
                    _updateObjects(/*god*/true, d.ns, i->second, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug);
                }
            }
            catch(DBException& e) { 
-               log() << "replSet exception in rollback ns:" << d.ns << ' ' << pattern.toString() << ' ' << e.toString() << rsLog;
+               log() << "replSet exception in rollback ns:" << d.ns << ' ' << pattern.toString() << ' ' << e.toString() << " ndeletes:" << deletes << rsLog;
                warn = true;
            }
        }
 
-       sethbmsg("syncRollback 5");
+       sethbmsg(str::stream() << "syncRollback 5 d:" << deletes << " u:" << updates);
        MemoryMappedFile::flushAll(true);
        sethbmsg("syncRollback 6");
 
