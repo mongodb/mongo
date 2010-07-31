@@ -60,7 +60,7 @@ namespace mongo {
             return false;
         }
 
-        log() << "shardVersionOk failed  ns:" << ns << " " << errmsg << endl;
+        log() << "shardVersionOk failed  ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
         
         if ( doesOpGetAResponse( op ) ){
             assert( dbresponse );
@@ -95,7 +95,7 @@ namespace mongo {
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
         
-        log() << "got write with an old config - writing back ns: " << ns << endl;
+        log(1) << "got write with an old config - writing back ns: " << ns << endl;
         if ( logLevel ) log(1) << debugString( m ) << endl;
 
         BSONObjBuilder b;
@@ -105,7 +105,7 @@ namespace mongo {
         b.appendTimestamp( "version" , shardingState.getVersion( ns ) );
         b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
-        log() << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
+        log(2) << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
         queueWriteBack( clientID.str() , b.obj() );
 
         return true;

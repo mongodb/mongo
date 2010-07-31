@@ -28,7 +28,7 @@
 
 namespace mongo {
     
-    DBConfigPtr Grid::getDBConfig( string database , bool create ){
+    DBConfigPtr Grid::getDBConfig( string database , bool create , const string& shardNameHint ){
         {
             string::size_type i = database.find( "." );
             if ( i != string::npos )
@@ -67,10 +67,18 @@ namespace mongo {
                     }
 
                     Shard primary;
-                    if ( database == "admin" )
+                    if ( database == "admin" ){
                         primary = configServer.getPrimary();
-                    else
+
+                    } else if ( shardNameHint.empty() ){
                         primary = Shard::pick();
+
+                    } else {
+                        // use the shard name if provided
+                        Shard shard;
+                        shard.reset( shardNameHint );
+                        primary = shard;
+                    }
 
                     if ( primary.ok() ){
                         cc->setPrimary( primary.getName() ); // saves 'cc' to configDB
@@ -115,7 +123,12 @@ namespace mongo {
             name = &nameInternal;
         }
 
-        // check whether host exists and is operative
+        // Check whether the host exists and is operative. In order to be accepted as a new shard, that
+        // mongod must not have any database name that exists already in any other shards. If that
+        // test passes, the new shard's databases are going to be entered as non-sharded db's whose
+        // primary is the newly added shard.
+
+        vector<string> dbNames;
         try {
             ScopedDbConnection newShardConn( host );
             newShardConn->getLastError();
@@ -131,26 +144,16 @@ namespace mongo {
                 return false;
             }
 
-            vector<string> dbNames;
             BSONObjIterator i( res["databases"].Obj() );
             while ( i.more() ){
                 BSONObj dbEntry = i.next().Obj();
                 const string& dbName = dbEntry["name"].String();
-                if ( ! _isSpecialLocalDB( dbName ) ){
+                if ( _isSpecialLocalDB( dbName ) ){
+                    // 'local', 'admin', and 'config' are system DBs and should be excluded here
+                    continue;
+                } else {
                     dbNames.push_back( dbName );
                 }
-            }
-
-            // TODO (within SERVER-1292) If the databases aren't duplicate, add them to the grid
-            if ( ! dbNames.empty() ){
-                string dbConcat;
-                joinStringDelim( dbNames, &dbConcat , ',' );
-                ostringstream ss;
-                ss << "cannot add shard " << host << " that has local databases: " << dbConcat;
-                *errMsg = ss.str();
-
-                newShardConn.done();
-                return false;
             }
 
             newShardConn.done();
@@ -162,7 +165,19 @@ namespace mongo {
             *errMsg = ss.str();
             return false;
         }
-                
+
+        // check that none of the existing shard candidate's db's exist elsewhere
+        for ( vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it ){
+            DBConfigPtr config = getDBConfig( *it , false );
+            if ( config.get() != NULL ){
+                ostringstream ss;
+                ss << "trying to add shard " << host << " because local database " << *it;
+                ss << " exists in another " << config->getPrimary().toString();
+                *errMsg = ss.str();
+                return false;
+            }
+        }
+
         // if a name for a shard wasn't provided, pick one.
         if ( name->empty() && ! _getNewShardName( name ) ){
             *errMsg = "error generating new shard name";
@@ -203,6 +218,15 @@ namespace mongo {
         }
 
         Shard::reloadShardInfo();
+
+        // add all databases of the new shard
+        for ( vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it ){
+            DBConfigPtr config = getDBConfig( *it , true , *name );
+            if ( ! config ){
+                log() << "adding shard " << host << " even though could not add database " << *it << endl; 
+            }
+        }
+
         return true;
     }
         
