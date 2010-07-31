@@ -27,9 +27,30 @@
 
 namespace mongo {
 
+    namespace {
+
+        mutex sleepMutex ("WriteBackThrottle");
+        int sleepTime (10);
+        Date_t throttleUntil(0);
+        thread_specific_ptr<int> writeBackThreadMarker; // non-NULL if in writeBack thread
+
+        void throttleIfNeeded() {
+            if (!writeBackThreadMarker.get() && jsTime() < throttleUntil){
+                int i;
+                {
+                    scoped_lock lock (sleepMutex);
+                    i = sleepTime++;
+                }
+                sleepmillis(min(1000, sleepTime));
+            }
+        }
+    }
+
     // ----- Strategy ------
 
     void Strategy::doWrite( int op , Request& r , const Shard& shard , bool checkVersion ){
+        throttleIfNeeded();
+
         ShardConnection conn( shard , r.getns() );
         if ( ! checkVersion )
             conn.donotCheckVersion();
@@ -70,6 +91,8 @@ namespace mongo {
     }
     
     void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj ){
+        throttleIfNeeded();
+
         ShardConnection dbcon( shard , ns );
         if ( dbcon.setVersion() ){
             dbcon.done();
@@ -87,6 +110,9 @@ namespace mongo {
         }
         
         void run(){
+            // doesn't matter what is put in here, just that it is not NULL
+            writeBackThreadMarker.reset(new int()); 
+
             OID lastID;
             lastID.clear();
             int secsToSleep = 0;
@@ -115,6 +141,8 @@ namespace mongo {
                     }
                     
                     log(1) << "writebacklisten result: " << result << endl;
+
+                    throttleUntil = jsTime() + 1000;
                     
                     BSONObj data = result.getObjectField( "data" );
                     if ( data.getBoolField( "writeBack" ) ){
@@ -154,6 +182,11 @@ namespace mongo {
                         log() << "unknown writeBack result: " << result << endl;
                     }
                     
+                    OCCASIONALLY {
+                        scoped_lock lock (sleepMutex);
+                        sleepTime /= 2;
+                    }
+
                     conn.done();
                     secsToSleep = 0;
                     continue;
