@@ -27,6 +27,7 @@
 #include "../../util/ramlog.h"
 #include "../helpers/dblogger.h"
 #include "connections.h"
+#include "../../util/unittest.h"
 
 namespace mongo {
     /* decls for connections.h */
@@ -336,5 +337,13 @@ namespace mongo {
         b.append("myState", box.getState().s);
         b.append("members", v);
     }
+
+    static struct Test : public UnitTest { 
+        void run() { 
+            HealthOptions a,b;
+            assert( a == b );
+            assert( a.isDefault() );
+        }
+    } test;
 
 }
