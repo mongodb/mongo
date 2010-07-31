@@ -307,15 +307,23 @@ namespace mongo {
             Flag_HaveIdIndex = 1 << 0 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
         };
 
-        IndexDetails& idx(int idxNo) {
+        IndexDetails& idx(int idxNo, bool missingExpected = false ) {
             if( idxNo < NIndexesBase ) 
                 return _indexes[idxNo];
             Extra *e = extra();
-            massert(13282, "missing Extra", e);
+            if ( ! e ){
+                if ( missingExpected )
+                    throw MsgAssertionException( 13283 , "Missing Extra" );
+                massert(13282, "missing Extra", e);
+            }
             int i = idxNo - NIndexesBase;
             if( i >= NIndexesExtra ) {
                 e = e->next(this);
-                massert(13283, "missing Extra", e);
+                if ( ! e ){
+                    if ( missingExpected )
+                        throw MsgAssertionException( 13283 , "missing extra" );
+                    massert(13283, "missing Extra", e);
+                }
                 i -= NIndexesExtra;
             }
             return e->details[i];

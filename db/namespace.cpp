@@ -426,11 +426,11 @@ namespace mongo {
 
         IndexDetails *id;
         try {
-            id = &idx(nIndexes);
+            id = &idx(nIndexes,true);
         }
         catch(DBException&) { 
             allocExtra(thisns, nIndexes);
-            id = &idx(nIndexes);
+            id = &idx(nIndexes,false);
         }
 
         nIndexes++;
