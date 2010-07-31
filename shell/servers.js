@@ -670,7 +670,7 @@ ReplPair.prototype.waitForSteadyState = function( state, expectedMasterHost, two
     var leftValues = {};
     var rightValues = {};
     assert.soon( function() { return rp.checkSteadyState( state, expectedMasterHost, twoMasterOk, leftValues, rightValues, debug ); },
-                "rp (" + rp + ") failed to reach expected steady state (" + state + ")" );
+                 "rp (" + rp + ") failed to reach expected steady state (" + state + ")" , 60000 );
 }
 
 ReplPair.prototype.master = function() { return this.master_; }
