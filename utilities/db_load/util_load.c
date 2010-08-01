@@ -100,6 +100,8 @@ main(int argc, char *argv[])
 			    progname, wiredtiger_strerror(ret));
 			goto err;
 		}
+		if (verbose)
+			printf("\n");
 	}
 
 	if (0) {

@@ -24,6 +24,7 @@ main(int argc, char *argv[])
 
 	WT_UTILITY_INTRO(progname, argv);
 
+	verbose = 0;
 	while ((ch = getopt(argc, argv, "Vv")) != EOF)
 		switch (ch) {
 		case 'v':			/* verbose */
@@ -55,6 +56,8 @@ main(int argc, char *argv[])
 			    progname, wiredtiger_strerror(ret));
 			goto err;
 		}
+		if (verbose)
+			printf("\n");
 	}
 
 	if (0) {
