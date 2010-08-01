@@ -11,7 +11,7 @@ function run( n ){
         t.insert( { _id : i } )
     db.getLastError()
 
-    join = startParallelShell( "sleep(50); db.cursora.remove( {} );" );
+    join = startParallelShell( "sleep(50); db.cursora.remove( {} ); db.getLastError();" );
     
     start = new Date()
     num = t.find( function(){ num = 2; for ( var x=0; x<1000; x++ ) num += 2; return num > 0; } ).sort( { _id : -1 } ).limit(n).itcount()
