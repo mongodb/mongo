@@ -419,7 +419,7 @@ namespace mongo {
         }
     
         if ( value->IsDate() ){
-            b.appendDate( sname , Date_t(v8::Date::Cast( *value )->NumberValue()) );
+	    b.appendDate( sname , Date_t( (unsigned long long)(v8::Date::Cast( *value )->NumberValue())) );
             return;
         }
 
