@@ -100,6 +100,13 @@ namespace mongo {
 
     CursorCache::~CursorCache(){
         // TODO: delete old cursors?
+        int logLevel = 1;
+        if ( _cursors.size() || _refs.size() )
+            logLevel = 0;
+        log( logLevel ) << " CursorCache at shutdown - "
+                        << " sharded: " << _cursors.size() 
+                        << " passthrough: " << _refs.size()
+                        << endl;
     }
 
     ShardedClientCursorPtr CursorCache::get( long long id ){
