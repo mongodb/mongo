@@ -258,19 +258,9 @@ namespace mongo {
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm" 
-        char _hbmsg[256]; // we change this unocked, thus not a c++ string
+        char _hbmsg[256]; // we change this unlocked, thus not an stl::string
     public:
-        void sethbmsg(string s, int logLevel = 0) { 
-            unsigned sz = s.size();
-            if( sz >= 256 ) 
-                memcpy(_hbmsg, s.c_str(), 255);
-            else {
-                _hbmsg[sz] = 0;
-                memcpy(_hbmsg, s.c_str(), sz);
-            }
-            if( !s.empty() )
-                log(logLevel) << "replSet " << s << rsLog;
-        }
+        void sethbmsg(string s, int logLevel = 0); 
     protected:
         bool initFromConfig(ReplSetConfig& c); // true if ok; throws if config really bad; false if config doesn't include self
         void _fillIsMaster(BSONObjBuilder&);

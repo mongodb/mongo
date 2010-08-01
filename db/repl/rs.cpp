@@ -30,6 +30,27 @@ namespace mongo {
     ReplSet *theReplSet = 0;
     extern string *discoveredSeed;
 
+    void ReplSetImpl::sethbmsg(string s, int logLevel) { 
+      static time_t lastLogged;
+      if( s == _hbmsg ) { 
+	// unchanged
+	if( time(0)-lastLogged < 60 )
+	  return;
+      }
+
+      unsigned sz = s.size();
+      if( sz >= 256 ) 
+	memcpy(_hbmsg, s.c_str(), 255);
+      else {
+	_hbmsg[sz] = 0;
+	memcpy(_hbmsg, s.c_str(), sz);
+      }
+      if( !s.empty() ) {
+	lastLogged = time(0);
+	log(logLevel) << "replSet " << s << rsLog;
+      }
+    }
+
     void ReplSetImpl::assumePrimary() { 
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()

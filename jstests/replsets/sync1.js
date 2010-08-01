@@ -1,10 +1,12 @@
 // FAILING TEST
 // replication is not rolled back
 
+var debugging=0;
+
 function pause(s) {
     // for debugging just to keep processes running
     print(s);
-    if (0) {
+    if (debugging) {
         while (1) {
             print(s);
             sleep(4000);
@@ -55,7 +57,7 @@ doTest = function (signal) {
     var max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
 
     if (max1.z == inserts && max2.z == inserts) {
-        print("try increasing # if inserts and running again");
+        print("sync1.js try increasing # if inserts and running again");
         replTest.stopSet(signal);
         return;
     }
@@ -66,9 +68,9 @@ doTest = function (signal) {
     // figure out who is master now
     var newMaster = replTest.getMaster();
 
-    print("**********************************************");
+    print("sync1.js **********************************************");
     assert(newMaster + "" != master + "", "new master is " + newMaster + ", old master was " + master);
-    print("new master is " + newMaster + ", old master was " + master);
+    print("sync1.js new master is " + newMaster + ", old master was " + master);
 
     var count = 0;
     do {
@@ -120,8 +122,9 @@ doTest = function (signal) {
             return;
         }
     } while (max0.z != max);
-    pause("success");
+    pause("sync1.js success");
     replTest.stopSet(signal);
 }
 
-//doTest( 15 );
+if( 0 || debugging )
+    doTest( 15 );
