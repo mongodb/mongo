@@ -140,12 +140,14 @@ namespace mongo {
                     /* perhaps we should check this earlier? but not before the rollback checks. */
                     if( state().recovering() ) { 
                         /* can we go to RS_SECONDARY state?  we can if not too old and if minvalid achieved */
-                        bool golive = false;
+                        bool golive = false;			
+			OpTime minvalid;
                         {
                             readlock lk("local.replset.minvalid");
-                            BSONObj mv;
+			    BSONObj mv;
                             if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
-                                if( mv["ts"]._opTime() <= lastOpTimeWritten ) { 
+			        minvalid = mv["ts"]._opTime();
+                                if( minvalid <= lastOpTimeWritten ) { 
                                     golive=true;
                                 }
                             }
@@ -158,7 +160,8 @@ namespace mongo {
                             changeState(MemberState::RS_SECONDARY);
                         }
                         else { 
-                            sethbmsg("still syncing, not yet to minValid optime");
+			    sethbmsg(str::stream() << "still syncing, not yet to minValid optime " << minvalid.toString());
+			    //log() << "TEMP " << lastOpTimeWritten.toString() << rsLog;
                         }
 
                         /* todo: too stale capability */
