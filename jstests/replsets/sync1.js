@@ -70,6 +70,7 @@ doTest = function (signal) {
 	    max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
 	}
 	catch(e) { 
+	    // we may get "not master" if in RECOVERING state
 	    print("\nsync1.js couldn't get max1/max2; retrying " + e);
 	    sleep(2000);
 	    continue;
