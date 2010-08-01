@@ -21,8 +21,9 @@ function run( n ){
 
     print( "num: " + num + " time:" + ( end.getTime() - start.getTime() ) )
     assert.eq( 0 , t.count() , "after remove" )
+    assert.gt( n , num , "shouldn't have counted all" )
 }
 
-//run( 5000 )
+run( 5000 )
     
 
