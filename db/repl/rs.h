@@ -342,7 +342,8 @@ namespace mongo {
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }
         void fatal() { _fatal(); }
-        bool isMaster(const char *client);
+        bool isPrimary();
+        bool isSecondary();
         MemberState state() const { return ReplSetImpl::state(); }
         string name() const { return ReplSetImpl::name(); }
         const ReplSetConfig& config() { return ReplSetImpl::config(); }
@@ -399,9 +400,13 @@ namespace mongo {
             }
     }
 
-    inline bool ReplSet::isMaster(const char *client) {         
+    inline bool ReplSet::isPrimary() {         
         /* todo replset */
         return box.getState().primary();
+    }
+
+    inline bool ReplSet::isSecondary() { 
+      return box.getState().secondary();
     }
 
 }
