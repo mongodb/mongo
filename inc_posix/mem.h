@@ -45,7 +45,11 @@ typedef struct __wt_mem {
  * bug is a mother to find -- make sure we get it right, don't make the caller
  * remember to put the & operator on the pointer.
  */
+#ifdef HAVE_DIAGNOSTIC
 #define	__wt_free(a, b, c)	__wt_free_func(a, &(b), c)
+#else
+#define	__wt_free(a, b, c)	__wt_free_func(a, &(b))
+#endif
 
 /*
  * There's no malloc interface, WiredTiger never calls malloc.  The problem is

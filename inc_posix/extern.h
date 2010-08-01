@@ -261,7 +261,11 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
 #endif
     );
 void
-__wt_free_func(ENV *env, void *p_arg, u_int32_t len);
+__wt_free_func(ENV *env, void *p_arg
+#ifdef HAVE_DIAGNOSTIC
+    , u_int32_t len
+#endif
+    );
 int
 __wt_mtrack_alloc(ENV *env);
 void
