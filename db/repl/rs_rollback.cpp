@@ -269,14 +269,14 @@ namespace mongo {
        /* we have items we are writing that aren't from a point-in-time.  thus best not to come online 
 	  until we get to that point in freshness. */
        try {
-	 log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
+           log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
        }
        catch(...){}
        Helpers::putSingleton("local.replset.minvalid", newMinValid);
 
        Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
-       uassert(13412, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
+       uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
 
        unsigned deletes = 0, updates = 0;
        for( list<pair<DocID,bo> >::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
