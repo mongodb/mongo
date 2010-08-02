@@ -147,8 +147,8 @@ namespace mongo {
                 time_t after = mem.lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
 
                 try {
-                    long long t = info["time"].numberLong();
                     mem.skew = 0;
+                    long long t = info["time"].Long();
                     if( t > after ) 
                         mem.skew = (int) (t - after);
                     else if( t < before ) 
@@ -222,7 +222,6 @@ namespace mongo {
 
     void ReplSetImpl::startHealthTaskFor(Member *m) {
         ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
-        //DEV log() << "TEMP starting healthtask thread " << m->h().toString() << endl;
         healthTasks.insert(task);
         task::repeat(task, 2000);
     }
@@ -239,7 +238,6 @@ namespace mongo {
         /*Member* m = _members.head();
         while( m ) {
             ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
-            cout << "TEMP starting hb thread " << m->h().toString() << endl;
             healthTasks.insert(task);
             task::repeat(shared_ptr<task::Task>(task), 2000);
             m = m->next();

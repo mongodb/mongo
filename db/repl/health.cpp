@@ -98,9 +98,9 @@ namespace mongo {
         stringstream q;
         q << "/_replSetOplog?" << id();
         s << td( a(q.str(), "", never ? "?" : hbinfo().opTime.toString()) );
-        if( hbinfo().skew > INT_MIN ) 
+        if( hbinfo().skew > INT_MIN ) {
             s << td( grey(str::stream() << hbinfo().skew,!ok) );
-        else
+        } else
             s << td("");
         s << _tr();
     }
