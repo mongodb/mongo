@@ -1744,6 +1744,24 @@ namespace mongo {
         }
     } capTruncCmd;    
     
+    // just for testing
+    class EmptyCapped : public Command {
+    public:
+        EmptyCapped() : Command( "emptycapped" ){}
+        virtual bool slaveOk() const { return false; }
+        virtual LockType locktype() const { return WRITE; }
+        virtual bool requiresAuth() { return true; }
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            string coll = cmdObj[ "emptycapped" ].valuestrsafe();
+            uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
+            string ns = dbname + "." + coll;
+            NamespaceDetails *nsd = nsdetails( ns.c_str() );
+            massert( 13429, "emptycapped no such collection", nsd );
+            nsd->emptyCappedCollection( ns.c_str() );
+            return true;
+        }
+    } emptyCappedCmd;    
+    
     /** 
      * this handles
      - auth
