@@ -124,10 +124,9 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	else {
 		fprintf(fp, "level %lu, entries %lu, records %llu\n",
 		    (u_long)hdr->level, (u_long)hdr->u.entries, page->records);
-		fprintf(fp, "\tfirst-free %#lx, space avail %lu\n",
+		fprintf(fp, "\tfirst-free %#lx, space avail %lu\n\n",
 		    (u_long)page->first_free, (u_long)page->space_avail);
 	}
-	fprintf(fp, "\n");
 
 	switch (hdr->type) {
 	case WT_PAGE_DESCRIPT:
