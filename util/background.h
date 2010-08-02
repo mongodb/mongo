@@ -91,4 +91,23 @@ namespace mongo {
         volatile State state;
     };
 
+    class PeriodicBackgroundJob : public BackgroundJob {
+    public:
+        PeriodicBackgroundJob( int millisToSleep ) 
+            : _millis( millisToSleep ){
+        }
+        
+        virtual ~PeriodicBackgroundJob(){}
+
+        /** this gets called every millisToSleep ms */
+        virtual void runLoop() = 0;
+        
+        virtual void run();
+
+
+    private:
+        int _millis;
+                
+    };
+
 } // namespace mongo

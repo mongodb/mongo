@@ -107,6 +107,10 @@ namespace mongo {
             }
         }
         
+        virtual void setAsTimeTracker(){
+            Listener::setAsTimeTracker();
+        }
+
         void run(){
             initAndListen();
         }
