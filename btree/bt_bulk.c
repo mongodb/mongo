@@ -1034,7 +1034,8 @@ split:		switch (page->hdr->type) {
 		/* Create the WT_OFF reference. */
 		WT_RECORDS(&off) = page->records;
 		off.addr = page->addr;
-		off.size = db->intlmin;
+		off.size =
+		    page->hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
 		/* Store the data item. */
 		++parent->hdr->u.entries;
@@ -1066,7 +1067,8 @@ split:		switch (page->hdr->type) {
 		WT_ITEM_TYPE_SET(&item, WT_ITEM_OFF);
 		WT_RECORDS(&off) = page->records;
 		off.addr = page->addr;
-		off.size = db->intlmin;
+		off.size =
+		    page->hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
 		/* Store the data item. */
 		++parent->hdr->u.entries;
