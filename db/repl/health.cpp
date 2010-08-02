@@ -284,7 +284,7 @@ namespace mongo {
             if( lk.got() ) {
                 BSONObj mv;
                 if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
-                    myMinValid = mv["ts"]._opTime().toString();
+                    myMinValid = "minvalid:" + mv["ts"]._opTime().toString();
                 }
             }
             else myMinValid = ".";
@@ -338,17 +338,25 @@ namespace mongo {
     }
 
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const { 
-        Member *m =_members.head();
         vector<BSONObj> v;
 
         // add self
         {
             HostAndPort h(getHostName(), cmdLine.port);
-            v.push_back( 
-                BSON( "name" << h.toString() << "self" << true << 
-                      "errmsg" << _self->lhb() ) );
+
+            BSONObjBuilder bb;
+            bb.append("_id", (int) _self->id());
+            bb.append("name", h.toString());
+            bb.append("health", 1.0);
+            bb.append("state", (int) box.getState().s);
+            string s = _self->lhb();
+            if( !s.empty() )
+                bb.append("errmsg", s);
+            bb.append("self", true);
+            v.push_back(bb.obj());
         }
 
+        Member *m =_members.head();
         while( m ) {
             BSONObjBuilder bb;
             bb.append("_id", (int) m->id());
