@@ -117,11 +117,29 @@ namespace mongo {
             cmdLine.quiet = true;
         }
 
+        string logpath;
+
 #ifndef _WIN32
         if (params.count("fork")) {
             if ( ! params.count( "logpath" ) ){
                 cout << "--fork has to be used with --logpath" << endl;
                 ::exit(-1);
+            }
+            
+            { // test logpath
+                logpath = params["logpath"].as<string>();
+                assert( logpath.size() );
+                if ( logpath[0] != '/' ){
+                    char temp[256];
+                    getcwd( temp , 256 );
+                    logpath = (string)temp + "/" + logpath;
+                }
+                FILE * test = fopen( logpath.c_str() , "a" );
+                if ( ! test ){
+                    cout << "can't open [" << logpath << "] for log file: " << errnoWithDescription() << endl;
+                    ::exit(-1);
+                }
+                fclose( test );
             }
             
             cout.flush();
@@ -168,9 +186,10 @@ namespace mongo {
         }
 #endif
         if (params.count("logpath")) {
-            string lp = params["logpath"].as<string>();
-            uassert( 10033 ,  "logpath has to be non-zero" , lp.size() );
-            initLogging( lp , params.count( "logappend" ) );
+            if ( logpath.size() == 0 )
+                logpath = params["logpath"].as<string>();
+            uassert( 10033 ,  "logpath has to be non-zero" , logpath.size() );
+            initLogging( logpath , params.count( "logappend" ) );
         }
 
         if ( params.count("pidfilepath")) {
