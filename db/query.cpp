@@ -35,6 +35,7 @@
 #include "queryoptimizer.h"
 #include "lasterror.h"
 #include "../s/d_logic.h"
+#include "repl_block.h"
 
 namespace mongo {
 
@@ -715,6 +716,7 @@ namespace mongo {
                             }
                         }
                         else {
+
                             if ( _pq.returnKey() ){
                                 BSONObjBuilder bb( _buf );
                                 bb.appendKeys( _c->indexKeyPattern() , _c->currKey() );
@@ -723,6 +725,13 @@ namespace mongo {
                             else {
                                 BSONObj js = _c->current();
                                 assert( js.isValid() );
+
+                                if ( _oplogReplay ){
+                                    BSONElement e = js["ts"];
+                                    if ( e.type() == Date || e.type() == Timestamp )
+                                        _slaveReadTill = e._opTime();
+                                }
+
                                 fillQueryResultFromObj( _buf , _pq.getFields() , js , (_pq.showDiskLoc() ? &cl : 0));
                             }
                             _n++;
@@ -778,6 +787,7 @@ namespace mongo {
             } else {
                 setComplete();
             }
+
         }
         
         void finishExplain( const BSONObj &suffix ) {
@@ -811,6 +821,11 @@ namespace mongo {
         bool saveClientCursor() const { return _saveClientCursor; }
         bool wouldSaveClientCursor() const { return _wouldSaveClientCursor; }
         
+        void finishForOplogReplay( ClientCursor * cc ){
+            if ( _oplogReplay && ! _slaveReadTill.isNull() )
+                cc->_slaveReadTill = _slaveReadTill;
+
+        }
     private:
         BufBuilder _buf;
         const ParsedQuery& _pq;
@@ -842,6 +857,7 @@ namespace mongo {
         Message &_response;
         ExplainBuilder &_eb;
         CurOp &_curop;
+        OpTime _slaveReadTill;
     };
     
     /* run a query -- includes checking for and running a Command */
@@ -1039,6 +1055,7 @@ namespace mongo {
                 exhaust = ns;
                 ss << " exhaust ";
             }
+            dqo.finishForOplogReplay(cc);
         }
 
         QueryResult *qr = (QueryResult *) result.header();

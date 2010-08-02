@@ -35,7 +35,7 @@ doTest = function( signal ) {
 
     var failed = false;
     var callGetLastError = function(w, timeout, db) {
-        var result = master.getDB(db).runCommand({getlasterror: 1, w: w, wtimeout: timeout});
+        var result = master.getDB(db).getLastErrorObj( w , timeout );
         printjson( result );
         if(result['ok'] != 1) {
           print("FAILURE");
@@ -51,9 +51,13 @@ doTest = function( signal ) {
     master.getDB(testDB).foo.insert({n: 3});
     callGetLastError(3, 10000, testDB);
 
+    print("**** TEMP 1a ****")
+
     m1 = master.getDB(testDB).foo.findOne({n: 1});
     printjson( m1 );
     assert( m1['n'] == 1 , "Failed to save to master on multiple inserts");
+
+    print("**** TEMP 1b ****")
 
     var s0 = slaves[0].getDB(testDB).foo.findOne({n: 1});
     assert( s0['n'] == 1 , "Failed to replicate to slave 0 on multiple inserts");
@@ -71,6 +75,7 @@ doTest = function( signal ) {
     m1 = master.getDB(testDB).foo.findOne({n: 1});
     printjson( m1 );
     assert( m1['n'] == 1 , "Failed to save to master");
+
 
     var s0 = slaves[0].getDB(testDB).foo.findOne({n: 1});
     assert( s0['n'] == 1 , "Failed to replicate to slave 0");
@@ -103,4 +108,4 @@ doTest = function( signal ) {
     replTest.stopSet( signal );
 }
 
-// doTest( 15 );
+doTest( 15 );
