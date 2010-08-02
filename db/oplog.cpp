@@ -300,7 +300,7 @@ namespace mongo {
 
         const char * ns = "local.oplog.$main";
 
-        bool rs = !cmdLine.replSet.empty();
+        bool rs = !cmdLine._replSet.empty();
         if( rs )
             ns = rsoplog;
 
