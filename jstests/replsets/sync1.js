@@ -64,6 +64,7 @@ doTest = function (signal) {
     // yay! there are out-of-date nodes
     var max1;
     var max2;
+    var count = 0;
     while( 1 ) {
 	try {
 	    max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
@@ -73,6 +74,10 @@ doTest = function (signal) {
 	    // we may get "not master" if in RECOVERING state
 	    print("\nsync1.js couldn't get max1/max2; retrying " + e);
 	    sleep(2000);
+            count++;
+            if (count == 50) {
+                assert(false, "errored out 50 times");
+            }
 	    continue;
 	}
 	break;
@@ -80,7 +85,7 @@ doTest = function (signal) {
 
     print("\nsync1.js ********************************************************************** part 8");
 
-    if (max1.z == inserts && max2.z == inserts) {
+    if (max1.z == (inserts-1) && max2.z == (inserts-1)) {
         print("\nsync1.js try increasing # if inserts and running again");
         replTest.stopSet(signal);
         return;
@@ -98,7 +103,7 @@ doTest = function (signal) {
     assert(newMaster + "" != master + "", "new master is " + newMaster + ", old master was " + master);
     print("\nsync1.js new master is " + newMaster + ", old master was " + master);
 
-    var count = 0;
+    count = 0;
     do {
 	try {
 	    max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
