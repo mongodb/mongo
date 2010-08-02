@@ -1034,7 +1034,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; } 
         virtual void help( stringstream &help ) const {
-            help << "{ collStats:\"blog.posts\" } ";
+            help << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string ns = dbname + "." + jsobj.firstElement().valuestr();
@@ -1056,6 +1056,10 @@ namespace mongo {
                     return false;
                 }
                     
+            }
+            else if ( jsobj["scale"].trueValue() ){
+                errmsg = "scale has to be a number > 0";
+                return false;
             }
 
             long long size = nsd->datasize / scale;
