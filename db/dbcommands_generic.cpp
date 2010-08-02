@@ -67,7 +67,7 @@ namespace mongo {
     /* for diagnostic / testing purposes. */
     class CmdSleep : public Command { 
     public:
-        virtual LockType locktype() const { return READ; } 
+        virtual LockType locktype() const { return NONE; } 
         virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() {
             return false;
@@ -76,11 +76,19 @@ namespace mongo {
             return true;
         }
         virtual void help( stringstream& help ) const {
-            help << "internal testing command.  Makes db block (in a read lock) for 100 seconds";
+            help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
+            help << "w:true write lock";
         }
-        CmdSleep() : Command("sleep") {}
+        CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            sleepsecs(100);
+            if( cmdObj.getBoolField("w") ) { 
+                writelock lk("");
+                sleepsecs(100);
+            }
+            else {
+                readlock lk("");
+                sleepsecs(100);
+            }
             return true;
         }
     } cmdSleep;

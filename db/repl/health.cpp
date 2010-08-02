@@ -185,6 +185,10 @@ namespace mongo {
         ScopedConn conn(m->fullName());        
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
+        if( c.get() == 0 ) { 
+            ss << "couldn't query " << rsoplog;
+            return;
+        }
         static const char *h[] = {"ts","optime", "h","op","ns","rest",0};
 
         ss << "<style type=\"text/css\" media=\"screen\">"
@@ -212,6 +216,10 @@ namespace mongo {
         }
         else { 
             auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
+            if( c.get() == 0 ) { 
+                ss << "couldn't query [2] " << rsoplog;
+                return;
+            }
             string x;
             bo o = c->next();
             otEnd = o["ts"]._opTime();
@@ -301,7 +309,7 @@ namespace mongo {
         s << _table();
 
         try {
-            readlocktry lk("local.replset.minvalid", 1000);
+            readlocktry lk("local.replset.minvalid", 300);
             if( lk.got() ) {
                 BSONObj mv;
                 if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
