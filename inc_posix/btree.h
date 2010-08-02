@@ -359,7 +359,8 @@ struct __wt_page_hdr {
 /*
  * WT_PAGE_HDR_SIZE is the expected structure size --  we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
- * The size must be a multiple of a 4-byte boundary.
+ * The size must also be a multiple of a 4-byte boundary, because the header
+ * is followed by WT_ITEM structures, which require 4-byte alignment.
  */
 #define	WT_PAGE_HDR_SIZE		20
 
@@ -628,9 +629,9 @@ struct __wt_item {
 	((WT_OVFL *)(WT_ITEM_BYTE(addr)))
 
 /*
- * The number of bytes required to store a WT_ITEM followed by additional
- * bytes.  Align the entry and the data itself to a 4-byte boundary so it's
- * possible to directly access WT_ITEMs on the page.
+ * Bytes required to store a WT_ITEM followed by additional bytes of data.
+ * Align the WT_ITEM and the subsequent data to a 4-byte boundary so the
+ * WT_ITEMs on a page all start at a 4-byte boundary.
  */
 #define	WT_ITEM_SPACE_REQ(size)						\
 	WT_ALIGN(sizeof(WT_ITEM) + (size), sizeof(u_int32_t))
