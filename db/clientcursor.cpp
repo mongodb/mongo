@@ -278,6 +278,7 @@ namespace mongo {
         }
         
         cc->_doingDeletes = data._doingDeletes;
+        cc->c->checkLocation();
         return true;        
     }
     
