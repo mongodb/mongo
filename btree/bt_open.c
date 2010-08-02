@@ -121,7 +121,7 @@ __wt_bt_open_verify_sizes(DB *db)
 	if (db->intlmin == 0)
 		db->intlmin = WT_BTREE_INTLMIN_DEFAULT;
 	if (db->intlmax == 0)
-		db->intlmin = WT_MAX(db->intlmin, WT_BTREE_INTLMAX_DEFAULT);
+		db->intlmax = WT_MAX(db->intlmin, WT_BTREE_INTLMAX_DEFAULT);
 	if (db->intlitemsize == 0) {
 		if (db->intlmin <= 1024)
 			db->intlitemsize = 50;
@@ -147,7 +147,7 @@ __wt_bt_open_verify_sizes(DB *db)
 	if (db->leafmin == 0)
 		db->leafmin = WT_BTREE_LEAFMIN_DEFAULT;
 	if (db->leafmax == 0)
-		db->leafmin = WT_MAX(db->leafmin, WT_BTREE_LEAFMAX_DEFAULT);
+		db->leafmax = WT_MAX(db->leafmin, WT_BTREE_LEAFMAX_DEFAULT);
 	if (db->leafitemsize == 0) {
 		if (db->leafmin <= 4096)
 			db->leafitemsize = 80;
