@@ -176,17 +176,17 @@ namespace mongo {
         {
             sethbmsg("initial sync copy+apply oplog");
             if( ! initialSyncOplogApplication(masterHostname, cp, startingTS, mvoptime) ) { 
-                log() << "replSet initial sync failed during applyoplog [1]" << rsLog;
+                log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
 				lastOpTimeWritten = OpTime();
 				lastH = 0;
-                log() << "replSet initial sync failed during applyoplog [2]" << rsLog;
+                log() << "replSet cleaning up [1]" << rsLog;
                 {
                     writelock lk("local.");
                     Client::Context cx( "local." );
                     cx.db()->flushFiles(true);            
                 }
-                log() << "replSet initial sync failed durying applyoplog [3]" << rsLog;
+                log() << "replSet cleaning up [2]" << rsLog;
                 sleepsecs(2);
                 return;
             }
