@@ -59,13 +59,15 @@ namespace mongo {
                 errmsg = "incompatible replset protocol version";
                 return false;
             }
-            string s = string(cmdObj.getStringField("replSetHeartbeat"))+'/';
-            if( !startsWith(cmdLine.replSet, s ) ) {
-                errmsg = "repl set names do not match";
-                log() << "cmdline: " << cmdLine.replSet << endl;
-                log() << "s: " << s << endl;
-                result.append("mismatch", true);
-                return false;
+            {
+                string s = string(cmdObj.getStringField("replSetHeartbeat"));
+                if( cmdLine.ourSetName() != s ) {
+                    errmsg = "repl set names do not match";
+                    log() << "cmdline: " << cmdLine._replSet << endl;
+                    log() << "s: " << s << endl;
+                    result.append("mismatch", true);
+                    return false;
+                }
             }
 
             result.append("rs", true);

@@ -155,17 +155,18 @@ namespace mongo {
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-/*
-    ReplSet::ReplSet(string cfgString) : fatal(false) {
-
-    }
-*/
 
     void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet ) { 
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
-        uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
-        setname = string(p, slash-p);
+        if( slash )
+            setname = string(p, slash-p);
+        else
+            setname = p;
+        uassert(13093, "bad --replSet config string format is: <setname>[/<seedhost1>,<seedhost2>,...]", !setname.empty());
+
+        if( slash == 0 )
+            return;
 
         p = slash + 1;
         while( 1 ) {

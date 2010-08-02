@@ -146,7 +146,7 @@ namespace mongo {
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
                 result.append("startupStatus", ReplSet::startupStatus);
                 errmsg = "all members and seeds must be reachable to initiate set";
-                result.append("info", cmdLine.replSet);
+                result.append("info", cmdLine._replSet);
                 return false;
             }
 
@@ -159,14 +159,14 @@ namespace mongo {
                 string name;
                 vector<HostAndPort> seeds;
                 set<HostAndPort> seedSet;
-                parseReplsetCmdLine(cmdLine.replSet, name, seeds, seedSet); // may throw...
+                parseReplsetCmdLine(cmdLine._replSet, name, seeds, seedSet); // may throw...
 
                 bob b;
                 b.append("_id", name);
                 bob members;
                 members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::Me().toString() ));
                 for( unsigned i = 0; i < seeds.size(); i++ )
-                    members.append(bob::numStr(i), BSON( "_id" << i << "host" << seeds[i].toString()));
+                    members.append(bob::numStr(i+1), BSON( "_id" << i+1 << "host" << seeds[i].toString()));
                 b.appendArray("members", members.obj());
                 configObj = b.obj();
                 log() << "replSet created this configuration for initiation : " << configObj.toString() << rsLog;

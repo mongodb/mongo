@@ -580,9 +580,9 @@ sendmore:
         snapshotThread.go();
         clientCursorMonitor.go();
 
-        if( !cmdLine.replSet.empty() ) {
+        if( !cmdLine._replSet.empty() ) {
             replSet = true;
-            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine.replSet);
+            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine._replSet);
             boost::thread t( boost::bind( &startReplSets, replSetCmdline) );
         }
 
@@ -920,7 +920,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("replSet")) {
             /* seed list of hosts for the repl set */
-            cmdLine.replSet = params["replSet"].as<string>().c_str();
+            cmdLine._replSet = params["replSet"].as<string>().c_str();
         }
         if (params.count("only")) {
             cmdLine.only = params["only"].as<string>().c_str();

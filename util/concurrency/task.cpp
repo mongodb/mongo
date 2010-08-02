@@ -120,12 +120,15 @@ namespace mongo {
             rq = false;
             while( 1 ) { 
                 lam f;
-                {
+                try {
                     boost::mutex::scoped_lock lk(m);
                     while( d.empty() )
                         c.wait(lk);
                     f = d.front();
                     d.pop_front();
+                }
+                catch(...) { 
+                    log() << "ERROR exception in Server:doWork?" << endl;
                 }
                 try {
                     f();
@@ -135,6 +138,8 @@ namespace mongo {
                     }
                 } catch(std::exception& e) { 
                     log() << "Server::doWork() exception " << e.what() << endl;
+                } catch(...) {
+                    log() << "Server::doWork() unknown exception!" << endl;
                 }
             }
         }

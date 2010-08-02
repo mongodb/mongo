@@ -44,6 +44,7 @@ namespace mongo {
 
         virtual ~MessageServer(){}
         virtual void run() = 0;
+        virtual void setAsTimeTracker() = 0;
     };
 
     // TODO use a factory here to decide between port and asio variations 

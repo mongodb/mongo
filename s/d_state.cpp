@@ -184,6 +184,7 @@ namespace mongo {
         }
 
         auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
+        assert( cursor.get() );
         if ( ! cursor->more() ){
             if ( scoped.get() )
                 scoped->done();

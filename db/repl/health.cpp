@@ -185,6 +185,10 @@ namespace mongo {
         ScopedConn conn(m->fullName());        
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
+        if( c.get() == 0 ) { 
+            ss << "couldn't query " << rsoplog;
+            return;
+        }
         static const char *h[] = {"ts","optime", "h","op","ns","rest",0};
 
         ss << "<style type=\"text/css\" media=\"screen\">"
@@ -212,6 +216,10 @@ namespace mongo {
         }
         else { 
             auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
+            if( c.get() == 0 ) { 
+                ss << "couldn't query [2] " << rsoplog;
+                return;
+            }
             string x;
             bo o = c->next();
             otEnd = o["ts"]._opTime();
@@ -270,6 +278,21 @@ namespace mongo {
            order on all the different web ui's; that is less confusing for the operator. */
         map<int,string> mp;
 
+        string myMinValid;
+        try {
+            readlocktry lk("local.replset.minvalid", 300);
+            if( lk.got() ) {
+                BSONObj mv;
+                if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
+                    myMinValid = "minvalid:" + mv["ts"]._opTime().toString();
+                }
+            }
+            else myMinValid = ".";
+        }
+        catch(...) { 
+            myMinValid = "exception fetching minvalid";
+        }
+
         {
             stringstream s;
             /* self row */
@@ -283,8 +306,8 @@ namespace mongo {
             s << td( _hbmsg );
             stringstream q;
             q << "/_replSetOplog?" << _self->id();
-            s << td( a(q.str(), "", theReplSet->lastOpTimeWritten.toString()) );
-            s << td("");
+            s << td( a(q.str(), myMinValid, theReplSet->lastOpTimeWritten.toString()) );
+            s << td(""); // skew
             s << _tr();
 			mp[_self->hbinfo().id()] = s.str();
         }
@@ -299,20 +322,6 @@ namespace mongo {
         for( map<int,string>::const_iterator i = mp.begin(); i != mp.end(); i++ )
             s << i->second;
         s << _table();
-
-        try {
-            readlocktry lk("local.replset.minvalid", 1000);
-            if( lk.got() ) {
-                BSONObj mv;
-                if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
-                    s << p( str::stream() << "minvalid: " << mv["ts"]._opTime().toString() );
-                }
-            }
-            else s << p(".");
-        }
-        catch(...) { 
-            s << p("exception fetching minvalid?");
-        }
     }
 
 
@@ -329,24 +338,36 @@ namespace mongo {
     }
 
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const { 
-        Member *m =_members.head();
         vector<BSONObj> v;
 
         // add self
         {
             HostAndPort h(getHostName(), cmdLine.port);
-            v.push_back( 
-                BSON( "name" << h.toString() << "self" << true << 
-                      "errmsg" << _self->lhb() ) );
+
+            BSONObjBuilder bb;
+            bb.append("_id", (int) _self->id());
+            bb.append("name", h.toString());
+            bb.append("health", 1.0);
+            bb.append("state", (int) box.getState().s);
+            string s = _self->lhb();
+            if( !s.empty() )
+                bb.append("errmsg", s);
+            bb.append("self", true);
+            v.push_back(bb.obj());
         }
 
+        Member *m =_members.head();
         while( m ) {
             BSONObjBuilder bb;
+            bb.append("_id", (int) m->id());
             bb.append("name", m->fullName());
             bb.append("health", m->hbinfo().health);
+            bb.append("state", (int) m->state().s);
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
-            bb.append("errmsg", m->lhb());
+            string s = m->lhb();
+            if( !s.empty() )
+                bb.append("errmsg", s);
             v.push_back(bb.obj());
             m = m->next();
         }

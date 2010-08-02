@@ -114,10 +114,12 @@ namespace mongo {
             }
             
             if ( cursor->sendNextBatch( r , ntoreturn ) ){
-                log(6) << "\t cursor finished: " << id << endl;
+                // still more data
+                cursor->accessed();
                 return;
             }
             
+            // we've exhausted the cursor
             cursorCache.remove( id );
         }
         

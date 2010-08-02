@@ -24,6 +24,7 @@
 #include "../util/background.h"
 #include "../util/mongoutils/str.h"
 #include "../client/dbclient.h"
+#include "replpair.h"
 
 //#define REPLDEBUG(x) log() << "replBlock: "  << x << endl;
 #define REPLDEBUG(x)
@@ -154,8 +155,10 @@ namespace mongo {
             RARELY {
                 REPLDEBUG( "looking for : " << op << " w=" << w );
             }
-            if ( w <= 1 || ! replSettings.master )
+
+            if ( w <= 1 || ! _isMaster() )
                 return true;
+
             w--; // now this is the # of slaves i need
             scoped_lock mylk(_mutex);
             for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++){
