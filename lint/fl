@@ -52,7 +52,8 @@ else
 		cp lint.tmp lint.current
 	elif test -f "lint.current"; then
 		cmp lint.tmp lint.current > /dev/null 2>&1 ||
-		    diff lint.tmp lint.current | more
+		    (echo '<<< Current Tree		>>> Previous Tree'; \
+		    diff lint.tmp lint.current) | more
 	else
 		more lint.tmp
 	fi
