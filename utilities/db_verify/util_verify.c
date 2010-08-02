@@ -46,14 +46,12 @@ main(int argc, char *argv[])
 
 	if ((ret = wiredtiger_simple_setup(progname, &db, 0, 0)) == 0) {
 		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
-			fprintf(stderr, "%s: Db.open: %s: %s\n",
-			    progname, *argv, wiredtiger_strerror(ret));
+			db->err(db, ret, "Db.open: %s", *argv);
 			goto err;
 		}
 		if ((ret =
 		    db->verify(db, verbose ? __wt_progress : NULL, 0)) != 0) {
-			fprintf(stderr, "%s: Db.verify: %s\n",
-			    progname, wiredtiger_strerror(ret));
+			db->err(db, ret, "Db.verify: %s", *argv);
 			goto err;
 		}
 		if (verbose)

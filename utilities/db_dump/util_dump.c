@@ -57,13 +57,11 @@ main(int argc, char *argv[])
 
 	if ((ret = wiredtiger_simple_setup(progname, &db, 0, 0)) == 0) {
 		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
-			fprintf(stderr, "%s: Db.open: %s: %s\n",
-			    progname, *argv, wiredtiger_strerror(ret));
+			db->err(db, ret, "Db.open: %s", *argv);
 			goto err;
 		}
 		if ((ret = db->dump(db, stdout, NULL, flags)) != 0) {
-			fprintf(stderr, "%s: Db.dump: %s\n",
-			    progname, wiredtiger_strerror(ret));
+			db->err(db, ret, "Db.dump");
 			goto err;
 		}
 	}
