@@ -40,7 +40,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "Just for testing : do not use.\n";
         }
-        CmdReplSetTest() : ReplSetCommand("replSetTest", true) { }
+        CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) ) 
                 return false;
@@ -57,11 +57,11 @@ namespace mongo {
     public:
         int rbid;
         virtual void help( stringstream &help ) const {
-	  help << "internal";
+            help << "internal";
         }
-        CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID", true) { 
-	  rbid = (int) curTimeMillis();
-	}
+        CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") { 
+            rbid = (int) curTimeMillis();
+        }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) ) 
                 return false;
@@ -69,11 +69,12 @@ namespace mongo {
             return true;
         }
     } cmdReplSetRBID;
-  using namespace bson;
+
+    using namespace bson;
     int getRBID(DBClientConnection *c) { 
-      bo info;
-      c->simpleCommand("admin", &info, "replSetGetRBID");
-      return info["rbid"].numberInt();
+        bo info;
+        c->simpleCommand("admin", &info, "replSetGetRBID");
+        return info["rbid"].numberInt();
     } 
 
     class CmdReplSetGetStatus : public ReplSetCommand {
@@ -174,7 +175,7 @@ namespace mongo {
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
 
-        CmdReplSetFreeze() : ReplSetCommand("replSetFreeze", true) { }
+        CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
@@ -191,7 +192,7 @@ namespace mongo {
             help << "http://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
 
-        CmdReplSetStepDown() : ReplSetCommand("replSetStepDown", true) { }
+        CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
@@ -235,7 +236,7 @@ namespace mongo {
             s << p(t);
 
             if( theReplSet == 0 ) { 
-                if( cmdLine.replSet.empty() ) 
+                if( cmdLine._replSet.empty() ) 
                     s << p("Not using --replSet");
                 else  {
                     s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated") 
@@ -266,7 +267,7 @@ namespace mongo {
                   );
 
             if( theReplSet == 0 ) { 
-                if( cmdLine.replSet.empty() ) 
+                if( cmdLine._replSet.empty() ) 
                     s << p("Not using --replSet");
                 else  {
                     s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated") 

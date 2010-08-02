@@ -147,7 +147,7 @@ namespace mongo {
     void ReplSetConfig::check() const { 
         uassert(13132,
             "nonmatching repl set name in _id field; check --replSet command line",
-            startsWith(cmdLine.replSet, _id + '/'));
+            _id == cmdLine.ourSetName());
         uassert(13308, "replSet bad config version #", version > 0);
         uassert(13133, "replSet bad config no members", members.size() >= 1);
         uassert(13309, "replSet bad config maximum number of members is 7 (for now)", members.size() <= 7);
@@ -262,9 +262,7 @@ namespace mongo {
             }
             else {
                 /* first, make sure other node is configured to be a replset. just to be safe. */
-                size_t sl = cmdLine.replSet.find('/');
-                assert( sl != string::npos );
-                string setname = cmdLine.replSet.substr(0, sl);
+                string setname = cmdLine.ourSetName();
                 BSONObj cmd = BSON( "replSetHeartbeat" << setname );
                 int theirVersion;
                 BSONObj info;

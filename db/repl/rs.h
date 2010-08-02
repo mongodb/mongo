@@ -372,7 +372,7 @@ namespace mongo {
         */
     class ReplSetCommand : public Command { 
     protected:
-        ReplSetCommand(const char * s, bool show=false) : Command(s) { }
+        ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }

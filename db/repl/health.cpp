@@ -278,6 +278,21 @@ namespace mongo {
            order on all the different web ui's; that is less confusing for the operator. */
         map<int,string> mp;
 
+        string myMinValid;
+        try {
+            readlocktry lk("local.replset.minvalid", 300);
+            if( lk.got() ) {
+                BSONObj mv;
+                if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
+                    myMinValid = mv["ts"]._opTime().toString();
+                }
+            }
+            else myMinValid = ".";
+        }
+        catch(...) { 
+            myMinValid = "exception fetching minvalid";
+        }
+
         {
             stringstream s;
             /* self row */
@@ -291,8 +306,8 @@ namespace mongo {
             s << td( _hbmsg );
             stringstream q;
             q << "/_replSetOplog?" << _self->id();
-            s << td( a(q.str(), "", theReplSet->lastOpTimeWritten.toString()) );
-            s << td("");
+            s << td( a(q.str(), myMinValid, theReplSet->lastOpTimeWritten.toString()) );
+            s << td(""); // skew
             s << _tr();
 			mp[_self->hbinfo().id()] = s.str();
         }
@@ -307,20 +322,6 @@ namespace mongo {
         for( map<int,string>::const_iterator i = mp.begin(); i != mp.end(); i++ )
             s << i->second;
         s << _table();
-
-        try {
-            readlocktry lk("local.replset.minvalid", 300);
-            if( lk.got() ) {
-                BSONObj mv;
-                if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
-                    s << p( str::stream() << "minvalid: " << mv["ts"]._opTime().toString() );
-                }
-            }
-            else s << p(".");
-        }
-        catch(...) { 
-            s << p("exception fetching minvalid?");
-        }
     }
 
 
@@ -350,11 +351,15 @@ namespace mongo {
 
         while( m ) {
             BSONObjBuilder bb;
+            bb.append("_id", (int) m->id());
             bb.append("name", m->fullName());
             bb.append("health", m->hbinfo().health);
+            bb.append("state", (int) m->state().s);
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
-            bb.append("errmsg", m->lhb());
+            string s = m->lhb();
+            if( !s.empty() )
+                bb.append("errmsg", s);
             v.push_back(bb.obj());
             m = m->next();
         }
