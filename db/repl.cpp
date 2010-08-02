@@ -360,9 +360,10 @@ namespace mongo {
             if( replSet ) {
                 if( theReplSet == 0 ) { 
                     result.append("ismaster", false);
+                    result.append("secondary", false);
                     errmsg = "replSet still trying to initialize";
                     result.append("info", ReplSet::startupStatusMsg);
-                    return false;
+                    return true;
                 }
                 theReplSet->fillIsMaster(result);
                 return true;
@@ -1719,7 +1720,7 @@ namespace mongo {
     void oldRepl();
     void startReplication() {
         /* if we are going to be a replica set, we aren't doing other forms of replication. */
-        if( !cmdLine.replSet.empty() ) {
+        if( !cmdLine._replSet.empty() ) {
             if( replSettings.slave || replSettings.master || replPair ) { 
                 log() << "***" << endl;
                 log() << "ERROR: can't use --slave or --master replication options with --replSet" << endl;

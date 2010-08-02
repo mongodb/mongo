@@ -170,6 +170,7 @@ namespace mongo {
         
         static DBClientBase * db = createDirectClient();
         auto_ptr<DBClientCursor> c = db->query( coll , Query() );
+        assert( c.get() );
         
         set<string> thisTime;
         

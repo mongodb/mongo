@@ -96,5 +96,24 @@ namespace mongo {
             }
         }
     }
+    
+    void PeriodicBackgroundJob::run(){
+        // want to handle first one differently so inShutdown is obeyed nicely
+        sleepmillis( _millis );
+        
+        while ( ! inShutdown() ){
+            try {
+                runLoop();
+            }
+            catch ( std::exception& e ){
+                log( LL_ERROR ) << "PeriodicBackgroundJob [" << name() << "] error: " << e.what() << endl;
+            }
+            catch ( ... ){
+                log( LL_ERROR ) << "PeriodicBackgroundJob [" << name() << "] unknown error" << endl;
+            }
+            
+            sleepmillis( _millis );
+        }
+    }
 
 } // namespace mongo

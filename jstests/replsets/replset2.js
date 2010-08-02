@@ -33,16 +33,40 @@ doTest = function( signal ) {
 
     var testDB = "repl-test";
 
+    var failed = false;
     var callGetLastError = function(w, timeout, db) {
         var result = master.getDB(db).runCommand({getlasterror: 1, w: w, wtimeout: timeout});
         printjson( result );
-        assert( result['ok'] == 1, "getLastError with w=" + w + " failed");
+        if(result['ok'] != 1) {
+          print("FAILURE");
+          failed = true;
+        }
     }
 
-    // Test getlasterror with a simple insert
+    // Test getlasterror with multiple inserts
     // TEST FAILS HERE
+    print("**** Try inserting a multiple records -- first insert ****")
     master.getDB(testDB).foo.insert({n: 1});
-    callGetLastError(3, 60000, testDB);
+    master.getDB(testDB).foo.insert({n: 2});
+    master.getDB(testDB).foo.insert({n: 3});
+    callGetLastError(3, 10000, testDB);
+
+    m1 = master.getDB(testDB).foo.findOne({n: 1});
+    printjson( m1 );
+    assert( m1['n'] == 1 , "Failed to save to master on multiple inserts");
+
+    var s0 = slaves[0].getDB(testDB).foo.findOne({n: 1});
+    assert( s0['n'] == 1 , "Failed to replicate to slave 0 on multiple inserts");
+
+    var s1 = slaves[1].getDB(testDB).foo.findOne({n: 1});
+    assert( s1['n'] == 1 , "Failed to replicate to slave 1 on multiple inserts");
+
+
+    // Test getlasterror with a simple insert
+    print("**** Try inserting a single record ****")
+    master.getDB(testDB).dropDatabase();
+    master.getDB(testDB).foo.insert({n: 1});
+    callGetLastError(3, 10000, testDB);
 
     m1 = master.getDB(testDB).foo.findOne({n: 1});
     printjson( m1 );
@@ -73,6 +97,8 @@ doTest = function( signal ) {
     verifyReplication("master", master.getDB(testDB).baz);
     verifyReplication("slave 0", slaves[0].getDB(testDB).baz);
     verifyReplication("slave 1", slaves[1].getDB(testDB).baz);
+
+    assert( failed == false, "Replication with getLastError failed. See errors." );
 
     replTest.stopSet( signal );
 }

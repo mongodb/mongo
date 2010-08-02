@@ -1707,6 +1707,35 @@ namespace mongo {
 
     } dbhashCmd;
 
+    /* for diagnostic / testing purposes. */
+    class CmdSleep : public Command { 
+    public:
+        virtual LockType locktype() const { return NONE; } 
+        virtual bool adminOnly() const { return true; }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        virtual void help( stringstream& help ) const {
+            help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
+            help << "w:true write lock";
+        }
+        CmdSleep() : Command("sleep") { }
+        bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( cmdObj.getBoolField("w") ) { 
+                writelock lk("");
+                sleepsecs(100);
+            }
+            else {
+                readlock lk("");
+                sleepsecs(100);
+            }
+            return true;
+        }
+    } cmdSleep;
+
     class AvailableQueryOptions : public Command {
     public:
         AvailableQueryOptions() : Command( "availablequeryoptions" ){}

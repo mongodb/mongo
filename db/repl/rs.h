@@ -52,7 +52,7 @@ namespace mongo {
         unsigned id() const { return _hbinfo.id(); }
         bool potentiallyHot() const { return _config->potentiallyHot(); } // not arbiter, not priority 0
 
-        void summarizeAsHtml(stringstream& s) const;
+        void summarizeMember(stringstream& s) const;
         friend class ReplSetImpl;
     private:
         const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
@@ -372,7 +372,7 @@ namespace mongo {
         */
     class ReplSetCommand : public Command { 
     protected:
-        ReplSetCommand(const char * s, bool show=false) : Command(s) { }
+        ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }

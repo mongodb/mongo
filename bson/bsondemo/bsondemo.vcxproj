@@ -170,6 +170,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\bson.cpp" />
     <ClCompile Include="bsondemo.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -847,6 +847,7 @@ namespace mongo {
         }
 
         /** uses QueryOption_Exhaust 
+            use DBClientCursorBatchIterator if you want to do items in large blocks, perhpas to avoid granular locking and such.
          */
         unsigned long long query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
         unsigned long long query( boost::function<void(DBClientCursorBatchIterator&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);

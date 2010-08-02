@@ -31,6 +31,7 @@
 #include "chunk.h"
 #include "balance.h"
 #include "grid.h"
+#include "cursors.h"
 
 namespace mongo {
     
@@ -125,12 +126,14 @@ namespace mongo {
 
     void start( const MessageServer::Options& opts ){
         balancer.go();
+        cursorCache.startTimeoutThread();
 
         log() << "waiting for connections on port " << cmdLine.port << endl;
         //DbGridListener l(port);
         //l.listen();
         ShardedMessageHandler handler;
         MessageServer * server = createServer( opts , &handler );
+        server->setAsTimeTracker();
         server->run();
     }
 

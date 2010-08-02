@@ -185,9 +185,11 @@
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
+    <ClCompile Include="..\db\dbwebserver.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\log.cpp" />
+    <ClCompile Include="..\util\miniwebserver.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />

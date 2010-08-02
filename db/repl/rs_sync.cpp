@@ -70,8 +70,8 @@ namespace mongo {
             /* we lock outside the loop to avoid the overhead of locking on every operation.  server isn't usable yet anyway! */
             writelock lk("");
 
-            // todo add status updates...
-
+            // todo : use exhaust
+            unsigned long long n = 0;
             while( 1 ) { 
                 if( !r.more() )
                     break;
@@ -96,6 +96,10 @@ namespace mongo {
                         syncApply(o);
                     }
                     _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */
+                }
+                if( ++n % 100000 == 0 ) { 
+                    // simple progress metering
+                    log() << "replSet initialSyncOplogApplication " << n << rsLog;
                 }
             }
         }

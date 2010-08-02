@@ -228,6 +228,7 @@ namespace mongo {
         
 
         auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection ,b.obj() );
+        assert( cursor.get() );
         while ( cursor->more() ){
             BSONObj o = cursor->next();
             _collections[o["_id"].String()] = CollectionInfo( this , o );
@@ -488,6 +489,7 @@ namespace mongo {
         
         ScopedDbConnection conn( _primary );
         auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
+        assert( c.get() );
         while ( c->more() ){
             BSONObj o = c->next();
             string name = o["_id"].valuestrsafe();

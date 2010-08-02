@@ -37,7 +37,7 @@ namespace mongo {
             /* might be intentional (non-user thread) */            
             OCCASIONALLY DEV if( !isShell ) log() << "warning dev: lastError==0 won't report:" << msg << endl;
         } else if ( le->disabled ) {
-            log() << "lastError disabled, can't report: " << msg << endl;
+            log() << "lastError disabled, can't report: " << code << ":" << msg << endl;
         } else {
             le->raiseError(code, msg);
         }
