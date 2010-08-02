@@ -13,5 +13,11 @@ b.foo.save( { x : 1 } )
 z = db.getLastErrorObj();
 assert.eq( 13297 , z.code || 0 , "B : " + tojson(z) )
 
+print( db.getMongo().getDBNames() )
+
 a.dropDatabase();
 b.dropDatabase();
+
+print( db.getMongo().getDBNames() )
+
+

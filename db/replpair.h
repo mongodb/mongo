@@ -55,7 +55,7 @@ namespace mongo {
         int remotePort;
         string remoteHost;
         string remote; // host:port if port specified.
-//    int date; // -1 not yet set; 0=slave; 1=master
+	//    int date; // -1 not yet set; 0=slave; 1=master
         
         string getInfo() {
             stringstream ss;
@@ -114,7 +114,7 @@ namespace mongo {
     inline bool _isMaster( const char *client = 0 ) {
         if( replSet ) {
             if( theReplSet ) 
-                return theReplSet->isMaster(client);
+                return theReplSet->isPrimary();
             return false;
         }
 
@@ -161,10 +161,13 @@ namespace mongo {
        query the nonmaster member of a replica pair.
     */
     inline void replVerifyReadsOk(ParsedQuery& pq) {
-        if( replSet ) 
-            notMasterUnless(isMaster() || pq.hasOption(QueryOption_SlaveOk));
-        else
+        if( replSet ) {
+  	    /* todo: speed up the secondary case.  as written here there are 2 mutex entries, it can be 1. */
+	    if( isMaster() ) return;
+	    notMasterUnless( pq.hasOption(QueryOption_SlaveOk) && theReplSet->isSecondary() );
+        } else {
             notMasterUnless(isMaster() || pq.hasOption(QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
+	}
     }
 
     inline bool isMasterNs( const char *ns ) {

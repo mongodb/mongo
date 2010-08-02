@@ -133,9 +133,13 @@ for ( i=0; i<200; i++ ){
     var idx = {}
     idx["x"+i] = 1;
     am.lotOfIndexes.ensureIndex( idx );
+    am.getLastError()
 }
 
-assert.eq( am.lotOfIndexes.getIndexes().length , as.lotOfIndexes.getIndexes().length , "lots of indexes" )
+
+assert.soon( function(){ return am.lotOfIndexes.getIndexes().length == as.lotOfIndexes.getIndexes().length; } , "lots of indexes a" )
+
+assert.eq( am.lotOfIndexes.getIndexes().length , as.lotOfIndexes.getIndexes().length , "lots of indexes b" )
 
 
 rt.stop();

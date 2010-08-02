@@ -156,8 +156,8 @@ namespace mongo {
             }
             c->advance();
             if ( c->eof() ) {
-                // advanced to end -- delete cursor
-                delete cc;
+                // advanced to end
+                // leave ClieneCursor in place so next getMore doesn't fail
             }
             else {
                 wassert( c->refLoc() != dl );
@@ -278,6 +278,7 @@ namespace mongo {
         }
         
         cc->_doingDeletes = data._doingDeletes;
+        cc->c->checkLocation();
         return true;        
     }
     

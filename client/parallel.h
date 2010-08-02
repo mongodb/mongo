@@ -195,7 +195,7 @@ namespace mongo {
         virtual BSONObj next();
         virtual string type() const { return "SerialServer"; }
 
-    private:
+    protected:
         virtual void _explain( map< string,list<BSONObj> >& out );
 
         void _init(){}
@@ -223,6 +223,7 @@ namespace mongo {
         virtual BSONObj next();
         virtual string type() const { return "ParallelSort"; }
     protected:
+        void _finishCons();
         void _init();
 
         virtual void _explain( map< string,list<BSONObj> >& out );

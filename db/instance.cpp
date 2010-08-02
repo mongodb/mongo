@@ -509,7 +509,10 @@ namespace mongo {
                 exhaust = false;
                 massert(13073, "shutting down", !inShutdown() );
                 pass++;
-                sleepmillis(2);
+                DEV 
+                    sleepmillis(20);
+                else 
+                    sleepmillis(2);
                 continue;
             }
             catch ( AssertionException& e ) {

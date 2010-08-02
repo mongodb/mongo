@@ -36,7 +36,7 @@ namespace mongo {
          * gets the config the db.
          * will return an empty DBConfig if not in db already
          */
-        DBConfigPtr getDBConfig( string ns , bool create=true );
+        DBConfigPtr getDBConfig( string ns , bool create=true , const string& shardNameHint="" );
         
         /**
          * removes db entry.

@@ -271,6 +271,7 @@ namespace mongo {
     }
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, bool& exhaust ) {
+//        log() << "TEMP GETMORE " << ns << ' ' << cursorid << ' ' << pass << endl;
         exhaust = false;
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p._c;
@@ -312,6 +313,7 @@ namespace mongo {
 
             while ( 1 ) {
                 if ( !c->ok() ) {
+//                    log() << "TEMP Tailable : " << c->tailable() << ' ' << (queryOptions & QueryOption_AwaitData) << endl;
                     if ( c->tailable() ) {
                         /* when a tailable cursor hits "EOF", ok() goes false, and current() is null.  however 
                            advance() can still be retries as a reactivation attempt.  when there is new data, it will 
@@ -647,7 +649,7 @@ namespace mongo {
                     _cc.reset();
                     massert( 13338, "cursor dropped during query", false );
                     // TODO maybe we want to prevent recording the winning plan as well?
-                }
+                } 
             }
         }        
         

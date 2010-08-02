@@ -1,51 +1,88 @@
-// FAILING TEST
-// replication is not rolled back
+// test rollback of replica sets
 
-doTest = function( signal ) {
+var debugging=0;
 
-    var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
-    var nodes = replTest.startSet({oplogSize : "40"});
+function pause(s) {
+    // for debugging just to keep processes running
+    print("\nsync1.js: " + s);
+    if (debugging) {
+        while (1) {
+            print("\nsync1.js: " + s);
+            sleep(4000);
+        }
+    }
+}
+
+doTest = function (signal) {
+
+    var replTest = new ReplSetTest({ name: 'testSet', nodes: 3 });
+    var nodes = replTest.startSet({ oplogSize: "40" });
 
     sleep(5000);
 
+    print("\nsync1.js ********************************************************************** part 0");
     replTest.initiate();
 
     // get master
+    print("\nsync1.js ********************************************************************** part 1");
     var master = replTest.getMaster();
+    print("\nsync1.js ********************************************************************** part 2");
     var dbs = [master.getDB("foo")];
 
     for (var i in nodes) {
-        if (nodes[i]+"" == master+"") {
+        if (nodes[i] + "" == master + "") {
             continue;
         }
         dbs.push(nodes[i].getDB("foo"));
         nodes[i].setSlaveOk();
     }
 
+    print("\nsync1.js ********************************************************************** part 3");
     dbs[0].bar.drop();
 
+    print("\nsync1.js ********************************************************************** part 4");
     // slow things down a bit
-    dbs[0].bar.ensureIndex({x:1});
-    dbs[0].bar.ensureIndex({y:1});
-    dbs[0].bar.ensureIndex({z:1});
-    dbs[0].bar.ensureIndex({w:1});
-    
+    dbs[0].bar.ensureIndex({ x: 1 });
+    dbs[0].bar.ensureIndex({ y: 1 });
+    dbs[0].bar.ensureIndex({ z: 1 });
+    dbs[0].bar.ensureIndex({ w: 1 });
+
     var ok = false;
     var inserts = 100000;
 
-    for (var i=0; i<inserts; i++) {
-        dbs[0].bar.insert({x:"foo"+i, y:"bar"+i, z:i, w:"biz baz bar boo"});
+    print("\nsync1.js ********************************************************************** part 5");
+
+    for (var i = 0; i < inserts; i++) {
+        dbs[0].bar.insert({ x: "foo" + i, y: "bar" + i, z: i, w: "biz baz bar boo" });
     }
 
-    dbs[0].getSisterDB("admin").runCommand({replSetTest:1, blind : true});
+    print("\nsync1.js ********************************************************************** part 6");
+    dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: true });
+
+    print("\nsync1.js ********************************************************************** part 7");
 
     // yay! there are out-of-date nodes
-    var max1 = dbs[1].bar.find().sort({z:-1}).limit(1).next();
-    var max2 = dbs[2].bar.find().sort({z:-1}).limit(1).next();
+    var max1;
+    var max2;
+    while( 1 ) {
+	try {
+	    max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
+	    max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
+	}
+	catch(e) { 
+	    // we may get "not master" if in RECOVERING state
+	    print("\nsync1.js couldn't get max1/max2; retrying " + e);
+	    sleep(2000);
+	    continue;
+	}
+	break;
+    }
+
+    print("\nsync1.js ********************************************************************** part 8");
 
     if (max1.z == inserts && max2.z == inserts) {
-        print ("try increasing # if inserts and running again");
-        replTest.stopSet( signal );
+        print("\nsync1.js try increasing # if inserts and running again");
+        replTest.stopSet(signal);
         return;
     }
 
@@ -55,26 +92,36 @@ doTest = function( signal ) {
     // figure out who is master now
     var newMaster = replTest.getMaster();
 
-    print("**********************************************");
-    assert(newMaster+"" != master+"", "new master is "+newMaster+", old master was "+master);
-    print("new master is "+newMaster+", old master was "+master);
+    print("\nsync1.js ********************************************************************** part 9");
+
+    print("\nsync1.js \nsync1.js ********************************************************************** part 9  **********************************************");
+    assert(newMaster + "" != master + "", "new master is " + newMaster + ", old master was " + master);
+    print("\nsync1.js new master is " + newMaster + ", old master was " + master);
 
     var count = 0;
     do {
-        max1 = dbs[1].bar.find().sort({z:-1}).limit(1).next();
-        max2 = dbs[2].bar.find().sort({z:-1}).limit(1).next();
+	try {
+	    max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
+	    max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
+	}
+	catch( e ) { 
+	    print("\nsync1.js: exception querying; will sleep and try again " + e);
+	    sleep(2000);
+	    continue;
+	}
 
-	print(count+" sync1.js: WAITING FOR MATCH " + Date() + " z[1]:" + max1.z + " z[2]:" + max2.z);
+        print("\nsync1.js waiting for match " + count + " " + Date() + " z[1]:" + max1.z + " z[2]:" + max2.z);
 
-	//        printjson(max1);
-	//        printjson(max2);
+        //        printjson(max1);
+        //        printjson(max2);
 
         sleep(2000);
 
         count++;
         if (count == 100) {
-            assert(false, "replsets/sync1.js fails timing out");
-            replTest.stopSet( signal );
+            pause("fail phase 1");
+            assert(false, "replsets/\nsync1.js fails timing out");
+            replTest.stopSet(signal);
             return;
         }
     } while (max1.z != max2.z);
@@ -82,8 +129,10 @@ doTest = function( signal ) {
     // okay, now they're caught up.  We have a max:
     var max = max1.z;
 
+    print("\nsync1.js ********************************************************************** part 10");
+
     // now, let's see if rollback works
-    var result = dbs[0].getSisterDB("admin").runCommand({replSetTest : 1, blind : false});
+    var result = dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: false });
     dbs[0].getMongo().setSlaveOk();
 
     printjson(result);
@@ -91,24 +140,37 @@ doTest = function( signal ) {
 
     // FAIL! This never resyncs
     // now this should resync
+    print("\nsync1.js ********************************************************************** part 11");
     var max0;
     count = 0;
     do {
-        max0 = dbs[0].bar.find().sort({z:-1}).limit(1).next();
+	try {
+	    max0 = dbs[0].bar.find().sort({ z: -1 }).limit(1).next();
+	}
+	catch(e) { 
+	    print("\nsync1.js phase 2 exception on bar.find() will sleep and try again " + e);
+	    sleep(2000);
+	    continue;
+	}
 
-	print(count+" sync1.js: WAITING FOR MATCH " + Date() + " z[0]:" + max0.z + " z:" + max);
+        print("\nsync1.js phase 2 waiting for match " + count + " " + Date() + " z[0]:" + max0.z + " z:" + max);
 
         sleep(2000);
 
         count++;
         if (count == 100) {
-            assert(false, "replsets/sync1.js fails timing out");
-            replTest.stopSet( signal );
+            pause("fail phase 2");
+            assert(false, "replsets/\nsync1.js fails timing out");
+            replTest.stopSet(signal);
             return;
         }
     } while (max0.z != max);
 
-    replTest.stopSet( signal );
+    print("\nsync1.js ********************************************************************** part 12");
+    pause("\nsync1.js success");
+    replTest.stopSet(signal);
 }
 
-//doTest( 15 );
+if( 0 || debugging ) {
+    doTest( 15 );
+}

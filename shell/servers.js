@@ -406,6 +406,65 @@ printShardingStatus = function( configDB ){
     print( raw );
 }
 
+printShardingSizes = function(){
+    configDB = db.getSisterDB('config')
+    
+    var version = configDB.getCollection( "version" ).findOne();
+    if ( version == null ){
+        print( "not a shard db!" );
+        return;
+    }
+    
+    var raw = "";
+    var output = function(s){
+        raw += s + "\n";
+    }
+    output( "--- Sharding Status --- " );
+    output( "  sharding version: " + tojson( configDB.getCollection( "version" ).findOne() ) );
+    
+    output( "  shards:" );
+    var shards = {};
+    configDB.shards.find().forEach( 
+        function(z){
+            shards[z._id] = new Mongo(z.host);
+            output( "      " + tojson(z) );
+        }
+    );
+
+    var saveDB = db;
+    output( "  databases:" );
+    configDB.databases.find().sort( { name : 1 } ).forEach( 
+        function(db){
+            output( "\t" + tojson(db,"",true) );
+        
+            if (db.partitioned){
+                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\." ) } ).sort( { _id : 1 } ).forEach(
+                    function( coll ){
+                        output("\t\t" + coll._id + " chunks:");
+                        configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
+                            function(chunk){
+                                var mydb = shards[chunk.shard].getDB(db._id)
+                                var out = mydb.runCommand({dataSize: coll._id,
+                                                           keyPattern: coll.key, 
+                                                           min: chunk.min,
+                                                           max: chunk.max });
+                                delete out.millis;
+                                delete out.ok;
+
+                                output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
+                                        " on : " + chunk.shard + " " + tojson( out ) );
+
+                            }
+                        );
+                    }
+                )
+            }
+        }
+    );
+    
+    print( raw );
+}
+
 ShardingTest.prototype.sync = function(){
     this.adminCommand( "connpoolsync" );
 }
@@ -611,7 +670,7 @@ ReplPair.prototype.waitForSteadyState = function( state, expectedMasterHost, two
     var leftValues = {};
     var rightValues = {};
     assert.soon( function() { return rp.checkSteadyState( state, expectedMasterHost, twoMasterOk, leftValues, rightValues, debug ); },
-                "rp (" + rp + ") failed to reach expected steady state (" + state + ")" );
+                 "rp (" + rp + ") failed to reach expected steady state (" + state + ")" , 60000 );
 }
 
 ReplPair.prototype.master = function() { return this.master_; }

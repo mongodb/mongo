@@ -501,9 +501,12 @@ dontReplacePackage = False
 if distBuild:
     release = True
 
+def isDriverBuild():
+    return GetOption( "prefix" ) and GetOption( "prefix" ).find( "mongo-cxx-driver" ) >= 0
+
 if GetOption( "prefix" ):
     installDir = GetOption( "prefix" )
-    if installDir.find( "mongo-cxx-driver" ) >= 0:
+    if isDriverBuild():
         installSetup.justClient()
 
 
@@ -1464,11 +1467,14 @@ def getDistName( sofar ):
 
 
 if distBuild:
-    from datetime import date
-    today = date.today()
-    installDir = "mongodb-" + getSystemInstallName() + "-"
-    installDir += getDistName( installDir )
-    print "going to make dist: " + installDir
+    if isDriverBuild():
+        installDir = GetOption( "prefix" )
+    else:
+        from datetime import date
+        today = date.today()
+        installDir = "mongodb-" + getSystemInstallName() + "-"
+        installDir += getDistName( installDir )
+        print "going to make dist: " + installDir
 
 # binaries
 
@@ -1619,8 +1625,10 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
         name = name.lower()
     else:
         name = remoteName
-
-    if platformDir:
+        
+    if isDriverBuild():
+        name = "cxx-driver/" + name
+    elif platformDir:
         name = platform + "/" + name
 
     print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )

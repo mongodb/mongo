@@ -25,6 +25,9 @@
 #include "../util/mongoutils/str.h"
 #include "../client/dbclient.h"
 
+//#define REPLDEBUG(x) log() << "replBlock: "  << x << endl;
+#define REPLDEBUG(x)
+
 namespace mongo {
 
     using namespace mongoutils;
@@ -108,8 +111,10 @@ namespace mongo {
         }
 
         void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ){
-            scoped_lock mylk(_mutex);
+            REPLDEBUG( host << " " << rid << " " << ns << " " << last );
 
+            scoped_lock mylk(_mutex);
+            
 #ifdef _DEBUG
             MongoFileAllowWrites allowWrites;
 #endif
@@ -136,7 +141,9 @@ namespace mongo {
             i.loc = new OpTime[1];
             i.loc[0] = last;
             _dirty = true;
+
             if ( ! _started ){
+                // start background thread here since we definitely need it
                 _started = true;
                 go();
             }
@@ -144,6 +151,9 @@ namespace mongo {
         }
         
         bool opReplicatedEnough( OpTime op , int w ){
+            RARELY {
+                REPLDEBUG( "looking for : " << op << " w=" << w );
+            }
             if ( w <= 1 || ! replSettings.master )
                 return true;
             w--; // now this is the # of slaves i need
