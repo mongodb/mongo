@@ -69,12 +69,7 @@ namespace mongo {
     bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string errmsg);
 
     static void emptyOplog() {
-        /* if we drop we would have to recreate.  instead we truncate.  but current
-           truncate impl is slow.  TODO */
-           
         writelock lk(rsoplog);
-        string errmsg;
-        bob res;
         Client::Context ctx(rsoplog);
 		NamespaceDetails *d = nsdetails(rsoplog);
 
@@ -82,10 +77,15 @@ namespace mongo {
 		if( d && d->nrecords == 0 )
 		  return; // already empty, ok.
 
-        dropCollection(rsoplog, errmsg, res);
+        log(1) << "replSet empty oplog" << rsLog;
+        d->emptyCappedCollection(rsoplog);
 
+        /*
+        string errmsg;
+        bob res;
+        dropCollection(rsoplog, errmsg, res);
 		log() << "replSet recreated oplog so it is empty.  todo optimize this..." << rsLog;
-		createOplog();
+		createOplog();*/
 
       	// TEMP: restart to recreate empty oplog
         //log() << "replSet FATAL error during initial sync.  mongod restart required." << rsLog;

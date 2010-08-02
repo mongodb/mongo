@@ -21,8 +21,10 @@ db.concflag.update({}, {inprog:true}, true)
 
 updater=startParallelShell("db=db.getSisterDB('concurrency');\
 			   db.conc.update({}, {$inc:{x: "+NRECORDS+"}}, false, true);\
-			   print(db.getLastError());\
-			   db.concflag.update({},{inprog:false})");
+			   e=db.getLastError();\
+			   print('update error: '+ e);\
+			   db.concflag.update({},{inprog:false});\
+			   assert.eq(e, null, \"update failed\");");
 
 querycount=0;
 decrements=0;
@@ -30,7 +32,10 @@ misses=0
 while (1) {
     if (db.concflag.findOne().inprog) {
 	c2=db.conc.count({x:{$lt:NRECORDS}})
-	print(c2)
+	e=db.getLastError()
+ 	print(c2)
+	print(e)
+	assert.eq(e, null, "some count() failed")
 	querycount++;
 	if (c2<c1)
 	    decrements++;
