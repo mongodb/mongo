@@ -27,6 +27,7 @@
 #include "../../util/ramlog.h"
 #include "../helpers/dblogger.h"
 #include "connections.h"
+#include "../../util/unittest.h"
 
 namespace mongo {
     /* decls for connections.h */
@@ -138,10 +139,11 @@ namespace mongo {
         be e = op["ts"];
         if( e.type() == Date || e.type() == Timestamp ) { 
             OpTime ot = e._opTime();
-            ss << td( a("",ot.toString(),ot.toStringPretty()) );
+	    ss << td( time_t_to_String_short( ot.getSecs() ) );
+            ss << td( ot.toString() );
             skip.insert("ts");
         }
-        else ss << td("?");
+        else ss << td("?") << td("?");
 
         e = op["h"];
         if( e.type() == NumberLong ) {
@@ -182,7 +184,7 @@ namespace mongo {
         ScopedConn conn(m->fullName());        
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
-        static const char *h[] = {"ts","h","op","ns","rest",0};
+        static const char *h[] = {"ts","optime", "h","op","ns","rest",0};
 
         ss << "<style type=\"text/css\" media=\"screen\">"
             "table { font-size:75% }\n"
@@ -228,6 +230,8 @@ namespace mongo {
             }
         }
         ss << _table();
+        ss << p(time_t_to_String_short(time(0)) + " current time");
+
         //ss << "</pre>\n";
 
         if( !otEnd.isNull() ) {
@@ -241,7 +245,7 @@ namespace mongo {
                 ss << h / 24.0 << " days";
             ss << "</p>\n";
         }
-        ss << p("Current time: " + time_t_to_String_short(time(0)));
+
     }
 
     void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 
@@ -256,7 +260,7 @@ namespace mongo {
             "<a title=\"length of time we have been continuously connected to the other member with no reconnects (for self, shows uptime)\">cctime</a>", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 
-            "<a title=\"how up to date this server is; write operations are sequentially numbered.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">opord</a>", 
+            "<a title=\"how up to date this server is.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">optime</a>", 
             "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">skew</a>", 
             0};
         s << table(h);
@@ -336,5 +340,13 @@ namespace mongo {
         b.append("myState", box.getState().s);
         b.append("members", v);
     }
+
+    static struct Test : public UnitTest { 
+        void run() { 
+            HealthOptions a,b;
+            assert( a == b );
+            assert( a.isDefault() );
+        }
+    } test;
 
 }

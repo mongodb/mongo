@@ -625,9 +625,9 @@ namespace mongo {
         v8::String::Utf8Value data( it->Get( v8::String::New( "data" ) ) );
         
         stringstream ss;
-        ss << "BinData( type: " << type << ", base64: \"";
+        ss << "BinData(" << type << ",\"";
         base64::encode( ss, *data, len );
-        ss << "\" )";
+        ss << "\")";
         string ret = ss.str();
         return v8::String::New( ret.c_str() );
     }

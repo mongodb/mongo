@@ -419,7 +419,7 @@ namespace mongo {
         }
     
         if ( value->IsDate() ){
-            b.appendDate( sname , Date_t(v8::Date::Cast( *value )->NumberValue()) );
+            b.appendDate( sname , Date_t( (unsigned long long)(v8::Date::Cast( *value )->NumberValue())) );
             return;
         }
 
@@ -435,8 +435,8 @@ namespace mongo {
                 switch( obj->GetInternalField( 0 )->ToInt32()->Value() ) { // NOTE Uint32's Value() gave me a linking error, so going with this instead
                     case Timestamp:
                         b.appendTimestamp( sname,
-                                          Date_t( obj->Get( v8::String::New( "t" ) )->ToNumber()->Value() ),
-                                          obj->Get( v8::String::New( "i" ) )->ToInt32()->Value() );
+                                           Date_t( (unsigned long long)(obj->Get( v8::String::New( "t" ) )->ToNumber()->Value() )),
+                                           obj->Get( v8::String::New( "i" ) )->ToInt32()->Value() );
                         return;
                     case MinKey:
                         b.appendMinKey( sname );

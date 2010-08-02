@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "chunk.h"
 #include "config.h"
+#include "grid.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -206,6 +207,10 @@ namespace mongo {
                 ss << "mulitSplit failing because config not up to date" 
                    << " onServer: " << onServer.toString()
                    << " mine: " << mine.toString();
+
+                //reload config
+                grid.getDBConfig(_manager->_ns)->getChunkManager(_manager->_ns, true);
+
                 uasserted( 13387 , ss.str() );
             }
         }
@@ -603,7 +608,9 @@ namespace mongo {
                 return;
             }
 
-            _printChunks();
+            if (_chunkMap.size() < 10){ 
+                _printChunks();
+            }
             sleepmillis(10 * (3-tries));
             sleepsecs(10);
         }
@@ -647,6 +654,12 @@ namespace mongo {
         // Make sure there are no gaps or overlaps
         for (ChunkMap::const_iterator it=boost::next(_chunkMap.begin()), end=_chunkMap.end(); it != end; ++it){
             ChunkMap::const_iterator last = prior(it);
+
+            if (!(it->second->getMin() == last->second->getMax())){
+                PRINT(it->second->toString());
+                PRINT(it->second->getMin());
+                PRINT(last->second->getMax());
+            }
             ENSURE(it->second->getMin() == last->second->getMax());
         }
 

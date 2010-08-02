@@ -46,7 +46,7 @@ namespace mongo {
                 return false;
             if( cmdObj.hasElement("blind") ) {
                 replSetBlind = cmdObj.getBoolField("blind");
-                log() << "replSet WARNING via command setting replSetBlind=" << replSetBlind << rsLog;
+                log() << "replSet info replSetTest command received, replSetBlind=" << replSetBlind << rsLog;
                 return true;
             }
             return false;
