@@ -28,7 +28,15 @@ namespace mongo {
         string bind_ip;        // --bind_ip
         bool rest;             // --rest
 
-        string replSet;        // --replSet <seedlist>
+        string _replSet;       // --replSet[/<seedlist>]
+        string ourSetName() const { 
+            string setname;
+            size_t sl = _replSet.find('/');
+            if( sl == string::npos )
+                return _replSet;
+            return _replSet.substr(0, sl);
+        }
+
         string source;         // --source
         string only;           // --only
         

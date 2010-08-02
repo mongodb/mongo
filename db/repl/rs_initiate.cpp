@@ -146,7 +146,7 @@ namespace mongo {
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
                 result.append("startupStatus", ReplSet::startupStatus);
                 errmsg = "all members and seeds must be reachable to initiate set";
-                result.append("info", cmdLine.replSet);
+                result.append("info", cmdLine._replSet);
                 return false;
             }
 
@@ -159,7 +159,7 @@ namespace mongo {
                 string name;
                 vector<HostAndPort> seeds;
                 set<HostAndPort> seedSet;
-                parseReplsetCmdLine(cmdLine.replSet, name, seeds, seedSet); // may throw...
+                parseReplsetCmdLine(cmdLine._replSet, name, seeds, seedSet); // may throw...
 
                 bob b;
                 b.append("_id", name);

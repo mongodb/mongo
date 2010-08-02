@@ -1720,7 +1720,7 @@ namespace mongo {
     void oldRepl();
     void startReplication() {
         /* if we are going to be a replica set, we aren't doing other forms of replication. */
-        if( !cmdLine.replSet.empty() ) {
+        if( !cmdLine._replSet.empty() ) {
             if( replSettings.slave || replSettings.master || replPair ) { 
                 log() << "***" << endl;
                 log() << "ERROR: can't use --slave or --master replication options with --replSet" << endl;
