@@ -21,10 +21,12 @@
 #include "../oplogreader.h"
 #include "../../util/mongoutils/str.h"
 #include "../dbhelpers.h"
+#include "rs_optime.h"
 
 namespace mongo {
 
     using namespace mongoutils;
+    using namespace bson;
 
     void dropAllDatabasesExceptLocal();
 
@@ -63,6 +65,29 @@ namespace mongo {
 
     void _logOpObjRS(const BSONObj& op);
 
+    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string errmsg);
+
+    static void emptyOplog() {
+        /* if we drop we would have to recreate.  instead we truncate.  but current
+           truncate impl is slow.  TODO */
+           
+        writelock lk(rsoplog);
+        string errmsg;
+        bob res;
+        Client::Context ctx(rsoplog);
+        dropCollection(rsoplog, errmsg, res);
+        log() << "replSet FATAL error during initial sync.  mongod restart required." << rsLog;
+        dbexit( EXIT_CLEAN );
+
+        /*
+        writelock lk(rsoplog);
+        Client::Context c(rsoplog, dbpath, 0, doauth/false);
+        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
+        uassert(13412, str::stream() << "replSet error " << rsoplog << " is missing", oplogDetails != 0);
+        oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
+        */
+    }
+
     void ReplSetImpl::_syncDoInitialSync() { 
         sethbmsg("initial sync pending",0);
 
@@ -90,7 +115,7 @@ namespace mongo {
             sleepsecs(15);
             return;
         }
-        OpTime ts = lastOp["ts"]._opTime();
+        OpTime startingTS = lastOp["ts"]._opTime();
         
         {
             /* make sure things aren't too flappy */
@@ -102,7 +127,9 @@ namespace mongo {
 
         sethbmsg("initial sync drop all databases", 0);
         dropAllDatabasesExceptLocal();
-        sethbmsg("initial sync continues");
+
+//        sethbmsg("initial sync drop oplog", 0);
+//        emptyOplog();
 
         list<string> dbs = r.conn()->getDatabaseNames();
         for( list<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
@@ -128,8 +155,30 @@ namespace mongo {
         /* our cloned copy will be strange until we apply oplog events that occurred 
            through the process.  we note that time point here. */
         BSONObj minValid = r.getLastOp(rsoplog);
+        assert( !minValid.isEmpty() );
+        OpTime mvoptime = minValid["ts"]._opTime();
+        assert( !mvoptime.isNull() );
 
-        sethbmsg("initial sync clone done first write to oplog still pending",0);
+        /* copy the oplog 
+        */
+        {
+            sethbmsg("initial sync copy+apply oplog");
+            if( ! initialSyncOplogApplication(masterHostname, cp, startingTS, mvoptime) ) { 
+                log() << "replSet initial sync failed during applyoplog [1]" << rsLog;
+                emptyOplog(); // otherwise we'll be up!
+                log() << "replSet initial sync failed during applyoplog [2]" << rsLog;
+                {
+                    writelock lk("local.");
+                    Client::Context cx( "local." );
+                    cx.db()->flushFiles(true);            
+                }
+                log() << "replSet initial sync failed durying applyoplog [3]" << rsLog;
+                sleepsecs(2);
+                return;
+            }
+        }
+
+        sethbmsg("initial sync finishing up",0);
         
         assert( !box.getState().primary() ); // wouldn't make sense if we were.
 
@@ -137,18 +186,11 @@ namespace mongo {
             writelock lk("local.");
             Client::Context cx( "local." );
             cx.db()->flushFiles(true);            
-	    try {
-	      log() << "replSet set minValid=" << minValid["ts"]._opTime().toString() << rsLog;
-	    }
-	    catch(...){}
+            try {
+                log() << "replSet set minValid=" << minValid["ts"]._opTime().toString() << rsLog;
+            }
+            catch(...) { }
             Helpers::putSingleton("local.replset.minvalid", minValid);
-            // write an op from the primary to our oplog that existed when 
-            // we started cloning.  that will be our starting point.
-            //
-            // todo : handle case where lastOp on the primary has rolled back.  may have to just 
-            //        reclone, but don't get stuck with manual error at least...
-            //
-            _logOpObjRS(lastOp);
             cx.db()->flushFiles(true);
         }
 

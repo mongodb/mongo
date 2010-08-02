@@ -34,7 +34,7 @@ namespace mongo {
 
     /* throws 
        @param initial - 
-    */ 
+    */
     void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {

@@ -719,7 +719,8 @@ namespace mongo {
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
         log(1) << "dropCollection: " << name << endl;
         NamespaceDetails *d = nsdetails(name.c_str());
-        assert( d );
+        if( d == 0 )
+            return;
 
         BackgroundOperation::assertNoBgOpInProgForNs(name.c_str());
 

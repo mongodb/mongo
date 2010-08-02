@@ -269,7 +269,7 @@ namespace mongo {
        /* we have items we are writing that aren't from a point-in-time.  thus best not to come online 
 	  until we get to that point in freshness. */
        try {
-	 log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
+           log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
        }
        catch(...){}
        Helpers::putSingleton("local.replset.minvalid", newMinValid);
