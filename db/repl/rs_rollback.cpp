@@ -276,7 +276,7 @@ namespace mongo {
 
        Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
-       uassert(13412, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
+       uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
 
        unsigned deletes = 0, updates = 0;
        for( list<pair<DocID,bo> >::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
