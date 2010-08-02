@@ -1057,11 +1057,13 @@ rs.help = function () {
     print("\trs.addArb(hostportstr)          add a new member which is arbiterOnly:true");
     print("\trs.stepDown()                   step down as primary (momentarily)");
     print("\trs.conf()                       return configuration from local.system.replset");
+    print("\trs.slaveOk()                    shorthand for db.getMongo().setSlaveOk()");
     print();
     print("\tdb.isMaster()                   check who is primary");
     print();
     print("\tsee also http://<mongod_host>:28017/_replSet for additional diagnostic info");
 }
+rs.slaveOk = function () { return db.getMongo().setSlaveOk(); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }

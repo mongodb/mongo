@@ -116,6 +116,7 @@
     <ClCompile Include="..\..\s\d_util.cpp" />
     <ClCompile Include="..\..\s\shardconnection.cpp" />
     <ClCompile Include="..\..\util\background.cpp" />
+    <ClCompile Include="..\..\util\log.cpp" />
     <ClCompile Include="..\..\util\mmap.cpp" />
     <ClCompile Include="..\..\util\password.cpp" />
     <ClCompile Include="..\..\util\text.cpp" />
