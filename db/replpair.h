@@ -111,7 +111,7 @@ namespace mongo {
 
        If 'client' is not specified, the current client is used.
     */
-    inline bool _isMaster( const char *client = 0 ) {
+    inline bool _isMaster() {
         if( replSet ) {
             if( theReplSet ) 
                 return theReplSet->isPrimary();
@@ -142,7 +142,7 @@ namespace mongo {
         return false;
     }
     inline bool isMaster(const char *client = 0) {
-        if( _isMaster(client) )
+        if( _isMaster() )
             return true;
         if ( !client ) {
             Database *database = cc().database();
