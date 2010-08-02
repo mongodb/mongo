@@ -56,6 +56,7 @@ namespace mongo {
         OpTime minValid)
     { 
         if( primary == 0 ) return false;
+
         OpTime ts;
         try {
             OplogReader r;
@@ -69,6 +70,21 @@ namespace mongo {
 
             /* we lock outside the loop to avoid the overhead of locking on every operation.  server isn't usable yet anyway! */
             writelock lk("");
+
+            {
+                if( !r.more() ) { 
+                    sethbmsg("replSet initial sync error reading remote oplog");
+                    return false;
+                }
+                bo op = r.next();
+                OpTime t = op["ts"]._opTime();
+                r.putBack(op);
+                assert( !t.isNull() );
+                if( t > applyGTE ) {
+                    sethbmsg(str::stream() << "error " << hn << " oplog wrapped during initial sync");
+                    return false;
+                }
+            }
 
             // todo : use exhaust
             unsigned long long n = 0;

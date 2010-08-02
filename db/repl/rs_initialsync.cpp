@@ -175,7 +175,7 @@ namespace mongo {
         */
         {
             sethbmsg("initial sync copy+apply oplog");
-            if( ! initialSyncOplogApplication(masterHostname, cp, startingTS, mvoptime) ) { 
+            if( ! initialSyncOplogApplication(masterHostname, cp, startingTS, mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
 				lastOpTimeWritten = OpTime();
