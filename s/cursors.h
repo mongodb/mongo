@@ -29,12 +29,12 @@
 
 namespace mongo {
 
-    class ShardedClientCursor {
+    class ShardedClientCursor : boost::noncopyable {
     public:
         ShardedClientCursor( QueryMessage& q , ClusteredCursor * cursor );
         virtual ~ShardedClientCursor();
 
-        long long getId(){ return _id; }
+        long long getId();
         
         /**
          * @return whether there is more data left
@@ -76,10 +76,14 @@ namespace mongo {
         
         void appendInfo( BSONObjBuilder& result );
 
+        long long genId();
     private:
         mutex _mutex;
+
         MapSharded _cursors;
         MapNormal _refs;
+        
+        long long _shardedTotal;
     };
     
     extern CursorCache cursorCache;
