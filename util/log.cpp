@@ -76,8 +76,7 @@ namespace mongo {
                 localtime_r( &_opened , &t );
                 
                 stringstream ss;
-                ss << _path << ".";
-                terseCurrentTime( ss , true );
+                ss << _path << "." << terseCurrentTime(false);
                 string s = ss.str();
                 rename( _path.c_str() , s.c_str() );
 #endif

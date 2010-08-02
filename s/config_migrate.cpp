@@ -61,7 +61,7 @@ namespace mongo {
             string backupName;
             {
                 stringstream ss;
-                ss << "config-backup-" << terseCurrentTime();
+                ss << "config-backup-" << terseCurrentTime(false);
                 backupName = ss.str();
             }
             log() << "backing up config to: " << backupName << endl;
