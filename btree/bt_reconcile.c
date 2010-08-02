@@ -442,43 +442,34 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
-		 * Get a reference to the data, on- or off- page, and see if
-		 * it's been deleted.
+		 * Get a reference to the data: it's either a replacement value
+		 * or the original on-page item.
 		 */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl->data))
-				goto deleted;
-
 			/*
-			 * Build the data's WT_ITEM chunk from the most recent
-			 * replacement value.
+			 * Check for deletion, else build the data's WT_ITEM
+			 * chunk from the most recent replacement value.
 			 */
-			data->data = repl->data;
-			data->size = repl->size;
-			WT_RET(__wt_bt_build_data_item(
-			    toc, data, &data_item, &data_ovfl));
-			data_loc = DATA_OFF_PAGE;
-		} else if (cip->data == NULL) {
-deleted:		data->data = NULL;
-			data->size = 0;
-			WT_RET(__wt_bt_build_data_item(
-			    toc, data, &data_item, &data_ovfl));
-			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DEL);
+			if (WT_REPL_DELETED_ISSET(repl->data)) {
+				WT_CLEAR(data_item);
+				WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DEL);
+				WT_ITEM_LEN_SET(&data_item, 0);
+				len = WT_ITEM_SPACE_REQ(0);
+			} else {
+				data->data = repl->data;
+				data->size = repl->size;
+				WT_RET(__wt_bt_build_data_item(
+				    toc, data, &data_item, &data_ovfl));
+				len = WT_ITEM_SPACE_REQ(data->size);
+			}
 			data_loc = DATA_OFF_PAGE;
 		} else {
 			data->data = cip->data;
 			data->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(cip->data));
+			len = data->size;
 			data_loc = DATA_ON_PAGE;
 		}
 
-		switch (data_loc) {
-		case DATA_OFF_PAGE:
-			len = WT_ITEM_SPACE_REQ(data->size);
-			break;
-		case DATA_ON_PAGE:
-			len = data->size;
-			break;
-		}
 		if (len > new->space_avail) {
 			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
 			__wt_abort(toc->env);
