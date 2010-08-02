@@ -454,6 +454,7 @@ namespace mongo {
         int n;
         {
             auto_ptr<DBClientCursor> c = conn->query(_manager->getns(), q, maxCount, 0, &fields);
+            assert( c.get() );
             n = c->itcount();
         }        
         conn.done();
@@ -628,6 +629,7 @@ namespace mongo {
 
         auto_ptr<DBClientCursor> cursor = conn->query(temp.getNS(), QUERY("ns" << _ns).sort("lastmod",1), 0, 0, 0, 0,
                 (DEBUG_BUILD ? 2 : 1000000)); // batch size. Try to induce potential race conditions in debug builds
+        assert( cursor.get() );
         while ( cursor->more() ){
             BSONObj d = cursor->next();
             if ( d["isMaxMarker"].trueValue() ){
@@ -988,6 +990,7 @@ namespace mongo {
         ScopedDbConnection conn( temp.modelServer() );
         
         auto_ptr<DBClientCursor> cursor = conn->query(temp.getNS(), QUERY("ns" << _ns).sort("lastmod",1), 1 );
+        assert( cursor.get() );
         BSONObj o;
         if ( cursor->more() )
             o = cursor->next();
