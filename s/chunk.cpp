@@ -451,8 +451,11 @@ namespace mongo {
         
         // not using regular count as this is more flexible and supports $min/$max
         Query q = Query().minKey(_min).maxKey(_max);
-        int n = conn->query(_manager->getns(), q, maxCount, 0, &fields)->itcount();
-        
+        int n;
+        {
+            auto_ptr<DBClientCursor> c = conn->query(_manager->getns(), q, maxCount, 0, &fields);
+            n = c->itcount();
+        }        
         conn.done();
         return n;
     }
