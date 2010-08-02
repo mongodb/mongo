@@ -59,7 +59,6 @@ doTest = function( signal ) {
 
     assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
 
-    
     { 
         // this may fail since it has to reconnect
         try {
@@ -74,8 +73,44 @@ doTest = function( signal ) {
     // Here's how to restart a node:
     replTest.restart( master_id );
 
+    // Now let's write some documents to the new master
+    for(var i=0; i<1000; i++) {
+        new_master.getDB("bar").bar.save({a: i});
+    }
+    new_master.getDB("admin").runCommand({getlasterror: 1});
+
+    // Here's how to restart the old master node:
+    slave = replTest.restart( master_id );
+
+    // Now, let's make sure that the old master comes up as a slave
+    assert.soon(function() {
+        var res = slave.getDB("admin").runCommand({ismaster: 1});
+        printjson(res);
+        return res['ok'] == 1 && res['ismaster'] == false;
+    });
+
+    // And we need to make sure that the replset comes back up
+    assert.soon(function() {
+        var res = new_master.getDB("admin").runCommand({replSetGetStatus: 1});
+        printjson( res );
+        return res.myState == 1;
+    });
+
+    // And that both slave nodes have all the updates
+    new_master = replTest.getMaster();
+    replTest.awaitReplication();
+
+    slaves = replTest.liveNodes.slaves;
+    assert( slaves.length == 2, "Expected 2 slaves but length was " + slaves.length );
+    slaves.forEach(function(slave) {
+        slave.setSlaveOk();
+        var count = slave.getDB("bar").runCommand({count: "bar"});
+        printjson( count );
+        assert( count.n == 1000 , slave + " expected 1000 but count was " + count.n);
+    });
+
     // Shut down the set and finish the test.
     replTest.stopSet( signal );
 }
 
-doTest( 15 );
+// doTest( 15 );

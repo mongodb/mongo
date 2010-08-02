@@ -1199,6 +1199,7 @@ ReplSetTest.prototype.awaitReplication = function() {
    this.getMaster();
 
    latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']['t']
+   print(latest);
 
    this.attempt({context: this, timeout: 30000, desc: "awaiting replication"},
        function() {
@@ -1214,9 +1215,14 @@ ReplSetTest.prototype.awaitReplication = function() {
              }
 
              slave.getDB("admin").getMongo().setSlaveOk();
-             var log = slave.getDB("local")['replset.minvalid'];
-             if(log.find().hasNext()) {
-               synced == synced && log.find().next()['ts']['t'];
+             var log = slave.getDB("local")['oplog.rs'];
+             if(log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
+               var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
+               printjson( entry );
+               var ts = entry['ts']['t'];
+               print("TS for " + slave + " is " + ts + " and latest is " + latest);
+               print("Oplog size for " + slave + " is " + log.count());
+               synced = (synced && (latest == ts));
              }
              else {
                synced = false;
@@ -1245,8 +1251,11 @@ ReplSetTest.prototype.start = function( n , options , restart ){
 
     print("Starting....");
     print( o );
-    if ( restart )
-        return startMongoProgram.apply( null , o );
+    if ( restart ) {
+        this.nodes[n] = startMongoProgram.apply( null , o );
+        printjson(this.nodes);
+        return this.nodes[n];
+    }
     else {
         return startMongod.apply( null , o );
     }
