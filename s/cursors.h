@@ -42,6 +42,10 @@ namespace mongo {
         bool sendNextBatch( Request& r ){ return sendNextBatch( r , _ntoreturn ); }
         bool sendNextBatch( Request& r , int ntoreturn );
         
+        void accessed();
+        /** @return idle time in ms */
+        long long idleTime( long long now );
+
     protected:
         
         ClusteredCursor * _cursor;
@@ -53,6 +57,8 @@ namespace mongo {
         bool _done;
 
         long long _id;
+        long long _lastAccessMillis; // 0 means no timeout
+
     };
 
     typedef boost::shared_ptr<ShardedClientCursor> ShardedClientCursorPtr;
@@ -60,6 +66,8 @@ namespace mongo {
     class CursorCache {
     public:
         
+        static long long TIMEOUT;
+
         typedef map<long long,ShardedClientCursorPtr> MapSharded;
         typedef map<long long,string> MapNormal;
 
@@ -75,8 +83,11 @@ namespace mongo {
         void gotKillCursors(Message& m );
         
         void appendInfo( BSONObjBuilder& result );
-
+        
         long long genId();
+
+        void doTimeouts();
+        void startTimeoutThread();
     private:
         mutex _mutex;
 

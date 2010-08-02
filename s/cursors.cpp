@@ -21,6 +21,7 @@
 #include "../client/connpool.h"
 #include "../db/queryutil.h"
 #include "../db/commands.h"
+#include "../util/background.h"
 
 namespace mongo {
     
@@ -37,6 +38,12 @@ namespace mongo {
         _done = false;
 
         _id = 0;
+        
+        if ( q.queryOptions & QueryOption_NoCursorTimeout ){
+            _lastAccessMillis = 0;
+        }
+        else 
+            _lastAccessMillis = Listener::getElapsedTimeMillis();
     }
 
     ShardedClientCursor::~ShardedClientCursor(){
@@ -51,6 +58,17 @@ namespace mongo {
             assert( _id >= 0 );
         }
         return _id;
+    }
+
+    void ShardedClientCursor::accessed(){
+        if ( _lastAccessMillis > 0 )
+            _lastAccessMillis = Listener::getElapsedTimeMillis();
+    }
+
+    long long ShardedClientCursor::idleTime( long long now ){
+        if ( _lastAccessMillis == 0 )
+            return 0;
+        return now - _lastAccessMillis;
     }
 
     bool ShardedClientCursor::sendNextBatch( Request& r , int ntoreturn ){
@@ -101,7 +119,10 @@ namespace mongo {
         
         return hasMore;
     }
+
+    // ---- CursorCache -----
     
+    long long CursorCache::TIMEOUT = 600000;
 
     CursorCache::CursorCache()
         :_mutex( "CursorCache" ), _shardedTotal(0){
@@ -125,6 +146,7 @@ namespace mongo {
             OCCASIONALLY log() << "Sharded CursorCache missing cursor id: " << id << endl;
             return ShardedClientCursorPtr();
         }
+        i->second->accessed();
         return i->second;
     }
     
@@ -222,7 +244,33 @@ namespace mongo {
         result.append( "totalOpen" , (int)(_cursors.size() + _refs.size() ) );
     }
 
+    void CursorCache::doTimeouts(){
+        long long now = Listener::getElapsedTimeMillis();
+        scoped_lock lk( _mutex );
+        for ( MapSharded::iterator i=_cursors.begin(); i!=_cursors.end(); ++i ){
+            long long idleFor = i->second->idleTime( now );
+            if ( idleFor < TIMEOUT ){
+                continue;
+            }
+            log() << "killing old cursor " << i->second->getId() << " idle for: " << idleFor << "ms" << endl; // TODO: make log(1)
+            _cursors.erase( i );
+        }
+    }
+
     CursorCache cursorCache;
+    
+    class CursorTimeoutThread : public PeriodicBackgroundJob {
+    public:
+        CursorTimeoutThread() : PeriodicBackgroundJob( 4000 ){}
+        virtual string name() { return "cursorTimeout"; }
+        virtual void runLoop(){
+            cursorCache.doTimeouts();
+        }
+    } cursorTimeoutThread;
+
+    void CursorCache::startTimeoutThread(){
+        cursorTimeoutThread.go();
+    }
 
     class CmdCursorInfo : public Command {
     public:
@@ -234,6 +282,8 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         bool run(const string&, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             cursorCache.appendInfo( result );
+            if ( jsobj["setTimeout"].isNumber() )
+                CursorCache::TIMEOUT = jsobj["setTimeout"].numberLong();
             return true;
         }
     } cmdCursorInfo;
