@@ -69,12 +69,7 @@ namespace mongo {
     bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string errmsg);
 
     static void emptyOplog() {
-        /* if we drop we would have to recreate.  instead we truncate.  but current
-           truncate impl is slow.  TODO */
-           
         writelock lk(rsoplog);
-        string errmsg;
-        bob res;
         Client::Context ctx(rsoplog);
 		NamespaceDetails *d = nsdetails(rsoplog);
 
@@ -82,10 +77,15 @@ namespace mongo {
 		if( d && d->nrecords == 0 )
 		  return; // already empty, ok.
 
-        dropCollection(rsoplog, errmsg, res);
+        log(1) << "replSet empty oplog" << rsLog;
+        d->emptyCappedCollection(rsoplog);
 
+        /*
+        string errmsg;
+        bob res;
+        dropCollection(rsoplog, errmsg, res);
 		log() << "replSet recreated oplog so it is empty.  todo optimize this..." << rsLog;
-		createOplog();
+		createOplog();*/
 
       	// TEMP: restart to recreate empty oplog
         //log() << "replSet FATAL error during initial sync.  mongod restart required." << rsLog;
@@ -176,17 +176,17 @@ namespace mongo {
         {
             sethbmsg("initial sync copy+apply oplog");
             if( ! initialSyncOplogApplication(masterHostname, cp, startingTS, mvoptime) ) { 
-                log() << "replSet initial sync failed during applyoplog [1]" << rsLog;
+                log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
 				lastOpTimeWritten = OpTime();
 				lastH = 0;
-                log() << "replSet initial sync failed during applyoplog [2]" << rsLog;
+                log() << "replSet cleaning up [1]" << rsLog;
                 {
                     writelock lk("local.");
                     Client::Context cx( "local." );
                     cx.db()->flushFiles(true);            
                 }
-                log() << "replSet initial sync failed durying applyoplog [3]" << rsLog;
+                log() << "replSet cleaning up [2]" << rsLog;
                 sleepsecs(2);
                 return;
             }
