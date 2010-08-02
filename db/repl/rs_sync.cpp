@@ -84,7 +84,10 @@ namespace mongo {
                     /* if we have become primary, we dont' want to apply things from elsewhere
                         anymore. assumePrimary is in the db lock so we are safe as long as 
                         we check after we locked above. */
-                    if( box.getPrimary() != primary ) {
+					const Member *p1 = box.getPrimary();
+                    if( p1 != primary ) {
+					  log() << "replSet primary was:" << primary->fullName() << " now:" << 
+						(p1 != 0 ? p1->fullName() : "none") << rsLog;
                         throw DBException("primary changed",0);
                     }
 

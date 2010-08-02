@@ -22,6 +22,7 @@
 #include "../../util/mongoutils/str.h"
 #include "../dbhelpers.h"
 #include "rs_optime.h"
+#include "../oplog.h"
 
 namespace mongo {
 
@@ -75,9 +76,20 @@ namespace mongo {
         string errmsg;
         bob res;
         Client::Context ctx(rsoplog);
+		NamespaceDetails *d = nsdetails(rsoplog);
+
+		// temp
+		if( d && d->nrecords == 0 )
+		  return; // already empty, ok.
+
         dropCollection(rsoplog, errmsg, res);
-        log() << "replSet FATAL error during initial sync.  mongod restart required." << rsLog;
-        dbexit( EXIT_CLEAN );
+
+		log() << "replSet recreated oplog so it is empty.  todo optimize this..." << rsLog;
+		createOplog();
+
+      	// TEMP: restart to recreate empty oplog
+        //log() << "replSet FATAL error during initial sync.  mongod restart required." << rsLog;
+        //dbexit( EXIT_CLEAN );
 
         /*
         writelock lk(rsoplog);
@@ -166,6 +178,8 @@ namespace mongo {
             if( ! initialSyncOplogApplication(masterHostname, cp, startingTS, mvoptime) ) { 
                 log() << "replSet initial sync failed during applyoplog [1]" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
+				lastOpTimeWritten = OpTime();
+				lastH = 0;
                 log() << "replSet initial sync failed during applyoplog [2]" << rsLog;
                 {
                     writelock lk("local.");

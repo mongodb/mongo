@@ -102,14 +102,14 @@ for ( i =0; i<100; i++ )
     t.save( { _id : i } );
 for ( i=0; i<100; i++ ){
     t.find().batchSize( 2 ).next();
-    assert.lt( 0 , db.runCommand( "cursorInfo" ).total , "cursor1" );
+    assert.lt( 0 , db.runCommand( "cursorInfo" ).totalOpen , "cursor1" );
     gc();
 }
 
 for ( i=0; i<100; i++ ){
     gc();
 }
-assert.eq( 0 , db.runCommand( "cursorInfo" ).total , "cursor2" );
+assert.eq( 0 , db.runCommand( "cursorInfo" ).totalOpen , "cursor2" );
 
 print( "checkpoint E")
 
