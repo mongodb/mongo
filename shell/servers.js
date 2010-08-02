@@ -1101,6 +1101,7 @@ ReplSetTest.prototype.callIsMaster = function() {
         this.nodeIds[master] = i;
       }
       else {
+        this.nodes[i].setSlaveOk();
         this.liveNodes.slaves.push(this.nodes[i]);
         this.nodeIds[this.nodes[i]] = i;
       }

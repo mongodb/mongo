@@ -271,7 +271,8 @@ namespace mongo {
         bool inCapExtent( const DiskLoc &dl ) const;
         void cappedCheckMigrate();
         void cappedTruncateAfter(const char *ns, DiskLoc after, bool inclusive); /** remove rest of the capped collection from this point onward */
-
+        void emptyCappedCollection(const char *ns);
+        
         int capped;
 
         int max; // max # of objects for a capped table.  TODO: should this be 64 bit? 
@@ -463,7 +464,7 @@ namespace mongo {
         DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
 
         long long storageSize( int * numExtents = 0 );
-
+        
     private:
         DiskLoc _alloc(const char *ns, int len);
         void maybeComplain( const char *ns, int len ) const;

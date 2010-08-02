@@ -478,6 +478,12 @@ DB.prototype.forceError = function(){
 }
 
 DB.prototype.getLastError = function( w , wtimeout ){
+    var res = this.getLastErrorObj( w , wtimeout );
+    if ( ! res.ok )
+        throw "getlasterror failed: " + tojson( res );
+    return res.err;
+}
+DB.prototype.getLastErrorObj = function( w , wtimeout ){
     var cmd = { getlasterror : 1 };
     if ( w ){
         cmd.w = w;
@@ -485,12 +491,7 @@ DB.prototype.getLastError = function( w , wtimeout ){
             cmd.wtimeout = wtimeout;
     }
     var res = this.runCommand( cmd );
-    if ( ! res.ok )
-        throw "getlasterror failed: " + tojson( res );
-    return res.err;
-}
-DB.prototype.getLastErrorObj = function(){
-    var res = this.runCommand( { getlasterror : 1 } );
+
     if ( ! res.ok )
         throw "getlasterror failed: " + tojson( res );
     return res;
@@ -535,7 +536,7 @@ DB.prototype.toString = function(){
     return this._name;
 }
 
-DB.prototype.isMaster = function(){ return this.runCommand("isMaster");}
+DB.prototype.isMaster = function () { return this.runCommand("isMaster"); }
 
 DB.prototype.currentOp = function(){
     return db.$cmd.sys.inprog.findOne();

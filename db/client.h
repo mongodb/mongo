@@ -214,6 +214,8 @@ namespace mongo {
          */
         bool shutdown();
 
+        
+        /* this is for map/reduce writes */
         bool isGod() const { return _god; }
 
         friend class CurOp;

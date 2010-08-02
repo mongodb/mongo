@@ -216,6 +216,9 @@
     <ClCompile Include="..\mongo-server.cpp">
       <Filter>shell\generated_from_js</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\log.cpp">
+      <Filter>shared source files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\SConstruct" />
