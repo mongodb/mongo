@@ -55,7 +55,7 @@ namespace mongo {
 
         void query(const char *ns, const BSONObj& query) { 
             assert( !haveCursor() );
-            cursor = _conn->query(ns, query, 0, 0, 0, 0);
+            cursor = _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk);
         }
 
         void tailingQuery(const char *ns, const BSONObj& query) { 
