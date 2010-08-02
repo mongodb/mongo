@@ -649,9 +649,7 @@ namespace mongo {
                     _cc.reset();
                     massert( 13338, "cursor dropped during query", false );
                     // TODO maybe we want to prevent recording the winning plan as well?
-                } else {
-                    _c->checkLocation();
-                }
+                } 
             }
         }        
         

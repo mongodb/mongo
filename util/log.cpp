@@ -50,7 +50,7 @@ namespace mongo {
             // test path
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
             if ( ! test ){
-                cout << "can't open [" << lp << "] for log file" << endl;
+                cout << "can't open [" << lp << "] for log file: " << errnoWithDescription() << endl;
                 dbexit( EXIT_BADOPTIONS );
                 assert( 0 );
             }

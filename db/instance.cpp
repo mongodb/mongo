@@ -380,7 +380,7 @@ namespace mongo {
         int n = *x++;
         uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
         if ( n > 2000 ) {
-            problem() << "Assertion failure, receivedKillCursors, n=" << n << endl;
+            log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
             assert( n < 30000 );
         }
         killCursors(n, (long long *) x);
