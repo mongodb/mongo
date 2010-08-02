@@ -140,10 +140,10 @@ namespace mongo {
 
         //auto_ptr<DBClientCursor> u = us->query(rsoplog, q, 0, 0, &fields, 0, 0);
 
-	h.rbid = getRBID(them);
+        h.rbid = getRBID(them);
         auto_ptr<DBClientCursor> t = them->query(rsoplog, q, 0, 0, &fields, 0, 0);
 
-        if( !t->more() ) throw "remote oplog empty or unreadable";
+        if( t.get() == 0 || !t->more() ) throw "remote oplog empty or unreadable";
 
         BSONObj ourObj = u.current();
         OpTime ourTime = ourObj["ts"]._opTime();

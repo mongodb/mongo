@@ -387,7 +387,13 @@ namespace mongo {
                     
                     tablecell( ss , co.opNum() );
                     tablecell( ss , co.active() );
-                    tablecell( ss , co.getLockType() );
+                    {
+                        int lt = co.getLockType();
+                        if( lt == -1 ) tablecell(ss, "R");
+                        else if( lt == 1 ) tablecell(ss, "W");
+                        else
+                            tablecell( ss ,  lt);
+                    }
                     tablecell( ss , co.isWaitingForLock() );
                     if ( co.active() )
                         tablecell( ss , co.elapsedSeconds() );

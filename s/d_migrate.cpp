@@ -788,6 +788,7 @@ namespace mongo {
             { // 3. initial bulk clone
                 state = CLONE;
                 auto_ptr<DBClientCursor> cursor = conn->query( ns , Query().minKey( min ).maxKey( max ) , /* QueryOption_Exhaust */ 0 );
+                assert( cursor.get() );
                 while ( cursor->more() ){
                     BSONObj o = cursor->next();
                     {

@@ -87,6 +87,8 @@ namespace mongo {
         
         auto_ptr<DBClientCursor> cursor = 
             conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize == 0 ? 0 : _batchSize + skipLeft );
+
+        assert( cursor.get() );
         
         if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ){
             conn.done();

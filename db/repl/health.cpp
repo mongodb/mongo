@@ -28,6 +28,7 @@
 #include "../helpers/dblogger.h"
 #include "connections.h"
 #include "../../util/unittest.h"
+#include "../dbhelpers.h"
 
 namespace mongo {
     /* decls for connections.h */
@@ -63,7 +64,7 @@ namespace mongo {
         return s.str();
     }
 
-    void Member::summarizeAsHtml(stringstream& s) const { 
+    void Member::summarizeMember(stringstream& s) const { 
         s << tr();
         {
             stringstream u;
@@ -184,6 +185,10 @@ namespace mongo {
         ScopedConn conn(m->fullName());        
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
+        if( c.get() == 0 ) { 
+            ss << "couldn't query " << rsoplog;
+            return;
+        }
         static const char *h[] = {"ts","optime", "h","op","ns","rest",0};
 
         ss << "<style type=\"text/css\" media=\"screen\">"
@@ -211,6 +216,10 @@ namespace mongo {
         }
         else { 
             auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
+            if( c.get() == 0 ) { 
+                ss << "couldn't query [2] " << rsoplog;
+                return;
+            }
             string x;
             bo o = c->next();
             otEnd = o["ts"]._opTime();
@@ -290,7 +299,7 @@ namespace mongo {
         Member *m = head();
         while( m ) {
 			stringstream s;
-            m->summarizeAsHtml(s);
+            m->summarizeMember(s);
 			mp[m->hbinfo().id()] = s.str();
             m = m->next();
         }
@@ -298,6 +307,20 @@ namespace mongo {
         for( map<int,string>::const_iterator i = mp.begin(); i != mp.end(); i++ )
             s << i->second;
         s << _table();
+
+        try {
+            readlocktry lk("local.replset.minvalid", 300);
+            if( lk.got() ) {
+                BSONObj mv;
+                if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
+                    s << p( str::stream() << "minvalid: " << mv["ts"]._opTime().toString() );
+                }
+            }
+            else s << p(".");
+        }
+        catch(...) { 
+            s << p("exception fetching minvalid?");
+        }
     }
 
 

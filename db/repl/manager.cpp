@@ -48,7 +48,7 @@ namespace mongo {
     task::Server("rs Manager"), rs(_rs), busyWithElectSelf(false), _primary(NOPRIMARY)
     { 
     }
-
+    
     Manager::~Manager() { 
         log() << "should never be called?" << rsLog;
         rs->mgr = 0;
