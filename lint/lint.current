@@ -31,17 +31,17 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1067  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1068  Info 740: Unusual pointer cast (incompatible indirect
     types)
                               _
 #... S((WT_OFF *)((cip)->data))
 	WT_COL_OFF_RECORDS(cip) += incr;
-../btree/bt_bulk.c  1239  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1241  Info 740: Unusual pointer cast (incompatible indirect
     types)
                               _
 #... WT_ITEM_BYTE((rip)->data))
 	WT_ROW_OFF_RECORDS(rip) += incr;
-../btree/bt_bulk.c  1256  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1258  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_close.c (C)
@@ -49,14 +49,6 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_cmp.c (C)
 
 --- Module:   ../btree/bt_debug.c (C)
-                                                                        _
-		    (u_long)off->addr, (u_long)off->size, WT_RECORDS(off));
-../btree/bt_debug.c  427  Info 740: Unusual pointer cast (incompatible indirect
-    types)
-                                                             _
-		    (u_long)off->size, (u_quad)WT_RECORDS(off));
-../btree/bt_debug.c  454  Info 740: Unusual pointer cast (incompatible indirect
-    types)
 
 --- Module:   ../btree/bt_desc.c (C)
 
@@ -104,11 +96,6 @@ _
 }
 ../btree/bt_reconcile.c  172  Warning 550: Symbol 'rp' (line 168) not accessed
 ../btree/bt_reconcile.c  168  Info 830: Location cited in prior message
-                                          _
-		if (len > new->space_avail) {
-../btree/bt_reconcile.c  482  Warning 644: Variable 'len' (line 433) may not
-    have been initialized
-../btree/bt_reconcile.c  433  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_ret.c (C)
                                              _
@@ -326,15 +313,12 @@ _
 #...  ((ret = (__wt_calloc_func(env, 1 << huffman->max_depth, sizeof(WT_STATIC_
 	    sizeof(WT_STATIC_HUFFMAN_NODE), &huffman->nodes));
 ../support/huffman.c  325  Info 701: Shift left of signed quantity (int)
-                                                       _
-		for (i = 0, n = 1 << huffman->max_depth; i < n; ++i) {
-../support/huffman.c  385  Info 701: Shift left of signed quantity (int)
                                    _
 	n = 1 << huffman->max_depth;
-../support/huffman.c  459  Info 701: Shift left of signed quantity (int)
+../support/huffman.c  460  Info 701: Shift left of signed quantity (int)
                                              _
 		mask = (u_int8_t)(1 << bitpos);
-../support/huffman.c  568  Info 701: Shift left of signed quantity (int)
+../support/huffman.c  569  Info 701: Shift left of signed quantity (int)
 
 --- Module:   ../support/pow.c (C)
 
