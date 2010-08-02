@@ -56,10 +56,18 @@ doTest = function (signal) {
         dbs[0].bar.insert({ x: "foo" + i, y: "bar" + i, z: i, w: "biz baz bar boo" });
     }
 
+    var status;
+    do {
+        sleep(1000);
+        status = dbs[0].getSisterDB("admin").runCommand({replSetGetStatus : 1});
+    } while(status.members[1].state != 2 && status.members[2].state != 2);
+
     print("\nsync1.js ********************************************************************** part 6");
     dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: true });
 
     print("\nsync1.js ********************************************************************** part 7");
+
+    sleep(5000);
 
     // yay! there are out-of-date nodes
     var max1;
