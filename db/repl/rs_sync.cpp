@@ -67,12 +67,17 @@ namespace mongo {
             r.query(rsoplog, bo());
             assert( r.haveCursor() );
 
+            /* we lock outside the loop to avoid the overhead of locking on every operation.  server isn't usable yet anyway! */
+            writelock lk("");
+
+            // todo add status updates...
+
             while( 1 ) { 
                 if( !r.more() )
                     break;
                 BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
                 {
-                    writelock lk("");
+                    //writelock lk("");
 
                     ts = o["ts"]._opTime();
 
