@@ -504,11 +504,11 @@ static int
 __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
-	enum { KEY_ON_PAGE, KEY_OFF_PAGE, KEY_NONE } key_loc;
+	enum { KEY_ON_PAGE, KEY_NONE } key_loc;
 	DB *db;
 	DBT *key, key_dbt, *data, data_dbt;
-	WT_ITEM key_item, data_item;
-	WT_OVFL key_ovfl, data_ovfl;
+	WT_ITEM key_item, data_item, *item;
+	WT_OVFL data_ovfl;
 	WT_PAGE_HDR *hdr;
 	WT_ROW *rip;
 	WT_REPL *repl;
@@ -528,8 +528,36 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	/*
 	 * Walk the page, accumulating key/data groups (groups, because a key
 	 * can reference a duplicate data set).
+	 *
+	 * We have to walk both the WT_ROW structures as well as the original
+	 * page: the problem is keys that require processing.  When a page is
+	 * read into memory from a simple database, the WT_ROW key/size pair
+	 * is set to reference an on-page group of bytes in the key's WT_ITEM
+	 * structure.  As Btree keys are immutable, that original WT_ITEM is
+	 * usually what we want to write, and we can pretty easily find it by
+	 * moving to immediately before the on-page key.
+	 *
+	 * Keys that require processing are harder (for example, a Huffman
+	 * encoded key).  When we have to use a key that requires processing,
+	 * we process the key and set the WT_ROW key/size pair to reference
+	 * the allocated memory that holds the key.  At that point we've lost
+	 * any reference to the original WT_ITEM structure, which is what we
+	 * want to re-write when reconciling the page.  We don't want to make
+	 * the WT_ROW structure bigger by another sizeof(void *) bytes, so we
+	 * walk the original page at the same time we walk the WT_PAGE array
+	 * when reconciling the page so we can find the original WT_ITEM.
 	 */
+	item = NULL;
 	WT_INDX_FOREACH(page, rip, i) {
+		/* Move to the next key on the original page. */
+		if (item == NULL)
+			item = (WT_ITEM *)WT_PAGE_BYTE(page);
+		else
+			do {
+				item = WT_ITEM_NEXT(item);
+			} while (WT_ITEM_TYPE(item) != WT_ITEM_KEY &&
+			    WT_ITEM_TYPE(item) != WT_ITEM_KEY_OVFL);
+
 		/*
 		 * Get a reference to the data.  We get the data first because
 		 * it may have been deleted, in which case we ignore the pair.
@@ -579,54 +607,15 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			else
 				WT_ITEM_TYPE_SET(&data_item, type);
 			key_loc = KEY_NONE;
-		} else if (WT_KEY_PROCESS(rip)) {
-			/*
-			 * If the page's key required processing, but was never
-			 * processed, rip->key points to the WT_ITEM structure,
-			 * and we can copy it directly from the original page..
-			 */
-onpage:			key->data = rip->key;
-			key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->key));
-			key_loc = KEY_ON_PAGE;
-		} else if (WT_ROW_KEY_ON_PAGE(page, rip)) {
-			/*
-			 * If the key is on the original page, we can find the
-			 * original WT_ITEM structure (messy, but we'd rather
-			 * not build a new WT_ITEM structure, that's slow).
-			 * This test comes after the WT_KEY_PROCESS test because
-			 * keys requiring processing will return true for being
-			 * "on the page".
-			 */
-			rip->key = (u_int8_t *)rip->key - sizeof(WT_ITEM);
-			goto onpage;
 		} else {
-			/*
-			 * We're left with keys that required processing and
-			 * which were processed, and so point to allocated
-			 * memory somewhere.   Since Btree keys are immutable,
-			 * we know the right WT_ITEM structure is somewhere on
-			 * the page, but we don't know where.  Instead, build
-			 * a complete new WT_ITEM structure, which is slow (for
-			 * example, overflow, Huffman-encoded keys).  Possible
-			 * alternatives might be to (1) walk the original page
-			 * at the same time we walk the in-memory page to find
-			 * the original WT_ITEM structures, or (2) whenever we
-			 * process a key, save a reference to the original
-			 * WT_ITEM structure somewhere (but preferably without
-			 * growing the WT_ROW structure to do so).
-			 */
-			key->data = rip->key;
-			key->size = rip->size;
-			WT_RET(__wt_bt_build_key_item(
-			    toc, key, &key_item, &key_ovfl));
-			key_loc = KEY_OFF_PAGE;
+			/* Take the key's WT_ITEM from the original page. */
+			key->data = item;
+			key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item));
+			key_loc = KEY_ON_PAGE;
 		}
 
 		len = 0;
 		switch (key_loc) {
-		case KEY_OFF_PAGE:
-			len = WT_ITEM_SPACE_REQ(key->size);
-			break;
 		case KEY_ON_PAGE:
 			len = key->size;
 			break;
@@ -651,14 +640,6 @@ onpage:			key->data = rip->key;
 			memcpy(new->first_free, key->data, key->size);
 			new->first_free += key->size;
 			new->space_avail -= key->size;
-			++hdr->u.entries;
-			break;
-		case KEY_OFF_PAGE:
-			memcpy(new->first_free, &key_item, sizeof(key_item));
-			memcpy(new->first_free +
-			    sizeof(WT_ITEM), key->data, key->size);
-			new->first_free += WT_ITEM_SPACE_REQ(key->size);
-			new->space_avail -= WT_ITEM_SPACE_REQ(key->size);
 			++hdr->u.entries;
 			break;
 		case KEY_NONE:
