@@ -162,12 +162,14 @@ namespace mongo {
     }
 
     // uses ISO 8601 dates without trailing Z
-    inline string terseCurrentTime(){
+    // colonsOk should be false when creating filenames
+    inline string terseCurrentTime(bool colonsOk=true){
         struct tm t;
         time_t_to_Struct( time(0) , &t );
 
+        const char* fmt = (colonsOk ? "%Y-%m-%dT%H:%M:%S" : "%Y-%m-%dT%H-%M-%S");
         char buf[32];
-        assert(strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &t) == 19);
+        assert(strftime(buf, sizeof(buf), fmt, &t) == 19);
         return buf;
     }
 
