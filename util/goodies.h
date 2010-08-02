@@ -161,23 +161,14 @@ namespace mongo {
 #endif
     }
 
-    inline void terseCurrentTime( stringstream& ss , bool seconds = false ){
+    // uses ISO 8601 dates without trailing Z
+    inline string terseCurrentTime(){
         struct tm t;
         time_t_to_Struct( time(0) , &t );
 
-        ss
-            << ( 1900 + t.tm_year ) << "-" << ( 1 + t.tm_mon ) << "-" << t.tm_mday 
-            << "_"
-            << t.tm_hour << "-" << t.tm_min;
-        
-        if ( seconds )
-            ss << "-" << t.tm_sec;
-    }
-
-    inline string terseCurrentTime(){
-        stringstream ss;
-        terseCurrentTime(ss);
-        return ss.str();
+        char buf[32];
+        assert(strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &t) == 19);
+        return buf;
     }
 
 #define MONGO_asctime _asctime_not_threadsafe_
