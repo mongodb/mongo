@@ -360,9 +360,10 @@ namespace mongo {
             if( replSet ) {
                 if( theReplSet == 0 ) { 
                     result.append("ismaster", false);
+                    result.append("secondary", false);
                     errmsg = "replSet still trying to initialize";
                     result.append("info", ReplSet::startupStatusMsg);
-                    return false;
+                    return true;
                 }
                 theReplSet->fillIsMaster(result);
                 return true;

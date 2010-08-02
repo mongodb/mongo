@@ -74,9 +74,10 @@ namespace mongo {
             }
 
             assert( cursor );
-            cursor->init();
 
             try {
+                cursor->init();
+
                 log(5) << "   cursor type: " << cursor->type() << endl;
                 shardedCursorTypes.hit( cursor->type() );
             
