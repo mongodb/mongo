@@ -618,7 +618,13 @@ namespace mongo {
     }
 
     bool QueryPlanSet::Runner::prepareToYield( QueryOp &op ) {
-        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { return op.prepareToYield(); } );
+        GUARD_OP_EXCEPTION( op,
+                           if ( op.error() ) {
+                               return true;
+                           } else {
+                               return op.prepareToYield();
+                           } );
+        return true;
     }
 
     void QueryPlanSet::Runner::recoverFromYield( QueryOp &op ) {
