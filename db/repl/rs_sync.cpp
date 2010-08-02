@@ -49,6 +49,63 @@ namespace mongo {
         applyOperation_inlock(o);
     }
 
+    bool ReplSetImpl::initialSyncOplogApplication(
+        string hn, 
+        const Member *primary,
+        OpTime applyGTE,
+        OpTime minValid)
+    { 
+        if( primary == 0 ) return false;
+        OpTime ts;
+        try {
+            OplogReader r;
+            if( !r.connect(hn) ) { 
+                log(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
+                return false;
+            }
+
+            r.query(rsoplog, bo());
+            assert( r.haveCursor() );
+
+            /* we lock outside the loop to avoid the overhead of locking on every operation.  server isn't usable yet anyway! */
+            writelock lk("");
+
+            // todo add status updates...
+
+            while( 1 ) { 
+                if( !r.more() )
+                    break;
+                BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
+                {
+                    //writelock lk("");
+
+                    ts = o["ts"]._opTime();
+
+                    /* if we have become primary, we dont' want to apply things from elsewhere
+                        anymore. assumePrimary is in the db lock so we are safe as long as 
+                        we check after we locked above. */
+                    if( box.getPrimary() != primary ) {
+                        throw DBException("primary changed",0);
+                    }
+
+                    if( ts >= applyGTE ) {
+                        // optimes before we started copying need not be applied.
+                        syncApply(o);
+                    }
+                    _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */
+                }
+            }
+        }
+        catch(DBException& e) { 
+            if( ts <= minValid ) {
+                // didn't make it far enough
+                log() << "replSet initial sync failing, error applying oplog " << e.toString() << rsLog;
+                return false;
+            }
+        }
+        return true;
+    }
+
     void ReplSetImpl::syncTail() { 
         // todo : locking vis a vis the mgr...
 
@@ -141,12 +198,12 @@ namespace mongo {
                     if( state().recovering() ) { 
                         /* can we go to RS_SECONDARY state?  we can if not too old and if minvalid achieved */
                         bool golive = false;			
-			OpTime minvalid;
+                        OpTime minvalid;
                         {
                             readlock lk("local.replset.minvalid");
-			    BSONObj mv;
+                            BSONObj mv;
                             if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
-			        minvalid = mv["ts"]._opTime();
+                                minvalid = mv["ts"]._opTime();
                                 if( minvalid <= lastOpTimeWritten ) { 
                                     golive=true;
                                 }
@@ -160,8 +217,8 @@ namespace mongo {
                             changeState(MemberState::RS_SECONDARY);
                         }
                         else { 
-			    sethbmsg(str::stream() << "still syncing, not yet to minValid optime " << minvalid.toString());
-			    //log() << "TEMP " << lastOpTimeWritten.toString() << rsLog;
+                            sethbmsg(str::stream() << "still syncing, not yet to minValid optime " << minvalid.toString());
+                            //log() << "TEMP " << lastOpTimeWritten.toString() << rsLog;
                         }
 
                         /* todo: too stale capability */
