@@ -168,12 +168,12 @@ format:		fprintf(stderr,
 	if (strcmp(opt, "leafmin") == 0) {
 		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
 			return (ret);
-		return (db->btree_pagesize_set(db, a, v, c, d, e));
+		return (db->btree_pagesize_set(db, a, b, c, v, e));
 	}
 	if (strcmp(opt, "leafmax") == 0) {
 		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
 			return (ret);
-		return (db->btree_pagesize_set(db, a, b, v, d, e));
+		return (db->btree_pagesize_set(db, a, b, c, d, v));
 	}
 
 	fprintf(stderr,
