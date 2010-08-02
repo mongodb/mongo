@@ -111,7 +111,7 @@ namespace mongo {
 
         virtual bool mayRecordPlan() const = 0;
         
-        virtual void prepareToYield() { massert( 13335, "yield not supported", false ); }
+        virtual bool prepareToYield() { massert( 13335, "yield not supported", false ); return false; }
         virtual void recoverFromYield() { massert( 13336, "yield not supported", false ); }
         
         /** @return a copy of the inheriting class, which will be run with its own
@@ -211,7 +211,7 @@ namespace mongo {
             QueryPlanSet &plans_;
             static void initOp( QueryOp &op );
             static void nextOp( QueryOp &op );
-            static void prepareToYield( QueryOp &op );
+            static bool prepareToYield( QueryOp &op );
             static void recoverFromYield( QueryOp &op );
         };
         const char *ns;

@@ -735,11 +735,11 @@ namespace mongo {
                 setComplete();
             }
         }
-        virtual void prepareToYield() {
+        virtual bool prepareToYield() {
             if ( ! _cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
             }
-            _cc->prepareToYield( _yieldData );
+            return _cc->prepareToYield( _yieldData );
         }        
         virtual void recoverFromYield() {
             if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
