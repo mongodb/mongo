@@ -49,12 +49,18 @@ wiredtiger_simple_setup(
 	}
 	if ((ret = env->db(env, 0, &db)) != 0) {
 		env->err(env, ret, "%s: Env.db", progname);
-err:		wiredtiger_simple_teardown(progname, db);
-		return (ret);
+		goto err;
+	}
+	if ((ret = db->errpfx_set(db, progname)) != 0) {
+		db->err(db, ret, "%s: Db.errpfx_set", progname);
+		goto err;
 	}
 
 	*dbp = db;
 	return (EXIT_SUCCESS);
+
+err:	wiredtiger_simple_teardown(progname, db);
+	return (ret);
 }
 
 /*
