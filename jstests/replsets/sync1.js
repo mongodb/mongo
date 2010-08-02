@@ -56,14 +56,23 @@ doTest = function (signal) {
         dbs[0].bar.insert({ x: "foo" + i, y: "bar" + i, z: i, w: "biz baz bar boo" });
     }
 
+    var status;
+    do {
+        sleep(1000);
+        status = dbs[0].getSisterDB("admin").runCommand({replSetGetStatus : 1});
+    } while(status.members[1].state != 2 && status.members[2].state != 2);
+
     print("\nsync1.js ********************************************************************** part 6");
     dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: true });
 
     print("\nsync1.js ********************************************************************** part 7");
 
+    sleep(5000);
+
     // yay! there are out-of-date nodes
     var max1;
     var max2;
+    var count = 0;
     while( 1 ) {
 	try {
 	    max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
@@ -72,6 +81,10 @@ doTest = function (signal) {
 	catch(e) { 
 	    print("\nsync1.js couldn't get max1/max2; retrying " + e);
 	    sleep(2000);
+            count++;
+            if (count == 50) {
+                assert(false, "errored out 50 times");
+            }
 	    continue;
 	}
 	break;
@@ -79,7 +92,7 @@ doTest = function (signal) {
 
     print("\nsync1.js ********************************************************************** part 8");
 
-    if (max1.z == inserts && max2.z == inserts) {
+    if (max1.z == (inserts-1) && max2.z == (inserts-1)) {
         print("\nsync1.js try increasing # if inserts and running again");
         replTest.stopSet(signal);
         return;
@@ -97,7 +110,7 @@ doTest = function (signal) {
     assert(newMaster + "" != master + "", "new master is " + newMaster + ", old master was " + master);
     print("\nsync1.js new master is " + newMaster + ", old master was " + master);
 
-    var count = 0;
+    count = 0;
     do {
 	try {
 	    max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();

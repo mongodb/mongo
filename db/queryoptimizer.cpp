@@ -511,7 +511,9 @@ namespace mongo {
                 int micros = ClientCursor::yieldSuggest();
                 if ( micros > 0 ) {
                     for( vector< shared_ptr< QueryOp > >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
-                        prepareToYield( **i );
+                        if ( !prepareToYield( **i ) ) {
+                            return;
+                        }
                     }
                     ClientCursor::staticYield( micros );
                     for( vector< shared_ptr< QueryOp > >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
@@ -615,8 +617,8 @@ namespace mongo {
         GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.next(); } );
     }
 
-    void QueryPlanSet::Runner::prepareToYield( QueryOp &op ) {
-        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.prepareToYield(); } );
+    bool QueryPlanSet::Runner::prepareToYield( QueryOp &op ) {
+        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { return op.prepareToYield(); } );
     }
 
     void QueryPlanSet::Runner::recoverFromYield( QueryOp &op ) {

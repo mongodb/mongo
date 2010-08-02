@@ -130,10 +130,11 @@ namespace mongo {
                 }
             }                
         }     
-        void prepareToYield() {
+        bool prepareToYield() {
             if ( _findingStartCursor ) {
-                _findingStartCursor->prepareToYield( _yieldData );
+                return _findingStartCursor->prepareToYield( _yieldData );
             }
+            return true;
         }
         void recoverFromYield() {
             if ( _findingStartCursor ) {

@@ -62,11 +62,11 @@ namespace mongo {
         virtual void _init() {
             c_ = qp().newCursor();
         }
-        virtual void prepareToYield() {
+        virtual bool prepareToYield() {
             if ( ! _cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , qp().ns() ) );
             }
-            _cc->prepareToYield( _yieldData );
+            return _cc->prepareToYield( _yieldData );
         }        
         virtual void recoverFromYield() {
             if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
@@ -406,11 +406,11 @@ namespace mongo {
             }
         }
 
-        virtual void prepareToYield() {
+        virtual bool prepareToYield() {
             if ( ! _cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , _ns.c_str() ) );
             }
-            _cc->prepareToYield( _yieldData );
+            return _cc->prepareToYield( _yieldData );
         }
         
         virtual void recoverFromYield() {
@@ -630,14 +630,14 @@ namespace mongo {
             }
         }
         
-        virtual void prepareToYield() {
+        virtual bool prepareToYield() {
             if ( _findingStartCursor.get() ) {
-                _findingStartCursor->prepareToYield();
+                return _findingStartCursor->prepareToYield();
             } else {
                 if ( ! _cc ) {
                     _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , _pq.ns() ) );
                 }
-                _cc->prepareToYield( _yieldData );
+                return _cc->prepareToYield( _yieldData );
             }
         }
         

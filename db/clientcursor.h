@@ -195,7 +195,7 @@ namespace mongo {
         static void staticYield( int micros );
         
         struct YieldData { CursorId _id; bool _doingDeletes; };
-        void prepareToYield( YieldData &data );
+        bool prepareToYield( YieldData &data );
         static bool recoverFromYield( const YieldData &data );
 
         struct YieldLock : boost::noncopyable {
