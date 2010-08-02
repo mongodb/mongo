@@ -203,6 +203,7 @@ namespace mongo {
                 : _canYield(cc->c->supportYields()) {
                 if ( _canYield ){
                     cc->prepareToYield( _data );
+                    _unlock.reset(new dbtempreleasecond());
                 }
             }
             ~YieldLock(){
@@ -222,8 +223,7 @@ namespace mongo {
             }
 
             void relock(){
-                if ( _canYield )
-                    _unlock.reset();
+                _unlock.reset();
             }
             
         private:
