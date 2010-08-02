@@ -78,6 +78,8 @@ namespace mongo {
                 if ( _le ){
                     _prev = _le->disabled;
                     _le->disabled = true;
+                } else {
+                    _prev = false;
                 }
             }
             

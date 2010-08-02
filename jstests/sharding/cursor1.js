@@ -53,9 +53,10 @@ assert.eq( 1 , before.totalOpen , "TX1" )
 sleep( 6000 )
 assert( cur.next() , "T3" )
 assert( cur.next() , "T4" );
-sleep( 18000 )
+sleep( 22000 )
 assert.throws( function(){ cur.next(); } , "T5" )
 after = db.runCommand( { "cursorInfo" : 1 , "setTimeout" : 10000 } ) // 10 seconds
+gc(); gc()
 assert.eq( 0 , after.totalOpen , "TX2" )
 
 s.stop()
