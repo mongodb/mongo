@@ -35,7 +35,7 @@ main(int argc, char *argv[])
 			return (EXIT_SUCCESS);
 		case '?':
 		default:
-			usage();
+			return (usage());
 		}
 	argc -= optind;
 	argv += optind;
