@@ -197,8 +197,7 @@ namespace mongo {
 
         DistributedLock lockSetup( ConnectionString( modelServer() , ConnectionString::SYNC ) , getns() );
         dist_lock_try dlk( &lockSetup , string("split-") + toString() );
-        if ( ! dlk.got() )
-            throw UserException( 10166 , "locking namespace failed" );
+        uassert( 10166 , "locking namespace failed" , dlk.got() );
         
         {
             ShardChunkVersion onServer = getVersionOnConfigServer();
@@ -334,6 +333,7 @@ namespace mongo {
     }
     
     bool Chunk::splitIfShould( long dataWritten ){
+        LastError::Disabled d( lastError.get() );
         try {
             return _splitIfShould( dataWritten );
         }
