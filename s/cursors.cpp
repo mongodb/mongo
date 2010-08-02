@@ -175,7 +175,7 @@ namespace mongo {
         scoped_lock lk( _mutex );
         result.append( "sharded" , (int)_cursors.size() );
         result.append( "refs" , (int)_refs.size() );
-        result.append( "total" , (int)(_cursors.size() + _refs.size() ) );
+        result.append( "totalOpen" , (int)(_cursors.size() + _refs.size() ) );
     }
 
     CursorCache cursorCache;
