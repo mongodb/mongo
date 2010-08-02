@@ -131,7 +131,7 @@ namespace mongo {
                 assert( logpath.size() );
                 if ( logpath[0] != '/' ){
                     char temp[256];
-                    getcwd( temp , 256 );
+                    assert( getcwd( temp , 256 ) );
                     logpath = (string)temp + "/" + logpath;
                 }
                 FILE * test = fopen( logpath.c_str() , "a" );
