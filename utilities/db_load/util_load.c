@@ -14,9 +14,15 @@ const char *progname;
 
 int	bulk_callback(DB *, DBT **, DBT **);
 int	bulk_read(DBT *dbt, int);
-int	config(DB *, char *);
-int	config_process(DB *, char **);
+int	config_read(char **);
+int	config_read_single(char *);
+int	config_set(DB *);
 int	usage(void);
+
+struct {
+	int pagesize_set;
+	u_long allocsize, intlmin, intlmax, leafmin, leafmax;
+} config;
 
 int
 main(int argc, char *argv[])
@@ -63,7 +69,7 @@ main(int argc, char *argv[])
 			break;
 		case '?':
 		default:
-			usage();
+			return (usage());
 		}
 	argc -= optind;
 	argv += optind;
@@ -71,6 +77,13 @@ main(int argc, char *argv[])
 	/* The remaining argument is the database name. */
 	if (argc != 1)
 		return (usage());
+
+	/*
+	 * Read through the command-line configuration options and convert
+	 * to the config structure.
+	 */
+	if (config_read(config_list) != 0)
+		goto err;
 
 	/*
 	 * Right now, we only support text input -- require the T option to
@@ -83,21 +96,19 @@ main(int argc, char *argv[])
 	}
 
 	if ((ret = wiredtiger_simple_setup(progname, &db, 0, 0)) == 0) {
-		if (config_process(db, config_list) != 0)
+		if (config_set(db) != 0)
 			goto err;
 
 		(void)remove(*argv);
 
 		if ((ret = db->open(db, *argv, 0600, WT_CREATE)) != 0) {
-			fprintf(stderr, "%s: Db.open: %s: %s\n",
-			    progname, *argv, wiredtiger_strerror(ret));
+			db->err(db, ret, "Db.open: %s", *argv);
 			goto err;
 		}
 
 		if ((ret = db->bulk_load(db, WT_DUPLICATES,
 		    verbose ? __wt_progress : NULL, bulk_callback)) != 0) {
-			fprintf(stderr, "%s: Db.bulk_load: %s\n",
-			    progname, wiredtiger_strerror(ret));
+			db->err(db, ret, "Db.bulk_load");
 			goto err;
 		}
 		if (verbose)
@@ -113,30 +124,29 @@ err:		ret = 1;
 }
 
 /*
- * config_process --
- *	Process command-line configuration options.
+ * config_read --
+ *	Convert command-line options into the config structure.
  */
 int
-config_process(DB *db, char **list)
+config_read(char **list)
 {
 	int ret;
 
 	for (; *list != NULL; ++list)
-		if ((ret = config(db, *list)) != 0)
+		if ((ret = config_read_single(*list)) != 0)
 			return (ret);
 	return (0);
 }
 
 /*
- * config --
- *	Process a single command-line configuration option.
+ * config_read_single --
+ *	Process a single command-line configuration option, converting it into
+ *	the config structure.
  */
 int
-config(DB *db, char *opt)
+config_read_single(char *opt)
 {
-	u_int32_t a, b, c, d, e;
 	u_long v;
-	int ret;
 	char *p, *ep;
 
 	/* Get pointers to the two parts of an X=Y format string. */
@@ -148,37 +158,73 @@ config(DB *db, char *opt)
 format:		fprintf(stderr,
 		    "%s: -c option %s is not correctly formatted\n",
 		    progname, opt);
-		return (EXIT_FAILURE);
+		return (1);
 	}
 	if (strcmp(opt, "allocsize") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
-			return (ret);
-		return (db->btree_pagesize_set(db, v, b, c, d, e));
+		config.allocsize = v;
+		config.pagesize_set = 1;
+		return (0);
 	}
 	if (strcmp(opt, "intlmin") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
-			return (ret);
-		return (db->btree_pagesize_set(db, a, v, c, d, e));
+		config.intlmin = v;
+		config.pagesize_set = 1;
+		return (0);
 	}
 	if (strcmp(opt, "intlmax") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
-			return (ret);
-		return (db->btree_pagesize_set(db, a, b, v, d, e));
+		config.intlmax = v;
+		config.pagesize_set = 1;
+		return (0);
 	}
 	if (strcmp(opt, "leafmin") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
-			return (ret);
-		return (db->btree_pagesize_set(db, a, b, c, v, e));
+		config.leafmin = v;
+		config.pagesize_set = 1;
+		return (0);
 	}
 	if (strcmp(opt, "leafmax") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
-			return (ret);
-		return (db->btree_pagesize_set(db, a, b, c, d, v));
+		config.leafmax = v;
+		config.pagesize_set = 1;
+		return (0);
 	}
 
 	fprintf(stderr,
 	    "%s: -c option %s has an unknown keyword\n", progname, opt);
-	return (EXIT_FAILURE);
+	return (1);
+}
+
+/*
+ * config_set --
+ *	Set the command-line configuration options on the database handle.
+ */
+int
+config_set(DB *db)
+{
+	u_int32_t allocsize, intlmin, intlmax, leafmin, leafmax;
+	int ret;
+
+	if (config.pagesize_set) {
+		if ((ret = db->btree_pagesize_get(db,
+		    &allocsize, &intlmin, &intlmax, &leafmin, &leafmax)) != 0) {
+			db->err(db, ret, "Db.btree_pagesize_get");
+			return (1);
+		}
+		if (config.allocsize != 0)
+			allocsize = config.allocsize;
+		if (config.intlmin != 0)
+			intlmin = config.intlmin;
+		if (config.intlmax != 0)
+			intlmax = config.intlmax;
+		if (config.leafmin != 0)
+			leafmin = config.leafmin;
+		if (config.leafmax != 0)
+			leafmax = config.leafmax;
+		if ((ret = db->btree_pagesize_set(db,
+		    allocsize, intlmin, intlmax, leafmin, leafmax)) != 0) {
+			db->err(db, ret, "Db.btree_pagesize_set");
+			return (1);
+		}
+	}
+
+	return (0);
 }
 
 /*
