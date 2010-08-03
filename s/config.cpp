@@ -431,11 +431,95 @@ namespace mongo {
             if ( ! ok )
                 return false;
         }
+
+        _config = configHosts;
         
         string fullString;
         joinStringDelim( configHosts, &fullString, ',' );
         _primary.setAddress( fullString , true );
         log(1) << " config string : " << fullString << endl;
+
+        return true;
+    }
+
+    bool ConfigServer::checkConfigServersConsistent( string& errmsg , int tries ) const {
+        if ( _config.size() == 1 )
+            return true;
+        
+        if ( tries <= 0 )
+            return false;
+        
+        unsigned firstGood = 0;
+        int up = 0;
+        vector<BSONObj> res;
+        for ( unsigned i=0; i<_config.size(); i++ ){
+            BSONObj x;
+            try {
+                ScopedDbConnection conn( _config[i] );
+                if ( ! conn->simpleCommand( "config" , &x , "dbhash" ) )
+                    x = BSONObj();
+                else {
+                    x = x.getOwned();
+                    if ( up == 0 )
+                        firstGood = i;
+                    up++;
+                }
+                conn.done();
+            }
+            catch ( std::exception& e ){
+                log(LL_WARNING) << " couldn't check on config server:" << _config[i] << " ok for now" << endl;
+            }
+            res.push_back(x);
+        }
+
+        if ( up == 0 ){
+            errmsg = "no config servers reachable";
+            return false;
+        }
+
+        if ( up == 1 ){
+            log( LL_WARNING ) << "only 1 config server reachable, continuing" << endl;
+            return true;
+        }
+
+        BSONObj base = res[firstGood];
+        for ( unsigned i=firstGood+1; i<res.size(); i++ ){
+            if ( res[i].isEmpty() )
+                continue;
+
+            string c1 = base.getFieldDotted( "collections.chunks" );
+            string c2 = res[i].getFieldDotted( "collections.chunks" );
+            
+            string d1 = base.getFieldDotted( "collections.databases" );
+            string d2 = res[i].getFieldDotted( "collections.databases" );
+
+            if ( c1 == c2 && d1 == d2 )
+                continue;
+            
+            stringstream ss;
+            ss << "config servers " << _config[firstGood] << " and " << _config[i] << " differ";
+            log( LL_WARNING ) << ss.str();
+            if ( tries <= 1 ){
+                ss << "\n" << c1 << "\t" << c2 << "\n" << d1 << "\t" << d2;
+                errmsg = ss.str();
+                return false;
+            }
+            
+            return checkConfigServersConsistent( errmsg , tries - 1 );
+        }
+        
+        return true;
+    }
+
+    bool ConfigServer::ok( bool checkConsistency ){
+        if ( ! _primary.ok() )
+            return false;
+        
+        string errmsg;
+        if ( ! checkConfigServersConsistent( errmsg ) ){
+            log( LL_ERROR ) << "config servers not in sync! " << errmsg << endl;
+            return false;
+        }
         
         return true;
     }
@@ -513,10 +597,15 @@ namespace mongo {
         
         
         // indexes
-        conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "min" << 1 ) , true );
-        conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "shard" << 1 << "min" << 1 ) , true );
-        conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "lastmod" << 1 ) , true );
-        conn->ensureIndex( ShardNS::shard , BSON( "host" << 1 ) , true );
+        try {
+            conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "min" << 1 ) , true );
+            conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "shard" << 1 << "min" << 1 ) , true );
+            conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "lastmod" << 1 ) , true );
+            conn->ensureIndex( ShardNS::shard , BSON( "host" << 1 ) , true );
+        }
+        catch ( std::exception& e ){
+            log( LL_WARNING ) << "couldn't create indexes on config db: " << e.what() << endl;
+        }
 
         conn.done();
     }

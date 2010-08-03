@@ -260,7 +260,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 7;
     }
     
-    if ( ! configServer.ok() ){
+    if ( ! configServer.ok( true ) ){
         cout << "configServer startup check failed" << endl;
         return 8;
     }
