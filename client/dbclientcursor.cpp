@@ -191,15 +191,7 @@ namespace mongo {
         }
     }
 
-    void DBClientCursor::attach( ScopedDbConnection * conn ){
-        assert( _scopedHost.size() == 0 );
-        assert( connector == conn->get() );
-        _scopedHost = conn->getHost();
-        conn->done();
-        connector = 0;
-    }
-
-    void DBClientCursor::attach( ShardConnection * conn ){
+    void DBClientCursor::attach( AScopedConnection * conn ){
         assert( _scopedHost.size() == 0 );
         assert( connector == conn->get() );
         _scopedHost = conn->getHost();

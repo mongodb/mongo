@@ -96,10 +96,18 @@ namespace mongo {
     
     extern DBConnectionPool pool;
 
+    class AScopedConnection : boost::noncopyable {
+    public:
+        virtual ~AScopedConnection(){}
+        virtual DBClientBase* get() = 0;
+        virtual void done() = 0;
+        virtual string getHost() const = 0;
+    };
+
     /** Use to get a connection from the pool.  On exceptions things
        clean up nicely.
     */
-    class ScopedDbConnection : boost::noncopyable {
+    class ScopedDbConnection : public AScopedConnection {
         const string _host;
         DBClientBase *_conn;
     public:
