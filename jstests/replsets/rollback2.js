@@ -43,6 +43,11 @@ function dbs_match(a, b) {
     var bc = b.system.namespaces.find().sort({name:1}).toArray();
     if (!friendlyEqual(ac, bc)) {
         print("dbs_match: namespaces don't match");
+        print("\n\n");
+        printjson(ac);
+        print("\n\n");
+        printjson(bc);
+        print("\n\n");
         return false;
     }
 

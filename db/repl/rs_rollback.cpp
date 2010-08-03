@@ -111,18 +111,25 @@ namespace mongo {
         }
 
         if( *op == 'c' ) { 
-            /* Create collection operation 
-               { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
-            */
+            be first = o.firstElement();
             NamespaceString s(d.ns); // foo.$cmd
-            string ns = s.db + '.' + o["create"].String(); // -> foo.abc
-            h.toDrop.insert(ns);
-            return;
+
+            if( string("create") == first.fieldName() ) {
+                /* Create collection operation 
+                   { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
+                */
+                string ns = s.db + '.' + o["create"].String(); // -> foo.abc
+                h.toDrop.insert(ns);
+                return;
+            }
+            else { 
+                log() << "replSet WARNING can't roll back this command yet: " << o.toString() << rsLog;
+            }
         }
 
         d._id = o["_id"];
         if( d._id.eoo() ) {
-            log() << "replSet WARNING ignoring op on rollback no _id TODO : " << ourObj.toString() << rsLog;
+            log() << "replSet WARNING ignoring op on rollback no _id TODO : " << d.ns << ' '<< ourObj.toString() << rsLog;
             return;
         }
 
