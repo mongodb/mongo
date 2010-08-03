@@ -70,9 +70,6 @@ doTest = function( signal ) {
 
     }
 
-    // Here's how to restart a node:
-    replTest.restart( master_id );
-
     // Now let's write some documents to the new master
     for(var i=0; i<1000; i++) {
         new_master.getDB("bar").bar.save({a: i});
@@ -81,6 +78,7 @@ doTest = function( signal ) {
 
     // Here's how to restart the old master node:
     slave = replTest.restart( master_id );
+
 
     // Now, let's make sure that the old master comes up as a slave
     assert.soon(function() {
@@ -98,6 +96,7 @@ doTest = function( signal ) {
 
     // And that both slave nodes have all the updates
     new_master = replTest.getMaster();
+    assert.eq( 1000 , new_master.getDB( "bar" ).runCommand( { count:"bar"} ).n , "assumption 2")
     replTest.awaitReplication();
 
     slaves = replTest.liveNodes.slaves;
@@ -106,11 +105,11 @@ doTest = function( signal ) {
         slave.setSlaveOk();
         var count = slave.getDB("bar").runCommand({count: "bar"});
         printjson( count );
-        assert( count.n == 1000 , slave + " expected 1000 but count was " + count.n);
+        assert.eq( 1000 , count.n , "slave count wrong: " + slave );
     });
 
     // Shut down the set and finish the test.
     replTest.stopSet( signal );
 }
 
-// doTest( 15 );
+doTest( 15 );

@@ -199,9 +199,7 @@ namespace mongo {
         ConfigServer();
         ~ConfigServer();
         
-        bool ok(){
-            return _primary.ok();
-        }
+        bool ok( bool checkConsistency = false );
         
         virtual string modelServer(){
             uassert( 10190 ,  "ConfigServer not setup" , _primary.ok() );
@@ -241,8 +239,16 @@ namespace mongo {
 
         static int VERSION;
         
+
+        /**
+         * check to see if all config servers have the same state
+         * will try tries time to make sure not catching in a bad state
+         */
+        bool checkConfigServersConsistent( string& errmsg , int tries = 4 ) const;
+
     private:
         string getHost( string name , bool withPort );
+        vector<string> _config;
     };
 
 } // namespace mongo

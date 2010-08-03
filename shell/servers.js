@@ -1199,7 +1199,7 @@ ReplSetTest.prototype.reInitiate = function() {
 ReplSetTest.prototype.awaitReplication = function() {
    this.getMaster();
 
-   latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']['t']
+   latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']
    print(latest);
 
    this.attempt({context: this, timeout: 30000, desc: "awaiting replication"},
@@ -1220,10 +1220,10 @@ ReplSetTest.prototype.awaitReplication = function() {
              if(log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
                var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
                printjson( entry );
-               var ts = entry['ts']['t'];
+               var ts = entry['ts'];
                print("TS for " + slave + " is " + ts + " and latest is " + latest);
                print("Oplog size for " + slave + " is " + log.count());
-               synced = (synced && (latest == ts));
+               synced = (synced && friendlyEqual(latest,ts))
              }
              else {
                synced = false;
