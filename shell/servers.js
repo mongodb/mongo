@@ -215,10 +215,14 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         this._connections.forEach(
             function(z){
                 var n = z.name;
-                if ( ! n )
-                    n = z;
+                if ( ! n ){
+                    n = z.host;
+                    if ( ! n )
+                        n = z;
+                }
                 print( "going to add shard: " + n )
-                admin.runCommand( { addshard : n } );
+                x = admin.runCommand( { addshard : n } );
+                printjson( x )
             }
         );
     }
