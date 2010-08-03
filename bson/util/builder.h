@@ -21,6 +21,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <boost/shared_ptr.hpp>
+
+#include "../inline_decls.h"
 #include "../stringdata.h"
 
 namespace mongo {
@@ -130,7 +132,17 @@ namespace mongo {
 
     private:
         /* "slow" portion of 'grow()'  */
-        void grow_reallocate(); 
+        void NOINLINE_DECL grow_reallocate(){
+            int a = size * 2;
+            if ( a == 0 )
+                a = 512;
+            if ( l > a )
+                a = l + 16 * 1024;
+            if( a > 64 * 1024 * 1024 )
+                msgasserted(10000, "BufBuilder grow() > 64MB");
+            data = (char *) realloc(data, a);
+            size= a;
+        }
 
         char *data;
         int l;
