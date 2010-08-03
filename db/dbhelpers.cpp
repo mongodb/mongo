@@ -190,7 +190,7 @@ namespace mongo {
 
      DiskLoc Helpers::findById(NamespaceDetails *d, BSONObj idquery) {
          int idxNo = d->findIdIndex();
-         uassert(10000, "no _id index", idxNo>=0);
+         uassert(13430, "no _id index", idxNo>=0);
          IndexDetails& i = d->idx( idxNo );        
          BSONObj key = i.getKeyFromQuery( idquery );
          return i.head.btree()->findSingle( i , i.head , key );
