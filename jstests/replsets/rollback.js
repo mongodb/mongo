@@ -121,8 +121,7 @@ doTest = function (signal) {
     assert(A.isMaster().ismaster || A.isMaster().secondary, "A up");
     assert(B.isMaster().ismaster || B.isMaster().secondary, "B up");
 
-    printjson(t.find().toArray());
-    printjson(u.find().toArray());
+    friendlyEqual(t.find().sort({ _id: 1 }).toArray(), u.find().sort({ _id: 1 }).toArray(), "server data sets do not match");
 
     pause("SUCCESS");
     replTest.stopSet(signal);
