@@ -289,7 +289,7 @@ namespace mongo {
                
                shared_ptr<RemoveSaver>& rs = removeSavers[d.ns];
                if ( ! rs )
-                   rs.reset( new RemoveSaver( "replSet" , "rollback" , d.ns ) );
+                   rs.reset( new RemoveSaver( "rollback" , "" , d.ns ) );
 
                // todo: lots of overhead in context, this can be faster
                Client::Context c(d.ns, dbpath, 0, /*doauth*/false);
