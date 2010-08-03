@@ -187,6 +187,6 @@ doTest = function (signal) {
     replTest.stopSet(signal);
 }
 
-if( 0 || debugging ) {
+if( 1 || debugging ) {
     doTest( 15 );
 }
