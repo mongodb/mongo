@@ -588,6 +588,7 @@
 		93E8A4D01174EEAF0025F7F8 /* or2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or2.js; sourceTree = "<group>"; };
 		93E8A53411752FCE0025F7F8 /* or3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or3.js; sourceTree = "<group>"; };
 		93EC34601207628300A95C8A /* capped7.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped7.js; sourceTree = "<group>"; };
+		93EC350F1207AEB000A95C8A /* remove9.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = remove9.js; sourceTree = "<group>"; };
 		93F0957010E165E50053380C /* basic.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basic.js; sourceTree = "<group>"; };
 		93F095CC10E16FF70053380C /* shellfork.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shellfork.js; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
@@ -832,6 +833,7 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				93EC350F1207AEB000A95C8A /* remove9.js */,
 				93EC34601207628300A95C8A /* capped7.js */,
 				93E6E10A11FE2BBC00EDA451 /* capped6.js */,
 				93C5BC9E11E5B7FE00F9671C /* group6.js */,

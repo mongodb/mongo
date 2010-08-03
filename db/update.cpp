@@ -931,6 +931,9 @@ namespace mongo {
                         // TODO should we assert or something?
                         break;
                     }
+                    if ( !c->ok() ) {
+                        break;
+                    }
                 }
                 continue;
             }
@@ -1054,6 +1057,9 @@ namespace mongo {
                     }
                     if ( ! cc->yield() ){
                         cc.release();
+                        break;
+                    }
+                    if ( !c->ok() ) {
                         break;
                     }
                 }

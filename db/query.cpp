@@ -164,6 +164,9 @@ namespace mongo {
                 // TODO should we assert or something?
                 break;
             }
+            if ( !cc->c->ok() ) {
+                break; // if we yielded, could have hit the end
+            }
                 
             // this way we can avoid calling updateLocation() every time (expensive)
             // as well as some other nuances handled
