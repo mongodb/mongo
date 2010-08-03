@@ -250,9 +250,9 @@ namespace mongo {
 
        sethbmsg("syncRollback 3.5");
        if( h.rbid != getRBID(r.conn()) ) { 
-	 // our source rolled back itself.  so the data we received isn't necessarily consistent.
-	   sethbmsg("syncRollback rbid on source changed during rollback, cancelling this attempt");
-	   return;
+           // our source rolled back itself.  so the data we received isn't necessarily consistent.
+           sethbmsg("syncRollback rbid on source changed during rollback, cancelling this attempt");
+           return;
        }
 
        // update them
@@ -267,7 +267,7 @@ namespace mongo {
        dbMutex.assertWriteLocked();
 
        /* we have items we are writing that aren't from a point-in-time.  thus best not to come online 
-	  until we get to that point in freshness. */
+	      until we get to that point in freshness. */
        try {
            log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
        }
@@ -336,6 +336,28 @@ namespace mongo {
                            }
                            catch(...) { 
                                log() << "replSet error rollback delete failed ns:" << d.ns << rsLog;
+                           }
+                       }
+                       // did we just empty the collection?  if so let's check if it even exists on the source.
+                       if( nsd->nrecords == 0 ) {
+                           try { 
+                               string sys = cc().database()->name + ".system.namespaces";
+                               bo o = them->findOne(sys, QUERY("name"<<d.ns));
+                               if( o.isEmpty() ) { 
+                                   // we should drop
+                                   try {
+                                       bob res;
+                                       string errmsg;
+                                       dropCollection(d.ns, errmsg, res);
+                                   }
+                                   catch(...) { 
+                                       log() << "replset error rolling back collection " << d.ns << rsLog;
+                                   }
+                               }
+                           }
+                           catch(DBException& ) { 
+                               /* this isn't *that* big a deal, but is bad. */
+                               log() << "replSet warning rollback error querying for existence of " << d.ns << " at the primary, ignoring" << rsLog;
                            }
                        }
                    }

@@ -92,6 +92,13 @@ function doItemsToRollBack(db) {
 
     db.kap.insert({ foo: 2 })
     db.kap2.insert({ foo: 2 })
+
+    // create a collection (need to roll back the whole thing)
+    db.newcoll.insert({ a: true });
+
+    // create a new empty collection (need to roll back the whole thing)
+    // TODO NOT DONE
+    // db.createCollection("abc");
 }
 
 function doWritesToKeep2(db) {
