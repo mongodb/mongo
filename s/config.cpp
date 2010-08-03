@@ -515,10 +515,12 @@ namespace mongo {
         if ( ! _primary.ok() )
             return false;
         
-        string errmsg;
-        if ( ! checkConfigServersConsistent( errmsg ) ){
-            log( LL_ERROR ) << "config servers not in sync! " << errmsg << endl;
-            return false;
+        if ( checkConsistency ){
+            string errmsg;
+            if ( ! checkConfigServersConsistent( errmsg ) ){
+                log( LL_ERROR ) << "config servers not in sync! " << errmsg << endl;
+                return false;
+            }
         }
         
         return true;
