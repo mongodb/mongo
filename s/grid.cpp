@@ -115,9 +115,8 @@ namespace mongo {
         _allowLocalShard = allow;
     }
 
-    bool Grid::addShard( string* name , const string& host , long long maxSize , string* errMsg ){
-        // errMsg is required but name is optional
-        DEV assert( errMsg );
+    bool Grid::addShard( string* name , const string& host , long long maxSize , string& errMsg ){
+        // name is optional
         string nameInternal;
         if ( ! name ) {
             name = &nameInternal;
@@ -135,7 +134,7 @@ namespace mongo {
             
             if ( newShardConn->type() == ConnectionString::SYNC ){
                 newShardConn.done();
-                *errMsg = "can't use sync cluster as a shard.  for replica set, have to use <name>/<server1>,<server2>,...";
+                errMsg = "can't use sync cluster as a shard.  for replica set, have to use <name>/<server1>,<server2>,...";
                 return false;
             }
 
@@ -145,7 +144,7 @@ namespace mongo {
             if ( !ok ){
                 ostringstream ss;
                 ss << "failed listing " << host << " databases:" << res;
-                *errMsg = ss.str();
+                errMsg = ss.str();
                 newShardConn.done();
                 return false;
             }
@@ -168,7 +167,7 @@ namespace mongo {
             ostringstream ss;
             ss << "couldn't connect to new shard ";
             ss << e.what();
-            *errMsg = ss.str();
+            errMsg = ss.str();
             return false;
         }
 
@@ -179,14 +178,14 @@ namespace mongo {
                 ostringstream ss;
                 ss << "trying to add shard " << host << " because local database " << *it;
                 ss << " exists in another " << config->getPrimary().toString();
-                *errMsg = ss.str();
+                errMsg = ss.str();
                 return false;
             }
         }
 
         // if a name for a shard wasn't provided, pick one.
         if ( name->empty() && ! _getNewShardName( name ) ){
-            *errMsg = "error generating new shard name";
+            errMsg = "error generating new shard name";
             return false;
         }
             
@@ -205,7 +204,7 @@ namespace mongo {
             // check whether this host:port is not an already a known shard
             BSONObj old = conn->findOne( ShardNS::shard , BSON( "host" << host ) );
             if ( ! old.isEmpty() ){
-                *errMsg = "host already used";
+                errMsg = "host already used";
                 conn.done();
                 return false;
             }
@@ -213,9 +212,9 @@ namespace mongo {
             log() << "going to add shard: " << shardDoc << endl;
 
             conn->insert( ShardNS::shard , shardDoc );
-            *errMsg = conn->getLastError();
-            if ( ! errMsg->empty() ){
-                log() << "error adding shard: " << shardDoc << " err: " << *errMsg << endl;
+            errMsg = conn->getLastError();
+            if ( ! errMsg.empty() ){
+                log() << "error adding shard: " << shardDoc << " err: " << errMsg << endl;
                 conn.done();
                 return false;
             }

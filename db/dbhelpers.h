@@ -148,5 +148,24 @@ namespace mongo {
         string name_;
         BSONObj key_;
     };
+
+
+    /**
+     * user for saving deletd bson objects to a flat file
+     */
+    class RemoveSaver : public Helpers::RemoveCallback , boost::noncopyable {
+    public:
+        RemoveSaver( const string& type , const string& ns , const string& why);
+        ~RemoveSaver();
+
+        void goingToDelete( const BSONObj& o );
+        
+    private:
+        path _root;
+        path _file;
+        ofstream* _out;
+        
+    };
+
     
 } // namespace mongo
