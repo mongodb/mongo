@@ -48,7 +48,8 @@ namespace mongo {
             DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers );
             if( ! set->connect() ){
                 delete set;
-                errmsg = "connect failed to set";
+                errmsg = "connect failed to set ";
+                errmsg += toString();
                 return 0;
             }
             return set;

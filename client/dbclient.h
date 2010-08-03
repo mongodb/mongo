@@ -122,7 +122,7 @@ namespace mongo {
                 break;
             case SET:
                 assert( _setName.size() );
-                assert( _servers.size() > 1 );
+                assert( _servers.size() >= 1 ); // 1 is ok since we can derive
                 break;
             case PAIR:
                 assert( _servers.size() == 2 );
@@ -173,6 +173,8 @@ namespace mongo {
         
         void _finishInit(){
             stringstream ss;
+            if ( _type == SET )
+                ss << _setName << "/";
             for ( unsigned i=0; i<_servers.size(); i++ ){
                 if ( i > 0 )
                     ss << ",";
