@@ -338,5 +338,45 @@ namespace mongo {
             deleteObjects( name_.c_str(), obj, true, false, false );
         }                        
     }
+
+    RemoveSaver::RemoveSaver( const string& type , const string& ns , const string& why) : _out(0){
+        static int NUM = 0;
+        
+        _root = dbpath;
+        _root /= type;
+        _root /= ns;
+        
+        _file = _root;
+        
+        stringstream ss;
+        ss << why << "." << terseCurrentTime() << "." << NUM++ << ".bson";
+        _file /= ss.str();
+
+    }
+    
+    RemoveSaver::~RemoveSaver(){
+        if ( _out ){
+            _out->close();
+            delete _out;
+            _out = 0;
+        }
+    }
+    
+    void RemoveSaver::goingToDelete( const BSONObj& o ){
+        if ( ! _out ){
+            create_directories( _root );
+            _out = new ofstream();
+            _out->open( _file.string().c_str() , ios_base::out | ios_base::binary );
+            if ( ! _out->good() ){
+                log( LL_WARNING ) << "couldn't create file: " << _file.string() << " for remove saving" << endl;
+                delete _out;
+                _out = 0;
+                return;
+            }
+            
+        }
+        _out->write( o.objdata() , o.objsize() );
+    }
+    
         
 } // namespace mongo
