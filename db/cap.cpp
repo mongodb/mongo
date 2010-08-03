@@ -300,7 +300,7 @@ namespace mongo {
                 }
             }
             
-            massert( 13415, "emptying the collection is not allowed", nrecords > 1 );
+            uassert( 13415, "emptying the collection is not allowed", nrecords > 1 );
             
             if ( !capLooped() ) {
                 theDataFileMgr.deleteRecord(ns, curr.rec(), curr, true);

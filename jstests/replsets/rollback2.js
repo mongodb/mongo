@@ -43,6 +43,11 @@ function dbs_match(a, b) {
     var bc = b.system.namespaces.find().sort({name:1}).toArray();
     if (!friendlyEqual(ac, bc)) {
         print("dbs_match: namespaces don't match");
+        print("\n\n");
+        printjson(ac);
+        print("\n\n");
+        printjson(bc);
+        print("\n\n");
         return false;
     }
 
@@ -67,6 +72,12 @@ function doInitialWrites(db) {
     t.insert({ q: 40, a: 1 });
     t.insert({ q: 40, a: 2 });
     t.insert({ q: 70, txt: 'willremove' });
+
+    db.createCollection("kap", { capped: true, size: 5000 });
+    db.kap.insert({ foo: 1 })
+
+    // going back to empty on capped is a special case and must be tested
+    db.createCollection("kap2", { capped: true, size: 5501 });
 }
 
 /* these writes on one primary only and will be rolled back. */
@@ -83,6 +94,15 @@ function doItemsToRollBack(db) {
     t.remove({ q: 1 });
 
     t.update({ q: 0 }, { $inc: { y: 1} });
+
+    db.kap.insert({ foo: 2 })
+    db.kap2.insert({ foo: 2 })
+
+    // create a collection (need to roll back the whole thing)
+    db.newcoll.insert({ a: true });
+
+    // create a new empty collection (need to roll back the whole thing)
+    db.createCollection("abc");
 }
 
 function doWritesToKeep2(db) {
