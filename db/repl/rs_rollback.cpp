@@ -278,12 +278,19 @@ namespace mongo {
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
        uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
 
+       map<string,shared_ptr<RemoveSaver> > removeSavers;
+
        unsigned deletes = 0, updates = 0;
        for( list<pair<DocID,bo> >::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
            const DocID& d = i->first;
            bo pattern = d._id.wrap(); // { _id : ... }
            try { 
                assert( d.ns && *d.ns );
+               
+               shared_ptr<RemoveSaver> rs = removeSavers[d.ns];
+               if ( ! rs )
+                   rs.reset( new RemoveSaver( "replSet" , "rollback" , d.ns ) );
+
                // todo: lots of overhead in context, this can be faster
                Client::Context c(d.ns, dbpath, 0, /*doauth*/false);
                if( i->second.isEmpty() ) {
@@ -291,7 +298,7 @@ namespace mongo {
                    /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
                    try { 
                        deletes++;
-                       deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
+                       deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true, rs.get() );
                    }
                    catch(...) { 
                        log() << "replSet rollback delete failed - todo finish capped collection support ns:" << d.ns << rsLog;
@@ -301,7 +308,7 @@ namespace mongo {
                    // todo faster...
                    OpDebug debug;
                    updates++;
-                   _updateObjects(/*god*/true, d.ns, i->second, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug);
+                   _updateObjects(/*god*/true, d.ns, i->second, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug, rs.get() );
                }
            }
            catch(DBException& e) { 
@@ -309,6 +316,8 @@ namespace mongo {
                warn = true;
            }
        }
+
+       removeSavers.clear(); // this effectively closes all of them
 
        sethbmsg(str::stream() << "syncRollback 5 d:" << deletes << " u:" << updates);
        MemoryMappedFile::flushAll(true);
