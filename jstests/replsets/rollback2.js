@@ -36,6 +36,37 @@ function wait(f) {
     }
 }
 
+/* these writes will be initial data and replicate everywhere. */
+function doInitialWrites(db) {
+    t = db.bar;
+    t.insert({ q: 1, a: "foo" });
+    t.insert({ q: 2, a: "foo", x: 1 });
+    t.insert({ q: 3, bb: 9, a: "foo" });
+}
+
+/* these writes on one primary only and will be rolled back. */
+function doItemsToRollBack(db) {
+    t = db.bar;
+    t.insert({ q: 4 });
+    t.update({ q: 3 }, { q: 3, rb: true });
+    t.update({ q: 2 }, { q: 39, rb: true });
+
+    // rolling back a delete will involve reinserting the item(s)
+    t.remove({q:1});
+}
+
+function doWritesToKeep2(db) {
+    t = db.bar;
+    t.insert({ txt: 'foo' });
+}
+
+function verify(db) {
+    t = db.bar;
+    assert(t.find({ q: 1 }).count() == 1);
+    assert(t.find({ txt: 'foo' }).count() == 1);
+    assert(t.find({ q: 4 }).count() == 0);
+}
+
 doTest = function (signal) {
 
     var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3 });
@@ -72,10 +103,7 @@ doTest = function (signal) {
     // Wait for initial replication
     var a = a_conn.getDB("foo");
     var b = b_conn.getDB("foo");
-    a.bar.insert({ q: 1, a: "foo" });
-    a.bar.insert({ q: 2, a: "foo", x: 1 });
-    a.bar.insert({ q: 3, bb: 9, a: "foo" });
-
+    doInitialWrites(a);
     assert(a.bar.count() == 3, "t.count");
 
     // wait for secondary to get this data
@@ -84,10 +112,7 @@ doTest = function (signal) {
     A.runCommand({ replSetTest: 1, blind: true });
     wait(function () { return B.isMaster().ismaster; });
 
-    b.bar.insert({ q: 4 });
-    b.bar.insert({ q: 5 });
-    b.bar.insert({ q: 6 });
-    assert(b.bar.count() == 6, "u.count");
+    doItemsToRollBack(b);
 
     // a should not have the new data as it was in blind state.
     B.runCommand({ replSetTest: 1, blind: true });
@@ -96,22 +121,14 @@ doTest = function (signal) {
     wait(function () { return A.isMaster().ismaster; });
 
     assert(a.bar.count() == 3, "t is 3");
-    a.bar.insert({ q: 7 });
-    a.bar.insert({ q: 8 });
-    {
-        assert(a.bar.count() == 5);
-        var x = a.bar.find().toArray();
-        assert(x[0].q == 1, '1');
-        assert(x[1].q == 2, '2');
-        assert(x[2].q == 3, '3');
-        assert(x[3].q == 7, '7');
-        assert(x[4].q == 8, '8');
-    }
+    doWritesToKeep2(a);
+    a.bar.insert({ q: 8, z: 99 });
 
     // A is 1 2 3 7 8
     // B is 1 2 3 4 5 6
 
-    // bring B back online  
+    // bring B back online
+    // as A is primary, B will roll back and then catch up
     B.runCommand({ replSetTest: 1, blind: false });
 
     wait(function () { return B.isMaster().ismaster || B.isMaster().secondary; });
@@ -119,6 +136,9 @@ doTest = function (signal) {
     // everyone is up here...
     assert(A.isMaster().ismaster || A.isMaster().secondary, "A up");
     assert(B.isMaster().ismaster || B.isMaster().secondary, "B up");
+
+    assert(a.bar.findOne({ q: 8 }).z == 99);
+    verify(a);
 
     friendlyEqual(a.bar.find().sort({ _id: 1 }).toArray(), b.bar.find().sort({ _id: 1 }).toArray(), "server data sets do not match");
 
