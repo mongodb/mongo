@@ -339,17 +339,20 @@ namespace mongo {
         }                        
     }
 
-    RemoveSaver::RemoveSaver( const string& type , const string& ns , const string& why) : _out(0){
+    RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) : _out(0){
         static int NUM = 0;
         
         _root = dbpath;
-        _root /= type;
-        _root /= ns;
+        if ( a.size() )
+            _root /= a;
+        if ( b.size() )
+            _root /= b;
+        assert( a.size() || b.size() );
         
         _file = _root;
         
         stringstream ss;
-        ss << why << "." << terseCurrentTime() << "." << NUM++ << ".bson";
+        ss << why << "." << terseCurrentTime(false) << "." << NUM++ << ".bson";
         _file /= ss.str();
 
     }
