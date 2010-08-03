@@ -36,12 +36,35 @@ function wait(f) {
     }
 }
 
+function dbs_match(a, b) {
+    print("dbs_match");
+
+    var ac = a.system.namespaces.find().sort({name:1}).toArray();
+    var bc = b.system.namespaces.find().sort({name:1}).toArray();
+    if (!friendlyEqual(ac, bc)) {
+        print("dbs_match: namespaces don't match");
+        return false;
+    }
+
+    var c = a.getCollectionNames();
+    for( var i in c ) {
+        print("checking " + c[i]);
+        if( !friendlyEqual( a[c[i]].find().sort({_id:1}).toArray(), b[c[i]].find().sort({_id:1}).toArray() ) ) { 
+            print("dbs_match: collections don't match " + c[i]);
+            return false;
+        }
+    }
+    return true;
+}
+
 /* these writes will be initial data and replicate everywhere. */
 function doInitialWrites(db) {
     t = db.bar;
     t.insert({ q: 1, a: "foo" });
     t.insert({ q: 2, a: "foo", x: 1 });
     t.insert({ q: 3, bb: 9, a: "foo" });
+    t.insert({ q: 40, a: 1 });
+    t.insert({ q: 40, a: 2 });
 }
 
 /* these writes on one primary only and will be rolled back. */
@@ -61,6 +84,7 @@ function doWritesToKeep2(db) {
 }
 
 function verify(db) {
+    print("verify");
     t = db.bar;
     assert(t.find({ q: 1 }).count() == 1);
     assert(t.find({ txt: 'foo' }).count() == 1);
@@ -104,10 +128,9 @@ doTest = function (signal) {
     var a = a_conn.getDB("foo");
     var b = b_conn.getDB("foo");
     doInitialWrites(a);
-    assert(a.bar.count() == 3, "t.count");
 
     // wait for secondary to get this data
-    wait(function () { return b.bar.count() == 3; });
+    wait(function () { return b.bar.count() == a.bar.count(); });
 
     A.runCommand({ replSetTest: 1, blind: true });
     wait(function () { return B.isMaster().ismaster; });
@@ -120,9 +143,8 @@ doTest = function (signal) {
     wait(function () { return !B.isMaster().ismaster; });
     wait(function () { return A.isMaster().ismaster; });
 
-    assert(a.bar.count() == 3, "t is 3");
+    assert(a.bar.count() >= 1, "count check");
     doWritesToKeep2(a);
-    a.bar.insert({ q: 8, z: 99 });
 
     // A is 1 2 3 7 8
     // B is 1 2 3 4 5 6
@@ -137,10 +159,9 @@ doTest = function (signal) {
     assert(A.isMaster().ismaster || A.isMaster().secondary, "A up");
     assert(B.isMaster().ismaster || B.isMaster().secondary, "B up");
 
-    assert(a.bar.findOne({ q: 8 }).z == 99);
     verify(a);
 
-    friendlyEqual(a.bar.find().sort({ _id: 1 }).toArray(), b.bar.find().sort({ _id: 1 }).toArray(), "server data sets do not match");
+    assert( dbs_match(a,b), "server data sets do not match after rollback, something is wrong");
 
     pause("SUCCESS");
     replTest.stopSet(signal);
