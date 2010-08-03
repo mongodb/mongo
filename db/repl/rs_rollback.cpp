@@ -78,6 +78,9 @@ namespace mongo {
            need to refetch it once. */
         set<DocID> toRefetch;
 
+        /* collections to drop */
+        set<string> toDrop;
+
         OpTime commonPoint;
         DiskLoc commonPointOurDiskloc;
 
@@ -97,13 +100,23 @@ namespace mongo {
         DocID d;
         d.ns = ourObj.getStringField("ns");
         if( *d.ns == 0 ) { 
-            log() << "replSet WARNING ignoring op on rollback TODO : " << ourObj.toString() << rsLog;
+            log() << "replSet WARNING ignoring op on rollback no ns TODO : " << ourObj.toString() << rsLog;
             return;
         }
 
         bo o = ourObj.getObjectField(*op=='u' ? "o2" : "o");
         if( o.isEmpty() ) { 
             log() << "replSet warning ignoring op on rollback : " << ourObj.toString() << rsLog;
+            return;
+        }
+
+        if( *op == 'c' ) { 
+            /* Create collection operation 
+               { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
+            */
+            NamespaceString s(d.ns); // foo.$cmd
+            string ns = s.db + '.' + o["create"].String(); // -> foo.abc
+            h.toDrop.insert(ns);
             return;
         }
 
@@ -273,6 +286,20 @@ namespace mongo {
        }
        catch(...){}
        Helpers::putSingleton("local.replset.minvalid", newMinValid);
+
+       /** first drop collections to drop - that might make things faster below actually if there were subsequent inserts */
+       for( set<string>::iterator i = h.toDrop.begin(); i != h.toDrop.end(); i++ ) { 
+           Client::Context c(*i, dbpath, 0, /*doauth*/false);
+           try {
+               bob res;
+               string errmsg;
+               log(1) << "replSet rollback drop: " << *i << rsLog;
+               dropCollection(*i, errmsg, res);
+           }
+           catch(...) { 
+               log() << "replset rollback error dropping collection " << *i << rsLog;
+           }
+       }
 
        Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);

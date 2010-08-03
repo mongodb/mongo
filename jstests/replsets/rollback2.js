@@ -97,8 +97,7 @@ function doItemsToRollBack(db) {
     db.newcoll.insert({ a: true });
 
     // create a new empty collection (need to roll back the whole thing)
-    // TODO NOT DONE
-    // db.createCollection("abc");
+    db.createCollection("abc");
 }
 
 function doWritesToKeep2(db) {
