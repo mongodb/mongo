@@ -50,7 +50,9 @@ function doItemsToRollBack(db) {
     t.insert({ q: 4 });
     t.update({ q: 3 }, { q: 3, rb: true });
     t.update({ q: 2 }, { q: 39, rb: true });
-    // t.remove({q:1});
+
+    // rolling back a delete will involve reinserting the item(s)
+    t.remove({q:1});
 }
 
 function doWritesToKeep2(db) {
