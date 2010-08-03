@@ -807,7 +807,7 @@ namespace mongo {
 
     void ChunkManager::getAllShards( set<Shard>& all ){
         rwlock lk( _lock , false ); 
-        all = _shards;
+        all.insert(_shards.begin(), _shards.end());
     }
     
     void ChunkManager::ensureIndex_inlock(){
