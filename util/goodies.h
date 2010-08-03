@@ -619,7 +619,7 @@ namespace mongo {
         }
 
         bool empty() const {
-            return _buf[0] == 0;
+            return _buf == 0 || _buf[0] == 0;
         }
 
     private:
