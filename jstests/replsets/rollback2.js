@@ -67,6 +67,12 @@ function doInitialWrites(db) {
     t.insert({ q: 40, a: 1 });
     t.insert({ q: 40, a: 2 });
     t.insert({ q: 70, txt: 'willremove' });
+
+    db.createCollection("kap", { capped: true, size: 5000 });
+    db.kap.insert({ foo: 1 })
+
+    // going back to empty on capped is a special case and must be tested
+    db.createCollection("kap2", { capped: true, size: 5501 });
 }
 
 /* these writes on one primary only and will be rolled back. */
@@ -83,6 +89,9 @@ function doItemsToRollBack(db) {
     t.remove({ q: 1 });
 
     t.update({ q: 0 }, { $inc: { y: 1} });
+
+    db.kap.insert({ foo: 2 })
+    db.kap2.insert({ foo: 2 })
 }
 
 function doWritesToKeep2(db) {

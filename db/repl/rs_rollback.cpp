@@ -296,14 +296,50 @@ namespace mongo {
                if( i->second.isEmpty() ) {
                    // wasn't on the primary; delete.
                    /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
-                   try { 
-                       deletes++;
-                       deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true, rs.get() );
+                   deletes++;
+
+                   NamespaceDetails *nsd = nsdetails(d.ns);
+                   if( nsd ) {
+                       if( nsd->capped ) { 
+                           /* can't delete from a capped collection - so we truncate instead. if this item must go, 
+                           so must all successors!!! */
+                           try { 
+                               /** todo: IIRC cappedTrunateAfter does not handle completely empty.  todo. */
+                               // this will crazy slow if no _id index.
+                               long long start = Listener::getElapsedTimeMillis();
+                               DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
+                               if( Listener::getElapsedTimeMillis() - start > 200 ) 
+                                   log() << "replSet warning roll back slow no _id index for " << d.ns << rsLog; 
+                               //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);
+                               if( !loc.isNull() ) {
+                                   try {
+                                       nsd->cappedTruncateAfter(d.ns, loc, true);
+                                   }
+                                   catch(DBException& e) { 
+                                       if( e.getCode() == 13415 ) {
+                                           // hack: need to just make cappedTruncate do this...
+                                           nsd->emptyCappedCollection(d.ns);
+                                       } else {
+                                           throw;
+                                       }
+                                   }
+                               }
+                           }
+                           catch(DBException& e) { 
+                               log() << "replSet error rolling back capped collection rec " << d.ns << ' ' << e.toString() << rsLog;
+                           }
+                       }
+                       else {
+                           try { 
+                               deletes++;
+                               deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true, rs.get() );
+                           }
+                           catch(...) { 
+                               log() << "replSet error rollback delete failed ns:" << d.ns << rsLog;
+                           }
+                       }
                    }
-                   catch(...) { 
-                       log() << "replSet rollback delete failed - todo finish capped collection support ns:" << d.ns << rsLog;
-                   }
-                }
+               }
                else {
                    // todo faster...
                    OpDebug debug;
@@ -324,7 +360,7 @@ namespace mongo {
        sethbmsg("syncRollback 6");
 
        // clean up oplog
-       log() << "replSet rollback temp truncate after " << h.commonPoint.toStringPretty() << rsLog;
+       log(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
        // todo: fatal error if this throws?
        oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
 

@@ -109,6 +109,7 @@ namespace mongo {
             }
             if ( matcher()->matches( c_->currKey(), c_->currLoc() ) ) {
                 one_ = c_->current();
+                loc_ = c_->currLoc();
                 setStop();
             } else {
                 c_->advance();
@@ -117,10 +118,12 @@ namespace mongo {
         virtual bool mayRecordPlan() const { return false; }
         virtual QueryOp *_createChild() const { return new FindOne( requireIndex_ ); }
         BSONObj one() const { return one_; }
+        DiskLoc loc() const { return loc_; }
     private:
         bool requireIndex_;
         shared_ptr<Cursor> c_;
         BSONObj one_;
+        DiskLoc loc_;
     };
     
     /* fetch a single object from collection ns that matches query 
@@ -138,13 +141,24 @@ namespace mongo {
         return true;
     }
 
+    /* fetch a single object from collection ns that matches query 
+       set your db SavedContext first
+    */
+    DiskLoc Helpers::findOne(const char *ns, const BSONObj &query, bool requireIndex) { 
+        MultiPlanScanner s( ns, query, BSONObj(), 0, !requireIndex );
+        FindOne original( requireIndex );
+        shared_ptr< FindOne > res = s.runOp( original );
+        if ( ! res->complete() )
+            throw MsgAssertionException( res->exception() );
+        return res->loc();
+    }
+
     auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
         uassert( 10047 ,  "requireIndex not supported in Helpers::find yet" , ! requireIndex );
         auto_ptr<CursorIterator> i;
         i.reset( new CursorIterator( DataFileMgr::findAll( ns ) , query ) );
         return i;
     }
-    
     
     bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
                            bool * nsFound , bool * indexFound ){
@@ -172,6 +186,14 @@ namespace mongo {
             return false;
         result = loc.obj();
         return true;
+    }
+
+     DiskLoc Helpers::findById(NamespaceDetails *d, BSONObj idquery) {
+         int idxNo = d->findIdIndex();
+         uassert(10000, "no _id index", idxNo>=0);
+         IndexDetails& i = d->idx( idxNo );        
+         BSONObj key = i.getKeyFromQuery( idquery );
+         return i.head.btree()->findSingle( i , i.head , key );
     }
 
     bool Helpers::isEmpty(const char *ns) {
