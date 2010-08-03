@@ -132,6 +132,12 @@ namespace mongo {
         try {
             ScopedDbConnection newShardConn( host );
             newShardConn->getLastError();
+            
+            if ( newShardConn->type() == ConnectionString::SYNC ){
+                newShardConn.done();
+                *errMsg = "can't use sync cluster as a shard.  for replica set, have to use <name>/<server1>,<server2>,...";
+                return false;
+            }
 
             // get the shard's local db's listing
             BSONObj res;
