@@ -65,6 +65,7 @@ function doInitialWrites(db) {
     t.insert({ q: 3, bb: 9, a: "foo" });
     t.insert({ q: 40, a: 1 });
     t.insert({ q: 40, a: 2 });
+    i.insert({ q: 70, txt: 'willremove' });
 }
 
 /* these writes on one primary only and will be rolled back. */
@@ -72,6 +73,9 @@ function doItemsToRollBack(db) {
     t = db.bar;
     t.insert({ q: 4 });
     t.update({ q: 3 }, { q: 3, rb: true });
+
+    t.remove({ q: 40 }); // multi remove test
+
     t.update({ q: 2 }, { q: 39, rb: true });
 
     // rolling back a delete will involve reinserting the item(s)
@@ -81,6 +85,7 @@ function doItemsToRollBack(db) {
 function doWritesToKeep2(db) {
     t = db.bar;
     t.insert({ txt: 'foo' });
+    t.remove({ q: 70 });
 }
 
 function verify(db) {
