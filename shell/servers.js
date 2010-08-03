@@ -307,8 +307,10 @@ ShardingTest.prototype.stop = function(){
     for ( var i=0; i<this._connections.length; i++){
         stopMongod( 30000 + i );
     }
-    for ( var i=0; i<this._rs.length; i++ ){
-        this._rs[i].test.stopSet( 15 );
+    if ( this._rs ){
+        for ( var i=0; i<this._rs.length; i++ ){
+            this._rs[i].test.stopSet( 15 );
+        }
     }
 
     print('*** ' + this._testName + " completed successfully ***");
