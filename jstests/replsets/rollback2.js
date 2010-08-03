@@ -65,7 +65,7 @@ function doInitialWrites(db) {
     t.insert({ q: 3, bb: 9, a: "foo" });
     t.insert({ q: 40, a: 1 });
     t.insert({ q: 40, a: 2 });
-    i.insert({ q: 70, txt: 'willremove' });
+    t.insert({ q: 70, txt: 'willremove' });
 }
 
 /* these writes on one primary only and will be rolled back. */
