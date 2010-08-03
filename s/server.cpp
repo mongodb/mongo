@@ -64,7 +64,8 @@ namespace mongo {
     class ShardingConnectionHook : public DBConnectionHook {
     public:
         virtual void onCreate( DBClientBase * conn ){
-            conn->simpleCommand( "admin" , 0 , "switchtoclienterrors" );
+            if ( conn->type() != ConnectionString::SYNC )
+                conn->simpleCommand( "admin" , 0 , "switchtoclienterrors" );
         }
         virtual void onHandedOut( DBClientBase * conn ){
             ClientInfo::get()->addShard( conn->getServerAddress() );
