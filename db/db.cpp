@@ -919,6 +919,13 @@ int main(int argc, char* argv[], char *envp[] )
             cmdLine.pretouch = params["pretouch"].as<int>();
         }
         if (params.count("replSet")) {
+            if (params.count("slavedelay")) {
+                cout << "--slavedelay cannot be used with --replSet" << endl;
+                ::exit(-1);
+            } else if (params.count("only")) {
+                cout << "--only cannot be used with --replSet" << endl;
+                ::exit(-1);
+            }
             /* seed list of hosts for the repl set */
             cmdLine._replSet = params["replSet"].as<string>().c_str();
         }
