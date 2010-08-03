@@ -124,7 +124,7 @@ namespace mongo {
                 break;
             cleanup.initial = left;
             
-            if ( ++loops % 20 == 0 ){
+            if ( ( loops++ % 200 ) == 0 ){
                 log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << endl;
                 
                 stringstream ss;
