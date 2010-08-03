@@ -60,6 +60,7 @@ function dbs_match(a, b) {
 /* these writes will be initial data and replicate everywhere. */
 function doInitialWrites(db) {
     t = db.bar;
+    t.insert({ q:0});
     t.insert({ q: 1, a: "foo" });
     t.insert({ q: 2, a: "foo", x: 1 });
     t.insert({ q: 3, bb: 9, a: "foo" });
@@ -79,13 +80,16 @@ function doItemsToRollBack(db) {
     t.update({ q: 2 }, { q: 39, rb: true });
 
     // rolling back a delete will involve reinserting the item(s)
-    t.remove({q:1});
+    t.remove({ q: 1 });
+
+    t.update({ q: 0 }, { $inc: { y: 1} });
 }
 
 function doWritesToKeep2(db) {
     t = db.bar;
     t.insert({ txt: 'foo' });
     t.remove({ q: 70 });
+    t.update({ q: 0 }, { $inc: { y: 33} });
 }
 
 function verify(db) {
