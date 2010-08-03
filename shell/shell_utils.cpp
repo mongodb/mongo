@@ -439,11 +439,12 @@ namespace mongo {
                 try {
                 // This assumes there aren't any 0's in the mongo program output.
                 // Hope that's ok.
-                char buf[ 4096 ];
-                char temp[ 4096 ];
+                const unsigned bufSize = 8192;
+                char buf[ bufSize ];
+                char temp[ bufSize ];
                 char *start = buf;
                 while( 1 ) {
-                    int lenToRead = 4095 - ( start - buf );
+                    int lenToRead = ( bufSize - 1 ) - ( start - buf );
                     assert( lenToRead > 0 );
                     int ret = read( pipe_, (void *)start, lenToRead );
                     if( mongo::goingAway )
@@ -467,7 +468,7 @@ namespace mongo {
                         strcpy( temp, last );
                         strcpy( buf, temp );
                     } else {
-                        assert( strlen( buf ) <= 4095 );
+                        assert( strlen( buf ) < bufSize );
                     }
                     start = buf + strlen( buf );
                 }    
