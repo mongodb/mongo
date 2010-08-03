@@ -287,7 +287,7 @@ namespace mongo {
            try { 
                assert( d.ns && *d.ns );
                
-               shared_ptr<RemoveSaver> rs = removeSavers[d.ns];
+               shared_ptr<RemoveSaver>& rs = removeSavers[d.ns];
                if ( ! rs )
                    rs.reset( new RemoveSaver( "replSet" , "rollback" , d.ns ) );
 

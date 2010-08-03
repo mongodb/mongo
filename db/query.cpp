@@ -207,7 +207,7 @@ namespace mongo {
             }
 
             if ( rs )
-                rs->goingToDelete( cc->c->current() );
+                rs->goingToDelete( rloc.obj() /*cc->c->current()*/ );
 
             theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
             nDeleted++;
