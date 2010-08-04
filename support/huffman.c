@@ -372,8 +372,8 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
 {
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE *node;
-	u_int i;
-	int n, p;
+	u_int i, n;
+	int p;
 	char *buffer;
 
 	huffman = huffman_arg;
