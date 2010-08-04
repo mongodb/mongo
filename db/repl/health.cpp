@@ -371,6 +371,7 @@ namespace mongo {
             v.push_back(bb.obj());
             m = m->next();
         }
+        sort(v.begin(), v.end());
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", box.getState().s);
