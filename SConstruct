@@ -1106,7 +1106,7 @@ def jsToH(target, source, env):
     if len( source ) != 1:
         raise Exception( "wrong" )
 
-    h = "const char * jsconcatcode" + outFile.split( "mongo" )[-1].replace( "-" , "_").split( ".cpp")[0] + " = \n"
+    h = "const char * jsconcatcode" + outFile.split( "mongo" )[-1].replace( "-" , "_").split( ".cpp")[0] + " = \r\n"
 
     for l in open( str(source[0]) , 'r' ):
         l = l.strip()
@@ -1114,9 +1114,9 @@ def jsToH(target, source, env):
         l = l.replace( '"' , "\\\"" )
 
 
-        h += '"' + l + "\\n\"\n "
+        h += '"' + l + "\\n\"\r\n "
 
-    h += ";\n\n"
+    h += ";\r\n\r\n"
 
     out = open( outFile , 'w' )
     out.write( h )
