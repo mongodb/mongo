@@ -203,8 +203,8 @@ namespace mongo {
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) { 
-                log() << "TEMP our last op time written: " << lastOpTimeWritten.toStringPretty() << endl;
-                log() << "TEMP primary's GTE: " << ts.toStringPretty() << endl;
+                log(1) << "TEMP our last op time written: " << lastOpTimeWritten.toStringPretty() << endl;
+                log(1) << "TEMP primary's GTE: " << ts.toStringPretty() << endl;
                 /*
                 }*/
 
@@ -243,7 +243,6 @@ namespace mongo {
                         }
                         else { 
                             sethbmsg(str::stream() << "still syncing, not yet to minValid optime " << minvalid.toString());
-                            //log() << "TEMP " << lastOpTimeWritten.toString() << rsLog;
                         }
 
                         /* todo: too stale capability */

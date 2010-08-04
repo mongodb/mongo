@@ -305,7 +305,9 @@ namespace mongo {
 
     private:
         Member* head() const { return _members.head(); }
-        Member* findById(unsigned id) const;
+    public:
+        const Member* findById(unsigned id) const;
+    private:
         void _getTargets(list<Target>&, int &configVersion);
         void getTargets(list<Target>&, int &configVersion);
         void startThreads();

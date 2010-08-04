@@ -390,9 +390,9 @@ namespace mongo {
                         startupStatus = EMPTYCONFIG;
                         startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)";
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
-                        log() << "replSet   have you ran replSetInitiate yet?" << rsLog;
+                        log(1) << "replSet have you ran replSetInitiate yet?" << rsLog;
                         if( _seeds->size() == 0 )
-                            log() << "replSet   no seed hosts were specified on the --replSet command line - that might be the issue" << rsLog;
+                            log(1) << "replSet info no seed hosts were specified on the --replSet command line" << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;

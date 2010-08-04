@@ -171,7 +171,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::_getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { 
-        Member *m = findById(server_id);
+        const Member *m = findById(server_id);
         if( m == 0 ) { 
             ss << "Error : can't find a member with id: " << server_id << '\n';
             return;
@@ -329,7 +329,7 @@ namespace mongo {
         _rsLog.toHTML( s );
     }
 
-    Member* ReplSetImpl::findById(unsigned id) const { 
+    const Member* ReplSetImpl::findById(unsigned id) const { 
         if( id == _self->id() ) return _self;
         for( Member *m = head(); m; m = m->next() )
             if( m->id() == id ) 
@@ -371,6 +371,7 @@ namespace mongo {
             v.push_back(bb.obj());
             m = m->next();
         }
+        sort(v.begin(), v.end());
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", box.getState().s);
