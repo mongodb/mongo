@@ -27,7 +27,7 @@ doTest = function( signal ) {
     var master = replTest.getMaster();
     var config = master.getDB("local").system.replset.findOne();
 
-    replTest.stopSet( signal );
+    replTest.stopSet( signal , true );
 
     replTest.restart(0);
     replTest.restart(1);
