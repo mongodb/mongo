@@ -114,7 +114,7 @@ namespace mongo {
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes >= 0 && votes <= 100);
-        uassert(13419, "replica set config : this version of mongo only supports priorities 0 and 1", priority == 0 || priority == 1);
+        uassert(13419, "this version of mongod only supports priorities 0 and 1", priority == 0 || priority == 1);
     }
 
     /*static*/ bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) { 
@@ -220,7 +220,7 @@ namespace mongo {
             catch(DBException& e) { 
                 log() << "replSet cfg parsing exception for members[" << i << "] " << e.what() << rsLog;
                 stringstream ss;
-                ss << "replSet members[" << i << "] bad config object";
+                ss << "bad config for member[" << i << "] " << e.what();
                 uassert(13135, ss.str(), false);
             }
             if( !(ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0) ) {
