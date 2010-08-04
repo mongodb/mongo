@@ -1124,8 +1124,12 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
     a.push( "--replSet" );
 
-
-    a.push( this.getURL() )
+    if( this.useSeedList ) {
+      a.push( this.getURL() );
+    }
+    else {
+      a.push( this.name );
+    }
 
     a.push( "--noprealloc", "--smallfiles" );
 
