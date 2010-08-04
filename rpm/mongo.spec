@@ -130,11 +130,6 @@ fi
 %attr(0755,mongod,mongod) %dir /var/log/mongo
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
 
-%files devel
-/usr/include/mongo
-%{_libdir}/libmongoclient.a
-#%{_libdir}/libmongotestfiles.a
-
 %changelog
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
 - Minor fixes.
