@@ -976,7 +976,7 @@ ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
     this.numNodes = opts.nodes || 0;
-    this.useSeedList = /*opts.useSeedList ||*/ true;
+    this.useSeedList = opts.useSeedList || false;
     this.bridged = opts.bridged || false;
     this.ports = [];
 
