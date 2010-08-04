@@ -157,6 +157,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     var localhost = "localhost";
 
+    this._alldbpaths = []
+
+
     if ( otherParams.rs ){
         localhost = getHostName();
         // start replica sets
@@ -173,6 +176,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         this._configServers = []
         for ( var i=0; i<3; i++ ){
             var conn = startMongodTest( 30000 + i , testName + "-config" + i );
+            this._alldbpaths.push( testName + "-config" + i )
             this._configServers.push( conn );
         }
         
@@ -183,6 +187,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     else {
         for ( var i=0; i<numShards; i++){
             var conn = startMongodTest( 30000 + i , testName + i );
+            this._alldbpaths.push( testName +i )
             this._connections.push( conn );
         }
         
@@ -314,6 +319,11 @@ ShardingTest.prototype.stop = function(){
     if ( this._rs ){
         for ( var i=0; i<this._rs.length; i++ ){
             this._rs[i].test.stopSet( 15 );
+        }
+    }
+    if ( this._alldbpaths ){
+        for( i=0; i<this._alldbpaths.length; i++ ){
+            resetDbpath( "/data/db/" + this._alldbpaths[i] );
         }
     }
 
@@ -1024,6 +1034,10 @@ ReplSetTest.prototype.getPort = function( n ){
 ReplSetTest.prototype.getPath = function( n ){
     var p = "/data/db/" + this.name + "-";
     p += n.toString();
+    if ( ! this._alldbpaths )
+        this._alldbpaths = [ p ];
+    else
+        this._alldbpaths.push( p );
     return p;
 }
 
@@ -1330,5 +1344,11 @@ ReplSetTest.prototype.stopSet = function( signal ) {
     for(i=0; i < this.ports.length; i++) {
         this.stop( i, signal );
     }
+    if ( this._alldbpaths ){
+        for( i=0; i<this._alldbpaths.length; i++ ){
+            resetDbpath( this._alldbpaths[i] );
+        }
+    }
+
     print('*** Shut down repl set - test worked ****' )
 }
