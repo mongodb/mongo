@@ -432,7 +432,7 @@ namespace mongo {
             ss << p( a("/", "back", "Home") );
             ss << p( "<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n" );
             const map<string, Command*> *m = Command::commandsByBestName();
-            ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock  A:admin-only<br>\n";
+            ss << "S:slave-ok  R:read-lock  W:write-lock  A:admin-only<br>\n";
             ss << table();
             ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
             for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) 
