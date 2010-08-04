@@ -328,6 +328,38 @@ namespace mongo {
     void ParallelSortClusteredCursor::_finishCons(){
         _numServers = _servers.size();
         _cursors = 0;
+
+        if ( ! _sortKey.isEmpty() && ! _fields.isEmpty() ){
+            // we need to make sure the sort key is in the project
+            bool isNegative = false;
+            BSONObjBuilder b;
+            {
+                BSONObjIterator i( _fields );
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    b.append( e );
+                    if ( ! e.trueValue() )
+                        isNegative = true;
+                }
+            }                    
+            
+            {
+                BSONObjIterator i( _sortKey );
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    BSONElement f = _fields.getField( e.fieldName() );
+                    if ( isNegative ){
+                        uassert( 13431 , "have to have sort key in projection and removing it" , f.eoo() );
+                    }
+                    else if ( f.eoo() ){
+                        // add to projection
+                        b.append( e );
+                    }
+                }
+            }
+            
+            _fields = b.obj();
+        }
     }
     
     void ParallelSortClusteredCursor::_init(){
