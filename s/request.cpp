@@ -123,7 +123,8 @@ namespace mongo {
                 log() << staleConfig.what() << " attempt: " << attempt << endl;
                 uassert( 10195 ,  "too many attempts to update config, failing" , attempt < 5 );
                 ShardConnection::checkMyConnectionVersions( getns() );
-                sleepsecs( attempt );
+                if (!staleConfig.justConnection() )
+                    sleepsecs( attempt );
                 reset( ! staleConfig.justConnection() );
                 _d.markReset();
                 process( attempt + 1 );
