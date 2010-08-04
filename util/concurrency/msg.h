@@ -27,13 +27,13 @@ namespace mongo {
 
         typedef boost::function<void()> lam;
 
-        /** typical usage is: task::fork( serverPtr ); */
+        /** typical usage is: task::fork( new Server("threadname") ); */
         class Server : public Task { 
         public:
             /** send a message to the port */
             void send(lam);
 
-            Server(string name) : _name(name) { }
+            Server(string name) : _name(name), rq(false) { }
             virtual ~Server() { }
 
             /** send message but block until function completes */
@@ -42,9 +42,8 @@ namespace mongo {
             void requeue() { rq = true; }
 
         protected:
-            /* this needn't be abstract; i left it that way for now so i remember 
-               to call Client::initThread() when using in mongo... */
-            virtual void starting() = 0;
+            /* REMINDER : for use in mongod, you will want to have this call Client::initThread(). */
+            virtual void starting() { }
 
         private:
             virtual bool initClient() { return true; }
