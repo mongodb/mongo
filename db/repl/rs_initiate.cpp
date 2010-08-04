@@ -32,10 +32,12 @@ using namespace mongoutils;
 
 namespace mongo { 
 
-    /* throws 
-       @param initial - 
+    /* called on a reconfig AND on initiate
+       throws 
+       @param initial true when initiating
     */
-    void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
+    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
+        int failures = 0;
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             if( i->h.isSelf() ) {
@@ -45,7 +47,7 @@ namespace mongo {
                 }
             }
         }
-        uassert(13278, "bad config?", me <= 1);
+        uassert(13278, "bad config - dups?", me <= 1); // dups?
         uassert(13279, "can't find self in the replset config", me == 1);
 
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
@@ -62,10 +64,10 @@ namespace mongo {
                     }
                 }
                 catch(DBException& e) { 
-                    log() << "replSet requestHeartbeat " << i->h.toString() << " : " << e.toString() << rsLog;
+                    log() << "replSet cmufcc requestHeartbeat " << i->h.toString() << " : " << e.toString() << rsLog;
                 }
                 catch(...) { 
-                    log() << "replSet error exception in requestHeartbeat?" << rsLog;
+                    log() << "replSet cmufcc error exception in requestHeartbeat?" << rsLog;
                 }
                 if( res.getBoolField("mismatch") )
                     uasserted(13145, "set name does not match the set name host " + i->h.toString() + " expects");
@@ -82,9 +84,31 @@ namespace mongo {
                     }
                 }
                 if( !ok && !res["rs"].trueValue() ) {
-                    if( !res.isEmpty() )
+                    if( !res.isEmpty() ) {
+                        /* strange.  got a response, but not "ok". log it. */
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
-                    uasserted(13144, "need members up to initiate/reconfig, not ok: " + i->h.toString());
+                    }
+
+                    bool allowFailure = false;
+                    failures++;
+                    if( res.isEmpty() && !initial && failures == 1 ) {
+                        /* for now we are only allowing 1 node to be down on a reconfig.  this can be made to be a minority
+                           trying to keep change small as release is near.
+                           */
+                        const Member* m = theReplSet->findById( i->_id );
+                        if( m ) { 
+                            // ok, so this was an existing member (wouldn't make sense to add to config a new member that is down)
+                            assert( m->h().toString() == i->h.toString() );
+                            allowFailure = true;
+                        }
+                    }
+
+                    if( !allowFailure ) {
+                        string msg = string("need members up to initiate, not ok : ") + i->h.toString();
+                        if( !initial )
+                            msg = string("need most members up to reconfigure, not ok : ") + i->h.toString();
+                        uasserted(13144, msg);
+                    }
                 }
             }
             if( initial ) {
@@ -186,7 +210,7 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 
-                checkAllMembersUpForConfigChange(newConfig, true);
+                checkMembersUpForConfigChange(newConfig, true);
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
