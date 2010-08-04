@@ -613,6 +613,8 @@ namespace mongo {
             BSONObjIteratorSorted i( query );
             while ( i.more() ){
                 BSONElement e = i.next();
+                if ( e.fieldName()[0] == '$' ) // for $atomic and anything else we add
+                    continue;
 
                 if ( e.type() == Object && e.embeddedObject().firstElement().fieldName()[0] == '$' ){
                     // this means this is a $gt type filter, so don't make part of the new object
