@@ -24,6 +24,7 @@
 #include "queryoptimizer.h"
 #include "cmdline.h"
 #include "clientcursor.h"
+#include <queue>
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
@@ -524,6 +525,15 @@ namespace mongo {
         }        
     }
     
+    struct OpHolder {
+        OpHolder( const shared_ptr< QueryOp > &op ) : _op( op ), _offset() {}
+        shared_ptr< QueryOp > _op;
+        long long _offset;
+        bool operator<( const OpHolder &other ) const {
+            return _op->nscanned() + _offset > other._op->nscanned() + other._offset;
+        }
+    };
+    
     shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
         massert( 10369 ,  "no plans", plans_.plans_.size() > 0 );
         
@@ -548,32 +558,29 @@ namespace mongo {
                 return *i;
         }
         
-        long long nScanned = 0;
-        long long nScannedBackup = 0;
-        while( 1 ) {
-            ++nScanned;
-            unsigned errCount = 0;
-            bool first = true;
-            for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
-                mayYield( ops );
-                QueryOp &op = **i;
-                nextOp( op );
-                if ( op.complete() ) {
-                    if ( first ) {
-                        nScanned += nScannedBackup;
-                    }
-                    if ( plans_.mayRecordPlan_ && op.mayRecordPlan() ) {
-                        op.qp().registerSelf( nScanned );
-                    }
-                    return *i;
+        std::priority_queue< OpHolder > queue;
+        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+            queue.push( *i );
+        }
+        
+        while( !queue.empty() ) {
+            mayYield( ops );
+            OpHolder holder = queue.top();
+            queue.pop();
+            QueryOp &op = *holder._op;
+            nextOp( op );
+            if ( op.complete() ) {
+                if ( plans_.mayRecordPlan_ && op.mayRecordPlan() ) {
+                    op.qp().registerSelf( op.nscanned() );
                 }
-                if ( op.error() )
-                    ++errCount;
-                first = false;
+                return holder._op;
             }
-            if ( errCount == ops.size() )
-                break;
-            if ( !plans_._bestGuessOnly && plans_.usingPrerecordedPlan_ && nScanned > plans_.oldNScanned_ * 10 && plans_._special.empty() ) {
+            if ( op.error() ) {
+                continue;
+            }
+            queue.push( holder );
+            if ( !plans_._bestGuessOnly && plans_.usingPrerecordedPlan_ && op.nscanned() > plans_.oldNScanned_ * 10 && plans_._special.empty() ) {
+                holder._offset = -op.nscanned();
                 plans_.addOtherPlans( true );
                 PlanSet::iterator i = plans_.plans_.begin();
                 ++i;
@@ -584,12 +591,11 @@ namespace mongo {
                     initOp( *op );
                     if ( op->complete() )
                         return op;
+                    queue.push( op );
                 }                
                 plans_.mayRecordPlan_ = true;
                 plans_.usingPrerecordedPlan_ = false;
-                nScannedBackup = nScanned;
-                nScanned = 0;
-            }
+            }            
         }
         return ops[ 0 ];
     }

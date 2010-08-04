@@ -96,6 +96,8 @@ namespace mongo {
 
         virtual bool capped() const { return false; }
 
+        virtual long long nscanned() = 0;
+        
         // The implementation may return different matchers depending on the
         // position of the cursor.  If matcher() is nonzero at the start,
         // matcher() should be checked each time advance() is called.
@@ -124,10 +126,12 @@ namespace mongo {
     protected:
         DiskLoc curr, last;
         const AdvanceStrategy *s;
+        void incNscanned() { if ( !curr.isNull() ) { ++_nscanned; } }
 
     private:
         bool tailable_;
         shared_ptr< CoveredIndexMatcher > _matcher;
+        long long _nscanned;
         void init() {
             tailable_ = false;
         }
@@ -153,10 +157,11 @@ namespace mongo {
         
         bool advance();
 
-        BasicCursor(DiskLoc dl, const AdvanceStrategy *_s = forward()) : curr(dl), s( _s ) {
+        BasicCursor(DiskLoc dl, const AdvanceStrategy *_s = forward()) : curr(dl), s( _s ), _nscanned() {
+            incNscanned();
             init();
         }
-        BasicCursor(const AdvanceStrategy *_s = forward()) : s( _s ) {
+        BasicCursor(const AdvanceStrategy *_s = forward()) : s( _s ), _nscanned() {
             init();
         }
         virtual string toString() {
@@ -179,6 +184,8 @@ namespace mongo {
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
             _matcher = matcher;
         }
+        
+        virtual long long nscanned() { return _nscanned; }
         
     };
 

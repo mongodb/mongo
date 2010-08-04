@@ -1200,6 +1200,7 @@ namespace QueryOptimizerTests {
                     return op;
                 }
                 virtual bool mayRecordPlan() const { return true; }
+                virtual long long nscanned() { return 0; }
             private:
                 bool iThrow_;
                 bool &threw_;
@@ -1233,6 +1234,7 @@ namespace QueryOptimizerTests {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }
+                virtual long long nscanned() { return 0; }
             };
         };
         
@@ -1305,6 +1307,7 @@ namespace QueryOptimizerTests {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }
+                virtual long long nscanned() { return 0; }
             };
             class NoRecordTestOp : public TestOp {
                 virtual bool mayRecordPlan() const { return false; }
@@ -1332,6 +1335,7 @@ namespace QueryOptimizerTests {
         private:
             class TestOp : public QueryOp {
             public:
+                TestOp() {}
                 virtual void _init() {}
                 virtual void next() {
                     if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
@@ -1342,6 +1346,7 @@ namespace QueryOptimizerTests {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }
+                virtual long long nscanned() { return 1; }
             };
             class ScanOnlyTestOp : public TestOp {
                 virtual void next() {
@@ -1380,7 +1385,7 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insertWithObjMod( ns(), one );
                 deleteObjects( ns(), BSON( "a" << 1 ), false );
                 ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ) ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 2, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ) ).pattern() ) );
+                ASSERT_EQUALS( 1, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ) ).pattern() ) );
             }
         };
         
@@ -1445,7 +1450,7 @@ namespace QueryOptimizerTests {
                     runQuery( m2, q);
                 }
                 ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );                
-                ASSERT_EQUALS( 2, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
+                ASSERT_EQUALS( 3, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
             }
         };
         

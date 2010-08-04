@@ -114,6 +114,10 @@ namespace mongo {
                 c_->advance();
             }
         }
+        virtual long long nscanned() {
+            assert( c_.get() );
+            return c_->nscanned();
+        }
         virtual bool mayRecordPlan() const { return false; }
         virtual QueryOp *_createChild() const { return new FindOne( requireIndex_ ); }
         BSONObj one() const { return one_; }

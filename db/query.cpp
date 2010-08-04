@@ -75,6 +75,10 @@ namespace mongo {
                 massert( 13340, "cursor dropped during delete", false );
             }
         }
+        virtual long long nscanned() {
+            assert( c_.get() );
+            return c_->nscanned();
+        }
         virtual void next() {
             if ( !c_->ok() ) {
                 setComplete();
@@ -89,7 +93,7 @@ namespace mongo {
             }
 
             c_->advance();
-            ++_nscanned;
+            _nscanned = c_->nscanned();
             if ( count_ > bestCount_ )
                 bestCount_ = count_;
             
@@ -409,6 +413,11 @@ namespace mongo {
             }
         }
 
+        virtual long long nscanned() {
+            assert( c_.get() );
+            return c_->nscanned();
+        }
+        
         virtual bool prepareToYield() {
             if ( ! _cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , _ns.c_str() ) );
@@ -657,6 +666,14 @@ namespace mongo {
             }
         }        
         
+        virtual long long nscanned() {
+            if ( _findingStartCursor.get() ) {
+                return 0; // should only be one query plan, so value doesn't really matter.
+            }
+            assert( _c.get() );
+            return _c->nscanned();
+        }
+        
         virtual void next() {
             if ( _findingStartCursor.get() ) {
                 if ( _findingStartCursor->done() ) {
@@ -684,7 +701,7 @@ namespace mongo {
                 return;
             }
 
-            _nscanned++;
+            _nscanned = _c->nscanned();
             if ( !matcher()->matches(_c->currKey(), _c->currLoc() , &_details ) ) {
                 // not a match, continue onward
                 if ( _details.loadedObject )
@@ -794,7 +811,7 @@ namespace mongo {
         }
         
         void finishExplain( const BSONObj &suffix ) {
-            BSONObj obj = _eb.finishWithSuffix( nscanned(), nscannedObjects(), n(), _curop.elapsedMillis(), suffix);
+            BSONObj obj = _eb.finishWithSuffix( totalNscanned(), nscannedObjects(), n(), _curop.elapsedMillis(), suffix);
             fillQueryResultFromObj(_buf, 0, obj);
             _n = 1;
             _oldN = 0;
@@ -810,7 +827,7 @@ namespace mongo {
             }
             UserQueryOp *ret = new UserQueryOp( _pq, _response, _eb, _curop );
             ret->_oldN = n();
-            ret->_oldNscanned = nscanned();
+            ret->_oldNscanned = totalNscanned();
             ret->_oldNscannedObjects = nscannedObjects();
             ret->_ntoskip = _ntoskip;
             return ret;
@@ -819,7 +836,7 @@ namespace mongo {
         bool scanAndOrderRequired() const { return _inMemSort; }
         shared_ptr<Cursor> cursor() { return _c; }
         int n() const { return _oldN + _n; }
-        long long nscanned() const { return _nscanned + _oldNscanned; }
+        long long totalNscanned() const { return _nscanned + _oldNscanned; }
         long long nscannedObjects() const { return _nscannedObjects + _oldNscannedObjects; }
         bool saveClientCursor() const { return _saveClientCursor; }
         bool wouldSaveClientCursor() const { return _wouldSaveClientCursor; }
@@ -1025,7 +1042,7 @@ namespace mongo {
             dqo.finishExplain( explainSuffix );
         }
         n = dqo.n();
-        long long nscanned = dqo.nscanned();
+        long long nscanned = dqo.totalNscanned();
         if ( dqo.scanAndOrderRequired() )
             ss << " scanAndOrder ";
         shared_ptr<Cursor> cursor = dqo.cursor();

@@ -114,6 +114,8 @@ namespace mongo {
         virtual bool prepareToYield() { massert( 13335, "yield not supported", false ); return false; }
         virtual void recoverFromYield() { massert( 13336, "yield not supported", false ); }
         
+        virtual long long nscanned() = 0;
+        
         /** @return a copy of the inheriting class, which will be run with its own
                     query plan.  If multiple plan sets are required for an $or query,
                     the QueryOp of the winning plan from a given set will be cloned
@@ -312,7 +314,7 @@ namespace mongo {
         };
         // takes ownership of 'op'
         MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr< CursorOp > op = shared_ptr< CursorOp >(), bool mayYield = false )
-        : _mps( new MultiPlanScanner( ns, pattern, order, 0, true, BSONObj(), BSONObj(), !op.get(), mayYield ) ) {
+        : _mps( new MultiPlanScanner( ns, pattern, order, 0, true, BSONObj(), BSONObj(), !op.get(), mayYield ) ), _nscanned() {
             if ( op.get() ) {
                 _op = op;
             } else {
@@ -329,7 +331,7 @@ namespace mongo {
         }
         // used to handoff a query to a getMore()
         MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, const shared_ptr< CoveredIndexMatcher > &matcher, const QueryOp &op )
-        : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ) {
+        : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ), _nscanned( -1 ) {
             _mps->setBestGuessOnly();
             _mps->mayYield( false ); // with a NoOp, there's no need to yield in QueryPlanSet
             if ( !ok() ) {
@@ -365,6 +367,8 @@ namespace mongo {
             return _c->getsetdup( loc );   
         }
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
+        // return -1 if we're a getmore handoff
+        virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }
         // just for testing
         shared_ptr< Cursor > sub_c() const { return _c; }
     private:
@@ -377,8 +381,12 @@ namespace mongo {
             virtual bool mayRecordPlan() const { return false; }
             virtual QueryOp *_createChild() const { return new NoOp(); }
             virtual shared_ptr< Cursor > newCursor() const { return qp().newCursor(); }
+            virtual long long nscanned() { assert( false ); return 0; }
         };
         void nextClause() {
+            if ( _nscanned >= 0 && _c.get() ) {
+                _nscanned += _c->nscanned();
+            }
             shared_ptr< CursorOp > best = _mps->runOpOnce( *_op );
             if ( ! best->complete() )
                 throw MsgAssertionException( best->exception() );
@@ -390,6 +398,7 @@ namespace mongo {
         shared_ptr< Cursor > _c;
         auto_ptr< MultiPlanScanner > _mps;
         shared_ptr< CoveredIndexMatcher > _matcher;
+        long long _nscanned;
     };
     
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.

@@ -364,6 +364,8 @@ namespace mongo {
             _matcher = matcher;
         }
 
+        virtual long long nscanned() { return _nscanned; }
+        
         // for debugging only
         DiskLoc getBucket() const { return bucket; }
         
@@ -408,6 +410,7 @@ namespace mongo {
         const IndexSpec& _spec;
         shared_ptr< CoveredIndexMatcher > _matcher;
         bool _independentFieldRanges;
+        long long _nscanned;
     };
 
 

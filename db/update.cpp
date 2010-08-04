@@ -747,7 +747,11 @@ namespace mongo {
                 _cc.reset();
                 massert( 13339, "cursor dropped during update", false );
             }
-        }        
+        }     
+        virtual long long nscanned() {
+            assert( _c.get() );
+            return _c->nscanned();
+        }
         virtual void next() {
             if ( ! _c->ok() ) {
                 setComplete();

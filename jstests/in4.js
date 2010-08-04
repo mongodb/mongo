@@ -41,7 +41,7 @@ assert.eq.automsg( "1", "t.find( {a:2,b:{$in:[3,4]},c:5} ).explain().nscanned" )
 t.remove();
 t.save( {a:2,b:4,c:5} );
 t.save( {a:2,b:4,c:4} );
-assert.eq.automsg( "1", "t.find( {a:2,b:{$in:[3,4]},c:5} ).explain().nscanned" );
+assert.eq.automsg( "2", "t.find( {a:2,b:{$in:[3,4]},c:5} ).explain().nscanned" );
 
 t.drop();
 t.ensureIndex( {a:1,b:-1} );

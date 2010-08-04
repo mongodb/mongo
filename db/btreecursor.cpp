@@ -38,7 +38,8 @@ namespace mongo {
             _ordering( Ordering::make( order ) ),
             direction( _direction ),
             _spec( _id.getSpec() ),
-            _independentFieldRanges( false )
+            _independentFieldRanges( false ),
+            _nscanned( 0 )
     {
         audit();
         init();
@@ -57,7 +58,8 @@ namespace mongo {
             bounds_( ( assert( _bounds.get() ), _bounds ) ),
             _boundsIterator( new FieldRangeVector::Iterator( *bounds_  ) ),
             _spec( _id.getSpec() ),
-            _independentFieldRanges( true )
+            _independentFieldRanges( true ),
+            _nscanned( 0 )
     {
         massert( 13384, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
         audit();
@@ -93,6 +95,9 @@ namespace mongo {
         bool found;
         bucket = indexDetails.head.btree()->
             locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
+        if ( ok() ) {
+            _nscanned = 1;
+        }        
         skipUnusedKeys( false );
         checkEnd();
     }
@@ -119,8 +124,10 @@ namespace mongo {
             bucket = DiskLoc();
             return false;
         } else if ( ret == -1 ) {
+            ++_nscanned;
             return false;
         }
+        ++_nscanned;
         advanceTo( currKeyNode().key, ret, _boundsIterator->cmp() );
         return true;
     }
@@ -137,6 +144,8 @@ namespace mongo {
                 break;
             bucket = b->advance(bucket, keyOfs, direction, "skipUnusedKeys");
             u++;
+            //don't include unused keys in nscanned
+            //++_nscanned;
             if ( mayJump && ( u % 10 == 0 ) ) {
                 skipOutOfRangeKeysAndCheckEnd();
             }
@@ -175,14 +184,16 @@ namespace mongo {
             return false;
 
         bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");
-
+        
         if ( !_independentFieldRanges ) {
             skipUnusedKeys( false );
             checkEnd();
-            return ok();
+            if ( ok() ) {
+                ++_nscanned;
+            }
+        } else {
+            skipAndCheck();
         }
-        
-        skipAndCheck();
         return ok();
     }
 

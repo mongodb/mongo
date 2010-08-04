@@ -8,4 +8,4 @@ assert.eq( {i:[[3,3],[6,6]]}, t.find( {i:{$in:[3,6]}} ).explain().indexBounds , 
 for ( var i=0; i<20; i++ )
     t.insert( { i : i } );
 
-assert.eq( 2 , t.find( {i:{$in:[3,6]}} ).explain().nscanned , "B1" )
+assert.eq( 3 , t.find( {i:{$in:[3,6]}} ).explain().nscanned , "B1" )

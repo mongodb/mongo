@@ -976,7 +976,10 @@ namespace mongo {
     public:
         GeoSearchCursor( shared_ptr<GeoSearch> s )
             : GeoCursorBase( s->_spec ) , 
-              _s( s ) , _cur( s->_hopper->_points.begin() ) , _end( s->_hopper->_points.end() ) {
+              _s( s ) , _cur( s->_hopper->_points.begin() ) , _end( s->_hopper->_points.end() ), _nscanned() {
+                  if ( _cur != _end ) {
+                      ++_nscanned;
+                  }
         }
         
         virtual ~GeoSearchCursor() {}
@@ -988,7 +991,7 @@ namespace mongo {
         virtual Record* _current(){ assert(ok()); return _cur->_loc.rec(); }
         virtual BSONObj current(){ assert(ok()); return _cur->_o; }
         virtual DiskLoc currLoc(){ assert(ok()); return _cur->_loc; }
-        virtual bool advance(){ _cur++; return ok(); }
+        virtual bool advance(){ _cur++; incNscanned(); return ok(); }
         virtual BSONObj currKey() const { return _cur->_key; }
 
         virtual string toString() {
@@ -1004,18 +1007,22 @@ namespace mongo {
             temp.move( 1 , 1 );
             return BSON( _s->_spec->_geo << temp.toString() ); 
         }
-
+        
+        virtual long long nscanned() { return _nscanned; }
 
         shared_ptr<GeoSearch> _s;
         GeoHopper::Holder::iterator _cur;
         GeoHopper::Holder::iterator _end;
+        
+        void incNscanned() { if ( ok() ) { ++_nscanned; } }
+        long long _nscanned;
     };
 
     class GeoBrowse : public GeoCursorBase , public GeoAccumulator {
     public:
         GeoBrowse( const Geo2dType * g , string type , BSONObj filter = BSONObj() )
             : GeoCursorBase( g ) ,GeoAccumulator( g , filter ) ,
-              _type( type ) , _filter( filter ) , _firstCall(true) {
+              _type( type ) , _filter( filter ) , _firstCall(true), _nscanned() {
         }
         
         virtual string toString() {
@@ -1023,17 +1030,26 @@ namespace mongo {
         }
 
         virtual bool ok(){
+            bool first = _firstCall;
             if ( _firstCall ){
                 fillStack();
                 _firstCall = false;
             }
-            if ( ! _cur.isEmpty() || _stack.size() )
+            if ( ! _cur.isEmpty() || _stack.size() ) {
+                if ( first ) {
+                    ++_nscanned;
+                }
                 return true;
+            }
 
             while ( moreToDo() ){
                 fillStack();
-                if ( ! _cur.isEmpty() )
+                if ( ! _cur.isEmpty() ) {
+                    if ( first ) {
+                        ++_nscanned;
+                    }
                     return true;
+                }
             }
             
             return false;
@@ -1045,6 +1061,7 @@ namespace mongo {
             if ( _stack.size() ){
                 _cur = _stack.front();
                 _stack.pop_front();
+                ++_nscanned;
                 return true;
             }
             
@@ -1053,7 +1070,7 @@ namespace mongo {
             
             while ( _cur.isEmpty() && moreToDo() )
                 fillStack();
-            return ! _cur.isEmpty();
+            return ! _cur.isEmpty() && ++_nscanned;
         }
         
         virtual Record* _current(){ assert(ok()); return _cur._loc.rec(); }
@@ -1072,12 +1089,21 @@ namespace mongo {
                 _stack.push_back( GeoPoint( node , d ) );
         }
 
+        virtual long long nscanned() {
+            if ( _firstCall ) {
+                ok();
+            }
+            return _nscanned;
+        }        
+        
         string _type;
         BSONObj _filter;
         list<GeoPoint> _stack;
 
         GeoPoint _cur;
         bool _firstCall;
+        
+        long long _nscanned;
 
     };
 
