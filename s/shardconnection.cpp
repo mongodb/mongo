@@ -26,6 +26,7 @@ namespace mongo {
     
     /**
      * holds all the actual db connections for a client to various servers
+     * 1 pre thread, so don't have to worry about thread safety
      */
     class ClientConnections : boost::noncopyable {
     public:
@@ -70,7 +71,8 @@ namespace mongo {
             _hosts.clear();
         }
         
-        DBClientBase * get( const string& addr ){
+        DBClientBase * get( const string& addr , const string& ns ){
+            _check( ns );
             scoped_lock lk( _mutex );
             Status* &s = _hosts[addr];
             if ( ! s )
@@ -152,9 +154,16 @@ namespace mongo {
             }
         }
         
+        void _check( const string& ns ){
+            if ( ns.size() == 0 || _seenNS.count( ns ) )
+                return;
+            _seenNS.insert( ns );
+            checkVersions( ns );
+        }
+
         map<string,Status*> _hosts;
         mongo::mutex _mutex;
-
+        set<string> _seenNS;
         // -----
         
         static thread_specific_ptr<ClientConnections> _perThread;
@@ -188,7 +197,7 @@ namespace mongo {
     
     void ShardConnection::_init(){
         assert( _addr.size() );
-        _conn = ClientConnections::get()->get( _addr );
+        _conn = ClientConnections::get()->get( _addr , _ns );
         _finishedInit = false;
     }
 
