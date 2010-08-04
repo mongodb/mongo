@@ -976,6 +976,7 @@ ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
     this.numNodes = opts.nodes || 0;
+    this.useSeedList = opts.useSeedList || false;
     this.bridged = opts.bridged || false;
     this.ports = [];
 
@@ -1105,8 +1106,12 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
     a.push( "--replSet" );
 
-
-    a.push( this.getURL() )
+    if( this.useSeedList ) {
+      a.push( this.getURL() );
+    }
+    else {
+      a.push( this.name );
+    }
 
     a.push( "--noprealloc", "--smallfiles" );
 
