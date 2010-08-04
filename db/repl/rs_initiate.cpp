@@ -67,7 +67,6 @@ namespace mongo {
                 catch(...) { 
                     log() << "replSet error exception in requestHeartbeat?" << rsLog;
                 }
-                cout << "TEMP hb res cfg change:" << res.toString() << endl;
                 if( res.getBoolField("mismatch") )
                     uasserted(13145, "set name does not match the set name host " + i->h.toString() + " expects");
                 if( *res.getStringField("set") ) {
