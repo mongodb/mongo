@@ -126,6 +126,7 @@ namespace mongo {
                     assert( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
                     c.curop()->setMessage( buf );
                     sleepmillis(1);
+                    killCurrentOp.checkForInterrupt();
                 }
                 result.appendNumber( "wtime" , t.millis() );
             }
