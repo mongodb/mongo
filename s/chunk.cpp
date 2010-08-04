@@ -265,7 +265,7 @@ namespace mongo {
         }
 
         // Save the new key boundaries in the configDB.
-        _manager->save();
+        _manager->save( false );
 
         // Log all these changes in the configDB's log. We log a simple split differently than a multi-split.
         if ( newChunks.size() == 1) {
@@ -584,7 +584,7 @@ namespace mongo {
 
             _shards.insert(c->getShard());
 
-            save_inlock();
+            save_inlock( true );
             log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
         }
     }
@@ -880,16 +880,18 @@ namespace mongo {
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
     
-    void ChunkManager::save(){
+    void ChunkManager::save( bool major ){
         rwlock lk( _lock , true ); 
-        save_inlock();
+        save_inlock( major );
     }
     
-    void ChunkManager::save_inlock(){
+    void ChunkManager::save_inlock( bool major ){
         
         ShardChunkVersion a = getVersion_inlock();
         assert( a > 0 || _chunkMap.size() <= 1 );
-        ShardChunkVersion nextChunkVersion = a.incMajor();
+        ShardChunkVersion nextChunkVersion = a;
+        nextChunkVersion.inc( major );
+
         vector<ChunkPtr> toFix;
         vector<ShardChunkVersion> newVersions;
         
@@ -907,7 +909,7 @@ namespace mongo {
             _sequenceNumber = ++NextSequenceNumber;
 
             ShardChunkVersion myVersion = nextChunkVersion;
-            ++nextChunkVersion;
+            nextChunkVersion.incMinor();
             toFix.push_back( c );
             newVersions.push_back( myVersion );
 
