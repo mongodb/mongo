@@ -1345,11 +1345,11 @@ ReplSetTest.prototype.stop = function( n , signal ){
     return stopMongod( port , signal || 15 );
 }
 
-ReplSetTest.prototype.stopSet = function( signal ) {
+ReplSetTest.prototype.stopSet = function( signal , forRestart ) {
     for(i=0; i < this.ports.length; i++) {
         this.stop( i, signal );
     }
-    if ( this._alldbpaths ){
+    if ( ! forRestart && this._alldbpaths ){
         for( i=0; i<this._alldbpaths.length; i++ ){
             resetDbpath( this._alldbpaths[i] );
         }

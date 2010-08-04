@@ -290,11 +290,13 @@ namespace mongo {
             }
         }
         else {
-            result.append("ismaster", replSettings.master || replSettings.slave == 0 ? 1 : 0);
-            //result.append("msg", "not paired");
+            result.appendBool("ismaster", _isMaster() );
         }
-        
-        if ( level ){
+
+        if ( level && replSet ){
+            result.append( "info" , "is replica set" );
+        }
+        else if ( level ){
             BSONObjBuilder sources( result.subarrayStart( "sources" ) );
             
             readlock lk( "local.sources" );

@@ -1118,13 +1118,13 @@ def jsToH(target, source, env):
 
     h += ";\n\n"
 
-    out = open( outFile , 'w' )
+    out = open( outFile , 'wb' )
     out.write( h )
     out.close()
 
     # mongo_vstudio.cpp is in git as the .vcproj doesn't generate this file.
     if outFile.find( "mongo.cpp" ) >= 0:
-        out = open( outFile.replace( "mongo" , "mongo_vstudio" ) , 'w' )
+        out = open( outFile.replace( "mongo" , "mongo_vstudio" ) , 'wb' )
         out.write( h )
         out.close()
 
