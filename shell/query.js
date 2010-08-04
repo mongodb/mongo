@@ -243,6 +243,20 @@ DBQuery.prototype.explain = function (verbose) {
     if (!verbose) {
         delete e.allPlans;
         delete e.oldPlan;
+        if (e.shards){
+            for (var key in e.shards){
+                var s = e.shards[key];
+                if(s.length === undefined){
+                    delete s.allPlans;
+                    delete s.oldPlan;
+                } else {
+                    for (var i=0; i < s.length; i++){
+                        delete s[i].allPlans;
+                        delete s[i].oldPlan;
+                    }
+                }
+            }
+        }
     }
     return e;
 }
