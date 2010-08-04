@@ -19,6 +19,7 @@
 #include "../client/dbclient.h"
 #include "../db/dbhelpers.h"
 #include "../db/cmdline.h"
+#include "../s/shard.h"
 
 namespace mongo {
 
@@ -57,10 +58,15 @@ namespace mongo {
         uassert( 10256 ,  "no createDirectClient in clientOnly" , 0 );
         return 0;
     }
-/*
-    auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
-        uassert( 10000 ,  "Helpers::find can't be used in client" , 0 );
-        return auto_ptr<CursorIterator>(0);
+
+    void Shard::getAllShards( vector<Shard>& all ){
+        assert(0);
     }
-*/
+
+    bool Shard::isAShard( const string& ident ){
+        assert(0);
+        return false;
+    }
+
+
 }
