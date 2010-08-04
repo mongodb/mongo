@@ -544,7 +544,7 @@ namespace mongo {
                 // 5.a
                 migrateFromStatus._inCriticalSection = true;
                 ShardChunkVersion myVersion = maxVersion;
-                ++myVersion;
+                myVersion.incMajor();
                 
                 {
                     dblock lk;
@@ -587,7 +587,8 @@ namespace mongo {
                     if ( ! x.isEmpty() ){
                         
                         BSONObjBuilder temp2;
-                        ++myVersion;
+                        myVersion.incMinor();
+
                         temp2.appendTimestamp( "lastmod" , myVersion );
                         
                         shardingState.setVersion( ns , myVersion );

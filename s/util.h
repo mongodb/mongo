@@ -58,11 +58,19 @@ namespace mongo {
             }
         }
 
-        ShardChunkVersion incMajor() const {
-            return ShardChunkVersion( _major + 1 , 0 );
+        void inc( bool major ){
+            if ( major )
+                incMajor();
+            else
+                incMinor();
         }
 
-        void operator++(){
+        void incMajor() {
+            _major++;
+            _minor = 0;
+        }
+        
+        void incMinor() {
             _minor++;
         }
 
@@ -79,8 +87,9 @@ namespace mongo {
             ss << _major << "|" << _minor; 
             return ss.str(); 
         }
+        
         operator unsigned long long() const { return _combined; }
-
+        
         ShardChunkVersion& operator=( const BSONElement& elem ){
             switch ( elem.type() ){
             case Timestamp:
