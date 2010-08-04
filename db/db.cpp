@@ -984,8 +984,10 @@ int main(int argc, char* argv[], char *envp[] )
 				cmdLine.port = CmdLine::ShardServerPort;
 		}
         else { 
-            uassert( 13392, "bad --port number", cmdLine.port > 0 );
-            uassert( 13391, "bad --port number", cmdLine.port <= 65535 || params.count("ipv6") );
+            if ( cmdLine.port <= 0 || cmdLine.port > 65535 ){
+                out() << "bad --port number" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
         }
         if ( params.count("configsvr" ) ){
             if ( params.count( "diaglog" ) == 0 )
