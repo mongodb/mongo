@@ -125,7 +125,7 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 	WT_RET(__wt_calloc(env, 11, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DB_CACHE_ALLOC].desc =
-	    "cache: pages allocated in the cache";
+	    "cache allocation: pages allocated in the cache";
 	stats[WT_STAT_DB_CACHE_HIT].desc =
 	    "cache hit: reads found in the cache";
 	stats[WT_STAT_DB_CACHE_MISS].desc =

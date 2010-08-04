@@ -52,7 +52,7 @@ cache_stats['CACHE_READ_RESTARTS'] = Stat([], 'cache read restarts')
 # IDB handle statistics
 ##########################################
 idb_stats = {}
-idb_stats['DB_CACHE_ALLOC'] = Stat([], 'cache: pages allocated in the cache')
+idb_stats['DB_CACHE_ALLOC'] = Stat([], 'cache allocation: pages allocated in the cache')
 idb_stats['DB_CACHE_HIT'] = Stat([], 'cache hit: reads found in the cache')
 idb_stats['DB_CACHE_MISS'] = Stat([], 'cache miss: reads not found in the cache')
 idb_stats['DUPLICATE_ITEMS_INSERTED'] = Stat([], 'duplicate key/data pairs inserted')
