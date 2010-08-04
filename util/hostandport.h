@@ -74,6 +74,7 @@ namespace mongo {
         string host() const { return _host; }
 
         int port() const { return _port >= 0 ? _port : CmdLine::DefaultDBPort; }
+        bool hasPort() const { return _port >= 0; }
         void setPort( int port ) { _port = port; }
 
     private:
