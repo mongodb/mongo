@@ -976,7 +976,7 @@ ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
     this.numNodes = opts.nodes || 0;
-    this.useSeedList = opts.useSeedList || false;
+    this.useSeedList = /*opts.useSeedList ||*/ true;
     this.bridged = opts.bridged || false;
     this.ports = [];
 
@@ -1345,11 +1345,11 @@ ReplSetTest.prototype.stop = function( n , signal ){
     return stopMongod( port , signal || 15 );
 }
 
-ReplSetTest.prototype.stopSet = function( signal ) {
+ReplSetTest.prototype.stopSet = function( signal , forRestart ) {
     for(i=0; i < this.ports.length; i++) {
         this.stop( i, signal );
     }
-    if ( this._alldbpaths ){
+    if ( ! forRestart && this._alldbpaths ){
         for( i=0; i<this._alldbpaths.length; i++ ){
             resetDbpath( this._alldbpaths[i] );
         }
