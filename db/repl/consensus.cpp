@@ -92,8 +92,8 @@ namespace mongo {
         LastYea &ly = t.ref();
         time_t now = time(0);
         if( ly.when + LeaseTime >= now && ly.who != memberId ) {
-            log() << "replSet TEMP not voting yea for " << memberId << rsLog;
-            log() << "replSet TEMP voted for " << ly.who << ' ' << now-ly.when << " secs ago" << rsLog;
+            log(1) << "replSet not voting yea for " << memberId <<
+                " voted for " << ly.who << ' ' << now-ly.when << " secs ago" << rsLog;
             throw VoteException();
         }
         ly.when = now;

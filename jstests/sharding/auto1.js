@@ -53,7 +53,7 @@ counts.push( s.config.chunks.count() );
 
 assert( counts[counts.length-1] > counts[0] , "counts 1 : " + tojson( counts ) )
 sorted = counts.slice(0)
-Array.sort( sorted )
+sorted.sort();
 assert.eq( counts , sorted , "counts 2 : " + tojson( counts ) )
 
 print( counts )

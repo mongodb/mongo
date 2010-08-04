@@ -868,7 +868,7 @@ namespace mongo {
         return UpdateResult( 1 , 0 , 1 );
     }
  
-    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug) {
+    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug, RemoveSaver* rs ) {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         Client& client = cc();
         int profile = client.database()->profile;
@@ -1019,6 +1019,9 @@ namespace mongo {
                     }
                 } 
                 else {
+                    if ( rs )
+                        rs->goingToDelete( onDisk );
+
                     BSONObj newObj = mss->createNewFromMods();
                     checkTooLarge(newObj);
                     bool changedId;

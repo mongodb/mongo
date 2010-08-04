@@ -155,27 +155,54 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     if ( otherParams.sync && numShards < 3 )
         throw "if you want sync, you need at least 3 servers";
 
-    for ( var i=0; i<numShards; i++){
-        var conn = startMongodTest( 30000 + i , testName + i );
-        this._connections.push( conn );
-    }
+    var localhost = "localhost";
 
-    if ( otherParams.sync ){
-        this._configDB = "localhost:30000,localhost:30001,localhost:30002";
+    if ( otherParams.rs ){
+        localhost = getHostName();
+        // start replica sets
+        this._rs = []
+        for ( var i=0; i<numShards; i++){
+            var rs = new ReplSetTest( { name : testName + "-rs" + i , nodes : 3 , startPort : 31100 + ( i * 100 ) } );
+            this._rs[i] = { test : rs , nodes : rs.startSet( { oplogSize:40 } ) , url : rs.getURL() };
+            rs.initiate();
+            rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
+            rs.awaitReplication();
+            this._connections.push( new Mongo( rs.getURL() ) );
+        }
+        
+        this._configServers = []
+        for ( var i=0; i<3; i++ ){
+            var conn = startMongodTest( 30000 + i , testName + "-config" + i );
+            this._configServers.push( conn );
+        }
+        
+        this._configDB = localhost + ":30000," + localhost + ":30001," + localhost + ":30002";
         this._configConnection = new Mongo( this._configDB );
         this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );        
     }
     else {
-        this._configDB = "localhost:30000";
-        this._connections[0].getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
+        for ( var i=0; i<numShards; i++){
+            var conn = startMongodTest( 30000 + i , testName + i );
+            this._connections.push( conn );
+        }
+        
+        if ( otherParams.sync ){
+            this._configDB = "localhost:30000,localhost:30001,localhost:30002";
+            this._configConnection = new Mongo( this._configDB );
+            this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );        
+        }
+        else {
+            this._configDB = "localhost:30000";
+            this._connections[0].getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
+        }
     }
-
+    
     this._mongos = [];
     var startMongosPort = 31000;
     for ( var i=0; i<(numMongos||1); i++ ){
         var myPort =  startMongosPort - i;
         var conn = startMongos( { port : startMongosPort - i , v : verboseLevel || 0 , configdb : this._configDB }  );
-        conn.name = "localhost:" + myPort;
+        conn.name = localhost + ":" + myPort;
         this._mongos.push( conn );
         if ( i == 0 )
             this.s = conn;
@@ -187,7 +214,15 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     if ( ! otherParams.manualAddShard ){
         this._connections.forEach(
             function(z){
-                admin.runCommand( { addshard : z.name } );
+                var n = z.name;
+                if ( ! n ){
+                    n = z.host;
+                    if ( ! n )
+                        n = z;
+                }
+                print( "going to add shard: " + n )
+                x = admin.runCommand( { addshard : n } );
+                printjson( x )
             }
         );
     }
@@ -275,6 +310,11 @@ ShardingTest.prototype.stop = function(){
     }
     for ( var i=0; i<this._connections.length; i++){
         stopMongod( 30000 + i );
+    }
+    if ( this._rs ){
+        for ( var i=0; i<this._rs.length; i++ ){
+            this._rs[i].test.stopSet( 15 );
+        }
     }
 
     print('*** ' + this._testName + " completed successfully ***");
@@ -1235,6 +1275,14 @@ ReplSetTest.prototype.awaitReplication = function() {
            }
            return synced;
    });
+}
+
+ReplSetTest.prototype.getHashes = function( db ){
+    this.getMaster();
+    var res = {};
+    res.master = this.liveNodes.master.getDB( db ).runCommand( "dbhash" )
+    res.slaves = this.liveNodes.slaves.map( function(z){ return z.getDB( db ).runCommand( "dbhash" ); } )
+    return res;
 }
 
 /**

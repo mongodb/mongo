@@ -78,6 +78,9 @@ namespace mongo {
            need to refetch it once. */
         set<DocID> toRefetch;
 
+        /* collections to drop */
+        set<string> toDrop;
+
         OpTime commonPoint;
         DiskLoc commonPointOurDiskloc;
 
@@ -97,7 +100,7 @@ namespace mongo {
         DocID d;
         d.ns = ourObj.getStringField("ns");
         if( *d.ns == 0 ) { 
-            log() << "replSet WARNING ignoring op on rollback TODO : " << ourObj.toString() << rsLog;
+            log() << "replSet WARNING ignoring op on rollback no ns TODO : " << ourObj.toString() << rsLog;
             return;
         }
 
@@ -107,9 +110,26 @@ namespace mongo {
             return;
         }
 
+        if( *op == 'c' ) { 
+            be first = o.firstElement();
+            NamespaceString s(d.ns); // foo.$cmd
+
+            if( string("create") == first.fieldName() ) {
+                /* Create collection operation 
+                   { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
+                */
+                string ns = s.db + '.' + o["create"].String(); // -> foo.abc
+                h.toDrop.insert(ns);
+                return;
+            }
+            else { 
+                log() << "replSet WARNING can't roll back this command yet: " << o.toString() << rsLog;
+            }
+        }
+
         d._id = o["_id"];
         if( d._id.eoo() ) {
-            log() << "replSet WARNING ignoring op on rollback no _id TODO : " << ourObj.toString() << rsLog;
+            log() << "replSet WARNING ignoring op on rollback no _id TODO : " << d.ns << ' '<< ourObj.toString() << rsLog;
             return;
         }
 
@@ -250,9 +270,9 @@ namespace mongo {
 
        sethbmsg("syncRollback 3.5");
        if( h.rbid != getRBID(r.conn()) ) { 
-	 // our source rolled back itself.  so the data we received isn't necessarily consistent.
-	   sethbmsg("syncRollback rbid on source changed during rollback, cancelling this attempt");
-	   return;
+           // our source rolled back itself.  so the data we received isn't necessarily consistent.
+           sethbmsg("syncRollback rbid on source changed during rollback, cancelling this attempt");
+           return;
        }
 
        // update them
@@ -267,16 +287,32 @@ namespace mongo {
        dbMutex.assertWriteLocked();
 
        /* we have items we are writing that aren't from a point-in-time.  thus best not to come online 
-	  until we get to that point in freshness. */
+	      until we get to that point in freshness. */
        try {
            log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
        }
        catch(...){}
        Helpers::putSingleton("local.replset.minvalid", newMinValid);
 
+       /** first drop collections to drop - that might make things faster below actually if there were subsequent inserts */
+       for( set<string>::iterator i = h.toDrop.begin(); i != h.toDrop.end(); i++ ) { 
+           Client::Context c(*i, dbpath, 0, /*doauth*/false);
+           try {
+               bob res;
+               string errmsg;
+               log(1) << "replSet rollback drop: " << *i << rsLog;
+               dropCollection(*i, errmsg, res);
+           }
+           catch(...) { 
+               log() << "replset rollback error dropping collection " << *i << rsLog;
+           }
+       }
+
        Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
        uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
+
+       map<string,shared_ptr<RemoveSaver> > removeSavers;
 
        unsigned deletes = 0, updates = 0;
        for( list<pair<DocID,bo> >::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
@@ -284,24 +320,87 @@ namespace mongo {
            bo pattern = d._id.wrap(); // { _id : ... }
            try { 
                assert( d.ns && *d.ns );
+               
+               shared_ptr<RemoveSaver>& rs = removeSavers[d.ns];
+               if ( ! rs )
+                   rs.reset( new RemoveSaver( "rollback" , "" , d.ns ) );
+
                // todo: lots of overhead in context, this can be faster
                Client::Context c(d.ns, dbpath, 0, /*doauth*/false);
                if( i->second.isEmpty() ) {
                    // wasn't on the primary; delete.
                    /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
-                   try { 
-                       deletes++;
-                       deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
+                   deletes++;
+
+                   NamespaceDetails *nsd = nsdetails(d.ns);
+                   if( nsd ) {
+                       if( nsd->capped ) { 
+                           /* can't delete from a capped collection - so we truncate instead. if this item must go, 
+                           so must all successors!!! */
+                           try { 
+                               /** todo: IIRC cappedTrunateAfter does not handle completely empty.  todo. */
+                               // this will crazy slow if no _id index.
+                               long long start = Listener::getElapsedTimeMillis();
+                               DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
+                               if( Listener::getElapsedTimeMillis() - start > 200 ) 
+                                   log() << "replSet warning roll back slow no _id index for " << d.ns << rsLog; 
+                               //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);
+                               if( !loc.isNull() ) {
+                                   try {
+                                       nsd->cappedTruncateAfter(d.ns, loc, true);
+                                   }
+                                   catch(DBException& e) { 
+                                       if( e.getCode() == 13415 ) {
+                                           // hack: need to just make cappedTruncate do this...
+                                           nsd->emptyCappedCollection(d.ns);
+                                       } else {
+                                           throw;
+                                       }
+                                   }
+                               }
+                           }
+                           catch(DBException& e) { 
+                               log() << "replSet error rolling back capped collection rec " << d.ns << ' ' << e.toString() << rsLog;
+                           }
+                       }
+                       else {
+                           try { 
+                               deletes++;
+                               deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true, rs.get() );
+                           }
+                           catch(...) { 
+                               log() << "replSet error rollback delete failed ns:" << d.ns << rsLog;
+                           }
+                       }
+                       // did we just empty the collection?  if so let's check if it even exists on the source.
+                       if( nsd->nrecords == 0 ) {
+                           try { 
+                               string sys = cc().database()->name + ".system.namespaces";
+                               bo o = them->findOne(sys, QUERY("name"<<d.ns));
+                               if( o.isEmpty() ) { 
+                                   // we should drop
+                                   try {
+                                       bob res;
+                                       string errmsg;
+                                       dropCollection(d.ns, errmsg, res);
+                                   }
+                                   catch(...) { 
+                                       log() << "replset error rolling back collection " << d.ns << rsLog;
+                                   }
+                               }
+                           }
+                           catch(DBException& ) { 
+                               /* this isn't *that* big a deal, but is bad. */
+                               log() << "replSet warning rollback error querying for existence of " << d.ns << " at the primary, ignoring" << rsLog;
+                           }
+                       }
                    }
-                   catch(...) { 
-                       log() << "replSet rollback delete failed - todo finish capped collection support ns:" << d.ns << rsLog;
-                   }
-                }
+               }
                else {
                    // todo faster...
                    OpDebug debug;
                    updates++;
-                   _updateObjects(/*god*/true, d.ns, i->second, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug);
+                   _updateObjects(/*god*/true, d.ns, i->second, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug, rs.get() );
                }
            }
            catch(DBException& e) { 
@@ -310,12 +409,14 @@ namespace mongo {
            }
        }
 
+       removeSavers.clear(); // this effectively closes all of them
+
        sethbmsg(str::stream() << "syncRollback 5 d:" << deletes << " u:" << updates);
        MemoryMappedFile::flushAll(true);
        sethbmsg("syncRollback 6");
 
        // clean up oplog
-       log() << "replSet rollback temp truncate after " << h.commonPoint.toStringPretty() << rsLog;
+       log(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
        // todo: fatal error if this throws?
        oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
 

@@ -77,7 +77,7 @@ namespace mongo {
            @return true if object found
         */
         static bool findOne(const char *ns, const BSONObj &query, BSONObj& result, bool requireIndex = false);
-        
+        static DiskLoc findOne(const char *ns, const BSONObj &query, bool requireIndex);        
 
         /**
          * @param foundIndex if passed in will be set to 1 if ns and index found
@@ -85,6 +85,10 @@ namespace mongo {
          */
         static bool findById(Client&, const char *ns, BSONObj query, BSONObj& result , 
                              bool * nsFound = 0 , bool * indexFound = 0 );
+
+        /* uasserts if no _id index. 
+           @return null loc if not found */
+        static DiskLoc findById(NamespaceDetails *d, BSONObj query);
 
         static auto_ptr<CursorIterator> find( const char *ns , BSONObj query = BSONObj() , bool requireIndex = false );
 
@@ -148,5 +152,24 @@ namespace mongo {
         string name_;
         BSONObj key_;
     };
+
+
+    /**
+     * user for saving deletd bson objects to a flat file
+     */
+    class RemoveSaver : public Helpers::RemoveCallback , boost::noncopyable {
+    public:
+        RemoveSaver( const string& type , const string& ns , const string& why);
+        ~RemoveSaver();
+
+        void goingToDelete( const BSONObj& o );
+        
+    private:
+        path _root;
+        path _file;
+        ofstream* _out;
+        
+    };
+
     
 } // namespace mongo

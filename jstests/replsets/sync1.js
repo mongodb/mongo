@@ -179,14 +179,14 @@ doTest = function (signal) {
             return;
         }
         print("||||| count:" + count);
-		printjson(max0);
-    } while (max0.z != max);
+	printjson(max0);
+    } while (! max0 || max0.z != max);
 
     print("\nsync1.js ********************************************************************** part 12");
     pause("\nsync1.js success");
     replTest.stopSet(signal);
 }
 
-if( 0 || debugging ) {
+if( 1 || debugging ) {
     doTest( 15 );
 }

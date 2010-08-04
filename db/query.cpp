@@ -125,7 +125,7 @@ namespace mongo {
        justOne: stop after 1 match
        god:     allow access to system namespaces, and don't yield
     */
-    long long deleteObjects(const char *ns, BSONObj pattern, bool justOneOrig, bool logop, bool god) {
+    long long deleteObjects(const char *ns, BSONObj pattern, bool justOneOrig, bool logop, bool god, RemoveSaver * rs ) {
         if( !god ) {
             if ( strstr(ns, ".system.") ) {
                 /* note a delete from system.indexes would corrupt the db 
@@ -209,6 +209,9 @@ namespace mongo {
                     problem() << "deleted object without id, not logging" << endl;
                 }
             }
+
+            if ( rs )
+                rs->goingToDelete( rloc.obj() /*cc->c->current()*/ );
 
             theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
             nDeleted++;

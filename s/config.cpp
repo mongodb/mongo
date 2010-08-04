@@ -466,7 +466,7 @@ namespace mongo {
                 }
                 conn.done();
             }
-            catch ( std::exception& e ){
+            catch ( std::exception&  ){
                 log(LL_WARNING) << " couldn't check on config server:" << _config[i] << " ok for now" << endl;
             }
             res.push_back(x);
@@ -515,10 +515,12 @@ namespace mongo {
         if ( ! _primary.ok() )
             return false;
         
-        string errmsg;
-        if ( ! checkConfigServersConsistent( errmsg ) ){
-            log( LL_ERROR ) << "config servers not in sync! " << errmsg << endl;
-            return false;
+        if ( checkConsistency ){
+            string errmsg;
+            if ( ! checkConfigServersConsistent( errmsg ) ){
+                log( LL_ERROR ) << "config servers not in sync! " << errmsg << endl;
+                return false;
+            }
         }
         
         return true;

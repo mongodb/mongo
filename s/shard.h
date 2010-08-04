@@ -53,6 +53,8 @@ namespace mongo {
             s.reset( ident );
             return s;
         }
+
+        static bool isAShard( const string& ident );
         
         /**
          * @param ident either name or address
@@ -126,7 +128,8 @@ namespace mongo {
         ShardStatus getStatus() const ;
         
         static void getAllShards( vector<Shard>& all );
-        
+        static void printShardInfo( ostream& out );
+
         /**
          * picks a Shard for more load
          */
@@ -181,7 +184,7 @@ namespace mongo {
         double _writeLock;
     };
 
-    class ShardConnection : boost::noncopyable{
+    class ShardConnection : public AScopedConnection {
     public:
         ShardConnection( const Shard * s , const string& ns );
         ShardConnection( const Shard& s , const string& ns );
@@ -232,7 +235,7 @@ namespace mongo {
         bool runCommand( const string& db , const BSONObj& cmd , BSONObj& res );
 
         /** checks all of my thread local connections for the version of this ns */
-        static void checkMyConnectionVersions( const string &  ns );
+        static void checkMyConnectionVersions( const string & ns );
         
     private:
         void _init();

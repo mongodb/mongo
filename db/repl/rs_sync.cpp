@@ -38,6 +38,8 @@ namespace mongo {
         nsToDatabase(ns, db);
 
         if ( *ns == '.' || *ns == 0 ) {
+		    if( *o.getStringField("op") == 'n' )
+			    return;
             log() << "replSet skipping bad op in oplog: " << o.toString() << endl;
             return;
         }

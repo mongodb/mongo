@@ -201,7 +201,7 @@ namespace BasicTests {
             t.reset();
             sleepmillis( 1727 );
             ASSERT( t.millis() >= 1000 );
-            ASSERT( t.millis() <= 2000 );
+            ASSERT( t.millis() <= 2500 );
             
             {
                 int total = 1200;

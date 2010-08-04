@@ -102,7 +102,10 @@ namespace mongo {
         LastError * get( bool create = false );
         LastError * getSafe(){
             LastError * le = get(false);
-            assert( le );
+            if ( ! le ){
+                log( LL_ERROR ) << " no LastError!  id: " << getID() << endl;
+                assert( le );
+            }
             return le;
         }
 

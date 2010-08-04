@@ -669,7 +669,7 @@ int main(int argc, char* argv[], char *envp[] )
     CmdLine::addGlobalOptions( general_options , hidden_options );
 
     general_options.add_options()
-        ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
+        ("dbpath", po::value<string>() , "directory for datafiles")
         ("directoryperdb", "each database will be stored in a separate directory")
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
         ("cpu", "periodically show cpu and iowait utilization")
@@ -798,7 +798,11 @@ int main(int argc, char* argv[], char *envp[] )
             printGitVersion();
             return 0;
         }
-        dbpath = params["dbpath"].as<string>();
+        if ( params.count( "dbpath" ) )
+            dbpath = params["dbpath"].as<string>();
+        else
+            dbpath = "/data/db/";
+
         if ( params.count("directoryperdb")) {
             directoryperdb = true;
         }
@@ -919,6 +923,13 @@ int main(int argc, char* argv[], char *envp[] )
             cmdLine.pretouch = params["pretouch"].as<int>();
         }
         if (params.count("replSet")) {
+            if (params.count("slavedelay")) {
+                cout << "--slavedelay cannot be used with --replSet" << endl;
+                ::exit(-1);
+            } else if (params.count("only")) {
+                cout << "--only cannot be used with --replSet" << endl;
+                ::exit(-1);
+            }
             /* seed list of hosts for the repl set */
             cmdLine._replSet = params["replSet"].as<string>().c_str();
         }
@@ -973,11 +984,16 @@ int main(int argc, char* argv[], char *envp[] )
 				cmdLine.port = CmdLine::ShardServerPort;
 		}
         else { 
-            uassert( 13392, "bad --port number", cmdLine.port > 0 );
-            uassert( 13391, "bad --port number", cmdLine.port <= 65535 || params.count("ipv6") );
+            if ( cmdLine.port <= 0 || cmdLine.port > 65535 ){
+                out() << "bad --port number" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
         }
-        if ( params.count("configsvr" ) && params.count( "diaglog" ) == 0 ){
-            _diaglog.level = 1;
+        if ( params.count("configsvr" ) ){
+            if ( params.count( "diaglog" ) == 0 )
+                _diaglog.level = 1;
+            if ( params.count( "dbpath" ) == 0 )
+                dbpath = "/data/configdb";
         }
         if ( params.count( "profile" ) ){
             cmdLine.defaultProfile = params["profile"].as<int>();

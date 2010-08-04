@@ -87,57 +87,6 @@ namespace mongo {
         BSONObjBuilder _b;
     };
 
-    class RemoveSaver : public Helpers::RemoveCallback , boost::noncopyable {
-    public:
-        RemoveSaver( const string& ns , const string& why) : _out(0){
-            static int NUM = 0;
-
-            _root = dbpath;
-            _root /= "moveChunk";
-            _root /= ns;
-            
-            _file = _root;
-            
-            stringstream ss;
-            ss << why << "." << terseCurrentTime() << "." << NUM++ << ".bson";
-            _file /= ss.str();
-
-        }
-        
-        ~RemoveSaver(){
-            if ( _out ){
-                _out->close();
-                delete _out;
-                _out = 0;
-            }
-        }
-
-        void goingToDelete( const BSONObj& o ){
-            if ( ! cmdLine.moveParanoia )
-                return;
-
-            if ( ! _out ){
-                create_directories( _root );
-                _out = new ofstream();
-                _out->open( _file.string().c_str() , ios_base::out | ios_base::binary );
-                if ( ! _out->good() ){
-                    log( LL_WARNING ) << "couldn't create file: " << _file.string() << " for temp moveChunk logging" << endl;
-                    delete _out;
-                    _out = 0;
-                    return;
-                }
-                
-            }
-            _out->write( o.objdata() , o.objsize() );
-        }
-        
-    private:
-        path _root;
-        path _file;
-        ofstream* _out;
-        
-    };
-    
     struct OldDataCleanup {
         string ns;
         BSONObj min;
@@ -146,8 +95,8 @@ namespace mongo {
         void doRemove(){
             ShardForceModeBlock sf;
             writelock lk(ns);
-            RemoveSaver rs(ns,"post-cleanup");
-            long long num = Helpers::removeRange( ns , min , max , true , false , &rs );
+            RemoveSaver rs("moveChunk",ns,"post-cleanup");
+            long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
             log() << "moveChunk deleted: " << num << endl;
         }
     };
@@ -175,7 +124,7 @@ namespace mongo {
                 break;
             cleanup.initial = left;
             
-            if ( ++loops % 20 == 0 ){
+            if ( ( loops++ % 200 ) == 0 ){
                 log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << endl;
                 
                 stringstream ss;
@@ -776,8 +725,8 @@ namespace mongo {
             
             { // 2. delete any data already in range
                 writelock lk( ns );
-                RemoveSaver rs( ns , "preCleanup" );
-                long long num = Helpers::removeRange( ns , min , max , true , false , &rs );
+                RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
+                long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
                 if ( num )
                     log( LL_WARNING ) << "moveChunkCmd deleted data already in chunk # objects: " << num << endl;
 
@@ -873,12 +822,12 @@ namespace mongo {
                 writelock lk(ns);
                 Client::Context cx(ns);
                 
-                RemoveSaver rs( ns , "removedDuring" );
+                RemoveSaver rs( "moveChunk" , ns , "removedDuring" );
 
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ){
                     BSONObj id = i.next().Obj();
-                    Helpers::removeRange( ns , id , id, false , true , &rs );
+                    Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0 );
                     didAnything = true;
                 }
             }

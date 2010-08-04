@@ -76,7 +76,7 @@ namespace mongo {
             if ( ! s )
                 s = new Status();
             
-            debug() << "WANT ONE pool avail: " << s->avail << endl;
+            debug( s , addr ) << "WANT ONE pool avail: " << s->avail << endl;
             
             if ( s->avail ){
                 DBClientBase* c = s->avail;
@@ -96,7 +96,8 @@ namespace mongo {
             Status* s = _hosts[addr];
             assert( s );
             if ( s->avail ){
-                delete conn;
+                debug( s , addr ) << "DONE WITH TEMP" << endl;
+                release( addr , conn );
                 return;
             }
             s->avail = conn;
@@ -120,12 +121,23 @@ namespace mongo {
         }
 
         void checkVersions( const string& ns ){
+            vector<Shard> all;
+            Shard::getAllShards( all );
             scoped_lock lk( _mutex );
+            for ( unsigned i=0; i<all.size(); i++ ){
+                Status* &s = _hosts[all[i].getConnString()];
+                if ( ! s )
+                    s = new Status();
+            }
+
             for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ){
+                if ( ! Shard::isAShard( i->first ) )
+                    continue;
                 Status* ss = i->second;
                 assert( ss );
-                if ( ss->avail )
-                    checkShardVersion( *ss->avail , ns );
+                if ( ! ss->avail )
+                    ss->avail = pool.get( i->first );
+                checkShardVersion( *ss->avail , ns );
             }
         }
 
@@ -184,7 +196,7 @@ namespace mongo {
         if ( _finishedInit )
             return;
         _finishedInit = true;
-
+        
         if ( _ns.size() ){
             _setVersion = checkShardVersion( *_conn , _ns );
         }

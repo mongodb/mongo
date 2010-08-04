@@ -1514,6 +1514,7 @@ def installBinary( e , name ):
 
 for x in normalTools:
     installBinary( env , "mongo" + x )
+installBinary( env , "bsondump" )
 
 if mongosniff_built:
     installBinary(env, "mongosniff")

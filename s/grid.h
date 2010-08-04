@@ -68,7 +68,7 @@ namespace mongo {
          * @param errMsg is the error description in case the operation failed. 
          * @return true if shard was successfully added.
          */
-        bool addShard( string* name , const string& host , long long maxSize , string* errMsg );
+        bool addShard( string* name , const string& host , long long maxSize , string& errMsg );
 
         /**
          * @return true if the config database knows about a host 'name'
