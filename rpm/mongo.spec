@@ -105,6 +105,7 @@ fi
 %{_bindir}/mongoimport
 %{_bindir}/mongorestore
 %{_bindir}/mongostat
+%{_bindir}/bsondump
 
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongod.1*
