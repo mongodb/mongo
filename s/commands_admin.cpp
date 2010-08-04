@@ -624,8 +624,7 @@ namespace mongo {
                     return false;
                 }
 
-                // HostAndPort defaults to a different port; adjust if needed.
-                if ( shardAddr.port() == CmdLine::DefaultDBPort ){
+                if ( ! shardAddr.hasPort() ){
                     shardAddr.setPort( CmdLine::ShardServerPort );
                 }
 
