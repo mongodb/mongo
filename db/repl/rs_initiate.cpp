@@ -175,8 +175,10 @@ namespace mongo {
                 configObj = cmdObj["replSetInitiate"].Obj();
             }
 
+            bool parsed = false;
             try {
                 ReplSetConfig newConfig(configObj);
+                parsed = true;
 
                 if( newConfig.version > 1 ) { 
                     errmsg = "can't initiate with a version number greater than 1";
@@ -199,7 +201,11 @@ namespace mongo {
             }
             catch( DBException& e ) { 
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
-                throw;
+                if( !parsed ) 
+                    errmsg = string("couldn't parse cfg object ") + e.what();
+                else
+                    errmsg = string("couldn't initiate : ") + e.what();
+                return false;
             }
 
             return true;
