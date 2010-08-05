@@ -36,14 +36,6 @@ namespace mongo {
          */
         DistributedLock( const ConnectionString& conn , const string& name , unsigned takeoverMinutes = 10 );
 
-        int getState(){
-            return _state.get();
-        }
-
-        bool isLocked(){
-            return _state.get() != 0;
-        }
-        
         bool lock_try( string why , BSONObj * other = 0 );
         void unlock();
 
@@ -54,8 +46,6 @@ namespace mongo {
         
         string _ns;
         BSONObj _id;
-        
-        ThreadLocalValue<int> _state;
     };
     
     class dist_lock_try {
