@@ -1,3 +1,8 @@
+mongodb (1.6.0) unstable; urgency=low
+
+  * sharding stable
+  * replica_sets stable
+
 mongodb (1.5.8) unstable; urgency=low
 
   * sharding lots of changes
