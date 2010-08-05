@@ -109,9 +109,6 @@ namespace mongo {
 
        
     bool DistributedLock::lock_try( string why , BSONObj * other ){
-        // check for recrusive
-        assert( getState() == 0 );
-
         ScopedDbConnection conn( _conn );
             
         BSONObjBuilder queryBuilder;
@@ -208,18 +205,33 @@ namespace mongo {
         if ( ! gotLock )
             return false;
             
-        _state.set( 1 );
         return true;
     }
 
     void DistributedLock::unlock(){
-        ScopedDbConnection conn( _conn );
-        conn->update( _ns , _id, BSON( "$set" << BSON( "state" << 0 ) ) );
-        log(1) << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
-        conn.done();
-            
-        _state.set( 0 );
-    }
+        const int maxAttempts = 3;
+        int attempted = 0;
+        while ( ++attempted <= maxAttempts ) {
 
+            try {
+                ScopedDbConnection conn( _conn );
+                conn->update( _ns , _id, BSON( "$set" << BSON( "state" << 0 ) ) );
+                log(1) << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
+                conn.done();
+
+                return;
+
+            
+            } catch ( std::exception& e) {
+                log( LL_WARNING ) << "dist_lock  " << _name << " failed to contact config server in unlock attempt " 
+                                  << attempted << ": " << e.what() <<  endl;
+
+                sleepsecs(1 << attempted);
+            }
+        }
+
+        log( LL_WARNING ) << "dist_lock couldn't consumate unlock request. " << "Lock " << _name 
+                              << " will be taken over after " <<  _takeoverMinutes << " minutes timeout" << endl;
+    }
 
 }
