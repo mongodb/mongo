@@ -168,6 +168,11 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var rs = new ReplSetTest( { name : testName + "-rs" + i , nodes : 3 , startPort : 31100 + ( i * 100 ) } );
             this._rs[i] = { test : rs , nodes : rs.startSet( { oplogSize:40 } ) , url : rs.getURL() };
             rs.initiate();
+            
+        }
+
+        for ( var i=0; i<numShards; i++){
+            var rs = this._rs[i].test;
             rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
             rs.awaitReplication();
             this._connections.push( new Mongo( rs.getURL() ) );
