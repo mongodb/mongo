@@ -90,6 +90,8 @@ namespace mongo {
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SYNC; }  
 
+        virtual bool isMember( const DBConnector * conn ) const;
+
     private:
         SyncClusterConnection( SyncClusterConnection& prev );
         string _toString() const;        

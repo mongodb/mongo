@@ -1063,6 +1063,18 @@ namespace mongo {
         return checkMaster()->findOne(a,b,c,d);
     }
 
+    bool DBClientReplicaSet::isMember( const DBConnector * conn ) const {
+        if ( conn == this )
+            return true;
+        
+        for ( unsigned i=0; i<_conns.size(); i++ )
+            if ( _conns[i]->isMember( conn ) )
+                return true;
+        
+        return false;
+    }
+    
+
     bool serverAlive( const string &uri ) {
         DBClientConnection c( false, 0, 20 ); // potentially the connection to server could fail while we're checking if it's alive - so use timeouts
         string err;
