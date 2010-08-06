@@ -369,4 +369,16 @@ namespace mongo {
         // should never need to do this
         assert(0);
     }
+
+    bool SyncClusterConnection::isMember( const DBConnector * conn ) const {
+        if ( conn == this )
+            return true;
+        
+        for ( unsigned i=0; i<_conns.size(); i++ )
+            if ( _conns[i]->isMember( conn ) )
+                return true;
+        
+        return false;
+    }
+
 }

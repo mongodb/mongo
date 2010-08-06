@@ -329,6 +329,8 @@ namespace mongo {
 
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
         virtual void recv( Message& m ) { assert(false); }
+
+        virtual string getServerAddress() const = 0;
     };
 
     /**
@@ -739,8 +741,6 @@ namespace mongo {
          */
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = false , bool multi = false );
         
-        virtual string getServerAddress() const = 0;
-        
         virtual bool isFailed() const = 0;
         
         virtual void killCursor( long long cursorID ) = 0;
@@ -758,6 +758,9 @@ namespace mongo {
         virtual void say( Message& toSend  ) = 0;
 
         virtual ConnectionString::ConnectionType type() const = 0;
+
+        /** @return true if conn is either equal to or contained in this connection */
+        virtual bool isMember( const DBConnector * conn ) const = 0;
     }; // DBClientBase
     
     class DBClientReplicaSet;
@@ -892,11 +895,16 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );
         
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }  
+
+        virtual bool isMember( const DBConnector * conn ) const { return this == conn; };
+
+        virtual void checkResponse( const char *data, int nReturned );
+
     protected:
         friend class SyncClusterConnection;
         virtual void recv( Message& m );
         virtual void sayPiggyBack( Message &toSend );
-        virtual void checkResponse( const char *data, int nReturned );
+
     };
     
     /** Use this class to connect to a replica set of servers.  The class will manage
@@ -987,9 +995,12 @@ namespace mongo {
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }  
 
+        virtual bool isMember( const DBConnector * conn ) const;
+
+        virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
+
     protected:                
         virtual void sayPiggyBack( Message &toSend ) { assert(false); }
-        virtual void checkResponse( const char *data, int nReturned ) { assert(false); }
         
         bool isFailed() const {
             return _currentMaster == 0 || _currentMaster->isFailed();

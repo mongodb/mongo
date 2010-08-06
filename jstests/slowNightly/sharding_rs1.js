@@ -15,7 +15,7 @@ while ( bigString.length < 10000 )
 inserted = 0;
 num = 0;
 while ( inserted < ( 20 * 1024 * 1024 ) ){
-    db.foo.insert( { _id : num++ , s : bigString } );
+    db.foo.insert( { _id : num++ , s : bigString , x : Math.random() } );
     inserted += bigString.length;
 }
 
@@ -57,5 +57,14 @@ for ( i=0; i<s._rs.length; i++ ){
     for ( j=0; j<x.slaves.length; j++ )
         assert.eq( x.master.md5 , x.slaves[j].md5 , "hashes same for: " + r.url + " slave: " + j );
 }
+
+assert.eq( num , db.foo.find().count() , "C1" )
+assert.eq( num , db.foo.find().itcount() , "C2" )
+assert.eq( num , db.foo.find().sort( { _id : 1 } ).itcount() , "C3" )
+assert.eq( num , db.foo.find().sort( { _id : -1 } ).itcount() , "C4" )
+db.foo.ensureIndex( { x : 1 } )
+assert.eq( num , db.foo.find().sort( { x : 1 } ).itcount() , "C5" )
+assert.eq( num , db.foo.find().sort( { x : -1 } ).itcount() , "C6" )
+
 
 s.stop()
