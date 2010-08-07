@@ -52,6 +52,10 @@ namespace mongo {
             bool potentiallyHot() const { 
                 return !arbiterOnly && priority > 0;
             }
+            bool operator==(const MemberCfg& r) const { 
+                return _id==r._id && votes == r.votes && h == r.h && priority == r.priority && arbiterOnly == r.arbiterOnly;
+            }
+            bool operator!=(const MemberCfg& r) const { return !(*this == r); }
         };
         vector<MemberCfg> members;
         string _id;
