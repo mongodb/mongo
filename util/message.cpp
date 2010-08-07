@@ -567,14 +567,23 @@ namespace mongo {
     }
 
     void MessagingPort::recv( char * buf , int len ){
+        unsigned retries = 0;
         while( len > 0 ) {
             int ret = ::recv( sock , buf , len , portRecvFlags );
             if ( ret == 0 ) {
                 log(3) << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
                 throw SocketException( SocketException::CLOSED );
             }
-            if ( ret == -1 ) {
+            if ( ret < 0 ) {
                 int e = errno;
+#if defined(EINTR) && !defined(_WIN32)
+                if( e == EINTR ) {
+                    if( ++retries == 1 ) {
+                        log() << "EINTR retry" << endl;
+                        continue;
+                    }
+                }
+#endif
                 if ( e != EAGAIN || _timeout == 0 ) {                
                     log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
                     throw SocketException( SocketException::RECV_ERROR );
