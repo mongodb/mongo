@@ -199,6 +199,7 @@ namespace mongo {
         _self(0), 
         mgr( new Manager(this) )
     {
+        _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
         *_hbmsg = '.'; // temp...just to see
         lastH = 0;
@@ -259,16 +260,36 @@ namespace mongo {
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
     string ReplSetImpl::startupStatusMsg;
 
-    // true if ok; throws if config really bad; false if config doesn't include self
-    bool ReplSetImpl::initFromConfig(ReplSetConfig& c) {
+    /** @param reconf true if this is a reconfiguration and not an initial load of the configuration.
+        @return true if ok; throws if config really bad; false if config doesn't include self
+    */
+    bool ReplSetImpl::initFromConfig(ReplSetConfig& c, bool reconf) {
         lock lk(this);
 
+        list<ReplSetConfig::MemberCfg> newOnes;
+        bool additive = reconf;
         {
+            int nfound = 0;
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
                 const ReplSetConfig::MemberCfg& m = *i;
                 if( m.h.isSelf() ) {
+                    nfound++;
                     me++;
+                    uassert(13432, "_id change for members is not allowed", !reconf || (_self && _self->id() == m._id));
+                }
+                else if( reconf ) { 
+                    const Member *old = findById(m._id);
+                    if( old ) { 
+                        nfound++;
+                        uassert(13433, "_id change for members is not allowed", old->id() == m._id);
+                        if( old->config() == m ) { 
+                            additive = false;
+                        }
+                    }
+                    else {
+                        newOnes.push_back(m);
+                    }
                 }
             }
             if( me == 0 ) {
@@ -278,6 +299,9 @@ namespace mongo {
                 return false;
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
+
+            if( reconf && config().members.size() != nfound ) 
+                additive = false;
         }
 
         _cfg = new ReplSetConfig(c);
@@ -285,6 +309,17 @@ namespace mongo {
         assert( _name.empty() || _name == _cfg->_id );
         _name = _cfg->_id;
         assert( !_name.empty() );
+
+        if( additive ) { 
+            log() << "replSet info : additive change to configuration" << rsLog;
+            for( list<ReplSetConfig::MemberCfg>::iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
+                const ReplSetConfig::MemberCfg& m = *i;
+                Member *mi = new Member(m.h, m._id, &m, false);
+                _members.push(mi);
+                startHealthTaskFor(mi);
+            }
+            return true;
+        }
 
         // start with no members.  if this is a reconfig, drop the old ones.
         _members.orphanAll();
@@ -441,7 +476,7 @@ namespace mongo {
             comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
         newConfig.saveConfigLocally(comment);
         try { 
-            initFromConfig(newConfig);
+            initFromConfig(newConfig, true);
             log() << "replSet replSetReconfig new config saved locally" << rsLog;
         }
         catch(DBException& e) { 
