@@ -269,20 +269,20 @@ namespace mongo {
         list<ReplSetConfig::MemberCfg> newOnes;
         bool additive = reconf;
         {
-            int nfound = 0;
+            unsigned nfound = 0;
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
                 const ReplSetConfig::MemberCfg& m = *i;
                 if( m.h.isSelf() ) {
                     nfound++;
                     me++;
-                    uassert(13432, "_id change for members is not allowed", !reconf || (_self && _self->id() == m._id));
+                    uassert(13432, "_id change for members is not allowed", !reconf || (_self && (int)_self->id() == m._id));
                 }
                 else if( reconf ) { 
                     const Member *old = findById(m._id);
                     if( old ) { 
                         nfound++;
-                        uassert(13433, "_id change for members is not allowed", old->id() == m._id);
+                        uassert(13433, "_id change for members is not allowed", (int)old->id() == m._id);
                         if( old->config() == m ) { 
                             additive = false;
                         }
