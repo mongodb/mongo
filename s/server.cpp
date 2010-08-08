@@ -171,21 +171,22 @@ int main(int argc, char* argv[], char *envp[] ) {
     static StaticObserver staticObserver;
     mongosCommand = argv[0];
 
-    po::options_description options("Sharding options");
+    po::options_description options("General options");
+    po::options_description sharding_options("Sharding options");
     po::options_description hidden("Hidden options");
     po::positional_options_description positional;
     
     CmdLine::addGlobalOptions( options , hidden );
     
-    options.add_options()
+    sharding_options.add_options()
         ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
         ( "test" , "just run unit tests" )
         ( "upgrade" , "upgrade meta data version" )
         ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
         ( "ipv6", "enable IPv6 support (disabled by default)" )
         ;
-    
 
+    options.add(sharding_options);
     // parse options
     po::variables_map params;
     if ( ! CmdLine::store( argc , argv , options , hidden , positional , params ) )
