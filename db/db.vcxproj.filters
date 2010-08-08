@@ -840,7 +840,7 @@
     <Filter Include="replSets">
       <UniqueIdentifier>{3b73f786-d352-446f-a5f5-df49384baf7a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="replSets\test stuff">
+    <Filter Include="replSets\testing">
       <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -851,23 +851,59 @@
     <None Include="..\util\mongoutils\README">
       <Filter>util\mongoutils</Filter>
     </None>
-    <None Include="repl\testing.js">
-      <Filter>replSets\test stuff</Filter>
-    </None>
-    <None Include="repl\test.html">
-      <Filter>replSets\test stuff</Filter>
-    </None>
     <None Include="..\SConstruct">
       <Filter>db</Filter>
     </None>
-    <None Include="..\jstests\rs\rs_basic.js">
-      <Filter>replSets\test stuff</Filter>
-    </None>
-    <None Include="..\jstests\rs\test_framework.js">
-      <Filter>replSets\test stuff</Filter>
-    </None>
     <None Include="mongo.ico">
       <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replset_remove_node.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replset1.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replset2.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replset3.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replset4.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replset5.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replsetadd.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replsetarb1.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replsetarb2.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replsetprio1.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replsetrestart1.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\replsetrestart2.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\rollback.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\rollback2.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\sync1.js">
+      <Filter>replSets\testing</Filter>
+    </None>
+    <None Include="..\jstests\replsets\twosets.js">
+      <Filter>replSets\testing</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

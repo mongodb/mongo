@@ -113,3 +113,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 );
+print("replset1.js SUCCESS");

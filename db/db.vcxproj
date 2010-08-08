@@ -574,14 +574,26 @@
     <ClCompile Include="repl\rs_config.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\jstests\rs\rs_basic.js" />
-    <None Include="..\jstests\rs\test_framework.js" />
+    <None Include="..\jstests\replsets\replset1.js" />
+    <None Include="..\jstests\replsets\replset2.js" />
+    <None Include="..\jstests\replsets\replset3.js" />
+    <None Include="..\jstests\replsets\replset4.js" />
+    <None Include="..\jstests\replsets\replset5.js" />
+    <None Include="..\jstests\replsets\replsetadd.js" />
+    <None Include="..\jstests\replsets\replsetarb1.js" />
+    <None Include="..\jstests\replsets\replsetarb2.js" />
+    <None Include="..\jstests\replsets\replsetprio1.js" />
+    <None Include="..\jstests\replsets\replsetrestart1.js" />
+    <None Include="..\jstests\replsets\replsetrestart2.js" />
+    <None Include="..\jstests\replsets\replset_remove_node.js" />
+    <None Include="..\jstests\replsets\rollback.js" />
+    <None Include="..\jstests\replsets\rollback2.js" />
+    <None Include="..\jstests\replsets\sync1.js" />
+    <None Include="..\jstests\replsets\twosets.js" />
     <None Include="..\SConstruct" />
     <None Include="..\util\mongoutils\README" />
     <None Include="mongo.ico" />
     <None Include="repl\notes.txt" />
-    <None Include="repl\test.html" />
-    <None Include="repl\testing.js" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
