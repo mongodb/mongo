@@ -197,6 +197,13 @@ namespace mongo {
 
                 refetch(h, ourObj);
 
+                if( !t->more() ) { 
+                    log() << "replSet error during rollback reached beginning of remote oplog? [2]" << rsLog;
+                    log() << "replSet  them: " << them->toString() << rsLog;
+                    log() << "replSet  theirTime: " << theirTime.toStringPretty() << rsLog;
+                    log() << "replSet  ourTime: " << ourTime.toStringPretty() << rsLog;
+                    throw "reached beginning of remote oplog [2]";
+                }
                 theirObj = t->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
 
@@ -206,7 +213,13 @@ namespace mongo {
                 ourTime = ourObj["ts"]._opTime();
             }
             else if( theirTime > ourTime ) { 
-                /* todo: we could hit beginning of log here.  exception thrown is ok but not descriptive, so fix up */
+                if( !t->more() ) { 
+                    log() << "replSet error during rollback reached beginning of remote oplog?" << rsLog;
+                    log() << "replSet  them: " << them->toString() << rsLog;
+                    log() << "replSet  theirTime: " << theirTime.toStringPretty() << rsLog;
+                    log() << "replSet  ourTime: " << ourTime.toStringPretty() << rsLog;
+                    throw "reached beginning of remote oplog [1]";
+                }
                 theirObj = t->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
             }
