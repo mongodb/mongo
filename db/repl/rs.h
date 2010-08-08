@@ -44,19 +44,19 @@ namespace mongo {
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
         string fullName() const { return h().toString(); }
-        const ReplSetConfig::MemberCfg& config() const { return *_config; }
+        const ReplSetConfig::MemberCfg& config() const { return _config; }
         const HeartbeatInfo& hbinfo() const { return _hbinfo; }
-        string lhb() { return _hbinfo.lastHeartbeatMsg; }
+        HeartbeatInfo& get_hbinfo() { return _hbinfo; }
+        string lhb() const { return _hbinfo.lastHeartbeatMsg; }
         MemberState state() const { return _hbinfo.hbstate; }
         const HostAndPort& h() const { return _h; }
         unsigned id() const { return _hbinfo.id(); }
-        bool potentiallyHot() const { return _config->potentiallyHot(); } // not arbiter, not priority 0
-
+        bool potentiallyHot() const { return _config.potentiallyHot(); } // not arbiter, not priority 0
         void summarizeMember(stringstream& s) const;
         friend class ReplSetImpl;
     private:
-        const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
-        HostAndPort _h;
+        const ReplSetConfig::MemberCfg _config;
+        const HostAndPort _h;
         HeartbeatInfo _hbinfo;
     };
 
@@ -397,10 +397,10 @@ namespace mongo {
     /** inlines ----------------- */
 
     inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) : 
-        _config(c), _h(h), _hbinfo(ord) { 
-            if( self ) { 
-                _hbinfo.health = 1.0;
-            }
+        _config(*c), _h(h), _hbinfo(ord) 
+    { 
+        if( self )
+            _hbinfo.health = 1.0;
     }
 
     inline bool ReplSet::isPrimary() {         

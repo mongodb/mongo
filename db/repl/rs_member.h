@@ -61,7 +61,7 @@ namespace mongo {
     class HeartbeatInfo { 
         unsigned _id;
     public:
-        HeartbeatInfo() : _id(0xffffffff),skew(INT_MIN) { }
+        HeartbeatInfo() : _id(0xffffffff),hbstate(MemberState::RS_UNKNOWN),health(-1.0),skew(INT_MIN) { }
         HeartbeatInfo(unsigned id);
         bool up() const { return health > 0; }
         unsigned id() const { return _id; }
@@ -78,9 +78,10 @@ namespace mongo {
     };
 
     inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id) { 
-          health = -1.0;
-          lastHeartbeat = upSince = 0; 
-          skew = INT_MIN;
+        hbstate = MemberState::RS_UNKNOWN;
+        health = -1.0;
+        lastHeartbeat = upSince = 0; 
+        skew = INT_MIN;
     }
 
     inline bool HeartbeatInfo::changed(const HeartbeatInfo& old) const { 
