@@ -276,6 +276,14 @@ namespace mongo {
                 if( m.h.isSelf() ) {
                     nfound++;
                     me++;
+                    if( !reconf || (_self && _self->id() == m._id) ) { 
+                    }
+                    else {
+                        log() << "replSet config change error old self id: " << _self->id() << " new: " << m._id << rsLog;
+                        log() << "replSet " << _self->fullName() << ' ' << m.h.toString() << rsLog;
+                        log() << "replSet old config: " << config().toString() << rsLog;
+                        log() <<" replSet new config: " << c.toString() << rsLog;
+                    }
                     uassert(13432, "_id change for members is not allowed", !reconf || (_self && _self->id() == m._id));
                 }
                 else if( reconf ) { 
