@@ -264,6 +264,9 @@ namespace mongo {
         @return true if ok; throws if config really bad; false if config doesn't include self
     */
     bool ReplSetImpl::initFromConfig(ReplSetConfig& c, bool reconf) {
+        /* NOTE: haveNewConfig() writes the new config to disk before we get here.  So 
+                 we cannot error out at this point, except fatally.  Check errors earlier.
+                 */
         lock lk(this);
 
         list<ReplSetConfig::MemberCfg> newOnes;
@@ -276,21 +279,13 @@ namespace mongo {
                 if( m.h.isSelf() ) {
                     nfound++;
                     me++;
-                    if( !reconf || (_self && _self->id() == (unsigned) m._id) ) { 
-                    }
-                    else {
-                        log() << "replSet config change error old self id: " << _self->id() << " new: " << m._id << rsLog;
-                        log() << "replSet " << _self->fullName() << ' ' << m.h.toString() << rsLog;
-                        log() << "replSet old config: " << config().toString() << rsLog;
-                        log() <<" replSet new config: " << c.toString() << rsLog;
-                    }
-                    uassert(13432, "_id change for members is not allowed", !reconf || (_self && _self->id() == (unsigned) m._id));
+                    assert( !reconf || (_self && _self->id() == (unsigned) m._id) );
                 }
                 else if( reconf ) { 
                     const Member *old = findById(m._id);
                     if( old ) { 
                         nfound++;
-                        uassert(13433, "_id change for members is not allowed", (int)old->id() == m._id);
+                        assert( (int) old->id() == m._id );
                         if( old->config() == m ) { 
                             additive = false;
                         }
@@ -302,9 +297,9 @@ namespace mongo {
             }
             if( me == 0 ) {
                 // log() << "replSet config : " << _cfg->toString() << rsLog;
-                log() << "replSet warning can't find self in the repl set configuration:" << rsLog;
+                log() << "replSet error can't find self in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;
-                return false;
+                assert(false);
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
 

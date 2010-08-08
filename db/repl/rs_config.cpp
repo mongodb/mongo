@@ -117,7 +117,12 @@ namespace mongo {
         uassert(13419, "this version of mongod only supports priorities 0 and 1", priority == 0 || priority == 1);
     }
 
+    /** @param o old config
+        @param n new config 
+        */
     /*static*/ bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) { 
+        assert( theReplSet );
+
         if( o._id != n._id ) { 
             errmsg = "set name may not change"; 
             return false;
@@ -130,6 +135,25 @@ namespace mongo {
             errmsg = "version number wrong";
             return false;
         }
+
+        map<HostAndPort,const ReplSetConfig::MemberCfg*> old;
+        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = o.members.begin(); i != o.members.end(); i++ ) { 
+            old[i->h] = &(*i);
+        }
+        int me = 0;
+        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = n.members.begin(); i != n.members.end(); i++ ) { 
+            const ReplSetConfig::MemberCfg& m = *i;
+            if( old.count(m.h) ) { 
+                if( old[m.h]->_id != m._id ) { 
+                    log() << "replSet reconfig error with member: " << m.h.toString() << rsLog;
+                    uasserted(13432, "_id may not change for members");
+                }
+            }
+            if( m.h.isSelf() ) 
+                me++;
+        }
+
+        uassert(13433, "can't find self in new replset config", me == 1);
 
         /* TODO : MORE CHECKS HERE */
 
