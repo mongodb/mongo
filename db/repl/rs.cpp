@@ -270,7 +270,7 @@ namespace mongo {
                  */
         lock lk(this);
 
-        list<ReplSetConfig::MemberCfg> newOnes;
+        list<const ReplSetConfig::MemberCfg*> newOnes;
         bool additive = reconf;
         {
             unsigned nfound = 0;
@@ -281,16 +281,12 @@ namespace mongo {
                     nfound++;
                     me++;
 
-                    if( !reconf || (_self && _self->id() == m._id) ) { 
+                    if( !reconf || (_self && _self->id() == (unsigned) m._id) )
+                        ;
+                    else { 
+                        log() << "replSet " << _self->id() << ' ' << m._id << rsLog;
+                        assert(false);
                     }
-                    else {
-                        log() << "replSet config change error old self id: " << _self->id() << " new: " << m._id << rsLog;
-                        log() << "replSet " << _self->fullName() << ' ' << m.h.toString() << rsLog;
-                        log() << "replSet old config: " << config().toString() << rsLog;
-                        log() <<" replSet new config: " << c.toString() << rsLog;
-                    }
-                    uassert(13432, "_id change for members is not allowed", !reconf || (_self && _self->id() == m._id));
-
                 }
                 else if( reconf ) { 
                     const Member *old = findById(m._id);
@@ -302,7 +298,7 @@ namespace mongo {
                         }
                     }
                     else {
-                        newOnes.push_back(m);
+                        newOnes.push_back(&m);
                     }
                 }
             }
@@ -326,9 +322,16 @@ namespace mongo {
 
         if( additive ) { 
             log() << "replSet info : additive change to configuration" << rsLog;
-            for( list<ReplSetConfig::MemberCfg>::iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
-                const ReplSetConfig::MemberCfg& m = *i;
-                Member *mi = new Member(m.h, m._id, &m, false);
+            for( list<const ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
+                const ReplSetConfig::MemberCfg* m = *i;
+                Member *mi = new Member(m->h, m->_id, m, false);
+
+                /** we will indicate that new members are up() initially so that we don't relinquish our 
+                    primary state because we can't (transiently) see a majority.  they should be up as we 
+                    check that new members are up before getting here on reconfig anyway.
+                    */
+                mi->get_hbinfo().health = 0.1;
+
                 _members.push(mi);
                 startHealthTaskFor(mi);
             }
