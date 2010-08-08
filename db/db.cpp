@@ -1111,9 +1111,6 @@ int main(int argc, char* argv[], char *envp[] )
 
 namespace mongo {
 
-    /* we do not use log() below as it uses a mutex and that could cause deadlocks.
-    */
-
     string getDbContext();
 
 #undef out
