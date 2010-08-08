@@ -976,7 +976,6 @@ function skipIfTestingReplication(){
     }
 }
 
-// ReplSetTest
 ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
