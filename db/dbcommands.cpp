@@ -74,6 +74,14 @@ namespace mongo {
         }
     } cmdResetError;
 
+    /* set by replica sets if specified in the configuration. 
+       a pointer is used to avoid any possible locking issues with lockless reading (see below locktype() is NONE 
+       and would like to keep that)
+       (for now, it simply orphans any old copy as config changes should be extremely rare).
+       note: once non-null, never goes to null again.
+    */
+    BSONObj *getLastErrorDefault = 0;
+
     class CmdGetLastError : public Command {
     public:
         virtual LockType locktype() const { return NONE; } 
@@ -88,7 +96,7 @@ namespace mongo {
             help << "return error status of the last operation on this connection";
         }
         CmdGetLastError() : Command("getLastError", false, "getlasterror") {}
-        bool run(const string& dbnamne, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbnamne, BSONObj& _cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
             if ( le->nPrev != 1 )
                 LastError::noError.appendSelf( result );
@@ -97,6 +105,18 @@ namespace mongo {
             
             Client& c = cc();
             c.appendLastOp( result );
+
+            BSONObj cmdObj = _cmdObj;
+            { 
+                BSONObj::iterator i(_cmdObj);
+                i.next();
+                if( !i.more() ) { 
+                    /* empty, use default */
+                    BSONObj *def = getLastErrorDefault;
+                    if( def )
+                        cmdObj = *def;
+                }
+            }
 
             if ( cmdObj["fsync"].trueValue() ){
                 log() << "fsync from getlasterror" << endl;
