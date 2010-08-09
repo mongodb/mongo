@@ -260,6 +260,8 @@ namespace mongo {
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
     string ReplSetImpl::startupStatusMsg;
 
+    extern BSONObj *getLastErrorDefault;
+
     /** @param reconf true if this is a reconfiguration and not an initial load of the configuration.
         @return true if ok; throws if config really bad; false if config doesn't include self
     */
@@ -268,6 +270,11 @@ namespace mongo {
                  we cannot error out at this point, except fatally.  Check errors earlier.
                  */
         lock lk(this);
+
+        if( getLastErrorDefault || !c.getLastErrorDefaults.isEmpty() ) {
+            // see comment in dbcommands.cpp for getlasterrordefault
+            getLastErrorDefault = new BSONObj( c.getLastErrorDefaults );
+        }
 
         list<const ReplSetConfig::MemberCfg*> newOnes;
         bool additive = reconf;
