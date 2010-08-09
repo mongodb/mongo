@@ -76,7 +76,7 @@ namespace mongo {
             out << "   faults/s  \t- # of pages faults/sec (linux only)\n";
             out << "   locked    \t- percent of time in global write lock\n";
             out << "   idx miss  \t- percent of btree page misses (sampled)\n";
-            out << "   q t|r|w   \t- lock queue lengths (total|read|write)\n";
+            out << "   q t|r|w   \t- ops waiting for lock from db.currentOp() (total|read|write)\n";
             out << "   conn      \t- number of open connections\n";
         }
 
