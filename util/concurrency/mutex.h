@@ -20,6 +20,8 @@
 #include <map>
 #include <set>
 
+#include "../heapcheck.h"
+
 namespace mongo { 
 
     extern bool __destroyingStatics;
@@ -142,9 +144,11 @@ namespace mongo {
 #endif
         { 
             _m = new boost::mutex(); 
+	    IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
         }
         ~mutex() {
             if( !__destroyingStatics ) {
+	        UNIGNORE_OBJECT( _m );
                 delete _m;
             }
         }
