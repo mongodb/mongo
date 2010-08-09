@@ -170,10 +170,12 @@ namespace mongo {
         BSONObj theirObj = t->nextSafe();
         OpTime theirTime = theirObj["ts"]._opTime();
 
-        if( 1 ) {
+        {
             long long diff = (long long) ourTime.getSecs() - ((long long) theirTime.getSecs());
             /* diff could be positive, negative, or zero */
-            log() << "replSet info syncRollback diff in end of log times : " << diff << " seconds" << rsLog;
+            log() << "replSet info syncRollback our last optime:   " << ourTime.toStringPretty() << rsLog;
+            log() << "replSet info syncRollback their last optime: " << theirTime.toStringPretty() << rsLog;
+            log() << "replSet info syncRollback diff in end of log times: " << diff << " seconds" << rsLog;
             if( diff > 3600 ) { 
                 log() << "replSet syncRollback too long a time period for a rollback." << rsLog;
                 throw "error not willing to roll back more than one hour of data";
@@ -199,7 +201,7 @@ namespace mongo {
 
                 if( !t->more() ) { 
                     log() << "replSet error during rollback reached beginning of remote oplog? [2]" << rsLog;
-                    log() << "replSet  them: " << them->toString() << rsLog;
+                    log() << "replSet  them: " << them->toString() << " scanned: " << scanned << rsLog;
                     log() << "replSet  theirTime: " << theirTime.toStringPretty() << rsLog;
                     log() << "replSet  ourTime: " << ourTime.toStringPretty() << rsLog;
                     throw "reached beginning of remote oplog [2]";
@@ -215,7 +217,7 @@ namespace mongo {
             else if( theirTime > ourTime ) { 
                 if( !t->more() ) { 
                     log() << "replSet error during rollback reached beginning of remote oplog?" << rsLog;
-                    log() << "replSet  them: " << them->toString() << rsLog;
+                    log() << "replSet  them: " << them->toString() << " scanned: " << scanned << rsLog;
                     log() << "replSet  theirTime: " << theirTime.toStringPretty() << rsLog;
                     log() << "replSet  ourTime: " << ourTime.toStringPretty() << rsLog;
                     throw "reached beginning of remote oplog [1]";
