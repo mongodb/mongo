@@ -48,6 +48,8 @@ doTest = function( signal ) {
     assert.soon( function() { return as.find().count() == 1020; } );
     assert.eq( 1, as.find( { i: 1019 } ).count() );
 
+    assert.automsg( "m.getDB( 'local' ).getCollection( 'oplog.$main' ).stats().size > 0" );
+    
     rt.stop();
 }
 

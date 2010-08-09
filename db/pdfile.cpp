@@ -1615,6 +1615,7 @@ namespace mongo {
         }
 
         d->nrecords++;
+        d->datasize += r->netLength();
 
         return r;
     }
