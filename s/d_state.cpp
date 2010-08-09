@@ -603,7 +603,8 @@ namespace mongo {
         BSONObj x = loc.obj().extractFields(_key);
         
         MyMap::const_iterator a = _map.upper_bound( x );
-        a--;
+        if ( a != _map.begin() )
+            a--;
         
         bool good = x.woCompare( a->second.first ) >= 0 && x.woCompare( a->second.second ) < 0;
 #if 0
