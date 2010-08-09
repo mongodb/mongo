@@ -164,6 +164,7 @@ namespace mongo {
 #define SBNUM(val,maxSize,macro) \
             int prev = _buf.l; \
             int z = sprintf( _buf.grow(maxSize) , macro , (val) );  \
+            assert( z >= 0 ); \
             _buf.l = prev + z; \
             return *this; 
 
@@ -196,6 +197,17 @@ namespace mongo {
             return *this;
         }
 #undef SBNUM
+
+        void appendDoubleNice( double x ){
+            int prev = _buf.l;
+            char * start = _buf.grow( 32 );
+            int z = sprintf( start , "%.16g" , x );
+            assert( z >= 0 );
+            _buf.l = prev + z;
+            if( strchr(start, '.') == 0 && strchr(start, 'E') == 0 && strchr(start, 'N') == 0 ){
+                write( ".0" , 2 );
+            }
+        }
 
         void write( const char* buf, int len){
             memcpy( _buf.grow( len ) , buf , len );

@@ -387,16 +387,7 @@ namespace mongo {
             }
             break;
         case NumberDouble:
-            {
-                stringstream tmp;
-                tmp.precision( 16 );
-                tmp << number();
-                string n = tmp.str();
-                s << n;
-                // indicate this is a double:
-                if( strchr(n.c_str(), '.') == 0 && strchr(n.c_str(), 'E') == 0 && strchr(n.c_str(), 'N') == 0 )
-                    s << ".0";
-            }
+            s.appendDoubleNice( number() );
             break;
         case NumberLong:
             s << _numberLong();
