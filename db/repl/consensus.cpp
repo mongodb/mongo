@@ -83,6 +83,17 @@ namespace mongo {
         return vUp * 2 > totalVotes();
     }
 
+    bool Consensus::shouldRelinquish() const {
+        int vUp = rs._self->config().votes;
+        const long long T = rs.config().ho.heartbeatTimeoutMillis * rs.config().ho.heartbeatConnRetries;
+        for( Member *m = rs.head(); m; m=m->next() ) {
+            long long dt = m->hbinfo().timeDown();
+            if( dt < T )
+                vUp += m->config().votes;
+        }
+        return !( vUp * 2 > totalVotes() );
+    }
+
     static const int VETO = -10000;
 
     const time_t LeaseTime = 30;

@@ -40,6 +40,13 @@ namespace mongo {
     // hacky
     string *discoveredSeed = 0;
 
+    long long HeartbeatInfo::timeDown() const {
+        if( up() ) return 0;
+        if( downSince == 0 ) 
+            return 0; // still waiting on first heartbeat
+        return jsTime() - downSince;
+    }
+
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public ReplSetCommand {
     public:
@@ -205,8 +212,9 @@ namespace mongo {
     private:
         void down(HeartbeatInfo& mem, string msg) {
             mem.health = 0.0;
-            if( mem.upSince ) {
+            if( mem.upSince || mem.downSince == 0 ) {
                 mem.upSince = 0;
+                mem.downSince = jsTime();
                 log() << "replSet info " << h.toString() << " is now down (or slow to respond)" << rsLog;
             }
             mem.lastHeartbeatMsg = msg;
