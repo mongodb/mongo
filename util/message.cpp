@@ -168,7 +168,11 @@ namespace mongo {
             const int ret = select(maxfd+1, fds, NULL, NULL, &maxSelectTime);
             
             if (ret == 0){
+#ifdef _WIN32
+                _elapsedTime += 10;
+#else
                 _elapsedTime += ( 10000 - maxSelectTime.tv_usec ) / 1000;
+#endif
                 continue;
             }
             _elapsedTime += ret; // assume 1ms to grab connection. very rough

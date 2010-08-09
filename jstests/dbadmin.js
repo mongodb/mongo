@@ -21,4 +21,10 @@ assert( res.databases && res.databases.length > 0 , "listDatabases 1 " + tojson(
 x = db._adminCommand( "ismaster" );
 assert( x.ismaster , "ismaster failed: " + tojson( x ) )
 
+before = db.runCommand( "serverStatus" )
+sleep( 5000 )
+after = db.runCommand( "serverStatus" )
+assert.lt( 3 , after.uptimeEstimate , "up1" )
+assert.lt( 3 , after.uptimeEstimate - before.uptimeEstimate , "up2" )
+
 // TODO: add more tests here
