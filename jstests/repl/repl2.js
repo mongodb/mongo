@@ -31,6 +31,8 @@ doTest = function( signal ) {
     assert.soon( function() { return 1 == s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
 
     soonCount( 1001 );
+    assert.automsg( "m.getDB( 'local' ).getCollection( 'oplog.$main' ).stats().size > 0" );
+
     as = s.getDB("foo").a
     assert.eq( 1, as.find( { i: 0 } ).count() );
     assert.eq( 1, as.find( { i: 999 } ).count() );
