@@ -389,6 +389,35 @@ namespace JsobjTests {
             }
         };
 
+        class ToStringNumber {
+        public:
+            
+            void run(){
+                BSONObjBuilder b;
+                b.append( "a" , (int)4 );
+                b.append( "b" , (double)5 );
+                b.append( "c" , (long long)6 );
+                
+                b.append( "d" , 123.456789123456789123456789123456789 );
+                b.append( "e" , 123456789.123456789123456789123456789 );
+                b.append( "f" , 1234567891234567891234.56789123456789 );
+
+                b.append( "g" , -123.456 );
+                
+                BSONObj x = b.obj();
+                ASSERT_EQUALS( "4", x["a"].toString( false , true ) );
+                ASSERT_EQUALS( "5.0", x["b"].toString( false , true ) );
+                ASSERT_EQUALS( "6", x["c"].toString( false , true ) );                
+
+                ASSERT_EQUALS( "123.4567891234568" , x["d"].toString( false , true ) );
+                ASSERT_EQUALS( "123456789.1234568" , x["e"].toString( false , true ) );
+                ASSERT_EQUALS( "1.234567891234568e+21" , x["f"].toString( false , true ) );
+
+                ASSERT_EQUALS( "-123.456" , x["g"].toString( false , true ) );
+
+            }
+        };
+
         class NullString {
         public:
             void run() {
@@ -1693,6 +1722,7 @@ namespace JsobjTests {
             add< BSONObjTests::AppendIntOrLL >();
             add< BSONObjTests::AppendNumber >();
             add< BSONObjTests::ToStringArray >();
+            add< BSONObjTests::ToStringNumber >();
             add< BSONObjTests::NullString >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
