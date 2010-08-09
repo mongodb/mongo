@@ -192,6 +192,7 @@ namespace mongo {
             return _lastOp;
         }
 
+        /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) {
             if( theReplSet ) { 
                 b.append("lastOp" , (long long) _lastOp);
