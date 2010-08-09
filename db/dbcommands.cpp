@@ -1454,15 +1454,12 @@ namespace mongo {
             scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
 
             while ( cursor->ok() ){
-                if ( cursor->matcher() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ){
-                    cursor->advance();
-                    continue;
+                if ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() ) ){
+                    BSONObj o = cursor->current();
+                    o.getFieldsDotted( key, values );
                 }
 
-                BSONObj o = cursor->current();
                 cursor->advance();
-                
-                o.getFieldsDotted( key, values );
 
                 if (!cc->yieldSometimes())
                     break;
