@@ -40,7 +40,7 @@ namespace mongo {
 
      BSON object format:
      
-     \code
+     code
      <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
      
      totalSize includes itself.
