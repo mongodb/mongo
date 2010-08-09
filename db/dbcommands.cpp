@@ -1451,6 +1451,7 @@ namespace mongo {
             
             BSONElementSet values;
             shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
+            scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
 
             while ( cursor->ok() ){
                 if ( cursor->matcher() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ){
@@ -1461,7 +1462,10 @@ namespace mongo {
                 BSONObj o = cursor->current();
                 cursor->advance();
                 
-                o.getFieldsDotted( key.c_str(), values );
+                o.getFieldsDotted( key, values );
+
+                if (!cc->yieldSometimes())
+                    break;
             }
 
             BSONArrayBuilder b( result.subarrayStart( "values" ) );
