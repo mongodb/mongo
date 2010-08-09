@@ -102,6 +102,7 @@ namespace mongo {
 
         int totalVotes() const;
         bool aMajoritySeemsToBeUp() const;
+        bool shouldRelinquish() const;
         void electSelf();
         void electCmdReceived(BSONObj, BSONObjBuilder*);
         void multiCommand(BSONObj cmd, list<Target>& L);
