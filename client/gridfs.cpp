@@ -66,7 +66,6 @@ namespace mongo {
     }
 
     BSONObj GridFS::storeFile( const char* data , size_t length , const string& remoteName , const string& contentType){
-        massert( 10279 , "large files not yet implemented", length <= 0xffffffff);
         char const * const end = data + length;
 
         OID id;
@@ -127,8 +126,6 @@ namespace mongo {
         if (fd != stdin)
             fclose( fd );
         
-        massert( 10280 , "large files not yet implemented", length <= 0xffffffff);
-
         return insertFile((remoteName.empty() ? fileName : remoteName), id, length, contentType);
     }
 
