@@ -255,6 +255,8 @@ namespace mongo {
         Extent* getPrevExtent() {
             return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev);
         }
+        
+        static int maxSize();
     };
 
     /*
