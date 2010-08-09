@@ -275,7 +275,7 @@ namespace mongo {
             r.tailCheck();
             if( !r.haveCursor() ) {
                 log() << "replSet TEMP end syncTail pass with " << hn << rsLog;
-                // TODO : reuse our cnonection to the primary.
+                // TODO : reuse our connection to the primary.
                 return;
             }
             if( box.getPrimary() != primary )

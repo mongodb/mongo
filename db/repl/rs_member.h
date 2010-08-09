@@ -61,17 +61,20 @@ namespace mongo {
     class HeartbeatInfo { 
         unsigned _id;
     public:
-        HeartbeatInfo() : _id(0xffffffff),hbstate(MemberState::RS_UNKNOWN),health(-1.0),skew(INT_MIN) { }
+        HeartbeatInfo() : _id(0xffffffff),hbstate(MemberState::RS_UNKNOWN),health(-1.0),downSince(0),skew(INT_MIN) { }
         HeartbeatInfo(unsigned id);
         bool up() const { return health > 0; }
         unsigned id() const { return _id; }
         MemberState hbstate;
         double health;
         time_t upSince;
+        long long downSince;
         time_t lastHeartbeat;
         string lastHeartbeatMsg;
         OpTime opTime;
         int skew;
+
+        long long timeDown() const; // ms
 
         /* true if changed in a way of interest to the repl set manager. */
         bool changed(const HeartbeatInfo& old) const;
@@ -80,6 +83,7 @@ namespace mongo {
     inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id) { 
         hbstate = MemberState::RS_UNKNOWN;
         health = -1.0;
+        downSince = 0;
         lastHeartbeat = upSince = 0; 
         skew = INT_MIN;
     }

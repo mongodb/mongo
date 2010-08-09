@@ -136,7 +136,7 @@ namespace mongo {
                     return;
                 }
 
-                if( !rs->elect.aMajoritySeemsToBeUp() ) { 
+                if( rs->elect.shouldRelinquish() ) { 
                     log() << "replSet can't see a majority of the set, relinquishing primary" << rsLog;
                     rs->relinquish();
                 }

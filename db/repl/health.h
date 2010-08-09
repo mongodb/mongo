@@ -27,7 +27,7 @@ namespace mongo {
         HealthOptions() { 
             heartbeatSleepMillis = 2000;
             heartbeatTimeoutMillis = 10000;
-            heartbeatConnRetries  = 3;
+            heartbeatConnRetries  = 2;
         }
 
         bool isDefault() const { return *this == HealthOptions(); }
