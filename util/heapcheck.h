@@ -18,8 +18,6 @@
 
 #pragma once
 
-namespace mongo {
-
 #if defined(HEAP_CHECKING)
 
 #include <google/heap-checker.h>
@@ -33,6 +31,3 @@ namespace mongo {
 #define UNIGNORE_OBJECT( a ) 
 
 #endif
-
-
-}  // namespace mongo

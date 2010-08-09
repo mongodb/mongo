@@ -144,11 +144,11 @@ namespace mongo {
 #endif
         { 
             _m = new boost::mutex(); 
-	    IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
+            IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
         }
         ~mutex() {
             if( !__destroyingStatics ) {
-	        UNIGNORE_OBJECT( _m );
+                UNIGNORE_OBJECT( _m );
                 delete _m;
             }
         }
