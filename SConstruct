@@ -1093,7 +1093,7 @@ def jsToH(target, source, env):
 
     for s in source:
         filename = str(s)
-        objname = filename.split(os.path.sep)[1].split('.')[0]
+        objname = os.path.split(filename)[1].split('.')[0]
         stringname = '_jscode_raw_' + objname
 
         h.append('const StringData ' + stringname + " = ")
