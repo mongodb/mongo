@@ -1111,6 +1111,7 @@ def jsToH(target, source, env):
 
     h.append("} // namespace JSFiles")
     h.append("} // namespace mongo")
+    h.append("")
 
     text = '\n'.join(h);
 
