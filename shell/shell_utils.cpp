@@ -47,8 +47,6 @@
 #include "../util/text.h"
 #include "../util/heapcheck.h"
 
-extern const mongo::StringData jsconcatcode_server;
-
 namespace mongo {
 #ifdef _WIN32
     inline int close(int fd) { return _close(fd); }
@@ -879,7 +877,7 @@ namespace mongo {
         void initScope( Scope &scope ) {
             scope.externalSetup();
             mongo::shellUtils::installShellUtils( scope );
-            scope.execSetup( jsconcatcode_server , "setupServerCode" );
+            scope.execSetup(JSFiles::servers);
             
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );

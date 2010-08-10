@@ -406,7 +406,7 @@ namespace mongo {
 
         //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
         _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( true )->GetFunction() );
-        exec( jsconcatcode , "localConnect 1" , false , true , true , 0 );
+        execCoreFiles();
         exec( "_mongo = new Mongo();" , "local connect 2" , false , true , true , 0 );
         exec( (string)"db = _mongo.getDB(\"" + dbName + "\");" , "local connect 3" , false , true , true , 0 );
         _connectState = LOCAL;
@@ -423,7 +423,7 @@ namespace mongo {
 
         installFork( _global, _context );
         _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( false )->GetFunction() );
-        exec( jsconcatcode , "shell setup" , false , true , true , 0 );
+        execCoreFiles();
         _connectState = EXTERNAL;
     }
 

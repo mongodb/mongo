@@ -1078,90 +1078,57 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
 env = doConfigure( env )
 
-# --- js concat ---
-
-def concatjs(target, source, env):
-
-    outFile = str( target[0] )
-
-    fullSource = ""
-
-    first = True
-
-    for s in source:
-        f = open( str(s) , 'r' )
-        for l in f:
-
-            #strip comments. special case if // is potentially in a string
-            parts = l.split("//", 1)
-            if (len(parts) > 1) and ('"' not in parts[1]) and ('"' not in parts[1]):
-                l = parts[0]
-
-            l = l.strip()
-            if len ( l ) == 0:
-                continue
-            
-            if l == "}":
-                fullSource += "}"
-                continue
-
-            if first:
-                first = False
-            else:
-                fullSource += "\n"
-
-            fullSource += l
-
-    fullSource += "\n"
-    
-    fullSource = re.compile( r'/\*\*.*?\*/' , re.M | re.S ).sub( "" , fullSource )
-
-    out = open( outFile , 'w' )
-    out.write( fullSource )
-
-    return None
-
-jsBuilder = Builder(action = concatjs,
-                    suffix = '.jsall',
-                    src_suffix = '.js')
-
-env.Append( BUILDERS={'JSConcat' : jsBuilder})
 
 # --- jsh ---
 
 def jsToH(target, source, env):
 
     outFile = str( target[0] )
-    if len( source ) != 1:
-        raise Exception( "wrong" )
 
-    h = '#include "bson/stringdata.h"\n extern "C" const mongo::StringData jsconcatcode' + outFile.split( "mongo" )[-1].replace( "-" , "_").split( ".cpp")[0] + " = \n"
+    h =  ['#include "bson/stringdata.h"'
+         ,'namespace mongo {'
+         ,'struct JSFile{ const char* name; const StringData& source; };'
+         ,'namespace JSFiles{'
+         ]
 
-    for l in open( str(source[0]) , 'r' ):
-        l = l.strip()
-        l = l.replace( '\\' , "\\\\" )
-        l = l.replace( '"' , "\\\"" )
+    for s in source:
+        filename = str(s)
+        objname = filename.split('/')[1].split('.')[0]
+        stringname = '_jscode_raw_' + objname
 
+        h.append('const StringData ' + stringname + " = ")
 
-        h += '"' + l + "\\n\"\n "
+        for l in open( filename , 'r' ):
+            l = l.strip()
+            l = l.replace( '\\' , '\\\\' )
+            l = l.replace( '"' , r'\"' )
 
-    h += ";\n\n"
+            h.append( '"' + l + r'\n" ' )
+
+        h.append(";")
+        h.append('extern const JSFile %s;'%objname) #symbols aren't exported w/o this
+        h.append('const JSFile %s = { "%s" , %s };'%(objname, filename, stringname))
+
+    h.append("} // namespace JSFiles")
+    h.append("} // namespace mongo")
+
+    text = '\n'.join(h);
 
     out = open( outFile , 'wb' )
-    out.write( h )
+    out.write( text )
     out.close()
 
     # mongo_vstudio.cpp is in git as the .vcproj doesn't generate this file.
     if outFile.find( "mongo.cpp" ) >= 0:
         out = open( outFile.replace( "mongo" , "mongo_vstudio" ) , 'wb' )
-        out.write( h )
+        out.write( text )
         out.close()
 
     return None
 
 jshBuilder = Builder(action = jsToH,
                     suffix = '.cpp',
-                    src_suffix = '.jsall')
+                    src_suffix = '.js')
 
 env.Append( BUILDERS={'JSHeader' : jshBuilder})
 
@@ -1247,11 +1214,9 @@ if darwin or clientEnv["_HAVEPCAP"]:
 
 # --- shell ---
 
-env.JSConcat( "shell/mongo.jsall"  , ["shell/utils.js","shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
-env.JSHeader( "shell/mongo.jsall" )
+env.JSHeader( "shell/mongo.cpp"  , ["shell/utils.js","shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 
-env.JSConcat( "shell/mongo-server.jsall"  , [ "shell/servers.js"] )
-env.JSHeader( "shell/mongo-server.jsall" )
+env.JSHeader( "shell/mongo-server.cpp"  , [ "shell/servers.js"] )
 
 shellEnv = env.Clone();
 

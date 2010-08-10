@@ -20,9 +20,22 @@
 #include "../pch.h"
 #include "../db/jsobj.h"
 
-extern const mongo::StringData jsconcatcode; // TODO: change name to mongoJSCode
-
 namespace mongo {
+
+    struct JSFile {
+        const char* name;
+        const StringData& source;
+    };
+
+    namespace JSFiles {
+        extern const JSFile collection;
+        extern const JSFile db;
+        extern const JSFile mongo;
+        extern const JSFile mr;
+        extern const JSFile query;
+        extern const JSFile servers;
+        extern const JSFile utils;
+    }
 
     typedef unsigned long long ScriptingFunction;
     typedef BSONObj (*NativeFunction) ( const BSONObj &args );
@@ -85,6 +98,21 @@ namespace mongo {
         virtual void execSetup( const StringData& code , const string& name = "setup" ){
             exec( code , name , false , true , true , 0 );
         }
+
+        void execSetup( const JSFile& file){
+            execSetup(file.source, file.name);
+        }
+
+        void execCoreFiles(){
+            // keeping same order as in SConstruct
+            execSetup(JSFiles::utils);
+            execSetup(JSFiles::db);
+            execSetup(JSFiles::mongo);
+            execSetup(JSFiles::mr);
+            execSetup(JSFiles::query);
+            execSetup(JSFiles::collection);
+        }
+
         virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 );
         
         virtual void injectNative( const char *field, NativeFunction func ) = 0;
