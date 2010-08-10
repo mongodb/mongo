@@ -1135,7 +1135,7 @@ def jsToH(target, source, env):
     if len( source ) != 1:
         raise Exception( "wrong" )
 
-    h = "const char * jsconcatcode" + outFile.split( "mongo" )[-1].replace( "-" , "_").split( ".cpp")[0] + " = \n"
+    h = '#include "bson/stringdata.h"\n extern "C" const mongo::StringData jsconcatcode' + outFile.split( "mongo" )[-1].replace( "-" , "_").split( ".cpp")[0] + " = \n"
 
     for l in open( str(source[0]) , 'r' ):
         l = l.strip()

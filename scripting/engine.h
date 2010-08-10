@@ -20,7 +20,7 @@
 #include "../pch.h"
 #include "../db/jsobj.h"
 
-extern const char * jsconcatcode; // TODO: change name to mongoJSCode
+extern const mongo::StringData jsconcatcode; // TODO: change name to mongoJSCode
 
 namespace mongo {
 
@@ -81,8 +81,8 @@ namespace mongo {
             throw UserException( 9005 , (string)"invoke failed: " + getError() );
         }
 
-        virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) = 0;
-        virtual void execSetup( const string& code , const string& name = "setup" ){
+        virtual bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) = 0;
+        virtual void execSetup( const StringData& code , const string& name = "setup" ){
             exec( code , name , false , true , true , 0 );
         }
         virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 );

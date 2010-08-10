@@ -1,4 +1,5 @@
-const char * jsconcatcode = 
+#include "bson/stringdata.h"
+ extern "C" const mongo::StringData jsconcatcode = 
 "__quiet = false;\n"
  "__magicNoPrint = { __magicNoPrint : 1111 }\n"
  "chatty = function(s){\n"

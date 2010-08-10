@@ -380,7 +380,7 @@ namespace mongo {
             return _real->getError();
         }
         
-        bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ){
+        bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ){
             return _real->exec( code , name , printResult , reportError , assertOnError , timeoutMs );
         }
         bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ){

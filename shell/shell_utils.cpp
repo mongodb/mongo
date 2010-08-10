@@ -47,7 +47,7 @@
 #include "../util/text.h"
 #include "../util/heapcheck.h"
 
-extern const char * jsconcatcode_server;
+extern const mongo::StringData jsconcatcode_server;
 
 namespace mongo {
 #ifdef _WIN32

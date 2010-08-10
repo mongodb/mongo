@@ -433,7 +433,7 @@ namespace mongo {
                 }
                 gcName = "cf anon";
                 fname << "anon";
-                return JS_CompileFunction( _context , assoc , fname.str().c_str() , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
+                return JS_CompileFunction( _context , assoc , fname.str().c_str() , 0 , 0 , s.c_str() , s.size() , "nofile_a" , 0 );
             }
 
             string code = raw;
@@ -466,7 +466,7 @@ namespace mongo {
             for ( size_t i=0; i<params.size(); i++ )
                 paramArray[i] = params[i].c_str();
             
-            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray.get() , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
+            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray.get() , code.c_str() , code.size() , "nofile_b" , 0 );
 
             if ( ! func ){
                 log() << "compile failed for: " << raw << endl;
@@ -1385,14 +1385,14 @@ namespace mongo {
             currentScope.reset( this );
         }
 
-        bool exec( const string& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ){
+        bool exec( const StringData& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ){
             smlock;
             precall();
 
             jsval ret = JSVAL_VOID;
 
             installCheckTimeout( timeoutMs );
-            JSBool worked = JS_EvaluateScript( _context , _global , code.c_str() , strlen( code.c_str() ) , name.c_str() , 0 , &ret );
+            JSBool worked = JS_EvaluateScript( _context , _global , code.data() , code.size() , name.c_str() , 0 , &ret );
             uninstallCheckTimeout( timeoutMs );
 
             if ( ! worked && _error.size() == 0 ){
@@ -1481,7 +1481,7 @@ namespace mongo {
             stringstream code;
             code << field << "_" << " = { x : " << field << "_ }; ";
             code << field << " = function(){ return nativeHelper.apply( " << field << "_ , arguments ); }";
-            exec( code.str().c_str() );
+            exec( code.str() );
         }
 
         virtual void gc(){
