@@ -1091,6 +1091,12 @@ def jsToH(target, source, env):
          ,'namespace JSFiles{'
          ]
 
+    def cppEscape(s):
+        s = s.strip()
+        s = s.replace( '\\' , '\\\\' )
+        s = s.replace( '"' , r'\"' )
+        return s
+
     for s in source:
         filename = str(s)
         objname = os.path.split(filename)[1].split('.')[0]
@@ -1099,15 +1105,11 @@ def jsToH(target, source, env):
         h.append('const StringData ' + stringname + " = ")
 
         for l in open( filename , 'r' ):
-            l = l.strip()
-            l = l.replace( '\\' , '\\\\' )
-            l = l.replace( '"' , r'\"' )
-
-            h.append( '"' + l + r'\n" ' )
+            h.append( '"' + cppEscape(l) + r'\n" ' )
 
         h.append(";")
         h.append('extern const JSFile %s;'%objname) #symbols aren't exported w/o this
-        h.append('const JSFile %s = { "%s" , %s };'%(objname, filename, stringname))
+        h.append('const JSFile %s = { "%s" , %s };'%(objname, cppEscape(filename), stringname))
 
     h.append("} // namespace JSFiles")
     h.append("} // namespace mongo")
