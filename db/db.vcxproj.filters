@@ -398,6 +398,9 @@
       <Filter>db</Filter>
     </ClCompile>
     <ClCompile Include="..\s\grid.cpp" />
+    <ClCompile Include="..\shell\mongo_vstudio.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
