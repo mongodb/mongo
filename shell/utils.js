@@ -896,7 +896,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
         if (begining.length)
             begining += '.';
 
-        var possibilities = Array.concat(
+        var possibilities = new Array().concat(
             Object.keySet(curObj),
             Object.keySet(curObj.constructor.prototype),
             builtinMethods[curObj] || [], // curObj is a builtin constructor
