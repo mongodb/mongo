@@ -696,3 +696,13 @@ DB.prototype.listCommands = function(){
 DB.prototype.printShardingStatus = function(){
     printShardingStatus( this.getSisterDB( "config" ) );
 }
+
+DB.autocomplete = function(obj){
+    var colls = obj.getCollectionNames();
+    var ret=[];
+    for (var i=0; i<colls.length; i++){
+        if (colls[i].match(/^[a-zA-Z0-9_.\$]+$/))
+            ret.push(colls[i]);
+    }
+    return ret;
+}
