@@ -40,11 +40,12 @@
 # include <sys/wait.h>
 #endif
 
-#include "../client/dbclient.h"
-#include "../util/processinfo.h"
 #include "utils.h"
-#include "../util/text.h"
+#include "../client/dbclient.h"
 #include "../util/md5.hpp"
+#include "../util/processinfo.h"
+#include "../util/text.h"
+#include "../util/heapcheck.h"
 
 extern const char * jsconcatcode_server;
 
@@ -541,7 +542,14 @@ namespace mongo {
                         ::_Exit(-1); //do not pass go, do not call atexit handlers
                     }
 
-                    execvp( argv[ 0 ], const_cast<char**>(argv) );
+                    const char** env = new const char* [2]; // don't need to free - in child
+                    env[0] = NULL;
+#if defined(HEAP_CHECKING)
+                    env[0] = "HEAPCHECK=normal";
+                    env[1] = NULL;
+#endif // HEAP_CHECKING
+
+                    execvpe( argv[ 0 ], const_cast<char**>(argv), const_cast<char**>(env) );
 
                     cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
                     ::_Exit(-1);
