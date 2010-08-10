@@ -578,16 +578,3 @@ DBCollection.prototype.toString = function(){
 DBCollection.prototype.tojson = DBCollection.prototype.toString;
 
 DBCollection.prototype.shellPrint = DBCollection.prototype.toString;
-
-DBCollection.autocomplete = function(obj){
-    var colls = DB.autocomplete(obj.getDB());
-    var ret = [];
-    for (var i=0; i<colls.length; i++){
-        var c = colls[i];
-        if (c.length <= obj.getName().length) continue;
-        if (c.slice(0,obj.getName().length+1) != obj.getName()+'.') continue;
-
-        ret.push(c.slice(obj.getName().length+1));
-    }
-    return ret;
-}
