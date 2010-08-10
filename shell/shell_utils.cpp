@@ -40,13 +40,12 @@
 # include <sys/wait.h>
 #endif
 
-#include "../client/dbclient.h"
-#include "../util/processinfo.h"
 #include "utils.h"
-#include "../util/text.h"
+#include "../client/dbclient.h"
 #include "../util/md5.hpp"
-
-extern const char * jsconcatcode_server;
+#include "../util/processinfo.h"
+#include "../util/text.h"
+#include "../util/heapcheck.h"
 
 namespace mongo {
 #ifdef _WIN32
@@ -541,6 +540,18 @@ namespace mongo {
                         ::_Exit(-1); //do not pass go, do not call atexit handlers
                     }
 
+                    const char** env = new const char* [2]; // don't need to free - in child
+                    env[0] = NULL;
+#if defined(HEAP_CHECKING)
+                    env[0] = "HEAPCHECK=normal";
+                    env[1] = NULL;
+
+                    // Heap-check for mongod and mongos only. 'argv[0]' must be in the path format.
+                    if ( ( argv_[0].find("mongod") != string::npos) || ( argv_[0].find("mongos") != string::npos) ){
+                        execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
+                    }
+#endif // HEAP_CHECKING
+
                     execvp( argv[ 0 ], const_cast<char**>(argv) );
 
                     cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
@@ -871,7 +882,7 @@ namespace mongo {
         void initScope( Scope &scope ) {
             scope.externalSetup();
             mongo::shellUtils::installShellUtils( scope );
-            scope.execSetup( jsconcatcode_server , "setupServerCode" );
+            scope.execSetup(JSFiles::servers);
             
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );

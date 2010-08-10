@@ -98,6 +98,7 @@ namespace mongo {
     extern class LastErrorHolder {
     public:
         LastErrorHolder() : _id( 0 ) {}
+        ~LastErrorHolder();
 
         LastError * get( bool create = false );
         LastError * getSafe(){
@@ -142,8 +143,10 @@ namespace mongo {
             time_t time;
             LastError *lerr;
         };
+        typedef map<int,Status> IDMap;
+
         static mongo::mutex _idsmutex;
-        map<int,Status> _ids;    
+        IDMap _ids;    
     } lastError;
 
     void raiseError(int code , const char *msg);

@@ -1178,6 +1178,21 @@ ReplSetTest.prototype.callIsMaster = function() {
   return master || false;
 }
 
+ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
+  var master = this.getMaster();
+  var slaves = this.liveNodes.slaves;
+  var len = slaves.length;
+
+  this.attempt({context: this, timeout: 60000, desc: "Awaiting secondaries"}, function() {
+     var ready = true;
+     for(var i=0; i<len; i++) {
+       ready = ready && slaves[i].getDB("admin").runCommand({ismaster: 1})['secondary'];
+     }
+
+     return ready;
+  });
+}
+
 ReplSetTest.prototype.getMaster = function( timeout ) {
   var tries = 0;
   var sleepTime = 500;

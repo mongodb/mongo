@@ -42,7 +42,7 @@ namespace mongo {
             le->raiseError(code, msg);
         }
     }
-    
+
     void LastError::appendSelf( BSONObjBuilder &b ) {
         if ( !valid ) {
             b.appendNull( "err" );
@@ -63,6 +63,15 @@ namespace mongo {
             b.append( "writeback" , writebackId );
         b.appendNumber( "n", nObjects );
     }
+
+    LastErrorHolder::~LastErrorHolder(){
+        scoped_lock lock(_idsmutex);
+        for ( IDMap::const_iterator i = _ids.begin(); i != _ids.end(); ++i ){
+            delete i->second.lerr;
+        }
+        _ids.clear();
+    }
+
 
     void LastErrorHolder::setID( int id ){
         _id.set( id );

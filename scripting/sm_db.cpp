@@ -990,7 +990,7 @@ namespace mongo {
         dbref_class.name = dbrefName;
         assert( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 2 , 0 , bson_functions , 0 , 0 ) );
         
-        scope->exec( jsconcatcode );
+        scope->execCoreFiles();
     }
 
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , jsval val , JSObject * o ){

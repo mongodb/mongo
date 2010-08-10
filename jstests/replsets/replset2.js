@@ -18,12 +18,14 @@ doTest = function( signal ) {
     // This will wait for initiation
     replTest.initiate();
 
+    var testDB = "repl-test";
+
     // Call getMaster to return a reference to the node that's been
     // elected master.
     var master = replTest.getMaster();
 
     // Wait for replication to a single node
-    master.getDB("test").bar.insert({n: 1});
+    master.getDB(testDB).bar.insert({n: 1});
 
     // Wait for initial sync
     replTest.awaitReplication();
@@ -31,7 +33,6 @@ doTest = function( signal ) {
     var slaves = replTest.liveNodes.slaves;
     slaves.forEach(function(slave) { slave.setSlaveOk(); });
 
-    var testDB = "repl-test";
 
     var failed = false;
     var callGetLastError = function(w, timeout, db) {

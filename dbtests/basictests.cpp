@@ -234,7 +234,7 @@ namespace BasicTests {
                     if ( y < 1000 || y > 2500 ){
                         cout << "sleeptest y: " << y << endl;
                         ASSERT( y >= 1000 );
-                        ASSERT( y <= 100000 );
+                        /* ASSERT( y <= 100000 ); */
                     }
                 }
             }
