@@ -549,7 +549,7 @@ namespace mongo {
                     env[1] = NULL;
 #endif // HEAP_CHECKING
 
-                    execvpe( argv[ 0 ], const_cast<char**>(argv), const_cast<char**>(env) );
+                    execve( argv[ 0 ], const_cast<char**>(argv), const_cast<char**>(env) );
 
                     cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
                     ::_Exit(-1);
