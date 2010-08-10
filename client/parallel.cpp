@@ -331,30 +331,39 @@ namespace mongo {
 
         if ( ! _sortKey.isEmpty() && ! _fields.isEmpty() ){
             // we need to make sure the sort key is in the project
-            bool isNegative = false;
+
+            set<string> sortKeyFields;
+            _sortKey.getFieldNames(sortKeyFields);
+
             BSONObjBuilder b;
+            bool isNegative = false;
             {
                 BSONObjIterator i( _fields );
                 while ( i.more() ){
                     BSONElement e = i.next();
                     b.append( e );
-                    if ( ! e.trueValue() )
+
+                    string fieldName = e.fieldName();
+
+                    // exact field
+                    bool found = sortKeyFields.erase(fieldName);
+
+                    // subfields
+                    set<string>::const_iterator begin = sortKeyFields.lower_bound(fieldName + ".\x00");
+                    set<string>::const_iterator end   = sortKeyFields.lower_bound(fieldName + ".\xFF");
+                    sortKeyFields.erase(begin, end);
+
+                    if ( ! e.trueValue() ) {
+                        uassert( 13431 , "have to have sort key in projection and removing it" , !found && begin == end );
+                    } else if (!e.isABSONObj()) {
                         isNegative = true;
+                    }
                 }
             }                    
             
-            {
-                BSONObjIterator i( _sortKey );
-                while ( i.more() ){
-                    BSONElement e = i.next();
-                    BSONElement f = _fields.getField( e.fieldName() );
-                    if ( isNegative ){
-                        uassert( 13431 , "have to have sort key in projection and removing it" , f.eoo() );
-                    }
-                    else if ( f.eoo() ){
-                        // add to projection
-                        b.append( e );
-                    }
+            if (isNegative){
+                for (set<string>::const_iterator it(sortKeyFields.begin()), end(sortKeyFields.end()); it != end; ++it){
+                    b.append(*it, 1);
                 }
             }
             
