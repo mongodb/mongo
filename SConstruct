@@ -260,13 +260,6 @@ AddOption( "--pch",
            action="store",
            help="use precompiled headers to speed up the build (experimental)" )
 
-AddOption( "--heapcheck",
-           dest="heapcheck",
-           type="string",
-           nargs=0,
-           action="store",
-           help="link to heap-checking malloc-lib and look for memory leaks during tests")
-
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -925,16 +918,15 @@ def doConfigure( myenv , needPcre=True , shell=False ):
         else:
             print( "WARNING: old version of boost - you should consider upgrading" )
 
-    if not shell:
-        # this will add it if it exists and works
-        myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
-                      "boost_system" + boostCompiler + boostVersion ] )
+    # this will add it if it exists and works
+    myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
+                  "boost_system" + boostCompiler + boostVersion ] )
 
-        for b in boostLibs:
-            l = "boost_" + b
-            myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
-                          l + boostCompiler + boostVersion ] ,
-                        release or not shell)
+    for b in boostLibs:
+        l = "boost_" + b
+        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
+                      l + boostCompiler + boostVersion ] ,
+                    release or not shell)
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
@@ -959,7 +951,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
     if solaris:
         conf.CheckLib( "nsl" )
 
-    if usesm and not shell:
+    if usesm:
 
         # see http://www.mongodb.org/pages/viewpageattachments.action?pageId=12157032
         J = [ "mozjs" , "js", "js_static" ]
@@ -1049,28 +1041,6 @@ def doConfigure( myenv , needPcre=True , shell=False ):
                     break
             if not found:
                 raise "can't find a static %s" % l
-
-    # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
-    # point.
-    if ( GetOption( "heapcheck" ) is not None ) and ( not shell ):
-        if ( not debugBuild ) and ( not debugLogging ):
-            print( "--heapcheck needs --d or --dd" )
-            Exit( 1 )
-
-        if not conf.CheckCXXHeader( "google/heap-checker.h" ):
-            print( "--heapcheck neads header 'google/heap-checker.h'" )
-            Exit( 1 )
-
-        myCheckLib( "tcmalloc" , True );  # if successful, appedded 'tcmalloc' to myenv[ LIBS ]
-        myenv.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
-        myenv.Append( CPPFLAGS="-fno-omit-frame-pointer" )
-
-    # FIXME doConfigure() is being called twice, in the case of the shell. So if it is called 
-    # with shell==True, it'd be on its second call and it would need to rearrange the libraries'
-    # order. The following removes tcmalloc from the LIB's list and reinserts it at the end.
-    if ( GetOption( "heapcheck" ) is not None ) and ( shell ):
-        removeIfInList( myenv["LIBS"] , "tcmalloc" )
-        myenv.Append( LIBS="tcmalloc" )
 
     myenv.Append(LINKCOM=" $STATICFILES")
     myenv.Append(STATICFILES=staticlibfiles)
