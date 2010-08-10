@@ -840,12 +840,102 @@ shellPrintHelper = function( x ){
         print( tojson( x ) );
 }
 
-shellAutocomplete = function( prefix ){
-    var a = [];
-    //a.push( prefix + "z" )
-    //a.push( prefix + "y" )
-    __autocomplete__ = a;
-}
+shellAutocomplete = function (/*prefix*/){ // outer scope function called on init. Actual function at end
+
+    // from w3schools reference
+    var builtinMethods = {}; // uses constructor objects as keys
+    builtinMethods[Array] = "constructor length prototype concat join pop push reverse shift slice sort splice toString unshift valueOf".split(' ');
+    builtinMethods[Boolean] = "constructor prototype toString valueOf".split(' ');
+    builtinMethods[Date] = "constructor prototype getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toLocaleDateString toLocaleTimeString toLocaleString toString toTimeString toUTCString UTC valueOf".split(' ');
+    builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split(' ');
+    builtinMethods[Number] = "constructor prototype MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision toString valueOf".split(' ');
+    builtinMethods[RegExp] = "constructor prototype global ignoreCase lastIndex multiline source compile exec test toString valueOf".split(' ');
+    builtinMethods[String] = "constructor prototype length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toString toUpperCase valueOf".split(' ');
+
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String".split(' ');
+
+    var isPrivate = function(name){
+        if (shellAutocomplete.showPrivate) return false;
+        if (name == '_id') return false;
+        if (name[0] == '_') return true;
+        if (name[name.length-1] == '_') return true; // some native functions have an extra name_ method
+        return false;
+    }
+
+    var customComplete = function(obj){
+        try {
+            if(obj.constructor.autocomplete){
+                var ret = obj.constructor.autocomplete(obj);
+                if (ret.constructor != Array){
+                    print("\nautocompleters must return real Arrays");
+                    return [];
+                }
+                return ret;
+            } else {
+                return [];
+            }
+        } catch (e) {
+            // print(e); // uncomment if debugging custom completers
+            return [];
+        }
+    }
+
+    var worker = function( prefix ){
+        var global = (function(){return this;}).call(); // trick to get global object
+
+        var curObj = global;
+        var parts = prefix.split('.');
+        for (var p=0; p < parts.length - 1; p++){ // doesn't include last part
+            curObj = curObj[parts[p]];
+            if (curObj === undefined)
+                return [];
+        }
+
+        var lastPrefix = parts[parts.length-1] || '';
+        var begining = parts.slice(0, parts.length-1).join('.');
+        if (begining.length)
+            begining += '.';
+
+        var possibilities = Array.concat(
+            Object.keySet(curObj),
+            Object.keySet(curObj.constructor.prototype),
+            builtinMethods[curObj] || [], // curObj is a builtin constructor
+            builtinMethods[curObj.constructor] || [], // curObj is made from a builtin constructor
+            curObj == global ? extraGlobals : [],
+            customComplete(curObj)
+        );
+
+        var ret = [];
+        for (var i=0; i < possibilities.length; i++){
+            var p = possibilities[i];
+            if (curObj[p] === undefined && curObj != global) continue; // extraGlobals aren't in the global object
+            if (p.length == 0 || p.length < lastPrefix.length) continue;
+            if (isPrivate(p)) continue;
+            if (p.match(/^[0-9]+$/)) continue; // don't array number indexes
+            if (p.substr(0, lastPrefix.length) != lastPrefix) continue;
+
+            var completion = begining + p;
+            if(curObj[p] && curObj[p].constructor == Function && p != 'constructor')
+                completion += '(';
+
+            ret.push(completion);
+        }
+
+        return ret;
+    }
+
+    // this is the actual function that gets assigned to shellAutocomplete
+    return function( prefix ){
+        try {
+            __autocomplete__ = worker(prefix).sort();
+        }catch (e){
+            print("exception durring autocomplete: " + tojson(e.message));
+            __autocomplete__ = [];
+        }
+    }
+}();
+
+shellAutocomplete.showPrivate = false; // toggle to show (useful when working on internals)
 
 shellHelper = function( command , rest , shouldPrint ){
     command = command.trim();

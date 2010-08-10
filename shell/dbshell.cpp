@@ -64,8 +64,8 @@ mongo::Scope * shellMainScope;
 void generateCompletions( const string& prefix , vector<string>& all ){
     if ( prefix.find( '"' ) != string::npos )
         return;
-    shellMainScope->exec( "shellAutocomplete( \"" + prefix + "\" );" , "autocomplete help" , false , true , false );
-    
+
+    shellMainScope->invokeSafe("function(x) {shellAutocomplete(x)}", BSON("0" << prefix), 1000);
     BSONObjBuilder b;
     shellMainScope->append( b , "" , "__autocomplete__" );
     BSONObj res = b.obj();
@@ -85,12 +85,9 @@ static char** completionHook(const char* text , int start ,int end ){
     
     vector<string> all;
     
-    if ( start == 0 ){
-        generateCompletions( string(text,end) , all );
-    }
+    generateCompletions( string(text,end) , all );
     
     if ( all.size() == 0 ){
-        rl_bind_key('\t',0);
         return 0;
     }
     
@@ -113,6 +110,8 @@ static char** completionHook(const char* text , int start ,int end ){
     }
     matches[x++] = 0;
 
+	rl_completion_append_character = '\0'; // don't add a space after completions
+
     return matches;
 }
 #endif
@@ -130,7 +129,7 @@ void shellHistoryInit(){
     read_history( historyFile.c_str() );
     
     rl_attempted_completion_function = completionHook;
-        
+
 #else
     //cout << "type \"exit\" to exit" << endl;
 #endif
