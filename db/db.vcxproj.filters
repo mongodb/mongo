@@ -238,9 +238,6 @@
     <ClCompile Include="..\util\mmap_win.cpp">
       <Filter>util\core</Filter>
     </ClCompile>
-    <ClCompile Include="..\shell\mongo_vstudio.cpp">
-      <Filter>db\core</Filter>
-    </ClCompile>
     <ClCompile Include="module.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
