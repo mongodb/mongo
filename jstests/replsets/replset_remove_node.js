@@ -31,8 +31,8 @@ doTest = function( signal ) {
     var c = master.getDB("local")['system.replset'].findOne();
     var config  = replTest.getReplSetConfig();
     config.version = c.version + 1;
-    config.members = [ { "_id" : 0, "host" : "arete.local:31000" },
-                       { "_id" : 2, "host" : "arete.local:31002" } ]
+    config.members = [ { "_id" : 0, "host" : replTest.host + ":31000" },
+                       { "_id" : 2, "host" : replTest.host + ":31002" } ]
     replTest.initiate( config , 'replSetReconfig' );
 
     // Make sure that a new master comes up
