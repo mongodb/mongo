@@ -134,7 +134,15 @@ namespace mongo {
         data[L] = 0;
         f.read( 0 , data.get() , (size_t) L );
 
-        StringData code (data.get(), L);
+        int offset = 0;
+        if (data[0] == '#' and data[1] == '!'){
+            const char* newline = strchr(data.get(), '\n');
+            if (! newline)
+                return true; // file of just shebang treated same as empty file
+            offset = newline - data.get();
+        }
+
+        StringData code (data.get() + offset, L - offset);
         
         return exec( code , filename , printResult , reportError , assertOnError, timeoutMs );
     }

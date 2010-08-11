@@ -1,3 +1,5 @@
+#!/usr/bin/mongod
+
 baseName = "jstests_shellspawn";
 t = db.getCollection( baseName );
 t.drop();
