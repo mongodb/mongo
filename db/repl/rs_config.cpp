@@ -194,7 +194,7 @@ namespace mongo {
             if( settings["heartbeatTimeout"].ok() )
                 ho.heartbeatTimeoutMillis = (unsigned) (settings["heartbeatTimeout"].Number() * 1000);
             ho.check();
-            try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj(); } catch(...) { }
+            try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); } catch(...) { }
         }
 
         set<string> hosts;
