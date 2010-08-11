@@ -805,39 +805,40 @@ printjsononeline = function(x){
     print( tojsononeline( x ) );
 }
 
-shellPrintHelper = function( x ){
+shellPrintHelper = function (x) {
 
-    if ( typeof( x ) == "undefined" ){
+    if (typeof (x) == "undefined") {
 
-        if ( typeof( db ) != "undefined" && db.getLastError ){
-            var e = db.getLastError();
-            if ( e != null )
-                print( e );
+        if (typeof (db) != "undefined" && db.getLastError) {
+            // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
+            var e = db.getLastError(1);
+            if (e != null)
+                print(e);
         }
 
         return;
     }
-    
-    if ( x == __magicNoPrint )
+
+    if (x == __magicNoPrint)
         return;
 
-    if ( x == null ){
-        print( "null" );
+    if (x == null) {
+        print("null");
         return;
     }
 
-    if ( typeof x != "object" ) 
-        return print( x );
-    
+    if (typeof x != "object")
+        return print(x);
+
     var p = x.shellPrint;
-    if ( typeof p == "function" )
+    if (typeof p == "function")
         return x.shellPrint();
 
     var p = x.tojson;
-    if ( typeof p == "function" )
-        print( x.tojson() );
+    if (typeof p == "function")
+        print(x.tojson());
     else
-        print( tojson( x ) );
+        print(tojson(x));
 }
 
 shellAutocomplete = function (/*prefix*/){ // outer scope function called on init. Actual function at end

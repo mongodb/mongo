@@ -810,39 +810,40 @@ const StringData _jscode_raw_utils =
 "print( tojsononeline( x ) );\n" 
 "}\n" 
 "\n" 
-"shellPrintHelper = function( x ){\n" 
+"shellPrintHelper = function (x) {\n" 
 "\n" 
-"if ( typeof( x ) == \"undefined\" ){\n" 
+"if (typeof (x) == \"undefined\") {\n" 
 "\n" 
-"if ( typeof( db ) != \"undefined\" && db.getLastError ){\n" 
-"var e = db.getLastError();\n" 
-"if ( e != null )\n" 
-"print( e );\n" 
+"if (typeof (db) != \"undefined\" && db.getLastError) {\n" 
+"// explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.\n" 
+"var e = db.getLastError(1);\n" 
+"if (e != null)\n" 
+"print(e);\n" 
 "}\n" 
 "\n" 
 "return;\n" 
 "}\n" 
 "\n" 
-"if ( x == __magicNoPrint )\n" 
+"if (x == __magicNoPrint)\n" 
 "return;\n" 
 "\n" 
-"if ( x == null ){\n" 
-"print( \"null\" );\n" 
+"if (x == null) {\n" 
+"print(\"null\");\n" 
 "return;\n" 
 "}\n" 
 "\n" 
-"if ( typeof x != \"object\" )\n" 
-"return print( x );\n" 
+"if (typeof x != \"object\")\n" 
+"return print(x);\n" 
 "\n" 
 "var p = x.shellPrint;\n" 
-"if ( typeof p == \"function\" )\n" 
+"if (typeof p == \"function\")\n" 
 "return x.shellPrint();\n" 
 "\n" 
 "var p = x.tojson;\n" 
-"if ( typeof p == \"function\" )\n" 
-"print( x.tojson() );\n" 
+"if (typeof p == \"function\")\n" 
+"print(x.tojson());\n" 
 "else\n" 
-"print( tojson( x ) );\n" 
+"print(tojson(x));\n" 
 "}\n" 
 "\n" 
 "shellAutocomplete = function (/*prefix*/){ // outer scope function called on init. Actual function at end\n" 
@@ -1247,7 +1248,7 @@ const StringData _jscode_raw_utils =
 "}\n" 
 ;
 extern const JSFile utils;
-const JSFile utils = { "shell/utils.js" , _jscode_raw_utils };
+const JSFile utils = { "shell\\utils.js" , _jscode_raw_utils };
 const StringData _jscode_raw_db = 
 "// db.js\n" 
 "\n" 
@@ -1959,7 +1960,7 @@ const StringData _jscode_raw_db =
 "}\n" 
 ;
 extern const JSFile db;
-const JSFile db = { "shell/db.js" , _jscode_raw_db };
+const JSFile db = { "shell\\db.js" , _jscode_raw_db };
 const StringData _jscode_raw_mongo = 
 "// mongo.js\n" 
 "\n" 
@@ -2048,7 +2049,7 @@ const StringData _jscode_raw_mongo =
 "}\n" 
 ;
 extern const JSFile mongo;
-const JSFile mongo = { "shell/mongo.js" , _jscode_raw_mongo };
+const JSFile mongo = { "shell\\mongo.js" , _jscode_raw_mongo };
 const StringData _jscode_raw_mr = 
 "// mr.js\n" 
 "\n" 
@@ -2147,7 +2148,7 @@ const StringData _jscode_raw_mr =
 "}\n" 
 ;
 extern const JSFile mr;
-const JSFile mr = { "shell/mr.js" , _jscode_raw_mr };
+const JSFile mr = { "shell\\mr.js" , _jscode_raw_mr };
 const StringData _jscode_raw_query = 
 "// query.js\n" 
 "\n" 
@@ -2452,7 +2453,7 @@ const StringData _jscode_raw_query =
 "DBQuery.shellBatchSize = 20;\n" 
 ;
 extern const JSFile query;
-const JSFile query = { "shell/query.js" , _jscode_raw_query };
+const JSFile query = { "shell\\query.js" , _jscode_raw_query };
 const StringData _jscode_raw_collection = 
 "// collection.js - DBCollection support in the mongo shell\n" 
 "// db.colName is a DBCollection object\n" 
@@ -3049,6 +3050,6 @@ const StringData _jscode_raw_collection =
 "}\n" 
 ;
 extern const JSFile collection;
-const JSFile collection = { "shell/collection.js" , _jscode_raw_collection };
+const JSFile collection = { "shell\\collection.js" , _jscode_raw_collection };
 } // namespace JSFiles
 } // namespace mongo
