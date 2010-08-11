@@ -23,7 +23,9 @@
 namespace mongo { 
 
     mutex _atomicMutex("_atomicMutex");
-    MutexDebugger mutexDebugger;
+
+    // intentional leak. otherwise destructor orders can be problematic at termination.
+    MutexDebugger &mutexDebugger = *(new MutexDebugger());
 
     MutexDebugger::MutexDebugger() : 
       x( *(new boost::mutex()) ), magic(0x12345678) {
