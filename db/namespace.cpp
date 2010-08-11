@@ -637,6 +637,8 @@ namespace mongo {
 	}
 
     bool legalClientSystemNS( const string& ns , bool write ){
+        if( ns == "local.system.replset" ) return true;
+
         if ( ns.find( ".system.users" ) != string::npos )
             return true;
 
