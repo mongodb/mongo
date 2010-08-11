@@ -65,9 +65,9 @@ namespace mongo {
     }
 
     LastErrorHolder::~LastErrorHolder(){
-        scoped_lock lock(_idsmutex);
-        for ( IDMap::const_iterator i = _ids.begin(); i != _ids.end(); ++i ){
+        for ( IDMap::iterator i = _ids.begin(); i != _ids.end(); ++i ){
             delete i->second.lerr;
+            i->second.lerr = 0;
         }
         _ids.clear();
     }
