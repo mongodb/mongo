@@ -117,7 +117,7 @@ namespace mongo {
             }
         }
     };
-    extern MutexDebugger mutexDebugger;
+    extern MutexDebugger &mutexDebugger;
     
     // If you create a local static instance of this class, that instance will be destroyed
     // before all global static objects are destroyed, so __destroyingStatics will be set
