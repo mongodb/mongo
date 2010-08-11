@@ -158,19 +158,7 @@ namespace mongo {
         static vector<Tee*> * globalTees;
     public:
 
-        static void logLockless( const StringData& s ){
-            if ( doneSetup == 1717 ){
-                if(fwrite(out.data(), out.size(), 1, logfile)){
-                    fflush(logfile);
-                }else{
-                    int x = errno;
-                    cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
-                }
-            }
-            else {
-                cout << s.data() << endl;
-            }
-        }
+        inline static void logLockless( const StringData& s );
         
         static void setLogFile(FILE* f){
             scoped_lock lk(mutex);
@@ -181,56 +169,9 @@ namespace mongo {
             return 1717;
         }
 
-        void flush(Tee *t = 0) {
-            // this ensures things are sane
-            if ( doneSetup == 1717 ) {
-                string msg = ss.str();
-                string threadName = getThreadName();
-                const char * type = logLevelToString(logLevel);
-                
-                int spaceNeeded = msg.size() + 64 + threadName.size();
-                int bufSize = 128;
-                while ( bufSize < spaceNeeded )
-                    bufSize += 128;
-                
-                BufBuilder b(bufSize);
-                time_t_to_String( time(0) , b.grow(20) );
-                if (!threadName.empty()){
-                    b.appendChar( '[' );
-                    b.appendStr( threadName , false );
-                    b.appendChar( ']' );
-                    b.appendChar( ' ' );
-                }
-                if ( type[0] ){
-                    b.appendStr( type , false );
-                    b.appendStr( ": " , false );
-                }
-                b.appendStr( msg );
-                
-                string out( b.buf() , b.len() - 1);
-
-                scoped_lock lk(mutex);
-                
-                if( t ) t->write(logLevel,out);
-                if ( globalTees ){
-                    for ( unsigned i=0; i<globalTees->size(); i++ )
-                        (*globalTees)[i]->write(logLevel,out);
-                }
-                
-#ifndef _WIN32
-                //syslog( LOG_INFO , "%s" , cc );
-#endif
-                if(fwrite(out.data(), out.size(), 1, logfile)){
-                    fflush(logfile);
-                }else{
-                    int x = errno;
-                    cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
-                }
-            }
-            _init();
-        }
+        inline void flush(Tee *t = 0);
         
-        Nullstream& setLogLevel(LogLevel l){
+        inline Nullstream& setLogLevel(LogLevel l){
             logLevel = l;
             return *this;
         }
@@ -424,6 +365,69 @@ namespace mongo {
     /** output the error # and error message with prefix.  
         handy for use as parm in uassert/massert.
         */
-    string errnoWithPrefix( const char * prefix = 0 );
+    string errnoWithPrefix( const char * prefix );
+
+    void Logstream::logLockless( const StringData& s ){
+        if ( doneSetup == 1717 ){
+            if(fwrite(s.data(), s.size(), 1, logfile)){
+                fflush(logfile);
+            }else{
+                int x = errno;
+                cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
+            }
+        }
+        else {
+            cout << s.data() << endl;
+        }
+    }
+
+    void Logstream::flush(Tee *t) {
+        // this ensures things are sane
+        if ( doneSetup == 1717 ) {
+            string msg = ss.str();
+            string threadName = getThreadName();
+            const char * type = logLevelToString(logLevel);
+
+            int spaceNeeded = msg.size() + 64 + threadName.size();
+            int bufSize = 128;
+            while ( bufSize < spaceNeeded )
+                bufSize += 128;
+
+            BufBuilder b(bufSize);
+            time_t_to_String( time(0) , b.grow(20) );
+            if (!threadName.empty()){
+                b.appendChar( '[' );
+                b.appendStr( threadName , false );
+                b.appendChar( ']' );
+                b.appendChar( ' ' );
+            }
+            if ( type[0] ){
+                b.appendStr( type , false );
+                b.appendStr( ": " , false );
+            }
+            b.appendStr( msg );
+
+            string out( b.buf() , b.len() - 1);
+
+            scoped_lock lk(mutex);
+
+            if( t ) t->write(logLevel,out);
+            if ( globalTees ){
+                for ( unsigned i=0; i<globalTees->size(); i++ )
+                    (*globalTees)[i]->write(logLevel,out);
+            }
+
+#ifndef _WIN32
+            //syslog( LOG_INFO , "%s" , cc );
+#endif
+            if(fwrite(out.data(), out.size(), 1, logfile)){
+                fflush(logfile);
+            }else{
+                int x = errno;
+                cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
+            }
+        }
+        _init();
+    }
 
 } // namespace mongo
