@@ -160,8 +160,12 @@ namespace mongo {
 
         static void logLockless( const StringData& s ){
             if ( doneSetup == 1717 ){
-                fwrite( s.data() , s.size() , 1 , logfile );
-                fflush( logfile );
+                if(fwrite(out.data(), out.size(), 1, logfile)){
+                    fflush(logfile);
+                }else{
+                    int x = errno;
+                    cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
+                }
             }
             else {
                 cout << s.data() << endl;
@@ -216,8 +220,12 @@ namespace mongo {
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
 #endif
-                fwrite(out.data(), out.size(), 1, logfile);
-                fflush(logfile);
+                if(fwrite(out.data(), out.size(), 1, logfile)){
+                    fflush(logfile);
+                }else{
+                    int x = errno;
+                    cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
+                }
             }
             _init();
         }
