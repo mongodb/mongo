@@ -130,11 +130,13 @@ namespace mongo {
 
         fileofs L = f.len();
         assert( L <= 0x7ffffffe );
-        char * data = (char*)malloc( (size_t) L+1 );
+        boost::scoped_array<char> data (new char[L+1]);
         data[L] = 0;
-        f.read( 0 , data , (size_t) L );
+        f.read( 0 , data.get() , (size_t) L );
+
+        StringData code (data.get(), L);
         
-        return exec( data , filename , printResult , reportError , assertOnError, timeoutMs );
+        return exec( code , filename , printResult , reportError , assertOnError, timeoutMs );
     }
 
     void Scope::storedFuncMod(){
