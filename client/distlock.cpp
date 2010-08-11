@@ -49,12 +49,16 @@ namespace mongo {
     void distLockPingThread( ConnectionString addr ){
         static int loops = 0;
         while( ! inShutdown() ){
+
+            string process = getDistLockProcess();
+            log(4) << "dist_lock about to ping for: " << process << endl;
+
             try {
                 ScopedDbConnection conn( addr );
                 
                 // do ping
                 conn->update( lockPingNS , 
-                              BSON( "_id" << getDistLockProcess() ) , 
+                              BSON( "_id" << process ) , 
                               BSON( "$set" << BSON( "ping" << DATENOW ) ) ,
                               true );
                 
@@ -73,8 +77,10 @@ namespace mongo {
                 conn.done();
             }
             catch ( std::exception& e ){
-                log( LL_WARNING ) << "couldn't ping: " << e.what() << endl;
+                log( LL_WARNING ) << "dist_lock couldn't ping: " << e.what() << endl;
             }
+
+            log(4) << "dist_lock pinged successfully for: " << process << endl;
             sleepsecs(30);
         }
     }
@@ -119,11 +125,14 @@ namespace mongo {
             BSONObj o = conn->findOne( _ns , _id );
             if ( o.isEmpty() ){
                 try {
+                    log(4) << "dist_lock inserting initial doc in " << _ns << " for lock " << _name << endl;
                     conn->insert( _ns , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
                 }
-                catch ( UserException& ){
+                catch ( UserException& e ){
+                    log(4) << "dist_lock could not insert initial doc: " << e << endl;
                 }
             }
+
             else if ( o["state"].numberInt() > 0 ){
                 BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ){
@@ -137,7 +146,7 @@ namespace mongo {
                 elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
 
                 if ( elapsed <= _takeoverMinutes ){
-                    log(1) << "dist_lock lock failed because taken by: " << o << endl;
+                    log(1) << "dist_lock lock failed because taken by: " << o << " elapsed minutes: " << elapsed << endl;
                     conn.done();
                     return false;
                 }
@@ -155,11 +164,13 @@ namespace mongo {
 
         bool gotLock = false;
         BSONObj now;
-            
-        BSONObj whatIWant = BSON( "$set" << BSON( "state" << 1 << 
-                                                  "who" << getDistLockId() << "process" << getDistLockProcess() <<
-                                                  "when" << DATENOW << "why" << why << "ts" << ts ) );
+
+        BSONObj lockDetails = BSON( "state" << 1 << "who" << getDistLockId() << "process" << getDistLockProcess() <<
+                                    "when" << DATENOW << "why" << why << "ts" << ts );
+        BSONObj whatIWant = BSON( "$set" << lockDetails );
         try {
+            log(4) << "dist_lock about to aquire lock: " << lockDetails << endl;
+
             conn->update( _ns , queryBuilder.obj() , whatIWant );
                 
             BSONObj o = conn->getLastErrorDetailed();
@@ -177,6 +188,7 @@ namespace mongo {
         }
         catch ( UpdateNotTheSame& up ){
             // this means our update got through on some, but not others
+            log(4) << "dist_lock lock did not propagate properly" << endl;
 
             for ( unsigned i=0; i<up.size(); i++ ){
                 ScopedDbConnection temp( up[i].first );
@@ -190,10 +202,12 @@ namespace mongo {
             }
 
             if ( now["ts"].OID() == ts ){
+                log(4) << "dist_lock completed lock propagation" << endl;
                 gotLock = true;
                 conn->update( _ns , _id , whatIWant );
             }
             else {
+                log(4) << "dist_lock did not complete propagation" << endl;
                 gotLock = false;
             }
         }
