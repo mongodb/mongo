@@ -222,7 +222,7 @@ namespace mongo {
             StringBuilder buf;
             buf << getHostNameCached() << ":" << cmdLine.port;
             _myid = buf.str();
-            log(1) << "balancer myid: " << _myid << endl;
+            log() << "balancer myid: " << _myid << endl;
             
             _started = time(0);
 
