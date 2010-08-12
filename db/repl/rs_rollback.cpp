@@ -461,6 +461,16 @@ namespace mongo {
             return;
         }
 
+        if( box.getState().secondary() ) {
+            /* by doing this, we will not service reads (return an error as we aren't in secondary staate.
+               that perhaps is moot becasue of the write lock above, but that write lock probably gets deferred 
+               or removed or yielded later anyway.
+
+               also, this is better for status reporting - we know what is happening.
+               */
+            box.change(MemberState::RS_ROLLBACK, _self);
+        }
+
         HowToFixUp how;
         sethbmsg("syncRollback 1");
         {

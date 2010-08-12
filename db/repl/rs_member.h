@@ -40,7 +40,8 @@ namespace mongo {
             RS_STARTUP2,
             RS_UNKNOWN, /* remote node not yet reached */
             RS_ARBITER,
-            RS_DOWN /* node not reachable for a report */
+            RS_DOWN, /* node not reachable for a report */
+            RS_ROLLBACK
         } s;
 
         MemberState(MS ms = RS_UNKNOWN) : s(ms) { }
@@ -51,6 +52,7 @@ namespace mongo {
         bool recovering() const { return s == RS_RECOVERING; }
         bool startup2() const { return s == RS_STARTUP2; }
         bool fatal() const { return s == RS_FATAL; }
+        bool rollback() const { return s == RS_ROLLBACK; }
 
         bool operator==(const MemberState& r) const { return s == r.s; }
         bool operator!=(const MemberState& r) const { return s != r.s; }

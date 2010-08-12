@@ -195,6 +195,12 @@ namespace mongo {
             assert( !sp.state.primary() );
             sp.primary = mem;
         }
+        void noteRemoteIsPrimary(const Member *remote) { 
+            scoped_lock lk(m);
+            if( !sp.state.secondary() )
+                sp.state = MemberState::RS_RECOVERING;
+            sp.primary = remote;
+        }
         StateBox() : m("StateBox") { }
     private:
         mutex m;

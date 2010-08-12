@@ -861,7 +861,6 @@ namespace mongo {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
             log(6) << "processing op: " << op << endl;
 
-        // skip no-op
         if( op.getStringField("op")[0] == 'n' )
             return;
 
