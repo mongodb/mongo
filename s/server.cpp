@@ -92,10 +92,12 @@ namespace mongo {
                 r.process();
             }
             catch ( DBException& e ){
+                log() << "DBException in process: " << e.what() << endl;
+                
                 le->raiseError( e.getCode() , e.what() );
                 
                 m.header()->id = r.id();
-                log() << "UserException: " << e.what() << endl;
+                
                 if ( r.expectResponse() ){
                     BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
                     replyToQuery( ResultFlag_ErrSet, p , m , err );
