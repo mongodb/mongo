@@ -1109,7 +1109,7 @@ def jsToH(target, source, env):
 
         h.append(";")
         h.append('extern const JSFile %s;'%objname) #symbols aren't exported w/o this
-        h.append('const JSFile %s = { "%s" , %s };'%(objname, cppEscape(filename), stringname))
+        h.append('const JSFile %s = { "%s" , %s };'%(objname, filename.replace('\\', '/'), stringname))
 
     h.append("} // namespace JSFiles")
     h.append("} // namespace mongo")
