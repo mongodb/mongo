@@ -162,9 +162,10 @@ namespace mongo {
     */
     inline void replVerifyReadsOk(ParsedQuery& pq) {
         if( replSet ) {
-            /* todo: speed up the secondary case.  as written here there are 2 mutex entries, it can be 1. */
+            /* todo: speed up the secondary case.  as written here there are 2 mutex entries, it can b 1. */
             if( isMaster() ) return;
-            notMasterUnless( pq.hasOption(QueryOption_SlaveOk) && theReplSet->isSecondary() );
+            uassert(13435, "not master and slaveok=false", pq.hasOption(QueryOption_SlaveOk));
+            uassert(13436, "not master or secondary, can't read", theReplSet->isSecondary() );
         } else {
             notMasterUnless(isMaster() || pq.hasOption(QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
         }
