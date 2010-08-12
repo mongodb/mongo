@@ -1,3 +1,5 @@
+// rs test getlasterrordefaults
+
 doTest = function (signal) {
 
     // Test getLastError defaults
@@ -20,7 +22,6 @@ doTest = function (signal) {
     // Initial replication
     master.getDB("barDB").bar.save({ a: 1 });
     replTest.awaitReplication();
-
 
     // These writes should be replicated immediately
     master.getDB(testDB).foo.insert({ n: 1 });

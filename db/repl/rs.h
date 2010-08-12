@@ -389,6 +389,8 @@ namespace mongo {
             if( theReplSet == 0 ) {
                 result.append("startupStatus", ReplSet::startupStatus);
                 errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg;
+                if( ReplSet::startupStatus == 3 ) 
+                    result.append("info", "run rs.initiate(...) if not yet done for the set");
                 return false;
             }
             return true;
