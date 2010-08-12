@@ -135,7 +135,7 @@ namespace mongo {
         f.read( 0 , data.get() , (size_t) L );
 
         int offset = 0;
-        if (data[0] == '#' and data[1] == '!'){
+        if (data[0] == '#' && data[1] == '!'){
             const char* newline = strchr(data.get(), '\n');
             if (! newline)
                 return true; // file of just shebang treated same as empty file
