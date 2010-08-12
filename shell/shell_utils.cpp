@@ -546,8 +546,8 @@ namespace mongo {
                     env[0] = "HEAPCHECK=normal";
                     env[1] = NULL;
 
-                    // Heap-check for mongod and mongos only. 'argv[0]' must be in the path format.
-                    if ( ( argv_[0].find("mongod") != string::npos) || ( argv_[0].find("mongos") != string::npos) ){
+                    // Heap-check for mongos only. 'argv[0]' must be in the path format.
+                    if ( argv_[0].find("mongos") != string::npos){
                         execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
                     }
 #endif // HEAP_CHECKING
