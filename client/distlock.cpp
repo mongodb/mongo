@@ -47,6 +47,8 @@ namespace mongo {
     }
     
     void distLockPingThread( ConnectionString addr ){
+        setThreadName( "LockPinger" );
+
         static int loops = 0;
         while( ! inShutdown() ){
 
