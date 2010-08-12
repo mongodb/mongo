@@ -163,7 +163,7 @@ namespace mongo {
             ss << usage.count;
             ss << "</td><td>";
             double per = 100 * ((double)usage.time)/elapsed;
-            ss << setprecision(4) << fixed << per << "%";
+            ss << setprecision(1) << fixed << per << "%";
             ss << "</td>";
         }
 
