@@ -544,13 +544,15 @@ namespace mongo {
             _num = _outof - used;
         }
 
-        int available(){
+        int available() const {
             return _num;
         }
 
-        int used(){
+        int used() const {
             return _outof - _num;
         }
+
+        int outof() const { return _outof; }
 
     private:
         int _outof;
