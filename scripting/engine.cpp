@@ -128,11 +128,15 @@ namespace mongo {
         File f;
         f.open( filename.c_str() , true );
 
-        fileofs L = f.len();
-        assert( L <= 0x7ffffffe );
+        unsigned L;
+        {
+            fileofs fo = f.len();
+            assert( fo <= 0x7ffffffe );
+            L = (unsigned) fo;
+        }
         boost::scoped_array<char> data (new char[L+1]);
         data[L] = 0;
-        f.read( 0 , data.get() , (size_t) L );
+        f.read( 0 , data.get() , L );
 
         int offset = 0;
         if (data[0] == '#' && data[1] == '!'){
