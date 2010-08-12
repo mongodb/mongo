@@ -858,7 +858,8 @@ namespace mongo {
        see logOp() comments.
     */
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail) {
-        log( 6 ) << "processing op: " << op << endl;
+        if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
+            log(6) << "processing op: " << op << endl;
         // skip no-op
         /* the no-op makes us process queued up databases.  so returning here would be problematic  */
 ////        if ( op.getStringField( "op" )[ 0 ] == 'n' )
