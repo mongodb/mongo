@@ -131,7 +131,7 @@ namespace mongo {
                     conn->insert( _ns , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
                 }
                 catch ( UserException& e ){
-                    log(4) << "dist_lock could not insert initial doc: " << e << endl;
+                    log() << "dist_lock could not insert initial doc: " << e << endl;
                 }
             }
 
@@ -179,8 +179,11 @@ namespace mongo {
             now = conn->findOne( _ns , _id );
                 
             if ( o["n"].numberInt() == 0 ){
-                if ( other )
+                if ( other ){
                     *other = now;
+                    other->getOwned();
+                }
+                log() << "dist_lock error trying to aquire lock: " << lockDetails << " error: " << o << endl;
                 gotLock = false;
             }
             else {
@@ -209,7 +212,7 @@ namespace mongo {
                 conn->update( _ns , _id , whatIWant );
             }
             else {
-                log(4) << "dist_lock did not complete propagation" << endl;
+                log() << "dist_lock error trying to complete propagation" << endl;
                 gotLock = false;
             }
         }
@@ -218,10 +221,7 @@ namespace mongo {
             
         log(1) << "dist_lock lock gotLock: " << gotLock << " now: " << now << endl;
 
-        if ( ! gotLock )
-            return false;
-            
-        return true;
+        return gotLock;
     }
 
     void DistributedLock::unlock(){
