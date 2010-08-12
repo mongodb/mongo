@@ -860,8 +860,8 @@ namespace mongo {
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail) {
         log( 6 ) << "processing op: " << op << endl;
         // skip no-op
-        if ( op.getStringField( "op" )[ 0 ] == 'n' )
-            return;
+//        if ( op.getStringField( "op" )[ 0 ] == 'n' )
+//            return;
         
         char clientName[MaxDatabaseLen];
         const char *ns = op.getStringField("ns");

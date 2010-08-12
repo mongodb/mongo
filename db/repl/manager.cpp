@@ -63,7 +63,11 @@ namespace mongo {
         if( rs->box.getPrimary() == m )
             return;
         rs->_self->lhb() = "";
-        rs->box.set(rs->iAmArbiterOnly() ? MemberState::RS_ARBITER : MemberState::RS_RECOVERING, m);
+        if( rs->iAmArbiterOnly() ) {
+            rs->box.set(MemberState::RS_ARBITER, m);
+        } else {
+            rs->box.noteRemoteIsPrimary(m);
+        }
     }
 
     /** called as the health threads get new results */
