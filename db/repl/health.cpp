@@ -89,11 +89,11 @@ namespace mongo {
         }
         s << td(config().votes);
         { 
-            string stateText = ReplSet::stateAsStr(state());
+            string stateText = state().toString();
             if( ok || stateText.empty() ) 
                 s << td(stateText); // text blank if we've never connected
             else
-                s << td( grey(str::stream() << "(was " << ReplSet::stateAsStr(state()) << ')', true) );
+                s << td( grey(str::stream() << "(was " << state().toString() << ')', true) );
         }
         s << td( grey(hbinfo().lastHeartbeatMsg,!ok) );
         stringstream q;
@@ -119,16 +119,16 @@ namespace mongo {
         return "";
     }
 
-    string ReplSetImpl::stateAsStr(MemberState s) { 
-        if( s.s == MemberState::RS_STARTUP ) return "STARTUP";
-        if( s.s == MemberState::RS_PRIMARY ) return "PRIMARY";
-        if( s.s == MemberState::RS_SECONDARY ) return "SECONDARY";
-        if( s.s == MemberState::RS_RECOVERING ) return "RECOVERING";
-        if( s.s == MemberState::RS_FATAL ) return "FATAL";
-        if( s.s == MemberState::RS_STARTUP2 ) return "STARTUP2";
-        if( s.s == MemberState::RS_ARBITER ) return "ARBITER";
-        if( s.s == MemberState::RS_DOWN ) return "DOWN";
-        if( s.s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
+    string MemberState::toString() const { 
+        if( s == MemberState::RS_STARTUP ) return "STARTUP";
+        if( s == MemberState::RS_PRIMARY ) return "PRIMARY";
+        if( s == MemberState::RS_SECONDARY ) return "SECONDARY";
+        if( s == MemberState::RS_RECOVERING ) return "RECOVERING";
+        if( s == MemberState::RS_FATAL ) return "FATAL";
+        if( s == MemberState::RS_STARTUP2 ) return "STARTUP2";
+        if( s == MemberState::RS_ARBITER ) return "ARBITER";
+        if( s == MemberState::RS_DOWN ) return "DOWN";
+        if( s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
         return "";
     }
 
