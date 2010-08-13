@@ -176,6 +176,9 @@ namespace mongo {
         const Member* getPrimary() const { return sp.primary; }
         void change(MemberState s, const Member *self) { 
             scoped_lock lk(m);
+            if( sp.state != s ) { 
+                log() << "replSet " << s.toString() << rsLog;
+            }
             sp.state = s;
             if( s.primary() ) { 
                 sp.primary = self;
@@ -233,7 +236,6 @@ namespace mongo {
         };
         static StartupStatus startupStatus;
         static string startupStatusMsg;
-        static string stateAsStr(MemberState state);
         static string stateAsHtml(MemberState state);
 
         /* todo thread */

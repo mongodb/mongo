@@ -54,6 +54,8 @@ namespace mongo {
         bool fatal() const { return s == RS_FATAL; }
         bool rollback() const { return s == RS_ROLLBACK; }
 
+        string toString() const;
+
         bool operator==(const MemberState& r) const { return s == r.s; }
         bool operator!=(const MemberState& r) const { return s != r.s; }
     };

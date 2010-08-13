@@ -238,7 +238,7 @@ namespace mongo {
                         }
                         if( golive ) {
                             sethbmsg("");
-                            log() << "replSet SECONDARY" << rsLog;
+                            //log() << "replSet SECONDARY" << rsLog;
                             changeState(MemberState::RS_SECONDARY);
                         }
                         else { 
