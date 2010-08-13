@@ -92,8 +92,8 @@ namespace mongo {
         //static mongo::mutex mutex;
         void thr();
         volatile State state;
-        boost::mutex _m;
-        boost::condition _c;
+        //boost::mutex _m;
+        //boost::condition _c;
     };
 
     class PeriodicBackgroundJob : public BackgroundJob {

@@ -56,10 +56,7 @@ namespace mongo {
     }
 
     bool BackgroundJob::wait(int msMax, unsigned maxsleep) {
-        //assert( state != NotStarted );
-        //unsigned ms = 0;
-        // TEMP:
-        unsigned ms = 500;
+        unsigned ms = 0;
         Date_t start = jsTime();
         while ( state != Done ) {
             sleepmillis(ms);
