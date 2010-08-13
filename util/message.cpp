@@ -329,6 +329,7 @@ namespace mongo {
         int sock;
         int res;
         SockAddr farEnd;
+        ConnectBG() { nameThread = false; }
         void run() {
             res = ::connect(sock, farEnd.raw(), farEnd.addressSize);
         }

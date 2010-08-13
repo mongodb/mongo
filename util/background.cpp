@@ -45,7 +45,7 @@ namespace mongo {
         }
         state = Done;
         bool delSelf = deleteSelf;
-        ending();
+        //ending();
         if( delSelf ) 
             delete this;
     }
@@ -57,7 +57,9 @@ namespace mongo {
 
     bool BackgroundJob::wait(int msMax, unsigned maxsleep) {
         //assert( state != NotStarted );
-        unsigned ms = 0;
+        //unsigned ms = 0;
+        // TEMP:
+        unsigned ms = 500;
         Date_t start = jsTime();
         while ( state != Done ) {
             sleepmillis(ms);

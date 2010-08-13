@@ -43,7 +43,7 @@ namespace mongo {
             friend void fork(Task* t);
             friend void repeat(Task* t, unsigned millis);
             virtual void run();
-            virtual void ending() { }
+            //virtual void ending() { }
             void begin();
         };
 
