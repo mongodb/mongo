@@ -63,9 +63,12 @@ namespace mongo {
 
         bool deleteSelf; // delete self when Done?
 
+        bool nameThread; // thread should name itself to the OS / debugger. set to false if very short lived to avoid that call
+
         BackgroundJob() {
             deleteSelf = false;
             state = NotStarted;
+            nameThread = true;
         }
         virtual ~BackgroundJob() { }
 
@@ -85,9 +88,9 @@ namespace mongo {
         static void wait(list<BackgroundJob*>&, unsigned maxSleepInterval=1000);
 
     private:
-        static BackgroundJob *grab;
-        static mongo::mutex mutex;
-        static void thr();
+        //static BackgroundJob *grab;
+        //static mongo::mutex mutex;
+        void thr();
         volatile State state;
     };
 

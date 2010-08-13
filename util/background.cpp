@@ -22,50 +22,41 @@
 
 namespace mongo {
 
-    BackgroundJob *BackgroundJob::grab = 0;
-    mongo::mutex BackgroundJob::mutex("BackgroundJob");
+// BackgroundJob *BackgroundJob::grab = 0;
+//    mongo::mutex BackgroundJob::mutex("BackgroundJob");
 
-    /* static */
     void BackgroundJob::thr() {
-        assert( grab );
-        BackgroundJob *us = grab;
-        assert( us->state == NotStarted );
-        us->state = Running;
-        grab = 0;
+        assert( state == NotStarted );
+        state = Running;
 
-        {
-            string nm = us->name();
+        if( nameThread ) {
+            string nm = name();
             setThreadName(nm.c_str());
         }
 
         try {
-            us->run();
+            run();
         }
         catch ( std::exception& e ){
-            log( LL_ERROR ) << "backgroundjob error: " << e.what() << endl;
+            log( LL_ERROR ) << "backgroundjob " << name() << "error: " << e.what() << endl;
         }
         catch(...) {
-            log( LL_ERROR ) << "uncaught exception in BackgroundJob" << endl;
+            log( LL_ERROR ) << "uncaught exception in BackgroundJob " << name() << endl;
         }
-        us->state = Done;
-        bool delSelf = us->deleteSelf;
-        us->ending();
+        state = Done;
+        bool delSelf = deleteSelf;
+        ending();
         if( delSelf ) 
-            delete us;
+            delete this;
     }
 
     BackgroundJob& BackgroundJob::go() {
-        scoped_lock bl(mutex);
-        assert( grab == 0 );
-        grab = this;
-        boost::thread t(thr);
-        while ( grab )
-            sleepmillis(2);
+        boost::thread t( boost::bind(&BackgroundJob::thr, this) );
         return *this;
     }
 
     bool BackgroundJob::wait(int msMax, unsigned maxsleep) {
-        assert( state != NotStarted );
+        //assert( state != NotStarted );
         unsigned ms = 0;
         Date_t start = jsTime();
         while ( state != Done ) {
@@ -90,7 +81,7 @@ namespace mongo {
             sleepmillis(ms);
             if( ms*2<maxsleep ) ms*=2;
             for( list<BackgroundJob*>::iterator i = L.begin(); i != L.end(); i++ ) { 
-                assert( (*i)->state != NotStarted );
+                //assert( (*i)->state != NotStarted );
                 if( (*i)->state != Done )
                     goto x;
             }
