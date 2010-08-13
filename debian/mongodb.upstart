@@ -1,5 +1,7 @@
 # Ubuntu upstart file at /etc/init/mongodb.conf
 
+limit nofile 20000
+
 pre-start script
     mkdir -p /var/lib/mongodb/
     mkdir -p /var/log/mongodb/
