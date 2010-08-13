@@ -72,6 +72,31 @@ doTest = function (signal) {
     // Wait for initial replication
     var a = a_conn.getDB("foo");
     var b = b_conn.getDB("foo");
+
+    /* force the oplog to roll */
+    if (new Date() % 2 == 0) {
+        print("ROLLING OPLOG AS PART OF TEST (we only do this sometimes)");
+        var pass = 1;
+        var first = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];
+        a.roll.insert({ x: 1 });
+        while (1) {
+            for (var i = 0; i < 10000; i++)
+                a.roll.update({}, { $inc: { x: 1} });
+            var op = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];
+            if (tojson(op.h) != tojson(first.h)) {
+                printjson(op);
+                printjson(first);
+                break;
+            }
+            pass++;
+            a.getLastError(2); // unlikely secondary isn't keeping up, but let's avoid possible intermittent issues with that.
+        }
+        print("PASSES FOR OPLOG ROLL: " + pass);
+    }
+    else {
+        print("NO ROLL");
+    }
+
     a.bar.insert({ q: 1, a: "foo" });
     a.bar.insert({ q: 2, a: "foo", x: 1 });
     a.bar.insert({ q: 3, bb: 9, a: "foo" });
