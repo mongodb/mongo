@@ -674,14 +674,20 @@ elif "win32" == os.sys.platform:
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
     else:
-        env.Append( CPPDEFINES=[ "_DEBUG" ] )
+
         # /Od disable optimization
         # /ZI debug info w/edit & continue 
         # /TP it's a c++ file
         # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
-        env.Append( CPPFLAGS=" /Od /RTC1 /MDd /Z7 /TP /errorReport:none " )
+        env.Append( CPPFLAGS=" /RTC1 /MDd /Z7 /TP /errorReport:none " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
-        env.Append( LINKFLAGS=" /debug " )
+
+        if debugBuild:
+            env.Append( LINKFLAGS=" /debug " )
+            env.Append( CPPFLAGS=" /Od " )
+            
+        if debugLogging:
+            env.Append( CPPDEFINES=[ "_DEBUG" ] )
 
     if os.path.exists("../readline/lib") :
         env.Append( LIBPATH=["../readline/lib"] )
