@@ -860,10 +860,11 @@ namespace mongo {
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail) {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
             log(6) << "processing op: " << op << endl;
+
         // skip no-op
         /* the no-op makes us process queued up databases.  so returning here would be problematic  */
-////        if ( op.getStringField( "op" )[ 0 ] == 'n' )
-////            return;
+//        if ( op.getStringField( "op" )[ 0 ] == 'n' )
+//            return;
         
         char clientName[MaxDatabaseLen];
         const char *ns = op.getStringField("ns");
@@ -874,9 +875,12 @@ namespace mongo {
             return;
         }
         else if ( *ns == 0 ) {
-            problem() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
-            replAllDead = "bad object in oplog";
-            throw SyncException();
+            if( op.getStringField("op")[0] != 'n' ) {
+                problem() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
+                replAllDead = "bad object in oplog";
+                throw SyncException();
+            }
+            ns = ".";
         }
 
         if ( !only.empty() && only != clientName )
