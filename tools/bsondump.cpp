@@ -115,7 +115,7 @@ public:
     virtual void gotObject( const BSONObj& o ){
         switch ( _type ){
         case JSON:
-            cout << o << endl;
+            cout << o.jsonString( TenGen ) << endl;
             break;
         case DEBUG:
             debug(o);
