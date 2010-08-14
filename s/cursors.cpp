@@ -21,7 +21,7 @@
 #include "../client/connpool.h"
 #include "../db/queryutil.h"
 #include "../db/commands.h"
-#include "../util/background.h"
+#include "../util/concurrency/task.h"
 
 namespace mongo {
     
@@ -259,17 +259,16 @@ namespace mongo {
 
     CursorCache cursorCache;
     
-    class CursorTimeoutThread : public PeriodicBackgroundJob {
+    class CursorTimeoutTask : public task::Task {
     public:
-        CursorTimeoutThread() : PeriodicBackgroundJob( 4000 ){}
         virtual string name() { return "cursorTimeout"; }
-        virtual void runLoop(){
+        virtual void doWork(){
             cursorCache.doTimeouts();
         }
-    } cursorTimeoutThread;
+    } cursorTimeoutTask;
 
     void CursorCache::startTimeoutThread(){
-        cursorTimeoutThread.go();
+        task::repeat( &cursorTimeoutTask , 400 );
     }
 
     class CmdCursorInfo : public Command {
