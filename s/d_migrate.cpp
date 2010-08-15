@@ -687,10 +687,12 @@ namespace mongo {
             catch ( std::exception& e ){
                 state = FAIL;
                 errmsg = e.what();
+                log( LL_ERROR ) << "migrate failed: " << e.what() << endl;
             }
             catch ( ... ){
                 state = FAIL;
                 errmsg = "UNKNOWN ERROR";
+                log( LL_ERROR ) << "migrate failed with unknown exception" << endl;
             }
             active = false;
         }
