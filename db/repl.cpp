@@ -880,7 +880,7 @@ namespace mongo {
                 replAllDead = "bad object in oplog";
                 throw SyncException();
             }
-            ns = ".";
+            ns = "admin.system.x";
         }
 
         if ( !only.empty() && only != clientName )
