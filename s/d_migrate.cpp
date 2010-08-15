@@ -759,7 +759,7 @@ namespace mongo {
                     if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
                         state = FAIL;
                         errmsg = "_transferMods failed: ";
-                        errmsg += res.toShard();
+                        errmsg += res.toString();
                         log( LL_ERROR ) << "_transferMods failed: " << res << endl;
                         return;
                     }
@@ -809,7 +809,7 @@ namespace mongo {
             
             b.append( "state" , stateString() );
             if ( state == FAIL )
-                b.apend( "errmsg" , errmsg );
+                b.append( "errmsg" , errmsg );
             {
                 BSONObjBuilder bb( b.subobjStart( "counts" ) );
                 bb.append( "cloned" , numCloned );
