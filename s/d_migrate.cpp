@@ -528,7 +528,8 @@ namespace mongo {
                 
                 log(0) << "_recvChunkStatus : " << res << endl;
                 
-                if ( ! ok ){
+                if ( ! ok || res["state"].String() == "fail" ){
+                    log( LL_ERROR ) << "_recvChunkStatus error : " << res << endl;
                     errmsg = "_recvChunkStatus error";
                     result.append( "cause" ,res );
                     return false;
@@ -757,7 +758,10 @@ namespace mongo {
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ){
                         state = FAIL;
+                        errmsg = "_transferMods failed: ";
+                        errmsg += res.toShard();
                         log( LL_ERROR ) << "_transferMods failed: " << res << endl;
+                        return;
                     }
                     if ( res["size"].number() == 0 )
                         break;
@@ -802,9 +806,10 @@ namespace mongo {
             b.append( "from" , from );
             b.append( "min" , min );
             b.append( "max" , max );
-
+            
             b.append( "state" , stateString() );
-
+            if ( state == FAIL )
+                b.apend( "errmsg" , errmsg );
             {
                 BSONObjBuilder bb( b.subobjStart( "counts" ) );
                 bb.append( "cloned" , numCloned );
