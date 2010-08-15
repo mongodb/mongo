@@ -761,6 +761,7 @@ namespace mongo {
                         errmsg = "_transferMods failed: ";
                         errmsg += res.toString();
                         log( LL_ERROR ) << "_transferMods failed: " << res << endl;
+                        conn.done();
                         return;
                     }
                     if ( res["size"].number() == 0 )
@@ -780,6 +781,7 @@ namespace mongo {
                         log() << "_transferMods failed in STEADY state: " << res << endl;
                         errmsg = res.toString();
                         state = FAIL;
+                        conn.done();
                         return;
                     }
 
