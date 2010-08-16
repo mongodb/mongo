@@ -55,6 +55,7 @@ namespace mongo {
 
     class CmdReplSetGetRBID : public ReplSetCommand {
     public:
+        /* todo: ideally this should only change on rollbacks NOT on mongod restarts also. fix... */
         int rbid;
         virtual void help( stringstream &help ) const {
             help << "internal";
