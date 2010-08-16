@@ -653,7 +653,13 @@ namespace mongo {
         BSONObj msg = BSON( "_id" << id.str() << "server" << getHostNameCached() << "time" << DATENOW <<
                             "what" << what << "ns" << ns << "details" << detail );
         log() << "config change: " << msg << endl;
-        conn->insert( "config.changelog" , msg );
+
+        try {
+            conn->insert( "config.changelog" , msg );
+        }
+        catch ( std::exception& e ){
+            log() << "not logging config change: " << e.what() << endl;                
+        }
         
         conn.done();
     }
