@@ -47,7 +47,7 @@ assert.eq( 500, rp.slave().getDB( baseName )[ baseName ].count() );
 rp.master().getDB( baseName )[ baseName ].save( {i:500} );
 assert.soon( function() { return 501 == rp.slave().getDB( baseName )[ baseName ].count(); } );
 
-assert( !rawMongoProgramOutput().match( /resync/ ) );
-assert( !rawMongoProgramOutput().match( /SyncException/ ) );
+assert( !rawMongoProgramOutput().match( new RegExp( "resync.*" + baseName + ".*\n" ) ) , "last1" );
+assert( !rawMongoProgramOutput().match( /SyncException/ ) , "last2" );
 
 print("snapshot3.js finishes");

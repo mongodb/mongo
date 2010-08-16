@@ -853,11 +853,6 @@ namespace mongo {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
             log(6) << "processing op: " << op << endl;
 
-        // skip no-op
-        /* the no-op makes us process queued up databases.  so returning here would be problematic  */
-//        if ( op.getStringField( "op" )[ 0 ] == 'n' )
-//            return;
-        
         char clientName[MaxDatabaseLen];
         const char *ns = op.getStringField("ns");
         nsToDatabase(ns, clientName);
@@ -873,6 +868,7 @@ namespace mongo {
                 throw SyncException();
             }
             ns = "admin.system.x";
+            nsToDatabase(ns, clientName);
         }
 
         if ( !only.empty() && only != clientName )

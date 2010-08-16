@@ -364,7 +364,7 @@ namespace mongo {
         BSONObj o = b.done();
         userCreateNS(ns, o, err, false);
         if( !rs )
-            logOp( "n", "dummy", BSONObj() );
+            logOp( "n", "", BSONObj() );
 
         /* sync here so we don't get any surprising lag later when we try to sync */
         MemoryMappedFile::flushAll(true);

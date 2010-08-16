@@ -28,7 +28,7 @@ namespace po = boost::program_options;
 
 class Dump : public Tool {
 public:
-    Dump() : Tool( "dump" , true , "*" , "*" , false ){
+    Dump() : Tool( "dump" , ALL , "*" , "*" , false ){
         add_options()
             ("out,o", po::value<string>()->default_value("dump"), "output directory or stdout")
             ("query,q", po::value<string>() , "json query" )
