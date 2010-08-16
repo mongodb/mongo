@@ -63,6 +63,7 @@ namespace mongo {
     using namespace bson;
 
     bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg);
+    void incRBID();
 
     class rsfatal : public std::exception { 
     public:
@@ -581,7 +582,16 @@ namespace mongo {
 
         sethbmsg("replSet syncRollback 3 fixup");
 
-        syncFixUp(how, r);
+        {
+            incRBID();
+            try { 
+                syncFixUp(how, r);
+            }
+            catch(...) { 
+                incRBID(); throw;
+            }
+            incRBID();
+        }
     }
 
 }

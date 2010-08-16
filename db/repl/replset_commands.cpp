@@ -71,6 +71,9 @@ namespace mongo {
     } cmdReplSetRBID;
 
     using namespace bson;
+    void incRBID() { 
+        cmdReplSetRBID.rbid++;
+    }
     int getRBID(DBClientConnection *c) { 
         bo info;
         c->simpleCommand("admin", &info, "replSetGetRBID");
