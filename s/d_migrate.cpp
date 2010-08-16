@@ -743,7 +743,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = conn->query( ns , Query().minKey( min ).maxKey( max ) , /* QueryOption_Exhaust */ 0 );
                 assert( cursor.get() );
                 while ( cursor->more() ){
-                    BSONObj o = cursor->next();
+                    BSONObj o = cursor->next().getOwned();
                     {
                         writelock lk( ns );
                         Helpers::upsert( ns , o );
