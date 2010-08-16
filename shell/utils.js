@@ -16,11 +16,20 @@ friendlyEqual = function( a , b ){
     return false;
 }
 
+printStackTrace = function(){
+    try{
+        throw new Error("Printing Stack Trace (lines are 0-based in spidermonkey)");
+    } catch (e) {
+        print(e.stack);
+    }
+}
+
 doassert = function (msg) {
     if (msg.indexOf("assert") == 0)
         print(msg);
     else
         print("assert: " + msg);
+    printStackTrace();
     throw msg;
 }
 
