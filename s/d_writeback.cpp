@@ -52,7 +52,7 @@ namespace mongo {
     class WriteBackCommand : public Command {
     public:
         virtual LockType locktype() const { return NONE; } 
-        virtual bool slaveOk() const { return false; }
+        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         
         WriteBackCommand() : Command( "writebacklisten" ){}

@@ -858,6 +858,9 @@ namespace mongo {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
             log(6) << "processing op: " << op << endl;
 
+        if( op.getStringField("op")[0] == 'n' )
+            return;
+
         char clientName[MaxDatabaseLen];
         const char *ns = op.getStringField("ns");
         nsToDatabase(ns, clientName);
@@ -867,13 +870,13 @@ namespace mongo {
             return;
         }
         else if ( *ns == 0 ) {
-            if( op.getStringField("op")[0] != 'n' ) {
+            /*if( op.getStringField("op")[0] != 'n' )*/ {
                 problem() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
                 replAllDead = "bad object in oplog";
                 throw SyncException();
             }
-            ns = "admin.system.x";
-            nsToDatabase(ns, clientName);
+            //ns = "local.system.x";
+            //nsToDatabase(ns, clientName);
         }
 
         if ( !only.empty() && only != clientName )
@@ -1302,12 +1305,15 @@ namespace mongo {
                    1) find most recent op in local log
                    2) more()?
                 */
-                if ( !oplogReader.more() ) {
+
+                bool moreInitialSyncsPending = !addDbNextPass.empty() && n; // we need "&& n" to assure we actually process at least one op to get a sync point recorded in the first place.
+
+                if ( moreInitialSyncsPending || !oplogReader.more() ) {
                     dblock lk;
                     OpTime nextLastSaved = nextLastSavedLocalTs();
                     {
                         dbtemprelease t;
-                        if ( oplogReader.more() ) {
+                        if ( !moreInitialSyncsPending && oplogReader.more() ) {
                             if ( getInitialSyncCompleted() ) { // if initial sync hasn't completed, break out of loop so we can set to completed or clone more dbs
                                 continue;
                             }
@@ -1323,6 +1329,8 @@ namespace mongo {
                     nApplied = n;
                     log() << "repl:  end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
                     break;
+                }
+                else {
                 }
 
                 OCCASIONALLY if( n > 0 && ( n > 100000 || time(0) - saveLast > 60 ) ) { 
