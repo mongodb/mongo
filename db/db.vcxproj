@@ -652,7 +652,6 @@
     <ClInclude Include="introspect.h" />
     <ClInclude Include="json.h" />
     <ClInclude Include="matcher.h" />
-    <ClInclude Include="minilex.h" />
     <ClInclude Include="namespace.h" />
     <ClInclude Include="..\pch.h" />
     <ClInclude Include="pdfile.h" />

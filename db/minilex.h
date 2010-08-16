@@ -17,6 +17,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#error does anything use this?
+
 namespace mongo {
 
 #if defined(_WIN32)
@@ -64,14 +66,15 @@ namespace mongo {
     
 #endif
     
-    struct MiniLex {
+    /*
+    struct MiniLexNotUsed {
         strhashmap reserved;
         bool ic[256]; // ic=Identifier Character
         bool starter[256];
 
         // dm: very dumb about comments and escaped quotes -- but we are faster then at least,
         // albeit returning too much (which is ok for jsbobj current usage).
-        void grabVariables(char *code /*modified and must stay in scope*/, strhashmap& vars) {
+        void grabVariables(char *code , strhashmap& vars) { // 'code' modified and must stay in scope*/
             char *p = code;
             char last = 0;
             while ( *p ) {
@@ -156,5 +159,6 @@ namespace mongo {
             reserved["with "] = true;
         }
     };
+    */
 
 } // namespace mongo

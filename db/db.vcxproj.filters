@@ -529,34 +529,7 @@
     <ClInclude Include="..\util\optime.h">
       <Filter>repl_old</Filter>
     </ClInclude>
-    <ClInclude Include="client.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
     <ClInclude Include="clientcursor.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="cursor.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="cmdline.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="commands.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="concurrency.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\pcre-7.4\config.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="curop.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="database.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="db.h">
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\embedded_builder.h">
@@ -580,18 +553,6 @@
     <ClInclude Include="..\util\goodies.h">
       <Filter>util\core</Filter>
     </ClInclude>
-    <ClInclude Include="dbhelpers.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="dbinfo.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="helpers\dblogger.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="dbmessage.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\hostandport.h">
       <Filter>util\core</Filter>
     </ClInclude>
@@ -604,32 +565,11 @@
     <ClInclude Include="..\util\httpclient.h">
       <Filter>util\core</Filter>
     </ClInclude>
-    <ClInclude Include="introspect.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="index.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="indexkey.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="json.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="jsobj.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\log.h">
       <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\md5.h">
       <Filter>util\core</Filter>
-    </ClInclude>
-    <ClInclude Include="lasterror.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
-    <ClInclude Include="matcher.h">
-      <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\md5.hpp">
       <Filter>util\core</Filter>
@@ -639,9 +579,6 @@
     </ClInclude>
     <ClInclude Include="..\util\message_server.h">
       <Filter>util\core</Filter>
-    </ClInclude>
-    <ClInclude Include="minilex.h">
-      <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\mmap.h">
       <Filter>util\core</Filter>
@@ -724,9 +661,6 @@
     <ClInclude Include="..\util\unittest.h">
       <Filter>util\core</Filter>
     </ClInclude>
-    <ClInclude Include="background.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\background.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
@@ -766,9 +700,6 @@
     <ClInclude Include="geo\core.h">
       <Filter>db\geo</Filter>
     </ClInclude>
-    <ClInclude Include="instance.h">
-      <Filter>db\core</Filter>
-    </ClInclude>
     <ClInclude Include="..\client\distlock.h">
       <Filter>client</Filter>
     </ClInclude>
@@ -777,6 +708,72 @@
     </ClInclude>
     <ClInclude Include="oplogreader.h">
       <Filter>repl_old</Filter>
+    </ClInclude>
+    <ClInclude Include="background.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="client.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="cmdline.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="commands.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="concurrency.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="curop.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="cursor.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="database.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="db.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="dbhelpers.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="dbinfo.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\pcre-7.4\config.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="dbmessage.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="helpers\dblogger.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="instance.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="indexkey.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="index.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="jsobj.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="introspect.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="json.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="lasterror.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher.h">
+      <Filter>db\core\h</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -842,6 +839,9 @@
     </Filter>
     <Filter Include="replSets\testing">
       <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\core\h">
+      <UniqueIdentifier>{de119f0e-3d04-429f-b88b-69e28b1e02fd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
