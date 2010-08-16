@@ -198,7 +198,7 @@ namespace mongo {
         }
     }
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string errmsg) {
+    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg) {
         Cloner c;
         return c.copyCollection(host, ns, query, errmsg , /*copyIndexes*/ true);
     }

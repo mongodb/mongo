@@ -62,6 +62,8 @@ namespace mongo {
 
     using namespace bson;
 
+    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg);
+
     class rsfatal : public std::exception { 
     public:
         virtual const char* what() const throw(){ return "replica set fatal exception"; }
@@ -380,11 +382,15 @@ namespace mongo {
                bob res;
                string errmsg;
                dropCollection(ns, errmsg, res);
-               Cloner c;
-               return c.copyCollection( fromhost , collection , query, errmsg , copyIndexes );
+               bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg);
+               if( !ok ) { 
+                   log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
+                   throw "rollback error resyncing rollection [1]";
+               }
            }
            catch(...) { 
                log() << "replset rollback error resyncing collection " << ns << rsLog;
+               throw "rollback error resyncing rollection [2]";
            }
        }
 
