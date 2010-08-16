@@ -262,6 +262,8 @@ namespace mongo {
         return replPair || replSettings.slave || replSettings.master;
     }
 
+    bool replAuthenticate(DBClientConnection *conn);
+    
     void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ){
         
         if ( replAllDead ) {
@@ -315,12 +317,15 @@ namespace mongo {
                 if ( level > 1 ){
                     dbtemprelease unlock;
                     ScopedDbConnection conn( s["host"].valuestr() );
-                    BSONObj first = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << 1 ) ) );
-                    BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << -1 ) ) );
-                    bb.appendDate( "masterFirst" , first["ts"].timestampTime() );
-                    bb.appendDate( "masterLast" , last["ts"].timestampTime() );
-                    double lag = (double) (last["ts"].timestampTime() - s["syncedTo"].timestampTime());
-                    bb.append( "lagSeconds" , lag / 1000 );
+                    DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn.conn() );
+                    if ( cliConn && replAuthenticate( cliConn ) ) {
+                        BSONObj first = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << 1 ) ) );
+                        BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << -1 ) ) );
+                        bb.appendDate( "masterFirst" , first["ts"].timestampTime() );
+                        bb.appendDate( "masterLast" , last["ts"].timestampTime() );
+                        double lag = (double) (last["ts"].timestampTime() - s["syncedTo"].timestampTime());
+                        bb.append( "lagSeconds" , lag / 1000 );
+                    }
                     conn.done();
                 }
 

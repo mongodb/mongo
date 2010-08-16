@@ -35,6 +35,10 @@ doTest = function( signal ) {
     sa = s.getDB( baseName ).a;
     assert.soon( function() { return 1 == sa.count(); } );
     
+    s.getDB( "local" ).auth( "repl", "foo" );
+    assert.commandWorked( s.getDB( "admin" )._adminCommand( {serverStatus:1,repl:1} ) );
+    assert.commandWorked( s.getDB( "admin" )._adminCommand( {serverStatus:1,repl:2} ) );
+    
     rt.stop( false, signal );
     
     ma.save( {} );

@@ -161,7 +161,7 @@ namespace mongo {
         if ( _conn ){
             if ( ! _conn->isFailed() ) {
                 /* see done() comments above for why we log this line */
-                log() << "~ScopedDBConnection: _conn != null" << endl;
+                log() << "~ScopedDbConnection: _conn != null" << endl;
             }
             kill();
         }
