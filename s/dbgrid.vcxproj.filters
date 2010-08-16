@@ -287,6 +287,9 @@
     <ClCompile Include="..\util\miniwebserver.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\task.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gridconfig.h">

@@ -49,7 +49,8 @@ namespace mongo {
         void programEnding();
         MutexDebugger();
         void entering(mid m) {
-            if( magic != 0x12345678 ) return;
+            if( this == 0 ) return;
+            assert( magic == 0x12345678 );
 
             Preceeding *_preceeding = us.get();
             if( _preceeding == 0 )
@@ -108,7 +109,7 @@ namespace mongo {
             }
         }
         void leaving(mid m) { 
-            if( magic != 0x12345678 ) return;
+            if( this == 0 ) return; // still in startup pre-main()
             Preceeding& preceeding = *us.get();
             preceeding[m]--;
             if( preceeding[m] < 0 ) {
