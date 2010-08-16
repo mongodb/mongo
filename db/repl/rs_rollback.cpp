@@ -86,6 +86,8 @@ namespace mongo {
         /* collections to drop */
         set<string> toDrop;
 
+        set<string> collectionsToResync;
+
         OpTime commonPoint;
         DiskLoc commonPointOurDiskloc;
 
@@ -125,10 +127,7 @@ namespace mongo {
                 return;
             }
             else {
-                /* dropdatabase - resync
-                   drop - resync coll
-                   dropindexes - refetch indexes
-                   findandmodify - tranlated?
+                /* findandmodify - tranlated?
                    godinsert?,  
                    renamecollection a->b.  just resync a & b
                 */
@@ -138,6 +137,27 @@ namespace mongo {
                     */
                     string ns = s.db + '.' + o["create"].String(); // -> foo.abc
                     h.toDrop.insert(ns);
+                    return;
+                }
+                else if( cmdname == "drop" ) { 
+                    string ns = s.db + '.' + first.valuestr();
+                    h.collectionsToResync.insert(ns);
+                    return;
+                }
+                else if( cmdname == "dropIndexes" ) { 
+                    /* TODO: this is bad.  we simply full resync the collection here, which could be very slow. */
+                    log() << "replSet info rollback of dropIndexes is slow in this version of mongod" << rsLog;
+                    string ns = s.db + '.' + first.valuestr();
+                    h.collectionsToResync.insert(ns);
+                    return;
+                }
+                else if( cmdname == "renameCollection" ) { 
+                    /* TODO: slow. */
+                    log() << "replSet info rollback of renameCollection is slow in this version of mongod" << rsLog;
+                    string from = first.valuestr();
+                    string to = o["to"].String();
+                    h.collectionsToResync.insert(from);
+                    h.collectionsToResync.insert(to);
                     return;
                 }
                 else if( cmdname == "reIndex" ) { 
@@ -348,6 +368,23 @@ namespace mongo {
            }
            catch(...) { 
                log() << "replset rollback error dropping collection " << *i << rsLog;
+           }
+       }
+
+       /** any full collection resyncs required? */
+       for( set<string>::iterator i = h.collectionsToResync.begin(); i != h.collectionsToResync.end(); i++ ) { 
+           string ns = *i;
+           log() << "replSet rollback resync collection: " << ns << rsLog;
+           Client::Context c(*i, dbpath, 0, /*doauth*/false);
+           try {
+               bob res;
+               string errmsg;
+               dropCollection(ns, errmsg, res);
+               Cloner c;
+               return c.copyCollection( fromhost , collection , query, errmsg , copyIndexes );
+           }
+           catch(...) { 
+               log() << "replset rollback error resyncing collection " << ns << rsLog;
            }
        }
 
