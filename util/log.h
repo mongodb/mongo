@@ -169,6 +169,11 @@ namespace mongo {
             return 1717;
         }
 
+        static int getLogDesc() {
+            if (logfile != NULL)
+                return fileno( logfile );
+        }
+
         inline void flush(Tee *t = 0);
         
         inline Nullstream& setLogLevel(LogLevel l){
