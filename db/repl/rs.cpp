@@ -491,7 +491,6 @@ namespace mongo {
         log() << "replSet error fatal error, stopping replication" << rsLog; 
     }
 
-
     void ReplSet::haveNewConfig(ReplSetConfig& newConfig, bool addComment) { 
         lock l(this); // convention is to lock replset before taking the db rwlock
         writelock lk("");

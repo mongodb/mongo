@@ -62,6 +62,11 @@ namespace mongo {
 
     using namespace bson;
 
+    class rsfatal : public std::exception { 
+    public:
+        virtual const char* what() const throw(){ return "replica set fatal exception"; }
+    };
+
     struct DocID {
         const char *ns;
         be _id;
@@ -113,15 +118,21 @@ namespace mongo {
         if( *op == 'c' ) { 
             be first = o.firstElement();
             NamespaceString s(d.ns); // foo.$cmd
-
-            Command *cmd = Command::findCommand( first.fieldName() );
+            string cmdname = first.fieldName();
+            Command *cmd = Command::findCommand(cmdname.c_str());
             if( cmd == 0 ) { 
                 log() << "replSet warning rollback no suchcommand " << first.fieldName() << " - different mongod versions perhaps?" << rsLog;
                 return;
             }
             else {
-                /* dropdatabase, drop, reindex, dropindexes, findandmodify, godinsert?,  renamecollection */
-                if( string("create") == first.fieldName() ) {
+                /* dropdatabase - resync
+                   drop - resync coll
+                   dropindexes - refetch indexes
+                   findandmodify - tranlated?
+                   godinsert?,  
+                   renamecollection a->b.  just resync a & b
+                */
+                if( cmdname == "create" ) {
                     /* Create collection operation 
                        { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
                     */
@@ -129,8 +140,17 @@ namespace mongo {
                     h.toDrop.insert(ns);
                     return;
                 }
+                else if( cmdname == "reIndex" ) { 
+                    return;
+                }
+                else if( cmdname == "dropDatabase" ) { 
+                    log() << "replSet ERROR rollback : can't rollback drop database full resync will be required" << rsLog;
+                    log() << "replSet " << o.toString() << rsLog;
+                    throw rsfatal();
+                }
                 else { 
-                    log() << "replSet WARNING can't roll back this command yet: " << o.toString() << rsLog;
+                    log() << "replSet ERROR can't rollback this command yet: " << o.toString() << rsLog;
+                    throw rsfatal();
                 }
             }
         }
@@ -497,6 +517,11 @@ namespace mongo {
             catch( const char *p ) { 
                 sethbmsg(string("syncRollback 2 error ") + p);
                 sleepsecs(10);
+                return;
+            }
+            catch( rsfatal& ) { 
+                _fatal();
+                sleepsecs(2);
                 return;
             }
             catch( DBException& e ) { 
