@@ -396,6 +396,9 @@ namespace mongo {
     extern const double EARTH_RADIUS_KM;
     extern const double EARTH_RADIUS_MILES;
 
+    inline double deg2rad(double deg) { return deg * (M_PI/180); }
+    inline double rad2deg(double rad) { return rad * (180/M_PI); }
+
     // WARNING: _x and _y MUST be longitude and latitude in that order
     // note: multiply by earth radius for distance
     inline double spheredist_rad( const Point& p1, const Point& p2 ) {
@@ -419,8 +422,8 @@ namespace mongo {
     // note: return is still in radians as that can be multiplied by radius to get arc length
     inline double spheredist_deg( const Point& p1, const Point& p2 ) {
         return spheredist_rad(
-                    Point( p1._x * (M_PI/180), p1._y * (M_PI/180)),
-                    Point( p2._x * (M_PI/180), p2._y * (M_PI/180))
+                    Point( deg2rad(p1._x), deg2rad(p1._y) ),
+                    Point( deg2rad(p2._x), deg2rad(p2._y) )
                );
     }
 
