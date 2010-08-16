@@ -292,7 +292,19 @@ namespace mongo {
         bson::bo goodVersionOfObject;
     };
 
-   void ReplSetImpl::syncFixUp(HowToFixUp& h, OplogReader& r) {
+    static void setMinValid(bo newMinValid) { 
+       try {
+           log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
+       }
+       catch(...) { }
+       {
+           Helpers::putSingleton("local.replset.minvalid", newMinValid);
+           Client::Context cx( "local." );
+           cx.db()->flushFiles(true);            
+       }
+    }
+
+    void ReplSetImpl::syncFixUp(HowToFixUp& h, OplogReader& r) {
        DBClientConnection *them = r.conn();
 
        // fetch all first so we needn't handle interruption in a fancy way
@@ -303,6 +315,7 @@ namespace mongo {
 
        bo newMinValid;
 
+       /* fetch all the goodVersions of each document from current primary */
        DocID d;
        unsigned long long n = 0;
        try {
@@ -334,6 +347,8 @@ namespace mongo {
            throw e;
        }
 
+       MemoryMappedFile::flushAll(true);
+
        sethbmsg("syncRollback 3.5");
        if( h.rbid != getRBID(r.conn()) ) { 
            // our source rolled back itself.  so the data we received isn't necessarily consistent.
@@ -348,19 +363,69 @@ namespace mongo {
 
        assert( !h.commonPointOurDiskloc.isNull() );
 
-       MemoryMappedFile::flushAll(true);
-
        dbMutex.assertWriteLocked();
 
        /* we have items we are writing that aren't from a point-in-time.  thus best not to come online 
 	      until we get to that point in freshness. */
-       try {
-           log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
-       }
-       catch(...){}
-       Helpers::putSingleton("local.replset.minvalid", newMinValid);
+       setMinValid(newMinValid);
 
-       /** first drop collections to drop - that might make things faster below actually if there were subsequent inserts to rollback */
+       /** any full collection resyncs required? */
+       if( !h.collectionsToResync.empty() ) {
+           unsigned n = 1;
+           for( set<string>::iterator i = h.collectionsToResync.begin(); i != h.collectionsToResync.end(); i++ ) { 
+               string ns = *i;
+               sethbmsg(str::stream() << "syncRollback 4.1 coll resync " << ns);
+               Client::Context c(*i, dbpath, 0, /*doauth*/false);
+               try {
+                   bob res;
+                   string errmsg;
+                   dropCollection(ns, errmsg, res);
+                   bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg);
+                   if( !ok ) { 
+                       log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
+                       throw "rollback error resyncing rollection [1]";
+                   }
+               }
+               catch(...) { 
+                   log() << "replset rollback error resyncing collection " << ns << rsLog;
+                   throw "rollback error resyncing rollection [2]";
+               }
+           }
+
+           /* we did more reading from primary, so check it again for a rollback (which would mess us up), and 
+              make minValid newer. 
+              */
+           sethbmsg("syncRollback 4.2");
+           { 
+               string err;
+               try {
+                   newMinValid = r.getLastOp(rsoplog);
+                   if( newMinValid.isEmpty() ) {
+                       err = "can't get minvalid from primary";
+                   } else { 
+                       setMinValid(newMinValid);
+                   }
+               }
+               catch(...) { 
+                   err = "can't get/set minvalid"; 
+               }
+               if( h.rbid != getRBID(r.conn()) ) {
+                   // our source rolled back itself.  so the data we received isn't necessarily consistent.
+                   // however, we've now done writes.  thus we have a problem.
+                   err += "rbid at primary changed during resync/rollback";
+               }
+               if( !err.empty() ) {
+                   log() << "replSet error rolling back : " << err << ". A full resync will be necessary." << rsLog;
+                   /* todo: reset minvalid so that we are permanently in fatal state */
+                   /* todo: don't be fatal, but rather, get all the data first. */
+                   throw rsfatal();
+               }
+           }
+           sethbmsg("syncRollback 4.3");
+       }
+
+       sethbmsg("syncRollback 4.6");
+       /** drop collections to drop before doing individual fixups - that might make things faster below actually if there were subsequent inserts to rollback */
        for( set<string>::iterator i = h.toDrop.begin(); i != h.toDrop.end(); i++ ) { 
            Client::Context c(*i, dbpath, 0, /*doauth*/false);
            try {
@@ -374,27 +439,7 @@ namespace mongo {
            }
        }
 
-       /** any full collection resyncs required? */
-       for( set<string>::iterator i = h.collectionsToResync.begin(); i != h.collectionsToResync.end(); i++ ) { 
-           string ns = *i;
-           log() << "replSet rollback resync collection: " << ns << rsLog;
-           Client::Context c(*i, dbpath, 0, /*doauth*/false);
-           try {
-               bob res;
-               string errmsg;
-               dropCollection(ns, errmsg, res);
-               bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg);
-               if( !ok ) { 
-                   log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
-                   throw "rollback error resyncing rollection [1]";
-               }
-           }
-           catch(...) { 
-               log() << "replset rollback error resyncing collection " << ns << rsLog;
-               throw "rollback error resyncing rollection [2]";
-           }
-       }
-
+       sethbmsg("syncRollback 4.7");
        Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
        uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
