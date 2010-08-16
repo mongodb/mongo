@@ -393,8 +393,8 @@ namespace mongo {
     };
 
 
-    extern double EARTH_RADIUS_KM;
-    extern double EARTH_RADIUS_MILES;
+    extern const double EARTH_RADIUS_KM;
+    extern const double EARTH_RADIUS_MILES;
 
     // WARNING: _x and _y MUST be longitude and latitude in that order
     // note: multiply by earth radius for distance

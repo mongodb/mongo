@@ -55,8 +55,8 @@ namespace mongo {
 # define PREFIXDEBUG(x, y) 
 #endif
 
-    double EARTH_RADIUS_KM = 6371;
-    double EARTH_RADIUS_MILES = EARTH_RADIUS_KM * 0.621371192;
+    const double EARTH_RADIUS_KM = 6371;
+    const double EARTH_RADIUS_MILES = EARTH_RADIUS_KM * 0.621371192;
 
 
     GeoBitSets geoBitSets;
