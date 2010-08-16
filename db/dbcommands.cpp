@@ -786,9 +786,6 @@ namespace mongo {
 
     class CmdListDatabases : public Command {
     public:
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }
@@ -1596,9 +1593,6 @@ namespace mongo {
     class CmdWhatsMyUri : public Command {
     public:
         CmdWhatsMyUri() : Command("whatsmyuri") { }
-        virtual bool logTheOp() {
-            return false; // the modification will be logged directly
-        }
         virtual bool slaveOk() const {
             return true;
         }
@@ -1734,12 +1728,8 @@ namespace mongo {
     public:
         virtual LockType locktype() const { return NONE; } 
         virtual bool adminOnly() const { return true; }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
+        virtual bool logTheOp() { return false; }
+        virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
             help << "w:true write lock";

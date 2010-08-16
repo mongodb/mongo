@@ -85,9 +85,7 @@ namespace mongo {
 
            Note if run() returns false, we do NOT log.
         */
-        virtual bool logTheOp() {
-            return false;
-        }
+        virtual bool logTheOp() { return false; }
 
         virtual void help( stringstream& help ) const;
 
