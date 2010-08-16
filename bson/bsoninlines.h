@@ -347,7 +347,14 @@ namespace mongo {
             size_t len1 = ( maxLen == -1 ) ? strlen( p ) : mongo::strnlen( p, remain );
             //massert( 10318 ,  "Invalid regex string", len1 != -1 ); // ERH - 4/28/10 - don't think this does anything
             p = p + len1 + 1;
-            size_t len2 = ( maxLen == -1 ) ? strlen( p ) : mongo::strnlen( p, remain - len1 - 1 );
+            size_t len2;
+            if( maxLen == -1 )
+                len2 = strlen( p );
+            else {
+                size_t x = remain - len1 - 1;
+                assert( x <= 0x7fffffff );
+                len2 = mongo::strnlen( p, (int) x );
+            }
             //massert( 10319 ,  "Invalid regex options string", len2 != -1 ); // ERH - 4/28/10 - don't think this does anything
             x = (int) (len1 + 1 + len2 + 1);
         }
