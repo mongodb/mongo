@@ -359,7 +359,7 @@ namespace mongo {
        catch(...){}
        Helpers::putSingleton("local.replset.minvalid", newMinValid);
 
-       /** first drop collections to drop - that might make things faster below actually if there were subsequent inserts */
+       /** first drop collections to drop - that might make things faster below actually if there were subsequent inserts to rollback */
        for( set<string>::iterator i = h.toDrop.begin(); i != h.toDrop.end(); i++ ) { 
            Client::Context c(*i, dbpath, 0, /*doauth*/false);
            try {
@@ -406,7 +406,12 @@ namespace mongo {
            bo pattern = d._id.wrap(); // { _id : ... }
            try { 
                assert( d.ns && *d.ns );
-               
+               if( h.collectionsToResync.count(d.ns) ) {
+                   /* we just synced this entire collection */
+                   continue;
+               }
+
+               /* keep an archive of items rolled back */
                shared_ptr<RemoveSaver>& rs = removeSavers[d.ns];
                if ( ! rs )
                    rs.reset( new RemoveSaver( "rollback" , "" , d.ns ) );
@@ -429,7 +434,7 @@ namespace mongo {
                                long long start = Listener::getElapsedTimeMillis();
                                DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
                                if( Listener::getElapsedTimeMillis() - start > 200 ) 
-                                   log() << "replSet warning roll back slow no _id index for " << d.ns << rsLog; 
+                                   log() << "replSet warning roll back slow no _id index for " << d.ns << " perhaps?" << rsLog; 
                                //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);
                                if( !loc.isNull() ) {
                                    try {
