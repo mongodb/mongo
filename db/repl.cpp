@@ -860,12 +860,11 @@ namespace mongo {
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail) {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
             log(6) << "processing op: " << op << endl;
-        // skip no-op
 
-        /* the no-op makes us process queued up databases.  so returning here would be problematic  */
-////        if ( op.getStringField( "op" )[ 0 ] == 'n' )
-////            return;
-        
+        // skip no-op
+        if( op.getStringField("op")[0] == 'n' )
+            return;
+
         char clientName[MaxDatabaseLen];
         const char *ns = op.getStringField("ns");
         nsToDatabase(ns, clientName);
@@ -1306,12 +1305,15 @@ namespace mongo {
                    1) find most recent op in local log
                    2) more()?
                 */
-                if ( !oplogReader.more() ) {
+
+                bool moreInitialSyncsPending = !addDbNextPass.empty() && n; // we need "&& n" to assure we actually process at least one op to get a sync point recorded in the first place.
+
+                if ( moreInitialSyncsPending || !oplogReader.more() ) {
                     dblock lk;
                     OpTime nextLastSaved = nextLastSavedLocalTs();
                     {
                         dbtemprelease t;
-                        if ( oplogReader.more() ) {
+                        if ( !moreInitialSyncsPending && oplogReader.more() ) {
                             if ( getInitialSyncCompleted() ) { // if initial sync hasn't completed, break out of loop so we can set to completed or clone more dbs
                                 continue;
                             }
@@ -1327,6 +1329,8 @@ namespace mongo {
                     nApplied = n;
                     log() << "repl:  end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
                     break;
+                }
+                else {
                 }
 
                 OCCASIONALLY if( n > 0 && ( n > 100000 || time(0) - saveLast > 60 ) ) { 
