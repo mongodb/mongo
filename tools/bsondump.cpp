@@ -36,7 +36,7 @@ class BSONDump : public BSONTool {
 
 public:
     
-    BSONDump() : BSONTool( "bsondump" ){
+    BSONDump() : BSONTool( "bsondump", NONE ){
         add_options()
             ("type" , po::value<string>()->default_value("json") , "type of output: json,debug" )
             ;

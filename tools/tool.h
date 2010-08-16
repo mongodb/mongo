@@ -35,8 +35,14 @@ namespace mongo {
 
     class Tool {
     public:
-        Tool( string name , bool localDBAllowed=true, string defaultDB="test" , 
-              string defaultCollection="", bool usesstdout=true );
+        enum DBAccess{
+            NONE,
+            ALL,
+            NO_LOCAL
+        };
+
+        Tool( string name , DBAccess access=ALL, string defaultDB="test" , 
+              string defaultCollection="", bool usesstdout=true);
         virtual ~Tool();
 
         int main( int argc , char ** argv );
@@ -126,7 +132,7 @@ namespace mongo {
         auto_ptr<Matcher> _matcher;
         
     public:
-        BSONTool( const char * name , bool objcheck = false );
+        BSONTool( const char * name , DBAccess access=ALL, bool objcheck = false );
         
         virtual int doRun() = 0;
         virtual void gotObject( const BSONObj& obj ) = 0;
