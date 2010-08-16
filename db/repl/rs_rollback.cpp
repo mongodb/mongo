@@ -368,10 +368,9 @@ namespace mongo {
        /* we have items we are writing that aren't from a point-in-time.  thus best not to come online 
 	      until we get to that point in freshness. */
        setMinValid(newMinValid);
-
+       
        /** any full collection resyncs required? */
        if( !h.collectionsToResync.empty() ) {
-           unsigned n = 1;
            for( set<string>::iterator i = h.collectionsToResync.begin(); i != h.collectionsToResync.end(); i++ ) { 
                string ns = *i;
                sethbmsg(str::stream() << "syncRollback 4.1 coll resync " << ns);
