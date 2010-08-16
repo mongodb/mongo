@@ -203,7 +203,7 @@ namespace mongo {
         return c.copyCollection(host, ns, query, errmsg , /*copyIndexes*/ true);
     }
 
-    bool Cloner::copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes ){
+    bool Cloner::copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes ) {
         auto_ptr<DBClientConnection> myconn;
         myconn.reset( new DBClientConnection() );
         if ( ! myconn->connect( from , errmsg ) )
@@ -226,6 +226,11 @@ namespace mongo {
             copy( ns.c_str() , ns.c_str() , false , true , false , true , Query(query).snapshot() );
         }
         
+        /* TODO : copyIndexes bool does not seem to be implemented! */
+        if( !copyIndexes ) { 
+            log() << "ERROR copy collection copyIndexes not implemented? " << ns << endl;
+        }
+
         { // indexes
             string temp = ctx.db()->name + ".system.indexes";
             copy( temp.c_str() , temp.c_str() , true , true , false , true , BSON( "ns" << ns ) );
