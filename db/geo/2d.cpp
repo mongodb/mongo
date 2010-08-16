@@ -1139,14 +1139,16 @@ namespace mongo {
 
             if (type == "$center"){
                 _type = GEO_PLAIN;
-                _scanDistance = _maxDistance;
+                _xScanDistance = _maxDistance;
+                _yScanDistance = _maxDistance;
             } else if (type == "$centerSphere") {
                 // current algorithm scans more buckets as you get further from equator
                 uassert(13437, "Spherical distance is currently limited to latitudes from 80S to 80N",
                                 _startPt._y >= -80 && _startPt._y <= 80);
 
                 _type = GEO_SPHERE;
-                _scanDistance = _maxDistance / cos(_startPt._y * (M_PI/180));
+                _xScanDistance = _maxDistance;
+                _yScanDistance = _maxDistance / cos(_startPt._y * (M_PI/180));
             } else {
                 uassert(13438, "invalid $center query type: " + type, false);
             }
@@ -1212,9 +1214,9 @@ namespace mongo {
                 Point tr (_g, trHash);
                 double sideLen = fabs(tr._x - ll._x);
 
-                if (sideLen > _scanDistance){ // circle must be contained by surrounding squares
-                    if ( (ll._x + _scanDistance < _startPt._x && ll._y + _scanDistance < _startPt._y) && 
-                         (tr._x - _scanDistance > _startPt._x && tr._y - _scanDistance > _startPt._y) )
+                if (sideLen > std::max(_xScanDistance, _yScanDistance)){ // circle must be contained by surrounding squares
+                    if ( (ll._x + _xScanDistance < _startPt._x && ll._y + _yScanDistance < _startPt._y) && 
+                         (tr._x - _xScanDistance > _startPt._x && tr._y - _yScanDistance > _startPt._y) )
                     {
                         GEODEBUG("square fully contains circle");
                         _state = DONE;
@@ -1241,15 +1243,15 @@ namespace mongo {
 
         bool needToCheckBox(const GeoHash& prefix){
             Point ll (_g, prefix);
-            if (fabs(ll._x - _startPt._x) <= _scanDistance) return true;
-            if (fabs(ll._y - _startPt._y) <= _scanDistance) return true;
+            if (fabs(ll._x - _startPt._x) <= _xScanDistance) return true;
+            if (fabs(ll._y - _startPt._y) <= _yScanDistance) return true;
 
             GeoHash trHash = _prefix;
             trHash.move( 1 , 1 );
             Point tr (_g, trHash);
 
-            if (fabs(tr._x - _startPt._x) <= _scanDistance) return true;
-            if (fabs(tr._y - _startPt._y) <= _scanDistance) return true;
+            if (fabs(tr._x - _startPt._x) <= _xScanDistance) return true;
+            if (fabs(tr._y - _startPt._y) <= _yScanDistance) return true;
 
             return false;
         }
@@ -1282,7 +1284,8 @@ namespace mongo {
         GeoHash _start;
         Point _startPt;
         double _maxDistance; // user input
-        double _scanDistance; // effected by GeoDistType
+        double _xScanDistance; // effected by GeoDistType
+        double _yScanDistance; // effected by GeoDistType
         
         int _found;
         
