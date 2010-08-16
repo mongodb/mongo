@@ -49,9 +49,7 @@ namespace mongo {
     class CmdGetNonce : public Command {
     public:
         virtual bool requiresAuth() { return false; }
-        virtual bool logTheOp() {
-            return false;
-        }
+        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const {
             return true;
         }
