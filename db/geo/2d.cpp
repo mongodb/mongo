@@ -1145,7 +1145,7 @@ namespace mongo {
                 // current algorithm scans more buckets as you get further from equator
                 uassert(13437, "Spherical distance is currently limited to latitudes from 80S to 80N",
                                 _startPt._y >= -80 && _startPt._y <= 80);
-                uassert(13438, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < (M_PI*1.05));
+                uassert(13439, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < (M_PI*1.05));
 
                 _type = GEO_SPHERE;
                 _xScanDistance = rad2deg(_maxDistance);
