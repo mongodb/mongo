@@ -65,7 +65,7 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) ) 
                 return false;
-	    result.append("rbid",rbid);
+            result.append("rbid",rbid);
             return true;
         }
     } cmdReplSetRBID;
