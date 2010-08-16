@@ -35,7 +35,7 @@ namespace mongo {
     class Stat : public Tool {
     public:
 
-        Stat() : Tool( "stat" , false , "admin" ){
+        Stat() : Tool( "stat" , NO_LOCAL , "admin" ){
             _sleep = 1;
             _rowNum = 0;
             _showHeaders = true;
