@@ -114,16 +114,24 @@ namespace mongo {
             be first = o.firstElement();
             NamespaceString s(d.ns); // foo.$cmd
 
-            if( string("create") == first.fieldName() ) {
-                /* Create collection operation 
-                   { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
-                */
-                string ns = s.db + '.' + o["create"].String(); // -> foo.abc
-                h.toDrop.insert(ns);
+            Command *cmd = Command::findCommand( first.fieldName() );
+            if( cmd == 0 ) { 
+                log() << "replSet warning rollback no suchcommand " << first.fieldName() << " - different mongod versions perhaps?" << rsLog;
                 return;
             }
-            else { 
-                log() << "replSet WARNING can't roll back this command yet: " << o.toString() << rsLog;
+            else {
+                /* dropdatabase, drop, reindex, dropindexes, findandmodify, godinsert?,  renamecollection */
+                if( string("create") == first.fieldName() ) {
+                    /* Create collection operation 
+                       { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
+                    */
+                    string ns = s.db + '.' + o["create"].String(); // -> foo.abc
+                    h.toDrop.insert(ns);
+                    return;
+                }
+                else { 
+                    log() << "replSet WARNING can't roll back this command yet: " << o.toString() << rsLog;
+                }
             }
         }
 
