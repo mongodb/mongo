@@ -17,18 +17,14 @@ namespace mongo {
     public:
 
         OplogReader() { 
-            DEV log() << "TEMP *** OplogReader()" << endl;
         }
         ~OplogReader() { 
-            DEV log() << "TEMP *** ~OplogReader()" << endl;
         }
 
         void resetCursor() {
-            DEV log() << "TEMP *** OplogReader::resetCursor" << endl;
             cursor.reset();
         }
         void resetConnection() {
-            DEV log() << "TEMP *** OplogReader::resetConnection" << endl;
             cursor.reset();
             _conn.reset();
         }
