@@ -1067,7 +1067,7 @@ namespace mongo {
             }
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
-            DEV tlog() << "query has more, cursorid: " << cursorid << endl;
+            DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->pos = n;
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();

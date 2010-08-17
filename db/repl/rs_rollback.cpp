@@ -249,26 +249,32 @@ namespace mongo {
                 refetch(h, ourObj);
 
                 if( !t->more() ) { 
-                    log() << "replSet error during rollback reached beginning of remote oplog? [2]" << rsLog;
-                    log() << "replSet  them: " << them->toString() << " scanned: " << scanned << rsLog;
-                    log() << "replSet  theirTime: " << theirTime.toStringPretty() << rsLog;
-                    log() << "replSet  ourTime: " << ourTime.toStringPretty() << rsLog;
+                    log() << "replSet rollback error RS100 reached beginning of remote oplog" << rsLog;
+                    log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
+                    log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
+                    log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
                     throw "reached beginning of remote oplog [2]";
                 }
                 theirObj = t->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
 
                 u.advance();
-                if( !u.ok() ) throw "reached beginning of local oplog";
+                if( !u.ok() ) {
+                    log() << "replSet rollback error RS101 reached beginning of local oplog" << rsLog;
+                    log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
+                    log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
+                    log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
+                    throw "reached beginning of local oplog [1]";
+                }
                 ourObj = u.current();
                 ourTime = ourObj["ts"]._opTime();
             }
             else if( theirTime > ourTime ) { 
                 if( !t->more() ) { 
-                    log() << "replSet error during rollback reached beginning of remote oplog?" << rsLog;
-                    log() << "replSet  them: " << them->toString() << " scanned: " << scanned << rsLog;
-                    log() << "replSet  theirTime: " << theirTime.toStringPretty() << rsLog;
-                    log() << "replSet  ourTime: " << ourTime.toStringPretty() << rsLog;
+                    log() << "replSet rollback error RS100 reached beginning of remote oplog" << rsLog;
+                    log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
+                    log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
+                    log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
                     throw "reached beginning of remote oplog [1]";
                 }
                 theirObj = t->nextSafe();
@@ -278,7 +284,13 @@ namespace mongo {
                 // theirTime < ourTime
                 refetch(h, ourObj);
                 u.advance();
-                if( !u.ok() ) throw "reached beginning of local oplog";
+                if( !u.ok() ) { 
+                    log() << "replSet rollback error RS101 reached beginning of local oplog" << rsLog;
+                    log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
+                    log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
+                    log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
+                    throw "reached beginning of local oplog [2]";
+                }
                 ourObj = u.current();
                 ourTime = ourObj["ts"]._opTime();
             }
