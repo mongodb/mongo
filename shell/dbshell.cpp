@@ -42,11 +42,7 @@ jmp_buf jbuf;
 
 using namespace std;
 using namespace boost::filesystem;
-
-using mongo::BSONObj;
-using mongo::BSONObjBuilder;
-using mongo::BSONObjIterator;
-using mongo::BSONElement;
+using namespace mongo;
 
 string historyFile;
 bool gotInterrupted = 0;
