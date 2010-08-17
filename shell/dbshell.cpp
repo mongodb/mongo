@@ -176,16 +176,21 @@ void killOps() {
             return;
     }
 
+    for( map< string, set<string> >::const_iterator i = shellUtils::_allMyUris.begin(); i != shellUtils::_allMyUris.end(); ++i ){
+        string errmsg;
+        ConnectionString cs = ConnectionString::parse(i->first, errmsg);
+        if (!cs.isValid()) continue;
+        boost::scoped_ptr<DBClientWithCommands> conn (cs.connect(errmsg));
+        if (!conn) continue;
 
-    vector< string > uris;
-    for( map< const void*, string >::iterator i = mongo::shellUtils::_allMyUris.begin(); i != mongo::shellUtils::_allMyUris.end(); ++i )
-        uris.push_back( i->second );
-    mongo::BSONObj spec = BSON( "" << uris );
-    try {
-        auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );        
-        scope->invoke( "function( x ) { killWithUris( x ); }", spec );
-    } catch ( ... ) {
-        mongo::rawOut( "exception while cleaning up any db ops started by this shell\n" );
+        const set<string>& uris = i->second;
+
+        BSONObj inprog =  conn->findOne("admin.$cmd.sys.inprog", Query())["inprog"].embeddedObject().getOwned();
+        BSONForEach(op, inprog){
+            if ( uris.count(op["client"].String()) ) {
+                conn->findOne("admin.$cmd.sys.killop", QUERY("op"<< op["opid"]));
+            }
+        }
     }
 }
 
