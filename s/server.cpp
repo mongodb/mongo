@@ -23,6 +23,7 @@
 #include "../util/message_server.h"
 #include "../util/stringutils.h"
 #include "../util/version.h"
+#include "../util/signal_handlers.h"
 #include "../db/dbwebserver.h"
 
 #include "server.h"
@@ -118,6 +119,12 @@ namespace mongo {
     void setupSignals(){
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
+
+        signal( SIGQUIT , printStackAndExit );
+        signal( SIGSEGV , printStackAndExit );
+        signal( SIGABRT , printStackAndExit );
+        signal( SIGFPE , printStackAndExit );
+        signal( SIGBUS , printStackAndExit );
     }
 
     void init(){
