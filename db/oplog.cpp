@@ -142,8 +142,10 @@ namespace mongo {
                      this code (or code in now() maybe) should be improved.
                      */
             if( theReplSet ) {
-                if( !(theReplSet->lastOpTimeWritten<ts) ) 
-                    log() << "replSet ERROR possible failover clock skew issue? " << theReplSet->lastOpTimeWritten << ' ' << ts << endl;
+                if( !(theReplSet->lastOpTimeWritten<ts) ) {
+                    log() << "replSet ERROR possible failover clock skew issue? " << theReplSet->lastOpTimeWritten << ' ' << ts << rsLog;
+                    log() << "replSet " << theReplSet->isPrimary() << rsLog;
+                }
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = hNew;
                 ctx.getClient()->setLastOp( ts.asDate() );

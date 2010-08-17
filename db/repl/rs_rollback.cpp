@@ -224,11 +224,11 @@ namespace mongo {
         {
             long long diff = (long long) ourTime.getSecs() - ((long long) theirTime.getSecs());
             /* diff could be positive, negative, or zero */
-            log() << "replSet info syncRollback our last optime:   " << ourTime.toStringPretty() << rsLog;
-            log() << "replSet info syncRollback their last optime: " << theirTime.toStringPretty() << rsLog;
-            log() << "replSet info syncRollback diff in end of log times: " << diff << " seconds" << rsLog;
+            log() << "replSet info rollback our last optime:   " << ourTime.toStringPretty() << rsLog;
+            log() << "replSet info rollback their last optime: " << theirTime.toStringPretty() << rsLog;
+            log() << "replSet info rollback diff in end of log times: " << diff << " seconds" << rsLog;
             if( diff > 3600 ) { 
-                log() << "replSet syncRollback too long a time period for a rollback." << rsLog;
+                log() << "replSet rollback too long a time period for a rollback." << rsLog;
                 throw "error not willing to roll back more than one hour of data";
             }
         }
@@ -337,27 +337,27 @@ namespace mongo {
            }
            newMinValid = r.getLastOp(rsoplog);
            if( newMinValid.isEmpty() ) { 
-               sethbmsg("syncRollback error newMinValid empty?");
+               sethbmsg("rollback error newMinValid empty?");
                return;
            }
        }
        catch(DBException& e) {
-           sethbmsg(str::stream() << "syncRollback re-get objects: " << e.toString(),0);
-           log() << "syncRollback couldn't re-get ns:" << d.ns << " _id:" << d._id << ' ' << n << '/' << h.toRefetch.size() << rsLog;
+           sethbmsg(str::stream() << "rollback re-get objects: " << e.toString(),0);
+           log() << "rollback couldn't re-get ns:" << d.ns << " _id:" << d._id << ' ' << n << '/' << h.toRefetch.size() << rsLog;
            throw e;
        }
 
        MemoryMappedFile::flushAll(true);
 
-       sethbmsg("syncRollback 3.5");
+       sethbmsg("rollback 3.5");
        if( h.rbid != getRBID(r.conn()) ) { 
            // our source rolled back itself.  so the data we received isn't necessarily consistent.
-           sethbmsg("syncRollback rbid on source changed during rollback, cancelling this attempt");
+           sethbmsg("rollback rbid on source changed during rollback, cancelling this attempt");
            return;
        }
 
        // update them
-       sethbmsg(str::stream() << "syncRollback 4 n:" << goodVersions.size());
+       sethbmsg(str::stream() << "rollback 4 n:" << goodVersions.size());
 
        bool warn = false;
 
@@ -373,7 +373,7 @@ namespace mongo {
        if( !h.collectionsToResync.empty() ) {
            for( set<string>::iterator i = h.collectionsToResync.begin(); i != h.collectionsToResync.end(); i++ ) { 
                string ns = *i;
-               sethbmsg(str::stream() << "syncRollback 4.1 coll resync " << ns);
+               sethbmsg(str::stream() << "rollback 4.1 coll resync " << ns);
                Client::Context c(*i, dbpath, 0, /*doauth*/false);
                try {
                    bob res;
@@ -394,7 +394,7 @@ namespace mongo {
            /* we did more reading from primary, so check it again for a rollback (which would mess us up), and 
               make minValid newer. 
               */
-           sethbmsg("syncRollback 4.2");
+           sethbmsg("rollback 4.2");
            { 
                string err;
                try {
@@ -420,10 +420,10 @@ namespace mongo {
                    throw rsfatal();
                }
            }
-           sethbmsg("syncRollback 4.3");
+           sethbmsg("rollback 4.3");
        }
 
-       sethbmsg("syncRollback 4.6");
+       sethbmsg("rollback 4.6");
        /** drop collections to drop before doing individual fixups - that might make things faster below actually if there were subsequent inserts to rollback */
        for( set<string>::iterator i = h.toDrop.begin(); i != h.toDrop.end(); i++ ) { 
            Client::Context c(*i, dbpath, 0, /*doauth*/false);
@@ -438,7 +438,7 @@ namespace mongo {
            }
        }
 
-       sethbmsg("syncRollback 4.7");
+       sethbmsg("rollback 4.7");
        Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
        uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
@@ -547,9 +547,9 @@ namespace mongo {
 
        removeSavers.clear(); // this effectively closes all of them
 
-       sethbmsg(str::stream() << "syncRollback 5 d:" << deletes << " u:" << updates);
+       sethbmsg(str::stream() << "rollback 5 d:" << deletes << " u:" << updates);
        MemoryMappedFile::flushAll(true);
-       sethbmsg("syncRollback 6");
+       sethbmsg("rollback 6");
 
        // clean up oplog
        log(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
@@ -559,25 +559,25 @@ namespace mongo {
        /* reset cached lastoptimewritten and h value */
        loadLastOpTimeWritten();
 
-       sethbmsg("syncRollback 7");
+       sethbmsg("rollback 7");
        MemoryMappedFile::flushAll(true);
 
        // done
        if( warn ) 
            sethbmsg("issues during syncRollback, see log");
        else
-           sethbmsg("syncRollback done");
+           sethbmsg("rollback done");
    }
 
     void ReplSetImpl::syncRollback(OplogReader&r) { 
         assert( !lockedByMe() );
         assert( !dbMutex.atLeastReadLocked() );
 
-        sethbmsg("syncRollback 0");
+        sethbmsg("rollback 0");
 
         writelocktry lk(rsoplog, 20000);
         if( !lk.got() ) {
-            sethbmsg("syncRollback couldn't get write lock in a reasonable time");
+            sethbmsg("rollback couldn't get write lock in a reasonable time");
             sleepsecs(2);
             return;
         }
@@ -593,22 +593,22 @@ namespace mongo {
         }
 
         HowToFixUp how;
-        sethbmsg("syncRollback 1");
+        sethbmsg("rollback 1");
         {
             r.resetCursor();
             /*DBClientConnection us(false, 0, 0);
             string errmsg;
             if( !us.connect(HostAndPort::me().toString(),errmsg) ) { 
-                sethbmsg("syncRollback connect to self failure" + errmsg);
+                sethbmsg("rollback connect to self failure" + errmsg);
                 return;
             }*/
 
-            sethbmsg("syncRollback 2 FindCommonPoint");
+            sethbmsg("rollback 2 FindCommonPoint");
             try {
                 syncRollbackFindCommonPoint(r.conn(), how);
             }
             catch( const char *p ) { 
-                sethbmsg(string("syncRollback 2 error ") + p);
+                sethbmsg(string("rollback 2 error ") + p);
                 sleepsecs(10);
                 return;
             }
@@ -618,13 +618,13 @@ namespace mongo {
                 return;
             }
             catch( DBException& e ) { 
-                sethbmsg(string("syncRollback 2 exception ") + e.toString() + "; sleeping 1 min");
+                sethbmsg(string("rollback 2 exception ") + e.toString() + "; sleeping 1 min");
                 sleepsecs(60);
                 throw;
             }
         }
 
-        sethbmsg("replSet syncRollback 3 fixup");
+        sethbmsg("replSet rollback 3 fixup");
 
         {
             incRBID();
