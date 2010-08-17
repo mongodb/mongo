@@ -83,11 +83,12 @@ static int formattedWrite( int fd , const char* format, ... ){
 }
 
 static void formattedBacktrace( int fd ){
+
+#if !defined(_WIN32) && !defined(NOEXECINFO)
+
     int numFrames;
     const int MAX_DEPTH = 20;
     void* stackFrame[MAX_DEPTH];
-
-#if !defined(_WIN32) && !defined(NOEXECINFO)
 
     numFrames = backtrace( stackFrame , 20 );
     for (int i = 0; i < numFrames; i++ ){
