@@ -192,8 +192,6 @@ namespace mongo {
     static void syncRollbackFindCommonPoint(DBClientConnection *them, HowToFixUp& h) { 
         static time_t last;
         if( time(0)-last < 60 ) { 
-            // this could put a lot of load on someone else, don't repeat too often
-            sleepsecs(10);
             throw "findcommonpoint waiting a while before trying again";
         }
         last = time(0);
@@ -570,6 +568,12 @@ namespace mongo {
    }
 
     void ReplSetImpl::syncRollback(OplogReader&r) { 
+        unsigned s = _syncRollback(r);
+        if( s ) 
+            sleepsecs(s);
+    }
+
+    unsigned ReplSetImpl::_syncRollback(OplogReader&r) { 
         assert( !lockedByMe() );
         assert( !dbMutex.atLeastReadLocked() );
 
@@ -578,8 +582,7 @@ namespace mongo {
         writelocktry lk(rsoplog, 20000);
         if( !lk.got() ) {
             sethbmsg("rollback couldn't get write lock in a reasonable time");
-            sleepsecs(2);
-            return;
+            return 2;
         }
 
         if( box.getState().secondary() ) {
@@ -609,16 +612,15 @@ namespace mongo {
             }
             catch( const char *p ) { 
                 sethbmsg(string("rollback 2 error ") + p);
-                sleepsecs(10);
-                return;
+                return 10;
             }
             catch( rsfatal& ) { 
                 _fatal();
-                sleepsecs(2);
-                return;
+                return 2;
             }
             catch( DBException& e ) { 
                 sethbmsg(string("rollback 2 exception ") + e.toString() + "; sleeping 1 min");
+                dbtemprelease r;
                 sleepsecs(60);
                 throw;
             }
@@ -636,6 +638,8 @@ namespace mongo {
             }
             incRBID();
         }
+
+        return 0;
     }
 
 }

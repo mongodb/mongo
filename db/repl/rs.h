@@ -340,6 +340,7 @@ namespace mongo {
         void _syncThread();
         void syncTail();
         void syncApply(const BSONObj &o);
+        unsigned _syncRollback(OplogReader& r);
         void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);
     public:
