@@ -88,14 +88,15 @@ static void formattedBacktrace( int fd ){
 
     int numFrames;
     const int MAX_DEPTH = 20;
-    void* stackFrame[MAX_DEPTH];
+    void* stackFrames[MAX_DEPTH];
 
-    numFrames = backtrace( stackFrame , 20 );
-    for (int i = 0; i < numFrames; i++ ){
-        formattedWrite( fd , "Frame %d: %p\n" , i , stackFrame[i] );
+    numFrames = backtrace( stackFrames , 20 );
+    for ( int i = 0; i < numFrames; i++ ){
+        formattedWrite( fd , "%p " , stackFrames[i] );
     }
+    formattedWrite( fd , "\n" );
 
-    // TODO get the backtrace_symbols
+    backtrace_symbols_fd( stackFrames , numFrames , fd );
 
 #else
 
@@ -110,7 +111,7 @@ void printStackAndExit( int signalNum ){
 
     if ( fd >= 0 ){
         formattedWrite( fd , "Received signal %d\n" , signalNum );
-        formattedWrite( fd , "Backtrace:\n" );
+        formattedWrite( fd , "Backtrace: " );
         formattedBacktrace( fd );
         formattedWrite( fd , "===\n" );
     }
