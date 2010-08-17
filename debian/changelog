@@ -1,5 +1,11 @@
 mongodb (1.6.0) unstable; urgency=low
 
+  * replica_sets some fixes
+  * sharding some fixes with rs
+  * full change log http://jira.mongodb.org/browse/SERVER/fixforversion/10183
+
+mongodb (1.6.0) unstable; urgency=low
+
   * sharding stable
   * replica_sets stable
 
