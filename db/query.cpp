@@ -657,7 +657,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
 
             if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
-                ss << " command ";
+                ss << " command: " << jsobj;
                 curop.markCommand();
                 n = 1;
                 qr.reset( (QueryResult *) bb.buf() );
