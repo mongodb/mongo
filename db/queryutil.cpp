@@ -944,6 +944,8 @@ namespace mongo {
         return ( l % 2 == 0 ); // if we're inside an interval        
     }
     
+    // binary search for interval containing the specified element
+    // an even return value indicates that the element is contained within a valid interval
     int FieldRangeVector::matchingLowElement( const BSONElement &e, int i, bool forward ) const {
         int l = -1;
         int h = _ranges[ i ].intervals().size() * 2;
@@ -1007,9 +1009,13 @@ namespace mongo {
     int FieldRangeVector::Iterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );
         BSONObjIterator o( _v._keyPattern );
+        // track first field for which we are not at the end of the valid values,
+        // since we may need to advance from the key prefix ending with this field
         int latestNonEndpoint = -1;
+        // iterate over fields to determine appropriate advance method
         for( int i = 0; i < (int)_i.size(); ++i ) {
             if ( i > 0 && !_v._ranges[ i - 1 ].intervals()[ _i[ i - 1 ] ].equality() ) {
+                // if last bound was inequality, we don't know anything about where we are for this field
                 // TODO if possible avoid this certain cases when field in prev key is the same
                 setMinus( i );
             }
@@ -1017,9 +1023,9 @@ namespace mongo {
             BSONElement oo = o.next();
             bool reverse = ( ( oo.number() < 0 ) ^ ( _v._direction < 0 ) );
             BSONElement jj = j.next();
-            if ( _i[ i ] == -1 ) {
+            if ( _i[ i ] == -1 ) { // unknown position for this field, do binary search
                 int l = _v.matchingLowElement( jj, i, !reverse );
-                if ( l % 2 == 0 ) {
+                if ( l % 2 == 0 ) { // we are in a valid range for this field
                     _i[ i ] = l / 2;
                     int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
                     if ( diff > 1 ) {
@@ -1031,7 +1037,8 @@ namespace mongo {
                         }
                     }
                     continue;
-                } else {
+                } else { // not in a valid range for this field - determine if and how to advance
+                    // check if we're after the last interval for this field
                     if ( l == (int)_v._ranges[ i ].intervals().size() * 2 - 1 ) {
                         if ( latestNonEndpoint == -1 ) {
                             return -2;
@@ -1053,7 +1060,11 @@ namespace mongo {
                 }
             }
             bool first = true;
+            // _i[ i ] != -1, so we have a starting interval for this field
+            // which serves as a lower/equal bound on the first iteration -
+            // we advance from this interval to find a matching interval
             while( _i[ i ] < (int)_v._ranges[ i ].intervals().size() ) {
+                // compare to current interval's upper bound
                 int x = _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._bound.woCompare( jj, false );
                 if ( reverse ) {
                     x = -x;
@@ -1062,16 +1073,22 @@ namespace mongo {
                     eq = true;
                     break;
                 }
+                // see if we're less than the upper bound
                 if ( x > 0 ) {
                     if ( i == 0 && first ) {
-                        break; // the value of 1st field won't go backward
+                        // the value of 1st field won't go backward, so don't check lower bound
+                        // TODO maybe we can check first only?
+                        break;
                     }
+                    // if it's an equality interval, don't need to compare separately to lower bound
                     if ( !_v._ranges[ i ].intervals()[ _i[ i ] ].equality() ) {
+                        // compare to current interval's lower bound
                         x = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound.woCompare( jj, false );
                         if ( reverse ) {
                             x = -x;
                         }
                     }
+                    // if we're less than the lower bound, advance
                     if ( x > 0 ) {
                         setZero( i + 1 );
                         // skip to curr / i / nextbounds
@@ -1084,17 +1101,20 @@ namespace mongo {
                         break;
                     }
                 }
+                // we're above the upper bound, so try next interval and reset remaining fields
                 ++_i[ i ];
                 setZero( i + 1 );
                 first = false;
             }
             int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
             if ( diff > 1 || ( !eq && diff == 1 ) ) {
+                 // check if we're not at the end of valid values for this field
                 latestNonEndpoint = i;
-            } else if ( diff == 0 ) {
+            } else if ( diff == 0 ) { // check if we're past the last interval for this field
                 if ( latestNonEndpoint == -1 ) {
                     return -2;
                 }
+                // more values possible, skip...
                 setZero( latestNonEndpoint + 1 );
                 // skip to curr / latestNonEndpoint + 1 / superlative
                 for( int j = latestNonEndpoint + 1; j < (int)_i.size(); ++j ) {
