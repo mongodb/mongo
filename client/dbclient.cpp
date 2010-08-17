@@ -580,7 +580,7 @@ namespace mongo {
             queryOptions |= (int)QueryOption_Exhaust;            
         }
         auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
-        massert( 13386, "socket error for mapping query", c.get() );
+        uassert( 13386, "socket error for mapping query", c.get() );
         
         if ( !doExhaust ) {
             while( c->more() ) {
