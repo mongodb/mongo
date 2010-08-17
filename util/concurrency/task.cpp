@@ -139,9 +139,14 @@ namespace mongo {
                         }
                     }
                 } catch(std::exception& e) { 
-                    log() << "Server::doWork() exception " << e.what() << endl;
-                } catch(...) {
-                    log() << "Server::doWork() unknown exception!" << endl;
+  				    log() << "Server::doWork task:" << name() << " exception:" << e.what() << endl;
+                } 
+				catch(const char *p) {
+				    log() << "Server::doWork task:" << name() << " unknown c exception:" << 
+                      ((p&&strlen(p)<800)?p:"?") << endl;
+				}
+				catch(...) {
+				    log() << "Server::doWork unknown exception task:" << name() << endl;
                 }
             }
         }
