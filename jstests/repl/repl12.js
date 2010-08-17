@@ -2,7 +2,7 @@
 // check for initial sync of multiple db's
 
 function debug( x ) {
-//    printjson( x );
+    print( "DEBUG:" + tojson( x ) );
 }
 
 rt = new ReplTest( "repl12tests" );
