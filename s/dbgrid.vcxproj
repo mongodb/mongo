@@ -193,6 +193,7 @@
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\miniwebserver.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
+    <ClCompile Include="..\util\signal_handlers.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
@@ -517,6 +518,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\util\processinfo.h" />
+    <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\version.h" />
     <ClInclude Include="balancer_policy.h" />
     <ClInclude Include="grid.h" />

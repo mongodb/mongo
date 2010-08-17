@@ -120,11 +120,15 @@ namespace mongo {
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
 
+#if defined(SIGQUIT)
         signal( SIGQUIT , printStackAndExit );
+#endif
         signal( SIGSEGV , printStackAndExit );
         signal( SIGABRT , printStackAndExit );
         signal( SIGFPE , printStackAndExit );
+#if defined(SIGBUS)
         signal( SIGBUS , printStackAndExit );
+#endif
     }
 
     void init(){
