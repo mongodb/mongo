@@ -2,15 +2,18 @@
 // check for initial sync of multiple db's
 
 function debug( x ) {
-//    printjson( x );
+    print( "DEBUG:" + tojson( x ) );
 }
 
 rt = new ReplTest( "repl12tests" );
 
 m = rt.start( true );
 
+usedDBs = []
+
 a = "a"
 for( i = 0; i < 3; ++i ) {
+    usedDBs.push( a )
     m.getDB( a ).c.save( {} );
     a += "a";
 }
@@ -25,6 +28,20 @@ sleep(z);
 
 s = rt.start(false);
 
-assert.soon( function() { var c = s.getDBNames().length; debug( "count: " + c ); return c == 3; } );
+function countHave(){
+    var have = 0;
+    for ( var i=0; i<usedDBs.length; i++ ){
+        if ( s.getDB( usedDBs[i] ).c.findOne() )
+            have++;
+    }
+    return have;
+}
+
+assert.soon( 
+    function() { 
+        var c = countHave();
+        debug( "count: " + c ); 
+        return c == 3; } 
+);
 
 //printjson(s.getDBNames());
