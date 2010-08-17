@@ -21,7 +21,10 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+
+#if !defined(_WIN32)  // TODO: windows support
 #include <unistd.h>
+#endif
 
 #if !defined(_WIN32) && !defined(NOEXECINFO)
 #include <execinfo.h>
@@ -41,6 +44,8 @@ namespace mongo {
  */
 
 static int rawWrite( int fd , char* c , int size ){
+#if !defined(_WIN32)
+
     int toWrite = size;
     int writePos = 0;
     int wrote;
@@ -51,6 +56,12 @@ static int rawWrite( int fd , char* c , int size ){
         writePos += wrote;        
     }
     return writePos;
+
+#else
+
+    return -1;
+
+#endif
 }
 
 static int formattedWrite( int fd , const char* format, ... ){
@@ -95,14 +106,13 @@ static void formattedBacktrace( int fd ){
 
 void printStackAndExit( int signalNum ){
     int fd = Logstream::getLogDesc();
-    if ( fd < 0 ){
-        fd = STDOUT_FILENO;
-    }
 
-    formattedWrite( fd , "Received signal %d\n" , signalNum );
-    formattedWrite( fd , "Backtrace:\n" );
-    formattedBacktrace( fd );
-    formattedWrite( fd , "===\n" );
+    if ( fd >= 0 ){
+        formattedWrite( fd , "Received signal %d\n" , signalNum );
+        formattedWrite( fd , "Backtrace:\n" );
+        formattedBacktrace( fd );
+        formattedWrite( fd , "===\n" );
+    }
 
     ::exit( EXIT_ABRUPT );
 }
