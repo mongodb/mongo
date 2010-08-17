@@ -21,8 +21,11 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
-#include <execinfo.h>
 #include <unistd.h>
+
+#if !defined(_WIN32) && !defined(NOEXECINFO)
+#include <execinfo.h>
+#endif
 
 #include "log.h"
 #include "signal_handlers.h"
@@ -101,7 +104,7 @@ void printStackAndExit( int signalNum ){
     formattedBacktrace( fd );
     formattedWrite( fd , "===\n" );
 
-    ::exit( EXIT_ABRUBT );
+    ::exit( EXIT_ABRUPT );
 }
 
 } // namespace mongo
