@@ -168,9 +168,7 @@ namespace mongo {
     }
     
     LastError * LastErrorHolder::startRequest( Message& m , int clientId ) {
-
-        if ( clientId == 0 )
-            clientId = m.header()->id & 0xFFFF0000;
+        assert( clientId );
         setID( clientId );
 
         LastError * le = _get( true );
@@ -179,11 +177,7 @@ namespace mongo {
     }
 
     void LastErrorHolder::startRequest( Message& m , LastError * connectionOwned ) {
-        if ( !connectionOwned->overridenById ) {
-            prepareErrForNewRequest( m, connectionOwned );
-            return;
-        }
-        startRequest(m);
+        prepareErrForNewRequest( m, connectionOwned );
     }
 
     void LastErrorHolder::disconnect( int clientId ){
