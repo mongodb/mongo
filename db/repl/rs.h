@@ -64,7 +64,13 @@ namespace mongo {
         ReplSetImpl *rs;
         bool busyWithElectSelf;
         int _primary;
-        const Member* findOtherPrimary();
+
+        /** @param two - if true two primaries were seen.  this can happen transiently, in addition to our 
+                         polling being only occasional.  in this case null is returned, but the caller should 
+                         not assume primary itself in that situation.
+        */
+        const Member* findOtherPrimary(bool& two);
+
         void noteARemoteIsPrimary(const Member *);
         virtual void starting();
     public:

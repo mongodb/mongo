@@ -29,12 +29,17 @@ namespace mongo {
     };
 
     /* check members OTHER THAN US to see if they think they are primary */
-    const Member * Manager::findOtherPrimary() { 
+    const Member * Manager::findOtherPrimary(bool& two) { 
+        two = false;
         Member *m = rs->head();
         Member *p = 0;
         while( m ) {
+            DEV assert( m != rs->_self );
             if( m->state().primary() && m->hbinfo().up() ) {
-                if( p ) throw "twomasters"; // our polling is asynchronous, so this is often ok.
+                if( p ) { 
+                    two = true;
+                    return 0;
+                }
                 p = m;
             }
             m = m->next();
@@ -91,11 +96,14 @@ namespace mongo {
             }
 
             const Member *p2;
-            try { p2 = findOtherPrimary(); }
-            catch(string s) { 
-                /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
-                log() << "replSet warning DIAG 2 primary" << s << rsLog;
-                return;
+            {
+                bool two;
+                p2 = findOtherPrimary(two);
+                if( two ) {
+                    /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
+                    log() << "replSet warning DIAG two primaries (transiently)" << rsLog;
+                    return;
+                }
             }
 
             if( p2 ) {
