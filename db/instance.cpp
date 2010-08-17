@@ -332,9 +332,10 @@ namespace mongo {
                     }
                 }
                 catch ( AssertionException& e ) {
-                    tlog() << " Caught Assertion in " << opToString(op) << " , continuing" << endl;
+                    static int n;
+                    tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing" << endl;
                     ss << " exception " + e.toString();
-                    log = true;
+                    log = ++n < 10;
                 }
             }
         }
