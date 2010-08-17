@@ -33,6 +33,7 @@ namespace mongo {
 
 #if 0
 # define GEODEBUG(x) cout << x << endl;
+# define GEODEBUGPRINT(x) PRINT(x)
     inline void PREFIXDEBUG(GeoHash prefix, const GeoConvert* g){
         if (!prefix.constrains()) {
             cout << "\t empty prefix" << endl;
@@ -52,6 +53,7 @@ namespace mongo {
     }
 #else
 # define GEODEBUG(x) 
+# define GEODEBUGPRINT(x) 
 # define PREFIXDEBUG(x, y) 
 #endif
 
@@ -599,6 +601,22 @@ namespace mongo {
                     assert( dist > 2469 && dist < 2470 );
                 }
 
+                {
+                    Point BNA (-86.67, 36.12);
+                    Point LAX (-118.40, 33.94);
+                    Point JFK (-73.77694444, 40.63861111 );
+                    assert( spheredist_deg(BNA, BNA) < 1e-6);
+                    assert( spheredist_deg(LAX, LAX) < 1e-6);
+                    assert( spheredist_deg(JFK, JFK) < 1e-6);
+
+                    Point zero (0, 0);
+                    Point antizero (0,-180);
+
+                    // these were known to cause NaN
+                    assert( spheredist_deg(zero, zero) < 1e-6);
+                    assert( fabs(M_PI-spheredist_deg(zero, antizero)) < 1e-6);
+                    assert( fabs(M_PI-spheredist_deg(antizero, zero)) < 1e-6);
+                }
             }
         }
     } geoUnitTest;
@@ -1148,8 +1166,12 @@ namespace mongo {
                 uassert(13439, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < (M_PI*1.05));
 
                 _type = GEO_SPHERE;
-                _xScanDistance = rad2deg(_maxDistance);
-                _yScanDistance = rad2deg(_maxDistance) / cos(_startPt._y * (M_PI/180));
+                _xScanDistance = rad2deg(_maxDistance) / cos(_startPt._y * (M_PI/180));
+                _yScanDistance = rad2deg(_maxDistance);
+
+                GEODEBUGPRINT(_maxDistance);
+                GEODEBUGPRINT(_xScanDistance);
+                GEODEBUGPRINT(_yScanDistance);
             } else {
                 uassert(13438, "invalid $center query type: " + type, false);
             }
@@ -1273,7 +1295,7 @@ namespace mongo {
                     d = _g->distance( _start , h );
                     break;
                 case GEO_SPHERE:
-                    d = _g->distance( _start , h );
+                    d = spheredist_deg(_startPt, Point(_g, h));
                     break;
             }
             

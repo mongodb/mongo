@@ -415,6 +415,12 @@ namespace mongo {
             (cos_y1*cos_x1 * cos_y2*cos_x2) +
             (cos_y1*sin_x1 * cos_y2*sin_x2) +
             (sin_y1        * sin_y2);
+        
+        if (cross_prod >= 1 || cross_prod <= -1){
+            // fun with floats
+            assert( fabs(cross_prod)-1 < 1e-6 );
+            return cross_prod > 0 ? 0 : M_PI;
+        }
 
         return acos(cross_prod);
     }
