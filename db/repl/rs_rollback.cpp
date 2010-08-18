@@ -253,7 +253,7 @@ namespace mongo {
                     log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
                     log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
                     log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
-                    throw "reached beginning of remote oplog [2]";
+                    throw "RS100 reached beginning of remote oplog [2]";
                 }
                 theirObj = t->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
@@ -264,7 +264,7 @@ namespace mongo {
                     log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
                     log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
                     log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
-                    throw "reached beginning of local oplog [1]";
+                    throw "RS101 reached beginning of local oplog [1]";
                 }
                 ourObj = u.current();
                 ourTime = ourObj["ts"]._opTime();
@@ -275,7 +275,7 @@ namespace mongo {
                     log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
                     log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
                     log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
-                    throw "reached beginning of remote oplog [1]";
+                    throw "RS100 reached beginning of remote oplog [1]";
                 }
                 theirObj = t->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
@@ -289,7 +289,7 @@ namespace mongo {
                     log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
                     log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
                     log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
-                    throw "reached beginning of local oplog [2]";
+                    throw "RS101 reached beginning of local oplog [2]";
                 }
                 ourObj = u.current();
                 ourTime = ourObj["ts"]._opTime();

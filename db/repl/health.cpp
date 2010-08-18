@@ -90,6 +90,8 @@ namespace mongo {
         s << td(config().votes);
         { 
             string stateText = state().toString();
+            if( _config.hidden )
+                stateText += " (hidden)";
             if( ok || stateText.empty() ) 
                 s << td(stateText); // text blank if we've never connected
             else
@@ -105,7 +107,7 @@ namespace mongo {
             s << td("");
         s << _tr();
     }
-    
+   
     string ReplSetImpl::stateAsHtml(MemberState s) { 
         if( s.s == MemberState::RS_STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
         if( s.s == MemberState::RS_PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
@@ -304,7 +306,7 @@ namespace mongo {
                 td(ago(started)) << 
 	        td("") << // last heartbeat
                 td(ToString(_self->config().votes)) << 
-                td(stateAsHtml(box.getState()));
+                td( stateAsHtml(box.getState()) + (_self->config().hidden?" (hidden)":"") );
             s << td( _hbmsg );
             stringstream q;
             q << "/_replSetOplog?" << _self->id();
