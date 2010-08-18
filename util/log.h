@@ -380,7 +380,7 @@ namespace mongo {
                 fflush(logfile);
             }else{
                 int x = errno;
-                cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
+                cout << "Failed to write to logfile: " << errnoWithDescription(x) << endl;
             }
         }
         else {
