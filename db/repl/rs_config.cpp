@@ -81,7 +81,7 @@ namespace mongo {
         if( votes != 1 ) b << "votes" << votes;
         if( priority != 1.0 ) b << "priority" << priority;
         if( arbiterOnly ) b << "arbiterOnly" << true;
-        if( slaveDelay ) b << "arbiterOnly" << slaveDelay;
+        if( slaveDelay ) b << "slaveDelay" << slaveDelay;
         if( hidden ) b << "hidden" << hidden;
         return b.obj();
     }
