@@ -27,7 +27,7 @@ function wait(f) {
     w++;
     var n = 0;
     while (!f()) {
-        if( n % 4 == 0 )
+        if (n % 4 == 0)
             print("waiting " + w);
         if (++n == 4) {
             print("" + f);
