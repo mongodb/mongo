@@ -233,16 +233,6 @@ namespace mongo {
             return append( fieldName , d );
         }
 
-        BSONObjBuilder& appendNumber( const StringData& fieldName , unsigned n ){
-            static unsigned maxInt = (unsigned)pow( 2.0 , 30.0 );
-
-            if ( n < maxInt )
-                append( fieldName , (int)n );
-            else
-                append( fieldName , (long long)n );
-            return *this;
-        }
-
         BSONObjBuilder& appendNumber( const StringData& fieldName , size_t n ){
             static size_t maxInt = (size_t)pow( 2.0 , 30.0 );
 
