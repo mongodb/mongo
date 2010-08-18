@@ -95,7 +95,13 @@ namespace mongo {
 
     JSBool internal_cursor_hasNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
         DBClientCursor *cursor = getCursor( cx, obj );
-        *rval = cursor->more() ? JSVAL_TRUE : JSVAL_FALSE;
+        try {
+            *rval = cursor->more() ? JSVAL_TRUE : JSVAL_FALSE;
+        }
+        catch ( std::exception& e ){
+            JS_ReportError( cx , e.what() );
+            return JS_FALSE;
+        }
         return JS_TRUE;
     }
 
@@ -108,13 +114,23 @@ namespace mongo {
 
     JSBool internal_cursor_next(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
         DBClientCursor *cursor = getCursor( cx, obj );
-        if ( ! cursor->more() ){
-            JS_ReportError( cx , "cursor at the end" );
+
+        BSONObj n;        
+        
+        try {
+            if ( ! cursor->more() ){
+                JS_ReportError( cx , "cursor at the end" );
+                return JS_FALSE;
+            }
+
+            n = cursor->next();
+        }
+        catch ( std::exception& e ){
+            JS_ReportError( cx , e.what() );
             return JS_FALSE;
         }
-        Convertor c(cx);
 
-        BSONObj n = cursor->next();
+        Convertor c(cx);
         *rval = c.toval( &n );
         return JS_TRUE;
     }
