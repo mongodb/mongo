@@ -119,7 +119,7 @@ namespace mongo {
         uassert(13419, "this version of mongod only supports priorities 0 and 1", priority == 0 || priority == 1);
         uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
-        uassert(13437, "priority must be 0 when hidden=true", priority == 0 || !hidden);
+        uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
     }
 
     /** @param o old config
