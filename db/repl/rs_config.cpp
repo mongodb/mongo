@@ -81,6 +81,7 @@ namespace mongo {
         if( votes != 1 ) b << "votes" << votes;
         if( priority != 1.0 ) b << "priority" << priority;
         if( arbiterOnly ) b << "arbiterOnly" << true;
+        if( slaveDelay ) b << "arbiterOnly" << slaveDelay;
         return b.obj();
     }
 
@@ -115,6 +116,8 @@ namespace mongo {
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes >= 0 && votes <= 100);
         uassert(13419, "this version of mongod only supports priorities 0 and 1", priority == 0 || priority == 1);
+        uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
+        uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
     }
 
     /** @param o old config
@@ -243,6 +246,7 @@ namespace mongo {
                 if( m.h.isLocalHost() ) 
                     localhosts++;
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");
+                m.slaveDelay = mobj["slaveDelay"].numberInt();
                 if( mobj.hasElement("priority") )
                     m.priority = mobj["priority"].Number();
                 if( mobj.hasElement("votes") )
