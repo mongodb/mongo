@@ -511,7 +511,7 @@ private:
         }
     }
 
-    /** Retrieve int value for the element safely.  Zero returned if not a number. */
+    /** Retrieve int value for the element safely.  Zero returned if not a number. Converted to int if another numeric type. */
     inline int BSONElement::numberInt() const { 
         switch( type() ) {
         case NumberDouble:
