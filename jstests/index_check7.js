@@ -11,5 +11,5 @@ assert.eq( 1 , t.find( { x : 27 } ).explain().nscanned , "A" )
 t.ensureIndex( { x : -1 } )
 assert.eq( 1 , t.find( { x : 27 } ).explain().nscanned , "B" )
 
-assert.eq( 41 , t.find( { x : { $gt : 59 } } ).explain().nscanned , "C" );
+assert.eq( 40 , t.find( { x : { $gt : 59 } } ).explain().nscanned , "C" );
 

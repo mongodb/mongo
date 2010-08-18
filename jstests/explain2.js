@@ -16,12 +16,12 @@ function go( q , c , b , o ){
 }
 
 q = { a : { $gt : 3 } }
-go( q , 6 , 7 , 6 );
+go( q , 6 , 6 , 6 );
 
 q.b = 5
-go( q , 1 , 2 , 1 );
+go( q , 1 , 6 , 1 );
 
 delete q.b
 q.c = 5
-go( q , 1 , 7 , 6 );
+go( q , 1 , 6 , 6 );
 

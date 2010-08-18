@@ -235,7 +235,8 @@ namespace mongo {
         /* advance one key position in the index: */
         DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
         
-        void advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd, const Ordering &order, int direction );
+        void advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction );
+        void customLocate(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, pair< DiskLoc, int > &bestParent );
         
         DiskLoc getHead(const DiskLoc& thisLoc);
 
@@ -259,9 +260,9 @@ namespace mongo {
                     const BSONObj& key, const Ordering &order, bool dupsAllowed,
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
         bool find(const IndexDetails& idx, const BSONObj& key, DiskLoc recordLoc, const Ordering &order, int& pos, bool assertIfDup);
-        bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent );
+        bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent );
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
-        static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, const vector< const BSONElement * > &rEnd, const Ordering &o );
+        static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, bool rSup, const vector< const BSONElement * > &rEnd, const vector< bool > &rEndInclusive, const Ordering &o, int direction );
     public:
         // simply builds and returns a dup key error message string
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );
@@ -384,7 +385,8 @@ namespace mongo {
         // set initial bucket
         void init();
 
-        void advanceTo( const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd);
+        // if afterKey is true, we want the first key with values of the keyBegin fields greater than keyBegin
+        void advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive );
         
         friend class BtreeBucket;
         set<DiskLoc> dups;

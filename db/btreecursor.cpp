@@ -64,10 +64,12 @@ namespace mongo {
         massert( 13384, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
         audit();
         startKey = bounds_->startKey();
-        bool found;
         _boundsIterator->advance( startKey ); // handles initialization
-        bucket = indexDetails.head.btree()->
-        locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
+        _boundsIterator->prepDive();
+        pair< DiskLoc, int > noBestParent;
+        bucket = indexDetails.head;
+        keyOfs = 0;
+        indexDetails.head.btree()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, direction, noBestParent );
         skipAndCheck();
         DEV assert( dups.size() == 0 );
     }
@@ -128,7 +130,7 @@ namespace mongo {
             return false;
         }
         ++_nscanned;
-        advanceTo( currKeyNode().key, ret, _boundsIterator->cmp() );
+        advanceTo( currKeyNode().key, ret, _boundsIterator->after(), _boundsIterator->cmp(), _boundsIterator->inc() );
         return true;
     }
     
@@ -174,8 +176,8 @@ namespace mongo {
         }
     }
     
-    void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd) {
-        bucket.btree()->advanceTo( indexDetails, bucket, keyOfs, keyBegin, keyBeginLen, keyEnd, _ordering, direction );
+    void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive) {
+        bucket.btree()->advanceTo( bucket, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, _ordering, direction );
     }
     
     bool BtreeCursor::advance() {
