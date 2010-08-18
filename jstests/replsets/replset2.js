@@ -45,7 +45,7 @@ doTest = function (signal) {
     }
 
     // Test getlasterror with multiple inserts
-    // TEST FAILS HERE
+    // TEST FAILS HEREg
     print("\n\nreplset2.js **** Try inserting a multiple records -- first insert ****")
 
     printjson(master.getDB("admin").runCommand("replSetGetStatus"));

@@ -79,6 +79,8 @@ namespace mongo {
         void flush( bool sync );
         
     private:
+        void badOfs(int) const;
+
         int defaultSize( const char *filename ) const;
 
         Extent* getExtent(DiskLoc loc);
@@ -341,7 +343,7 @@ namespace mongo {
 
     inline Record* MongoDataFile::recordAt(DiskLoc dl) {
         int ofs = dl.getOfs();
-        assert( ofs >= DataFileHeader::HeaderSize );
+        if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
         return (Record*) _p.at(ofs, -1);
     }
 
