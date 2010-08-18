@@ -98,7 +98,7 @@ namespace mongo {
             result.append("set", theReplSet->name());
             result.append("state", theReplSet->state().s);
             result.append("hbmsg", theReplSet->hbmsg());
-            result.append("time", (int) time(0));
+            result.append("time", (long long) time(0));
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             int v = theReplSet->config().version;
             result.append("v", v);
