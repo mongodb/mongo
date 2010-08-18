@@ -400,7 +400,7 @@ namespace mongo {
         }
         
         if ( value->IsFunction() ){
-            b.appendCode( sname , toSTLString( value ).c_str() );
+            b.appendCode( sname , toSTLString( value ) );
             return;
         }
     
@@ -453,7 +453,7 @@ namespace mongo {
                 s = s.substr( 1 );
                 string r = s.substr( 0 , s.rfind( "/" ) );
                 string o = s.substr( s.rfind( "/" ) + 1 );
-                b.appendRegex( sname , r.c_str() , o.c_str() );
+                b.appendRegex( sname , r , o );
             }
             else if ( value->ToObject()->GetPrototype()->IsObject() &&
                       value->ToObject()->GetPrototype()->ToObject()->HasRealNamedProperty( v8::String::New( "isObjectId" ) ) ){
@@ -481,7 +481,7 @@ namespace mongo {
                 OID oid;
                 oid.init( toSTLString( value->ToObject()->Get( v8::String::New( "id" ) ) ) );
                 string ns = toSTLString( value->ToObject()->Get( v8::String::New( "ns" ) ) );
-                b.appendDBRef( sname, ns.c_str(), oid );                
+                b.appendDBRef( sname, ns, oid );                
             }
             else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__BinData" ) ).IsEmpty() ) {
                 int len = obj->Get( v8::String::New( "len" ) )->ToInt32()->Value();

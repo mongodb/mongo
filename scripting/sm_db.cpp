@@ -1039,7 +1039,7 @@ namespace mongo {
         }
         
         if ( JS_InstanceOf( c->_context , o , &dbpointer_class , 0 ) ){
-            b.appendDBRef( name , c->getString( o , "ns" ).c_str() , c->toOID( c->getProperty( o , "id" ) ) );
+            b.appendDBRef( name , c->getString( o , "ns" ) , c->toOID( c->getProperty( o , "id" ) ) );
             return true;
         }
         

@@ -676,7 +676,7 @@ namespace mongo {
                 BSONObjBuilder b( size );
                 int n=0;
                 for ( set<BSONObj,BSONObjCmp>::iterator i = all.begin() ; i != all.end(); i++ ){
-                    b.appendAs( i->firstElement() , b.numStr( n++ ).c_str() );
+                    b.appendAs( i->firstElement() , b.numStr( n++ ) );
                 }
                 
                 result.appendArray( "values" , b.obj() );
