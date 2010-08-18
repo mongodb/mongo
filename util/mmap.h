@@ -168,7 +168,9 @@ namespace mongo {
         long length() {
             return len;
         }
-        
+
+        string filename() const { return _filename; }
+
     private:
         static void updateLength( const char *filename, long &length );
         
