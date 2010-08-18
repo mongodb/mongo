@@ -376,7 +376,13 @@ namespace mongo {
                 globalFlushCounters.append( bb );
                 bb.done();
             }
-
+            
+            {
+                BSONObjBuilder bb( result.subobjStart( "cursros" ) );
+                ClientCursor::appendStats( bb );
+                bb.done();
+            }
+            
             timeBuilder.appendNumber( "after counters" , Listener::getElapsedTimeMillis() - start );            
 
             if ( anyReplEnabled() ){

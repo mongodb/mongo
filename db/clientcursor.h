@@ -65,10 +65,11 @@ namespace mongo {
 
         static CCById clientCursorsById;
         static CCByLoc byLoc;
+        static long long numberTimedOut;
         static boost::recursive_mutex ccmutex;   // must use this for all statics above!
         
         static CursorId allocCursorId_inlock();
-
+        
 
         
     public:
@@ -308,10 +309,7 @@ namespace mongo {
         /**
          * @param millis amount of idle passed time since last call
          */
-        bool shouldTimeout( unsigned millis ){
-            _idleAgeMillis += millis;
-            return _idleAgeMillis > 600000 && _pinValue == 0;
-        }
+        bool shouldTimeout( unsigned millis );
 
         void storeOpForSlave( DiskLoc last );
         void updateSlaveLocation( CurOp& curop );
@@ -331,6 +329,8 @@ public:
         void setDoingDeletes( bool doingDeletes ){
             _doingDeletes = doingDeletes;
         }
+        
+        static void appendStats( BSONObjBuilder& result );
 
         static unsigned byLocSize();        // just for diagnostics
 
