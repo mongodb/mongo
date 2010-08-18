@@ -286,14 +286,14 @@ namespace mongo {
                         if( sleeptime > 0 ) {
                             uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
                             log() << "replSet temp slavedelay sleep:" << sleeptime << rsLog;
-                            if( sleeptime < 120 ) {
+                            if( sleeptime < 60 ) {
                                 sleepsecs((int) sleeptime);
                             }
                             else {
                                 // sleep(hours) would prevent reconfigs from taking effect & such!
                                 long long waitUntil = b + sleeptime;
                                 while( 1 ) {
-                                    sleepsecs(10);
+                                    sleepsecs(6);
                                     if( time(0) >= waitUntil )
                                         break;
                                     if( box.getPrimary() != primary )
