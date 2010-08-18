@@ -139,25 +139,25 @@ assert.eq( 0 , doCounts( "after dropDatabase called" ) )
 
 s.adminCommand( { enablesharding : "test2" } );
 s.adminCommand( { shardcollection : "test2.foo" , key : { num : 1 } } );
-a = s.getDB( "test2" ).foo;
-b = s2.getDB( "test2" ).foo;
-a.save( { num : 1 } );
-a.save( { num : 2 } );
-a.save( { num : 3 } );
-
+dba = s.getDB( "test2" );
+dbb = s2.getDB( "test2" );
+dba.foo.save( { num : 1 } );
+dba.foo.save( { num : 2 } );
+dba.foo.save( { num : 3 } );
+dba.getLastError();
 
 assert.eq( 1 , s.onNumShards( "foo" , "test2" ) , "B on 1 shards" );
-assert.eq( 3 , a.count() , "Ba" );
-assert.eq( 3 , b.count() , "Bb" );
+assert.eq( 3 , dba.foo.count() , "Ba" );
+assert.eq( 3 , dbb.foo.count() , "Bb" );
 
 s.adminCommand( { split : "test2.foo" , middle : { num : 2 } } );
 s.adminCommand( { movechunk : "test2.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test2" ) ).name } );
 
 assert.eq( 2 , s.onNumShards( "foo" , "test2" ) , "B on 2 shards" );
 
-x = a.stats()
+x = dba.foo.stats()
 printjson( x )
-y = b.stats()
+y = dbb.foo.stats()
 printjson( y )
 
 
