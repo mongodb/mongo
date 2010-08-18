@@ -165,16 +165,7 @@ void killOps() {
     if ( atPrompt )
         return;
 
-    if ( !autoKillOp ) {
-        cout << endl << "do you want to kill the current op on the server? (y/n): ";
-        cout.flush();
-
-        char yn;
-        cin >> yn;
-
-        if (yn != 'y' && yn != 'Y')
-            return;
-    }
+    sleepmillis(10); // give current op a chance to finish
 
     for( map< string, set<string> >::const_iterator i = shellUtils::_allMyUris.begin(); i != shellUtils::_allMyUris.end(); ++i ){
         string errmsg;
@@ -188,6 +179,17 @@ void killOps() {
         BSONObj inprog =  conn->findOne("admin.$cmd.sys.inprog", Query())["inprog"].embeddedObject().getOwned();
         BSONForEach(op, inprog){
             if ( uris.count(op["client"].String()) ) {
+                ONCE if ( !autoKillOp ) {
+                    cout << endl << "do you want to kill the current op(s) on the server? (y/n): ";
+                    cout.flush();
+
+                    char yn;
+                    cin >> yn;
+
+                    if (yn != 'y' && yn != 'Y')
+                        return;
+                }
+
                 conn->findOne("admin.$cmd.sys.killop", QUERY("op"<< op["opid"]));
             }
         }
