@@ -60,7 +60,7 @@ namespace mongo {
         const FieldRange &operator&=( const FieldRange &other );
         const FieldRange &operator|=( const FieldRange &other );
         // does not remove fully contained ranges (eg [1,3] - [2,2] doesn't remove anything)
-        // in future we can change so that an or on $in:[3] combined with $in:{$gt:2} doesn't scan 3 a second time
+        // in future we can change so that an or on $in:[3] combined with $gt:2 doesn't scan 3 a second time
         const FieldRange &operator-=( const FieldRange &other );
         // true iff other includes this
         bool operator<=( const FieldRange &other );
@@ -381,17 +381,7 @@ namespace mongo {
         bool matches( const BSONObj &obj ) const;
         class Iterator {
         public:
-            Iterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), -1 ), _cmp( _v._ranges.size(), 0 ), _superlative( _v._ranges.size(), 0 ) {
-                static BSONObj minObj = minObject();
-                static BSONElement minElt = minObj.firstElement();
-                static BSONObj maxObj = maxObject();
-                static BSONElement maxElt = maxObj.firstElement();
-                BSONObjIterator i( _v._keyPattern );
-                for( int j = 0; j < (int)_superlative.size(); ++j ) {
-                    int number = (int) i.next().number();
-                    bool forward = ( ( number >= 0 ? 1 : -1 ) * ( _v._direction >= 0 ? 1 : -1 ) > 0 );
-                    _superlative[ j ] = forward ? &maxElt : &minElt;
-                }
+            Iterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), -1 ), _cmp( _v._ranges.size(), 0 ), _inc( _v._ranges.size(), false ), _after() {
             }
             static BSONObj minObject() {
                 BSONObjBuilder b;
@@ -424,6 +414,9 @@ namespace mongo {
             // >= 0 skip parameter
             int advance( const BSONObj &curr );
             const vector< const BSONElement * > &cmp() const { return _cmp; }
+            const vector< bool > &inc() const { return _inc; }
+            bool after() const { return _after; }
+            void prepDive();
             void setZero( int i ) {
                 for( int j = i; j < (int)_i.size(); ++j ) {
                     _i[ j ] = 0;
@@ -459,10 +452,11 @@ namespace mongo {
             const FieldRangeVector &_v;
             vector< int > _i;
             vector< const BSONElement* > _cmp;
-            vector< const BSONElement* > _superlative;
+            vector< bool > _inc;
+            bool _after;
         };
     private:
-        int matchingLowElement( const BSONElement &e, int i, bool direction ) const;
+        int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
         vector< FieldRange > _ranges;
         BSONObj _keyPattern;

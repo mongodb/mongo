@@ -940,22 +940,28 @@ namespace mongo {
     }
     
     bool FieldRangeVector::matchesElement( const BSONElement &e, int i, bool forward ) const {
-        int l = matchingLowElement( e, i, forward );
+        bool eq;
+        int l = matchingLowElement( e, i, forward, eq );
         return ( l % 2 == 0 ); // if we're inside an interval        
     }
     
     // binary search for interval containing the specified element
     // an even return value indicates that the element is contained within a valid interval
-    int FieldRangeVector::matchingLowElement( const BSONElement &e, int i, bool forward ) const {
+    int FieldRangeVector::matchingLowElement( const BSONElement &e, int i, bool forward, bool &lowEquality ) const {
+        lowEquality = false;
         int l = -1;
         int h = _ranges[ i ].intervals().size() * 2;
         while( l + 1 < h ) {
             int m = ( l + h ) / 2;
             BSONElement toCmp;
+            bool toCmpInclusive;
+            const FieldInterval &interval = _ranges[ i ].intervals()[ m / 2 ];
             if ( m % 2 == 0 ) {
-                toCmp = _ranges[ i ].intervals()[ m / 2 ]._lower._bound;
+                toCmp = interval._lower._bound;
+                toCmpInclusive = interval._lower._inclusive;
             } else {
-                toCmp = _ranges[ i ].intervals()[ m / 2 ]._upper._bound;
+                toCmp = interval._upper._bound;
+                toCmpInclusive = interval._upper._inclusive;
             }
             int cmp = toCmp.woCompare( e, false );
             if ( !forward ) {
@@ -966,7 +972,18 @@ namespace mongo {
             } else if ( cmp > 0 ) {
                 h = m;
             } else {
-                return ( m % 2 == 0 ) ? m : m - 1;
+                if ( m % 2 == 0 ) {
+                    lowEquality = true;
+                }
+                int ret = m;
+                // if left match and inclusive, all good
+                // if left match and not inclusive, return right before left bound
+                // if right match and inclusive, return left bound
+                // if right match and not inclusive, return right bound
+                if ( ( m % 2 == 0 && !toCmpInclusive ) || ( m % 2 == 1 && toCmpInclusive ) ) {
+                    --ret;
+                }
+                return ret;
             }
         }
         assert( l + 1 == h );
@@ -1016,7 +1033,8 @@ namespace mongo {
         for( int i = 0; i < (int)_i.size(); ++i ) {
             if ( i > 0 && !_v._ranges[ i - 1 ].intervals()[ _i[ i - 1 ] ].equality() ) {
                 // if last bound was inequality, we don't know anything about where we are for this field
-                // TODO if possible avoid this certain cases when field in prev key is the same
+                // TODO if possible avoid this certain cases when value in previous field of the previous
+                // key is the same as value of previous field in current key
                 setMinus( i );
             }
             bool eq = false;
@@ -1024,7 +1042,8 @@ namespace mongo {
             bool reverse = ( ( oo.number() < 0 ) ^ ( _v._direction < 0 ) );
             BSONElement jj = j.next();
             if ( _i[ i ] == -1 ) { // unknown position for this field, do binary search
-                int l = _v.matchingLowElement( jj, i, !reverse );
+                bool lowEquality;
+                int l = _v.matchingLowElement( jj, i, !reverse, lowEquality );
                 if ( l % 2 == 0 ) { // we are in a valid range for this field
                     _i[ i ] = l / 2;
                     int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
@@ -1045,17 +1064,23 @@ namespace mongo {
                         }
                         setZero( latestNonEndpoint + 1 );
                         // skip to curr / latestNonEndpoint + 1 / superlative
-                        for( int j = latestNonEndpoint + 1; j < (int)_i.size(); ++j ) {
-                            _cmp[ j ] = _superlative[ j ];
-                        }
+                        _after = true;
                         return latestNonEndpoint + 1;                        
                     }
                     _i[ i ] = ( l + 1 ) / 2;
+                    if ( lowEquality ) {
+                        // skip to curr / i + 1 / superlative
+                        _after = true;
+                        return i + 1;                        
+                    }
                     // skip to curr / i / nextbounds
                     _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound;
+                    _inc[ i ] = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._inclusive;
                     for( int j = i + 1; j < (int)_i.size(); ++j ) {
                         _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
+                        _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
                     }
+                    _after = false;
                     return i;                    
                 }
             }
@@ -1069,7 +1094,7 @@ namespace mongo {
                 if ( reverse ) {
                     x = -x;
                 }
-                if ( x == 0 ) {
+                if ( x == 0 && _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._inclusive ) {
                     eq = true;
                     break;
                 }
@@ -1088,14 +1113,24 @@ namespace mongo {
                             x = -x;
                         }
                     }
+                    // if we're equal to and not inclusive the lower bound, advance
+                    if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i[ i ] ]._lower._inclusive ) ) {
+                        setZero( i + 1 );
+                        // skip to curr / i + 1 / superlative
+                        _after = true;
+                        return i + 1;                        
+                    }
                     // if we're less than the lower bound, advance
                     if ( x > 0 ) {
                         setZero( i + 1 );
                         // skip to curr / i / nextbounds
                         _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound;
+                        _inc[ i ] = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._inclusive;
                         for( int j = i + 1; j < (int)_i.size(); ++j ) {
                             _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
+                            _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
                         }
+                        _after = false;
                         return i;
                     } else {
                         break;
@@ -1108,7 +1143,7 @@ namespace mongo {
             }
             int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
             if ( diff > 1 || ( !eq && diff == 1 ) ) {
-                 // check if we're not at the end of valid values for this field
+                // check if we're not at the end of valid values for this field
                 latestNonEndpoint = i;
             } else if ( diff == 0 ) { // check if we're past the last interval for this field
                 if ( latestNonEndpoint == -1 ) {
@@ -1117,13 +1152,18 @@ namespace mongo {
                 // more values possible, skip...
                 setZero( latestNonEndpoint + 1 );
                 // skip to curr / latestNonEndpoint + 1 / superlative
-                for( int j = latestNonEndpoint + 1; j < (int)_i.size(); ++j ) {
-                    _cmp[ j ] = _superlative[ j ];
-                }
+                _after = true;
                 return latestNonEndpoint + 1;
             }
         }
         return -1;        
+    }
+    
+    void FieldRangeVector::Iterator::prepDive() {
+        for( int j = 0; j < (int)_i.size(); ++j ) {
+            _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
+            _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
+        }        
     }
     
     struct SimpleRegexUnitTest : UnitTest {

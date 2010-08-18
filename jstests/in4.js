@@ -27,7 +27,7 @@ checkRanges( {a:[[2,2],[3,3]],b:[[4,10]]}, t.find( {a:{$in:[2,3]},b:{$gt:4,$lt:1
 t.save( {a:1,b:1} );
 t.save( {a:2,b:4.5} );
 t.save( {a:2,b:4} );
-assert.eq.automsg( "1", "t.find( {a:{$in:[2,3]},b:{$in:[4,5]}} ).explain().nscanned" );
+assert.eq.automsg( "2", "t.find( {a:{$in:[2,3]},b:{$in:[4,5]}} ).explain().nscanned" );
 assert.eq.automsg( "2", "t.findOne( {a:{$in:[2,3]},b:{$in:[4,5]}} ).a" );
 assert.eq.automsg( "4", "t.findOne( {a:{$in:[2,3]},b:{$in:[4,5]}} ).b" );
 

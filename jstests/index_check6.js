@@ -41,21 +41,21 @@ assert.eq.automsg( "3", "t.find( { a:5, b:5, c:{$gte:5,$lte:7} } ).sort( sort ).
 assert.eq.automsg( "4", "t.find( { a:5, b:{$gte:5,$lte:6}, c:5 } ).sort( sort ).explain().nscanned" );
     if ( s.b > 0 ) {
         assert.eq.automsg( "2", "t.find( { a:5, b:{$gte:5.5,$lte:6}, c:5 } ).sort( sort ).explain().nscanned" );
-        assert.eq.automsg( "1", "t.find( { a:5, b:{$gte:5,$lte:5.5}, c:5 } ).sort( sort ).explain().nscanned" );        
+        assert.eq.automsg( "2", "t.find( { a:5, b:{$gte:5,$lte:5.5}, c:5 } ).sort( sort ).explain().nscanned" );        
     } else {
-        assert.eq.automsg( "1", "t.find( { a:5, b:{$gte:5.5,$lte:6}, c:5 } ).sort( sort ).explain().nscanned" );
+        assert.eq.automsg( "2", "t.find( { a:5, b:{$gte:5.5,$lte:6}, c:5 } ).sort( sort ).explain().nscanned" );
         assert.eq.automsg( "2", "t.find( { a:5, b:{$gte:5,$lte:5.5}, c:5 } ).sort( sort ).explain().nscanned" );   
     }
 assert.eq.automsg( "7", "t.find( { a:5, b:{$gte:5,$lte:7}, c:5 } ).sort( sort ).explain().nscanned" );
 assert.eq.automsg( "4", "t.find( { a:{$gte:5,$lte:6}, b:5, c:5 } ).sort( sort ).explain().nscanned" );
     if ( s.a > 0 ) {
         assert.eq.automsg( "2", "t.find( { a:{$gte:5.5,$lte:6}, b:5, c:5 } ).sort( sort ).explain().nscanned" );
-        assert.eq.automsg( "1", "t.find( { a:{$gte:5,$lte:5.5}, b:5, c:5 } ).sort( sort ).explain().nscanned" );
+        assert.eq.automsg( "2", "t.find( { a:{$gte:5,$lte:5.5}, b:5, c:5 } ).sort( sort ).explain().nscanned" );
         assert.eq.automsg( "3", "t.find( { a:{$gte:5.5,$lte:6}, b:5, c:{$gte:5,$lte:6} } ).sort( sort ).explain().nscanned" );
     } else {
-        assert.eq.automsg( "1", "t.find( { a:{$gte:5.5,$lte:6}, b:5, c:5 } ).sort( sort ).explain().nscanned" );
+        assert.eq.automsg( "2", "t.find( { a:{$gte:5.5,$lte:6}, b:5, c:5 } ).sort( sort ).explain().nscanned" );
         assert.eq.automsg( "2", "t.find( { a:{$gte:5,$lte:5.5}, b:5, c:5 } ).sort( sort ).explain().nscanned" );        
-        assert.eq.automsg( "2", "t.find( { a:{$gte:5.5,$lte:6}, b:5, c:{$gte:5,$lte:6} } ).sort( sort ).explain().nscanned" );
+        assert.eq.automsg( "3", "t.find( { a:{$gte:5.5,$lte:6}, b:5, c:{$gte:5,$lte:6} } ).sort( sort ).explain().nscanned" );
     }
 assert.eq.automsg( "7", "t.find( { a:{$gte:5,$lte:7}, b:5, c:5 } ).sort( sort ).explain().nscanned" );
 assert.eq.automsg( "6", "t.find( { a:{$gte:5,$lte:6}, b:5, c:{$gte:5,$lte:6} } ).sort( sort ).explain().nscanned" );
