@@ -1110,17 +1110,6 @@ Random.genExp = function( mean ) {
     return -Math.log( Random.rand() ) * mean;
 }
 
-killWithUris = function( uris ) {
-    var inprog = db.currentOp().inprog;
-    for( var u in uris ) {
-        for ( var i in inprog ) {
-            if ( uris[ u ] == inprog[ i ].client ) {
-                db.killOp( inprog[ i ].opid );
-            }
-        }
-    }
-}
-
 Geo = {};
 Geo.distance = function( a , b ){
     var ax = null;

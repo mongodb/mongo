@@ -1035,7 +1035,7 @@ namespace mongo {
 
         Timer t;
 
-        tlog() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
+        tlog(1) << "fastBuildIndex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
 
         bool dupsAllowed = !idx.unique();
         bool dropDups = idx.dropDups() || inDBRepair;

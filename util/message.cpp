@@ -379,6 +379,13 @@ namespace mongo {
         setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
 #endif
 
+#ifdef SO_LINGER
+        struct linger ling;
+        ling.l_onoff = 1;
+        ling.l_linger = 0;
+        setsockopt(sock, SOL_SOCKET, SO_LINGER, (char *) &ling, sizeof(ling));
+#endif
+
         return true;
     }
 

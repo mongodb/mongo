@@ -34,8 +34,11 @@ namespace mongo {
     void raiseError(int code , const char *msg) {
         LastError *le = lastError.get();
         if ( le == 0 ) {
-            /* might be intentional (non-user thread) */            
-            OCCASIONALLY DEV if( !isShell ) log() << "warning dev: lastError==0 won't report:" << msg << endl;
+            /* might be intentional (non-user thread) */    
+            DEV {
+                static unsigned n;
+                if( ++n < 4 && !isShell ) log() << "warning dev: lastError==0 won't report:" << msg << endl;
+            }
         } else if ( le->disabled ) {
             log() << "lastError disabled, can't report: " << code << ":" << msg << endl;
         } else {
@@ -177,9 +180,7 @@ namespace mongo {
     }
     
     LastError * LastErrorHolder::startRequest( Message& m , int clientId ) {
-
-        if ( clientId == 0 )
-            clientId = m.header()->id & 0xFFFF0000;
+        assert( clientId );
         setID( clientId );
 
         LastError * le = _get( true );
@@ -188,11 +189,7 @@ namespace mongo {
     }
 
     void LastErrorHolder::startRequest( Message& m , LastError * connectionOwned ) {
-        if ( !connectionOwned->overridenById ) {
-            prepareErrForNewRequest( m, connectionOwned );
-            return;
-        }
-        startRequest(m);
+        prepareErrForNewRequest( m, connectionOwned );
     }
 
     void LastErrorHolder::disconnect( int clientId ){

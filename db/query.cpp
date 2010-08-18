@@ -913,7 +913,8 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
             BSONObjBuilder cmdResBuf;
             if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
-                ss << " command: " << jsobj.toString();
+                ss << " command: ";
+                jsobj.toString( ss );
                 curop.markCommand();
                 auto_ptr< QueryResult > qr;
                 qr.reset( (QueryResult *) bb.buf() );
@@ -1069,7 +1070,7 @@ namespace mongo {
             }
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
-            DEV tlog() << "query has more, cursorid: " << cursorid << endl;
+            DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->pos = n;
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();

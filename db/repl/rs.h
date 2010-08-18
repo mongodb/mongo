@@ -64,7 +64,13 @@ namespace mongo {
         ReplSetImpl *rs;
         bool busyWithElectSelf;
         int _primary;
-        const Member* findOtherPrimary();
+
+        /** @param two - if true two primaries were seen.  this can happen transiently, in addition to our 
+                         polling being only occasional.  in this case null is returned, but the caller should 
+                         not assume primary itself in that situation.
+        */
+        const Member* findOtherPrimary(bool& two);
+
         void noteARemoteIsPrimary(const Member *);
         virtual void starting();
     public:
@@ -120,8 +126,8 @@ namespace mongo {
     protected:
         RSBase() : magic(0x12345677), m("RSBase"), _locked(0) { }
         ~RSBase() { 
-            log() << "~RSBase should never be called?" << rsLog;
-            assert(false);
+            /* this can happen if we throw in the constructor; otherwise never happens.  thus we log it as it is quite unusual. */
+            log() << "replSet ~RSBase called" << rsLog;
         }
 
         class lock { 
@@ -334,6 +340,7 @@ namespace mongo {
         void _syncThread();
         void syncTail();
         void syncApply(const BSONObj &o);
+        unsigned _syncRollback(OplogReader& r);
         void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);
     public:

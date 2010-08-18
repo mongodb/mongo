@@ -893,7 +893,8 @@ namespace mongo {
             }
         }
         
-        map< const void*, string > _allMyUris;        
+        //   connstr, myuris
+        map< string, set<string> > _allMyUris;
         bool _nokillop = false;
         void onConnect( DBClientWithCommands &c ) {
             if ( _nokillop ) {
@@ -901,9 +902,8 @@ namespace mongo {
             }
             BSONObj info;
             if ( c.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) ) {
-                // There's no way to explicitly disconnect a DBClientConnection, but we might allocate
-                // a new uri on automatic reconnect.  So just store one uri per connection.
-                _allMyUris[ &c ] = info[ "you" ].str();
+                string connstr = dynamic_cast<DBClientBase&>(c).getServerAddress();
+                _allMyUris[connstr].insert(info[ "you" ].str());
             }
         }
     }

@@ -26,7 +26,7 @@ namespace mongo {
 
         extern std::string _dbConnect;
         extern std::string _dbAuth;
-        extern map< const void*, string > _allMyUris;
+        extern map< string, set<string> > _allMyUris;
         extern bool _nokillop;
 
         void RecordMyLocation( const char *_argv0 );

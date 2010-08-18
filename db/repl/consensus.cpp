@@ -333,6 +333,7 @@ namespace mongo {
     void Consensus::electSelf() {
         assert( !rs.lockedByMe() );
         assert( !rs.myConfig().arbiterOnly );
+        assert( rs.myConfig().slaveDelay == 0 );
         try { 
             _electSelf(); 
         } 

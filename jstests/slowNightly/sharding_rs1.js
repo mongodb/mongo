@@ -48,6 +48,7 @@ assert.soon( function(){
     return d < 5;
 } , "balance didn't happen" , 1000 * 60 * 3 , 5000 );
 
+s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
 
 for ( i=0; i<s._rs.length; i++ ){
     r = s._rs[i];
@@ -57,6 +58,7 @@ for ( i=0; i<s._rs.length; i++ ){
     for ( j=0; j<x.slaves.length; j++ )
         assert.eq( x.master.md5 , x.slaves[j].md5 , "hashes same for: " + r.url + " slave: " + j );
 }
+
 
 assert.eq( num , db.foo.find().count() , "C1" )
 assert.eq( num , db.foo.find().itcount() , "C2" )

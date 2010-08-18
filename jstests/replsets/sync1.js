@@ -2,6 +2,8 @@
 
 var debugging=0;
 
+w = 0;
+
 function pause(s) {
     // for debugging just to keep processes running
     print("\nsync1.js: " + s);
@@ -59,8 +61,8 @@ doTest = function (signal) {
     var status;
     do {
         sleep(1000);
-        status = dbs[0].getSisterDB("admin").runCommand({replSetGetStatus : 1});
-    } while(status.members[1].state != 2 && status.members[2].state != 2);
+        status = dbs[0].getSisterDB("admin").runCommand({ replSetGetStatus: 1 });
+    } while (status.members[1].state != 2 && status.members[2].state != 2);
 
     print("\nsync1.js ********************************************************************** part 6");
     dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: true });
@@ -73,26 +75,26 @@ doTest = function (signal) {
     var max1;
     var max2;
     var count = 0;
-    while( 1 ) {
-	try {
-	    max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
-	    max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
-	}
-	catch(e) { 
-	    print("\nsync1.js couldn't get max1/max2; retrying " + e);
-	    sleep(2000);
+    while (1) {
+        try {
+            max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
+            max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
+        }
+        catch (e) {
+            print("\nsync1.js couldn't get max1/max2; retrying " + e);
+            sleep(2000);
             count++;
             if (count == 50) {
                 assert(false, "errored out 50 times");
             }
-	    continue;
-	}
-	break;
+            continue;
+        }
+        break;
     }
 
     print("\nsync1.js ********************************************************************** part 8");
 
-    if (max1.z == (inserts-1) && max2.z == (inserts-1)) {
+    if (max1.z == (inserts - 1) && max2.z == (inserts - 1)) {
         print("\nsync1.js try increasing # if inserts and running again");
         replTest.stopSet(signal);
         return;
@@ -100,27 +102,36 @@ doTest = function (signal) {
 
     // wait for a new master to be elected
     sleep(5000);
-
-    // figure out who is master now
-    var newMaster = replTest.getMaster();
+    var newMaster;
 
     print("\nsync1.js ********************************************************************** part 9");
 
-    print("\nsync1.js \nsync1.js ********************************************************************** part 9  **********************************************");
+    for (var q = 0; q < 10; q++) {
+        // figure out who is master now
+        newMaster = replTest.getMaster();
+        if (newMaster + "" != master + "")
+            break;
+        sleep(2000);
+        if (q > 6) print("sync1.js zzz....");
+    }
+
     assert(newMaster + "" != master + "", "new master is " + newMaster + ", old master was " + master);
+
     print("\nsync1.js new master is " + newMaster + ", old master was " + master);
+
+    print("\nsync1.js ********************************************************************** part 9.1");
 
     count = 0;
     do {
-	try {
-	    max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
-	    max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
-	}
-	catch( e ) { 
-	    print("\nsync1.js: exception querying; will sleep and try again " + e);
-	    sleep(2000);
-	    continue;
-	}
+        try {
+            max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
+            max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
+        }
+        catch (e) {
+            print("\nsync1.js: exception querying; will sleep and try again " + e);
+            sleep(2000);
+            continue;
+        }
 
         print("\nsync1.js waiting for match " + count + " " + Date() + " z[1]:" + max1.z + " z[2]:" + max2.z);
 
@@ -156,17 +167,17 @@ doTest = function (signal) {
     var max0 = null;
     count = 0;
     do {
-		try {
-			max0 = dbs[0].bar.find().sort({ z: -1 }).limit(1).next();
-		}
-		catch(e) { 
-			print("\nsync1.js part 11 exception on bar.find() will sleep and try again " + e);
-			sleep(2000);
-			continue;
-		}
+        try {
+            max0 = dbs[0].bar.find().sort({ z: -1 }).limit(1).next();
+        }
+        catch (e) {
+            print("\nsync1.js part 11 exception on bar.find() will sleep and try again " + e);
+            sleep(2000);
+            continue;
+        }
 
-		printjson(max);
-		printjson(max0);
+        printjson(max);
+        printjson(max0);
         print("\nsync1.js part 11 waiting for match " + count + " " + Date() + " z[0]:" + max0.z + " z:" + max);
 
         sleep(2000);
@@ -179,8 +190,8 @@ doTest = function (signal) {
             return;
         }
         print("||||| count:" + count);
-	printjson(max0);
-    } while (! max0 || max0.z != max);
+        printjson(max0);
+    } while (!max0 || max0.z != max);
 
     print("\nsync1.js ********************************************************************** part 12");
     pause("\nsync1.js success");

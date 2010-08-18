@@ -32,7 +32,6 @@ namespace mongo {
         long long nObjects;
         int nPrev;
         bool valid;
-        bool overridenById;
         bool disabled;
         void writeback( OID& oid ){
             reset( true );
@@ -56,7 +55,6 @@ namespace mongo {
             nObjects = nDeleted;
         }
         LastError() {
-            overridenById = false;
             reset();
         }
         void reset( bool _valid = false ) {
@@ -128,7 +126,7 @@ namespace mongo {
         
         /** when db receives a message/request, call this */
         void startRequest( Message& m , LastError * connectionOwned );
-        LastError * startRequest( Message& m , int clientId = 0 );
+        LastError * startRequest( Message& m , int clientId );
         
         void disconnect( int clientId );
 

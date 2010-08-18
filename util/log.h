@@ -170,8 +170,10 @@ namespace mongo {
         }
 
         static int getLogDesc() {
+            int fd = -1;
             if (logfile != NULL)
-                return fileno( logfile );
+                fd = fileno( logfile );
+            return fd;
         }
 
         inline void flush(Tee *t = 0);
@@ -378,7 +380,7 @@ namespace mongo {
                 fflush(logfile);
             }else{
                 int x = errno;
-                cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
+                cout << "Failed to write to logfile: " << errnoWithDescription(x) << endl;
             }
         }
         else {

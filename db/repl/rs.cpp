@@ -109,11 +109,18 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMasterHost(const Member *m, vector<string>& hosts, vector<string>& passives, vector<string>& arbiters) {
+        if( m->config().hidden )
+            return;
+
         if( m->potentiallyHot() ) {
             hosts.push_back(m->h().toString());
         }
         else if( !m->config().arbiterOnly ) {
-            passives.push_back(m->h().toString());
+            if( m->config().slaveDelay ) {
+                /* hmmm - we don't list these as they are stale. */   
+            } else {
+                passives.push_back(m->h().toString());
+            }
         }
         else {
             arbiters.push_back(m->h().toString());
@@ -151,6 +158,10 @@ namespace mongo {
         }
         if( myConfig().arbiterOnly )
             b.append("arbiterOnly", true);
+        if( myConfig().slaveDelay )
+            b.append("slaveDelay", myConfig().slaveDelay);
+        if( myConfig().hidden )
+            b.append("hidden", true);
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */

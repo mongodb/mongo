@@ -104,7 +104,7 @@ namespace mongo {
             char buf[64];
             time_t_to_String(secs, buf);
             stringstream ss;
-            ss << buf << ' ';
+            ss << time_t_to_String_short(secs) << ' ';
             ss << hex << secs << ':' << i;
             return ss.str();
         }

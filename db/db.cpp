@@ -1157,7 +1157,7 @@ namespace mongo {
         oss << "Backtrace:" << endl;
         printStackTrace( oss );
         rawOut( oss.str() );
-        dbexit( EXIT_ABRUBT );
+        dbexit( EXIT_ABRUPT );
     }
 
     sigset_t asyncSignals;
