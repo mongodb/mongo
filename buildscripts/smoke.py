@@ -212,15 +212,9 @@ def checkDbHashes(master, slave):
     print "waiting for slave to catch up..."
     ARB=10  # ARBITRARY
     time.sleep(ARB)
-    while True:
-        # FIXME: it's probably better to do an empty insert and a
-        # getLastError() to force a sync.
-        argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
-        res = Popen(argv, stdout=PIPE).communicate()[0]
-        m = re.search('(\d+)secs ', res)
-        if int(m.group(1)) > ARB: #res.find('initial sync') < 0:
-            break
-        time.sleep(3)
+    argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.getLastError(2, 30000)']
+    res = Popen(argv, stdout=PIPE).wait() #.communicate()[0]
+    # FIXME: maybe assert that that res == 0?
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
