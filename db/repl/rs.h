@@ -126,8 +126,8 @@ namespace mongo {
     protected:
         RSBase() : magic(0x12345677), m("RSBase"), _locked(0) { }
         ~RSBase() { 
-            log() << "~RSBase should never be called?" << rsLog;
-            assert(false);
+            /* this can happen if we throw in the constructor; otherwise never happens.  thus we log it as it is quite unusual. */
+            log() << "replSet ~RSBase called" << rsLog;
         }
 
         class lock { 
