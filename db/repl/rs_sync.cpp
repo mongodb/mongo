@@ -1,4 +1,4 @@
-p/**
+/**
 *    Copyright (C) 2008 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
@@ -276,7 +276,7 @@ namespace mongo {
                         syncApply(o);
                         _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
                     }
-                    unsigned sd = myConfig().slaveDelay;
+                    int sd = myConfig().slaveDelay;
                     if( sd ) { 
                         const OpTime ts = o["ts"]._opTime();
                         long long a = ts.getSecs();
