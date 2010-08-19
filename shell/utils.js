@@ -247,6 +247,13 @@ String.prototype.rtrim = function() {
     return this.replace(/\s+$/,"");
 }
 
+Number.prototype.zeroPad = function(width) {
+    var str = this + '';
+    while (str.length < width)
+        str = '0' + str;
+    return str;
+}
+
 Date.timeFunc = function( theFunc , numTimes ){
 
     var start = new Date();
@@ -260,32 +267,67 @@ Date.timeFunc = function( theFunc , numTimes ){
 }
 
 Date.prototype.tojson = function(){
-    var year = this.getUTCFullYear();
-    var month = this.getUTCMonth() + 1; // js is stupid
-    var date = this.getUTCDate();
-    var hour = this.getUTCHours();
-    var minute = this.getUTCMinutes();
-    var sec = this.getUTCSeconds() + (this.getUTCMilliseconds()/1000);
 
-    return 'UTCDate('+year+', '+month+', '+date+',  '+hour+', '+minute+', '+sec+')';
-}
+    var UTC = Date.printAsUTC ? 'UTC' : '';
 
-UTCDate = function(year, month, date, hour, min, sec, ms){
-    if (!year) return new Date();
+    var year = this['get'+UTC+'FullYear']().zeroPad(4);
+    var month = (this['get'+UTC+'Month']() + 1).zeroPad(2);
+    var date = this['get'+UTC+'Date']().zeroPad(2);
+    var hour = this['get'+UTC+'Hours']().zeroPad(2);
+    var minute = this['get'+UTC+'Minutes']().zeroPad(2);
+    var sec = this['get'+UTC+'Seconds']().zeroPad(2)
 
-    month = (month || 1) - 1; // js is stupid
-    date = (date || 1);
-    hour = (hour || 0);
-    min = (min || 0);
-    sec = (sec || 0);
-    ms = (ms || 0);
+    if (this['get'+UTC+'Milliseconds']())
+        sec += '.' + this['get'+UTC+'Milliseconds']().zeroPad(3)
 
-    // support fractional seconds
-    if (sec % 1){
-        ms = Math.round((sec%1) * 1000)
+    var ofs = 'Z';
+    if (!Date.printAsUTC){
+        var ofsmin = this.getTimezoneOffset();
+        if (ofsmin != 0){
+            ofs = ofsmin > 0 ? '-' : '+'; // This is correct
+            ofs += (ofsmin/60).zeroPad(2)
+            ofs += (ofsmin%60).zeroPad(2)
+        }
     }
 
-    return new Date(Date.UTC(year, month, date, hour, min, sec, ms));
+    return 'ISODate("'+year+'-'+month+'-'+date+'T'+hour+':'+minute+':'+sec+ofs+'")';
+}
+
+Date.printAsUTC = true;
+
+
+ISODate = function(isoDateStr){
+    if (!isoDateStr)
+        return new Date();
+
+    var isoDateRegex = /(\d{4})-?(\d{2})-?(\d{2})([T ](\d{2})(:?(\d{2})(:?(\d{2}(\.\d+)?))?)?(Z|([+-])(\d{2}):?(\d{2})?)?)?/;
+    var res = isoDateRegex.exec(isoDateStr);
+
+    if (!res)
+        throw "invalid ISO date";
+
+    var year = parseInt(res[1],10) || 1970; // this should always be present
+    var month = (parseInt(res[2],10) || 1) - 1;
+    var date = parseInt(res[3],10) || 0;
+    var hour = parseInt(res[5],10) || 0;
+    var min = parseInt(res[7],10) || 0;
+    var sec = parseFloat(res[9]) || 0;
+    var ms = Math.round((sec%1) * 1000)
+    sec -= ms/1000
+
+    var time = Date.UTC(year, month, date, hour, min, sec, ms);
+
+    if (res[11] && res[11] != 'Z'){
+        var ofs = 0;
+        ofs += (parseInt(res[13],10) || 0) * 60*60*1000; // hours
+        ofs += (parseInt(res[14],10) || 0) *    60*1000; // mins
+        if (res[12] == '+') // if ahead subtract
+            ofs *= -1;
+
+        time += ofs
+    }
+
+    return new Date(time);
 }
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
