@@ -909,7 +909,7 @@ namespace mongo {
 
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
-            uassert( 10003 , "E10003 failing update: objects in a capped ns cannot grow", !(d && d->capped));
+            uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->capped));
             d->paddingTooSmall();
             if ( cc().database()->profile )
                 ss << " moved ";
