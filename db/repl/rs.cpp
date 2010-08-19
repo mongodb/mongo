@@ -65,7 +65,8 @@ namespace mongo {
     void ReplSetImpl::relinquish() { 
         if( box.getState().primary() ) {
             log() << "replSet relinquishing primary state" << rsLog;
-            changeState(MemberState::RS_SECONDARY);
+            changeState(MemberState::RS_RECOVERING);
+            //changeState(MemberState::RS_SECONDARY);
         }
         else if( box.getState().startup2() ) {
             // ? add comment
