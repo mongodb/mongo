@@ -36,7 +36,7 @@ for ( i=0; i<searches.length; i++ ){
     //printjson( Array.sort( t.find(q).map( function(z){ return z._id; } ) ) )
     
     assert.eq( correct[i].length , t.find( q ).itcount() , "itcount : " + tojson( searches[i] ) );
-    assert.eq( correct[i].length , t.find( q ).itcount() , "count : " + tojson( searches[i] ) );
+    assert.eq( correct[i].length , t.find( q ).count() , "count : " + tojson( searches[i] ) );
     assert.gt( correct[i].length * 2 , t.find(q).explain().nscanned , "nscanned : " + tojson( searches[i] ) )
 }
 
