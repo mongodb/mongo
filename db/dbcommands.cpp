@@ -378,7 +378,7 @@ namespace mongo {
             }
             
             {
-                BSONObjBuilder bb( result.subobjStart( "cursros" ) );
+                BSONObjBuilder bb( result.subobjStart( "cursors" ) );
                 ClientCursor::appendStats( bb );
                 bb.done();
             }
