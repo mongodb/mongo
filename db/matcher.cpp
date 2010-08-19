@@ -259,7 +259,7 @@ namespace mongo {
     }
     
     void Matcher::parseOr( const BSONElement &e, bool subMatcher, list< shared_ptr< Matcher > > &matchers ) {
-        uassert( 13090, "recursive $or/$nor not allowed", !subMatcher );
+        uassert( 13090, "nested $or/$nor not allowed", !subMatcher );
         uassert( 13086, "$or/$nor must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
         BSONObjIterator j( e.embeddedObject() );
         while( j.more() ) {
