@@ -260,7 +260,32 @@ Date.timeFunc = function( theFunc , numTimes ){
 }
 
 Date.prototype.tojson = function(){
-    return "\"" + this.toString() + "\"";
+    var year = this.getUTCFullYear();
+    var month = this.getUTCMonth() + 1; // js is stupid
+    var date = this.getUTCDate();
+    var hour = this.getUTCHours();
+    var minute = this.getUTCMinutes();
+    var sec = this.getUTCSeconds() + (this.getUTCMilliseconds()/1000);
+
+    return 'UTCDate('+year+', '+month+', '+date+',  '+hour+', '+minute+', '+sec+')';
+}
+
+UTCDate = function(year, month, date, hour, min, sec, ms){
+    if (!year) return new Date();
+
+    month = (month || 1) - 1; // js is stupid
+    date = (date || 1);
+    hour = (hour || 0);
+    min = (min || 0);
+    sec = (sec || 0);
+    ms = (ms || 0);
+
+    // support fractional seconds
+    if (sec % 1){
+        ms = Math.round((sec%1) * 1000)
+    }
+
+    return new Date(Date.UTC(year, month, date, hour, min, sec, ms));
 }
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
