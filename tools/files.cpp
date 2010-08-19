@@ -87,7 +87,7 @@ public:
         if ( cmd == "list" ){
             BSONObjBuilder b;
             if ( filename.size() )
-                b.appendRegex( "filename" , ( (string)"^" + filename ).c_str() );
+                b.appendRegex( "filename" , ( (string)"^" + filename ) );
             display( &g , b.obj() );
             return 0;
         }
@@ -100,7 +100,7 @@ public:
 
         if ( cmd == "search" ){
             BSONObjBuilder b;
-            b.appendRegex( "filename" , filename.c_str() );
+            b.appendRegex( "filename" , filename );
             display( &g , b.obj() );
             return 0;
         }

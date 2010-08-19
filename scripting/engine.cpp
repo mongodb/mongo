@@ -74,7 +74,7 @@ namespace mongo {
             builder.appendDate( fieldName , Date_t((unsigned long long)getNumber( scopeName )) );
             break;
         case Code:
-            builder.appendCode( fieldName , getString( scopeName ).c_str() );
+            builder.appendCode( fieldName , getString( scopeName ) );
             break;
         default:
             stringstream temp;

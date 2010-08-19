@@ -502,7 +502,7 @@ namespace mongo {
             if ( onedownseen.count( nf ) )
                 return;
             onedownseen.insert( nf );
-            BSONObjBuilder bb ( b.subobjStart( nf.c_str() ) );
+            BSONObjBuilder bb ( b.subobjStart( nf ) );
             createNewFromMods( nr , bb , BSONObj() ); // don't infer an array from name
             bb.done();
         }

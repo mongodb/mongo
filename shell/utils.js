@@ -260,7 +260,32 @@ Date.timeFunc = function( theFunc , numTimes ){
 }
 
 Date.prototype.tojson = function(){
-    return "\"" + this.toString() + "\"";
+    var year = this.getUTCFullYear();
+    var month = this.getUTCMonth() + 1; // js is stupid
+    var date = this.getUTCDate();
+    var hour = this.getUTCHours();
+    var minute = this.getUTCMinutes();
+    var sec = this.getUTCSeconds() + (this.getUTCMilliseconds()/1000);
+
+    return 'UTCDate('+year+', '+month+', '+date+',  '+hour+', '+minute+', '+sec+')';
+}
+
+UTCDate = function(year, month, date, hour, min, sec, ms){
+    if (!year) return new Date();
+
+    month = (month || 1) - 1; // js is stupid
+    date = (date || 1);
+    hour = (hour || 0);
+    min = (min || 0);
+    sec = (sec || 0);
+    ms = (ms || 0);
+
+    // support fractional seconds
+    if (sec % 1){
+        ms = Math.round((sec%1) * 1000)
+    }
+
+    return new Date(Date.UTC(year, month, date, hour, min, sec, ms));
 }
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
@@ -852,17 +877,24 @@ shellPrintHelper = function (x) {
 
 shellAutocomplete = function (/*prefix*/){ // outer scope function called on init. Actual function at end
 
-    // from w3schools reference
-    var builtinMethods = {}; // uses constructor objects as keys
-    builtinMethods[Array] = "constructor length prototype concat join pop push reverse shift slice sort splice toString unshift valueOf".split(' ');
-    builtinMethods[Boolean] = "constructor prototype toString valueOf".split(' ');
-    builtinMethods[Date] = "constructor prototype getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toLocaleDateString toLocaleTimeString toLocaleString toString toTimeString toUTCString UTC valueOf".split(' ');
-    builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split(' ');
-    builtinMethods[Number] = "constructor prototype MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision toString valueOf".split(' ');
-    builtinMethods[RegExp] = "constructor prototype global ignoreCase lastIndex multiline source compile exec test toString valueOf".split(' ');
-    builtinMethods[String] = "constructor prototype length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toString toUpperCase valueOf".split(' ');
+    var universalMethods = "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable".split(' ');
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String".split(' ');
+    var builtinMethods = {}; // uses constructor objects as keys
+    builtinMethods[Array] = "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some".split(' ');
+    builtinMethods[Boolean] = "".split(' '); // nothing more than universal methods
+    builtinMethods[Date] = "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC".split(' ');
+    builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split(' ');
+    builtinMethods[Number] = "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split(' ');
+    builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split(' ');
+    builtinMethods[String] = "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase".split(' ');
+    builtinMethods[Function] = "call apply".split(' ');
+    builtinMethods[Object] = "bsonsize".split(' ');
+
+    builtinMethods[Mongo] = "find update insert remove".split(' ');
+    builtinMethods[BinData] = "hex base64 length subtype".split(' ');
+    builtinMethods[NumberLong] = "toNumber".split(' ');
+
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split(' ');
 
     var isPrivate = function(name){
         if (shellAutocomplete.showPrivate) return false;
@@ -874,7 +906,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
 
     var customComplete = function(obj){
         try {
-            if(obj.constructor.autocomplete){
+            if(obj.__proto__.constructor.autocomplete){
                 var ret = obj.constructor.autocomplete(obj);
                 if (ret.constructor != Array){
                     print("\nautocompleters must return real Arrays");
@@ -897,7 +929,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
         var parts = prefix.split('.');
         for (var p=0; p < parts.length - 1; p++){ // doesn't include last part
             curObj = curObj[parts[p]];
-            if (curObj === undefined)
+            if (curObj == null)
                 return [];
         }
 
@@ -907,10 +939,11 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
             begining += '.';
 
         var possibilities = new Array().concat(
+            universalMethods,
             Object.keySet(curObj),
-            Object.keySet(curObj.constructor.prototype),
+            Object.keySet(curObj.__proto__),
             builtinMethods[curObj] || [], // curObj is a builtin constructor
-            builtinMethods[curObj.constructor] || [], // curObj is made from a builtin constructor
+            builtinMethods[curObj.__proto__.constructor] || [], // curObj is made from a builtin constructor
             curObj == global ? extraGlobals : [],
             customComplete(curObj)
         );
@@ -918,7 +951,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
         var ret = [];
         for (var i=0; i < possibilities.length; i++){
             var p = possibilities[i];
-            if (curObj[p] === undefined && curObj != global) continue; // extraGlobals aren't in the global object
+            if (typeof(curObj[p]) == "undefined" && curObj != global) continue; // extraGlobals aren't in the global object
             if (p.length == 0 || p.length < lastPrefix.length) continue;
             if (isPrivate(p)) continue;
             if (p.match(/^[0-9]+$/)) continue; // don't array number indexes

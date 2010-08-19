@@ -1531,7 +1531,7 @@ namespace mongo {
                 double dis = distanceMultiplier * p._distance;
                 totalDistance += dis;
                 
-                BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ).c_str() ) );
+                BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ) ) );
                 bb.append( "dis" , dis );
                 bb.append( "obj" , p._o );
                 bb.done();
