@@ -45,8 +45,7 @@ namespace mongo {
     /* =================== */
 
     string getDistLockProcess(){
-        if ( _cachedProcessString == NULL )
-            boost::call_once( initModule, _init );
+        boost::call_once( initModule, _init );
         assert( _cachedProcessString );
         return *_cachedProcessString;
     }
