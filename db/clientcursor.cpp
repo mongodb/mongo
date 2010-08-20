@@ -164,7 +164,9 @@ namespace mongo {
             c->advance();
             if ( c->eof() ) {
                 // advanced to end
-                // leave ClieneCursor in place so next getMore doesn't fail
+                // leave ClientCursor in place so next getMore doesn't fail
+                // still need to mark new location though
+                cc->updateLocation();
             }
             else {
                 wassert( c->refLoc() != dl );
