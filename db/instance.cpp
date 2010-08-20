@@ -767,12 +767,14 @@ namespace mongo {
 
         bool oldFile = false;
 
-        if ( boost::filesystem::exists( name ) && boost::filesystem::file_size( name ) > 0 ){
+        if ( boost::filesystem::exists( name ) && boost::filesystem::file_size( name ) > 0 ) {
             oldFile = true;
         }
 
         lockFile = open( name.c_str(), O_RDWR | O_CREAT , S_IRWXU | S_IRWXG | S_IRWXO );
-        uassert( 10309 ,  "Unable to create / open lock file for lockfilepath: " + name, lockFile > 0 );
+		if( lockFile <= 0 ) {
+		    uasserted( 10309 , str::stream() << "Unable to create / open lock file for lockfilepath: " << name << ' ' << errnoWithDescription());
+        }
         if (flock( lockFile, LOCK_EX | LOCK_NB ) != 0) {
             close ( lockFile );
             lockFile = 0;
