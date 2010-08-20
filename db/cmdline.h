@@ -71,6 +71,9 @@ namespace mongo {
         static void addGlobalOptions( boost::program_options::options_description& general , 
                                       boost::program_options::options_description& hidden );
 
+        static void addWindowsOptions( boost::program_options::options_description& windows , 
+                                      boost::program_options::options_description& hidden );
+
         
         /**
          * @return true if should run program, false if should exit
