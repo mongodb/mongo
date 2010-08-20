@@ -152,7 +152,7 @@ namespace mongo {
                 if (i->first != c->name)
                     continue;
 
-                BSONObjBuilder temp( b.subobjStart( c->name.c_str() ) );
+                BSONObjBuilder temp( b.subobjStart( c->name ) );
 
                 {
                     stringstream help;

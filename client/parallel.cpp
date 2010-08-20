@@ -165,7 +165,7 @@ namespace mongo {
             for ( map<string,list<BSONObj> >::iterator i=out.begin(); i!=out.end(); ++i ){
                 string shard = i->first;
                 list<BSONObj> l = i->second;
-                BSONArrayBuilder y( x.subarrayStart( shard.c_str() ) );
+                BSONArrayBuilder y( x.subarrayStart( shard ) );
                 for ( list<BSONObj>::iterator j=l.begin(); j!=l.end(); ++j ){
                     BSONObj temp = *j;
                     y.append( temp );

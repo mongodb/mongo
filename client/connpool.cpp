@@ -142,7 +142,7 @@ namespace mongo {
         BSONObjBuilder bb( b.subobjStart( "hosts" ) );
         for ( map<string,PoolForHost>::iterator i=_pools.begin(); i!=_pools.end(); ++i ){
             string s = i->first;
-            BSONObjBuilder temp( bb.subobjStart( s.c_str() ) );
+            BSONObjBuilder temp( bb.subobjStart( s ) );
             temp.append( "available" , (int)(i->second.pool.size()) );
             temp.appendNumber( "created" , i->second.created );
             temp.done();

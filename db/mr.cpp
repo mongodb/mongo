@@ -636,7 +636,7 @@ namespace mongo {
                         
                         uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
                         servers.insert( shard );
-                        shardCounts.appendAs( res["counts"] , shard.c_str() );
+                        shardCounts.appendAs( res["counts"] , shard );
                         
                         BSONObjIterator j( res["counts"].embeddedObjectUserCheck() );
                         while ( j.more() ){

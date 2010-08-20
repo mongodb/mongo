@@ -274,6 +274,7 @@ namespace mongo {
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm" 
         char _hbmsg[256]; // we change this unlocked, thus not an stl::string
+        time_t _hbmsgTime; // when it was logged
     public:
         void sethbmsg(string s, int logLevel = 0); 
     protected:
@@ -382,7 +383,10 @@ namespace mongo {
         bool lockedByMe() { return RSBase::lockedByMe(); }
 
         // heartbeat msg to send to others; descriptive diagnostic info
-        string hbmsg() const { return _hbmsg; }
+        string hbmsg() const { 
+            if( time(0)-_hbmsgTime > 120 ) return "";
+            return _hbmsg; 
+        }
     };
 
     /** base class for repl set commands.  checks basic things such as in rs mode before the command 

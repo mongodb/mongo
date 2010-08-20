@@ -342,7 +342,7 @@ namespace mongo {
     struct dbrefEnd {
         dbrefEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            b.back()->appendDBRef( b.fieldName(), b.ns.c_str(), b.oid );
+            b.back()->appendDBRef( b.fieldName(), b.ns, b.oid );
         }
         ObjectBuilder &b;
     };
@@ -417,8 +417,7 @@ namespace mongo {
     struct regexEnd {
         regexEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            b.back()->appendRegex( b.fieldName(), b.regex.c_str(),
-                                   b.regexOptions.c_str() );
+            b.back()->appendRegex( b.fieldName(), b.regex, b.regexOptions );
         }
         ObjectBuilder &b;
     };
