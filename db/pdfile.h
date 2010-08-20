@@ -80,6 +80,7 @@ namespace mongo {
         
     private:
         void badOfs(int) const;
+        void badOfs2(int) const;
 
         int defaultSize( const char *filename ) const;
 
@@ -353,8 +354,8 @@ namespace mongo {
 	}
 
     inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) { 
-        int ofs = dl.getOfs();
-        assert( ofs >= DataFileHeader::HeaderSize );
+        int ofs = dl.getOfs();	   
+        if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
         return (Record*) _p.at(ofs, size);
     }
 

@@ -279,6 +279,12 @@ namespace mongo {
         }
     }
 
+    void MongoDataFile::badOfs2(int ofs) const { 
+        stringstream ss;
+        ss << "bad offset:" << ofs << " accessing file: " << mmf.filename() << " - consider repairing database";
+        uasserted(13441, ss.str());
+    }
+
     void MongoDataFile::badOfs(int ofs) const { 
         stringstream ss;
         ss << "bad offset:" << ofs << " accessing file: " << mmf.filename() << " - consider repairing database";
