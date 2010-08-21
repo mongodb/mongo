@@ -502,7 +502,7 @@ namespace mongo {
 
         if ( !p->connect(*server) ) {
             stringstream ss;
-            ss << "couldn't connect to server " << _serverString << '}';
+            ss << "couldn't connect to server " << _serverString;
             errmsg = ss.str();
             failed = true;
             return false;
