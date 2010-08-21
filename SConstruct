@@ -631,8 +631,6 @@ elif "win32" == os.sys.platform:
     else:
         print( "boost found at '" + boostDir + "'" )
 
-    serverOnlyFiles += [ "util/ntservice.cpp" ]
-
     boostLibs = []
 
     env.Append(CPPPATH=[ "js/src/" ])
@@ -1170,7 +1168,7 @@ def checkErrorCodes():
 checkErrorCodes()
 
 # main db target
-mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "db/db.cpp" ] )
+mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "db/db.cpp" , "util/ntservice.cpp" ] )
 Default( mongod )
 
 # tools
