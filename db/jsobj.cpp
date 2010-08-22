@@ -463,9 +463,12 @@ namespace mongo {
     }
 
     FieldCompareResult compareDottedFieldNames( const string& l , const string& r ){
+        static int maxLoops = 1024 * 1024;
+        
         size_t lstart = 0;
         size_t rstart = 0;
-        while ( 1 ){
+
+        for ( int i=0; i<maxLoops; i++ ){
             if ( lstart >= l.size() ){
                 if ( rstart >= r.size() )
                     return SAME;
@@ -493,6 +496,10 @@ namespace mongo {
             lstart = lend + 1;
             rstart = rend + 1;
         }
+
+        log() << "compareDottedFieldNames ERROR  l: " << l << " r: " << r << "  TOO MANY LOOPS" << endl;
+        assert(0);
+        return SAME; // will never get here
     }
 
     /* BSONObj ------------------------------------------------------------*/
