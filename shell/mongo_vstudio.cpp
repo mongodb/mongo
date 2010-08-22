@@ -1317,6 +1317,7 @@ const StringData _jscode_raw_utils =
 "print(\"\\t\" + \"db.foo.find()                list objects in collection foo\");\n" 
 "print(\"\\t\" + \"db.foo.find( { a : 1 } )     list objects in foo where a == 1\");\n" 
 "print(\"\\t\" + \"it                           result of the last line evaluated; use to further iterate\");\n" 
+"print(\"\\t\" + \"DBQuery.shellBatchSize = x   set default number of items to display on shell\" );\n" 
 "print(\"\\t\" + \"exit                         quit the mongo shell\");\n" 
 "}\n" 
 ;
@@ -2700,8 +2701,8 @@ const StringData _jscode_raw_collection =
 "this._lastID = obj._id;\n" 
 "}\n" 
 "\n" 
-"DBCollection.prototype.remove = function( t ){\n" 
-"this._mongo.remove( this._fullName , this._massageObject( t ) );\n" 
+"DBCollection.prototype.remove = function( t , justOne ){\n" 
+"this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );\n" 
 "}\n" 
 "\n" 
 "DBCollection.prototype.update = function( query , obj , upsert , multi ){\n" 
