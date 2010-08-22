@@ -1415,7 +1415,7 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insertWithObjMod( ns(), one );
                 theDataFileMgr.insertWithObjMod( ns(), two );
                 theDataFileMgr.insertWithObjMod( ns(), three );
-                deleteObjects( ns(), BSON( "a" << GTE << 0 << "_id" << GT << 0 ), true );
+                deleteObjects( ns(), BSON( "a" << GTE << 0 ), true );
                 for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
                     ASSERT( 2 != c->current().getIntField( "_id" ) );
             }

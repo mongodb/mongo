@@ -785,6 +785,9 @@ namespace mongo {
 
         // this plan won, so set data for response broadly
         void finish( bool stop ) {
+            if ( _c.get() ) {
+                _nscanned = _c->nscanned();
+            }
             if ( _pq.isExplain() ) {
                 _n = _inMemSort ? _so->size() : _n;
             } 

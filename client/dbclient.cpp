@@ -384,8 +384,8 @@ namespace mongo {
     BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, const string& outputcolname) { 
         BSONObjBuilder b;
         b.append("mapreduce", nsGetCollection(ns));
-        b.appendCode("map", jsmapf.c_str());
-        b.appendCode("reduce", jsreducef.c_str());
+        b.appendCode("map", jsmapf);
+        b.appendCode("reduce", jsreducef);
         if( !query.isEmpty() )
             b.append("query", query);
         if( !outputcolname.empty() )
@@ -397,7 +397,7 @@ namespace mongo {
 
     bool DBClientWithCommands::eval(const string &dbname, const string &jscode, BSONObj& info, BSONElement& retValue, BSONObj *args) {
         BSONObjBuilder b;
-        b.appendCode("$eval", jscode.c_str());
+        b.appendCode("$eval", jscode);
         if ( args )
             b.appendArray("args", *args);
         bool ok = runCommand(dbname, b.done(), info);
@@ -502,7 +502,7 @@ namespace mongo {
 
         if ( !p->connect(*server) ) {
             stringstream ss;
-            ss << "couldn't connect to server " << _serverString << '}';
+            ss << "couldn't connect to server " << _serverString;
             errmsg = ss.str();
             failed = true;
             return false;

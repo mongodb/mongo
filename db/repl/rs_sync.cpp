@@ -131,6 +131,7 @@ namespace mongo {
         return true;
     }
 
+    /* tail the primary's oplog.  ok to return, will be re-called. */
     void ReplSetImpl::syncTail() { 
         // todo : locking vis a vis the mgr...
 
@@ -213,7 +214,8 @@ namespace mongo {
             }
         }
 
-        while( 1 ) { 
+        bool achievedMinValid = false;
+        while( 1 ) {
             while( 1 ) {
                 if( !r.moreInCurrentBatch() ) { 
                     /* we need to occasionally check some things. between 
@@ -237,6 +239,7 @@ namespace mongo {
                                 golive = true; /* must have been the original member */
                         }
                         if( golive ) {
+                            achievedMinValid = true;
                             sethbmsg("");
                             //log() << "replSet SECONDARY" << rsLog;
                             changeState(MemberState::RS_SECONDARY);
@@ -246,6 +249,9 @@ namespace mongo {
                         }
 
                         /* todo: too stale capability */
+                    }
+                    else {
+                        achievedMinValid = true;
                     }
 
                     if( box.getPrimary() != primary ) 
@@ -270,11 +276,39 @@ namespace mongo {
                         syncApply(o);
                         _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
                     }
+                    int sd = myConfig().slaveDelay;
+                    if( sd ) { 
+                        const OpTime ts = o["ts"]._opTime();
+                        long long a = ts.getSecs();
+                        long long b = time(0);
+                        long long lag = b - a;
+                        long long sleeptime = sd - lag;
+                        if( sleeptime > 0 ) {
+                            uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
+                            log() << "replSet temp slavedelay sleep:" << sleeptime << rsLog;
+                            if( sleeptime < 60 ) {
+                                sleepsecs((int) sleeptime);
+                            }
+                            else {
+                                // sleep(hours) would prevent reconfigs from taking effect & such!
+                                long long waitUntil = b + sleeptime;
+                                while( 1 ) {
+                                    sleepsecs(6);
+                                    if( time(0) >= waitUntil )
+                                        break;
+                                    if( box.getPrimary() != primary )
+                                        break;
+                                    if( myConfig().slaveDelay != sd ) // reconf
+                                        break;
+                                }
+                            }
+                        }
+                    }
                 }
             }
             r.tailCheck();
             if( !r.haveCursor() ) {
-                log() << "replSet TEMP end syncTail pass with " << hn << rsLog;
+                log(1) << "replSet end syncTail pass with " << hn << rsLog;
                 // TODO : reuse our connection to the primary.
                 return;
             }

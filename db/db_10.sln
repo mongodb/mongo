@@ -12,7 +12,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59
 		..\tools\bsondump.cpp = ..\tools\bsondump.cpp
 		..\tools\dump.cpp = ..\tools\dump.cpp
 		..\tools\export.cpp = ..\tools\export.cpp
-		..\tools\files.cpp = ..\tools\files.cpp
 		..\tools\import.cpp = ..\tools\import.cpp
 		..\tools\restore.cpp = ..\tools\restore.cpp
 		..\tools\sniffer.cpp = ..\tools\sniffer.cpp
@@ -29,9 +28,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "unix files", "unix files", 
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{407B4B88-3451-433C-B74F-31B31FEB5791}"
-	ProjectSection(SolutionItems) = preProject
-		..\shell\utils.h = ..\shell\utils.h
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other", "other", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
 EndProject

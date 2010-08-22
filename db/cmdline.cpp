@@ -54,6 +54,22 @@ namespace mongo {
     }
 
 
+#if defined(_WIN32)
+    void CmdLine::addWindowsOptions( boost::program_options::options_description& windows , 
+                                    boost::program_options::options_description& hidden ){
+        windows.add_options()
+            ("install", "install mongodb service")
+            ("remove", "remove mongodb service")
+            ("reinstall", "reinstall mongodb service (equivilant of mongod --remove followed by mongod --install)")
+            ("serviceName", po::value<string>(), "windows service name")
+            ("serviceUser", po::value<string>(), "user name service executes as")
+            ("servicePassword", po::value<string>(), "password used to authenticate serviceUser")
+            ;
+        hidden.add_options()("service", "start mongodb service");
+    }
+#endif
+
+
     bool CmdLine::store( int argc , char ** argv , 
                          boost::program_options::options_description& visible,
                          boost::program_options::options_description& hidden,

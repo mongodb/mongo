@@ -35,6 +35,7 @@ namespace mongo {
     CCById ClientCursor::clientCursorsById;
     CCByLoc ClientCursor::byLoc;
     boost::recursive_mutex ClientCursor::ccmutex;
+    long long ClientCursor::numberTimedOut = 0;
 
     unsigned ClientCursor::byLocSize() { 
         recursive_scoped_lock lock(ccmutex);
@@ -87,6 +88,11 @@ namespace mongo {
         }
     }
 
+    bool ClientCursor::shouldTimeout( unsigned millis ){
+        _idleAgeMillis += millis;
+        return _idleAgeMillis > 600000 && _pinValue == 0;
+    }
+
     /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
     void ClientCursor::idleTimeReport(unsigned millis) {
         recursive_scoped_lock lock(ccmutex);
@@ -94,6 +100,7 @@ namespace mongo {
             CCByLoc::iterator j = i;
             i++;
             if( j->second->shouldTimeout( millis ) ){
+                numberTimedOut++;
                 log(1) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns 
                        << " idle:" << j->second->idleTime() << "ms\n";
                 delete j->second;
@@ -157,7 +164,9 @@ namespace mongo {
             c->advance();
             if ( c->eof() ) {
                 // advanced to end
-                // leave ClieneCursor in place so next getMore doesn't fail
+                // leave ClientCursor in place so next getMore doesn't fail
+                // still need to mark new location though
+                cc->updateLocation();
             }
             else {
                 wassert( c->refLoc() != dl );
@@ -328,7 +337,14 @@ namespace mongo {
     }
 
 
-
+    void ClientCursor::appendStats( BSONObjBuilder& result ){
+        recursive_scoped_lock lock(ccmutex);
+        result.appendNumber("totalOpen", clientCursorsById.size() );
+        result.appendNumber("byLocation_size", byLoc.size() );
+        result.appendNumber("clientCursors_size", clientCursorsById.size() );
+        result.appendNumber( "timedOut" , numberTimedOut );
+    }
+    
     // QUESTION: Restrict to the namespace from which this command was issued?
     // Alternatively, make this command admin-only?
     class CmdCursorInfo : public Command {
@@ -340,10 +356,7 @@ namespace mongo {
         }
         virtual LockType locktype() const { return NONE; }
         bool run(const string&, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            recursive_scoped_lock lock(ClientCursor::ccmutex);
-            result.append("totalOpen", unsigned( ClientCursor::clientCursorsById.size() ) );
-            result.append("byLocation_size", unsigned( ClientCursor::byLoc.size() ) );
-            result.append("clientCursors_size", unsigned( ClientCursor::clientCursorsById.size() ) );
+            ClientCursor::appendStats( result );
             return true;
         }
     } cmdCursorInfo;

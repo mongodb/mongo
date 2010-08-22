@@ -376,7 +376,13 @@ namespace mongo {
                 globalFlushCounters.append( bb );
                 bb.done();
             }
-
+            
+            {
+                BSONObjBuilder bb( result.subobjStart( "cursors" ) );
+                ClientCursor::appendStats( bb );
+                bb.done();
+            }
+            
             timeBuilder.appendNumber( "after counters" , Listener::getElapsedTimeMillis() - start );            
 
             if ( anyReplEnabled() ){
@@ -1799,7 +1805,7 @@ namespace mongo {
         
 
         if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
-            result.append( "errmsg" ,  "access denied- use admin db" );
+            result.append( "errmsg" ,  "access denied; use admin db" );
             log() << "command denied: " << cmdObj.toString() << endl;
             return false;
         }        

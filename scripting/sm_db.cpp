@@ -95,7 +95,13 @@ namespace mongo {
 
     JSBool internal_cursor_hasNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
         DBClientCursor *cursor = getCursor( cx, obj );
-        *rval = cursor->more() ? JSVAL_TRUE : JSVAL_FALSE;
+        try {
+            *rval = cursor->more() ? JSVAL_TRUE : JSVAL_FALSE;
+        }
+        catch ( std::exception& e ){
+            JS_ReportError( cx , e.what() );
+            return JS_FALSE;
+        }
         return JS_TRUE;
     }
 
@@ -108,13 +114,23 @@ namespace mongo {
 
     JSBool internal_cursor_next(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
         DBClientCursor *cursor = getCursor( cx, obj );
-        if ( ! cursor->more() ){
-            JS_ReportError( cx , "cursor at the end" );
+
+        BSONObj n;        
+        
+        try {
+            if ( ! cursor->more() ){
+                JS_ReportError( cx , "cursor at the end" );
+                return JS_FALSE;
+            }
+
+            n = cursor->next();
+        }
+        catch ( std::exception& e ){
+            JS_ReportError( cx , e.what() );
             return JS_FALSE;
         }
-        Convertor c(cx);
 
-        BSONObj n = cursor->next();
+        Convertor c(cx);
         *rval = c.toval( &n );
         return JS_TRUE;
     }
@@ -310,7 +326,7 @@ namespace mongo {
     }
 
     JSBool mongo_remove(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        smuassert( cx ,  "mongo_remove needs 2 arguments" , argc == 2 );
+        smuassert( cx ,  "mongo_remove needs 2 or 3 arguments" , argc == 2 || argc == 3 );
         smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
         Convertor c( cx );
@@ -324,9 +340,12 @@ namespace mongo {
         
         string ns = c.toString( argv[0] );
         BSONObj o = c.toObject( argv[1] );
-
+        bool justOne = false;
+        if ( argc > 2 )
+            justOne = c.toBoolean( argv[2] );
+        
         try {
-            conn->remove( ns , o );
+            conn->remove( ns , o , justOne );
             return JS_TRUE;
         }
         catch ( ... ){
@@ -1023,7 +1042,7 @@ namespace mongo {
         }
         
         if ( JS_InstanceOf( c->_context , o , &dbpointer_class , 0 ) ){
-            b.appendDBRef( name , c->getString( o , "ns" ).c_str() , c->toOID( c->getProperty( o , "id" ) ) );
+            b.appendDBRef( name , c->getString( o , "ns" ) , c->toOID( c->getProperty( o , "id" ) ) );
             return true;
         }
         

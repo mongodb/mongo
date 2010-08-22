@@ -1000,7 +1000,7 @@ namespace mongo {
         virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
 
     protected:                
-        virtual void sayPiggyBack( Message &toSend ) { assert(false); }
+        virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
         
         bool isFailed() const {
             return _currentMaster == 0 || _currentMaster->isFailed();

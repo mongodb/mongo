@@ -324,7 +324,7 @@ namespace mongo {
             assert( s[0] == '/' );
             s = s.substr(1);
             string::size_type end = s.rfind( '/' );
-            b.appendRegex( name , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
+            b.appendRegex( name , s.substr( 0 , end ) , s.substr( end + 1 ) );
         }
 
         void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO , const TraverseStack& stack=TraverseStack() ){
@@ -368,7 +368,7 @@ namespace mongo {
                     appendRegex( b , name , s );
                 }
                 else {
-                    b.appendCode( name , getFunctionCode( val ).c_str() );
+                    b.appendCode( name , getFunctionCode( val ) );
                 }
                 break;
             }

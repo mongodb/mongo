@@ -74,7 +74,7 @@ namespace mongo {
             builder.appendDate( fieldName , Date_t((unsigned long long)getNumber( scopeName )) );
             break;
         case Code:
-            builder.appendCode( fieldName , getString( scopeName ).c_str() );
+            builder.appendCode( fieldName , getString( scopeName ) );
             break;
         default:
             stringstream temp;
@@ -319,7 +319,9 @@ namespace mongo {
                 _real = 0;
             }
             else {
-                log() << "warning: scopeCache is empty!" << endl;
+                // this means that the Scope was killed from a different thread
+                // for example a cursor got timed out that has a $where clause
+                log(3) << "warning: scopeCache is empty!" << endl;
                 delete _real;
                 _real = 0;
             }

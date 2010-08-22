@@ -23,6 +23,7 @@
 namespace mongo {
 
 	typedef bool ( *ServiceCallback )( void );
+    void serviceParamsCheck( program_options::variables_map& params, const std::string dbpath, int argc, char* argv[] );
 
     class ServiceController {
     public:

@@ -31,24 +31,26 @@ namespace mongo {
     extern string *discoveredSeed;
 
     void ReplSetImpl::sethbmsg(string s, int logLevel) { 
-      static time_t lastLogged;
-      if( s == _hbmsg ) { 
-	// unchanged
-	if( time(0)-lastLogged < 60 )
-	  return;
-      }
+        static time_t lastLogged;
+        _hbmsgTime = time(0);
 
-      unsigned sz = s.size();
-      if( sz >= 256 ) 
-	memcpy(_hbmsg, s.c_str(), 255);
-      else {
-	_hbmsg[sz] = 0;
-	memcpy(_hbmsg, s.c_str(), sz);
-      }
-      if( !s.empty() ) {
-	lastLogged = time(0);
-	log(logLevel) << "replSet " << s << rsLog;
-      }
+        if( s == _hbmsg ) { 
+            // unchanged
+            if( _hbmsgTime - lastLogged < 60 )
+                return;
+        }
+
+        unsigned sz = s.size();
+        if( sz >= 256 ) 
+            memcpy(_hbmsg, s.c_str(), 255);
+        else {
+            _hbmsg[sz] = 0;
+            memcpy(_hbmsg, s.c_str(), sz);
+        }
+        if( !s.empty() ) {
+            lastLogged = _hbmsgTime;
+            log(logLevel) << "replSet " << s << rsLog;
+        }
     }
 
     void ReplSetImpl::assumePrimary() { 
@@ -62,8 +64,9 @@ namespace mongo {
 
     void ReplSetImpl::relinquish() { 
         if( box.getState().primary() ) {
+            log() << "replSet relinquishing primary state" << rsLog;
             changeState(MemberState::RS_RECOVERING);
-            log() << "replSet info relinquished primary state" << rsLog;
+            //changeState(MemberState::RS_SECONDARY);
         }
         else if( box.getState().startup2() ) {
             // ? add comment
@@ -109,6 +112,9 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMasterHost(const Member *m, vector<string>& hosts, vector<string>& passives, vector<string>& arbiters) {
+        if( m->config().hidden )
+            return;
+
         if( m->potentiallyHot() ) {
             hosts.push_back(m->h().toString());
         }
@@ -157,6 +163,8 @@ namespace mongo {
             b.append("arbiterOnly", true);
         if( myConfig().slaveDelay )
             b.append("slaveDelay", myConfig().slaveDelay);
+        if( myConfig().hidden )
+            b.append("hidden", true);
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */

@@ -60,12 +60,6 @@ namespace mongo {
     extern bool checkNsFilesOnLoad;    
     extern string repairpath;
 
-#if defined(_WIN32)
-    std::wstring windowsServiceName = L"MongoDB";
-    std::wstring windowsServiceUser = L"";
-    std::wstring windowsServicePassword = L"";
-#endif
-
     void setupSignals();
     void closeAllSockets();
     void startReplSets(ReplSetCmdline*);
@@ -701,17 +695,10 @@ int main(int argc, char* argv[], char *envp[] )
 		#endif
         ("ipv6", "enable IPv6 support (disabled by default)")
         ;
-	#if defined(_WIN32)
-    windows_scm_options.add_options()
-        ("install", "install mongodb service")
-        ("remove", "remove mongodb service")
-        ("reinstall", "reinstall mongodb service (equivilant of mongod --remove followed by mongod --install)")
-        ("service", "start mongodb service")
-        ("serviceName", po::value<string>(), "windows service name")
-        ("serviceUser", po::value<string>(), "user name service executes as")
-        ("servicePassword", po::value<string>(), "password used to authenticate serviceUser")
-		;
-	#endif
+
+#if defined(_WIN32)
+    CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
+#endif
 
 	replication_options.add_options()
         ("master", "master mode")
@@ -773,10 +760,6 @@ int main(int argc, char* argv[], char *envp[] )
         cout << dbExecCommand << " --help for help and startup options" << endl;
 
     {
-        bool installService = false;
-        bool removeService = false;
-        bool reinstallService = false;
-        bool startService = false;
         po::variables_map params;
         
         string error_message = arg_error_check(argc, argv);
@@ -877,28 +860,6 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("notablescan")) {
             cmdLine.notablescan = true;
-        }
-        if (params.count("install")) {
-            if ( ! params.count( "logpath" ) ){
-                cout << "--install has to be used with --logpath" << endl;
-                ::exit(-1);
-            }
-
-            installService = true;
-        }
-        if (params.count("remove")) {
-            removeService = true;
-        }
-        if (params.count("reinstall")) {
-            if ( ! params.count( "logpath" ) ){
-                cout << "--reinstall has to be used with --logpath" << endl;
-                ::exit(-1);
-            }
-
-            reinstallService = true;
-        }
-        if (params.count("service")) {
-            startService = true;
         }
         if (params.count("master")) {
             replSettings.master = true;
@@ -1013,30 +974,6 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("noMoveParanoia")){
             cmdLine.moveParanoia = false;
         }
-#if defined(_WIN32)
-        if (params.count("serviceName")){
-            string x = params["serviceName"].as<string>();
-            windowsServiceName = wstring(x.size(),L' ');
-            for ( size_t i=0; i<x.size(); i++) {
-                windowsServiceName[i] = x[i];
-	    }
-        }
-        if (params.count("serviceUser")){
-            string x = params["serviceUser"].as<string>();
-            windowsServiceUser = wstring(x.size(),L' ');
-            for ( size_t i=0; i<x.size(); i++) {
-                windowsServiceUser[i] = x[i];
-	    }
-        }
-        if (params.count("servicePassword")){
-            string x = params["servicePassword"].as<string>();
-            windowsServicePassword = wstring(x.size(),L' ');
-            for ( size_t i=0; i<x.size(); i++) {
-                windowsServicePassword[i] = x[i];
-	    }
-        }
-        #endif
-
 
         Module::configAll( params );
         dataFileSync.go();
@@ -1080,24 +1017,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
 
 #if defined(_WIN32)
-        if ( reinstallService ) {
-            ServiceController::removeService( windowsServiceName );
-	}
-	if ( installService || reinstallService ) {
-            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", windowsServiceUser, windowsServicePassword, dbpath, argc, argv ) )
-                dbexit( EXIT_NTSERVICE_ERROR );
-            dbexit( EXIT_CLEAN );
-        }
-        else if ( removeService ) {
-            if ( !ServiceController::removeService( windowsServiceName ) )
-                dbexit( EXIT_NTSERVICE_ERROR );
-            dbexit( EXIT_CLEAN );
-        }
-        else if ( startService ) {
-            if ( !ServiceController::startService( windowsServiceName , mongo::initService ) )
-                dbexit( EXIT_NTSERVICE_ERROR );
-            dbexit( EXIT_CLEAN );
-        }
+        serviceParamsCheck( params, dbpath, argc, argv );
 #endif
     }
 

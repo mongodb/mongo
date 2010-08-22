@@ -14,5 +14,5 @@ assert.eq( 4 , t.count() , "B" );
 t.remove( { _id : 5 } );
 assert.eq( 3 , t.count() , "C" );
 
-t.remove( { _id : { $lt : 8 } } , "D" );
+t.remove( { _id : { $lt : 8 } } );
 assert.eq( 1 , t.count() , "D" );

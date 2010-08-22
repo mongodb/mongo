@@ -176,11 +176,11 @@ namespace mongo {
                 { // query options
                     if ( cmdObj["query"].type() == Object ){
                         filter = cmdObj["query"].embeddedObjectUserCheck();
-                        q = filter;
                     }
                     
-                    if ( cmdObj["sort"].type() == Object )
-                        q.sort( cmdObj["sort"].embeddedObjectUserCheck() );
+                    if ( cmdObj["sort"].type() == Object ){
+                        sort = cmdObj["sort"].embeddedObjectUserCheck();
+                    }
 
                     if ( cmdObj["limit"].isNumber() )
                         limit = cmdObj["limit"].numberLong();
@@ -222,7 +222,7 @@ namespace mongo {
             // query options
             
             BSONObj filter;
-            Query q;
+            BSONObj sort;
             long long limit;
 
             // functions
@@ -444,7 +444,7 @@ namespace mongo {
                         readlock lock( mr.ns );
                         Client::Context ctx( mr.ns );
                         
-                        shared_ptr<Cursor> temp = bestGuessCursor( mr.ns.c_str(), mr.filter, BSONObj() );
+                        shared_ptr<Cursor> temp = bestGuessCursor( mr.ns.c_str(), mr.filter, mr.sort );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.ns.c_str() ) );
 
                         Timer mt;
@@ -636,7 +636,7 @@ namespace mongo {
                         
                         uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
                         servers.insert( shard );
-                        shardCounts.appendAs( res["counts"] , shard.c_str() );
+                        shardCounts.appendAs( res["counts"] , shard );
                         
                         BSONObjIterator j( res["counts"].embeddedObjectUserCheck() );
                         while ( j.more() ){

@@ -127,7 +127,7 @@ namespace mongo {
 
     void Top::append( BSONObjBuilder& b , const UsageMap& map ){
         for ( UsageMap::const_iterator i=map.begin(); i!=map.end(); i++ ){
-            BSONObjBuilder bb( b.subobjStart( i->first.c_str() ) );
+            BSONObjBuilder bb( b.subobjStart( i->first ) );
             
             const CollectionData& coll = i->second;
             

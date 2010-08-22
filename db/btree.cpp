@@ -374,21 +374,26 @@ namespace mongo {
         }
     }
     
-    int BtreeBucket::customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, const vector< const BSONElement * > &rEnd, const Ordering &o ) {
+    int BtreeBucket::customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, bool rSup, const vector< const BSONElement * > &rEnd, const vector< bool > &rEndInclusive, const Ordering &o, int direction ) {
         BSONObjIterator ll( l );
         BSONObjIterator rr( rBegin );
         vector< const BSONElement * >::const_iterator rr2 = rEnd.begin();
+        vector< bool >::const_iterator inc = rEndInclusive.begin();
         unsigned mask = 1;
         for( int i = 0; i < rBeginLen; ++i, mask <<= 1 ) {
             BSONElement lll = ll.next();
             BSONElement rrr = rr.next();
             ++rr2;
+            ++inc;
             
             int x = lll.woCompare( rrr, false );
             if ( o.descending( mask ) )
                 x = -x;
             if ( x != 0 )
                 return x;
+        }
+        if ( rSup ) {
+            return -direction;
         }
         for( ; ll.more(); mask <<= 1 ) {
             BSONElement lll = ll.next();
@@ -399,6 +404,10 @@ namespace mongo {
                 x = -x;
             if ( x != 0 )
                 return x;
+            if ( !*inc ) {
+                return -direction;
+            }
+            ++inc;
         }
         return 0;
     }
@@ -887,8 +896,8 @@ found:
         else
             return pos == n ? DiskLoc() /*theend*/ : thisLoc;
     }
-
-    bool BtreeBucket::customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) {
+    
+    bool BtreeBucket::customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) {
         while( 1 ) {
             if ( l + 1 == h ) {
                 keyOfs = ( direction > 0 ) ? h : l;
@@ -902,7 +911,7 @@ found:
                 }
             }
             int m = l + ( h - l ) / 2;
-            int cmp = customBSONCmp( thisLoc.btree()->keyNode( m ).key, keyBegin, keyBeginLen, keyEnd, order );
+            int cmp = customBSONCmp( thisLoc.btree()->keyNode( m ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction );
             if ( cmp < 0 ) {
                 l = m;
             } else if ( cmp > 0 ) {
@@ -920,22 +929,22 @@ found:
     // find smallest/biggest value greater-equal/less-equal than specified
     // starting thisLoc + keyOfs will be strictly less than/strictly greater than keyBegin/keyBeginLen/keyEnd
     // All the direction checks below allowed me to refactor the code, but possibly separate forward and reverse implementations would be more efficient
-    void BtreeBucket::advanceTo(const IndexDetails &id, DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, const vector< const BSONElement * > &keyEnd, const Ordering &order, int direction ) {
+    void BtreeBucket::advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) {
         int l,h;
         bool dontGoUp;
         if ( direction > 0 ) {
             l = keyOfs;
             h = n - 1;
-            dontGoUp = ( customBSONCmp( keyNode( h ).key, keyBegin, keyBeginLen, keyEnd, order ) >= 0 );
+            dontGoUp = ( customBSONCmp( keyNode( h ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) >= 0 );
         } else {
             l = 0;
             h = keyOfs;
-            dontGoUp = ( customBSONCmp( keyNode( l ).key, keyBegin, keyBeginLen, keyEnd, order ) <= 0 );
+            dontGoUp = ( customBSONCmp( keyNode( l ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) <= 0 );
         }
         pair< DiskLoc, int > bestParent;
         if ( dontGoUp ) {
             // this comparison result assures h > l
-            if ( !customFind( l, h, keyBegin, keyBeginLen, keyEnd, order, direction, thisLoc, keyOfs, bestParent ) ) {
+            if ( !customFind( l, h, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction, thisLoc, keyOfs, bestParent ) ) {
                 return;
             }
         } else {
@@ -943,26 +952,34 @@ found:
             while( !thisLoc.btree()->parent.isNull() ) {
                 thisLoc = thisLoc.btree()->parent;
                 if ( direction > 0 ) {
-                    if ( customBSONCmp( thisLoc.btree()->keyNode( thisLoc.btree()->n - 1 ).key, keyBegin, keyBeginLen, keyEnd, order ) >= 0 ) {
+                    if ( customBSONCmp( thisLoc.btree()->keyNode( thisLoc.btree()->n - 1 ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) >= 0 ) {
                         break;
                     }
                 } else {
-                    if ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, keyEnd, order ) <= 0 ) {
+                    if ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) <= 0 ) {
                         break;
                     }                    
                 }
             }
         }
+        customLocate( thisLoc, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction, bestParent );
+    }
+    
+    void BtreeBucket::customLocate(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) {
+        if ( thisLoc.btree()->n == 0 ) {
+            thisLoc = DiskLoc();
+            return;
+        }
         // go down until find smallest/biggest >=/<= target
         while( 1 ) {
-            l = 0;
-            h = thisLoc.btree()->n - 1;
+            int l = 0;
+            int h = thisLoc.btree()->n - 1;
             // leftmost/rightmost key may possibly be >=/<= search key
             bool firstCheck;
             if ( direction > 0 ) {
-                firstCheck = ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, keyEnd, order ) >= 0 );
+                firstCheck = ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) >= 0 );
             } else {
-                firstCheck = ( customBSONCmp( thisLoc.btree()->keyNode( h ).key, keyBegin, keyBeginLen, keyEnd, order ) <= 0 );
+                firstCheck = ( customBSONCmp( thisLoc.btree()->keyNode( h ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) <= 0 );
             }
             if ( firstCheck ) {
                 DiskLoc next;
@@ -983,9 +1000,9 @@ found:
             }
             bool secondCheck;
             if ( direction > 0 ) {
-                secondCheck = ( customBSONCmp( thisLoc.btree()->keyNode( h ).key, keyBegin, keyBeginLen, keyEnd, order ) < 0 );
+                secondCheck = ( customBSONCmp( thisLoc.btree()->keyNode( h ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) < 0 );
             } else {
-                secondCheck = ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, keyEnd, order ) > 0 );
+                secondCheck = ( customBSONCmp( thisLoc.btree()->keyNode( 0 ).key, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) > 0 );
             }
             if ( secondCheck ) {
                 DiskLoc next;
@@ -1004,7 +1021,7 @@ found:
                     continue;
                 }
             }
-            if ( !customFind( l, h, keyBegin, keyBeginLen, keyEnd, order, direction, thisLoc, keyOfs, bestParent ) ) {
+            if ( !customFind( l, h, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction, thisLoc, keyOfs, bestParent ) ) {
                 return;
             }
         }

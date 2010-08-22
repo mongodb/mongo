@@ -233,6 +233,17 @@ namespace mongo {
             return append( fieldName , d );
         }
 
+        BSONObjBuilder& appendNumber( const StringData& fieldName , size_t n ){
+            static size_t maxInt = (size_t)pow( 2.0 , 30.0 );
+
+            if ( n < maxInt )
+                append( fieldName , (int)n );
+            else
+                append( fieldName , (long long)n );
+            return *this;
+        }
+
+
         BSONObjBuilder& appendNumber( const StringData& fieldName , long long l ){
             static long long maxInt = (int)pow( 2.0 , 30.0 );
             static long long maxDouble = (long long)pow( 2.0 , 40.0 );
@@ -335,27 +346,22 @@ namespace mongo {
             @param regex the regular expression pattern
             @param regex options such as "i" or "g"
         */
-        BSONObjBuilder& appendRegex(const StringData& fieldName, const char *regex, const char *options = "") {
+        BSONObjBuilder& appendRegex(const StringData& fieldName, const StringData& regex, const StringData& options = "") {
             _b.appendNum((char) RegEx);
             _b.appendStr(fieldName);
             _b.appendStr(regex);
             _b.appendStr(options);
             return *this;
         }
-        /** Append a regular expression value
-            @param regex the regular expression pattern
-            @param regex options such as "i" or "g"
-        */
-        BSONObjBuilder& appendRegex(const StringData& fieldName, string regex, string options = "") {
-            return appendRegex(fieldName, regex.c_str(), options.c_str());
-        }
-        BSONObjBuilder& appendCode(const StringData& fieldName, const char *code) {
+
+        BSONObjBuilder& appendCode(const StringData& fieldName, const StringData& code) {
             _b.appendNum((char) Code);
             _b.appendStr(fieldName);
-            _b.appendNum((int) strlen(code)+1);
+            _b.appendNum((int) code.size()+1);
             _b.appendStr(code);
             return *this;
         }
+
         /** Append a string element. len DOES include terminating nul */
         BSONObjBuilder& append(const StringData& fieldName, const char *str, int len) {
             _b.appendNum((char) String);
@@ -366,16 +372,17 @@ namespace mongo {
         }
         /** Append a string element */
         BSONObjBuilder& append(const StringData& fieldName, const char *str) {
-            return append(fieldName, str, (int) strlen(str)+1);
+           return append(fieldName, str, (int) strlen(str)+1);
         }
         /** Append a string element */
         BSONObjBuilder& append(const StringData& fieldName, string str) {
             return append(fieldName, str.c_str(), (int) str.size()+1);
         }
-        BSONObjBuilder& appendSymbol(const StringData& fieldName, const char *symbol) {
+
+        BSONObjBuilder& appendSymbol(const StringData& fieldName, const StringData& symbol) {
             _b.appendNum((char) Symbol);
             _b.appendStr(fieldName);
-            _b.appendNum((int) strlen(symbol)+1);
+            _b.appendNum((int) symbol.size()+1);
             _b.appendStr(symbol);
         return *this; }
 
@@ -424,10 +431,10 @@ namespace mongo {
         Append an element of the deprecated DBRef type.
         @deprecated 
         */
-        BSONObjBuilder& appendDBRef( const StringData& fieldName, const char *ns, const OID &oid ) {
+        BSONObjBuilder& appendDBRef( const StringData& fieldName, const StringData& ns, const OID &oid ) {
             _b.appendNum( (char) DBRef );
             _b.appendStr( fieldName );
-            _b.appendNum( (int) strlen( ns ) + 1 );
+            _b.appendNum( (int) ns.size() + 1 );
             _b.appendStr( ns );
             _b.appendBuf( (void *) &oid, 12 );
             return *this; 
@@ -471,11 +478,11 @@ namespace mongo {
         /** Append to the BSON object a field of type CodeWScope.  This is a javascript code 
             fragment accompanied by some scope that goes with it.
         */
-        BSONObjBuilder& appendCodeWScope( const StringData& fieldName, const char *code, const BSONObj &scope ) {
+        BSONObjBuilder& appendCodeWScope( const StringData& fieldName, const StringData& code, const BSONObj &scope ) {
             _b.appendNum( (char) CodeWScope );
             _b.appendStr( fieldName );
-            _b.appendNum( ( int )( 4 + 4 + strlen( code ) + 1 + scope.objsize() ) );
-            _b.appendNum( ( int ) strlen( code ) + 1 );
+            _b.appendNum( ( int )( 4 + 4 + code.size() + 1 + scope.objsize() ) );
+            _b.appendNum( ( int ) code.size() + 1 );
             _b.appendStr( code );
             _b.appendBuf( ( void * )scope.objdata(), scope.objsize() );
             return *this;
@@ -487,11 +494,8 @@ namespace mongo {
         }
         
         /* helper function -- see Query::where() for primary way to do this. */
-        void appendWhere( const char *code, const BSONObj &scope ){
+        void appendWhere( const StringData& code, const BSONObj &scope ){
             appendCodeWScope( "$where" , code , scope );
-        }
-        void appendWhere( const string &code, const BSONObj &scope ){
-            appendWhere( code.c_str(), scope );
         }
         
         /**
@@ -669,19 +673,19 @@ namespace mongo {
             return *this;
         }
         
-        BufBuilder &subobjStart( const char *name = "0" ) {
+        BufBuilder &subobjStart( const StringData& name = "0" ) {
             fill( name );
-            return _b.subobjStart( num().c_str() );
+            return _b.subobjStart( num() );
         }
 
         BufBuilder &subarrayStart( const char *name ) {
             fill( name );
-            return _b.subarrayStart( num().c_str() );
+            return _b.subarrayStart( num() );
         }
         
         void appendArray( const StringData& name, BSONObj subObj ) {
             fill( name );
-            _b.appendArray( num().c_str(), subObj );
+            _b.appendArray( num(), subObj );
         }
         
         void appendAs( const BSONElement &e, const char *name ) {
