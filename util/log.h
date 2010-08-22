@@ -384,7 +384,8 @@ namespace mongo {
             }
         }
         else {
-            cout << s.data() << endl;
+            cout << s.data();
+            cout.flush();
         }
     }
 
