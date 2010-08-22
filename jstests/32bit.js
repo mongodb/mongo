@@ -1,3 +1,4 @@
+function f() {
 pass = 1;
 
 db.dropDatabase();
@@ -84,6 +85,10 @@ while( 1 ) {
 }
 
 print("32bit.js SUCCESS");
+}
 
-
-
+var h = (new Date()).getHours();
+if( h <= 4 || h >= 21 ) {
+    /* this test is slow, so don't run during the day */
+    f();
+}
