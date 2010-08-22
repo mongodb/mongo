@@ -326,7 +326,7 @@ namespace mongo {
     }
 
     JSBool mongo_remove(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        smuassert( cx ,  "mongo_remove needs 2 arguments" , argc == 2 );
+        smuassert( cx ,  "mongo_remove needs 2 or 3 arguments" , argc == 2 || argc == 3 );
         smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
         Convertor c( cx );
@@ -340,9 +340,12 @@ namespace mongo {
         
         string ns = c.toString( argv[0] );
         BSONObj o = c.toObject( argv[1] );
-
+        bool justOne = false;
+        if ( argc > 2 )
+            justOne = c.toBoolean( argv[2] );
+        
         try {
-            conn->remove( ns , o );
+            conn->remove( ns , o , justOne );
             return JS_TRUE;
         }
         catch ( ... ){
