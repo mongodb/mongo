@@ -156,27 +156,21 @@ namespace mongo {
         }
         printStackTrace();
     }
-    
+
+    /* note: can't use malloc herein - may be in signal handler.
+             logLockless() likely does not comply and should still be fixed todo
+             */
     void rawOut( const string &s ) {
         if( s.empty() ) return;
 
-        char smallbuf[512];
-        char *buf = smallbuf;
-        if( s.size() + 20 + 10 > 512 ) {
-            // don't use the heap unless the output is really big.  that way rawOut("out of memory") is ok.
-            buf = new char[32 + s.size()];
-        }
-
+        char buf[64];
         time_t_to_String( time(0) , buf );
         buf[20] = ' ';
-        strncpy( buf + 21 , s.c_str() , s.size() );
-        buf[21+s.size()] = '\n';
-        buf[21+s.size()+1] = 0;
+        buf[21] = 0;
 
-        Logstream::logLockless( buf );
-
-        if( buf != smallbuf ) 
-            delete[] buf;
+        Logstream::logLockless(buf);
+        Logstream::logLockless(s);
+        Logstream::logLockless("\n");
     }
 
     ostream& operator<<( ostream &s, const ThreadSafeString &o ){
