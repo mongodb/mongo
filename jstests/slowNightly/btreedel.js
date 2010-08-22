@@ -9,7 +9,7 @@ for (var i = 0; i < 1000000; i++) {
 
 print("1 insert done count: " + t.count());
 
-var c = t.find().sort({ _id: 1 });
+var c = t.find({y:null}).sort({ _id: 1 });
 for (var j = 0; j < 400000; j++) {
     c.next();
     if (j % 200000 == 0)
@@ -17,11 +17,15 @@ for (var j = 0; j < 400000; j++) {
 }
 printjson(c.next());
 
+var d = t.find({ _id: { $gt: 300000} }).sort({ _id: -1 });
+d.next();
+
 print("2");
 
 t.remove({ _id: { $gt: 200000, $lt: 600000} });
 
 print("3");
+print(d.hasNext());
 
 n = 0;
 last = {};
