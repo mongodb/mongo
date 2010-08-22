@@ -170,8 +170,8 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
     this._lastID = obj._id;
 }
 
-DBCollection.prototype.remove = function( t ){
-    this._mongo.remove( this._fullName , this._massageObject( t ) );
+DBCollection.prototype.remove = function( t , justOne ){
+    this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );
 }
 
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
