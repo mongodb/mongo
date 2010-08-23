@@ -1,5 +1,5 @@
 
-t = db.getCollection( "foo" );
+t = db.getCollection( "foo_basic3" );
 
 t.find( { "a.b" : 1 } ).toArray();
 

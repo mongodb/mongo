@@ -1,6 +1,6 @@
 
-a = db.getSisterDB( "test_dbnamea" )
-b = db.getSisterDB( "test_dbnameA" )
+a = db.getSisterDB( "dbcasetest_dbnamea" )
+b = db.getSisterDB( "dbcasetest_dbnameA" )
 
 a.dropDatabase();
 b.dropDatabase();
