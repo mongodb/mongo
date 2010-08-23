@@ -172,7 +172,7 @@ namespace mongo {
     JSBool mongo_external_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         Convertor c( cx );
         
-        uassert( 10238 ,  "0 or 1 args to Mongo" , argc <= 1 );
+        smuassert( cx ,  "0 or 1 args to Mongo" , argc <= 1 );
         
         string host = "127.0.0.1";
         if ( argc > 0 )
@@ -223,9 +223,9 @@ namespace mongo {
      };
 
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        uassert( 10240 ,  "mongo_find neesd 6 args" , argc == 6 );
+        smuassert( cx , "mongo_find needs 6 args" , argc == 6 );
         shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
-        uassert( 10241 ,  "no connection!" , connHolder && connHolder->get() );
+        smuassert( cx ,  "no connection!" , connHolder && connHolder->get() );
         DBClientWithCommands *conn = connHolder->get();
                       
         Convertor c( cx );
