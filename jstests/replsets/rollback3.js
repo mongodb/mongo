@@ -56,8 +56,13 @@ function dbs_match(a, b) {
     var c = a.getCollectionNames();
     for( var i in c ) {
         print("checking " + c[i]);
-        if( !friendlyEqual( a[c[i]].find().sort({_id:1}).toArray(), b[c[i]].find().sort({_id:1}).toArray() ) ) { 
+        // system.indexes doesn't have _id so the more involved sort here: 
+        if (!friendlyEqual(a[c[i]].find().sort({ _id: 1, ns:1, name:1 }).toArray(), b[c[i]].find().sort({ _id: 1, ns:1,name:1 }).toArray())) {
             print("dbs_match: collections don't match " + c[i]);
+            if (a[c[i]].count() < 12) {
+                printjson(a[c[i]].find().sort({ _id: 1 }).toArray());
+                printjson(b[c[i]].find().sort({ _id: 1 }).toArray());
+            }
             return false;
         }
     }
@@ -68,6 +73,9 @@ function dbs_match(a, b) {
 function doInitialWrites(db) {
     db.b.insert({ x: 1 });
     db.b.ensureIndex({ x: 1 });
+    db.oldname.insert({ y: 1 });
+    db.oldname.insert({ y: 2 });
+    db.oldname.ensureIndex({ y: 1 },true);
     t = db.bar;
     t.insert({ q:0});
     t.insert({ q: 1, a: "foo" });
@@ -83,7 +91,7 @@ function doInitialWrites(db) {
 }
 
 /* these writes on one primary only and will be rolled back. */
-function doItemsToRollBack(db) {
+function doItemsToRollBack(db) {    
     t = db.bar;
     t.insert({ q: 4 });
     t.update({ q: 3 }, { q: 3, rb: true });
@@ -111,6 +119,8 @@ function doItemsToRollBack(db) {
 
     // drop an index - verify it comes back
     db.b.dropIndexes();
+
+    db.oldname.renameCollection("newname");
 }
 
 function doWritesToKeep2(db) {
