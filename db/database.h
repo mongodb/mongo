@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    class ClientCursor;
+
     /**
      * Database represents a database database
      * Each database database has its own set of files -- dbname.ns, dbname.0, dbname.1, ...
@@ -196,6 +198,9 @@ namespace mongo {
         NamespaceIndex namespaceIndex;
         int profile; // 0=off.
         string profileName; // "alleyinsider.system.profile"
+
+        multimap<DiskLoc, ClientCursor*> ccByLoc;
+
         int magic; // used for making sure the object is still loaded in memory 
     };
 

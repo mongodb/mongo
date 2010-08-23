@@ -287,7 +287,6 @@ namespace mongo {
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            
             long long start = Listener::getElapsedTimeMillis();
             BSONObjBuilder timeBuilder(128);
 
