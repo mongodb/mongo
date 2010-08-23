@@ -38,13 +38,6 @@ namespace mongo {
     boost::recursive_mutex ClientCursor::ccmutex;
     long long ClientCursor::numberTimedOut = 0;
 
-    unsigned ClientCursor::byLocSize() { 
-        log() << "todo ClientCursor::byLocSize()" << endl;
-        return 0;
-        //recursive_scoped_lock lock(ccmutex);
-        //return byLoc.size();
-    }
-
     /*static*/ void ClientCursor::assertNoCursors() { 
         recursive_scoped_lock lock(ccmutex);
         if( clientCursorsById.size() ) { 
