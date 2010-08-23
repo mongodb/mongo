@@ -127,7 +127,17 @@ namespace mongo {
         int size(){
             return _size;
         }
-        
+                
+        void forEach(boost::function<void(Database *)> f) const {
+            dbMutex.assertAtLeastReadLocked();
+            for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ){
+                DBs m = i->second;
+                for( DBs::const_iterator j=m.begin(); j!=m.end(); j++ ){
+                    f(j->second);
+                }
+            }
+        }         
+
         /**
          * gets all unique db names, ignoring paths
          */
