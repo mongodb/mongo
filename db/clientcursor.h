@@ -76,28 +76,27 @@ namespace mongo {
            had a bug, it could (or perhaps some sort of attack situation).
         */
         class Pointer : boost::noncopyable { 
-        public:
             ClientCursor *_c;
+        public:
+            ClientCursor * c() { return _c; }
             void release() {
                 if( _c ) {
                     assert( _c->_pinValue >= 100 );
                     _c->_pinValue -= 100;
+                    _c = 0;
                 }
-                _c = 0;
             }
+            ~Pointer() { release(); }
             Pointer(long long cursorid) {
                 recursive_scoped_lock lock(ccmutex);
                 _c = ClientCursor::find_inlock(cursorid, true);
                 if( _c ) {
                     if( _c->_pinValue >= 100 ) {
                         _c = 0;
-                        uassert(12051, "clientcursor already in use? driver problem?", false);
+                        uasserted(12051, "clientcursor already in use? driver problem?");
                     }
                     _c->_pinValue += 100;
                 }
-            }
-            ~Pointer() {
-                release();
             }
         }; 
         
@@ -108,15 +107,12 @@ namespace mongo {
         public:
             CleanupPointer() : _c( 0 ), _id( -1 ) {}
             void reset( ClientCursor *c = 0 ) {
-                if ( c == _c ) {
+                if ( c == _c )
                     return;
-                }
-
                 if ( _c ) {
                     // be careful in case cursor was deleted by someone else
                     ClientCursor::erase( _id );
-                }
-                
+                }                
                 if ( c ) {
                     _c = c;
                     _id = c->cursorid;
@@ -160,11 +156,10 @@ namespace mongo {
             cursorid = allocCursorId_inlock();
             clientCursorsById.insert( make_pair(cursorid, this) );
         }
+
         ~ClientCursor();
 
-        DiskLoc lastLoc() const {
-            return _lastLoc;
-        }
+        DiskLoc lastLoc() const { return _lastLoc; }
 
         shared_ptr< ParsedQuery > pq;
         shared_ptr< FieldMatcher > fields; // which fields query wants returned
@@ -214,50 +209,32 @@ namespace mongo {
                     relock();
                 }
             }
-
             bool stillOk(){
                 if ( ! _canYield )
                     return true;
-
                 relock();
-                
                 return ClientCursor::recoverFromYield( _data );
             }
-
             void relock(){
                 _unlock.reset();
             }
-            
         private:
-            bool _canYield;
-            YieldData _data;
-            
+            const bool _canYield;
+            YieldData _data;            
             scoped_ptr<dbtempreleasecond> _unlock;
-
         };
 
         // --- some pass through helpers for Cursor ---
 
-        BSONObj indexKeyPattern() {
-            return c->indexKeyPattern();
-        }
-
-        bool ok(){
-            return c->ok();
-        }
-
-        bool advance(){
-            return c->advance();
-        }
+        BSONObj indexKeyPattern() { return c->indexKeyPattern();  }
+        bool ok() { return c->ok(); }
+        bool advance(){ return c->advance(); }
+        BSONObj current() {  return c->current(); }
 
         bool currentMatches(){
             if ( ! c->matcher() )
                 return true;
             return c->matcher()->matchesCurrent( c.get() );
-        }
-
-        BSONObj current(){
-            return c->current();
         }
 
     private:

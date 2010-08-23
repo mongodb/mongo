@@ -285,7 +285,7 @@ namespace mongo {
 //        log() << "TEMP GETMORE " << ns << ' ' << cursorid << ' ' << pass << endl;
         exhaust = false;
         ClientCursor::Pointer p(cursorid);
-        ClientCursor *cc = p._c;
+        ClientCursor *cc = p.c();
         
         int bufSize = 512;
         if ( cc ){
