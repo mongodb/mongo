@@ -266,8 +266,8 @@ namespace mongo {
             
             ss << "# databases: " << dbHolder.size() << '\n';
             
-//            if( ClientCursor::byLocSize()>500 )
-//                ss << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << '\n';
+            if( ClientCursor::numCursors()>500 )
+                ss << "# Cursors: " << ClientCursor::numCursors() << '\n';
             
             ss << "\nreplication: ";
             if( *replInfo )
