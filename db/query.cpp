@@ -1063,13 +1063,12 @@ namespace mongo {
             if ( moreClauses ) {
                 // this MultiCursor will use a dumb NoOp to advance(), so no need to specify mayYield
                 shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher(), dqo ) );
-                cc = new ClientCursor(queryOptions, multi, ns);
+                cc = new ClientCursor(queryOptions, multi, ns, jsobj.getOwned());
             } else {
                 cursor->setMatcher( dqo.matcher() );
-                cc = new ClientCursor( queryOptions, cursor, ns );
+                cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
             }
             cursorid = cc->cursorid;
-            cc->query = jsobj.getOwned();
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->pos = n;
             cc->pq = pq_shared;

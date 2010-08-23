@@ -138,17 +138,18 @@ namespace mongo {
         /*const*/ CursorId cursorid;
         const string ns;
         const shared_ptr<Cursor> c;
-        int pos;                  // # objects into the cursor so far 
-        BSONObj query;
+        int pos;                        // # objects into the cursor so far 
+        const BSONObj query;            // used for logging diags only; optional in constructor
         const int _queryOptions;        // see enum QueryOptions dbclient.h
         OpTime _slaveReadTill;
         Database * const _db;
 
-        ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const string& _ns) :
+        ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const string& _ns, BSONObj _query = BSONObj()) :
             _idleAgeMillis(0), _pinValue(0), 
             _doingDeletes(false), _yieldSometimesTracker(128,10),
             ns(_ns), c(_c), 
-            pos(0), _queryOptions(queryOptions), 
+            pos(0), query(_query), 
+            _queryOptions(queryOptions), 
             _db( cc().database() )
         {
             assert( _db );
