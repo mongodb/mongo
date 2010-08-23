@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+    Client* Client::syncThread;
     mongo::mutex Client::clientsMutex("clientsMutex");
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;

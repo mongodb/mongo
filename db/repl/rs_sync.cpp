@@ -28,6 +28,7 @@ namespace mongo {
 
     void startSyncThread() { 
         Client::initThread("rs_sync");
+        cc().iAmSyncThread();
         theReplSet->syncThread();
         cc().shutdown();
     }
