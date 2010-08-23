@@ -145,14 +145,19 @@ namespace mongo {
                 return false;
             }
 
+            // If there's not enough data for more than one chunk, no point continuing.
             NamespaceDetails *d = nsdetails( ns );
-            BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+            const long long dataSize = d->datasize;
+            if ( dataSize < maxChunkSize ) {
+                vector<BSONObj> emptyVector;
+                result.append( "splitKeys" , emptyVector );
+                return true;
+            }
 
             // We'll use the average object size and number of object to find approximately how many keys
             // each chunk should have. We'll split a little smaller than the specificied by 'maxSize'
             // assuming a recently sharded collectio is still going to grow.
 
-            const long long dataSize = d->datasize;
             const long long recCount = d->nrecords;
             long long keyCount = 0;
             if (( dataSize > 0 ) && ( recCount > 0 )){
@@ -168,6 +173,8 @@ namespace mongo {
             long long currCount = 0;
             vector<BSONObj> splitKeys;
             BSONObj currKey;
+            BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+
             while ( c.ok() ){ 
                 currCount++;
                 if ( currCount > keyCount ){
