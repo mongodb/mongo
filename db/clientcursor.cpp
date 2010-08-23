@@ -384,7 +384,7 @@ namespace mongo {
     void ClientCursor::appendStats( BSONObjBuilder& result ){
         recursive_scoped_lock lock(ccmutex);
         result.appendNumber("totalOpen", clientCursorsById.size() );
-        result.appendNumber("clientCursors_size", numCursors());
+        result.appendNumber("clientCursors_size", (int) numCursors());
         result.appendNumber("timedOut" , numberTimedOut);
     }
     
