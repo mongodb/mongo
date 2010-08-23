@@ -120,7 +120,11 @@ function doItemsToRollBack(db) {
     // drop an index - verify it comes back
     db.b.dropIndexes();
 
+    // two to see if we transitively rollback?
     db.oldname.renameCollection("newname");
+    db.newname.renameCollection("fooname");
+
+    assert(db.fooname.count() > 0, "count rename");
 }
 
 function doWritesToKeep2(db) {
