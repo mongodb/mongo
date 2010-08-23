@@ -745,6 +745,7 @@ namespace mongo {
                          fn == "reduce" ||
                          fn == "query" ||
                          fn == "sort" ||
+                         fn == "scope" ||
                          fn == "verbose" ){
                         b.append( e );
                     }
