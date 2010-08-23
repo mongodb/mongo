@@ -66,6 +66,8 @@ function dbs_match(a, b) {
 
 /* these writes will be initial data and replicate everywhere. */
 function doInitialWrites(db) {
+    db.b.insert({ x: 1 });
+    db.b.ensureIndex({ x: 1 });
     t = db.bar;
     t.insert({ q:0});
     t.insert({ q: 1, a: "foo" });
@@ -106,6 +108,9 @@ function doItemsToRollBack(db) {
 
     // drop a collection - we'll need all its data back!
     t.drop();
+
+    // drop an index - verify it comes back
+    db.b.dropIndexes();
 }
 
 function doWritesToKeep2(db) {
