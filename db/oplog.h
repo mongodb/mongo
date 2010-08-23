@@ -195,7 +195,7 @@ namespace mongo {
             // Use a ClientCursor here so we can release db mutex while scanning
             // oplog (can take quite a while with large oplogs).
             shared_ptr<Cursor> c = _qp.newReverseCursor();
-            _findingStartCursor = new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns());
+            _findingStartCursor = new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns(), BSONObj());
             _findingStartTimer.reset();
             _findingStartMode = Initial;
             BSONElement tsElt = _qp.originalQuery()[ "ts" ];
