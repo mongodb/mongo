@@ -297,7 +297,7 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> mongoRemove(const v8::Arguments& args){
-        jsassert( args.Length() == 2 , "remove needs 2 args" );
+        jsassert( args.Length() == 2 || args.Length() == 3 , "remove needs 2 args" );
         jsassert( args[1]->IsObject() , "have to remove an object template" );
 
         DBClientBase * conn = getConnection( args );
@@ -306,10 +306,15 @@ namespace mongo {
         v8::Handle<v8::Object> in = args[1]->ToObject();
         BSONObj o = v8ToMongo( in );
     
+        bool justOne = false;
+        if ( args.Length() > 2 ){
+            justOne = args[2]->BooleanValue();
+        }
+
         DDD( "want to remove : " << o.jsonString() );
         try {
             v8::Unlocker u;
-            conn->remove( ns , o );
+            conn->remove( ns , o , justOne );
         }
         catch ( ... ){
             return v8::ThrowException( v8::String::New( "socket error on remove" ) );
