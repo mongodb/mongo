@@ -84,6 +84,7 @@ namespace mongo {
         assert( len > 0 && strchr(nsPrefix, '.') );
 
         {
+            //cout << "\nTEMP invalidate " << nsPrefix << endl;
             recursive_scoped_lock lock(ccmutex);
 
             Database *db = cc().database();
@@ -115,6 +116,12 @@ namespace mongo {
 
             for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
                 delete (*i);
+
+            /*cout << "TEMP after invalidate " << endl;
+            for( auto i = clientCursorsById.begin(); i != clientCursorsById.end(); ++i ) { 
+                cout << "  " << i->second->ns << endl;
+            }
+            cout << "TEMP after invalidate done" << endl;*/
         }
     }
 
