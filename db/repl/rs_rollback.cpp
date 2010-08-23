@@ -147,7 +147,7 @@ namespace mongo {
                     h.collectionsToResync.insert(ns);
                     return;
                 }
-                else if( cmdname == "dropIndexes" ) { 
+                else if( cmdname == "dropIndexes" || cmdname == "deleteIndexes" ) { 
                     /* TODO: this is bad.  we simply full resync the collection here, which could be very slow. */
                     log() << "replSet info rollback of dropIndexes is slow in this version of mongod" << rsLog;
                     string ns = s.db + '.' + first.valuestr();
