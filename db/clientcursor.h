@@ -45,8 +45,6 @@ namespace mongo {
     */
     typedef map<CursorId, ClientCursor*> CCById;
 
-    typedef multimap<DiskLoc, ClientCursor*> CCByLoc;
-
     extern BSONObj id_obj;
 
     class ClientCursor {
@@ -64,15 +62,13 @@ namespace mongo {
         ElapsedTracker _yieldSometimesTracker;
 
         static CCById clientCursorsById;
-        static CCByLoc byLoc;
         static long long numberTimedOut;
-        static boost::recursive_mutex ccmutex;   // must use this for all statics above!
-        
-        static CursorId allocCursorId_inlock();
-        
-
+        static boost::recursive_mutex ccmutex;   // must use this for all statics above!        
+        static CursorId allocCursorId_inlock();        
         
     public:
+        static void assertNoCursors();
+
         /* use this to assure we don't in the background time out cursor while it is under use.
            if you are using noTimeout() already, there is no risk anyway.
            Further, this mechanism guards against two getMore requests on the same cursor executing
@@ -146,13 +142,17 @@ namespace mongo {
         BSONObj query;
         int _queryOptions;        // see enum QueryOptions dbclient.h
         OpTime _slaveReadTill;
+        Database * const _db;
 
         ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const string& _ns) :
             _idleAgeMillis(0), _pinValue(0), 
             _doingDeletes(false), _yieldSometimesTracker(128,10),
             ns(_ns), c(_c), 
-            pos(0), _queryOptions(queryOptions)
+            pos(0), _queryOptions(queryOptions), 
+            _db( cc().database() )
         {
+            assert( _db );
+            assert( str::startsWith(_ns, _db->name) );
             if( queryOptions & QueryOption_NoCursorTimeout )
                 noTimeout();
             recursive_scoped_lock lock(ccmutex);
@@ -324,6 +324,10 @@ private:
         // setting this prevents timeout of the cursor in question.
         void noTimeout() { 
             _pinValue++;
+        }
+
+        multimap<DiskLoc, ClientCursor*>& byLoc() { 
+            return _db->ccByLoc;
         }
 public:
         void setDoingDeletes( bool doingDeletes ){

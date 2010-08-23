@@ -10,7 +10,6 @@ function setup( mydb ){
     mydb.getLastError();
 }
 
-
 setup( a );
 setup( b );
 
@@ -29,4 +28,4 @@ assert.eq( 51 , a.foo.find().itcount() , "B1" )
 assert.eq( 100 , b.foo.find().itcount() , "B2" )
 
 assert.eq( 59 , x.itcount() , "C1" ) 
-//assert.eq( 100 , y.itcount() , "C2" );  // this is asserting because ClientCursor byLoc doesn't take db into consideration
+assert.eq( 99 , y.itcount() , "C2" );  // this was asserting because ClientCursor byLoc doesn't take db into consideration
