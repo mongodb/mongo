@@ -136,11 +136,11 @@ namespace mongo {
         };
 
         /*const*/ CursorId cursorid;
-        string ns;
-        shared_ptr<Cursor> c;
+        const string ns;
+        const shared_ptr<Cursor> c;
         int pos;                  // # objects into the cursor so far 
         BSONObj query;
-        int _queryOptions;        // see enum QueryOptions dbclient.h
+        const int _queryOptions;        // see enum QueryOptions dbclient.h
         OpTime _slaveReadTill;
         Database * const _db;
 
