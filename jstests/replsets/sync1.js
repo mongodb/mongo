@@ -71,7 +71,6 @@ doTest = function (signal) {
 
     sleep(5000);
 
-    // yay! there are out-of-date nodes
     var max1;
     var max2;
     var count = 0;
@@ -90,14 +89,6 @@ doTest = function (signal) {
             continue;
         }
         break;
-    }
-
-    print("\nsync1.js ********************************************************************** part 8");
-
-    if (max1.z == (inserts - 1) && max2.z == (inserts - 1)) {
-        print("\nsync1.js try increasing # if inserts and running again");
-        replTest.stopSet(signal);
-        return;
     }
 
     // wait for a new master to be elected
