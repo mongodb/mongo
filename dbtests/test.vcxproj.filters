@@ -485,9 +485,6 @@
     <ClCompile Include="..\util\mmap.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\ntservice.cpp">
-      <Filter>util\cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\processinfo_win32.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
