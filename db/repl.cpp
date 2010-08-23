@@ -1690,6 +1690,7 @@ namespace mongo {
     void replSlaveThread() {
         sleepsecs(1);
         Client::initThread("replslave");
+        cc().iAmSyncThread();
             
         {
             dblock lk;
