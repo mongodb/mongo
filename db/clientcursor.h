@@ -336,7 +336,7 @@ public:
         
         static void appendStats( BSONObjBuilder& result );
 
-        static unsigned byLocSize();        // just for diagnostics
+        static unsigned numCursors() { return clientCursorsById.size(); }
 
         static void informAboutToDeleteBucket(const DiskLoc& b);
         static void aboutToDelete(const DiskLoc& dl);

@@ -391,10 +391,8 @@ namespace mongo {
     void ClientCursor::appendStats( BSONObjBuilder& result ){
         recursive_scoped_lock lock(ccmutex);
         result.appendNumber("totalOpen", clientCursorsById.size() );
-        // todo ...
-        // result.appendNumber("byLocation_size_thisdb", cc().database()->ccByLoc.size() );
-        result.appendNumber("clientCursors_size", clientCursorsById.size() );
-        result.appendNumber( "timedOut" , numberTimedOut );
+        result.appendNumber("clientCursors_size", numCursors());
+        result.appendNumber("timedOut" , numberTimedOut);
     }
     
     // QUESTION: Restrict to the namespace from which this command was issued?
