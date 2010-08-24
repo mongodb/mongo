@@ -156,12 +156,20 @@ namespace mongo {
                 }              
 
                 {
+                    BSONObj params;
+                    const size_t pos = url.find( "?" );
+                    if ( pos != string::npos ) {
+                        MiniWebServer::parseParams( params , url.substr( pos + 1 ) );
+                        url = url.substr(0, pos);
+                    }
+
                     DbWebHandler * handler = DbWebHandler::findHandler( url );
                     if ( handler ){
-                        if ( handler->requiresREST( url ) && ! cmdLine.rest )
+                        if ( handler->requiresREST( url ) && ! cmdLine.rest ){
                             _rejectREST( responseMsg , responseCode , headers );
-                        else
-                            handler->handle( rq , url , responseMsg , responseCode , headers , from );
+                        }else{
+                            handler->handle( rq , url , params , responseMsg , responseCode , headers , from );
+                        }
                         return;
                     }
                 }
@@ -350,7 +358,7 @@ namespace mongo {
     public:
         FavIconHandler() : DbWebHandler( "favicon.ico" , 0 , false ){}
 
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             responseCode = 404;
@@ -364,7 +372,7 @@ namespace mongo {
     public:
         StatusHandler() : DbWebHandler( "_status" , 1 , false ){}
         
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             headers.push_back( "Content-Type: application/json" );
@@ -374,11 +382,6 @@ namespace mongo {
             if ( commands.size() == 0 ){
                 commands.push_back( "serverStatus" );
                 commands.push_back( "buildinfo" );
-            }
-            
-            BSONObj params;
-            if ( url.find( "?" ) != string::npos ) {
-                MiniWebServer::parseParams( params , url.substr( url.find( "?" ) + 1 ) );
             }
             
             BSONObjBuilder buf(1024);
@@ -421,7 +424,7 @@ namespace mongo {
     public:
         CommandListHandler() : DbWebHandler( "_commands" , 1 , true ){}
         
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             headers.push_back( "Content-Type: text/html" );
@@ -494,7 +497,7 @@ namespace mongo {
             return _cmd( cmd );
         }
         
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             

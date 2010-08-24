@@ -220,7 +220,7 @@ namespace mongo {
             return startsWith( url , "/_replSet" );
         }
 
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params, 
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             
