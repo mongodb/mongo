@@ -1,7 +1,16 @@
+// 32bit.js dm
+
+var forceSeedToBe = null;
+
+if (forceSeedToBe)
+    print("WARNING FORCING A SPECIFIC SEED - TEST WILL RUN DURING DAY");
+
 function f() {
+    seed = forceSeedToBe || Math.random();
+
     pass = 1;
 
-    var mydb = db.getSisterDB( "corruption_test_32bit" );
+    var mydb = db.getSisterDB( "test_32bit" );
     mydb.dropDatabase();
 
     while( 1 ) {
@@ -9,9 +18,8 @@ function f() {
         print("32bit.js PASS #" + pass);
         pass++;
         
-        t = mydb.corruptiontest_32bit;
-        
-        seed = Math.random(); 
+        t = mydb.colltest_32bit;
+
         print("seed=" + seed);
         
         t.insert({x:1});
@@ -79,8 +87,9 @@ function f() {
         var res = t.validate();
         if( !rs.valid ) {
             print("32bit.js FAIL validating");
+            print(res.result);
             printjson(res);
-	        mydb.dropDatabase();
+	        //mydb.dropDatabase();
 	        throw "fail validating 32bit.js";
         }
 
@@ -91,7 +100,7 @@ function f() {
 }
 
 var h = (new Date()).getHours();
-if( h <= 4 || h >= 22 ) {
+if( forceSeedToBe || h <= 4 || h >= 22 ) {
     /* this test is slow, so don't run during the day */
     print("running 32bit.js - this test is slow only runs at night."); 
     f();
