@@ -76,6 +76,9 @@ for( i=1; i<numDocs; i++ ){
 }
 res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 } );
 
+// splitVector aims at getting half-full chunks after split
+factor = 0.5; 
+
 assert.eq( true , res.ok );
-assert.close( numDocs*docSize / (1<<20) , res.splitKeys.length , "num split keys" , -1 );
-assertChunkSizes( res.splitKeys , numDocs, (1<<20) * 0.9 ); // splitVector cuts at 90% of maxChunkSize
+assert.close( numDocs*docSize / ((1<<20) * factor), res.splitKeys.length , "num split keys" , -1 );
+assertChunkSizes( res.splitKeys , numDocs, (1<<20) * factor );
