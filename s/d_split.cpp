@@ -145,7 +145,13 @@ namespace mongo {
             }
  
             Client::Context ctx( ns );
-
+            NamespaceDetails *d = nsdetails( ns );
+            
+            if ( ! d ){
+                errmsg = "ns not found";
+                return false;
+            }
+            
             IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
             if ( idx == NULL ){
                 errmsg = "couldn't find index over splitting key";
@@ -153,7 +159,6 @@ namespace mongo {
             }
 
             // If there's not enough data for more than one chunk, no point continuing.
-            NamespaceDetails *d = nsdetails( ns );
             const long long dataSize = d->datasize;
             if ( dataSize < maxChunkSize ) {
                 vector<BSONObj> emptyVector;
