@@ -949,9 +949,11 @@ namespace mongo {
             Client::Context ctx( ns );
             NamespaceDetails *d = nsdetails(ns.c_str());
             
-            if ( ! d ){
-                errmsg = "ns not found";
-                return false;
+            if ( ! d || d->nrecords == 0 ){
+                result.appendNumber( "size" , 0 );
+                result.appendNumber( "numObjects" , 0 );
+                result.append( "millis" , timer.millis() );
+                return true;
             }
             
             result.appendBool( "estimate" , estimate );
