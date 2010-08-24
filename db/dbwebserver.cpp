@@ -169,6 +169,11 @@ namespace mongo {
                             _rejectREST( responseMsg , responseCode , headers );
                         }else{
                             handler->handle( rq , url , params , responseMsg , responseCode , headers , from );
+
+                            string callback = params.getStringField("jsonp");
+                            if (responseCode == 200 && !callback.empty()){
+                                responseMsg = callback + '(' + responseMsg + ')';
+                            }
                         }
                         return;
                     }
