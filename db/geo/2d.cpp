@@ -33,6 +33,7 @@ namespace mongo {
 
 #if 0
 # define GEODEBUG(x) cout << x << endl;
+# define GEODEBUGPRINT(x) PRINT(x)
     inline void PREFIXDEBUG(GeoHash prefix, const GeoConvert* g){
         if (!prefix.constrains()) {
             cout << "\t empty prefix" << endl;
@@ -43,7 +44,7 @@ namespace mongo {
         prefix.move(1,1);
         Point tr (g, prefix); // top right
 
-        Point center ( (ll._y+tr._y)/2, (ll._x+tr._x)/2 );
+        Point center ( (ll._x+tr._x)/2, (ll._y+tr._y)/2 );
         double radius = fabs(ll._x - tr._x) / 2;
 
         cout << "\t ll: " << ll.toString() << " tr: " << tr.toString() 
@@ -52,12 +53,17 @@ namespace mongo {
     }
 #else
 # define GEODEBUG(x) 
+# define GEODEBUGPRINT(x) 
 # define PREFIXDEBUG(x, y) 
 #endif
 
     const double EARTH_RADIUS_KM = 6371;
     const double EARTH_RADIUS_MILES = EARTH_RADIUS_KM * 0.621371192;
 
+    enum GeoDistType {
+        GEO_PLAIN,
+        GEO_SPHERE
+    };
 
     GeoBitSets geoBitSets;
 
@@ -171,25 +177,25 @@ namespace mongo {
         GeoHash _hash( const BSONObj& o ) const {
             BSONObjIterator i(o);
             uassert( 13067 , "geo field is empty" , i.more() );
-            BSONElement y = i.next();
-            uassert( 13068 , "geo field only has 1 element" , i.more() );
             BSONElement x = i.next();
+            uassert( 13068 , "geo field only has 1 element" , i.more() );
+            BSONElement y = i.next();
             
-            uassert( 13026 , "geo values have to be numbers: " + o.toString() , y.isNumber() && x.isNumber() );
+            uassert( 13026 , "geo values have to be numbers: " + o.toString() , x.isNumber() && y.isNumber() );
 
-            return hash( y.number() , x.number() );
+            return hash( x.number() , y.number() );
         }
 
-        GeoHash hash( double y , double x ) const {
-            return GeoHash( _convert(y), _convert(x) , _bits );
+        GeoHash hash( double x , double y ) const {
+            return GeoHash( _convert(x), _convert(y) , _bits );
         }
 
         BSONObj _unhash( const GeoHash& h ) const {
-            unsigned y , x;
-            h.unhash( y , x );
+            unsigned x , y;
+            h.unhash( x , y );
             BSONObjBuilder b;
-            b.append( "y" , _unconvert( y ) );
             b.append( "x" , _unconvert( x ) );
+            b.append( "y" , _unconvert( y ) );
             return b.obj();
         }
         
@@ -207,11 +213,11 @@ namespace mongo {
             return x;
         }
         
-        void unhash( const GeoHash& h , double& y , double& x ) const {
+        void unhash( const GeoHash& h , double& x , double& y ) const {
             unsigned a,b;
             h.unhash(a,b);
-            y = _unconvert( a );
-            x = _unconvert( b );
+            x = _unconvert( a );
+            y = _unconvert( b );
         }
         
         double distance( const GeoHash& a , const GeoHash& b ) const {
@@ -282,12 +288,12 @@ namespace mongo {
         
         Box( const Geo2dType * g , const GeoHash& hash )
             : _min( g , hash ) , 
-              _max( _min._y + g->sizeEdge( hash ) , _min._x + g->sizeEdge( hash ) ){
+              _max( _min._x + g->sizeEdge( hash ) , _min._y + g->sizeEdge( hash ) ){
         }
         
-        Box( double y , double x , double size )
-            : _min( y , x ) , 
-              _max( y + size , x + size ){
+        Box( double x , double y , double size )
+            : _min( x , y ) , 
+              _max( x + size , y + size ){
         }
 
         Box( Point min , Point max )
@@ -327,10 +333,10 @@ namespace mongo {
             Point boundMin(0,0);
             Point boundMax(0,0);
             
-            if ( mid( _min._y , _max._y , other._min._y , other._max._y , true , boundMin._y ) == false ||
-                 mid( _min._y , _max._y , other._min._y , other._max._y , false , boundMax._y ) == false ||
-                 mid( _min._x , _max._x , other._min._x , other._max._x , true , boundMin._x ) == false ||
-                 mid( _min._x , _max._x , other._min._x , other._max._x , false , boundMax._x ) == false )
+            if ( mid( _min._x , _max._x , other._min._x , other._max._x , true , boundMin._x ) == false ||
+                 mid( _min._x , _max._x , other._min._x , other._max._x , false , boundMax._x ) == false ||
+                 mid( _min._y , _max._y , other._min._y , other._max._y , true , boundMin._y ) == false ||
+                 mid( _min._y , _max._y , other._min._y , other._max._y , false , boundMax._y ) == false )
                 return 0;
             
             Box intersection( boundMin , boundMax );
@@ -339,24 +345,24 @@ namespace mongo {
         }
 
         double area() const {
-            return ( _max._y - _min._y ) * ( _max._x - _min._x );
+            return ( _max._x - _min._x ) * ( _max._y - _min._y );
         }
 
         Point center() const {
-            return Point( ( _min._y + _max._y ) / 2 ,
-                          ( _min._x + _max._x ) / 2 );
+            return Point( ( _min._x + _max._x ) / 2 ,
+                          ( _min._y + _max._y ) / 2 );
         }
 
         bool inside( Point p , double fudge = 0 ){
-            bool res = inside( p._y , p._x , fudge );
+            bool res = inside( p._x , p._y , fudge );
             //cout << "is : " << p.toString() << " in " << toString() << " = " << res << endl;
             return res;
         }
         
-        bool inside( double y , double x , double fudge = 0 ){
+        bool inside( double x , double y , double fudge = 0 ){
             return 
-                between( _min._y , _max._y  , y , fudge ) &&
-                between( _min._x , _max._x  , x , fudge );
+                between( _min._x , _max._x  , x , fudge ) &&
+                between( _min._y , _max._y  , y , fudge );
         }
         
         Point _min;
@@ -389,27 +395,27 @@ namespace mongo {
             IndexSpec i( BSON( "loc" << "2d" ) );
             Geo2dType g( &geo2dplugin , &i );
             {
-                double y = 73.01212;
-                double x = 41.352964;
-                BSONObj in = BSON( "y" << y << "x" << x );
+                double x = 73.01212;
+                double y = 41.352964;
+                BSONObj in = BSON( "x" << x << "y" << y );
                 GeoHash h = g._hash( in );
                 BSONObj out = g._unhash( h );
-                assert( round(y) == round( out["y"].number() ) );
                 assert( round(x) == round( out["x"].number() ) );
-                assert( round( in["y"].number() ) == round( out["y"].number() ) );
+                assert( round(y) == round( out["y"].number() ) );
                 assert( round( in["x"].number() ) == round( out["x"].number() ) );
+                assert( round( in["y"].number() ) == round( out["y"].number() ) );
             }
 
             {
-                double y = -73.01212;
-                double x = 41.352964;
-                BSONObj in = BSON( "y" << y << "x" << x );
+                double x = -73.01212;
+                double y = 41.352964;
+                BSONObj in = BSON( "x" << x << "y" << y );
                 GeoHash h = g._hash( in );
                 BSONObj out = g._unhash( h );
-                assert( round(y) == round( out["y"].number() ) );
                 assert( round(x) == round( out["x"].number() ) );
-                assert( round( in["y"].number() ) == round( out["y"].number() ) );
+                assert( round(y) == round( out["y"].number() ) );
                 assert( round( in["x"].number() ) == round( out["x"].number() ) );
+                assert( round( in["y"].number() ) == round( out["y"].number() ) );
             }
             
             {
@@ -535,13 +541,13 @@ namespace mongo {
                 {
                     Timer t;
                     for ( int i=0; i<N; i++ ){
-                        unsigned y = (unsigned)rand();
                         unsigned x = (unsigned)rand();
-                        GeoHash h( y , x );
+                        unsigned y = (unsigned)rand();
+                        GeoHash h( x , y );
                         unsigned a,b;
                         h.unhash_slow( a,b );
-                        assert( a == y );
-                        assert( b == x );
+                        assert( a == x );
+                        assert( b == y );
                     }
                     //cout << "slow: " << t.millis() << endl;
                 }
@@ -549,13 +555,13 @@ namespace mongo {
                 {
                     Timer t;
                     for ( int i=0; i<N; i++ ){
-                        unsigned y = (unsigned)rand();
                         unsigned x = (unsigned)rand();
-                        GeoHash h( y , x );
+                        unsigned y = (unsigned)rand();
+                        GeoHash h( x , y );
                         unsigned a,b;
                         h.unhash_fast( a,b );
-                        assert( a == y );
-                        assert( b == x );
+                        assert( a == x );
+                        assert( b == y );
                     }
                     //cout << "fast: " << t.millis() << endl;
                 }
@@ -566,8 +572,8 @@ namespace mongo {
                 // see http://en.wikipedia.org/wiki/Great-circle_distance#Worked_example
 
                 {
-                    Point BNA (36.12, -86.67);
-                    Point LAX (33.94, -118.40);
+                    Point BNA (-86.67, 36.12);
+                    Point LAX (-118.40, 33.94);
 
                     double dist1 = spheredist_deg(BNA, LAX);
                     double dist2 = spheredist_deg(LAX, BNA);
@@ -577,8 +583,8 @@ namespace mongo {
                     assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
                 }
                 {
-                    Point BNA (0.6304, -1.5127);
-                    Point LAX (0.5924, -2.0665);
+                    Point BNA (-1.5127, 0.6304);
+                    Point LAX (-2.0665, 0.5924);
                     
                     double dist1 = spheredist_rad(BNA, LAX);
                     double dist2 = spheredist_rad(LAX, BNA);
@@ -588,13 +594,29 @@ namespace mongo {
                     assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
                 }
                 {
-                    Point JFK (40.63861111 , -73.77694444);
-                    Point LAX (33.94, -118.40);
+                    Point JFK (-73.77694444, 40.63861111 );
+                    Point LAX (-118.40, 33.94);
                     
                     double dist = spheredist_deg(JFK, LAX) * EARTH_RADIUS_MILES;
                     assert( dist > 2469 && dist < 2470 );
                 }
 
+                {
+                    Point BNA (-86.67, 36.12);
+                    Point LAX (-118.40, 33.94);
+                    Point JFK (-73.77694444, 40.63861111 );
+                    assert( spheredist_deg(BNA, BNA) < 1e-6);
+                    assert( spheredist_deg(LAX, LAX) < 1e-6);
+                    assert( spheredist_deg(JFK, JFK) < 1e-6);
+
+                    Point zero (0, 0);
+                    Point antizero (0,-180);
+
+                    // these were known to cause NaN
+                    assert( spheredist_deg(zero, zero) < 1e-6);
+                    assert( fabs(M_PI-spheredist_deg(zero, antizero)) < 1e-6);
+                    assert( fabs(M_PI-spheredist_deg(antizero, zero)) < 1e-6);
+                }
             }
         }
     } geoUnitTest;
@@ -864,7 +886,7 @@ namespace mongo {
                 // Phase 1 might not have found any points.
                 if (farthest == -1)
                     farthest = _spec->sizeDiag( _prefix );
-                Box want( center._y - farthest , center._x - farthest , farthest * 2 );
+                Box want( center._x - farthest , center._y - farthest , farthest * 2 );
                 _prefix = _n;
                 while ( _spec->sizeEdge( _prefix ) < ( farthest / 2 ) ){
                     _prefix = _prefix.up();
@@ -875,10 +897,10 @@ namespace mongo {
                            << " farthest: " << farthest << " using box: " << Box( _spec , _prefix ).toString() << endl;
                 }
                 
-                for ( int y=-1; y<=1; y++ ){
-                    for ( int x=-1; x<=1; x++ ){
+                for ( int x=-1; x<=1; x++ ){
+                    for ( int y=-1; y<=1; y++ ){
                         GeoHash toscan = _prefix;
-                        toscan.move( y , x );
+                        toscan.move( x , y );
                         
                         // 3 & 4
                         doBox( id , want , toscan );
@@ -1117,13 +1139,14 @@ namespace mongo {
             DONE
         } _state;
 
-        GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() )        
+        GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() , const string& type="$center")
             : GeoBrowse( g , "circle" , filter ){
-            
+
             uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
             BSONObjIterator i(circle);
-            _startPt = Point(i.next());
-            _start = _startPt.hash(g);
+            BSONElement center = i.next();
+            _start = g->_tohash(center);
+            _startPt = Point(center);
             _prefix = _start;
             _maxDistance = i.next().numberDouble();
             uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
@@ -1131,6 +1154,31 @@ namespace mongo {
 
             _state = START;
             _found = 0;
+
+            if (type == "$center"){
+                _type = GEO_PLAIN;
+                _xScanDistance = _maxDistance;
+                _yScanDistance = _maxDistance;
+            } else if (type == "$centerSphere") {
+                uassert(13451, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
+
+                _type = GEO_SPHERE;
+                _yScanDistance = rad2deg(_maxDistance);
+
+                // TODO: this overestimates for large _maxDistance far from the equator
+                _xScanDistance = rad2deg(_maxDistance) / min(cos(deg2rad(_startPt._y + _yScanDistance)),
+                                                             cos(deg2rad(_startPt._y - _yScanDistance)));
+
+                uassert(13452, "Spherical distance would require wrapping, which isn't implemented yet", 
+                               (_startPt._x + _xScanDistance < 180) && (_startPt._x - _xScanDistance > -180) &&
+                               (_startPt._y + _yScanDistance < 90) && (_startPt._y - _yScanDistance > -90));
+
+                GEODEBUGPRINT(_maxDistance);
+                GEODEBUGPRINT(_xScanDistance);
+                GEODEBUGPRINT(_yScanDistance);
+            } else {
+                uassert(13450, "invalid $center query type: " + type, false);
+            }
 
             ok();
         }
@@ -1140,6 +1188,7 @@ namespace mongo {
         }
         
         virtual void fillStack(){
+
             if ( _state == START ){
                 if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , 
                                                _prefix , _found , this ) ){
@@ -1187,16 +1236,15 @@ namespace mongo {
                     return;
                 }
                 
-
                 Point ll (_g, _prefix);
                 GeoHash trHash = _prefix;
                 trHash.move( 1 , 1 );
                 Point tr (_g, trHash);
-                double sideLen = fabs(tr._y - ll._y);
+                double sideLen = fabs(tr._x - ll._x);
 
-                if (sideLen > _maxDistance){ // circle must be contained by surrounding squares
-                    if ( (ll._y + _maxDistance < _startPt._y && ll._x + _maxDistance < _startPt._x) && 
-                         (tr._y - _maxDistance > _startPt._y && tr._x - _maxDistance > _startPt._x) )
+                if (sideLen > std::max(_xScanDistance, _yScanDistance)){ // circle must be contained by surrounding squares
+                    if ( (ll._x + _xScanDistance < _startPt._x && ll._y + _yScanDistance < _startPt._y) && 
+                         (tr._x - _xScanDistance > _startPt._x && tr._y - _yScanDistance > _startPt._y) )
                     {
                         GEODEBUG("square fully contains circle");
                         _state = DONE;
@@ -1223,15 +1271,15 @@ namespace mongo {
 
         bool needToCheckBox(const GeoHash& prefix){
             Point ll (_g, prefix);
-            if (fabs(ll._y - _startPt._y) <= _maxDistance) return true;
-            if (fabs(ll._x - _startPt._x) <= _maxDistance) return true;
+            if (fabs(ll._x - _startPt._x) <= _xScanDistance) return true;
+            if (fabs(ll._y - _startPt._y) <= _yScanDistance) return true;
 
-            GeoHash trHash = _prefix;
+            GeoHash trHash = prefix;
             trHash.move( 1 , 1 );
             Point tr (_g, trHash);
 
-            if (fabs(tr._y - _startPt._y) <= _maxDistance) return true;
-            if (fabs(tr._x - _startPt._x) <= _maxDistance) return true;
+            if (fabs(tr._x - _startPt._x) <= _xScanDistance) return true;
+            if (fabs(tr._y - _startPt._y) <= _yScanDistance) return true;
 
             return false;
         }
@@ -1247,14 +1295,25 @@ namespace mongo {
 
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
-            d = _g->distance( _start , h );
+            switch (_type){
+                case GEO_PLAIN: 
+                    d = _g->distance( _start , h );
+                    break;
+                case GEO_SPHERE:
+                    d = spheredist_deg(_startPt, Point(_g, h));
+                    break;
+            }
+
             GEODEBUG( "\t " << h << "\t" << d );
             return d <= _maxDistance;
         }
 
+        GeoDistType _type;
         GeoHash _start;
         Point _startPt;
-        double _maxDistance;
+        double _maxDistance; // user input
+        double _xScanDistance; // effected by GeoDistType
+        double _yScanDistance; // effected by GeoDistType
         
         int _found;
         
@@ -1290,7 +1349,7 @@ namespace mongo {
             _found = 0;
 
             Point center = _want.center();
-            _prefix = _g->hash( center._y , center._x );
+            _prefix = _g->hash( center._x , center._y );
             
             GEODEBUG( "center : " << center.toString() << "\t" << _prefix );
 
@@ -1336,10 +1395,10 @@ namespace mongo {
                     }
                     
                     Box cur( _g , _prefix );
-                    if ( cur._min._y + _fudge < _want._min._y &&
-                         cur._min._x + _fudge < _want._min._x &&
-                         cur._max._y - _fudge > _want._max._y &&
-                         cur._max._x - _fudge > _want._max._x ){
+                    if ( cur._min._x + _fudge < _want._min._x &&
+                         cur._min._y + _fudge < _want._min._y &&
+                         cur._max._x - _fudge > _want._max._x &&
+                         cur._max._y - _fudge > _want._max._y ){
                         
                         _state = DONE;
                         GeoHash temp = _prefix.commonPrefix( cur._max.hash( _g ) );
@@ -1428,16 +1487,13 @@ namespace mongo {
                 uassert( 13057 , "$within has to take an object or array" , e.isABSONObj() );
                 e = e.embeddedObject().firstElement();
                 string type = e.fieldName();
-                if ( type == "$center" ){
+                if ( startsWith(type,  "$center") ){
                     uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c;
-                    c.reset( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                    shared_ptr<Cursor> c( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query , type) );
                     return c;   
-                }
-                else if ( type == "$box" ){
+                } else if ( type == "$box" ){
                     uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c;
-                    c.reset( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                    shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
                     return c;   
                 }
                 throw UserException( 13058 , (string)"unknown $with type: " + type );

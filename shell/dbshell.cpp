@@ -377,6 +377,10 @@ string finishCode( string code ){
             return "";
         if ( ! line )
             return "";
+
+        while (startsWith(line, "... "))
+            line += 4;
+
         code += line;
     }
     return code;
@@ -616,9 +620,13 @@ int _main(int argc, char* argv[]) {
             gotInterrupted = 0;
             char * line = shellReadline( "> " );
 
-            if ( line )
+            if ( line ){
+                while (startsWith(line, "> "))
+                    line += 2;
+
                 while ( line[0] == ' ' )
                     line++;
+            }
 
             if ( ! line || ( strlen(line) == 4 && strstr( line , "exit" ) ) ){
                 cout << "bye" << endl;
