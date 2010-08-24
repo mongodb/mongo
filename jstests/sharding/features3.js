@@ -1,4 +1,3 @@
-
 s = new ShardingTest( "features3" , 2 , 1 , 1 );
 s.adminCommand( { enablesharding : "test" } );
 
@@ -40,8 +39,8 @@ function getMine(){
 state = 0; // 0 = not found, 1 = killed, 
 killTime = null;
 
-for ( i=0; i<100000; i++ ){
-    var mine = getMine();
+for ( i=0; i<200000; i++ ){
+    mine = getMine();
     if ( state == 0 ){
         if ( mine.length == 0 ){
             sleep(1);
@@ -60,6 +59,7 @@ for ( i=0; i<100000; i++ ){
     }
 }
 
+assert( killTime , "timed out waiting too kill last mine:" + tojson(mine) )
 killTime = (new Date()).getTime() - killTime.getTime()
 print( "killTime: " + killTime );
 
