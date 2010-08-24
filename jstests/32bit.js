@@ -76,10 +76,12 @@ function f() {
         } 
         print("count: " + t.count());
 
-        if( !t.validate().valid ) { 
-	    print("32bit.js FAIL validating"); 
-	    mydb.dropDatabase();
-	    throw "fail validating 32bit.js";
+        var res = t.validate();
+        if( !rs.valid ) {
+            print("32bit.js FAIL validating");
+            printjson(res);
+	        mydb.dropDatabase();
+	        throw "fail validating 32bit.js";
         }
 
         mydb.dropDatabase();    
@@ -89,7 +91,8 @@ function f() {
 }
 
 var h = (new Date()).getHours();
-if( true || h <= 4 || h >= 21 ) {
+if( h <= 4 || h >= 22 ) {
     /* this test is slow, so don't run during the day */
+    print("running 32bit.js - this test is slow only runs at night."); 
     f();
 }
