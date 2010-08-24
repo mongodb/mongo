@@ -111,13 +111,29 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help <<
                 "Internal command.\n"
-                "example: { splitVector : \"myLargeCollection\" , keyPattern : {x:1} , maxChunkSize : 200 }\n"
+                "example: { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, maxChunkSize:200 }\n"
                 "maxChunkSize unit in MBs\n"
                 "NOTE: This command may take a while to run";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             const char* ns = jsobj.getStringField( "splitVector" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
+
+            BSONObj min = jsobj.getObjectField( "min" );
+            BSONObj max = jsobj.getObjectField( "max" );
+            if ( min.isEmpty() && max.isEmpty() ){
+                BSONObjBuilder minBuilder;
+                BSONObjBuilder maxBuilder;
+                BSONForEach(key, keyPattern){
+                    minBuilder.appendMinKey( key.fieldName() );
+                    maxBuilder.appendMaxKey( key.fieldName() );
+                }
+                min = minBuilder.obj();
+                max = maxBuilder.obj();
+            } else if ( min.isEmpty() || max.isEmpty() ){
+                errmsg = "either provide both min and max or leave both empty";
+                return false;
+            }
 
             long long maxChunkSize = 0;
             BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
@@ -127,17 +143,8 @@ namespace mongo {
                 errmsg = "need to specify the desired max chunk size";
                 return false;
             }
-            
+ 
             Client::Context ctx( ns );
-
-            BSONObjBuilder minBuilder;
-            BSONObjBuilder maxBuilder;
-            BSONForEach(key, keyPattern){
-                minBuilder.appendMinKey( key.fieldName() );
-                maxBuilder.appendMaxKey( key.fieldName() );
-            }
-            BSONObj min = minBuilder.obj();
-            BSONObj max = maxBuilder.obj();
 
             IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
             if ( idx == NULL ){

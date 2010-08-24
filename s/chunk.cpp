@@ -158,14 +158,16 @@ namespace mongo {
         return median;
     }
 
-    void Chunk::pickSplitVector( vector<BSONObj>* splitPoints ) const { 
+    void Chunk::pickSplitVector( vector<BSONObj>* splitPoints , int chunkSize /* in bytes */) const { 
         // Ask the mongod holding this chunk to figure out the split points.
         ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
         BSONObjBuilder cmd;
         cmd.append( "splitVector" , _manager->getns() );
         cmd.append( "keyPattern" , _manager->getShardKey().key() );
-        cmd.append( "maxChunkSize" , Chunk::MaxChunkSize / (1<<20) );
+        cmd.append( "min" , getMin() );
+        cmd.append( "max" , getMax() );
+        cmd.append( "maxChunkSize" , chunkSize / (1<<20) /* in MBs */ );
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , result )){
@@ -213,6 +215,18 @@ namespace mongo {
 
                 uasserted( 13387 , ss.str() );
             }
+        }
+
+        // Now that we're sure to have the freshest data about the shard, sanity check the split
+        // keys. Recall we get the split keys without any lock. It is possible that another split
+        // started in front of us and made the split vector used here invalid.
+        if ( ( _min.woCompare( m.front() ) > 0 ) || ( _max.woCompare( m.back() ) <= 0 ) ){
+            stringstream ss;
+            ss << "attempt to split on stale range (other split got through first?)"
+               << " min / max on split request: " << m.front() << " / " << m.back() 
+               << " min / max on shard: " << _min << " / " << _max;
+
+            uasserted( 13442 , ss.str() );
         }
 
         BSONObjBuilder detail;
@@ -978,7 +992,7 @@ namespace mongo {
 
         ChunkPtr soleChunk = _chunkMap.begin()->second;
         vector<BSONObj> splitPoints;
-        soleChunk->pickSplitVector( &splitPoints );
+        soleChunk->pickSplitVector( &splitPoints , Chunk::MaxChunkSize );
         if ( splitPoints.empty() ){
             log(1) << "not enough data to warrant chunking " << getns() << endl;
             return;
