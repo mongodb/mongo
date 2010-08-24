@@ -137,13 +137,12 @@ namespace mongo {
 
             long long maxChunkSize = 0;
             BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
-            if ( ! maxSizeElem.eoo() ){
-                maxChunkSize = maxSizeElem.numberLong() * 1<<20;
-            } else {
+            if ( maxSizeElem.eoo() ){
                 errmsg = "need to specify the desired max chunk size";
                 return false;
             }
- 
+            maxChunkSize = maxSizeElem.numberLong() * 1<<20; 
+
             Client::Context ctx( ns );
             NamespaceDetails *d = nsdetails( ns );
             
