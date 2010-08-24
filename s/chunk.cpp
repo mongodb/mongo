@@ -453,6 +453,7 @@ namespace mongo {
                                                                        << "min" << getMin() 
                                                                        << "max" << getMax() 
                                                                        << "maxSize" << ( MaxChunkSize + 1 )
+                                                                       << "estimate" << true
                                                                        ) , result ) );
         
         conn.done();
