@@ -9,8 +9,6 @@ function run( options ){
     return db.runCommand( c );
 }
 
-assert.eq( 0 , run().ok );
-
 t.insert( { x : 1 } )
 
 a = run()
