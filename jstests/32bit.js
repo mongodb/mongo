@@ -85,7 +85,7 @@ function f() {
         print("count: " + t.count());
 
         var res = t.validate();
-        if( !rs.valid ) {
+        if( !res.valid ) {
             print("32bit.js FAIL validating");
             print(res.result);
             printjson(res);
