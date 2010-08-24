@@ -101,7 +101,7 @@ namespace mongo {
                 p2 = findOtherPrimary(two);
                 if( two ) {
                     /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
-                    log() << "replSet warning DIAG two primaries (transiently)" << rsLog;
+                    log() << "replSet info two primaries (transiently)" << rsLog;
                     return;
                 }
             }
