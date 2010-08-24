@@ -1141,7 +1141,7 @@ namespace mongo {
 
         GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() , const string& type="$center")
             : GeoBrowse( g , "circle" , filter ){
-            
+
             uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
             BSONObjIterator i(circle);
             BSONElement center = i.next();
@@ -1160,20 +1160,24 @@ namespace mongo {
                 _xScanDistance = _maxDistance;
                 _yScanDistance = _maxDistance;
             } else if (type == "$centerSphere") {
-                // current algorithm scans more buckets as you get further from equator
-                uassert(13437, "Spherical distance is currently limited to latitudes from 80S to 80N",
-                                _startPt._y >= -80 && _startPt._y <= 80);
-                uassert(13439, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < (M_PI*1.05));
+                uassert(13451, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
 
                 _type = GEO_SPHERE;
-                _xScanDistance = rad2deg(_maxDistance) / cos(_startPt._y * (M_PI/180));
                 _yScanDistance = rad2deg(_maxDistance);
+
+                // TODO: this overestimates for large _maxDistance far from the equator
+                _xScanDistance = rad2deg(_maxDistance) / min(cos(deg2rad(_startPt._y + _yScanDistance)),
+                                                             cos(deg2rad(_startPt._y - _yScanDistance)));
+
+                uassert(13452, "Spherical distance would require wrapping, which isn't implemented yet", 
+                               (_startPt._x + _xScanDistance < 180) && (_startPt._x - _xScanDistance > -180) &&
+                               (_startPt._y + _yScanDistance < 90) && (_startPt._y - _yScanDistance > -90));
 
                 GEODEBUGPRINT(_maxDistance);
                 GEODEBUGPRINT(_xScanDistance);
                 GEODEBUGPRINT(_yScanDistance);
             } else {
-                uassert(13438, "invalid $center query type: " + type, false);
+                uassert(13450, "invalid $center query type: " + type, false);
             }
 
             ok();
@@ -1184,6 +1188,7 @@ namespace mongo {
         }
         
         virtual void fillStack(){
+
             if ( _state == START ){
                 if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , 
                                                _prefix , _found , this ) ){
@@ -1269,7 +1274,7 @@ namespace mongo {
             if (fabs(ll._x - _startPt._x) <= _xScanDistance) return true;
             if (fabs(ll._y - _startPt._y) <= _yScanDistance) return true;
 
-            GeoHash trHash = _prefix;
+            GeoHash trHash = prefix;
             trHash.move( 1 , 1 );
             Point tr (_g, trHash);
 
@@ -1298,7 +1303,7 @@ namespace mongo {
                     d = spheredist_deg(_startPt, Point(_g, h));
                     break;
             }
-            
+
             GEODEBUG( "\t " << h << "\t" << d );
             return d <= _maxDistance;
         }
