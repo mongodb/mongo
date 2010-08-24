@@ -155,20 +155,17 @@ namespace mongo {
             }
 
             // We'll use the average object size and number of object to find approximately how many keys
-            // each chunk should have. We'll split a little smaller than the specificied by 'maxSize'
-            // assuming a recently sharded collectio is still going to grow.
-
+            // each chunk should have. We'll split at half the maxChunkSize.
             const long long recCount = d->nrecords;
             long long keyCount = 0;
             if (( dataSize > 0 ) && ( recCount > 0 )){
                 const long long avgRecSize = dataSize / recCount;
-                keyCount = 90 * maxChunkSize / (100 * avgRecSize);
+                keyCount = maxChunkSize / (2 * avgRecSize);
             }
 
             // We traverse the index and add the keyCount-th key to the result vector. If that key
             // appeared in the vector before, we omit it. The assumption here is that all the 
             // instances of a key value live in the same chunk.
-
             Timer timer;
             long long currCount = 0;
             vector<BSONObj> splitKeys;
