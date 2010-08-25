@@ -67,7 +67,6 @@ namespace mongo {
 #endif
 
     void setupSignals();
-    void closeAllSockets();
     void startReplSets(ReplSetCmdline*);
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
