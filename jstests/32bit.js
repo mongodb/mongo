@@ -1,6 +1,6 @@
 // 32bit.js dm
 
-var forceSeedToBe = .8;
+var forceSeedToBe = null;
 
 if (forceSeedToBe)
     print("\n32bit.js WARNING FORCING A SPECIFIC SEED - TEST WILL RUN DURING DAY");
