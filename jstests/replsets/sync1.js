@@ -144,8 +144,7 @@ doTest = function (signal) {
         }
     } while (max1.z != max2.z);
 
-    // okay, now they're caught up.  We have a max:
-    var max = max1.z;
+    // okay, now they're caught up.  We have a max: max1.z
 
     print("\nsync1.js ********************************************************************** part 10");
 
@@ -171,9 +170,9 @@ doTest = function (signal) {
             continue;
         }
 
-        printjson(max);
+        printjson(max1);
         printjson(max0);
-        print("\nsync1.js part 11 waiting for match " + count + " " + Date() + " z[0]:" + max0.z + " z:" + max);
+        print("\nsync1.js part 11 waiting for match " + count + " " + Date() + " z[0]:" + max0.z + " z:" + max1.z);
 
         sleep(2000);
 
@@ -186,7 +185,7 @@ doTest = function (signal) {
         }
         print("||||| count:" + count);
         printjson(max0);
-    } while (!max0 || max0.z != max);
+    } while (!max0 || max0.z != max1.z);
 
     print("\nsync1.js ********************************************************************** part 12");
     pause("\nsync1.js success");
