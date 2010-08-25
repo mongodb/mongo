@@ -238,7 +238,7 @@ namespace mongo {
 
     string sayClientState(){
         Client* c = currentClient.get();
-        if ( ! c )
+        if ( !c )
             return "no client";
         return c->toString();
     }

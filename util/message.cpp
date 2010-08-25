@@ -272,7 +272,7 @@ namespace mongo {
         mongo::mutex m;
     public:
         Ports() : ports(), m("Ports") {}
-        void closeAll() { \
+        void closeAll() {
             scoped_lock bl(m);
             for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
                 (*i)->shutdown();
@@ -290,8 +290,6 @@ namespace mongo {
     // we "new" this so it is still be around when other automatic global vars
     // are being destructed during termination.
     Ports& ports = *(new Ports());
-
-
 
     void closeAllSockets() {
         ports.closeAll();

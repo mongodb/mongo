@@ -29,12 +29,10 @@
 #include "namespace.h"
 #include "lasterror.h"
 #include "stats/top.h"
-//#include "repl/rs.h"
 
 namespace mongo { 
 
     extern class ReplSet *theReplSet;
-
     class AuthenticationInfo;
     class Database;
     class CurOp;
@@ -50,13 +48,14 @@ namespace mongo {
             wassert( syncThread == 0 );
             syncThread = this; 
         }
-        bool isSyncThread() const { return this == syncThread; }
+        bool isSyncThread() const { return this == syncThread; } // true if this client is the replication secondary pull thread
 
         static mongo::mutex clientsMutex;
         static set<Client*> clients; // always be in clientsMutex when manipulating this
 
         static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
 
+        /* set _god=true temporarily, safely */
         class GodScope {
             bool _prev;
         public:
@@ -188,16 +187,10 @@ namespace mongo {
         
         void _invalidateDB(const string& db);
         static void invalidateDB(const string& db);
-
         static void invalidateNS( const string& ns );
 
-        void setLastOp( ReplTime op ) {
-            _lastOp = op;
-        }
-
-        ReplTime getLastOp() const {
-            return _lastOp;
-        }
+        void setLastOp( ReplTime op ) { _lastOp = op; }
+        ReplTime getLastOp() const { return _lastOp; }
 
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) {
@@ -221,7 +214,6 @@ namespace mongo {
            @return true if anything was done
          */
         bool shutdown();
-
         
         /* this is for map/reduce writes */
         bool isGod() const { return _god; }
@@ -229,13 +221,12 @@ namespace mongo {
         friend class CurOp;
 
         string toString() const;
-
         void gotHandshake( const BSONObj& o );
-
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
     };
     
+    /** get the Client object for this thread. */
     inline Client& cc() { 
         Client * c = currentClient.get();
         assert( c );
@@ -284,8 +275,5 @@ namespace mongo {
 
     string sayClientState();
   
-    inline bool haveClient(){ 
-        return currentClient.get() > 0;
-    }
+    inline bool haveClient() { return currentClient.get() > 0; }
 };
-

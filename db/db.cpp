@@ -61,7 +61,6 @@ namespace mongo {
     extern string repairpath;
 
     void setupSignals();
-    void closeAllSockets();
     void startReplSets(ReplSetCmdline*);
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
