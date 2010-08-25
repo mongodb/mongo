@@ -88,8 +88,8 @@ namespace mongo {
             return ss.str(); 
         }
 
-        int major() const { return _major; }
-        int minor() const { return _minor; }
+        int majorVersion() const { return _major; }
+        int minorVersion() const { return _minor; }
         
         operator unsigned long long() const { return _combined; }
         

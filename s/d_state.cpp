@@ -565,7 +565,7 @@ namespace mongo {
             return false;
         }
 
-        if ( isWriteOp && version.major() == clientVersion.major() ){
+        if ( isWriteOp && version.majorVersion() == clientVersion.majorVersion() ){
             // this means there was just a split 
             // since on a split w/o a migrate this server is ok
             // going to accept write
