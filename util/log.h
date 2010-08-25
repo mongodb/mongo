@@ -302,10 +302,13 @@ namespace mongo {
     inline Nullstream& log() {
         return Logstream::get().prolog();
     }
+    
+    inline Nullstream& error() {
+        return log( LL_ERROR );
+    }
 
-    /* TODOCONCURRENCY */
-    inline ostream& stdcout() {
-        return cout;
+    inline Nullstream& warning() {
+        return log( LL_WARNING );
     }
 
     /* default impl returns "" -- mongod overrides */
