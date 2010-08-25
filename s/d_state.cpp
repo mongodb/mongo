@@ -549,7 +549,7 @@ namespace mongo {
 
         if ( version == 0 && clientVersion > 0 ){
             stringstream ss;
-            ss << "version: " << version << " clientVersion: " << clientVersion;
+            ss << "collection was dropped or this shard no longer valied version: " << version << " clientVersion: " << clientVersion;
             errmsg = ss.str();
             return false;
         }
@@ -563,6 +563,13 @@ namespace mongo {
             ss << "client in sharded mode, but doesn't have version set for this collection: " << ns << " myVersion: " << version;
             errmsg = ss.str();
             return false;
+        }
+
+        if ( isWriteOp && version.major() == clientVersion.major() ){
+            // this means there was just a split 
+            // since on a split w/o a migrate this server is ok
+            // going to accept write
+            return true;
         }
 
         stringstream ss;
