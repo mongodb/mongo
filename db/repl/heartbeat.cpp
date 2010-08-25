@@ -203,7 +203,12 @@ namespace mongo {
 
             static time_t last = 0;
             time_t now = time(0);
-            if( mem.changed(old) || now-last>4 ) {
+            bool changed = mem.changed(old);
+            if( changed ) { 
+                if( old.hbstate != mem.hbstate ) 
+                    log() << "replSet " << h.toString() << ' ' << mem.hbstate.toString() << rsLog;
+            }
+            if( changed || now-last>4 ) {
                 last = now;
                 theReplSet->mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
             }
