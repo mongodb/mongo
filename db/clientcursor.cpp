@@ -51,6 +51,8 @@ namespace mongo {
 
 
     void ClientCursor::setLastLoc_inlock(DiskLoc L) {
+        assert( pos != -2 ); // defensive - see ~ClientCursor
+
         if ( L == _lastLoc )
             return;
 
