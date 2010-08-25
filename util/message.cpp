@@ -295,12 +295,12 @@ namespace mongo {
         ports.closeAll();
     }
 
-    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far), _timeout() {
+    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far), _timeout(), tag(0) {
         _logLevel = 0;
         ports.insert(this);
     }
 
-    MessagingPort::MessagingPort( int timeout, int ll ) {
+    MessagingPort::MessagingPort( int timeout, int ll ) : tag(0) {
         _logLevel = ll;
         ports.insert(this);
         sock = -1;
@@ -340,7 +340,7 @@ namespace mongo {
 
         sock = socket(farEnd.getType(), SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
-            log(_logLevel) << "ERROR: connect(): invalid socket? " << errnoWithDescription() << endl;
+            log(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
             return false;
         }
 

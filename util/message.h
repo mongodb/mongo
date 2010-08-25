@@ -30,7 +30,7 @@ namespace mongo {
     class PiggyBackData;
     typedef AtomicUInt MSGID;
 
-    class Listener {
+    class Listener : boost::noncopyable {
     public:
         Listener(const string &ip, int p, bool logConnect=true ) : _port(p), _ip(ip), _logConnect(logConnect), _elapsedTime(0){ }
         virtual ~Listener() {
@@ -74,7 +74,7 @@ namespace mongo {
         static const Listener* _timeTracker;
     };
 
-    class AbstractMessagingPort {
+    class AbstractMessagingPort : boost::noncopyable {
     public:
         virtual ~AbstractMessagingPort() { }
         virtual void reply(Message& received, Message& response, MSGID responseTo) = 0; // like the reply below, but doesn't rely on received.data still being available
@@ -134,6 +134,9 @@ namespace mongo {
         SockAddr farEnd;
         int _timeout;
         int _logLevel; // passed to log() when logging errors
+
+        /* ports can be tagged with various classes.  see closeAllSockets(tag). defaults to 0. */
+        unsigned tag;
 
         friend class PiggyBackData;
     };
