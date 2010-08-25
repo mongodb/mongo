@@ -517,10 +517,12 @@ namespace mongo {
         DEBUGUPDATE( "\t\t createNewFromMods root: " << root );
         BSONObjIteratorSorted es( obj );
         BSONElement e = es.next();
-
+        
         ModStateHolder::iterator m = _mods.lower_bound( root );
-        ModStateHolder::iterator mend = _mods.lower_bound( root + (char)254 );
-
+        StringBuilder buf(root.size() + 2 );
+        buf << root << (char)255;
+        ModStateHolder::iterator mend = _mods.lower_bound( buf.str() );
+        
         set<string> onedownseen;
         
         while ( e.type() && m != mend ){
