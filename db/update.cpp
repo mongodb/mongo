@@ -25,8 +25,8 @@
 #include "update.h"
 #include "btree.h"
 
-#define DEBUGUPDATE(x) cout << x << endl;
-//#define DEBUGUPDATE(x)
+//#define DEBUGUPDATE(x) cout << x << endl;
+#define DEBUGUPDATE(x)
 
 namespace mongo {
 
