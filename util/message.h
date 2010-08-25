@@ -169,6 +169,30 @@ namespace mongo {
             return "";
         }
     }
+    
+    inline bool opIsWrite( int op ){
+        switch ( op ){
+
+        case 0: 
+        case opReply: 
+        case dbMsg: 
+        case dbQuery: 
+        case dbGetMore: 
+        case dbKillCursors: 
+            return false;
+            
+        case dbUpdate: 
+        case dbInsert: 
+        case dbDelete: 
+            return false;
+
+        default: 
+            PRINT(op);
+            assert(0); 
+            return "";
+        }
+        
+    }
 
 #pragma pack(1)
 /* see http://www.mongodb.org/display/DOCS/Mongo+Wire+Protocol 
