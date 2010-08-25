@@ -438,7 +438,7 @@ namespace mongo {
                 try {
                 // This assumes there aren't any 0's in the mongo program output.
                 // Hope that's ok.
-                const unsigned bufSize = 8192;
+                const unsigned bufSize = 64000;
                 char buf[ bufSize ];
                 char temp[ bufSize ];
                 char *start = buf;
