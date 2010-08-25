@@ -56,9 +56,9 @@ namespace mongo {
         _god = 0;
 
         if ( _context )
-            cout << "ERROR: Client::~Client _context should be NULL: " << _desc << endl;
+            error() << "Client::~Client _context should be NULL: " << _desc << endl;
         if ( !_shutdown ) 
-            cout << "ERROR: Client::shutdown not called: " << _desc << endl;
+            error() << "Client::shutdown not called: " << _desc << endl;
     }
 
     void Client::_dropns( const string& ns ){
@@ -75,7 +75,7 @@ namespace mongo {
             dropCollection( ns , err , b );
         }
         catch ( ... ){
-            log() << "error dropping temp collection: " << ns << endl;
+            warning() << "couldn't dropping temp collection: " << ns << endl;
         }
 
     }
