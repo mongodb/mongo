@@ -25,8 +25,8 @@
 #include "update.h"
 #include "btree.h"
 
-//#define DEBUGUPDATE(x) cout << x << endl;
-#define DEBUGUPDATE(x)
+#define DEBUGUPDATE(x) cout << x << endl;
+//#define DEBUGUPDATE(x)
 
 namespace mongo {
 
@@ -519,7 +519,7 @@ namespace mongo {
         BSONElement e = es.next();
 
         ModStateHolder::iterator m = _mods.lower_bound( root );
-        ModStateHolder::iterator mend = _mods.lower_bound( root + '{' );
+        ModStateHolder::iterator mend = _mods.lower_bound( root + (char)254 );
 
         set<string> onedownseen;
         
