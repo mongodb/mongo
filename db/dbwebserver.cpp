@@ -168,9 +168,11 @@ namespace mongo {
                         if ( handler->requiresREST( url ) && ! cmdLine.rest ){
                             _rejectREST( responseMsg , responseCode , headers );
                         }else{
+                            string callback = params.getStringField("jsonp");
+                            uassert(13453, "server not started with --jsonp", callback.empty() || cmdLine.jsonp);
+
                             handler->handle( rq , url , params , responseMsg , responseCode , headers , from );
 
-                            string callback = params.getStringField("jsonp");
                             if (responseCode == 200 && !callback.empty()){
                                 responseMsg = callback + '(' + responseMsg + ')';
                             }

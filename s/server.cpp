@@ -184,6 +184,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         ( "upgrade" , "upgrade meta data version" )
         ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
         ( "ipv6", "enable IPv6 support (disabled by default)" )
+        ( "jsonp","allow JSONP access via http (has security implications)" )
         ;
 
     options.add(sharding_options);
@@ -208,6 +209,10 @@ int main(int argc, char* argv[], char *envp[] ) {
 
     if ( params.count( "ipv6" ) ){
         enableIPv6();
+    }
+
+    if ( params.count( "jsonp" ) ){
+        cmdLine.jsonp = true;
     }
 
     if ( params.count( "test" ) ){
