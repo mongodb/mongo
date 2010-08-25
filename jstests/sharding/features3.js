@@ -23,7 +23,9 @@ assert.eq( N / 2 , x.shards.shard0001.count , "count on shard0001" )
 
 start = new Date()
 
+print( "about to fork shell: " + Date() )
 join = startParallelShell( "db.foo.find( function(){ x = \"\"; for ( i=0; i<5000; i++ ){ x+=i; } return true; } ).itcount()" )
+print( "after forking shell: " + Date() )
 
 function getMine(){
     var inprog = db.currentOp().inprog;
@@ -59,6 +61,7 @@ for ( i=0; i<200000; i++ ){
     }
 }
 
+print( "after loop: " + Date() );
 assert( killTime , "timed out waiting too kill last mine:" + tojson(mine) )
 killTime = (new Date()).getTime() - killTime.getTime()
 print( "killTime: " + killTime );
