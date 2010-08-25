@@ -80,10 +80,13 @@ function f() {
 	    if (a == 10000 ) {
 		var delta_ms = (new Date())-start;
 		// 2MM / 10000 = 2000.  1000ms/sec.
-		var eta_secs = delta_ms * (2000 / 1000) > 1800;
-		print("machine is slow, stopping early. a:" + a + " eta_secs:" + eta_secs);
-		mydb.dropDatabase();
-		break;
+		var eta_secs = delta_ms * (2000 / 1000);
+		print("eta_secs:" + eta_secs);
+		if( eta_secs > 1800 ) {
+		    print("machine is slow, stopping early. a:" + a);
+		    mydb.dropDatabase();
+		    return;
+		}
 	    }
 	    if( a % 100000 == 0 ) {
 	        print(a);
@@ -91,7 +94,7 @@ function f() {
 	        // vary by a factor of 2x by platform
 	        if( a >= 2200000 ) {
                     mydb.dropDatabase();
-		    break;
+		    return;
 		}
             }
         } 
