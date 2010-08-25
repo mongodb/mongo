@@ -7,14 +7,15 @@ if (forceSeedToBe)
 
 function f() {
     seed = forceSeedToBe || Math.random();
-
+    
     pass = 1;
 
     var mydb = db.getSisterDB( "test_32bit" );
     mydb.dropDatabase();
 
     while( 1 ) {
-        if( pass == 3 ) break;
+        if( pass >= 2 ) 
+	    break;
         print("32bit.js PASS #" + pass);
         pass++;
         
@@ -41,13 +42,15 @@ function f() {
         
         a = 0;
         c = 'kkk';
+        var start = new Date();
         while( 1 ) { 
 	    b = Math.random(seed);
 	    d = c + -a;
             f = Math.random(seed) + a;
             a++;
 	    cc = big;
-            if( Math.random(seed) < .1 ) cc = null;
+            if( Math.random(seed) < .1 ) 
+		cc = null;
 	    t.insert({a:a,b:b,c:cc,d:d,f:f});
 	    if( Math.random(seed) < 0.01 ) { 
 
@@ -74,13 +77,23 @@ function f() {
                 if( Math.random() < 0.0001 ) { print("update cc"); t.update({c:cc},{'$set':{c:1}},false,true); }
                 if( Math.random() < 0.00001 ) { print("remove e"); t.remove({e:1}); }
 	    }
+	    if (a == 10000 ) {
+		var delta_ms = (new Date())-start;
+		// 2MM / 10000 = 2000.  1000ms/sec.
+		var eta_secs = delta_ms * (2000 / 1000) > 1800;
+		print("machine is slow, stopping early. a:" + a + " eta_secs:" + eta_secs);
+		mydb.dropDatabase();
+		break;
+	    }
 	    if( a % 100000 == 0 ) {
 	        print(a);
 	        // on 64 bit we won't error out, so artificially stop.  on 32 bit we will hit mmap limit ~1.6MM but may 
 	        // vary by a factor of 2x by platform
-	        if( a >= 2200000 )
+	        if( a >= 2200000 ) {
+                    mydb.dropDatabase();
 		    break;
-	    }
+		}
+            }
         } 
         print("count: " + t.count());
 
