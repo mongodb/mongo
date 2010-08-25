@@ -71,7 +71,6 @@ doTest = function (signal) {
 
     sleep(5000);
 
-    // yay! there are out-of-date nodes
     var max1;
     var max2;
     var count = 0;
@@ -90,14 +89,6 @@ doTest = function (signal) {
             continue;
         }
         break;
-    }
-
-    print("\nsync1.js ********************************************************************** part 8");
-
-    if (max1.z == (inserts - 1) && max2.z == (inserts - 1)) {
-        print("\nsync1.js try increasing # if inserts and running again");
-        replTest.stopSet(signal);
-        return;
     }
 
     // wait for a new master to be elected
@@ -122,12 +113,16 @@ doTest = function (signal) {
     print("\nsync1.js ********************************************************************** part 9.1");
 
     count = 0;
+    countExceptions = 0;
     do {
         try {
             max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
             max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
         }
         catch (e) {
+            if ( countExceptions++ > 500 ){
+                assert(false ,"too many exceptions, failing" );
+            }
             print("\nsync1.js: exception querying; will sleep and try again " + e);
             sleep(2000);
             continue;

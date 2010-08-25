@@ -599,7 +599,6 @@
     <ClCompile Include="..\util\message_server_port.cpp" />
     <ClCompile Include="..\util\miniwebserver.cpp" />
     <ClCompile Include="..\util\mmap.cpp" />
-    <ClCompile Include="..\util\ntservice.cpp" />
     <ClCompile Include="..\util\processinfo_win32.cpp" />
     <ClCompile Include="..\util\sock.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />

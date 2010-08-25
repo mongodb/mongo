@@ -172,7 +172,7 @@ namespace mongo {
     JSBool mongo_external_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         Convertor c( cx );
         
-        uassert( 10238 ,  "0 or 1 args to Mongo" , argc <= 1 );
+        smuassert( cx ,  "0 or 1 args to Mongo" , argc <= 1 );
         
         string host = "127.0.0.1";
         if ( argc > 0 )
@@ -223,9 +223,9 @@ namespace mongo {
      };
 
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        uassert( 10240 ,  "mongo_find neesd 6 args" , argc == 6 );
+        smuassert( cx , "mongo_find needs 6 args" , argc == 6 );
         shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
-        uassert( 10241 ,  "no connection!" , connHolder && connHolder->get() );
+        smuassert( cx ,  "no connection!" , connHolder && connHolder->get() );
         DBClientWithCommands *conn = connHolder->get();
                       
         Convertor c( cx );
@@ -326,7 +326,7 @@ namespace mongo {
     }
 
     JSBool mongo_remove(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        smuassert( cx ,  "mongo_remove needs 2 arguments" , argc == 2 );
+        smuassert( cx ,  "mongo_remove needs 2 or 3 arguments" , argc == 2 || argc == 3 );
         smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
         Convertor c( cx );
@@ -340,9 +340,12 @@ namespace mongo {
         
         string ns = c.toString( argv[0] );
         BSONObj o = c.toObject( argv[1] );
-
+        bool justOne = false;
+        if ( argc > 2 )
+            justOne = c.toBoolean( argv[2] );
+        
         try {
-            conn->remove( ns , o );
+            conn->remove( ns , o , justOne );
             return JS_TRUE;
         }
         catch ( ... ){

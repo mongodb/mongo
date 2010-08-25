@@ -30,7 +30,7 @@ class Dump : public Tool {
 public:
     Dump() : Tool( "dump" , ALL , "*" , "*" , false ){
         add_options()
-            ("out,o", po::value<string>()->default_value("dump"), "output directory or stdout")
+            ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
             ("query,q", po::value<string>() , "json query" )
             ;
     }
@@ -110,7 +110,7 @@ public:
 
         // check if we're outputting to stdout
         string out = getParam("out");
-        if ( out == "stdout" ) {
+        if ( out == "-" ) {
             if ( _db != "*" && _coll != "*" ) {
                 writeCollectionStdout( _db+"."+_coll );
                 return 0;

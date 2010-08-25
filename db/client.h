@@ -45,6 +45,13 @@ namespace mongo {
 
     class Client : boost::noncopyable { 
     public:
+        static Client *syncThread;
+        void iAmSyncThread() { 
+            wassert( syncThread == 0 );
+            syncThread = this; 
+        }
+        bool isSyncThread() const { return this == syncThread; }
+
         static mongo::mutex clientsMutex;
         static set<Client*> clients; // always be in clientsMutex when manipulating this
 

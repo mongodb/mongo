@@ -138,6 +138,14 @@ namespace mongo {
         wassert( n >= 0 && n < Size() );
         wassert( emptySize >= 0 && emptySize < BucketSize );
         wassert( topSize >= n && topSize <= BucketSize );
+
+        // this is very slow so don't do often
+        {
+            static int _k;
+            if( ++_k % 128 ) 
+                return;
+        }
+
         DEV {
             // slow:
             for ( int i = 0; i < n-1; i++ ) {

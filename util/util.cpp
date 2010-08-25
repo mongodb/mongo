@@ -156,20 +156,21 @@ namespace mongo {
         }
         printStackTrace();
     }
-    
+
+    /* note: can't use malloc herein - may be in signal handler.
+             logLockless() likely does not comply and should still be fixed todo
+             */
     void rawOut( const string &s ) {
         if( s.empty() ) return;
 
-        boost::scoped_array<char> buf_holder(new char[32 + s.size()]);
-        char * buf = buf_holder.get();
-
+        char buf[64];
         time_t_to_String( time(0) , buf );
         buf[20] = ' ';
-        strncpy( buf + 21 , s.c_str() , s.size() );
-        buf[21+s.size()] = '\n';
-        buf[21+s.size()+1] = 0;
+        buf[21] = 0;
 
-        Logstream::logLockless( buf );
+        Logstream::logLockless(buf);
+        Logstream::logLockless(s);
+        Logstream::logLockless("\n");
     }
 
     ostream& operator<<( ostream &s, const ThreadSafeString &o ){

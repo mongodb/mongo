@@ -49,7 +49,7 @@ namespace mongo {
         void setConnection( DBClientWithCommands *c ) { conn.reset( c ); }
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot);
 
-        bool copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes = true );
+        bool copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes = true, bool logForRepl = true );
     };
 
     /* for index info object:
@@ -198,12 +198,12 @@ namespace mongo {
         }
     }
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg) {
+    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logForRepl) {
         Cloner c;
-        return c.copyCollection(host, ns, query, errmsg , /*copyIndexes*/ true);
+        return c.copyCollection(host, ns, query, errmsg , /*copyIndexes*/ true, logForRepl);
     }
 
-    bool Cloner::copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes ) {
+    bool Cloner::copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes, bool logForRepl ) {
         auto_ptr<DBClientConnection> myconn;
         myconn.reset( new DBClientConnection() );
         if ( ! myconn->connect( from , errmsg ) )
@@ -223,7 +223,7 @@ namespace mongo {
         }
         
         { // main data
-            copy( ns.c_str() , ns.c_str() , false , true , false , true , Query(query).snapshot() );
+            copy( ns.c_str() , ns.c_str() , /*isindex*/false , logForRepl , false , true , Query(query).snapshot() );
         }
         
         /* TODO : copyIndexes bool does not seem to be implemented! */
@@ -233,7 +233,7 @@ namespace mongo {
 
         { // indexes
             string temp = ctx.db()->name + ".system.indexes";
-            copy( temp.c_str() , temp.c_str() , true , true , false , true , BSON( "ns" << ns ) );
+            copy( temp.c_str() , temp.c_str() , /*isindex*/true , logForRepl , false , true , BSON( "ns" << ns ) );
         }
         return true;
     }

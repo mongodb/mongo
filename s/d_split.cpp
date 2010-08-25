@@ -111,7 +111,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help <<
                 "Internal command.\n"
-                "example: { splitVector : \"myLargeCollection\" , keyPattern : {x:1} , maxChunkSize : 200 }\n"
+                "example: { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, maxChunkSize:200 }\n"
                 "maxChunkSize unit in MBs\n"
                 "NOTE: This command may take a while to run";
         }
@@ -119,55 +119,70 @@ namespace mongo {
             const char* ns = jsobj.getStringField( "splitVector" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
+            BSONObj min = jsobj.getObjectField( "min" );
+            BSONObj max = jsobj.getObjectField( "max" );
+            if ( min.isEmpty() && max.isEmpty() ){
+                BSONObjBuilder minBuilder;
+                BSONObjBuilder maxBuilder;
+                BSONForEach(key, keyPattern){
+                    minBuilder.appendMinKey( key.fieldName() );
+                    maxBuilder.appendMaxKey( key.fieldName() );
+                }
+                min = minBuilder.obj();
+                max = maxBuilder.obj();
+            } else if ( min.isEmpty() || max.isEmpty() ){
+                errmsg = "either provide both min and max or leave both empty";
+                return false;
+            }
+
             long long maxChunkSize = 0;
             BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
-            if ( ! maxSizeElem.eoo() ){
-                maxChunkSize = maxSizeElem.numberLong() * 1<<20;
-            } else {
+            if ( maxSizeElem.eoo() ){
                 errmsg = "need to specify the desired max chunk size";
                 return false;
             }
-            
+            maxChunkSize = maxSizeElem.numberLong() * 1<<20; 
+
             Client::Context ctx( ns );
-
-            BSONObjBuilder minBuilder;
-            BSONObjBuilder maxBuilder;
-            BSONForEach(key, keyPattern){
-                minBuilder.appendMinKey( key.fieldName() );
-                maxBuilder.appendMaxKey( key.fieldName() );
+            NamespaceDetails *d = nsdetails( ns );
+            
+            if ( ! d ){
+                errmsg = "ns not found";
+                return false;
             }
-            BSONObj min = minBuilder.obj();
-            BSONObj max = maxBuilder.obj();
-
+            
             IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
             if ( idx == NULL ){
                 errmsg = "couldn't find index over splitting key";
                 return false;
             }
 
-            NamespaceDetails *d = nsdetails( ns );
-            BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+            // If there's not enough data for more than one chunk, no point continuing.
+            const long long dataSize = d->datasize;
+            if ( dataSize < maxChunkSize ) {
+                vector<BSONObj> emptyVector;
+                result.append( "splitKeys" , emptyVector );
+                return true;
+            }
 
             // We'll use the average object size and number of object to find approximately how many keys
-            // each chunk should have. We'll split a little smaller than the specificied by 'maxSize'
-            // assuming a recently sharded collectio is still going to grow.
-
-            const long long dataSize = d->datasize;
+            // each chunk should have. We'll split at half the maxChunkSize.
             const long long recCount = d->nrecords;
             long long keyCount = 0;
             if (( dataSize > 0 ) && ( recCount > 0 )){
                 const long long avgRecSize = dataSize / recCount;
-                keyCount = 90 * maxChunkSize / (100 * avgRecSize);
+                keyCount = maxChunkSize / (2 * avgRecSize);
             }
 
             // We traverse the index and add the keyCount-th key to the result vector. If that key
             // appeared in the vector before, we omit it. The assumption here is that all the 
             // instances of a key value live in the same chunk.
-
             Timer timer;
             long long currCount = 0;
             vector<BSONObj> splitKeys;
             BSONObj currKey;
+            BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+
             while ( c.ok() ){ 
                 currCount++;
                 if ( currCount > keyCount ){

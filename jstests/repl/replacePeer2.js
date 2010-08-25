@@ -44,15 +44,8 @@ doTest = function( signal ) {
     checkWrite( rp.master(), rp.slave() );
 
     // allow slave to finish initial sync
-    assert.soon( 
-        function() { 
-            var res = rp.slave().getDB( "admin" ).runCommand( {replacepeer:1} );
-            if ( res.ok == 1 )
-                return true;
-            printjson( res );
-            return false;
-        } 
-    );
+    var res = rp.slave().getDB( "admin" ).runCommand( {replacepeer:1} );
+    assert( res.ok , "replacepeer didn't finish: " + tojson( res ) );
     
     // Should not be saved to slave.
     writeOne( rp.master() );

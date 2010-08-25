@@ -95,7 +95,7 @@ namespace mongo {
         BSONObj pickSplitPoint() const;
         ChunkPtr split();
 
-        void pickSplitVector( vector<BSONObj>* splitPoints ) const;
+        void pickSplitVector( vector<BSONObj>* splitPoints , int chunkSize ) const;
         ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
 
         /**

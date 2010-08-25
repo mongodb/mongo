@@ -47,7 +47,7 @@ namespace mongo {
                 url.find_last_of( '/' ) > 0;
         }
 
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params, 
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
 
@@ -61,12 +61,6 @@ namespace mongo {
             string dbname = url.substr( 1 , first - 1 );
             string coll = url.substr( first + 1 );
             string action = "";
-
-            BSONObj params;
-            if ( coll.find( "?" ) != string::npos ) {
-                MiniWebServer::parseParams( params , coll.substr( coll.find( "?" ) + 1 ) );
-                coll = coll.substr( 0 , coll.find( "?" ) );
-            }
 
             string::size_type last = coll.find_last_of( "/" );
             if ( last == string::npos ) {
@@ -266,8 +260,8 @@ namespace mongo {
             
             ss << "# databases: " << dbHolder.size() << '\n';
             
-            if( ClientCursor::byLocSize()>500 )
-                ss << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << '\n';
+            if( ClientCursor::numCursors()>500 )
+                ss << "# Cursors: " << ClientCursor::numCursors() << '\n';
             
             ss << "\nreplication: ";
             if( *replInfo )

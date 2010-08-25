@@ -38,6 +38,7 @@ namespace mongo {
 
         virtual void handle( const char *rq, // the full request
                              string url,
+                             BSONObj params,
                              // set these and return them:
                              string& responseMsg,
                              int& responseCode,

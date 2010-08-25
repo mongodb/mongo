@@ -1532,6 +1532,13 @@ namespace mongo {
 
             BSONObj info = loc.obj();
             bool background = info["background"].trueValue();
+            if( background && cc().isSyncThread() ) { 
+                /* don't do background indexing on slaves.  there are nuances.  this could be added later 
+                   but requires more code.
+                   */
+                log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
+                background = false;
+            }
 
             int idxNo = tableToIndex->nIndexes;
             IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str(), !background); // clear transient info caches so they refresh; increments nIndexes
@@ -1914,7 +1921,10 @@ namespace mongo {
         bb.done();
         if( nNotClosed )
             result.append("nNotClosed", nNotClosed);
-        
+        else {
+            ClientCursor::assertNoCursors();
+        }
+
         return true;
     }
     

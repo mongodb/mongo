@@ -285,7 +285,7 @@ namespace mongo {
 //        log() << "TEMP GETMORE " << ns << ' ' << cursorid << ' ' << pass << endl;
         exhaust = false;
         ClientCursor::Pointer p(cursorid);
-        ClientCursor *cc = p._c;
+        ClientCursor *cc = p.c();
         
         int bufSize = 512;
         if ( cc ){
@@ -324,7 +324,6 @@ namespace mongo {
 
             while ( 1 ) {
                 if ( !c->ok() ) {
-//                    log() << "TEMP Tailable : " << c->tailable() << ' ' << (queryOptions & QueryOption_AwaitData) << endl;
                     if ( c->tailable() ) {
                         /* when a tailable cursor hits "EOF", ok() goes false, and current() is null.  however 
                            advance() can still be retries as a reactivation attempt.  when there is new data, it will 
@@ -663,11 +662,12 @@ namespace mongo {
                 if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
                     _c.reset();
                     _cc.reset();
+                    _so.reset();
                     massert( 13338, "cursor dropped during query", false );
                     // TODO maybe we want to prevent recording the winning plan as well?
                 } 
             }
-        }        
+        }
         
         virtual long long nscanned() {
             if ( _findingStartCursor.get() ) {
@@ -792,7 +792,8 @@ namespace mongo {
                 _n = _inMemSort ? _so->size() : _n;
             } 
             else if ( _inMemSort ) {
-                _so->fill( _buf, _pq.getFields() , _n );
+                if( _so.get() )
+                    _so->fill( _buf, _pq.getFields() , _n );
             }
             
             if ( _pq.hasOption( QueryOption_CursorTailable ) && _pq.getNumToReturn() != 1 )
@@ -1063,13 +1064,12 @@ namespace mongo {
             if ( moreClauses ) {
                 // this MultiCursor will use a dumb NoOp to advance(), so no need to specify mayYield
                 shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher(), dqo ) );
-                cc = new ClientCursor(queryOptions, multi, ns);
+                cc = new ClientCursor(queryOptions, multi, ns, jsobj.getOwned());
             } else {
                 cursor->setMatcher( dqo.matcher() );
-                cc = new ClientCursor( queryOptions, cursor, ns );
+                cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
             }
             cursorid = cc->cursorid;
-            cc->query = jsobj.getOwned();
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->pos = n;
             cc->pq = pq_shared;

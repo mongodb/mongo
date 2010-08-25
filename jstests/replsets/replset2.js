@@ -36,11 +36,17 @@ doTest = function (signal) {
 
     var failed = false;
     var callGetLastError = function (w, timeout, db) {
-        var result = master.getDB(db).getLastErrorObj(w, timeout);
-        print("replset2.js getLastError result: " + tojson(result));
-        if (result['ok'] != 1) {
-            print("replset2.js FAILURE getlasterror not ok");
-            failed = true;
+        try {
+            var result = master.getDB(db).getLastErrorObj(w, timeout);
+            print("replset2.js getLastError result: " + tojson(result));
+            if (result['ok'] != 1) {
+                print("replset2.js FAILURE getlasterror not ok");
+                failed = true;
+            }
+        }
+        catch (e) {
+            print("\nreplset2.js exception in getLastError: " + e + '\n');
+            throw e;
         }
     }
 
@@ -58,7 +64,7 @@ doTest = function (signal) {
 
     printjson(master.getDB("admin").runCommand("replSetGetStatus"));
 
-    callGetLastError(3, 10000, testDB);
+    callGetLastError(3, 25000, testDB);
 
     print("replset2.js **** TEMP 1a ****")
 
@@ -90,7 +96,6 @@ doTest = function (signal) {
 
     var s1 = slaves[1].getDB(testDB).foo.findOne({ n: 1 });
     assert(s1['n'] == 1, "replset2.js Failed to replicate to slave 1");
-
 
     // Test getlasterror with large insert
     print("replset2.js **** Try inserting many records ****")

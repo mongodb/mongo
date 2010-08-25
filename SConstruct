@@ -1168,7 +1168,10 @@ def checkErrorCodes():
 checkErrorCodes()
 
 # main db target
-mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "db/db.cpp" , "util/ntservice.cpp" ] )
+mongodOnlyFiles = [ "db/db.cpp" ]
+if windows:
+    mongodOnlyFiles.append( "util/ntservice.cpp" ) 
+mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + mongodOnlyFiles )
 Default( mongod )
 
 # tools

@@ -62,7 +62,7 @@ namespace mongo {
 
     using namespace bson;
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg);
+    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logforrepl);
     void incRBID();
 
     class rsfatal : public std::exception { 
@@ -147,7 +147,7 @@ namespace mongo {
                     h.collectionsToResync.insert(ns);
                     return;
                 }
-                else if( cmdname == "dropIndexes" ) { 
+                else if( cmdname == "dropIndexes" || cmdname == "deleteIndexes" ) { 
                     /* TODO: this is bad.  we simply full resync the collection here, which could be very slow. */
                     log() << "replSet info rollback of dropIndexes is slow in this version of mongod" << rsLog;
                     string ns = s.db + '.' + first.valuestr();
@@ -389,10 +389,13 @@ namespace mongo {
                    bob res;
                    string errmsg;
                    dropCollection(ns, errmsg, res);
-                   bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg);
-                   if( !ok ) { 
-                       log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
-                       throw "rollback error resyncing rollection [1]";
+                   {
+                       dbtemprelease r;
+                       bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg, false);
+                       if( !ok ) { 
+                           log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
+                           throw "rollback error resyncing rollection [1]";
+                       }
                    }
                }
                catch(...) { 

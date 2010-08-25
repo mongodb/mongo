@@ -287,7 +287,6 @@ namespace mongo {
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            
             long long start = Listener::getElapsedTimeMillis();
             BSONObjBuilder timeBuilder(128);
 
@@ -939,15 +938,34 @@ namespace mongo {
                 "\nnote: This command may take a while to run";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            Timer timer;
+
             string ns = jsobj.firstElement().String();
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
+            bool estimate = jsobj["estimate"].trueValue();
 
             Client::Context ctx( ns );
+            NamespaceDetails *d = nsdetails(ns.c_str());
             
+            if ( ! d || d->nrecords == 0 ){
+                result.appendNumber( "size" , 0 );
+                result.appendNumber( "numObjects" , 0 );
+                result.append( "millis" , timer.millis() );
+                return true;
+            }
+            
+            result.appendBool( "estimate" , estimate );
+
             shared_ptr<Cursor> c;
             if ( min.isEmpty() && max.isEmpty() ) {
+                if ( estimate ){
+                    result.appendNumber( "size" , d->datasize );
+                    result.appendNumber( "numObjects" , d->nrecords );
+                    result.append( "millis" , timer.millis() );
+                    return 1;
+                }
                 c = theDataFileMgr.findAll( ns.c_str() );
             } 
             else if ( min.isEmpty() || max.isEmpty() ) {
@@ -958,18 +976,24 @@ namespace mongo {
                 IndexDetails *idx = cmdIndexDetailsForRange( ns.c_str(), errmsg, min, max, keyPattern );
                 if ( idx == 0 )
                     return false;
-                NamespaceDetails *d = nsdetails(ns.c_str());
+                
                 c.reset( new BtreeCursor( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }
             
+            long long avgObjSize = d->datasize / d->nrecords;
+
             long long maxSize = jsobj["maxSize"].numberLong();
             long long maxObjects = jsobj["maxObjects"].numberLong();
 
-            Timer timer;
             long long size = 0;
             long long numObjects = 0;
             while( c->ok() ) {
-                size += c->currLoc().rec()->netLength();
+
+                if ( estimate )
+                    size += avgObjSize;
+                else
+                    size += c->currLoc().rec()->netLength();
+                
                 numObjects++;
                 
                 if ( ( maxSize && size > maxSize ) || 
@@ -988,8 +1012,8 @@ namespace mongo {
             }
             logIfSlow( timer , os.str() );
 
-            result.append( "size", (double)size );
-            result.append( "numObjects" , (double)numObjects );
+            result.appendNumber( "size", size );
+            result.appendNumber( "numObjects" , numObjects );
             result.append( "millis" , timer.millis() );
             return true;
         }

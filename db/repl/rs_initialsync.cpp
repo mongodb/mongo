@@ -66,7 +66,7 @@ namespace mongo {
 
     void _logOpObjRS(const BSONObj& op);
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string &errmsg);
+    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string &errmsg, bool logforrepl);
 
     static void emptyOplog() {
         writelock lk(rsoplog);
