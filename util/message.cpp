@@ -399,9 +399,9 @@ namespace mongo {
             int lft = 4;
             recv( lenbuf, lft );
             
-            if ( len < 16 || len > 16000000 ) { // messages must be large enough for headers
+            if ( len < 16 || len > 48000000 ) { // messages must be large enough for headers
                 if ( len == -1 ) {
-                    // Endian check from the database, after connecting, to see what mode server is running in.
+                    // Endian check from the client, after connecting, to see what mode server is running in.
                     unsigned foo = 0x10203040;
                     send( (char *) &foo, 4, "endian" );
                     goto again;
@@ -417,7 +417,7 @@ namespace mongo {
                     send( s.c_str(), s.size(), "http" );
                     return false;
                 }
-                log(_logLevel) << "bad recv() len: " << len << '\n';
+                log(0) << "recv(): message len " << len << " is too large" << len << endl;
                 return false;
             }
             
