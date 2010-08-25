@@ -1,9 +1,9 @@
 // 32bit.js dm
 
-var forceSeedToBe = null;
+var forceSeedToBe = .8;
 
 if (forceSeedToBe)
-    print("WARNING FORCING A SPECIFIC SEED - TEST WILL RUN DURING DAY");
+    print("\n32bit.js WARNING FORCING A SPECIFIC SEED - TEST WILL RUN DURING DAY");
 
 function f() {
     seed = forceSeedToBe || Math.random();
@@ -79,9 +79,10 @@ function f() {
 	    }
 	    if (a == 10000 ) {
 		var delta_ms = (new Date())-start;
-		// 2MM / 10000 = 2000.  1000ms/sec.
-		var eta_secs = delta_ms * (2000 / 1000);
+		// 2MM / 10000 = 200.  1000ms/sec.
+		var eta_secs = delta_ms * (200 / 1000);
 		print("eta_secs:" + eta_secs);
+		print(delta_ms);
 		if( eta_secs > 1800 ) {
 		    print("machine is slow, stopping early. a:" + a);
 		    mydb.dropDatabase();
@@ -118,6 +119,6 @@ function f() {
 var h = (new Date()).getHours();
 if( forceSeedToBe || h <= 4 || h >= 22 ) {
     /* this test is slow, so don't run during the day */
-    print("running 32bit.js - this test is slow only runs at night."); 
+    print("\n32bit.js running - this test is slow only runs at night."); 
     f();
 }
