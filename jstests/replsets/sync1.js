@@ -120,8 +120,8 @@ doTest = function (signal) {
             max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
         }
         catch (e) {
-            if ( countExceptions++ > 500 ){
-                assert(false ,"too many exceptions, failing" );
+            if (countExceptions++ > 500) {
+                assert(false, "too many exceptions, failing");
             }
             print("\nsync1.js: exception querying; will sleep and try again " + e);
             sleep(2000);
@@ -170,21 +170,23 @@ doTest = function (signal) {
             continue;
         }
 
-        printjson(max1);
-        printjson(max0);
-        print("\nsync1.js part 11 waiting for match " + count + " " + Date() + " z[0]:" + max0.z + " z:" + max1.z);
+        print("part 11");
+        if (max0) {
+            print("max0.z:" + max0.z);
+            print("max1.z:" + max1.z);
+        }
 
         sleep(2000);
 
         count++;
         if (count == 100) {
-            pause("fail part 11");
+            pause("FAIL part 11");
             assert(false, "replsets/\nsync1.js fails timing out");
             replTest.stopSet(signal);
             return;
         }
-        print("||||| count:" + count);
-        printjson(max0);
+        //print("||||| count:" + count);
+        //printjson(max0);
     } while (!max0 || max0.z != max1.z);
 
     print("\nsync1.js ********************************************************************** part 12");
