@@ -155,7 +155,6 @@ doTest = function (signal) {
     printjson(result);
     sleep(5000);
 
-    // FAIL! This never resyncs
     // now this should resync
     print("\nsync1.js ********************************************************************** part 11");
     var max0 = null;
@@ -163,6 +162,7 @@ doTest = function (signal) {
     do {
         try {
             max0 = dbs[0].bar.find().sort({ z: -1 }).limit(1).next();
+            max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
         }
         catch (e) {
             print("\nsync1.js part 11 exception on bar.find() will sleep and try again " + e);
