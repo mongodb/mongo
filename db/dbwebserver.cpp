@@ -215,12 +215,18 @@ namespace mongo {
             {
                 const map<string, Command*> *m = Command::webCommands();
                 if( m ) {
-                    ss << a("", "These read-only context-less commands can be executed from the web interface.  Results are json format, unless ?text is appended in which case the result is output as text for easier human viewing", "Commands") << ": ";
+                    ss << 
+                        a("", 
+                          "These read-only context-less commands can be executed from the web interface. "
+                            "Results are json format, unless ?text=1 is appended in which case the result is output as text "
+                            "for easier human viewing", 
+                          "Commands") 
+                        << ": ";
                     for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
                         stringstream h;
                         i->second->help(h);
                         string help = h.str();
-                        ss << "<a href=\"/" << i->first << "?text\"";
+                        ss << "<a href=\"/" << i->first << "?text=1\"";
                         if( help != "no help defined" )
                             ss << " title=\"" << help << '"';
                         ss << ">" << i->first << "</a> ";
@@ -455,29 +461,9 @@ namespace mongo {
     public:
         CommandsHandler() : DbWebHandler( "DUMMY COMMANDS" , 2 , true ){}
         
-        bool _cmd( const string& url , string& cmd , bool& text ) const {
-            const char * x = url.c_str();
-            
-            if ( x[0] != '/' ){
-                // this should never happen
-                return false;
-            }
-            
-            if ( strchr( x + 1 , '/' ) )
-                return false;
-            
-            x++;
-
-            const char * end = strstr( x , "?text" );
-            if ( end ){
-                text = true;
-                cmd = string( x , end - x );
-            }
-            else {
-                text = false;
-                cmd = string(x);
-            }
-             
+        bool _cmd( const string& url , string& cmd , bool& text, bo params ) const {
+            cmd = str::after(url, '/');
+            text = params["text"].boolean();
             return true;
         }
 
@@ -496,19 +482,17 @@ namespace mongo {
         virtual bool handles( const string& url ) const { 
             string cmd;
             bool text;
-            if ( ! _cmd( url , cmd , text ) )
+            if ( ! _cmd( url , cmd , text, bo() ) )
                 return false;
-
-            return _cmd( cmd );
+            return _cmd(cmd) != 0;
         }
         
         virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
-                             vector<string>& headers,  const SockAddr &from ){
-            
+                             vector<string>& headers,  const SockAddr &from ) {            
             string cmd;
             bool text = false;
-            assert( _cmd( url , cmd , text ) );
+            assert( _cmd( url , cmd , text, params ) );
             Command * c = _cmd( cmd );
             assert( c );
 

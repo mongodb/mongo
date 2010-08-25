@@ -268,7 +268,7 @@ namespace mongo {
             s << start("Replica Set Status " + prettyHostName());
             s << p( a("/", "back", "Home") + " | " + 
                     a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
-                    a("/replSetGetStatus?text", "", "replSetGetStatus") + " | " +
+                    a("/replSetGetStatus?text=1", "", "replSetGetStatus") + " | " +
                     a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
                   );
 
