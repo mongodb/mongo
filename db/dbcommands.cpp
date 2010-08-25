@@ -933,7 +933,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help <<
                 "determine data size for a set of data in a certain range"
-                "\nexample: { datasize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
+                "\nexample: { dataSize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
                 "\nkeyPattern, min, and max parameters are optional."
                 "\nnote: This command may take a while to run";
         }
@@ -1111,7 +1111,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; } 
         virtual void help( stringstream &help ) const {
-            help << " example: { dbstats:1 } ";
+            help << " example: { dbStats:1 } ";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             list<string> collections;
@@ -1501,8 +1501,8 @@ namespace mongo {
     public:
         virtual void help( stringstream &help ) const {
             help << 
-                "{ findandmodify: \"collection\", query: {processed:false}, update: {$set: {processed:true}}, new: true}\n"
-                "{ findandmodify: \"collection\", query: {processed:false}, remove: true, sort: {priority:-1}}\n"
+                "{ findAndModify: \"collection\", query: {processed:false}, update: {$set: {processed:true}}, new: true}\n"
+                "{ findAndModify: \"collection\", query: {processed:false}, remove: true, sort: {priority:-1}}\n"
                 "Either update or remove is required, all other fields have default values.\n"
                 "Output is in the \"value\" field\n";
         }
