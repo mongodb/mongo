@@ -203,7 +203,7 @@ namespace mongo {
             break;
         default: {
             string errmsg;
-            if ( ! shardVersionOk( _ns , errmsg ) ){
+            if ( ! shardVersionOk( _ns , lockState > 0 , errmsg ) ){
                 msgasserted( StaleConfigInContextCode , (string)"[" + _ns + "] shard version not ok in Client::Context: " + errmsg );
             }
         }
