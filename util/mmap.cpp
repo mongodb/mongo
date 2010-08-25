@@ -57,6 +57,7 @@ namespace mongo {
 
     static set<MongoFile*> mmfiles;
     static RWLock mmmutex("rw:mmmutex");
+    static mutex flush_mutex("rw:flush_mutex");
 
     void MongoFile::destroyed() {
         rwlock lk( mmmutex , true );
@@ -96,6 +97,7 @@ namespace mongo {
     /*static*/ int MongoFile::flushAll( bool sync ){
         if ( ! sync ){
             int num = 0;
+            scoped_lock flushlk(flush_mutex);
             rwlock lk( mmmutex , false );
             for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
                 num++;
@@ -128,7 +130,10 @@ namespace mongo {
             if ( ! f.get() )
                 break;
             
-            f->flush();
+            {
+                scoped_lock flushlk(flush_mutex);
+                f->flush();
+            }
         }
         return seen.size();
     }
