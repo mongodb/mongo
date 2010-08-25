@@ -497,7 +497,7 @@ namespace mongo {
         if( ntoreturn ) 
             ss << " ntoreturn:" << ntoreturn;
 
-		time_t start;
+		time_t start = 0;
         int pass = 0;        
         bool exhaust = false;
         QueryResult* msgdata;
