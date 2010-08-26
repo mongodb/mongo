@@ -49,14 +49,7 @@ namespace mongo {
     } THREADNAME_INFO;
 #pragma pack(pop)
 
-    void setThreadName(const char *name)
-    {
-        _setThreadName( name );
-#if !defined(_DEBUG)
-        // naming might be expensive so don't do "conn*" over and over
-        if( string("conn") == name )
-            return;
-#endif
+    void setWinThreadName(const char *name) { 
         /* is the sleep here necessary???
            Sleep(10);
            */
@@ -66,17 +59,31 @@ namespace mongo {
         info.dwThreadID = -1;
         info.dwFlags = 0;
         __try
-            {
-                RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
-            }
+        {
+            RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
+        }
         __except(EXCEPTION_EXECUTE_HANDLER)
         {
         }
     }
+
+    void setThreadName(const char *name)
+    {
+        _setThreadName( name );
+#if !defined(_DEBUG)
+        // naming might be expensive so don't do "conn*" over and over
+        if( string("conn") == name )
+            return;
+#endif
+        setWinThreadName(name);
+    }
+
 #else
+
     void setThreadName(const char * name ) { 
         _setThreadName( name );
     }
+
 #endif
 
     string getThreadName(){
