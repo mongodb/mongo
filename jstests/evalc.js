@@ -6,7 +6,6 @@ for( i = 0; i < 10; ++i ) {
 }
 
 // SERVER-1610
-if ( 0 ) {
 
 function op() {
     uri = db.runCommand( "whatsmyuri" ).you;
@@ -15,17 +14,19 @@ function op() {
     for ( var i in p ) {
         var o = p[ i ];
         if ( o.client == uri ) {
+            print( "found it" );
             return o.opid;
         }
     }
     return -1;
 }
 
-s = startParallelShell( "db.eval( 'while( 1 ) { db.jstests_evalc.count( {i:10} ); }' )" );
+s = startParallelShell( "print( 'starting forked:' + Date() ); for ( i=0; i<500000; i++ ){ db.currentOp(); } print( 'ending forked:' + Date() ); " )
 
-assert.soon( "op() != -1" );
-//db.killOp( op() );
+print( "starting eval: " + Date() )
+for ( i=0; i<50000; i++ ){
+    db.eval( "db.jstests_evalc.count( {i:10} );" );
+}
+print( "end eval: " + Date() )
 
 s();
-
-}
