@@ -65,6 +65,11 @@ namespace mongo {
         GEO_SPHERE
     };
 
+    inline double computeXScanDistance(double y, double maxDistDegrees){
+        // TODO: this overestimates for large madDistDegrees far from the equator
+        return maxDistDegrees / min(cos(deg2rad(y + maxDistDegrees)), cos(deg2rad(y - maxDistDegrees)));
+    }
+
     GeoBitSets geoBitSets;
 
     const string GEO2DNAME = "2d";
@@ -717,13 +722,21 @@ namespace mongo {
     public:
         typedef multiset<GeoPoint> Holder;
 
-        GeoHopper( const Geo2dType * g , unsigned max , const GeoHash& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() )
-            : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ) {
-            _farthest = -1;
-        }
+        GeoHopper( const Geo2dType * g , unsigned max , const Point& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN)
+            : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type )
+        {}
 
         virtual bool checkDistance( const GeoHash& h , double& d ){
-            d = _g->distance( _near , h );
+            switch (_type){
+                case GEO_PLAIN: 
+                    d = _near.distance( Point(_g, h) );
+                    break;
+                case GEO_SPHERE:
+                    d = spheredist_deg(_near, Point(_g, h));
+                    break;
+                default:
+                    assert(0);
+            }
             bool good = d < _maxDistance && ( _points.size() < _max || d < farthest() );
             GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near << "\t" << h << "\t" << d 
                       << " ok: " << good << " farthest: " << farthest() );
@@ -736,21 +749,22 @@ namespace mongo {
             if ( _points.size() > _max ){
                 _points.erase( --_points.end() );
             }
-
-            Holder::iterator i = _points.end();
-            i--;
-            _farthest = i->_distance;
         }
 
         double farthest() const {
-            return _farthest;
+            if (_points.empty())
+                return -1;
+
+            Holder::iterator i = _points.end();
+            i--;
+            return  i->_distance;
         }
 
         unsigned _max;
-        GeoHash _near;
+        Point _near;
         Holder _points;
         double _maxDistance;
-        double _farthest;
+        GeoDistType _type;
     };
     
     struct BtreeLocation {
@@ -829,14 +843,23 @@ namespace mongo {
 
     class GeoSearch {
     public:
-        GeoSearch( const Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() )
-            : _spec( g ) , _start( n ) ,
+        GeoSearch( const Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN)
+            : _spec( g ) ,_startPt(g,n), _start( n ) ,
               _numWanted( numWanted ) , _filter( filter ) , _maxDistance( maxDistance ) ,
-              _hopper( new GeoHopper( g , numWanted , n , filter , maxDistance ) )
+              _hopper( new GeoHopper( g , numWanted , _startPt , filter , maxDistance, type ) ), _type(type)
         {
             assert( g->getDetails() );
             _nscanned = 0;
             _found = 0;
+            
+            if (type == GEO_PLAIN){
+                _scanDistance = maxDistance;
+            } else if (type == GEO_SPHERE) {
+                //TODO: consider splitting into x and y scan distances
+                _scanDistance = computeXScanDistance(_startPt._y, rad2deg(maxDistance));
+            } else {
+                assert(0);
+            }
         }
         
         void exec(){
@@ -862,41 +885,47 @@ namespace mongo {
                 if ( ! BtreeLocation::initial( id , _spec , min , max , _start , _found , hopper ) )
                     return;
                 
-                while ( _hopper->found() < _numWanted ){
+                while ( !_prefix.constrains() || // if next pass would cover universe, just keep going
+                        ( _hopper->found() < _numWanted && _spec->sizeEdge( _prefix ) <= _scanDistance))
+                {
                     GEODEBUG( _prefix << "\t" << _found << "\t DESC" );
                     while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , hopper ) )
                         _nscanned++;
                     GEODEBUG( _prefix << "\t" << _found << "\t ASC" );
                     while ( max.hasPrefix( _prefix ) && max.advance( 1 , _found , hopper ) )
                         _nscanned++;
-                    if ( ! _prefix.constrains() )
-                        break;
+
+                    if ( ! _prefix.constrains() ){
+                        GEODEBUG( "done search w/o part 2" )
+                        return;
+                    }
+
                     _prefix = _prefix.up();
-                    
-                    double temp = _spec->distance( _prefix , _start );
-                    if ( temp > ( _maxDistance * 2 ) )
-                        break;
                 }
             }
             GEODEBUG( "done part 1" );
-            if ( _found && _prefix.constrains() ){
+            {
                 // 2
-                Point center( _spec , _start );
                 double farthest = hopper->farthest();
-                // Phase 1 might not have found any points.
-                if (farthest == -1)
-                    farthest = _spec->sizeDiag( _prefix );
-                Box want( center._x - farthest , center._y - farthest , farthest * 2 );
+                if (farthest == -1){
+                    // Nothing found in Phase 1
+                    farthest = _scanDistance;
+                } else if (_type == GEO_SPHERE) {
+                    farthest = min(_scanDistance, computeXScanDistance(_startPt._y, rad2deg(farthest)));
+                }
+
+                Box want( _startPt._x - farthest , _startPt._y - farthest , farthest * 2 );
+
                 _prefix = _start;
                 while ( _spec->sizeEdge( _prefix ) < farthest ){
                     _prefix = _prefix.up();
                 }
-                
+
                 if ( logLevel > 0 ){
                     log(1) << "want: " << want << " found:" << _found << " nscanned: " << _nscanned << " hash size:" << _spec->sizeEdge( _prefix ) 
                            << " farthest: " << farthest << " using box: " << Box( _spec , _prefix ).toString() << endl;
                 }
-                
+
                 for ( int x=-1; x<=1; x++ ){
                     for ( int y=-1; y<=1; y++ ){
                         GeoHash toscan = _prefix;
@@ -949,15 +978,18 @@ namespace mongo {
 
         const Geo2dType * _spec;
 
+        Point _startPt;
         GeoHash _start;
         GeoHash _prefix;
         int _numWanted;
         BSONObj _filter;
         double _maxDistance;
+        double _scanDistance;
         shared_ptr<GeoHopper> _hopper;
 
         long long _nscanned;
         int _found;
+        GeoDistType _type;
     };
 
     class GeoCursorBase : public Cursor {
@@ -1163,10 +1195,7 @@ namespace mongo {
 
                 _type = GEO_SPHERE;
                 _yScanDistance = rad2deg(_maxDistance);
-
-                // TODO: this overestimates for large _maxDistance far from the equator
-                _xScanDistance = rad2deg(_maxDistance) / min(cos(deg2rad(_startPt._y + _yScanDistance)),
-                                                             cos(deg2rad(_startPt._y - _yScanDistance)));
+                _xScanDistance = computeXScanDistance(_startPt._y, _yScanDistance);
 
                 uassert(13452, "Spherical distance would require wrapping, which isn't implemented yet", 
                                (_startPt._x + _xScanDistance < 180) && (_startPt._x - _xScanDistance > -180) &&
@@ -1301,6 +1330,8 @@ namespace mongo {
                 case GEO_SPHERE:
                     d = spheredist_deg(_startPt, Point(_g, h));
                     break;
+                default:
+                    assert(0);
             }
 
             GEODEBUG( "\t " << h << "\t" << d );
@@ -1562,7 +1593,11 @@ namespace mongo {
             if ( cmdObj["maxDistance"].isNumber() )
                 maxDistance = cmdObj["maxDistance"].number();
 
-            GeoSearch gs( g , n , numWanted , filter , maxDistance );
+            GeoDistType type = GEO_PLAIN;
+            if ( cmdObj["spherical"].trueValue() )
+                type = GEO_SPHERE;
+
+            GeoSearch gs( g , n , numWanted , filter , maxDistance , type);
 
             if ( cmdObj["start"].type() == String){
                 GeoHash start ((string) cmdObj["start"].valuestr());
