@@ -980,6 +980,7 @@ ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
     this.numNodes = opts.nodes || 0;
+    this.oplogSize = opts.oplogSize || 2;
     this.useSeedList = opts.useSeedList || false;
     this.bridged = opts.bridged || false;
     this.ports = [];
@@ -1100,7 +1101,7 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
         extra = {};
 
     if ( ! extra.oplogSize )
-        extra.oplogSize = "2";
+        extra.oplogSize = this.oplogSize;
 
     var a = []
 
