@@ -1673,7 +1673,8 @@ namespace mongo {
         Client::invalidateDB( d->name );
 
         Database::closeDatabase( d->name.c_str(), d->path );
-        _deleteDataFiles( d->name.c_str() );
+        d = 0; // d is now deleted
+        _deleteDataFiles( db.c_str() );
     }
 
     typedef boost::filesystem::path Path;
