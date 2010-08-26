@@ -731,25 +731,25 @@ namespace mongo {
     
     void shutdown() {
 
-        log() << "\t shutdown: going to close listening sockets..." << endl;        
+        log() << "shutdown: going to close listening sockets..." << endl;        
         ListeningSockets::get()->closeAll();
 
-        log() << "\t shutdown: going to flush oplog..." << endl;
+        log() << "shutdown: going to flush oplog..." << endl;
         stringstream ss2;
         flushOpLog( ss2 );
         rawOut( ss2.str() );
 
         /* must do this before unmapping mem or you may get a seg fault */
-        log() << "\t shutdown: going to close sockets..." << endl;
+        log() << "shutdown: going to close sockets..." << endl;
         boost::thread close_socket_thread(closeAllSockets);
 
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
-        log() << "\t shutdown: waiting for fs preallocator..." << endl;
+        log() << "shutdown: waiting for fs preallocator..." << endl;
         theFileAllocator().waitUntilFinished();
         
-        log() << "\t shutdown: closing all files..." << endl;
+        log() << "shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );
@@ -759,9 +759,9 @@ namespace mongo {
         
 #if !defined(_WIN32) && !defined(__sunos__)
         if ( lockFile ){
-            log() << "\t shutdown: removing fs lock..." << endl;
+            log() << "shutdown: removing fs lock..." << endl;
             if( ftruncate( lockFile , 0 ) ) 
-                log() << "\t couldn't remove fs lock " << errnoWithDescription() << endl;
+                log() << "couldn't remove fs lock " << errnoWithDescription() << endl;
             flock( lockFile, LOCK_UN );
         }
 #endif
