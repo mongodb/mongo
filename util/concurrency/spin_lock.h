@@ -19,13 +19,15 @@
 #ifndef CONCURRENCY_SPINLOCK_HEADER
 #define CONCURRENCY_SPINLOCK_HEADER
 
+#include "../../pch.h"
+
+#include "boost/thread/mutex.hpp"
+
 namespace mongo {
 
     /**
-     * BIG WARNING - COMPILES, BUT NOT READY FOR USE - BIG WARNING
-     *
-     * The spinlock currently requires late GCC support
-     * routines. Support for other platforms will be added soon.
+     * The spinlock currently requires late GCC support routines to be efficient.
+     * Other platforms default to a mutex implemenation.
      */
     class SpinLock{
     public:
@@ -36,7 +38,10 @@ namespace mongo {
         void unlock();
 
     private:
-        bool _locked;
+        volatile bool _locked;
+
+        // default to a scoped mutex if not implemented
+        boost::mutex* _mutex;
 
         // Non-copyable, non-assignable
         SpinLock(SpinLock&);

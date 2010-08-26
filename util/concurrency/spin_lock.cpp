@@ -16,14 +16,28 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "../../pch.h"
+
 #include <time.h>
+
 #include "spin_lock.h"
 
 namespace mongo {
 
-    SpinLock::SpinLock() : _locked( false ){}
+    SpinLock::SpinLock() : _locked( false ) 
+#if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
 
-    SpinLock::~SpinLock(){}
+                         , _mutex ( NULL ) 
+
+#else
+
+                         , _mutex ( new boost::mutex ) 
+#endif
+    { }
+
+    SpinLock::~SpinLock(){
+        delete _mutex;
+    }
 
     void SpinLock::lock(){
 #if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
@@ -46,7 +60,9 @@ namespace mongo {
         }
 #else
 
-        // WARNING "TODO Missing spin lock in this platform."
+        // WARNING Missing spin lock in this platform. This can potentially
+        // be slow.
+        _mutex->lock();
 
 #endif
     }
@@ -58,7 +74,7 @@ namespace mongo {
 
 #else
 
-        // WARNING "TODO Missing spin lock in this platform."
+        _mutex->unlock();
 
 #endif
     }
