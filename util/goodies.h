@@ -667,16 +667,35 @@ namespace mongo {
             bool n2 = isNumber( *s2 );
         
             if ( n1 && n2 ) {
-                char * e1;
-                char * e2;
-                long l1 = strtol( s1 , &e1 , 10 );
-                long l2 = strtol( s2 , &e2 , 10 );
-            
-                if ( l1 > l2 )
+                // get rid of leading 0s
+                while ( *s1 == '0' ) s1++;
+                while ( *s2 == '0' ) s2++;
+
+                char * e1 = (char*)s1;
+                char * e2 = (char*)s2;
+
+                // find length
+                // if end of string, will break immediately ('\0')
+                while ( isNumber (*e1) ) e1++;
+                while ( isNumber (*e2) ) e2++;
+
+                int len1 = e1-s1;
+                int len2 = e2-s2;
+
+                int result;
+                // if one is longer than the other, return
+                if ( len1 > len2 ) {
                     return 1;
-                else if ( l1 < l2 )
+                }
+                else if ( len2 > len1 ) {
                     return -1;
-            
+                }
+                // if the lengths are equal, just strcmp
+                else if ( (result = strncmp(s1, s2, len1)) != 0 ) {
+                    return result;
+                }
+
+                // otherwise, the numbers are equal
                 s1 = e1;
                 s2 = e2;
                 continue;
