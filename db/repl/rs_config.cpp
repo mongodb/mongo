@@ -178,7 +178,7 @@ namespace mongo {
         return true;
     }
 
-    VOID ReplSetConfig::clear() { 
+    void ReplSetConfig::clear() { 
         version = -5;
         _ok = false;
     }
