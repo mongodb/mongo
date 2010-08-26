@@ -52,7 +52,7 @@ namespace mongo {
     
     /* comment MUST only be set when initiating the set by the initiator */
     void ReplSetConfig::saveConfigLocally(bo comment) { 
-        check();
+        checkRsConfig();
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
         { 
             writelock lk("");
@@ -178,12 +178,12 @@ namespace mongo {
         return true;
     }
 
-    void ReplSetConfig::clear() { 
+    VOID ReplSetConfig::clear() { 
         version = -5;
         _ok = false;
     }
 
-    void ReplSetConfig::check() const { 
+    void ReplSetConfig::checkRsConfig() const { 
         uassert(13132,
             "nonmatching repl set name in _id field; check --replSet command line",
             _id == cmdLine.ourSetName());
@@ -358,6 +358,7 @@ namespace mongo {
         BSONObj o = c->nextSafe();
         uassert(13109, "multiple rows in " + rsConfigNs + " not supported", !c->more());
         from(o);
+        checkRsConfig();
         _ok = true;
         log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
     }
