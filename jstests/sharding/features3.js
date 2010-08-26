@@ -67,7 +67,7 @@ killTime = (new Date()).getTime() - killTime.getTime()
 print( "killTime: " + killTime );
 
 assert.eq( 2 , state , "failed killing" );
-assert.gt( 3000 , killTime , "took too long to kill" )
+assert.gt( 10000 , killTime , "took too long to kill" )
 
 join()
 
