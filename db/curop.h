@@ -85,13 +85,7 @@ namespace mongo {
         int querySize() const { return *((int *) _queryBuf); }
         bool haveQuery() const { return querySize() != 0; }
 
-        BSONObj query() {
-            if( querySize() == 1 ) { 
-                return _tooBig;
-            }
-            BSONObj o(_queryBuf);
-            return o;
-        }
+        BSONObj query( bool threadSafe = false);
 
         void ensureStarted(){
             if ( _start == 0 )
