@@ -53,15 +53,21 @@ namespace mongo {
     }
 
     Client::~Client() { 
-        delete _curOp;
         _god = 0;
 
         if ( _context )
             error() << "Client::~Client _context should be NULL: " << _desc << endl;
-        if ( !_shutdown ) 
-            error() << "Client::shutdown not called: " << _desc << endl;
-    }
 
+        if ( ! _shutdown ) {
+            error() << "Client::shutdown not called: " << _desc << endl;
+        }
+        
+        scoped_lock bl(clientsMutex);
+        if ( ! _shutdown )
+            clients.erase(this);
+        delete _curOp;
+    }
+    
     void Client::_dropns( const string& ns ){
         Top::global.collectionDropped( ns );
                     
@@ -258,6 +264,15 @@ namespace mongo {
         if ( co ){
             co->gotLock();
         }
+    }
+
+    CurOp::~CurOp(){
+        if ( _wrapped ){
+            scoped_lock bl(Client::clientsMutex);
+            _client->_curOp = _wrapped;
+        }
+        
+        _client = 0;
     }
 
     BSONObj CurOp::query( bool threadSafe ) {

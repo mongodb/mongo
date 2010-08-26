@@ -222,10 +222,7 @@ namespace mongo {
             memset(_queryBuf, 0, sizeof(_queryBuf));
         }
         
-        ~CurOp(){
-            if ( _wrapped )
-                _client->_curOp = _wrapped;
-        }
+        ~CurOp();
 
         BSONObj info() { 
             if( ! cc().getAuthenticationInfo()->isAuthorized("admin") ) { 
