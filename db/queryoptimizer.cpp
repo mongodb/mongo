@@ -362,7 +362,7 @@ namespace mongo {
                 const IndexSpec& spec = ii.getSpec();
                 if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , order_ ) ){
                     usingPrerecordedPlan_ = true;
-                    mayRecordPlan_ = true;
+                    mayRecordPlan_ = false;
                     plans_.push_back( PlanPtr( new QueryPlan( d , j , *fbs_ , _originalQuery, order_ , 
                                                               BSONObj() , BSONObj() , _special ) ) );
                     return;
