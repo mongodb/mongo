@@ -699,16 +699,18 @@ namespace mongo {
                     ::_exit( rc );
                 }
                 stringstream ss;
-                ss << "dbexit: " << why << "; exiting immediately" << endl;
+                ss << "dbexit: " << why << "; exiting immediately";
                 tryToOutputFatal( ss.str() );
                 if ( c ) c->shutdown();
                 ::exit( rc );                
             }
         }
         
-        stringstream ss;
-        ss << "dbexit: " << why << endl;
-        tryToOutputFatal( ss.str() );
+        {
+            stringstream ss;
+            ss << "dbexit: " << why;
+            tryToOutputFatal( ss.str() );
+        }
         
         try {
             shutdown(); // gracefully shutdown instance

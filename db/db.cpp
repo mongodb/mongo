@@ -1099,7 +1099,7 @@ namespace mongo {
     // this will be called in certain c++ error cases, for example if there are two active
     // exceptions
     void myterminate() {
-        rawOut( "terminate() called, printing stack:\n" );
+        rawOut( "terminate() called, printing stack:" );
         printStackTrace();
         abort();
     }
@@ -1135,22 +1135,22 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
     switch( fdwCtrlType )
     {
     case CTRL_C_EVENT:
-        rawOut("Ctrl-C signal\n");
+        rawOut("Ctrl-C signal");
         ctrlCTerminate();
         return( TRUE );
     case CTRL_CLOSE_EVENT:
-        rawOut("CTRL_CLOSE_EVENT signal\n");
+        rawOut("CTRL_CLOSE_EVENT signal");
         ctrlCTerminate();
         return( TRUE );
     case CTRL_BREAK_EVENT:
-        rawOut("CTRL_BREAK_EVENT signal\n");
+        rawOut("CTRL_BREAK_EVENT signal");
         ctrlCTerminate();
         return TRUE;
     case CTRL_LOGOFF_EVENT:
-        rawOut("CTRL_LOGOFF_EVENT signal (ignored)\n");
+        rawOut("CTRL_LOGOFF_EVENT signal (ignored)");
         return FALSE;
     case CTRL_SHUTDOWN_EVENT:
-         rawOut("CTRL_SHUTDOWN_EVENT signal (ignored)\n");
+         rawOut("CTRL_SHUTDOWN_EVENT signal (ignored)");
          return FALSE;
     default:
         return FALSE;
@@ -1158,7 +1158,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 }
 
     void myPurecallHandler() {
-        rawOut( "pure virtual method called, printing stack:\n" );
+        rawOut( "pure virtual method called, printing stack:" );
         printStackTrace();
         abort();        
     }
