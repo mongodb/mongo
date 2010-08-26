@@ -369,6 +369,10 @@ namespace mongo {
                 between( _min._x , _max._x  , x , fudge ) &&
                 between( _min._y , _max._y  , y , fudge );
         }
+
+        bool contains(const Box& other, double fudge=0){
+            return inside(other._min, fudge) && inside(other._max, fudge);
+        }
         
         Point _min;
         Point _max;
@@ -900,6 +904,7 @@ namespace mongo {
                         return;
                     }
 
+                    _alreadyScanned = Box(_spec, _prefix);
                     _prefix = _prefix.up();
                 }
             }
@@ -949,6 +954,9 @@ namespace mongo {
                 cout << " doBox: " << testBox.toString() << "\t" << toscan.toString() << " scanned so far: " << _nscanned << endl;
             }
 
+            if (_alreadyScanned.contains(testBox, _spec->_error))
+                return; // been here, done this
+
             double intPer = testBox.intersects( want );
             
             if ( intPer <= 0 )
@@ -990,6 +998,8 @@ namespace mongo {
         long long _nscanned;
         int _found;
         GeoDistType _type;
+
+        Box _alreadyScanned;
     };
 
     class GeoCursorBase : public Cursor {
