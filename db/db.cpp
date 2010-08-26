@@ -217,7 +217,6 @@ namespace mongo {
 
             Message m;
             while ( 1 ) {
-                m.reset();
 
                 if ( !dbMsgPort->recv(m) ) {
                     if( !cmdLine.quiet )
@@ -275,6 +274,8 @@ sendmore:
                         }
                     }
                 }
+
+                m.reset();
             }
 
         }
