@@ -25,7 +25,7 @@
 
    local.sources         - indicates what sources we pull from as a "slave", and the last update of each
    local.oplog.$main     - our op log as "master"
-   local.dbinfo.<dbname>
+   local.dbinfo.<dbname> - no longer used???
    local.pair.startup    - can contain a special value indicating for a pair that we have the master copy.
                            used when replacing other half of the pair which has permanently failed.
    local.pair.sync       - { initialsynccomplete: 1 }

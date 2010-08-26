@@ -37,7 +37,9 @@ namespace mongo {
     }
 
     Database::Database(const char *nm, bool& newDb, const string& _path )
-        : name(nm), path(_path), namespaceIndex( path, name ) {
+        : name(nm), path(_path), namespaceIndex( path, name ), 
+          profileName(name + ".system.profile")
+    {
         
         { // check db name is valid
             size_t L = strlen(nm);
@@ -50,7 +52,6 @@ namespace mongo {
         
         newDb = namespaceIndex.exists();
         profile = 0;
-        profileName = name + ".system.profile";
 
         {
             vector<string> others;
