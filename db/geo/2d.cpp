@@ -830,7 +830,7 @@ namespace mongo {
     class GeoSearch {
     public:
         GeoSearch( const Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() )
-            : _spec( g ) , _n( n ) , _start( n ) ,
+            : _spec( g ) , _start( n ) ,
               _numWanted( numWanted ) , _filter( filter ) , _maxDistance( maxDistance ) ,
               _hopper( new GeoHopper( g , numWanted , n , filter , maxDistance ) )
         {
@@ -859,7 +859,7 @@ namespace mongo {
                 
 
                 BtreeLocation min,max;
-                if ( ! BtreeLocation::initial( id , _spec , min , max , _n , _found , hopper ) )
+                if ( ! BtreeLocation::initial( id , _spec , min , max , _start , _found , hopper ) )
                     return;
                 
                 while ( _hopper->found() < _numWanted ){
@@ -881,13 +881,13 @@ namespace mongo {
             GEODEBUG( "done part 1" );
             if ( _found && _prefix.constrains() ){
                 // 2
-                Point center( _spec , _n );
+                Point center( _spec , _start );
                 double farthest = hopper->farthest();
                 // Phase 1 might not have found any points.
                 if (farthest == -1)
                     farthest = _spec->sizeDiag( _prefix );
                 Box want( center._x - farthest , center._y - farthest , farthest * 2 );
-                _prefix = _n;
+                _prefix = _start;
                 while ( _spec->sizeEdge( _prefix ) < farthest ){
                     _prefix = _prefix.up();
                 }
@@ -949,7 +949,6 @@ namespace mongo {
 
         const Geo2dType * _spec;
 
-        GeoHash _n;
         GeoHash _start;
         GeoHash _prefix;
         int _numWanted;
