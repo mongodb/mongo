@@ -77,14 +77,13 @@ function f() {
                 if( Math.random() < 0.0001 ) { print("update cc"); t.update({c:cc},{'$set':{c:1}},false,true); }
                 if( Math.random() < 0.00001 ) { print("remove e"); t.remove({e:1}); }
 	    }
-	    if (a == 10000 ) {
+	    if (a == 20000 ) {
 		var delta_ms = (new Date())-start;
-		// 2MM / 10000 = 200.  1000ms/sec.
-		var eta_secs = delta_ms * (200 / 1000);
-		print("eta_secs:" + eta_secs);
-		print(delta_ms);
-		if( eta_secs > 1800 ) {
-		    print("machine is slow, stopping early. a:" + a);
+		// 2MM / 20000 = 100.  1000ms/sec.
+		var eta_secs = delta_ms * (100 / 1000);
+		print("32bit.js eta_secs:" + eta_secs);
+		if( eta_secs > 1000 ) {
+		    print("32bit.js machine is slow, stopping early. a:" + a);
 		    mydb.dropDatabase();
 		    return;
 		}
@@ -117,8 +116,8 @@ function f() {
 }
 
 var h = (new Date()).getHours();
-if( forceSeedToBe || h <= 4 || h >= 22 ) {
+if( forceSeedToBe || h <= 2 || h >= 22 ) {
     /* this test is slow, so don't run during the day */
-    print("\n32bit.js running - this test is slow only runs at night."); 
+    print("\n32bit.js running - this test is slow so only runs at night."); 
     f();
 }
