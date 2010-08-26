@@ -31,6 +31,16 @@ namespace mongo {
 
     void logOpInitiate(const bo&);
 
+    void assertOnlyHas(BSONObj o, const set<string>& fields) { 
+        BSONObj::iterator i(o);
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if( !fields.count( e.fieldName() ) ) {
+                uasserted(13434, str::stream() << "unexpected field '" << e.fieldName() << "'in object");
+            }
+        }
+    }
+
     list<HostAndPort> ReplSetConfig::otherMemberHostnames() const { 
         list<HostAndPort> L;
         for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++ ) {
@@ -182,16 +192,6 @@ namespace mongo {
         uassert(13309, "replSet bad config maximum number of members is 7 (for now)", members.size() <= 7);
     }
 
-    void assertOnlyHas(BSONObj o, const set<string>& fields) { 
-        BSONObj::iterator i(o);
-        while( i.more() ) {
-            BSONElement e = i.next();
-            if( !fields.count( e.fieldName() ) ) {
-                uasserted(13434, str::stream() << "unexpected field '" << e.fieldName() << "'in object");
-            }
-        }
-    }
-
     void ReplSetConfig::from(BSONObj o) {
         static const string legal[] = {"_id","version", "members","settings"};
         static const set<string> legals(legal, legal + 4);
@@ -231,6 +231,10 @@ namespace mongo {
             BSONObj mobj = members[i].Obj();
             MemberCfg m;
             try {
+                static const string legal[] = {"_id","votes","priority","host","hidden","slaveDelay","arbiterOnly"};
+                static const set<string> legals(legal, legal + 7);
+                assertOnlyHas(mobj, legals);
+
                 try { 
                     m._id = (int) mobj["_id"].Number();
                 } catch(...) { 
