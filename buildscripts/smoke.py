@@ -210,11 +210,9 @@ def checkDbHashes(master, slave):
         raise(Bug("slave instance doesn't have slave attribute set"))
 
     print "waiting for slave to catch up..."
-    ARB=10  # ARBITRARY
-    time.sleep(ARB)
-    argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 60000) );']
+    argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 120000) );']
     res = Popen(argv, stdout=PIPE).wait() #.communicate()[0]
-    # FIXME: maybe assert that that res == 0?
+    print( res )
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
