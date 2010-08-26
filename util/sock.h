@@ -253,9 +253,7 @@ namespace mongo {
 
     class ListeningSockets {
     public:
-        ListeningSockets() : _mutex("ListeningSockets"), _sockets( new set<int>() ){
-        }
-        
+        ListeningSockets() : _mutex("ListeningSockets"), _sockets( new set<int>() ) { }
         void add( int sock ){
             scoped_lock lk( _mutex );
             _sockets->insert( sock );
@@ -264,7 +262,6 @@ namespace mongo {
             scoped_lock lk( _mutex );
             _sockets->erase( sock );
         }
-        
         void closeAll(){
             set<int>* s;
             {
@@ -272,17 +269,13 @@ namespace mongo {
                 s = _sockets;
                 _sockets = new set<int>();
             }
-
-            for ( set<int>::iterator i=s->begin(); i!=s->end(); i++ ){
+            for ( set<int>::iterator i=s->begin(); i!=s->end(); i++ ) {
                 int sock = *i;
-                log() << "\t going to close listening socket: " << sock << endl;
+                log() << "closing listening socket: " << sock << endl;
                 closesocket( sock );
-            }
-            
+            }            
         }
-        
         static ListeningSockets* get();
-
     private:
         mongo::mutex _mutex;
         set<int>* _sockets;

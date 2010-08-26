@@ -33,34 +33,25 @@ namespace mongo {
     public:
         static bool _openAllFiles;
         
-        Database(const char *nm, bool& newDb, const string& _path = dbpath);
-        
-        ~Database() {
-            magic = 0;
-            btreeStore->closeFiles(name, path);
-            size_t n = files.size();
-            for ( size_t i = 0; i < n; i++ )
-                delete files[i];
-            if( ccByLoc.size() ) { 
-                /* dm: we need to move some code from closeDatabase(...) to here i think - will look into that tomorrow. 
-                       in the meantime, this reminds us that something is wrong if it logs.
-                */
-                log() << "\n\n\nWARNING: ccByLoc not empty on database close! " << ccByLoc.size() << ' ' << name << endl;
-            }
-        }
-        
+        Database(const char *nm, /*out*/ bool& newDb, const string& _path = dbpath);
+    private:
+        ~Database();
+    public:
+        /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
+           thus the destructor is private.  this could be cleaned up one day...
+        */
+        static void closeDatabase( const char *db, const string& path );
+
         /**
          * tries to make sure that this hasn't been deleted
          */
-        bool isOk(){
-            return magic == 781231;
-        }
+        bool isOk() const { return magic == 781231; }
 
         bool isEmpty(){
             return ! namespaceIndex.allocated();
         }
 
-        boost::filesystem::path fileName( int n ) {
+        boost::filesystem::path fileName( int n ) const {
             stringstream ss;
             ss << name << '.' << n;
             boost::filesystem::path fullName;
@@ -71,7 +62,7 @@ namespace mongo {
             return fullName;
         }
         
-        bool exists(int n) { 
+        bool exists(int n) const { 
             return boost::filesystem::exists( fileName( n ) );
         }
 
@@ -181,7 +172,7 @@ namespace mongo {
         }
         
         /**
-         * @return true if success, false otherwise
+         * @return true if success.  false if bad level or error creating profile ns
          */
         bool setProfilingLevel( int newLevel , string& errmsg );
 
@@ -199,14 +190,12 @@ namespace mongo {
         void flushFiles( bool sync );
         
         vector<MongoDataFile*> files;
-        string name; // "alleyinsider"
-        string path;
+        const string name; // "alleyinsider"
+        const string path;
         NamespaceIndex namespaceIndex;
         int profile; // 0=off.
-        string profileName; // "alleyinsider.system.profile"
-
+        const string profileName; // "alleyinsider.system.profile"
         multimap<DiskLoc, ClientCursor*> ccByLoc;
-
         int magic; // used for making sure the object is still loaded in memory 
     };
 

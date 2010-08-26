@@ -90,11 +90,10 @@ doTest = function (signal) {
     printjson(m1);
     assert(m1['n'] == 1, "replset2.js Failed to save to master");
 
-
-    var s0 = slaves[0].getDB(testDB).foo.findOne({ n: 1 });
+    s0 = slaves[0].getDB(testDB).foo.findOne({ n: 1 });
     assert(s0['n'] == 1, "replset2.js Failed to replicate to slave 0");
 
-    var s1 = slaves[1].getDB(testDB).foo.findOne({ n: 1 });
+    s1 = slaves[1].getDB(testDB).foo.findOne({ n: 1 });
     assert(s1['n'] == 1, "replset2.js Failed to replicate to slave 1");
 
     // Test getlasterror with large insert
