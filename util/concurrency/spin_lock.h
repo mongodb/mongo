@@ -20,8 +20,7 @@
 #define CONCURRENCY_SPINLOCK_HEADER
 
 #include "../../pch.h"
-
-#include "boost/thread/mutex.hpp"
+#include "rwlock.h"
 
 namespace mongo {
 
@@ -38,10 +37,12 @@ namespace mongo {
         void unlock();
 
     private:
+#if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
         volatile bool _locked;
-
+#else
         // default to a scoped mutex if not implemented
-        boost::mutex* _mutex;
+        RWLock _mutex;
+#endif
 
         // Non-copyable, non-assignable
         SpinLock(SpinLock&);

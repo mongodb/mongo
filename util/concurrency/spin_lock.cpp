@@ -24,19 +24,14 @@
 
 namespace mongo {
 
-    SpinLock::SpinLock() : _locked( false ) 
+    SpinLock::SpinLock() : 
+
 #if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
-
-                         , _mutex ( NULL ) 
-
-#else
-
-                         , _mutex ( new boost::mutex ) 
+        _locked( false ) 
 #endif
     { }
 
     SpinLock::~SpinLock(){
-        delete _mutex;
     }
 
     void SpinLock::lock(){
@@ -73,8 +68,8 @@ namespace mongo {
         __sync_lock_release(&_locked);
 
 #else
-
-        _mutex->unlock();
+        
+        _mutex.unlock();
 
 #endif
     }
