@@ -355,52 +355,52 @@ def expand_suites(suites):
     globstr = None
     global mongo_repo, tests
     for suite in suites:
-        if suite == 'smokeAll':
+        if suite == 'all':
             tests = []
-            expand_suites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlowNightly', 'smokeJsSlowWeekly', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
+            expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'parallel', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'])
             break
-        if suite == 'smoke':
+        if suite == 'test':
             if os.sys.platform == "win32":
                 program = 'test.exe'
             else:
                 program = 'test'
             (globstr, usedb) = (program, False)
-        elif suite == 'smokePerf':
+        elif suite == 'perf':
             if os.sys.platform == "win32":
                 program = 'perftest.exe'
             else:
                 program = 'perftest'
             (globstr, usedb) = (program, False)
-        elif suite == 'smokeJs':
+        elif suite == 'js':
             # FIXME: _runner.js seems equivalent to "[!_]*.js".
             #(globstr, usedb) = ('_runner.js', True)
             (globstr, usedb) = ('[!_]*.js', True)
-        elif suite == 'smokeQuota':
+        elif suite == 'quota':
             (globstr, usedb) = ('quota/*.js', True)
-        elif suite == 'smokeJsPerf':
+        elif suite == 'jsPerf':
             (globstr, usedb) = ('perf/*.js', True)
-        elif suite == 'smokeDisk':
+        elif suite == 'disk':
             (globstr, usedb) = ('disk/*.js', True)
-        elif suite == 'smokeJsSlowNightly':
+        elif suite == 'jsSlowNightly':
             (globstr, usedb) = ('slowNightly/*.js', True)
-        elif suite == 'smokeJsSlowWeekly':
+        elif suite == 'jsSlowWeekly':
             (globstr, usedb) = ('slowWeekly/*.js', True)
-        elif suite == 'smokeParallel':
+        elif suite == 'parallel':
             (globstr, usedb) = ('parallel/*.js', True)
-        elif suite == 'smokeClone':
+        elif suite == 'clone':
             (globstr, usedb) = ('clone/*.js', False)
-        elif suite == 'smokeRepl':
+        elif suite == 'repl':
             (globstr, usedb) = ('repl/*.js', False)
-        elif suite == 'smokeReplSets':
+        elif suite == 'replSets':
             (globstr, usedb) = ('replsets/*.js', False)
-        elif suite == 'smokeAuth':
+        elif suite == 'auth':
             (globstr, usedb) = ('auth/*.js', False)
-        elif suite == 'smokeSharding':
+        elif suite == 'sharding':
             (globstr, usedb) = ('sharding/*.js', False)
-        elif suite == 'smokeTool':
+        elif suite == 'tool':
             (globstr, usedb) = ('tool/*.js', False)
         # well, the above almost works for everything...
-        elif suite == 'smokeClient':
+        elif suite == 'client':
             paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
             if os.sys.platform == "win32":
                 paths = [path+'.exe' for path in paths]
@@ -434,7 +434,7 @@ def main():
 #                      help='Top-level directory of mongo checkout to use.  (default: script will make a guess)')
     parser.add_option('--test-path', dest='test_path', default=None,
                       help="Path to the test executables to run "
-                      "(currently only used for smokeClient)")
+                      "(currently only used for 'client')")
     parser.add_option('--mongod', dest='mongod_executable', #default='./mongod',
                       help='Path to mongod to run (default "./mongod")')
     parser.add_option('--port', dest='mongod_port', default="32000",
@@ -498,8 +498,8 @@ def main():
         raise Exception( "no tests specified" )
     # If we're in suite mode, tests is a list of names of sets of tests.
     if options.mode == 'suite':
-        # Suites: smoke, smokePerf, smokeJs, smokeQuota, smokeJsPerf,
-        # smokeJsSlow, smokeParalell, smokeClone, smokeRepl, smokeDisk
+        # Suites: test, perf, js, quota, jsPerf,
+        # jsSlow, parallel, clone, repl, disk
         suites = tests
         tests = []
         expand_suites(suites)

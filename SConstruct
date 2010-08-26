@@ -1307,7 +1307,15 @@ def addTest(name, deps, actions):
     smokeEnv.SideEffect( "dummySmokeSideEffect", name )
 
 def addSmoketest( name, deps ):
-    addTest(name, deps, [ "python buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + name ])
+    # Convert from smoke to test, smokeJs to js, and foo to foo
+    target = name
+    if name.startswith("smoke"):
+        if name == "smoke":
+            target = "test"
+        else:
+            target = name[5].lower() + name[6:]
+
+    addTest(name, deps, [ "python buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
 
 addSmoketest( "smoke", [ add_exe( "test" ) ] )
 addSmoketest( "smokePerf", [ "perftest" ]  )
