@@ -57,7 +57,7 @@ namespace mongo {
 
         // WARNING Missing spin lock in this platform. This can potentially
         // be slow.
-        _mutex->lock();
+        _mutex.lock();
 
 #endif
     }
