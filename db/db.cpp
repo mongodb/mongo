@@ -416,7 +416,7 @@ sendmore:
                     return;
                 }
             } else {
-                closeDatabase( dbName.c_str() );
+                Database::closeDatabase( dbName.c_str(), dbpath );
             }
         }
 

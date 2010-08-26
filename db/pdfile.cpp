@@ -1662,15 +1662,18 @@ namespace mongo {
 
     void dropDatabase(string db) {
         log(1) << "dropDatabase " << db << endl;
-        assert( cc().database() );
-        assert( cc().database()->name == db );
+        Database *d = cc().database();
+        assert( d );
+        assert( d->name == db );
 
-        BackgroundOperation::assertNoBgOpInProgForDb(db.c_str());
+        BackgroundOperation::assertNoBgOpInProgForDb(d->name.c_str());
 
-        Client::invalidateDB( db );
+        /* why is this not called all the time in closeDatabase?! seems dangerous? */
+        /* no path specified here - seems dangerous */
+        Client::invalidateDB( d->name );
 
-        closeDatabase( db.c_str() );
-        _deleteDataFiles( db.c_str() );
+        Database::closeDatabase( d->name.c_str(), d->path );
+        _deleteDataFiles( d->name.c_str() );
     }
 
     typedef boost::filesystem::path Path;
@@ -1797,6 +1800,7 @@ namespace mongo {
         
         problem() << "repairDatabase " << dbName << endl;
         assert( cc().database()->name == dbName );
+        assert( cc().database()->path == dbpath );
 
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
@@ -1824,7 +1828,7 @@ namespace mongo {
             
             res = cloneFrom(localhost.c_str(), errmsg, dbName, 
                                  /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false);
-            closeDatabase( dbName, reservedPathString.c_str() );
+            Database::closeDatabase( dbName, reservedPathString.c_str() );
         }
 
         if ( !res ) {
@@ -1835,7 +1839,7 @@ namespace mongo {
         }
 
         Client::Context ctx( dbName );
-        closeDatabase( dbName );
+        Database::closeDatabase( dbName, dbpath );
 
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );
@@ -1897,6 +1901,7 @@ namespace mongo {
         
         set< string > dbs;
         for ( map<string,Database*>::iterator i = m.begin(); i != m.end(); i++ ) {
+            wassert( i->second->path == path );
             dbs.insert( i->first );
         }
         
@@ -1914,7 +1919,7 @@ namespace mongo {
                 nNotClosed++;
             }
             else {
-                closeDatabase( name.c_str() , path );
+                Database::closeDatabase( name.c_str() , path );
                 bb.append( bb.numStr( n++ ) , name );
             }
         }

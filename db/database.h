@@ -34,21 +34,14 @@ namespace mongo {
         static bool _openAllFiles;
         
         Database(const char *nm, bool& newDb, const string& _path = dbpath);
-        
-        ~Database() {
-            magic = 0;
-            btreeStore->closeFiles(name, path);
-            size_t n = files.size();
-            for ( size_t i = 0; i < n; i++ )
-                delete files[i];
-            if( ccByLoc.size() ) { 
-                /* dm: we need to move some code from closeDatabase(...) to here i think - will look into that tomorrow. 
-                       in the meantime, this reminds us that something is wrong if it logs.
-                */
-                log() << "\n\n\nWARNING: ccByLoc not empty on database close! " << ccByLoc.size() << ' ' << name << endl;
-            }
-        }
-        
+    private:
+        ~Database();
+    public:
+        /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
+           thus the destructor is private.  this could be cleaned up one day...
+        */
+        static void closeDatabase( const char *db, const string& path );
+
         /**
          * tries to make sure that this hasn't been deleted
          */

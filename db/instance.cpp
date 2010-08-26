@@ -390,7 +390,7 @@ namespace mongo {
     /* db - database name
        path - db directory
     */
-    void closeDatabase( const char *db, const string& path ) {
+    /*static*/ void Database::closeDatabase( const char *db, const string& path ) {
         assertInWriteLock();
         
         Client::Context * ctx = cc().getContext();
@@ -413,8 +413,8 @@ namespace mongo {
         NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
         dbHolder.erase( db, path );
-        delete database; // closes files
         ctx->clear();
+        delete database; // closes files
     }
 
     void receivedUpdate(Message& m, CurOp& op) {
