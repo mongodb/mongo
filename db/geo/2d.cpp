@@ -727,7 +727,7 @@ namespace mongo {
         typedef multiset<GeoPoint> Holder;
 
         GeoHopper( const Geo2dType * g , unsigned max , const Point& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN)
-            : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type )
+            : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _farthest(-1)
         {}
 
         virtual bool checkDistance( const GeoHash& h , double& d ){
@@ -752,23 +752,27 @@ namespace mongo {
             _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
             if ( _points.size() > _max ){
                 _points.erase( --_points.end() );
+                
+                Holder::iterator i = _points.end();
+                i--;
+                _farthest = i->_distance;
+            } else {
+                if (d > _farthest)
+                    _farthest = d;
             }
         }
 
         double farthest() const {
-            if (_points.empty())
-                return -1;
-
-            Holder::iterator i = _points.end();
-            i--;
-            return  i->_distance;
+            return _farthest;
         }
+
 
         unsigned _max;
         Point _near;
         Holder _points;
         double _maxDistance;
         GeoDistType _type;
+        double _farthest;
     };
     
     struct BtreeLocation {
