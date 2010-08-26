@@ -399,7 +399,7 @@ namespace mongo {
         Database *database = ctx->db();
         assert( database->name == db );
         
-        oplogCheckCloseDatabase( database );
+        oplogCheckCloseDatabase( database ); // oplog caches some things, dirty its caches
 
         if( BackgroundOperation::inProgForDb(db) ) { 
             log() << "warning: bg op in prog during close db? " << db << endl;
