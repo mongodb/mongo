@@ -299,10 +299,11 @@ sendmore:
             dbexit( EXIT_UNCAUGHT );
         }
 
-        // any thread cleanup can happen here
-
-        if ( currentClient.get() )
-            currentClient->shutdown();
+        // thread ending...
+        {
+            Client * c = currentClient.get();
+            if( c ) c->shutdown();
+        }
         globalScriptEngine->threadDone();
     }
 
@@ -316,7 +317,7 @@ sendmore:
 
         MessagingPort p;
         if ( !p.connect(db) ){
-            out() << "msg couldn't connect" << endl;
+            log() << "msg couldn't connect" << endl;
             return;
         }
 
