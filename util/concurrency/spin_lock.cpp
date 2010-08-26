@@ -24,10 +24,9 @@
 
 namespace mongo {
 
-    SpinLock::SpinLock() : 
-
+    SpinLock::SpinLock() 
 #if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
-        _locked( false ) 
+        : _locked( false ) 
 #endif
     { }
 
