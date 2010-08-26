@@ -371,39 +371,10 @@ def expand_suites(suites):
             else:
                 program = 'perftest'
             (globstr, usedb) = (program, False)
-        elif suite == 'js':
-            # FIXME: _runner.js seems equivalent to "[!_]*.js".
-            #(globstr, usedb) = ('_runner.js', True)
-            (globstr, usedb) = ('[!_]*.js', True)
-        elif suite == 'quota':
-            (globstr, usedb) = ('quota/*.js', True)
-        elif suite == 'jsPerf':
-            (globstr, usedb) = ('perf/*.js', True)
-        elif suite == 'disk':
-            (globstr, usedb) = ('disk/*.js', True)
-        elif suite == 'jsSlowNightly':
-            (globstr, usedb) = ('slowNightly/*.js', True)
-        elif suite == 'jsSlowWeekly':
-            (globstr, usedb) = ('slowWeekly/*.js', True)
-        elif suite == 'parallel':
-            (globstr, usedb) = ('parallel/*.js', True)
-        elif suite == 'clone':
-            (globstr, usedb) = ('clone/*.js', False)
-        elif suite == 'repl':
-            (globstr, usedb) = ('repl/*.js', False)
-        elif suite == 'replSets':
-            (globstr, usedb) = ('replsets/*.js', False)
-        elif suite == 'auth':
-            (globstr, usedb) = ('auth/*.js', False)
-        elif suite == 'sharding':
-            (globstr, usedb) = ('sharding/*.js', False)
-        elif suite == 'tool':
-            (globstr, usedb) = ('tool/*.js', False)
-        # well, the above almost works for everything...
         elif suite == 'client':
             paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
             if os.sys.platform == "win32":
-                paths = [path+'.exe' for path in paths]
+                paths = [path + '.exe' for path in paths]
             # hack
             tests += [(test_path and path or os.path.join(mongo_repo, path), False) for path in paths]
         elif suite == 'mongosTest':
@@ -413,7 +384,22 @@ def expand_suites(suites):
                 program = 'mongos'
             tests += [(os.path.join(mongo_repo, program), False)]
         else:
-            raise Exception('unknown test suite %s' % suite)
+            try:
+                globstr, usedb = {"js": ("[!_]*.js", True),
+                                  "quota": ("quota/*.js", True),
+                                  "jsPerf": ("perf/*.js", True),
+                                  "disk": ("disk/*.js", True),
+                                  "jsSlowNightly": ("slowNightly/*.js", True),
+                                  "jsSlowWeekly": ("slowWeekly/*.js", True),
+                                  "parallel": ("parallel/*.js", True),
+                                  "clone": ("clone/*.js", False),
+                                  "repl": ("repl/*.js", False),
+                                  "replSets": ("replsets/*.js", False),
+                                  "auth": ("auth/*.js", False),
+                                  "sharding": ("sharding/*.js", False),
+                                  "tool": ("tool/*.js", False)}[suite]
+            except KeyError:
+                raise Exception('unknown test suite %s' % suite)
 
         if globstr:
             globstr = os.path.join(mongo_repo, (os.path.join(('jstests/' if globstr.endswith('.js') else ''), globstr)))
