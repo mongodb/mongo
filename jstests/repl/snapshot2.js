@@ -25,8 +25,17 @@ rp.slave().setSlaveOk();
 print("snapshot2.js 5 -----------------------------------------------------------");
 for (i = 0; i < 500; ++i) {
     rp.master().getDB( baseName )[ baseName ].save( { _id: new ObjectId(), i: i, b: big } );
-    if ( i % 250 == 249 ) {
-        assert.soon( function() { return i+1 == rp.slave().getDB( baseName )[ baseName ].count(); } );    
+    if (i % 250 == 249) {
+        function p() { return i + 1 == rp.slave().getDB(baseName)[baseName].count(); }
+        try {
+            assert.soon(p);
+        } catch (e) {
+            print("\n\n\nsnapshot2.js\ni+1:" + (i + 1));
+            print("slave count:" + rp.slave().getDB(baseName)[baseName].count());
+            sleep(2000);
+            print(p());
+            throw (e);
+        } 
         sleep( 10 ); // give master a chance to grab a sync point - have such small oplogs the master log might overflow otherwise
     }
 }
