@@ -24,7 +24,7 @@ function op() {
 s = startParallelShell( "print( 'starting forked:' + Date() ); for ( i=0; i<500000; i++ ){ db.currentOp(); } print( 'ending forked:' + Date() ); " )
 
 print( "starting eval: " + Date() )
-for ( i=0; i<50000; i++ ){
+for ( i=0; i<20000; i++ ){
     db.eval( "db.jstests_evalc.count( {i:10} );" );
 }
 print( "end eval: " + Date() )
