@@ -41,6 +41,12 @@ namespace mongo {
             size_t n = files.size();
             for ( size_t i = 0; i < n; i++ )
                 delete files[i];
+            if( ccByLoc.size() ) { 
+                /* dm: we need to move some code from closeDatabase(...) to here i think - will look into that tomorrow. 
+                       in the meantime, this reminds us that something is wrong if it logs.
+                */
+                log() << "\n\n\nWARNING: ccByLoc not empty on database close! " << ccByLoc.size() << ' ' << name << endl;
+            }
         }
         
         /**
