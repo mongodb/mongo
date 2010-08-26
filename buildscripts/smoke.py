@@ -2,7 +2,7 @@
 
 # smoke.py: run some mongo tests.
 
-# Bugs, TODOs: 
+# Bugs, TODOs:
 
 # 0 Some tests hard-code pathnames relative to the mongo repository,
 #   so the smoke.py process and all its children must be run with the
@@ -34,27 +34,31 @@
 #   jobs on the same host at once.  So something's gotta change.
 
 from __future__ import with_statement
-from subprocess import Popen, PIPE, call
-import os
-import sys
-import utils
-import time
-import socket
-from optparse import OptionParser
+
 import atexit
 import glob
-import shutil
-import re
+from optparse import OptionParser
+import os
 import parser
+import re
+import shutil
+import socket
+from subprocess import (Popen,
+                        PIPE,
+                        call)
+import sys
+import time
 
-mongoRepo = os.getcwd() #'./'
-testPath = None
+import utils
 
-mongodExecutable = "./mongod"
-mongodPort = "32000"
-shellExecutable = "./mongo"
-continueOnFailure = False
-oneMongodPerTest = False
+mongo_repo = os.getcwd() #'./'
+test_path = None
+
+mongod_executable = "./mongod"
+mongod_port = "32000"
+shell_executable = "./mongo"
+continue_on_failure = False
+one_mongod_per_test = False
 
 tests = []
 winners = []
@@ -71,12 +75,12 @@ lost_in_slave = []
 lost_in_master = []
 screwy_in_slave = {}
 
-smokeDbPrefix = ''
-smallOplog = False
+smoke_db_prefix = ''
+small_oplog = False
 
 # This class just implements the with statement API, for a sneaky
 # purpose below.
-class nothing(object):
+class Nothing(object):
     def __enter__(self):
         return self
     def __exit__(self, type, value, traceback):
@@ -99,23 +103,23 @@ class mongod(object):
             print >> sys.stderr, e
         return not isinstance(value, Exception)
 
-    def ensureTestDirs(self):
-        utils.ensureDir( smokeDbPrefix + "/tmp/unittest/" )
-        utils.ensureDir( smokeDbPrefix + "/data/" )
-        utils.ensureDir( smokeDbPrefix + "/data/db/" )
+    def ensure_test_dirs(self):
+        utils.ensureDir(smoke_db_prefix + "/tmp/unittest/")
+        utils.ensureDir(smoke_db_prefix + "/data/")
+        utils.ensureDir(smoke_db_prefix + "/data/db/")
 
-    def checkMongoPort( self, port=27017 ):
+    def check_mongo_port(self, port=27017):
         sock = socket.socket()
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.settimeout(1)
         sock.connect(("localhost", int(port)))
         sock.close()
-    
-    def didMongodStart( self, port=mongodPort, timeout=20 ):
+
+    def did_mongod_start(self, port=mongod_port, timeout=20):
         while timeout > 0:
-            time.sleep( 1 )
+            time.sleep(1)
             try:
-                self.checkMongoPort( int(port) )
+                self.check_mongo_port(int(port))
                 return True
             except Exception,e:
                 print >> sys.stderr, e
@@ -123,47 +127,44 @@ class mongod(object):
         return False
 
     def start(self):
-        global mongodPort
+        global mongod_port
         global mongod
         if self.proc:
             print >> sys.stderr, "probable bug: self.proc already set in start()"
             return
-        self.ensureTestDirs()
-        dirName = smokeDbPrefix + "/data/db/sconsTests/"
-        self.port = int(mongodPort)
+        self.ensure_test_dirs()
+        dir_name = smoke_db_prefix + "/data/db/sconsTests/"
+        self.port = int(mongod_port)
         self.slave = False
         if 'slave' in self.kwargs:
-            dirName = smokeDbPrefix + '/data/db/sconsTestsSlave/'
-            srcport = mongodPort
+            dir_name = smoke_db_prefix + '/data/db/sconsTestsSlave/'
+            srcport = mongod_port
             self.port += 1
             self.slave = True
-        if os.path.exists ( dirName ):
+        if os.path.exists(dir_name):
             if 'slave' in self.kwargs:
-                argv = ["python", "buildscripts/cleanbb.py", '--nokill', dirName] 
-
+                argv = ["python", "buildscripts/cleanbb.py", '--nokill', dir_name]
             else:
-                argv = ["python", "buildscripts/cleanbb.py", dirName]
-            call( argv )
-        utils.ensureDir( dirName )
-        argv = [mongodExecutable, "--port", str(self.port), "--dbpath", dirName]
-        if self.kwargs.get('smallOplog'):
+                argv = ["python", "buildscripts/cleanbb.py", dir_name]
+            call(argv)
+        utils.ensureDir(dir_name)
+        argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
+        if self.kwargs.get('small_oplog'):
             argv += ["--master", "--oplogSize", "10"]
         if self.slave:
-            argv += ['--slave', '--source', 'localhost:'+str(srcport)]
+            argv += ['--slave', '--source', 'localhost:' + str(srcport)]
         print "running " + " ".join(argv)
         self.proc = Popen(argv)
-        if not self.didMongodStart( self.port ):
-            raise Exception( "Failed to start mongod" )
-        
+        if not self.did_mongod_start(self.port):
+            raise Exception("Failed to start mongod")
+
         if self.slave:
             while True:
-                argv = [shellExecutable, "--port", str(self.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
+                argv = [shell_executable, "--port", str(self.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
                 res = Popen(argv, stdout=PIPE).communicate()[0]
                 if res.find('initial sync') < 0:
                     break
-            
 
-            
     def stop(self):
         if not self.proc:
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
@@ -177,11 +178,11 @@ class mongod(object):
                 win32process.TerminateProcess(self.proc._handle, -1)
             else:
                 from os import kill
-                kill( self.proc.pid, 15 )
+                kill(self.proc.pid, 15)
         self.proc.wait()
         sys.stderr.flush()
         sys.stdout.flush()
-    
+
 class Bug(Exception):
     def __str__(self):
         return 'bug in smoke.py: ' + super(Bug, self).__str__()
@@ -192,6 +193,7 @@ class TestFailure(Exception):
 class TestExitFailure(TestFailure):
     def __init__(self, *args):
         self.path = args[0]
+
         self.status=args[1]
     def __str__(self):
         return "test %s exited with status %d" % (self.path, self.status)
@@ -204,25 +206,25 @@ class TestServerFailure(TestFailure):
     def __str__(self):
         return 'mongod not running after executing test %s' % self.path
 
-def checkDbHashes(master, slave):
+def check_db_hashes(master, slave):
     # Need to pause a bit so a slave might catch up...
     if not slave.slave:
         raise(Bug("slave instance doesn't have slave attribute set"))
 
     print "waiting for slave to catch up..."
-    argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 120000) );']
+    argv = [shell_executable, "--port", str(slave.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 120000) );']
     res = Popen(argv, stdout=PIPE).wait() #.communicate()[0]
-    print( res )
+    print res
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
-        argv = [shellExecutable, "--port", str(mongod.port), "--quiet", "--eval", "x=db.runCommand('dbhash'); printjson(x.collections)"]
+        argv = [shell_executable, "--port", str(mongod.port), "--quiet", "--eval", "x=db.runCommand('dbhash'); printjson(x.collections)"]
         hashstr = Popen(argv, stdout=PIPE).communicate()[0]
         # WARNING FIXME KLUDGE et al.: this is sleazy and unsafe.
         mongod.dict = eval(hashstr)
 
     global lost_in_slave, lost_in_master, screwy_in_slave, replicated_dbs
-    
+
     for db in replicated_dbs:
         if db not in slave.dict:
             lost_in_slave.append(db)
@@ -237,7 +239,7 @@ def checkDbHashes(master, slave):
 
 # Blech.
 def skipTest(path):
-    if smallOplog:
+    if small_oplog:
         if os.path.basename(path) in ["cursor8.js", "indexh.js"]:
             return True
     return False
@@ -249,72 +251,72 @@ def runTest(test):
         print "skippping " + path
         return
     if ext == ".js":
-        argv=[shellExecutable, "--port", mongodPort]
+        argv = [shell_executable, "--port", mongod_port]
         if not usedb:
-            argv += ["--nodb"] 
-        if smallOplog:
+            argv += ["--nodb"]
+        if small_oplog:
             argv += ["--eval", 'testingReplication = true;']
         argv += [path]
     elif ext in ["", ".exe"]:
         # Blech.
         if os.path.basename(path) in ["test", "test.exe", "perftest", "perftest.exe"]:
-            argv=[path]
+            argv = [path]
         # more blech
         elif os.path.basename(path) == 'mongos':
-            argv=[path, "--test"]
+            argv = [path, "--test"]
         else:
-            argv=[testPath and os.path.abspath(os.path.join(testPath, path)) or path,
-                  "--port", mongodPort]
+            argv = [test_path and os.path.abspath(os.path.join(test_path, path)) or path,
+                    "--port", mongod_port]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
     print " *******************************************"
     print "         Test : " + os.path.basename(path) + " ..."
-    t1=time.time()
+    t1 = time.time()
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
-    r = call(argv, cwd=testPath)
-    t2=time.time()
-    print "                " + str((t2-t1)*1000) + "ms"
+    r = call(argv, cwd=test_path)
+    t2 = time.time()
+    print "                " + str((t2 - t1) * 1000) + "ms"
     if r != 0:
         raise TestExitFailure(path, r)
-    if Popen( [ mongodExecutable, "msg", "ping", mongodPort ], stdout=PIPE ).communicate()[0].count( "****ok" ) == 0:
+    if Popen([mongod_executable, "msg", "ping", mongod_port], stdout=PIPE).communicate()[0].count( "****ok") == 0:
         raise TestServerFailure(path)
-    if call( [ mongodExecutable, "msg", "ping", mongodPort ] ) != 0:
+    if call([mongod_executable, "msg", "ping", mongod_port]) != 0:
         raise TestServerFailure(path)
     print ""
 
-def runTests(tests):
-    # If we're in one-mongo-per-test mode, we instantiate a nothing
+def run_tests(tests):
+    # If we're in one-mongo-per-test mode, we instantiate a Nothing
     # around the loop, and a mongod inside the loop.
 
     # FIXME: some suites of tests start their own mongod, so don't
     # need this.  (So long as there are no conflicts with port,
     # dbpath, etc., and so long as we shut ours down properly,
     # starting this mongod shouldn't break anything, though.)
-    with nothing() if oneMongodPerTest else mongod(smallOplog=smallOplog) as master1:
-        with nothing() if oneMongodPerTest else (mongod(slave=True) if smallOplog else nothing()) as slave1:
+    with Nothing() if one_mongod_per_test else mongod(small_oplog=small_oplog) as master1:
+        with Nothing() if one_mongod_per_test else (mongod(slave=True) if small_oplog else Nothing()) as slave1:
             for test in tests:
                 try:
-                    with mongod(smallOplog=smallOplog) if oneMongodPerTest else nothing() as master2: 
-                        with mongod(slave=True) if oneMongodPerTest and smallOplog else nothing() as slave2:
+                    with mongod(small_oplog=small_oplog) if one_mongod_per_test else Nothing() as master2:
+                        with mongod(slave=True) if one_mongod_per_test and small_oplog else Nothing() as slave2:
                             runTest(test)
                     winners.append(test)
                     if isinstance(slave2, mongod):
-                        checkDbHashes(master2, slave2)
+                        check_db_hashes(master2, slave2)
                 except TestFailure, f:
                     try:
                         print f
                         # Record the failing test and re-raise.
                         losers[f.path] = f.status
                         raise f
-                    except TestServerFailure, f: 
-                        if not oneMongodPerTest:
+                    except TestServerFailure, f:
+                        if not one_mongod_per_test:
                             return 2
                     except TestFailure, f:
-                        if not continueOnFailure:
+                        if not continue_on_failure:
                             return 1
             if isinstance(slave1, mongod):
-                checkDbHashes(master1, slave1)
+                check_db_hashes(master1, slave1)
 
     return 0
 
@@ -327,7 +329,7 @@ def report():
         print "The following tests failed (with exit code):"
         for loser in losers:
             print "%s\t%d" % (loser, losers[loser])
-    
+
     def missing(lst, src, dst):
         if lst:
             print """The following collections were present in the %s but not the %s
@@ -341,7 +343,7 @@ at the end of testing:""" % (src, dst)
 at the end of testing:"""
         for db in screwy_in_slave.keys():
             print "%s\t %s" % (db, screwy_in_slave[db])
-    if smallOplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
+    if small_oplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
         print "replication ok for %d collections" % (len(replicated_dbs))
     if (exit_bad or losers or lost_in_slave or lost_in_master or screwy_in_slave):
         status = 1
@@ -349,13 +351,13 @@ at the end of testing:"""
         status = 0
     exit (status)
 
-def expandSuites(suites):
+def expand_suites(suites):
     globstr = None
-    global mongoRepo, tests
+    global mongo_repo, tests
     for suite in suites:
         if suite == 'smokeAll':
             tests = []
-            expandSuites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlowNightly', 'smokeJsSlowWeekly', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
+            expand_suites(['smoke', 'smokePerf', 'smokeClient', 'smokeJs', 'smokeJsPerf', 'smokeJsSlowNightly', 'smokeJsSlowWeekly', 'smokeParallel', 'smokeClone', 'smokeParallel', 'smokeRepl', 'smokeAuth', 'smokeSharding', 'smokeTool'])
             break
         if suite == 'smoke':
             if os.sys.platform == "win32":
@@ -403,18 +405,18 @@ def expandSuites(suites):
             if os.sys.platform == "win32":
                 paths = [path+'.exe' for path in paths]
             # hack
-            tests += [(testPath and path or os.path.join(mongoRepo, path), False) for path in paths]
+            tests += [(test_path and path or os.path.join(mongo_repo, path), False) for path in paths]
         elif suite == 'mongosTest':
             if os.sys.platform == "win32":
                 program = 'mongos.exe'
             else:
                 program = 'mongos'
-            tests += [(os.path.join(mongoRepo, program), False)]
+            tests += [(os.path.join(mongo_repo, program), False)]
         else:
             raise Exception('unknown test suite %s' % suite)
 
         if globstr:
-            globstr = os.path.join(mongoRepo, (os.path.join(('jstests/' if globstr.endswith('.js') else ''), globstr)))
+            globstr = os.path.join(mongo_repo, (os.path.join(('jstests/' if globstr.endswith('.js') else ''), globstr)))
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
@@ -428,62 +430,62 @@ def main():
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests.  (default "suite")')
     # Some of our tests hard-code pathnames e.g., to execute, so until
     # th we don't have the freedom to run from anyplace.
-#    parser.add_option('--mongo-repo', dest='mongoRepo', default=None,
+#    parser.add_option('--mongo-repo', dest='mongo_repo', default=None,
 #                      help='Top-level directory of mongo checkout to use.  (default: script will make a guess)')
-    parser.add_option('--test-path', dest='testPath', default=None,
+    parser.add_option('--test-path', dest='test_path', default=None,
                       help="Path to the test executables to run "
                       "(currently only used for smokeClient)")
-    parser.add_option('--mongod', dest='mongodExecutable', #default='./mongod',
+    parser.add_option('--mongod', dest='mongod_executable', #default='./mongod',
                       help='Path to mongod to run (default "./mongod")')
-    parser.add_option('--port', dest='mongodPort', default="32000",
+    parser.add_option('--port', dest='mongod_port', default="32000",
                       help='Port the mongod will bind to (default 32000)')
-    parser.add_option('--mongo', dest='shellExecutable', #default="./mongo",
+    parser.add_option('--mongo', dest='shell_executable', #default="./mongo",
                       help='Path to mongo, for .js test files (default "./mongo")')
-    parser.add_option('--continue-on-failure', dest='continueOnFailure',
+    parser.add_option('--continue-on-failure', dest='continue_on_failure',
                       action="store_true", default=False,
                       help='If supplied, continue testing even after a test fails')
-    parser.add_option('--one-mongod-per-test', dest='oneMongodPerTest',
+    parser.add_option('--one-mongod-per-test', dest='one_mongod_per_test',
                       action="store_true", default=False,
                       help='If supplied, run each test in a fresh mongod')
     parser.add_option('--from-file', dest='File',
                       help="Run tests/suites named in FILE, one test per line, '-' means stdin")
-    parser.add_option('--smoke-db-prefix', dest='smokeDbPrefix', default='',
+    parser.add_option('--smoke-db-prefix', dest='smoke_db_prefix', default='',
                       help="Prefix to use for the mongods' dbpaths.")
-    parser.add_option('--small-oplog', dest='smallOplog', default=False,
+    parser.add_option('--small-oplog', dest='small_oplog', default=False,
                       action="store_true",
                       help='Run tests with master/slave replication & use a small oplog')
     global tests
     (options, tests) = parser.parse_args()
 
-#    global mongoRepo
-#    if options.mongoRepo:
+#    global mongo_repo
+#    if options.mongo_repo:
 #        pass
-#        mongoRepo = options.mongoRepo
+#        mongo_repo = options.mongo_repo
 #    else:
 #        prefix = ''
 #        while True:
 #            if os.path.exists(prefix+'buildscripts'):
-#                mongoRepo = os.path.normpath(prefix)
+#                mongo_repo = os.path.normpath(prefix)
 #                break
 #            else:
 #                prefix += '../'
 #                # FIXME: will this be a device's root directory on
 #                # Windows?
-#                if os.path.samefile('/', prefix): 
+#                if os.path.samefile('/', prefix):
 #                    raise Exception("couldn't guess the mongo repository path")
 
     print tests
 
-    global mongoRepo, mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest, smallOplog, smokeDbPrefix, testPath
-    testPath = options.testPath
-    mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, 'mongod')
-    mongodPort = options.mongodPort if options.mongodPort else mongodPort
-    shellExecutable = options.shellExecutable if options.shellExecutable else os.path.join(mongoRepo, 'mongo')
-    continueOnFailure = options.continueOnFailure if options.continueOnFailure else continueOnFailure
-    oneMongodPerTest = options.oneMongodPerTest if options.oneMongodPerTest else oneMongodPerTest
-    smokeDbPrefix = options.smokeDbPrefix
-    smallOplog = options.smallOplog
-    
+    global mongo_repo, mongod_executable, mongod_port, shell_executable, continue_on_failure, one_mongod_per_test, small_oplog, smoke_db_prefix, test_path
+    test_path = options.test_path
+    mongod_executable = options.mongod_executable if options.mongod_executable else os.path.join(mongo_repo, 'mongod')
+    mongod_port = options.mongod_port if options.mongod_port else mongod_port
+    shell_executable = options.shell_executable if options.shell_executable else os.path.join(mongo_repo, 'mongo')
+    continue_on_failure = options.continue_on_failure if options.continue_on_failure else continue_on_failure
+    one_mongod_per_test = options.one_mongod_per_test if options.one_mongod_per_test else one_mongod_per_test
+    smoke_db_prefix = options.smoke_db_prefix
+    small_oplog = options.small_oplog
+
     if options.File:
         if options.File == '-':
             tests = sys.stdin.readlines()
@@ -500,11 +502,11 @@ def main():
         # smokeJsSlow, smokeParalell, smokeClone, smokeRepl, smokeDisk
         suites = tests
         tests = []
-        expandSuites(suites)
+        expand_suites(suites)
     elif options.mode == 'files':
         tests = [(os.path.abspath(test), True) for test in tests]
 
-    runTests(tests)
+    run_tests(tests)
     global exit_bad
     exit_bad = False
 
