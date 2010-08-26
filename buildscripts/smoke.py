@@ -212,7 +212,7 @@ def checkDbHashes(master, slave):
     print "waiting for slave to catch up..."
     ARB=10  # ARBITRARY
     time.sleep(ARB)
-    argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.getLastError(2, 30000)']
+    argv = [shellExecutable, "--port", str(slave.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 60000) );']
     res = Popen(argv, stdout=PIPE).wait() #.communicate()[0]
     # FIXME: maybe assert that that res == 0?
 
