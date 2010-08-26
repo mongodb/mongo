@@ -165,8 +165,9 @@ namespace mongo {
 
         char buf[64];
         time_t_to_String( time(0) , buf );
-        buf[20] = ' ';
-        buf[21] = 0;
+        /* truncate / don't show the year: */
+        buf[19] = ' ';
+        buf[20] = 0;
 
         Logstream::logLockless(buf);
         Logstream::logLockless(s);
