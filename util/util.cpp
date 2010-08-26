@@ -26,7 +26,7 @@ namespace mongo {
     boost::thread_specific_ptr<string> _threadName;
     
     void _setThreadName( const char * name ){
-        static int N = 0;
+        static unsigned N = 0;
         if ( strcmp( name , "conn" ) == 0 ){
             stringstream ss;
             ss << name << ++N;
@@ -52,7 +52,14 @@ namespace mongo {
     void setThreadName(const char *name)
     {
         _setThreadName( name );
-        Sleep(10);
+#if !defined(_DEBUG)
+        // naming might be expensive so don't do "conn*" over and over
+        if( string("conn") == name )
+            return;
+#endif
+        /* is the sleep here necessary???
+           Sleep(10);
+           */
         THREADNAME_INFO info;
         info.dwType = 0x1000;
         info.szName = name;
