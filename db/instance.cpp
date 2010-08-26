@@ -461,6 +461,7 @@ namespace mongo {
         const char *ns = d.getns();
         assert(*ns);
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
+        op.debug().str << ns << ' ';
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
         bool broadcast = flags & RemoveOption_Broadcast;
