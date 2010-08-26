@@ -336,7 +336,7 @@ namespace mongo {
         if ( timeoutMs ){
             static bool t = 1;
             if ( t ){
-                log() << "timeoutMs not support for v8 yet" << endl;
+                log() << "timeoutMs not support for v8 yet  code: " << code << endl;
                 t = 0;
             }
         }
