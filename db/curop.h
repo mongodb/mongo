@@ -21,6 +21,7 @@
 #include "namespace.h"
 #include "client.h"
 #include "../bson/util/atomic_int.h"
+#include "../util/concurrency/spin_lock.h"
 #include "db.h"
 
 namespace mongo { 
@@ -35,11 +36,99 @@ namespace mongo {
         }
     };
     
+    class CachedBSONObj {
+    public:
+
+        static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
+
+        CachedBSONObj(){
+            _size = (int*)_buf;
+            reset();
+        }
+        
+        void reset( int sz = 0 ){
+            _size[0] = sz;
+        }
+        
+        void set( const BSONObj& o ){
+            _lock.lock();
+            try {
+                int sz = o.objsize();
+                
+                if ( sz > (int) sizeof(_buf) ) { 
+                    reset(1); // flag as too big and return
+                }
+                else {
+                    memcpy(_buf, o.objdata(), sz );
+                }
+                
+                _lock.unlock();
+            }
+            catch ( ... ){
+                _lock.unlock();
+                throw;
+            }
+            
+        }
+        
+        int size() const { return *_size; }
+        bool have() const { return size() > 0; }
+
+        BSONObj get( bool threadSafe ){
+            _lock.lock();
+            
+            BSONObj o;
+
+            try {
+                o = _get( threadSafe );
+                _lock.unlock();
+            }
+            catch ( ... ){
+                _lock.unlock();
+                throw;
+            }
+            
+            return o;
+            
+        }
+
+        void append( BSONObjBuilder& b , const StringData& name ){
+            _lock.lock();
+            try {
+                b.append( name , _get( false ) );
+                _lock.unlock();
+            }
+            catch ( ... ){
+                _lock.unlock();
+                throw;
+            }
+        }
+        
+    private:
+
+        /** you have to be locked when you call this */
+        BSONObj _get( bool getCopy ){
+            int sz = size();
+
+            if ( sz == 0 )
+                return BSONObj();
+            
+            if ( sz == 1 )
+                return _tooBig;
+            
+            return BSONObj( _buf ).copy();
+        }
+
+
+        SpinLock _lock;
+        char _buf[512];
+        int * _size;
+    };
+
     /* Current operation (for the current Client).
        an embedded member of Client class, and typically used from within the mutex there. */
     class CurOp : boost::noncopyable {
         static AtomicUInt _nextOpNum;
-        static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
         
         Client * _client;
         CurOp * _wrapped;
@@ -57,9 +146,7 @@ namespace mongo {
         AtomicUInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
         struct SockAddr _remote;
-        char _queryBuf[256];
-        
-        void resetQuery(int x=0) { *((int *)_queryBuf) = x; }
+        CachedBSONObj _query;
         
         OpDebug _debug;
         
@@ -82,10 +169,8 @@ namespace mongo {
 
     public:
         
-        int querySize() const { return *((int *) _queryBuf); }
-        bool haveQuery() const { return querySize() != 0; }
-
-        BSONObj query( bool threadSafe = false);
+        bool haveQuery() const { return _query.have(); }
+        BSONObj query( bool threadSafe = false ){ return _query.get( threadSafe );  }
 
         void ensureStarted(){
             if ( _start == 0 )
@@ -111,7 +196,7 @@ namespace mongo {
             _opNum = _nextOpNum++;
             _ns[0] = '?'; // just in case not set later
             _debug.reset();
-            resetQuery();            
+            _query.reset();
         }
         
         void reset( const SockAddr & remote, int op ) {
@@ -194,11 +279,7 @@ namespace mongo {
         }
 
         void setQuery(const BSONObj& query) { 
-            if( query.objsize() > (int) sizeof(_queryBuf) ) { 
-                resetQuery(1); // flag as too big and return
-                return;
-            }
-            memcpy(_queryBuf, query.objdata(), query.objsize());
+            _query.set( query ); 
         }
 
         Client * getClient() const { 
@@ -219,7 +300,6 @@ namespace mongo {
             // placed here as a precaution because currentOp may be accessed
             // without the db mutex.
             memset(_ns, 0, sizeof(_ns));
-            memset(_queryBuf, 0, sizeof(_queryBuf));
         }
         
         ~CurOp();
@@ -233,7 +313,7 @@ namespace mongo {
             return infoNoauth();
         }
         
-        BSONObj infoNoauth( int attempt = 0 );
+        BSONObj infoNoauth();
 
         string getRemoteString( bool includePort = true ){
             return _remote.toString(includePort);

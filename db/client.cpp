@@ -140,7 +140,7 @@ namespace mongo {
         return didAnything;
     }
 
-    BSONObj CurOp::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
+    BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     AtomicUInt CurOp::_nextOpNum;
     
     Client::Context::Context( string ns , Database * db, bool doauth )
@@ -275,30 +275,7 @@ namespace mongo {
         _client = 0;
     }
 
-    BSONObj CurOp::query( bool threadSafe ) {
-        if( querySize() == 1 ) { 
-            return _tooBig;
-        }
-        
-        if ( ! threadSafe ){
-            BSONObj o(_queryBuf);
-            return o;
-        }
-
-        int size = querySize();        
-        int before = checksum( _queryBuf , size );
-        BSONObj a(_queryBuf);
-        BSONObj b = a.copy();
-        int after = checksum( _queryBuf , size );
-        
-        if ( before == after )
-            return b;
-        
-        return BSON( "msg" << "query changed while capturing" );
-    }
-
-
-    BSONObj CurOp::infoNoauth( int attempt ) {
+    BSONObj CurOp::infoNoauth() {
         BSONObjBuilder b;
         b.append("opid", _opNum);
         bool a = _active && _start;
@@ -315,31 +292,7 @@ namespace mongo {
         
         b.append("ns", _ns);
         
-        {
-            int size = querySize();
-            if ( size == 0 ){
-                // do nothing
-            }
-            else if ( size == 1 ){
-                b.append( "query" , _tooBig );
-            }
-            else if ( attempt > 2 ){
-                b.append( "query" , BSON( "err" << "can't get a clean object" ) );
-                log( LL_WARNING ) << "CurOp changing too much to get reading" << endl;
-                         
-            }
-            else {
-                int before = checksum( _queryBuf , size );
-                b.appendObject( "query" , _queryBuf , size );
-                int after = checksum( _queryBuf , size );
-                
-                if ( after != before ){
-                    // this means something changed
-                    // going to retry
-                    return infoNoauth( attempt + 1 );
-                }
-            }
-        }
+        _query.append( b , "query" );
 
         // b.append("inLock",  ??
         stringstream clientStr;
@@ -440,8 +393,9 @@ namespace mongo {
                         tablecell( ss , "" );
                     tablecell( ss , co.getOp() );
                     tablecell( ss , co.getNS() );
-                    if ( co.haveQuery() )
+                    if ( co.haveQuery() ){
                         tablecell( ss , co.query( true ) );
+                    }
                     else
                         tablecell( ss , "" );
                     tablecell( ss , co.getRemoteString() );
