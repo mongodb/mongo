@@ -9,7 +9,7 @@ doTest = function (signal) {
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
-    var replTest = new ReplSetTest({ name: 'testSet', nodes: 3 });
+    var replTest = new ReplSetTest({ name: 'testSet', nodes: 3, oplogSize: 5 });
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes
@@ -98,6 +98,7 @@ doTest = function (signal) {
 
     // Test getlasterror with large insert
     print("replset2.js **** Try inserting many records ****")
+    try {
     bigData = new Array(2000).toString()
     for (var n = 0; n < 1000; n++) {
         master.getDB(testDB).baz.insert({ n: n, data: bigData });
@@ -120,6 +121,17 @@ doTest = function (signal) {
     verifyReplication("slave 1", slaves[1].getDB(testDB).baz);
 
     assert(failed == false, "replset2.js Replication with getLastError failed. See errors.");
+    }
+    catch(e) {
+      print("ERROR: " + e);
+      print("Master oplog findOne:");
+      printjson(master.getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+      print("Slave 0 oplog findOne:");
+      printjson(slaves[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+      print("Slave 1 oplog findOne:");
+      printjson(slaves[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+    }
+
 
     replTest.stopSet(signal);
 }
