@@ -30,7 +30,6 @@ namespace mongo {
     class SpinLock {
     public:
         SpinLock();
-        ~SpinLock();
 
         void lock();
         void unlock();

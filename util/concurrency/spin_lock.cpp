@@ -30,9 +30,6 @@ namespace mongo {
 #endif
     { }
 
-    SpinLock::~SpinLock(){
-    }
-
     void SpinLock::lock(){
 #if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
 
