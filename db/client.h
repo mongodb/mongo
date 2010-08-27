@@ -40,6 +40,7 @@ namespace mongo {
     class CurOp;
     class Command;
     class Client;
+    class MessagingPort;
 
     extern boost::thread_specific_ptr<Client> currentClient;
 
@@ -151,6 +152,8 @@ namespace mongo {
         };
         
     private:
+        void _dropns( const string& ns );
+
         CurOp * _curOp;
         Context * _context;
         bool _shutdown;
@@ -162,9 +165,9 @@ namespace mongo {
         BSONObj _handshake;
         BSONObj _remoteId;
 
-        void _dropns( const string& ns );
-
     public:
+        MessagingPort const *_mp;
+
         string clientAddress() const;
         AuthenticationInfo * getAuthenticationInfo(){ return &_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
@@ -174,7 +177,7 @@ namespace mongo {
         const char *ns() const { return _context->ns(); }
         const char *desc() const { return _desc; }
         
-        Client(const char *desc);
+        Client(const char *desc, MessagingPort *p = 0);
         ~Client();
 
         void addTempCollection( const string& ns );
@@ -207,7 +210,7 @@ namespace mongo {
         /* each thread which does db operations has a Client object in TLS.  
            call this when your thread starts. 
         */
-        static void initThread(const char *desc);
+        static Client& initThread(const char *desc, MessagingPort *mp = 0);
 
         /* 
            this has to be called as the client goes away, but before thread termination
@@ -238,11 +241,13 @@ namespace mongo {
     /* each thread which does db operations has a Client object in TLS.  
        call this when your thread starts. 
     */
-    inline void Client::initThread(const char *desc) {
+    inline Client& Client::initThread(const char *desc, MessagingPort *mp) {
         setThreadName(desc);
         assert( currentClient.get() == 0 );
-        currentClient.reset( new Client(desc) );
+        Client *c = new Client(desc, mp);
+        currentClient.reset(c);
         mongo::lastError.initThread();
+        return *c;
     }
 
     inline Client::GodScope::GodScope(){
