@@ -16,10 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CONCURRENCY_SPINLOCK_HEADER
-#define CONCURRENCY_SPINLOCK_HEADER
+#pragma once
 
-#include "../../pch.h"
+#include "pch.h"
 #include "rwlock.h"
 
 namespace mongo {
@@ -28,7 +27,7 @@ namespace mongo {
      * The spinlock currently requires late GCC support routines to be efficient.
      * Other platforms default to a mutex implemenation.
      */
-    class SpinLock{
+    class SpinLock {
     public:
         SpinLock();
         ~SpinLock();
@@ -51,4 +50,3 @@ namespace mongo {
 
 }  // namespace mongo
 
-#endif  // CONCURRENCY_SPINLOCK_HEADER
