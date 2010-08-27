@@ -1689,7 +1689,7 @@ def build_and_test_client(env, target, source):
     call(scons_command + ["libmongoclient.a", "clientTests"], cwd=installDir)
 
     return bool(call(["python", "buildscripts/smoke.py",
-                      "--test-path", installDir, "smokeClient"]))
+                      "--test-path", installDir, "client"]))
 env.Alias("clientBuild", [mongod, installDir], [build_and_test_client])
 env.AlwaysBuild("clientBuild")
 
