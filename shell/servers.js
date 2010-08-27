@@ -64,7 +64,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
         dirname = "" + port; // e.g., data/db/27000
 
     var useHostname = false;
-    if (extraOptions && extraOptions.useHostname) {
+    if (extraOptions) {
          useHostname = extraOptions.useHostname;
          delete extraOptions.useHostname;
     }
