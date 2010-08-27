@@ -106,10 +106,11 @@ namespace mongo {
             _finishInit();
         }
 
-        ConnectionString( ConnectionType type , const vector<HostAndPort>& servers )
-            : _type( type ) , _servers( servers ){
-            _finishInit();
-        }
+        // TODO Delete if nobody is using
+        //ConnectionString( ConnectionType type , const vector<HostAndPort>& servers )
+        //    : _type( type ) , _servers( servers ){
+        //    _finishInit();
+        //}
         
         ConnectionString( ConnectionType type , const string& s , const string& setName = "" ){
             _type = type;
@@ -155,6 +156,10 @@ namespace mongo {
         DBClientBase* connect( string& errmsg ) const;
 
         static ConnectionString parse( const string& url , string& errmsg );
+        
+        vector<HostAndPort> getServers() const {
+            return _servers;
+        }
         
     private:
 
