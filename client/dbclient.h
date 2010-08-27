@@ -157,6 +157,10 @@ namespace mongo {
 
         static ConnectionString parse( const string& url , string& errmsg );
         
+        string getSetName() const{
+            return _setName;
+        }
+
         vector<HostAndPort> getServers() const {
             return _servers;
         }
