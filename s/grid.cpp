@@ -138,6 +138,16 @@ namespace mongo {
                 return false;
             }
 
+            // if name was not set and this is a replica set, use the rs's name
+            if ( name->empty() ) {
+                BSONObj fields;
+                BSONObj conf = newShardConn->findOne( "local.system.replset", Query(), &fields, 0 );
+                if ( !conf.isEmpty() ) {
+                    nameInternal = conf["_id"].String();
+                    name->assign(nameInternal);
+                }
+            }
+
             // get the shard's local db's listing
             BSONObj res;
             bool ok = newShardConn->runCommand( "admin" , BSON( "listDatabases" << 1 ) , res );
