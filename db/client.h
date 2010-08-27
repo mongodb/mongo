@@ -48,7 +48,6 @@ namespace mongo {
     public:
         static mongo::mutex clientsMutex;
         static set<Client*> clients; // always be in clientsMutex when manipulating this
-
         static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
 
         class GodScope {
@@ -149,7 +148,7 @@ namespace mongo {
             }
 
             friend class CurOp;
-        };
+        }; // class Client::Context
         
     private:
         void _dropns( const string& ns );
@@ -166,7 +165,7 @@ namespace mongo {
         BSONObj _remoteId;
 
     public:
-        MessagingPort const *_mp;
+        MessagingPort * const _mp;
 
         string clientAddress() const;
         AuthenticationInfo * getAuthenticationInfo(){ return &_ai; }
