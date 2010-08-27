@@ -62,6 +62,13 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
         f = startMongodNoReset;
     if (!dirname)
         dirname = "" + port; // e.g., data/db/27000
+
+    var useHostname = false;
+    if (extraOptions && extraOptions.useHostname) {
+         useHostname = extraOptions.useHostname;
+         delete extraOptions.useHostname;
+    }
+
     
     var options = 
         {
@@ -78,7 +85,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     
     var conn = f.apply(null, [ options ] );
 
-    conn.name = "localhost:" + port;
+    conn.name = (useHostname ? getHostName() : "localhost") + ":" + port;
     return conn;
 }
 
@@ -145,6 +152,10 @@ myPort = function() {
         return 27017;
 }
 
+/**
+ * otherParams can be:
+ * * useHostname to use the hostname (instead of localhost)
+ */
 ShardingTest = function( testName , numShards , verboseLevel , numMongos , otherParams ){
     this._testName = testName;
 
@@ -155,7 +166,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     if ( otherParams.sync && numShards < 3 )
         throw "if you want sync, you need at least 3 servers";
 
-    var localhost = "localhost";
+    var localhost = otherParams.useHostname ? getHostName() : "localhost";
 
     this._alldbpaths = []
 
@@ -191,18 +202,18 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
     else {
         for ( var i=0; i<numShards; i++){
-            var conn = startMongodTest( 30000 + i , testName + i );
+            var conn = startMongodTest( 30000 + i , testName + i, 0, {useHostname : otherParams.useHostname} );
             this._alldbpaths.push( testName +i )
             this._connections.push( conn );
         }
         
         if ( otherParams.sync ){
-            this._configDB = "localhost:30000,localhost:30001,localhost:30002";
+            this._configDB = localhost+":30000,"+localhost+":30001,"+localhost+":30002";
             this._configConnection = new Mongo( this._configDB );
             this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );        
         }
         else {
-            this._configDB = "localhost:30000";
+            this._configDB = localhost + ":30000";
             this._connections[0].getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
         }
     }
@@ -211,6 +222,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     var startMongosPort = 31000;
     for ( var i=0; i<(numMongos||1); i++ ){
         var myPort =  startMongosPort - i;
+        print("config: "+this._configDB);
         var conn = startMongos( { port : startMongosPort - i , v : verboseLevel || 0 , configdb : this._configDB }  );
         conn.name = localhost + ":" + myPort;
         this._mongos.push( conn );
