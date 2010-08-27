@@ -37,6 +37,8 @@ namespace mongo {
     private:
 #if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
         volatile bool _locked;
+#elif defined(_WIN32)
+        CRITICAL_SECTION _cs;
 #else
         // default to a scoped mutex if not implemented
         RWLock _mutex;
