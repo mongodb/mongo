@@ -742,7 +742,7 @@ namespace mongo {
                     assert(0);
             }
             bool good = d < _maxDistance && ( _points.size() < _max || d < farthest() );
-            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near << "\t" << h << "\t" << d 
+            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString() << "\t" << h << "\t" << d 
                       << " ok: " << good << " farthest: " << farthest() );
             return good;
         }
@@ -863,8 +863,12 @@ namespace mongo {
             if (type == GEO_PLAIN){
                 _scanDistance = maxDistance;
             } else if (type == GEO_SPHERE) {
-                //TODO: consider splitting into x and y scan distances
-                _scanDistance = computeXScanDistance(_startPt._y, rad2deg(maxDistance));
+                if (maxDistance == numeric_limits<double>::max()){
+                    _scanDistance = maxDistance;
+                } else {
+                    //TODO: consider splitting into x and y scan distances
+                    _scanDistance = computeXScanDistance(_startPt._y, rad2deg(maxDistance));
+                }
             } else {
                 assert(0);
             }
@@ -886,10 +890,10 @@ namespace mongo {
             GeoHopper * hopper = _hopper.get();
 
             _prefix = _start;
+            BtreeLocation min,max;
             { // 1 regular geo hash algorithm
                 
 
-                BtreeLocation min,max;
                 if ( ! BtreeLocation::initial( id , _spec , min , max , _start , _found , hopper ) )
                     return;
                 
@@ -920,14 +924,26 @@ namespace mongo {
                     // Nothing found in Phase 1
                     farthest = _scanDistance;
                 } else if (_type == GEO_SPHERE) {
-                    farthest = min(_scanDistance, computeXScanDistance(_startPt._y, rad2deg(farthest)));
+                    farthest = std::min(_scanDistance, computeXScanDistance(_startPt._y, rad2deg(farthest)));
                 }
 
                 Box want( _startPt._x - farthest , _startPt._y - farthest , farthest * 2 );
 
                 _prefix = _start;
-                while ( _spec->sizeEdge( _prefix ) < farthest ){
+                while (_prefix.constrains() && _spec->sizeEdge( _prefix ) < farthest ){
                     _prefix = _prefix.up();
+                }
+
+                if (!_prefix.constrains()){
+                    // TODO consider walking in $natural order
+
+                    while ( min.advance( -1 , _found , hopper ) )
+                        _nscanned++;
+                    while ( max.advance( 1 , _found , hopper ) )
+                        _nscanned++;
+
+                    GEODEBUG( "done search after scanning whole collection" )
+                        return;
                 }
 
                 if ( logLevel > 0 ){
