@@ -115,51 +115,77 @@ namespace mongo {
         _allowLocalShard = allow;
     }
 
-    bool Grid::addShard( string* name , const string& host , long long maxSize , string& errMsg ){
-        // name is optional
+    bool Grid::addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg ){
+        // name can be NULL, so privide a dummy one here to avoid testing it elsewhere
         string nameInternal;
         if ( ! name ) {
             name = &nameInternal;
         }
 
-        // Check whether the host exists and is operative. In order to be accepted as a new shard, that
-        // mongod must not have any database name that exists already in any other shards. If that
-        // test passes, the new shard's databases are going to be entered as non-sharded db's whose
-        // primary is the newly added shard.
+        // Check whether the host (or set) exists and run several sanity checks on this request. 
 
         vector<string> dbNames;
         try {
-            ScopedDbConnection newShardConn( host );
+            ScopedDbConnection newShardConn( servers );
             newShardConn->getLastError();
             
             if ( newShardConn->type() == ConnectionString::SYNC ){
                 newShardConn.done();
-                errMsg = "can't use sync cluster as a shard.  for replica set, have to use <name>/<server1>,<server2>,...";
+                errMsg = "can't use sync cluster as a shard.  for replica set, have to use <setname>/<server1>,<server2>,...";
                 return false;
             }
 
-            // if name was not set and this is a replica set, use the rs's name
-            if ( name->empty() ) {
-                BSONObj fields;
-                BSONObj conf = newShardConn->findOne( "local.system.replset", Query(), &fields, 0 );
-                if ( !conf.isEmpty() ) {
-                    nameInternal = conf["_id"].String();
-                    name->assign(nameInternal);
-                }
-            }
-
-            // get the shard's local db's listing
-            BSONObj res;
-            bool ok = newShardConn->runCommand( "admin" , BSON( "listDatabases" << 1 ) , res );
+            BSONObj resIsMaster;
+            bool ok =  newShardConn->runCommand( "admin" , BSON( "isMaster" << 1 ) , resIsMaster );
             if ( !ok ){
                 ostringstream ss;
-                ss << "failed listing " << host << " databases:" << res;
+                ss << "failed running isMaster: " << resIsMaster;
                 errMsg = ss.str();
                 newShardConn.done();
                 return false;
             }
 
-            BSONObjIterator i( res["databases"].Obj() );
+            // if the shard has only one host, make sure it is not part of a replica set
+            string setName = resIsMaster["setName"].str();
+            string commandSetName = servers.getSetName();
+            if ( commandSetName.empty() && ! setName.empty() ){
+                ostringstream ss;
+                ss << "host is part of set: " << setName << " use replica set url format <setname>/<server1>,<server2>,....";
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
+
+            // if the shard is part of replica set, make sure it is the right one
+            if ( ! commandSetName.empty() && ( commandSetName != setName ) ){
+                ostringstream ss;
+                ss << "host is part of a different set: " << setName;
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
+
+            // TODO Check that the hosts in 'server' all belong to the replica set 
+
+            // shard name defaults to the name of the replica set
+            if ( name->empty() && ! setName.empty() )
+                    *name = setName;
+
+            // In order to be accepted as a new shard, that mongod must not have any database name that exists already 
+            // in any other shards. If that test passes, the new shard's databases are going to be entered as 
+            // non-sharded db's whose primary is the newly added shard.
+
+            BSONObj resListDB;
+            ok = newShardConn->runCommand( "admin" , BSON( "listDatabases" << 1 ) , resListDB );
+            if ( !ok ){
+                ostringstream ss;
+                ss << "failed listing " << servers.toString() << "'s databases:" << resListDB;
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
+
+            BSONObjIterator i( resListDB["databases"].Obj() );
             while ( i.more() ){
                 BSONObj dbEntry = i.next().Obj();
                 const string& dbName = dbEntry["name"].String();
@@ -186,7 +212,7 @@ namespace mongo {
             DBConfigPtr config = getDBConfig( *it , false );
             if ( config.get() != NULL ){
                 ostringstream ss;
-                ss << "trying to add shard " << host << " because local database " << *it;
+                ss << "trying to add shard " << servers.toString() << " because local database " << *it;
                 ss << " exists in another " << config->getPrimary().toString();
                 errMsg = ss.str();
                 return false;
@@ -202,7 +228,7 @@ namespace mongo {
         // build the ConfigDB shard document
         BSONObjBuilder b;
         b.append( "_id" , *name );
-        b.append( "host" , host );
+        b.append( "host" , servers.toString() );
         if ( maxSize > 0 ){
             b.append( ShardFields::maxSize.name() , maxSize );
         }
@@ -211,8 +237,8 @@ namespace mongo {
         {
             ScopedDbConnection conn( configServer.getPrimary() );
                 
-            // check whether this host:port is not an already a known shard
-            BSONObj old = conn->findOne( ShardNS::shard , BSON( "host" << host ) );
+            // check whether the set of hosts (or single host) is not an already a known shard
+            BSONObj old = conn->findOne( ShardNS::shard , BSON( "host" << servers.toString() ) );
             if ( ! old.isEmpty() ){
                 errMsg = "host already used";
                 conn.done();
@@ -238,7 +264,7 @@ namespace mongo {
         for ( vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it ){
             DBConfigPtr config = getDBConfig( *it , true , *name );
             if ( ! config ){
-                log() << "adding shard " << host << " even though could not add database " << *it << endl; 
+                log() << "adding shard " << servers << " even though could not add database " << *it << endl; 
             }
         }
 

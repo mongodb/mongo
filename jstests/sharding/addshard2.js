@@ -28,7 +28,7 @@ assert(shard, "shard wasn't found");
 assert.eq("add_shard2_rs1", shard._id, "t2 name");
 
 // replica set w/ name given
-assert(s.admin.runCommand({"addshard" : "add_shard2_rs2/"+getHostName()+":31200", "name" : "myshard"}).ok, "failed to add shard");
+assert(s.admin.runCommand({"addshard" : "add_shard2_rs2/"+getHostName()+":31203", "name" : "myshard"}).ok, "failed to add shard");
 shard = s.getDB("config").shards.findOne({"_id" : {"$nin" : ["shard0000", "bar", "add_shard2_rs1"]}});
 assert(shard, "shard wasn't found");
 assert.eq("myshard", shard._id, "t3 name");
