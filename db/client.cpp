@@ -45,7 +45,8 @@ namespace mongo {
       _shutdown(false),
       _desc(desc),
       _god(0),
-      _lastOp(0), _mp(p)
+      _lastOp(0), 
+      _mp(p)
     {
         _curOp = new CurOp( this );
         scoped_lock bl(clientsMutex);
@@ -56,7 +57,7 @@ namespace mongo {
         _god = 0;
 
         if ( _context )
-            error() << "Client::~Client _context should be NULL: " << _desc << endl;
+            error() << "Client::~Client _context should be null but is not; client:" << _desc << endl;
 
         if ( ! _shutdown ) {
             error() << "Client::shutdown not called: " << _desc << endl;
@@ -82,7 +83,7 @@ namespace mongo {
             dropCollection( ns , err , b );
         }
         catch ( ... ){
-            warning() << "couldn't dropping temp collection: " << ns << endl;
+            warning() << "error dropping temp collection: " << ns << endl;
         }
 
     }

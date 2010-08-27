@@ -62,6 +62,14 @@ namespace mongo {
                 errmsg = "not running with --replSet";
                 return false;
             }
+
+            /* we want to keep heartbeat connections open when relinquishing primary.  tag them here. */
+            {
+                MessagingPort *mp = cc()._mp;
+                if( mp ) 
+                    mp->tag |= 1;
+            }
+
             if( cmdObj["pv"].Int() != 1 ) { 
                 errmsg = "incompatible replset protocol version";
                 return false;
