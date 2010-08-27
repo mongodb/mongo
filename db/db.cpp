@@ -200,16 +200,14 @@ namespace mongo {
     void connThread( MessagingPort * inPort )
     {
         TicketHolderReleaser connTicketReleaser( &connTicketHolder );
-        Client::initThread("conn");
 
         /* todo: move to Client object */
         LastError *le = new LastError();
         lastError.reset(le);
 
+        inPort->_logLevel = 1;
         auto_ptr<MessagingPort> dbMsgPort( inPort );
-
-        dbMsgPort->_logLevel = 1;
-        Client& c = cc();
+        Client& c = Client::initThread("conn", inPort);
 
         try {
 

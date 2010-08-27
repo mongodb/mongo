@@ -40,12 +40,12 @@ namespace mongo {
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;
 
-    Client::Client(const char *desc) : 
+    Client::Client(const char *desc, MessagingPort *p) : 
       _context(0),
       _shutdown(false),
       _desc(desc),
       _god(0),
-      _lastOp(0)
+      _lastOp(0), _mp(p)
     {
         _curOp = new CurOp( this );
         scoped_lock bl(clientsMutex);
