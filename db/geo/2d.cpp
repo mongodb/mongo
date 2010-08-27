@@ -836,13 +836,13 @@ namespace mongo {
 
             min.bucket = id.head.btree()->locate( id , id.head , start.wrap() , 
                                                   ordering , min.pos , min.found , minDiskLoc );
-            min.checkCur( found , hopper );
+            if (hopper) min.checkCur( found , hopper );
             max = min;
             
-            if ( min.bucket.isNull() || ( !(hopper->found()) ) ){
+            if ( min.bucket.isNull() || ( hopper && !(hopper->found()) ) ){
                 min.bucket = id.head.btree()->locate( id , id.head , start.wrap() , 
                                                       ordering , min.pos , min.found , minDiskLoc , -1 );
-                min.checkCur( found , hopper );
+                if (hopper) min.checkCur( found , hopper );
             }
             
             return ! min.bucket.isNull() || ! max.bucket.isNull();
@@ -894,17 +894,17 @@ namespace mongo {
             { // 1 regular geo hash algorithm
                 
 
-                if ( ! BtreeLocation::initial( id , _spec , min , max , _start , _found , hopper ) )
+                if ( ! BtreeLocation::initial( id , _spec , min , max , _start , _found , NULL ) )
                     return;
                 
                 while ( !_prefix.constrains() || // if next pass would cover universe, just keep going
                         ( _hopper->found() < _numWanted && _spec->sizeEdge( _prefix ) <= _scanDistance))
                 {
                     GEODEBUG( _prefix << "\t" << _found << "\t DESC" );
-                    while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , hopper ) )
+                    while ( min.hasPrefix(_prefix) && min.checkCur(_found, hopper) && min.advance(-1, _found, NULL) )
                         _nscanned++;
                     GEODEBUG( _prefix << "\t" << _found << "\t ASC" );
-                    while ( max.hasPrefix( _prefix ) && max.advance( 1 , _found , hopper ) )
+                    while ( max.hasPrefix(_prefix) && max.checkCur(_found, hopper) && max.advance(+1, _found, NULL) )
                         _nscanned++;
 
                     if ( ! _prefix.constrains() ){
