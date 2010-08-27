@@ -653,7 +653,7 @@ namespace mongo {
                     maxSize = cmdObj[ ShardFields::maxSize.name() ].numberLong();
                 }
                 
-                if ( ! grid.addShard( &name , servers.toString() , maxSize , errmsg ) ){
+                if ( ! grid.addShard( &name , servers , maxSize , errmsg ) ){
                     log() << "addshard request " << cmdObj << " failed: " << errmsg << endl;
                     return false;
                 }
