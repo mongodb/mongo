@@ -670,7 +670,8 @@ namespace mongo {
                 CHECKNEWOBJECT(o,_context,"Bindata_BinData1");
                 int len;
                 const char * data = e.binData( len );
-                assert( JS_SetPrivate( _context , o , new BinDataHolder( data ) ) );
+                assert( data );
+                assert( JS_SetPrivate( _context , o , new BinDataHolder( data , len ) ) );
 
                 setProperty( o , "len" , toval( (double)len ) );
                 setProperty( o , "type" , toval( (double)e.binDataType() ) );
