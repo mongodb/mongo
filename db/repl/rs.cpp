@@ -133,6 +133,7 @@ namespace mongo {
     void ReplSetImpl::_fillIsMaster(BSONObjBuilder& b) {
         const StateBox::SP sp = box.get();
         bool isp = sp.state.primary();
+        b.append("setName", name());
         b.append("ismaster", isp);
         b.append("secondary", sp.state.secondary());
         {
