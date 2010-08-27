@@ -35,12 +35,13 @@ namespace mongo {
 
     boost::thread_specific_ptr<Client> currentClient;
 
-    Client::Client(const char *desc) : 
+    Client::Client(const char *desc , MessagingPort *p) : 
       _context(0),
       _shutdown(false),
       _desc(desc),
       _god(0),
-      _lastOp(0)
+      _lastOp(0),
+      _mp(p)
     {
     }
     Client::~Client(){}
