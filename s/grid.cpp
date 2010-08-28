@@ -123,6 +123,9 @@ namespace mongo {
         }
 
         // Check whether the host (or set) exists and run several sanity checks on this request. 
+        // There are two set of sanity checks: making sure adding this particular shard is consistent
+        // with the replica set state (if it exists) and making sure this shards databases can be 
+        // brought into the grid without conflict.
 
         vector<string> dbNames;
         try {
@@ -165,7 +168,34 @@ namespace mongo {
                 return false;
             }
 
-            // TODO Check that the hosts in 'server' all belong to the replica set 
+            // if the shard is part of a replica set, make sure all the hosts mentioned in 'servers' are part of 
+            // the set. It is fine if not all members of the set are present in 'servers'.
+            bool foundAll = true;
+            string offendingHost;
+            if ( ! commandSetName.empty() ){
+                set<string> hostSet;
+                BSONObjIterator iter( resIsMaster["hosts"].Obj() );
+                while ( iter.more() ){
+                    hostSet.insert( iter.next().String() ); // host:port
+                }
+
+                vector<HostAndPort> hosts = servers.getServers();
+                for ( size_t i = 0 ; i < hosts.size() ; i++ ){
+                    string host = hosts[i].toString(); // host:port
+                    if ( hostSet.find( host ) == hostSet.end() ){
+                        offendingHost = host;
+                        foundAll = false;
+                        break;
+                    }
+                }
+            }
+            if ( ! foundAll ){
+                ostringstream ss;
+                ss << "host " << offendingHost << " does not belong to replica set " << setName;;
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
 
             // shard name defaults to the name of the replica set
             if ( name->empty() && ! setName.empty() )
