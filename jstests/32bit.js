@@ -116,8 +116,13 @@ function f() {
 }
 
 var h = (new Date()).getHours();
-if( forceSeedToBe || h <= 2 || h >= 22 ) {
-    /* this test is slow, so don't run during the day */
-    print("\n32bit.js running - this test is slow so only runs at night."); 
-    f();
+if (!db._adminCommand("buildInfo").debug) {
+    if (forceSeedToBe || h <= 2 || h >= 22) {
+        /* this test is slow, so don't run during the day */
+        print("\n32bit.js running - this test is slow so only runs at night.");
+        f();
+    }
+}
+else {
+    print("32bit.js skipping this test - debug server build would be too slow");
 }
