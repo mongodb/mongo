@@ -134,7 +134,7 @@ namespace mongo {
             
             scoped_lock lk(_mutex);
             for ( NSVersionMap::iterator i=_versions.begin(); i!=_versions.end(); ++i ){
-                bb.appendTimestamp( i->first.c_str() , i->second );
+                bb.appendTimestamp( i->first , i->second );
             }
             bb.done();
         }
