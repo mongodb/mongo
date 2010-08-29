@@ -34,19 +34,27 @@ namespace mongo {
     */
 
     bool replSetBlind = false;
+    unsigned replSetForceInitialSyncFailure = 0;
 
     class CmdReplSetTest : public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
-            help << "Just for testing : do not use.\n";
+            help << "Just for regression tests.\n";
         }
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
+            if( cmdObj.hasElement("forceInitialSyncFailure") ) {
+                replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
+                return true;
+            }
+
+            // may not need this, but if removed check all tests still work:
             if( !check(errmsg, result) ) 
                 return false;
+
             if( cmdObj.hasElement("blind") ) {
                 replSetBlind = cmdObj.getBoolField("blind");
-                log() << "replSet info replSetTest command received, replSetBlind=" << replSetBlind << rsLog;
                 return true;
             }
             return false;
