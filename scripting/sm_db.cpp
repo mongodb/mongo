@@ -846,6 +846,12 @@ namespace mongo {
     JSBool numberlong_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         smuassert( cx , "NumberLong needs 0 or 1 args" , argc == 0 || argc == 1 );
         
+        if ( ! JS_InstanceOf( cx , obj , &numberlong_class , 0 ) ){
+            obj = JS_NewObject( cx , &numberlong_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "numberlong_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
         Convertor c( cx );
         if ( argc == 0 ) {
             c.setProperty( obj, "floatApprox", c.toval( 0.0 ) );

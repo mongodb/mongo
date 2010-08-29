@@ -518,7 +518,7 @@ namespace JSTests {
     class NumberLong {
     public:
         void run() {
-            Scope * s = globalScriptEngine->newScope();
+            auto_ptr<Scope> s( globalScriptEngine->newScope() );
             s->localConnect( "blah" );
             BSONObjBuilder b;
             long long val = (long long)( 0xbabadeadbeefbaddULL );
@@ -573,6 +573,34 @@ namespace JSTests {
             ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
             ASSERT_EQUALS( 4, out.firstElement().numberLong() );     
             
+        }
+    };
+
+    class NumberLong2 {
+    public:
+        void run() {
+            auto_ptr<Scope> s( globalScriptEngine->newScope() );
+            s->localConnect( "blah" );
+            
+            BSONObj in;
+            {
+                BSONObjBuilder b;
+                b.append( "a" , 5 );
+                b.append( "b" , (long long)5 );
+                b.append( "c" , (long long)pow( 2.0, 29 ) );
+                b.append( "d" , (long long)pow( 2.0, 30 ) );
+                b.append( "e" , (long long)pow( 2.0, 31 ) );
+                b.append( "f" , (long long)pow( 2.0, 45 ) );
+                in = b.obj();
+            }
+            s->setObject( "a" , in );
+            
+            ASSERT( s->exec( "x = tojson( a ); " ,"foo" , false , true , false ) );
+            string outString = s->getString( "x" );
+
+            ASSERT( s->exec( (string)"y = " + outString , "foo2" , false , true , false ) );
+            BSONObj out = s->getObject( "y" );
+            ASSERT_EQUALS( in , out );
         }
     };
     
@@ -931,6 +959,7 @@ namespace JSTests {
             add< SpecialDBTypes >();
             add< TypeConservation >();
             add< NumberLong >();
+            add< NumberLong2 >();
             
             add< WeirdObjects >();
             add< CodeTests >();
