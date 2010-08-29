@@ -155,7 +155,7 @@ namespace mongo {
             sz = 1000000000;
         int z = ((int)sz) & 0xffffff00;
         assert( z > len );
-        DEV tlog() << "initialExtentSize(" << len << ") returns " << z << endl;
+        //DEV tlog() << "initialExtentSize(" << len << ") returns " << z << endl;
         return z;
     }
 
