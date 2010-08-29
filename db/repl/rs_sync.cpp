@@ -24,6 +24,8 @@ namespace mongo {
 
     using namespace bson;
 
+    extern unsigned replSetForceInitialSyncFailure;
+
     void startSyncThread() { 
         Client::initThread("rs_sync");
         cc().iAmSyncThread();
@@ -92,6 +94,7 @@ namespace mongo {
             // todo : use exhaust
             unsigned long long n = 0;
             while( 1 ) { 
+
                 if( !r.more() )
                     break;
                 BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
@@ -104,9 +107,14 @@ namespace mongo {
                         anymore. assumePrimary is in the db lock so we are safe as long as 
                         we check after we locked above. */
 					const Member *p1 = box.getPrimary();
-                    if( p1 != primary ) {
-					  log() << "replSet primary was:" << primary->fullName() << " now:" << 
-						(p1 != 0 ? p1->fullName() : "none") << rsLog;
+                    if( p1 != primary || replSetForceInitialSyncFailure ) {
+                        int f = replSetForceInitialSyncFailure;
+                        if( f > 0 ) {
+                            replSetForceInitialSyncFailure = f-1;
+                            log() << "replSet test code invoked, replSetForceInitialSyncFailure" << rsLog;
+                        }
+                        log() << "replSet primary was:" << primary->fullName() << " now:" << 
+                            (p1 != 0 ? p1->fullName() : "none") << rsLog;
                         throw DBException("primary changed",0);
                     }
 
