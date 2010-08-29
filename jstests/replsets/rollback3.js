@@ -30,7 +30,7 @@ function wait(f) {
     var n = 0;
     while (!f()) {
         if (n % 4 == 0)
-            print("waiting " + w);
+            print("rollback3.js waiting " + w);
         if (++n == 4) {
             print("" + f);
         }
@@ -204,10 +204,11 @@ doTest = function (signal) {
 
     assert( dbs_match(a,b), "server data sets do not match after rollback, something is wrong");
 
-    pause("SUCCESS");
+    pause("rollback3.js SUCCESS");
     replTest.stopSet(signal);
 }
 
+print("rollback3.js");
 doTest( 15 );
 
-print("rollback3.js done success");
+
