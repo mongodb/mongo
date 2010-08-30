@@ -1257,16 +1257,15 @@ namespace mongo {
         
             nextOpTime = OpTime( ts.date() );
             log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
-            if ( tailing || initial ) {
-                if ( initial )
-                    log(1) << "repl:   initial run\n";
-                else {
-                    if( !( syncedTo <= nextOpTime ) ) { 
-                        log() << "repl ASSERTION failed : syncedTo <= nextOpTime" << endl;
-                        log() << "repl syncTo:     " << syncedTo.toStringLong() << endl;
-                        log() << "repl nextOpTime: " << nextOpTime.toStringLong() << endl;
-                        assert(false);
-                    }
+            if ( initial ) {
+                log(1) << "repl:   initial run\n";
+            }
+            if( tailing ) {
+                if( !( syncedTo < nextOpTime ) ) { 
+                    log() << "repl ASSERTION failed : syncedTo < nextOpTime" << endl;
+                    log() << "repl syncTo:     " << syncedTo.toStringLong() << endl;
+                    log() << "repl nextOpTime: " << nextOpTime.toStringLong() << endl;
+                    assert(false);
                 }
                 oplogReader.putBack( op ); // op will be processed in the loop below
                 nextOpTime = OpTime(); // will reread the op below
@@ -1288,7 +1287,7 @@ namespace mongo {
                 throw SyncException();
             }
             else {
-                /* t == syncedTo, so the first op was applied previously. */
+                /* t == syncedTo, so the first op was applied previously or it is the first op of initial query and need not be applied. */
             }
         }
 
