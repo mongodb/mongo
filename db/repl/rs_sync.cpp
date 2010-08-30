@@ -157,8 +157,14 @@ namespace mongo {
         {
             BSONObj remoteOldestOp = r.findOne(rsoplog, Query());
             OpTime ts = remoteOldestOp["ts"]._opTime();
-            DEV log() << "remoteOldestOp: " << ts.toStringPretty() << endl;
-            else log(3) << "remoteOldestOp: " << ts.toStringPretty() << endl;
+            DEV log() << "replSet remoteOldestOp:    " << ts.toStringLong() << rsLog;
+            else log(3) << "replSet remoteOldestOp: " << ts.toStringLong() << rsLog;
+            DEV { 
+                // debugging sync1.js...
+                log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
+                log() << "replSet minValid:          " << minValid.toStringLong() << rsLog;
+                log() << "replSet our state: " << state().toString() << rsLog;
+            }
             if( lastOpTimeWritten < ts ) { 
                 log() << "replSet error RS102 too stale to catch up, at least from primary: " << hn << rsLog;
                 log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
