@@ -23,7 +23,7 @@
 namespace mongo {
 
     MemoryMappedFile::MemoryMappedFile()
-        : _flushMutex("flushMutex")
+        : _flushMutex(new mutex("flushMutex"))
     {
         fd = 0;
         maphandle = 0;
@@ -99,16 +99,15 @@ namespace mongo {
 
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
-        WindowsFlushable( void * view , HANDLE fd , string filename )
-            : _view(view) , _fd(fd) , _filename(filename){
-            
-        }
+        WindowsFlushable( void * view , HANDLE fd , string filename , boost::shared_ptr<mutex> flushMutex )
+            : _view(view) , _fd(fd) , _filename(filename) , _flushMutex(flushMutex)
+        {}
         
         void flush(){
             if (!_view || !_fd) 
                 return;
 
-            scoped_lock lk(_flushMutex);
+            scoped_lock lk(*_flushMutex);
 
             bool success = FlushViewOfFile(_view, 0); // 0 means whole mapping
             if (!success){
@@ -126,18 +125,18 @@ namespace mongo {
         void * _view;
         HANDLE _fd;
         string _filename;
-        
+        boost::shared_ptr<mutex> _flushMutex;
     };
     
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
         
-        WindowsFlushable f( view , fd , _filename );
+        WindowsFlushable f( view , fd , _filename , _flushMutex);
         f.flush();
     }
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush(){
-        return new WindowsFlushable( view , fd , _filename );
+        return new WindowsFlushable( view , fd , _filename , _flushMutex );
     }
     void MemoryMappedFile::_lock() {}
     void MemoryMappedFile::_unlock() {}

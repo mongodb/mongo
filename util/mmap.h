@@ -66,11 +66,6 @@ namespace mongo {
         static bool exists(boost::filesystem::path p) {
             return boost::filesystem::exists(p);
         }
-
-#ifdef _WIN32
-    private:
-        mutex _flushMutex;
-#endif
     };
 
 #ifndef _DEBUG
@@ -184,6 +179,10 @@ namespace mongo {
         void *view;
         long len;
         string _filename;
+
+#ifdef _WIN32
+        boost::shared_ptr<mutex> _flushMutex;
+#endif
 
     protected:
         // only posix mmap implementations will support this
