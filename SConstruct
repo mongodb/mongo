@@ -1307,10 +1307,12 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest("smokeJsSlow", [add_exe("mongo")], runShellTest)
-    addSmoketest("smokeJsSlowNightly", [add_exe("mongo")], runShellTest)
     addSmoketest("smokeJsSlowWeekly", [add_exe("mongo")], runShellTest)
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [ jsDirTestSpec( "tool" ) ] )
+
+env.Alias("smokeJsSlowNightly","stdafx.cpp")
+
 
 mongodForTests = None
 mongodForTestsPort = "27017"
