@@ -66,6 +66,11 @@ namespace mongo {
         static bool exists(boost::filesystem::path p) {
             return boost::filesystem::exists(p);
         }
+
+#ifdef _WIN32
+    private:
+        mutex _flushMutex;
+#endif
     };
 
 #ifndef _DEBUG

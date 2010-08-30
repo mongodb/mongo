@@ -22,7 +22,9 @@
 
 namespace mongo {
 
-    MemoryMappedFile::MemoryMappedFile() {
+    MemoryMappedFile::MemoryMappedFile()
+        : _flushMutex("flushMutex")
+    {
         fd = 0;
         maphandle = 0;
         view = 0;
@@ -105,6 +107,8 @@ namespace mongo {
         void flush(){
             if (!_view || !_fd) 
                 return;
+
+            scoped_lock lk(_flushMutex);
 
             bool success = FlushViewOfFile(_view, 0); // 0 means whole mapping
             if (!success){
