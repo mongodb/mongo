@@ -353,12 +353,10 @@ at the end of testing:"""
 
 def expand_suites(suites):
     globstr = None
-    global tests
+    tests = []
     for suite in suites:
         if suite == 'all':
-            tests = []
-            expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'parallel', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'])
-            break
+            return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'parallel', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'])
         if suite == 'test':
             if os.sys.platform == "win32":
                 program = 'test.exe'
@@ -406,8 +404,6 @@ def expand_suites(suites):
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
-    if not tests:
-        raise Exception( "no tests found" )
     return tests
 
 def main():
@@ -462,17 +458,14 @@ def main():
                 tests = f.readlines()
     tests = [t.rstrip('\n') for t in tests]
 
-    if not tests:
-        raise Exception( "no tests specified" )
     # If we're in suite mode, tests is a list of names of sets of tests.
     if options.mode == 'suite':
-        # Suites: test, perf, js, quota, jsPerf,
-        # jsSlow, parallel, clone, repl, disk
-        suites = tests
-        tests = []
-        expand_suites(suites)
+        tests = expand_suites(tests)
     elif options.mode == 'files':
         tests = [(os.path.abspath(test), True) for test in tests]
+
+    if not tests:
+        raise Exception( "no tests specified" )
 
     run_tests(tests)
     global exit_bad
