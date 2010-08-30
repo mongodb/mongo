@@ -240,6 +240,7 @@ namespace mongo {
         shared_ptr< Matcher > _docMatcher;
         Matcher _keyMatcher;
         bool _needRecord;
+        bool _useRecordOnly;
     };
     
 } // namespace mongo
