@@ -162,7 +162,6 @@ namespace mongo {
             DEV { 
                 // debugging sync1.js...
                 log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
-                log() << "replSet minValid:          " << minValid.toStringLong() << rsLog;
                 log() << "replSet our state: " << state().toString() << rsLog;
             }
             if( lastOpTimeWritten < ts ) { 

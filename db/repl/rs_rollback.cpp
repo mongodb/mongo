@@ -304,7 +304,7 @@ namespace mongo {
 
     static void setMinValid(bo newMinValid) { 
        try {
-           log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
+           log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
        }
        catch(...) { }
        {
