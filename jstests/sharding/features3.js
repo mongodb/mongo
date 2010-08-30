@@ -27,8 +27,10 @@ print( "about to fork shell: " + Date() )
 join = startParallelShell( "db.foo.find( function(){ x = \"\"; for ( i=0; i<5000; i++ ){ x+=i; } return true; } ).itcount()" )
 print( "after forking shell: " + Date() )
 
-function getMine(){
+function getMine( printInprog ){
     var inprog = db.currentOp().inprog;
+    if ( printInprog )
+        printjson( inprog )
     var mine = []
     for ( var x=0; x<inprog.length; x++ ){
         if ( inprog[x].query && inprog[x].query.$where ){
@@ -42,7 +44,7 @@ state = 0; // 0 = not found, 1 = killed,
 killTime = null;
 
 for ( i=0; i<200000; i++ ){
-    mine = getMine();
+    mine = getMine( state == 0 && i > 20 );
     if ( state == 0 ){
         if ( mine.length == 0 ){
             sleep(1);
@@ -63,10 +65,12 @@ for ( i=0; i<200000; i++ ){
 
 print( "after loop: " + Date() );
 assert( killTime , "timed out waiting too kill last mine:" + tojson(mine) )
+
+assert.eq( 2 , state , "failed killing" );
+
 killTime = (new Date()).getTime() - killTime.getTime()
 print( "killTime: " + killTime );
 
-assert.eq( 2 , state , "failed killing" );
 assert.gt( 10000 , killTime , "took too long to kill" )
 
 join()
