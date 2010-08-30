@@ -1260,8 +1260,14 @@ namespace mongo {
             if ( tailing || initial ) {
                 if ( initial )
                     log(1) << "repl:   initial run\n";
-                else
-                    assert( syncedTo < nextOpTime );
+                else {
+                    if( !( syncedTo <= nextOpTime ) ) { 
+                        log() << "repl ASSERTION failed : syncedTo <= nextOpTime" << endl;
+                        log() << "repl syncTo:     " << syncedTo.toStringLong() << endl;
+                        log() << "repl nextOpTime: " << nextOpTime.toStringLong() << endl;
+                        assert(false);
+                    }
+                }
                 oplogReader.putBack( op ); // op will be processed in the loop below
                 nextOpTime = OpTime(); // will reread the op below
             }
