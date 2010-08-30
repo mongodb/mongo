@@ -140,6 +140,31 @@ namespace mongo {
         return true;
     }
 
+    /* should be in RECOVERING state on arrival here.  
+       readlocks
+       @return true if transitioned to SECONDARY
+    */
+    bool ReplSetImpl::tryToGoLiveAsASecondary(OpTime& /*out*/ minvalid) { 
+        bool golive = false;			
+        {
+            readlock lk("local.replset.minvalid");
+            BSONObj mv;
+            if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
+                minvalid = mv["ts"]._opTime();
+                if( minvalid <= lastOpTimeWritten ) { 
+                    golive=true;
+                }
+            }
+            else 
+                golive = true; /* must have been the original member */
+        }
+        if( golive ) {
+            sethbmsg("");
+            changeState(MemberState::RS_SECONDARY);
+        }
+        return golive;
+    }
+
     /* tail the primary's oplog.  ok to return, will be re-called. */
     void ReplSetImpl::syncTail() { 
         // todo : locking vis a vis the mgr...
@@ -228,7 +253,12 @@ namespace mongo {
             }
         }
 
-        bool achievedMinValid = false;
+        /* we have now checked if we need to rollback and we either don't have to or did it. */
+        {
+            OpTime minvalid;
+            tryToGoLiveAsASecondary(minvalid);
+        }
+
         while( 1 ) {
             while( 1 ) {
                 if( !r.moreInCurrentBatch() ) { 
@@ -238,34 +268,16 @@ namespace mongo {
                     /* perhaps we should check this earlier? but not before the rollback checks. */
                     if( state().recovering() ) { 
                         /* can we go to RS_SECONDARY state?  we can if not too old and if minvalid achieved */
-                        bool golive = false;			
                         OpTime minvalid;
-                        {
-                            readlock lk("local.replset.minvalid");
-                            BSONObj mv;
-                            if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
-                                minvalid = mv["ts"]._opTime();
-                                if( minvalid <= lastOpTimeWritten ) { 
-                                    golive=true;
-                                }
-                            }
-                            else 
-                                golive = true; /* must have been the original member */
-                        }
+                        bool golive = ReplSetImpl::tryToGoLiveAsASecondary(minvalid);
                         if( golive ) {
-                            achievedMinValid = true;
-                            sethbmsg("");
-                            //log() << "replSet SECONDARY" << rsLog;
-                            changeState(MemberState::RS_SECONDARY);
+                            ;
                         }
                         else { 
-                            sethbmsg(str::stream() << "still syncing, not yet to minValid optime " << minvalid.toString());
+                            sethbmsg(str::stream() << "still syncing, not yet to minValid optime" << minvalid.toString());
                         }
 
                         /* todo: too stale capability */
-                    }
-                    else {
-                        achievedMinValid = true;
                     }
 
                     if( box.getPrimary() != primary ) 
