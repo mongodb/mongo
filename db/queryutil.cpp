@@ -220,8 +220,9 @@ namespace mongo {
         if ( isNot ) {
             switch( op ) {
                 case BSONObj::Equality:
-                    op = BSONObj::NE;
-                    break;
+                    return;
+//                    op = BSONObj::NE;
+//                    break;
                 case BSONObj::opALL:
                 case BSONObj::opMOD: // NOTE for mod and type, we could consider having 1-2 intervals comprising the complementary types (multiple intervals already possible with $in)
                 case BSONObj::opTYPE:
