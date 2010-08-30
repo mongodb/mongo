@@ -272,7 +272,7 @@ namespace mongo {
         mongo::mutex m;
     public:
         Ports() : ports(), m("Ports") {}
-        void closeAll() { \
+        void closeAll() {
             scoped_lock bl(m);
             for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
                 (*i)->shutdown();
@@ -291,18 +291,16 @@ namespace mongo {
     // are being destructed during termination.
     Ports& ports = *(new Ports());
 
-
-
     void closeAllSockets() {
         ports.closeAll();
     }
 
-    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far), _timeout() {
+    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far), _timeout(), tag(0) {
         _logLevel = 0;
         ports.insert(this);
     }
 
-    MessagingPort::MessagingPort( int timeout, int ll ) {
+    MessagingPort::MessagingPort( int timeout, int ll ) : tag(0) {
         _logLevel = ll;
         ports.insert(this);
         sock = -1;
@@ -342,7 +340,7 @@ namespace mongo {
 
         sock = socket(farEnd.getType(), SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
-            log(_logLevel) << "ERROR: connect(): invalid socket? " << errnoWithDescription() << endl;
+            log(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
             return false;
         }
 
@@ -401,9 +399,9 @@ namespace mongo {
             int lft = 4;
             recv( lenbuf, lft );
             
-            if ( len < 16 || len > 16000000 ) { // messages must be large enough for headers
+            if ( len < 16 || len > 48000000 ) { // messages must be large enough for headers
                 if ( len == -1 ) {
-                    // Endian check from the database, after connecting, to see what mode server is running in.
+                    // Endian check from the client, after connecting, to see what mode server is running in.
                     unsigned foo = 0x10203040;
                     send( (char *) &foo, 4, "endian" );
                     goto again;
@@ -419,7 +417,7 @@ namespace mongo {
                     send( s.c_str(), s.size(), "http" );
                     return false;
                 }
-                log(_logLevel) << "bad recv() len: " << len << '\n';
+                log(0) << "recv(): message len " << len << " is too large" << len << endl;
                 return false;
             }
             

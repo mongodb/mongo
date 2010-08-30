@@ -16,18 +16,29 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "pch.h"
 #include <time.h>
 #include "spin_lock.h"
 
 namespace mongo {
 
-    SpinLock::SpinLock() : _locked( false ){}
+    SpinLock::~SpinLock() { 
+#if defined(_WIN32)
+        DeleteCriticalSection(&_cs);
+#endif
+    }
 
-    SpinLock::~SpinLock(){}
+    SpinLock::SpinLock()
+#if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
+        : _locked( false ) { } 
+#elif defined(_WIN32)
+    { InitializeCriticalSectionAndSpinCount(&_cs, 4000); }
+#else
+        : _mutex( "SpinLock" ) { }
+#endif
 
     void SpinLock::lock(){
 #if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
-
         // fast path
         if (!_locked && !__sync_lock_test_and_set(&_locked, true)) {
             return;
@@ -44,9 +55,12 @@ namespace mongo {
         while (__sync_lock_test_and_set(&_locked, true)) {
             nanosleep(&t, NULL);
         }
+#elif defined(_WIN32)
+        EnterCriticalSection(&_cs);
 #else
-
-        // WARNING "TODO Missing spin lock in this platform."
+        // WARNING Missing spin lock in this platform. This can potentially
+        // be slow.
+        _mutex.lock();
 
 #endif
     }
@@ -56,9 +70,13 @@ namespace mongo {
 
         __sync_lock_release(&_locked);
 
-#else
+#elif defined(WIN32) 
 
-        // WARNING "TODO Missing spin lock in this platform."
+        LeaveCriticalSection(&_cs);
+
+#else
+        
+        _mutex.unlock();
 
 #endif
     }

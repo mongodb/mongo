@@ -57,18 +57,17 @@ namespace mongo {
         /**
          *
          * addShard will create a new shard in the grid. It expects a mongod process to be runing
-         * on the provided address.
-         * TODO - add the mongod's databases to the grid
+         * on the provided address. Adding a shard that is a replica set is supported. 
          *
          * @param name is an optional string with the name of the shard. if ommited, grid will
          * generate one and update the parameter.
-         * @param host is the complete address of the machine where the shard will be
+         * @param servers is the connection string of the shard being added
          * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
          * space usage
          * @param errMsg is the error description in case the operation failed. 
          * @return true if shard was successfully added.
          */
-        bool addShard( string* name , const string& host , long long maxSize , string& errMsg );
+        bool addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg );
 
         /**
          * @return true if the config database knows about a host 'name'

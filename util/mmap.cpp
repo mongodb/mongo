@@ -79,7 +79,7 @@ namespace mongo {
             (*i)->close();
             pm.hit();
         }
-        message << "    closeAllFiles() finished" << endl;
+        message << "closeAllFiles() finished";
         --closingAllFiles;
     }
 

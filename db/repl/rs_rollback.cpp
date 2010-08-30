@@ -304,7 +304,7 @@ namespace mongo {
 
     static void setMinValid(bo newMinValid) { 
        try {
-           log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
+           log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
        }
        catch(...) { }
        {
@@ -652,6 +652,11 @@ namespace mongo {
                 incRBID(); throw;
             }
             incRBID();
+
+            /* success - leave "ROLLBACK" state 
+               can go to SECONDARY once minvalid is achieved
+            */
+            box.change(MemberState::RS_RECOVERING, _self);
         }
 
         return 0;

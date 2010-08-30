@@ -62,6 +62,14 @@ namespace mongo {
                 errmsg = "not running with --replSet";
                 return false;
             }
+
+            /* we want to keep heartbeat connections open when relinquishing primary.  tag them here. */
+            {
+                MessagingPort *mp = cc()._mp;
+                if( mp ) 
+                    mp->tag |= 1;
+            }
+
             if( cmdObj["pv"].Int() != 1 ) { 
                 errmsg = "incompatible replset protocol version";
                 return false;
@@ -203,7 +211,12 @@ namespace mongo {
 
             static time_t last = 0;
             time_t now = time(0);
-            if( mem.changed(old) || now-last>4 ) {
+            bool changed = mem.changed(old);
+            if( changed ) { 
+                if( old.hbstate != mem.hbstate ) 
+                    log() << "replSet " << h.toString() << ' ' << mem.hbstate.toString() << rsLog;
+            }
+            if( changed || now-last>4 ) {
                 last = now;
                 theReplSet->mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
             }

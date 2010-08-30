@@ -34,19 +34,27 @@ namespace mongo {
     */
 
     bool replSetBlind = false;
+    unsigned replSetForceInitialSyncFailure = 0;
 
     class CmdReplSetTest : public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
-            help << "Just for testing : do not use.\n";
+            help << "Just for regression tests.\n";
         }
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
+            if( cmdObj.hasElement("forceInitialSyncFailure") ) {
+                replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
+                return true;
+            }
+
+            // may not need this, but if removed check all tests still work:
             if( !check(errmsg, result) ) 
                 return false;
+
             if( cmdObj.hasElement("blind") ) {
                 replSetBlind = cmdObj.getBoolField("blind");
-                log() << "replSet info replSetTest command received, replSetBlind=" << replSetBlind << rsLog;
                 return true;
             }
             return false;
@@ -220,20 +228,22 @@ namespace mongo {
             return startsWith( url , "/_replSet" );
         }
 
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params, 
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             
-            string s = str::after(url, "/_replSetOplog?");
-            if( !s.empty() )
-                responseMsg = _replSetOplog(s);
-            else
+            if( url == "/_replSetOplog" ) {
+                cout << params.toString() << endl;
+                responseMsg = _replSetOplog(params);
+            } else
                 responseMsg = _replSet();
             responseCode = 200;
         }
 
 
-        string _replSetOplog(string parms) { 
+        string _replSetOplog(bo parms) { 
+            int _id = parms["_id"].numberInt();
+
             stringstream s;
             string t = "Replication oplog";
             s << start(t);
@@ -249,7 +259,7 @@ namespace mongo {
             }
             else {
                 try {
-                    theReplSet->getOplogDiagsAsHtml(stringToNum(parms.c_str()), s);
+                    theReplSet->getOplogDiagsAsHtml(_id, s);
                 }
                 catch(std::exception& e) { 
                     s << "error querying oplog: " << e.what() << '\n'; 
@@ -266,7 +276,7 @@ namespace mongo {
             s << start("Replica Set Status " + prettyHostName());
             s << p( a("/", "back", "Home") + " | " + 
                     a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
-                    a("/replSetGetStatus?text", "", "replSetGetStatus") + " | " +
+                    a("/replSetGetStatus?text=1", "", "replSetGetStatus") + " | " +
                     a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
                   );
 

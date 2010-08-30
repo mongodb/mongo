@@ -156,12 +156,27 @@ namespace mongo {
                 }              
 
                 {
+                    BSONObj params;
+                    const size_t pos = url.find( "?" );
+                    if ( pos != string::npos ) {
+                        MiniWebServer::parseParams( params , url.substr( pos + 1 ) );
+                        url = url.substr(0, pos);
+                    }
+
                     DbWebHandler * handler = DbWebHandler::findHandler( url );
                     if ( handler ){
-                        if ( handler->requiresREST( url ) && ! cmdLine.rest )
+                        if ( handler->requiresREST( url ) && ! cmdLine.rest ){
                             _rejectREST( responseMsg , responseCode , headers );
-                        else
-                            handler->handle( rq , url , responseMsg , responseCode , headers , from );
+                        }else{
+                            string callback = params.getStringField("jsonp");
+                            uassert(13453, "server not started with --jsonp", callback.empty() || cmdLine.jsonp);
+
+                            handler->handle( rq , url , params , responseMsg , responseCode , headers , from );
+
+                            if (responseCode == 200 && !callback.empty()){
+                                responseMsg = callback + '(' + responseMsg + ')';
+                            }
+                        }
                         return;
                     }
                 }
@@ -202,12 +217,18 @@ namespace mongo {
             {
                 const map<string, Command*> *m = Command::webCommands();
                 if( m ) {
-                    ss << a("", "These read-only context-less commands can be executed from the web interface.  Results are json format, unless ?text is appended in which case the result is output as text for easier human viewing", "Commands") << ": ";
+                    ss << 
+                        a("", 
+                          "These read-only context-less commands can be executed from the web interface. "
+                            "Results are json format, unless ?text=1 is appended in which case the result is output as text "
+                            "for easier human viewing", 
+                          "Commands") 
+                        << ": ";
                     for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
                         stringstream h;
                         i->second->help(h);
                         string help = h.str();
-                        ss << "<a href=\"/" << i->first << "?text\"";
+                        ss << "<a href=\"/" << i->first << "?text=1\"";
                         if( help != "no help defined" )
                             ss << " title=\"" << help << '"';
                         ss << ">" << i->first << "</a> ";
@@ -350,7 +371,7 @@ namespace mongo {
     public:
         FavIconHandler() : DbWebHandler( "favicon.ico" , 0 , false ){}
 
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             responseCode = 404;
@@ -364,7 +385,7 @@ namespace mongo {
     public:
         StatusHandler() : DbWebHandler( "_status" , 1 , false ){}
         
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             headers.push_back( "Content-Type: application/json" );
@@ -374,11 +395,6 @@ namespace mongo {
             if ( commands.size() == 0 ){
                 commands.push_back( "serverStatus" );
                 commands.push_back( "buildinfo" );
-            }
-            
-            BSONObj params;
-            if ( url.find( "?" ) != string::npos ) {
-                MiniWebServer::parseParams( params , url.substr( url.find( "?" ) + 1 ) );
             }
             
             BSONObjBuilder buf(1024);
@@ -421,7 +437,7 @@ namespace mongo {
     public:
         CommandListHandler() : DbWebHandler( "_commands" , 1 , true ){}
         
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             headers.push_back( "Content-Type: text/html" );
@@ -447,29 +463,9 @@ namespace mongo {
     public:
         CommandsHandler() : DbWebHandler( "DUMMY COMMANDS" , 2 , true ){}
         
-        bool _cmd( const string& url , string& cmd , bool& text ) const {
-            const char * x = url.c_str();
-            
-            if ( x[0] != '/' ){
-                // this should never happen
-                return false;
-            }
-            
-            if ( strchr( x + 1 , '/' ) )
-                return false;
-            
-            x++;
-
-            const char * end = strstr( x , "?text" );
-            if ( end ){
-                text = true;
-                cmd = string( x , end - x );
-            }
-            else {
-                text = false;
-                cmd = string(x);
-            }
-             
+        bool _cmd( const string& url , string& cmd , bool& text, bo params ) const {
+            cmd = str::after(url, '/');
+            text = params["text"].boolean();
             return true;
         }
 
@@ -488,19 +484,17 @@ namespace mongo {
         virtual bool handles( const string& url ) const { 
             string cmd;
             bool text;
-            if ( ! _cmd( url , cmd , text ) )
+            if ( ! _cmd( url , cmd , text, bo() ) )
                 return false;
-
-            return _cmd( cmd );
+            return _cmd(cmd) != 0;
         }
         
-        virtual void handle( const char *rq, string url, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
-                             vector<string>& headers,  const SockAddr &from ){
-            
+                             vector<string>& headers,  const SockAddr &from ) {            
             string cmd;
             bool text = false;
-            assert( _cmd( url , cmd , text ) );
+            assert( _cmd( url , cmd , text, params ) );
             Command * c = _cmd( cmd );
             assert( c );
 

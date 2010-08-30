@@ -27,6 +27,7 @@ namespace mongo {
         int port;              // --port
         string bind_ip;        // --bind_ip
         bool rest;             // --rest
+        bool jsonp;             // --jsonp
 
         string _replSet;       // --replSet[/<seedlist>]
         string ourSetName() const { 
@@ -63,7 +64,7 @@ namespace mongo {
         };
 
         CmdLine() : 
-            port(DefaultDBPort), rest(false), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
+            port(DefaultDBPort), rest(false), jsonp(false), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
             quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true )
         { } 
         

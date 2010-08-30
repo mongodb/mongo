@@ -163,12 +163,16 @@ namespace mongo {
             ss << usage.count;
             ss << "</td><td>";
             double per = 100 * ((double)usage.time)/elapsed;
-            ss << setprecision(1) << fixed << per << "%";
+            if( per == (int) per )
+                ss << (int) per;
+            else
+                ss << setprecision(1) << fixed << per;
+            ss << '%';
             ss << "</td>";
         }
 
         void display( stringstream& ss , double elapsed , const string& ns , const Top::CollectionData& data ){
-            if ( ns != "GLOBAL" && data.total.count == 0 )
+            if ( ns != "TOTAL" && data.total.count == 0 )
                 return;
             ss << "<tr><th>" << ns << "</th>";
             
@@ -205,7 +209,7 @@ namespace mongo {
                 "<th colspan=2>Removes</th>";
             ss << "</tr>\n";
             
-            display( ss , (double) delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
+            display( ss , (double) delta->elapsed() , "TOTAL" , delta->globalUsageDiff() );
             
             Top::UsageMap usage = delta->collectionUsageDiff();
             for ( Top::UsageMap::iterator i=usage.begin(); i != usage.end(); i++ ){

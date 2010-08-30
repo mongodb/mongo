@@ -26,7 +26,7 @@ namespace mongo {
     boost::thread_specific_ptr<string> _threadName;
     
     void _setThreadName( const char * name ){
-        static int N = 0;
+        static unsigned N = 0;
         if ( strcmp( name , "conn" ) == 0 ){
             stringstream ss;
             ss << name << ++N;
@@ -49,27 +49,41 @@ namespace mongo {
     } THREADNAME_INFO;
 #pragma pack(pop)
 
-    void setThreadName(const char *name)
-    {
-        _setThreadName( name );
-        Sleep(10);
+    void setWinThreadName(const char *name) { 
+        /* is the sleep here necessary???
+           Sleep(10);
+           */
         THREADNAME_INFO info;
         info.dwType = 0x1000;
         info.szName = name;
         info.dwThreadID = -1;
         info.dwFlags = 0;
         __try
-            {
-                RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
-            }
+        {
+            RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
+        }
         __except(EXCEPTION_EXECUTE_HANDLER)
         {
         }
     }
+
+    void setThreadName(const char *name)
+    {
+        _setThreadName( name );
+#if !defined(_DEBUG)
+        // naming might be expensive so don't do "conn*" over and over
+        if( string("conn") == name )
+            return;
+#endif
+        setWinThreadName(name);
+    }
+
 #else
+
     void setThreadName(const char * name ) { 
         _setThreadName( name );
     }
+
 #endif
 
     string getThreadName(){
@@ -165,8 +179,9 @@ namespace mongo {
 
         char buf[64];
         time_t_to_String( time(0) , buf );
-        buf[20] = ' ';
-        buf[21] = 0;
+        /* truncate / don't show the year: */
+        buf[19] = ' ';
+        buf[20] = 0;
 
         Logstream::logLockless(buf);
         Logstream::logLockless(s);

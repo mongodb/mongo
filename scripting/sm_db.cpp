@@ -846,6 +846,12 @@ namespace mongo {
     JSBool numberlong_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         smuassert( cx , "NumberLong needs 0 or 1 args" , argc == 0 || argc == 1 );
         
+        if ( ! JS_InstanceOf( cx , obj , &numberlong_class , 0 ) ){
+            obj = JS_NewObject( cx , &numberlong_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "numberlong_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
         Convertor c( cx );
         if ( argc == 0 ) {
             c.setProperty( obj, "floatApprox", c.toval( 0.0 ) );
@@ -880,12 +886,14 @@ namespace mongo {
     JSBool numberlong_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
         stringstream ss;
-        if ( c.hasProperty( obj, "top" ) ) {
-            long long val = c.toNumberLongUnsafe( obj );
-            ss << "NumberLong( \"" << val << "\" )";            
-        } else {
-            ss << "NumberLong( " << c.getNumber( obj, "floatApprox" ) << " )";            
-        }
+        long long val = c.toNumberLongUnsafe( obj );
+        const long long limit = 2LL << 30;
+
+        if ( val <= -limit || limit <= val )
+            ss << "NumberLong(\"" << val << "\")";
+        else
+            ss << "NumberLong(" << val << ")";
+
         string ret = ss.str();
         return *rval = c.toval( ret.c_str() );
     }

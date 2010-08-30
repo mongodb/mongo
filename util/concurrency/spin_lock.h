@@ -16,18 +16,18 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CONCURRENCY_SPINLOCK_HEADER
-#define CONCURRENCY_SPINLOCK_HEADER
+#pragma once
+
+#include "pch.h"
+#include "rwlock.h"
 
 namespace mongo {
 
     /**
-     * BIG WARNING - COMPILES, BUT NOT READY FOR USE - BIG WARNING
-     *
-     * The spinlock currently requires late GCC support
-     * routines. Support for other platforms will be added soon.
+     * The spinlock currently requires late GCC support routines to be efficient.
+     * Other platforms default to a mutex implemenation.
      */
-    class SpinLock{
+    class SpinLock {
     public:
         SpinLock();
         ~SpinLock();
@@ -36,7 +36,14 @@ namespace mongo {
         void unlock();
 
     private:
-        bool _locked;
+#if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
+        volatile bool _locked;
+#elif defined(_WIN32)
+        CRITICAL_SECTION _cs;
+#else
+        // default to a scoped mutex if not implemented
+        RWLock _mutex;
+#endif
 
         // Non-copyable, non-assignable
         SpinLock(SpinLock&);
@@ -45,4 +52,3 @@ namespace mongo {
 
 }  // namespace mongo
 
-#endif  // CONCURRENCY_SPINLOCK_HEADER

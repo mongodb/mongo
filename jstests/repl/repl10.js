@@ -34,5 +34,8 @@ doTest = function( signal ) {
     rt.stop();
 }
 
-doTest( 15 ); // SIGTERM
-doTest( 9 );  // SIGKILL
+print("repl10.js dotest(15)");
+doTest(15); // SIGTERM
+print("repl10.js dotest(15)");
+doTest(9);  // SIGKILL
+print("repl10.js SUCCESS");

@@ -25,8 +25,21 @@ namespace mongo {
 
     bool Database::_openAllFiles = false;
 
+    Database::~Database() {
+        magic = 0;
+        btreeStore->closeFiles(name, path);
+        size_t n = files.size();
+        for ( size_t i = 0; i < n; i++ )
+            delete files[i];
+        if( ccByLoc.size() ) { 
+            log() << "\n\n\nWARNING: ccByLoc not empty on database close! " << ccByLoc.size() << ' ' << name << endl;
+        }
+    }
+
     Database::Database(const char *nm, bool& newDb, const string& _path )
-        : name(nm), path(_path), namespaceIndex( path, name ) {
+        : name(nm), path(_path), namespaceIndex( path, name ), 
+          profileName(name + ".system.profile")
+    {
         
         { // check db name is valid
             size_t L = strlen(nm);
@@ -39,7 +52,6 @@ namespace mongo {
         
         newDb = namespaceIndex.exists();
         profile = 0;
-        profileName = name + ".system.profile";
 
         {
             vector<string> others;

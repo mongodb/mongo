@@ -3,18 +3,19 @@
 var forceSeedToBe = null;
 
 if (forceSeedToBe)
-    print("WARNING FORCING A SPECIFIC SEED - TEST WILL RUN DURING DAY");
+    print("\n32bit.js WARNING FORCING A SPECIFIC SEED - TEST WILL RUN DURING DAY");
 
 function f() {
     seed = forceSeedToBe || Math.random();
-
+    
     pass = 1;
 
     var mydb = db.getSisterDB( "test_32bit" );
     mydb.dropDatabase();
 
     while( 1 ) {
-        if( pass == 3 ) break;
+        if( pass >= 2 ) 
+	    break;
         print("32bit.js PASS #" + pass);
         pass++;
         
@@ -41,13 +42,15 @@ function f() {
         
         a = 0;
         c = 'kkk';
+        var start = new Date();
         while( 1 ) { 
 	    b = Math.random(seed);
 	    d = c + -a;
             f = Math.random(seed) + a;
             a++;
 	    cc = big;
-            if( Math.random(seed) < .1 ) cc = null;
+            if( Math.random(seed) < .1 ) 
+		cc = null;
 	    t.insert({a:a,b:b,c:cc,d:d,f:f});
 	    if( Math.random(seed) < 0.01 ) { 
 
@@ -74,13 +77,26 @@ function f() {
                 if( Math.random() < 0.0001 ) { print("update cc"); t.update({c:cc},{'$set':{c:1}},false,true); }
                 if( Math.random() < 0.00001 ) { print("remove e"); t.remove({e:1}); }
 	    }
+	    if (a == 20000 ) {
+		var delta_ms = (new Date())-start;
+		// 2MM / 20000 = 100.  1000ms/sec.
+		var eta_secs = delta_ms * (100 / 1000);
+		print("32bit.js eta_secs:" + eta_secs);
+		if( eta_secs > 1000 ) {
+		    print("32bit.js machine is slow, stopping early. a:" + a);
+		    mydb.dropDatabase();
+		    return;
+		}
+	    }
 	    if( a % 100000 == 0 ) {
 	        print(a);
 	        // on 64 bit we won't error out, so artificially stop.  on 32 bit we will hit mmap limit ~1.6MM but may 
 	        // vary by a factor of 2x by platform
-	        if( a >= 2200000 )
-		    break;
-	    }
+	        if( a >= 2200000 ) {
+                    mydb.dropDatabase();
+		    return;
+		}
+            }
         } 
         print("count: " + t.count());
 
@@ -100,8 +116,13 @@ function f() {
 }
 
 var h = (new Date()).getHours();
-if( forceSeedToBe || h <= 4 || h >= 22 ) {
-    /* this test is slow, so don't run during the day */
-    print("running 32bit.js - this test is slow only runs at night."); 
-    f();
+if (!db._adminCommand("buildInfo").debug) {
+    if (forceSeedToBe || h <= 2 || h >= 22) {
+        /* this test is slow, so don't run during the day */
+        print("\n32bit.js running - this test is slow so only runs at night.");
+        f();
+    }
+}
+else {
+    print("32bit.js skipping this test - debug server build would be too slow");
 }

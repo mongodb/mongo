@@ -113,14 +113,30 @@ doTest = function (signal) {
     print("\nsync1.js ********************************************************************** part 9.1");
 
     count = 0;
+    countExceptions = 0;
     do {
         try {
             max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
             max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
         }
         catch (e) {
+            if (countExceptions++ > 300) {
+                print("dbs[1]:");
+                try {
+                    printjson(dbs[1].isMaster());
+                    printjson(dbs[1].bar.count());
+                }
+                catch (e) { print(e); }
+                print("dbs[2]:");
+                try {
+                    printjson(dbs[2].isMaster());
+                    printjson(dbs[2].bar.count());
+                }
+                catch (e) { print(e); }
+                assert(false, "sync1.js too many exceptions, failing");
+            }
             print("\nsync1.js: exception querying; will sleep and try again " + e);
-            sleep(2000);
+            sleep(3000);
             continue;
         }
 
@@ -140,8 +156,7 @@ doTest = function (signal) {
         }
     } while (max1.z != max2.z);
 
-    // okay, now they're caught up.  We have a max:
-    var max = max1.z;
+    // okay, now they're caught up.  We have a max: max1.z
 
     print("\nsync1.js ********************************************************************** part 10");
 
@@ -152,7 +167,6 @@ doTest = function (signal) {
     printjson(result);
     sleep(5000);
 
-    // FAIL! This never resyncs
     // now this should resync
     print("\nsync1.js ********************************************************************** part 11");
     var max0 = null;
@@ -160,6 +174,7 @@ doTest = function (signal) {
     do {
         try {
             max0 = dbs[0].bar.find().sort({ z: -1 }).limit(1).next();
+            max1 = dbs[1].bar.find().sort({ z: -1 }).limit(1).next();
         }
         catch (e) {
             print("\nsync1.js part 11 exception on bar.find() will sleep and try again " + e);
@@ -167,22 +182,24 @@ doTest = function (signal) {
             continue;
         }
 
-        printjson(max);
-        printjson(max0);
-        print("\nsync1.js part 11 waiting for match " + count + " " + Date() + " z[0]:" + max0.z + " z:" + max);
+        print("part 11");
+        if (max0) {
+            print("max0.z:" + max0.z);
+            print("max1.z:" + max1.z);
+        }
 
         sleep(2000);
 
         count++;
         if (count == 100) {
-            pause("fail part 11");
+            pause("FAIL part 11");
             assert(false, "replsets/\nsync1.js fails timing out");
             replTest.stopSet(signal);
             return;
         }
-        print("||||| count:" + count);
-        printjson(max0);
-    } while (!max0 || max0.z != max);
+        //print("||||| count:" + count);
+        //printjson(max0);
+    } while (!max0 || max0.z != max1.z);
 
     print("\nsync1.js ********************************************************************** part 12");
     pause("\nsync1.js success");

@@ -28,7 +28,7 @@ function wait(f) {
     var n = 0;
     while (!f()) {
         if( n % 4 == 0 )
-            print("waiting " + w);
+            print("rollback.js waiting " + w);
         if (++n == 4) {
             print("" + f);
         }
@@ -147,8 +147,9 @@ doTest = function (signal) {
 
     friendlyEqual(a.bar.find().sort({ _id: 1 }).toArray(), b.bar.find().sort({ _id: 1 }).toArray(), "server data sets do not match");
 
-    pause("SUCCESS");
+    pause("rollback.js SUCCESS");
     replTest.stopSet(signal);
 }
 
+print("rollback.js");
 doTest( 15 );

@@ -1210,6 +1210,46 @@ Geo.distance = function( a , b ){
                       Math.pow( bx - ax , 2 ) );
 }
 
+Geo.sphereDistance = function( a , b ){
+    var ax = null;
+    var ay = null;
+    var bx = null;
+    var by = null;
+    
+    // TODO swap order of x and y when done on server
+    for ( var key in a ){
+        if ( ax == null )
+            ax = a[key] * (Math.PI/180);
+        else if ( ay == null )
+            ay = a[key] * (Math.PI/180);
+    }
+    
+    for ( var key in b ){
+        if ( bx == null )
+            bx = b[key] * (Math.PI/180);
+        else if ( by == null )
+            by = b[key] * (Math.PI/180);
+    }
+
+    var sin_x1=Math.sin(ax), cos_x1=Math.cos(ax);
+    var sin_y1=Math.sin(ay), cos_y1=Math.cos(ay);
+    var sin_x2=Math.sin(bx), cos_x2=Math.cos(bx);
+    var sin_y2=Math.sin(by), cos_y2=Math.cos(by);
+
+    var cross_prod = 
+        (cos_y1*cos_x1 * cos_y2*cos_x2) +
+        (cos_y1*sin_x1 * cos_y2*sin_x2) +
+        (sin_y1        * sin_y2);
+
+    if (cross_prod >= 1 || cross_prod <= -1){
+        // fun with floats
+        assert( Math.abs(cross_prod)-1 < 1e-6 );
+        return cross_prod > 0 ? 0 : Math.PI;
+    }
+
+    return Math.acos(cross_prod);
+}
+
 rs = function () { return "try rs.help()"; }
 
 rs.help = function () {
@@ -1220,6 +1260,7 @@ rs.help = function () {
     print("\trs.add(membercfgobj)            add a new member to the set with extra attributes");
     print("\trs.addArb(hostportstr)          add a new member which is arbiterOnly:true");
     print("\trs.stepDown()                   step down as primary (momentarily)");
+    print("\trs.remove(hostportstr)          remove a host from the replica set");
     print("\trs.conf()                       return configuration from local.system.replset");
     print("\trs.slaveOk()                    shorthand for db.getMongo().setSlaveOk()");
     print();
@@ -1253,6 +1294,23 @@ rs.add = function (hostport, arb) {
 rs.stepDown = function () { return db._adminCommand({ replSetStepDown:true}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
+
+rs.remove = function (hn) { 
+    var local = db.getSisterDB("local");
+    assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
+    var c = local.system.replset.findOne();
+    assert(c, "no config object retrievable from local.system.replset");
+    c.version++;
+
+    for (var i in c.members) {
+        if (c.members[i].host == hn) {
+            c.members.splice(i, 1);
+            return db._adminCommand({ replSetReconfig : c});
+        }
+    }
+
+    return "error: couldn't find "+hn+" in "+tojson(c.members);
+};
 
 help = shellHelper.help = function (x) {
     if (x == "connect") {
