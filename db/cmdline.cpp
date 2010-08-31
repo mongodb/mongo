@@ -45,7 +45,7 @@ namespace mongo {
             ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
             ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
             ("logappend" , "append to logpath instead of over-writing" )
-            ("pidfilepath", po::value<string>(), "directory for pidfile (if not set, no pidfile is created)")
+            ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
 #ifndef _WIN32
             ("fork" , "fork server process" )
 #endif
