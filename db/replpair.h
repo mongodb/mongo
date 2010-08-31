@@ -164,7 +164,7 @@ namespace mongo {
         if( replSet ) {
             /* todo: speed up the secondary case.  as written here there are 2 mutex entries, it can be 1. */
             if( isMaster() ) return;
-            notMasterUnless( pq.hasOption(QueryOption_SlaveOk) && theReplSet->isSecondary() );
+            notMasterUnless( pq.hasOption(QueryOption_SlaveOk) && theReplSet && theReplSet->isSecondary() );
         } else {
             notMasterUnless(isMaster() || pq.hasOption(QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
         }
