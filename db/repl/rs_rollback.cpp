@@ -167,12 +167,13 @@ namespace mongo {
                     return;
                 }
                 else if( cmdname == "dropDatabase" ) { 
-                    log() << "replSet ERROR rollback : can't rollback drop database full resync will be required" << rsLog;
+                    log() << "replSet error rollback : can't rollback drop database full resync will be required" << rsLog;
                     log() << "replSet " << o.toString() << rsLog;
                     throw rsfatal();
                 }
                 else { 
-                    log() << "replSet ERROR can't rollback this command yet: " << o.toString() << rsLog;
+                    log() << "replSet error can't rollback this command yet: " << o.toString() << rsLog;
+                    log() << "replSet cmdname=" << cmdname << rsLog;
                     throw rsfatal();
                 }
             }
