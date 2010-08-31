@@ -189,7 +189,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype() const { return WRITE; } 
+        virtual LockType locktype() const { return NONE; } 
         virtual void help( stringstream& help ) const {
             help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
         }
@@ -199,8 +199,12 @@ namespace mongo {
             if ( c ) {
                 c->shutdown();
             }
+            
             log() << "terminating, shutdown command received" << endl;
+
+            dblock l;
             dbexit( EXIT_CLEAN ); // this never returns
+            assert(0);
             return true;
         }
     } cmdShutdown;
