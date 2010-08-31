@@ -648,10 +648,10 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "create a collection";
         }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
             string err;
-            bool ok = userCreateNS(ns.c_str(), cmdObj, err, true);
+            bool ok = userCreateNS(ns.c_str(), cmdObj, err, ! fromRepl );
             if ( !ok && !err.empty() )
                 errmsg = err;
             return ok;
