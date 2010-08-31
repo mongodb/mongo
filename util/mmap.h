@@ -180,6 +180,10 @@ namespace mongo {
         long len;
         string _filename;
 
+#ifdef _WIN32
+        boost::shared_ptr<mutex> _flushMutex;
+#endif
+
     protected:
         // only posix mmap implementations will support this
         virtual void _lock();

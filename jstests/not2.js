@@ -97,7 +97,7 @@ indexed = function( query, min, max ) {
         assert.eq( exp.indexBounds[ i ][0][0], min );        
     }
     for( i in exp.indexBounds ) {
-        assert.eq( exp.indexBounds[ i ][0][1], max );
+        assert.eq( exp.indexBounds[ i ][exp.indexBounds[ i ].length - 1][1], max );
     }
 }
 
@@ -109,7 +109,7 @@ not = function( query ) {
 }
 
 indexed( {i:1}, 1, 1 );
-not( {i:{$ne:1}} );
+indexed( {i:{$ne:1}}, {$minElement:1}, {$maxElement:1} );
 
 indexed( {i:{$not:{$ne:"a"}}}, "a", "a" );
 not( {i:{$not:/^a/}} );
@@ -138,5 +138,6 @@ not( {i:{$not:{$in:[1]}}} );
 t.drop();
 t.ensureIndex( {"i.j":1} );
 indexed( {i:{$elemMatch:{j:1}}}, 1, 1 );
+//indexed( {i:{$not:{$elemMatch:{j:1}}}}, {$minElement:1}, {$maxElement:1} );
 not( {i:{$not:{$elemMatch:{j:1}}}} );
 indexed( {i:{$not:{$elemMatch:{j:{$ne:1}}}}}, 1, 1 );

@@ -653,6 +653,11 @@ namespace mongo {
                 incRBID(); throw;
             }
             incRBID();
+
+            /* success - leave "ROLLBACK" state 
+               can go to SECONDARY once minvalid is achieved
+            */
+            box.change(MemberState::RS_RECOVERING, _self);
         }
 
         return 0;

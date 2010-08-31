@@ -89,7 +89,8 @@ namespace mongo {
         bool nontrivial() const {
             return
                 ! empty() && 
-                ( minKey.firstElement().woCompare( min(), false ) != 0 ||
+                ( _intervals.size() != 1 ||
+                  minKey.firstElement().woCompare( min(), false ) != 0 ||
                   maxKey.firstElement().woCompare( max(), false ) != 0 );
         }
         bool empty() const { return _intervals.empty(); }
@@ -220,9 +221,10 @@ namespace mongo {
         }
         int nNontrivialRanges() const {
             int count = 0;
-            for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i )
+            for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
                 if ( i->second.nontrivial() )
                     ++count;
+            }
             return count;
         }
         const char *ns() const { return _ns; }

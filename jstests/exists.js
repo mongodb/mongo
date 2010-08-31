@@ -25,7 +25,7 @@ function dotest( n ){
     assert.eq( 3, t.count( {'a.b': {$exists:true}} ) , n );
     assert.eq( 2, t.count( {'a.b.c': {$exists:true}} ) , n );
     assert.eq( 1, t.count( {'a.b.c.d': {$exists:true}} ) , n );
-    
+
     assert.eq( 1, t.count( {a: {$exists:false}} ) , n );
     assert.eq( 2, t.count( {'a.b': {$exists:false}} ) , n );
     assert.eq( 3, t.count( {'a.b.c': {$exists:false}} ) , n );
@@ -38,6 +38,7 @@ t.ensureIndex( { "a.b" : 1 } )
 t.ensureIndex( { "a.b.c" : 1 } )
 t.ensureIndex( { "a.b.c.d" : 1 } )
 dotest( "after index" )
+assert.eq( 1, t.find( {a: {$exists:false}} ).hint( {a:1} ).itcount() );
     
 t.drop();
 

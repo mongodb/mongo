@@ -26,10 +26,9 @@ doTest = function( signal ) {
     am.save( {i:2} );
     assert.eq( 2, am.count() );
     sleep( 3000 );
-    
-    rt.stop( true, signal );
-    sleep( 3000 );
     assert.eq( 1, s.getDB( baseName ).a.count() );
+
+    soonCount( 2 );
 
     rt.stop();
 }
