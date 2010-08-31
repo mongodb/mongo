@@ -19,25 +19,3 @@ e = t.find( { a: { $gt: -1, $lt: 1, $ne: 0 } } ).explain();
 assert.eq( "BtreeCursor a_1 multi", e.cursor );
 assert.eq( { a: [ [ -1, 0 ], [ 0, 1 ] ] }, e.indexBounds );
 assert.eq( 3, e.nscanned );
-
-//e = t.find( { a: { $not: { $all: [0]  }} } ).explain( true );
-//assert.eq( "BtreeCursor a_1 multi", e.cursor );
-//assert.eq( 0, e.indexBounds.a[ 0 ][ 1 ] );
-//assert.eq( 0, e.indexBounds.a[ 1 ][ 0 ] );
-//assert.eq( 3, e.nscanned );
-//
-//e = t.find( { a: { $gt: -1, $lt: 1, $not: { $all: [ 0 ] } } } ).explain();
-//assert.eq( "BtreeCursor a_1 multi", e.cursor );
-//assert.eq( { a: [ [ -1, 0 ], [ 0, 1 ] ] }, e.indexBounds );
-//assert.eq( 3, e.nscanned );
-//
-//e = t.find( { a: { $nin: [ 0 ] } } ).explain( true );
-//assert.eq( "BtreeCursor a_1 multi", e.cursor );
-//assert.eq( 0, e.indexBounds.a[ 0 ][ 1 ] );
-//assert.eq( 0, e.indexBounds.a[ 1 ][ 0 ] );
-//assert.eq( 3, e.nscanned );
-//
-//e = t.find( { a: { $gt: -1, $lt: 1, $nin: [ 0 ] } } ).explain();
-//assert.eq( "BtreeCursor a_1 multi", e.cursor );
-//assert.eq( { a: [ [ -1, 0 ], [ 0, 1 ] ] }, e.indexBounds );
-//assert.eq( 3, e.nscanned );

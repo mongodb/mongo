@@ -181,10 +181,12 @@ namespace mongo {
 
         if ( e.eoo() )
             return;
+        int op = e.getGtLtOp();
         if ( e.type() == RegEx
              || (e.type() == Object && !e.embeddedObject()["$regex"].eoo())
            )
         {
+            uassert( 13454, "invalid regular expression operator", op == BSONObj::Equality || op == BSONObj::opREGEX );
             if ( !isNot ) { // no optimization for negated regex - we could consider creating 2 intervals comprising all nonmatching prefixes
                 const string r = simpleRegex(e);
                 if ( r.size() ) {
@@ -216,7 +218,6 @@ namespace mongo {
             }
             return;
         }
-        int op = e.getGtLtOp();
         if ( isNot ) {
             switch( op ) {
                 case BSONObj::Equality:
