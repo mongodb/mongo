@@ -62,7 +62,7 @@ namespace mongo {
         strings = backtrace_symbols(b, size);
         for (i = 0; i < size; i++)
             o << ' ' << strings[i] << '\n';
-
+        o.flush();
         free (strings);
     }
 #else
