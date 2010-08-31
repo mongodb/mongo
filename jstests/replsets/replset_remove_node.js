@@ -59,4 +59,6 @@ doTest = function( signal ) {
     }, "Wrong number of members", 60000);
 }
 
-doTest( 15 );
+print("replset_remove_node.js");
+doTest(15);
+print("replset_remove_node SUCCESS");
