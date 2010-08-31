@@ -219,12 +219,24 @@ namespace mongo {
         staticShardInfo.remove( name );
     }
 
-    Shard Shard::pick(){
+    Shard Shard::pick( const Shard& exclude ){
         vector<Shard> all;
         staticShardInfo.getAllShards( all );
         if ( all.size() == 0 ){
             staticShardInfo.reload();
             staticShardInfo.getAllShards( all );
+            if ( all.size() == 0 )
+                return EMPTY;
+        }
+        
+        // if provided, do not consider the 'exclude' shard as a viable candidate
+        if ( exclude != EMPTY ){
+            for ( vector<Shard>::iterator it= all.begin() ; it != all.end() ; ++it ){
+                if ( exclude == *it ){
+                    all.erase( it );
+                    break;
+                }
+            }
             if ( all.size() == 0 )
                 return EMPTY;
         }
