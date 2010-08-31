@@ -689,7 +689,14 @@ namespace mongo {
     }
 
     /* not using log() herein in case we are already locked */
-    void dbexit( ExitCode rc, const char *why) {        
+    void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {        
+        
+        auto_ptr<writelocktry> wlt;
+        if ( tryToGetLock ){
+            wlt.reset( new writelocktry( "" , 2 * 60 * 1000 ) );
+            uassert( 13455 , "dbexit timed out getting lock" , wlt->got() );
+        }
+        
         Client * c = currentClient.get();
         {
             scoped_lock lk( exitMutex );

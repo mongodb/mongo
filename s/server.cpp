@@ -308,8 +308,11 @@ int main(int argc, char* argv[], char *envp[] ) {
 }
 
 #undef exit
-void mongo::dbexit( ExitCode rc, const char *why) {
+void mongo::dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
     dbexitCalled = true;
-    log() << "dbexit: " << why << " rc:" << rc << endl;
+    log() << "dbexit: " << why 
+          << " rc:" << rc 
+          << " " << ( why ? why : "" )
+          << endl;
     ::exit(rc);
 }

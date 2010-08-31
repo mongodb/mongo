@@ -126,7 +126,7 @@ namespace mongo {
 
     };
 
-    void dbexit( ExitCode returnCode, const char *whyMsg = "");
+    void dbexit( ExitCode returnCode, const char *whyMsg = "", bool tryToGetLock = false);
 
     /**
        this is here so you can't just type exit() to quit the program

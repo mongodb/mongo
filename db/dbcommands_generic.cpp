@@ -202,8 +202,7 @@ namespace mongo {
             
             log() << "terminating, shutdown command received" << endl;
 
-            dblock l;
-            dbexit( EXIT_CLEAN ); // this never returns
+            dbexit( EXIT_CLEAN , "shutdown called" , true ); // this never returns
             assert(0);
             return true;
         }

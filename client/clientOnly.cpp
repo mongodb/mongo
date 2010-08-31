@@ -29,7 +29,7 @@ namespace mongo {
 
     bool dbexitCalled = false;
 
-    void dbexit( ExitCode returnCode, const char *whyMsg ) {
+    void dbexit( ExitCode returnCode, const char *whyMsg , bool tryToGetLock ) {
         dbexitCalled = true;
         out() << "dbexit called" << endl;
         if ( whyMsg )
