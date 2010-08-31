@@ -196,8 +196,9 @@ namespace mongo {
         CmdShutdown() : Command("shutdown") {}
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Client * c = currentClient.get();
-            if ( c )
+            if ( c ) {
                 c->shutdown();
+            }
             log() << "terminating, shutdown command received" << endl;
             dbexit( EXIT_CLEAN ); // this never returns
             return true;
