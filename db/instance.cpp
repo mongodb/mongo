@@ -724,7 +724,7 @@ namespace mongo {
         }
         catch (...) { }
         
-        tryToOutputFatal( "dbexit: really exiting now\n" );
+        tryToOutputFatal( "dbexit: really exiting now" );
         if ( c ) c->shutdown();
         ::exit(rc);
     }
