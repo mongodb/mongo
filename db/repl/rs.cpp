@@ -68,8 +68,8 @@ namespace mongo {
             changeState(MemberState::RS_RECOVERING);
             
             /* close sockets that were talking to us */
-            log() << "replSet closing sockets after reqlinquishing primary" << rsLog;
-            MessagingPort::closeAllSockets(1);
+            /*log() << "replSet closing sockets after reqlinquishing primary" << rsLog;
+            MessagingPort::closeAllSockets(1);*/
 
             // todo: >
             //changeState(MemberState::RS_SECONDARY);
