@@ -201,10 +201,12 @@ namespace mongo {
                     if ( x == ECONNABORTED || x == EBADF ) {
                         log() << "Listener on port " << _port << " aborted" << endl;
                         return;
-                    } if ( x == 0 && inShutdown() ){
+                    } 
+                    if ( x == 0 && inShutdown() ) {
                         return;   // socket closed
                     }
-                    log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x) << endl;
+                    if( !inShutdown() )
+                        log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x) << endl;
                     continue;
                 } 
                 if (from.getType() != AF_UNIX)
