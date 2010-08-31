@@ -212,7 +212,7 @@ def check_db_hashes(master, slave):
         raise(Bug("slave instance doesn't have slave attribute set"))
 
     print "waiting for slave to catch up..."
-    argv = [shell_executable, "--port", str(slave.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 120000) );']
+    argv = [shell_executable, "--port", str(master.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 120000) );']
     res = Popen(argv, stdout=PIPE).communicate()
     print "wait result: " + str( res[0] ) + "\t" + str( res[1] )
 
