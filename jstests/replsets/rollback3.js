@@ -5,7 +5,7 @@
 //   mongo --nodb rollback.js | tee out | grep -v ^m31
 //
 
-var debugging = 1;
+var debugging = 0;
 
 function pause(s) {
     print(s);
