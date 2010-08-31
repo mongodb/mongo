@@ -213,8 +213,8 @@ def check_db_hashes(master, slave):
 
     print "waiting for slave to catch up..."
     argv = [shell_executable, "--port", str(slave.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 120000) );']
-    res = Popen(argv, stdout=PIPE).wait() #.communicate()[0]
-    print res
+    res = Popen(argv, stdout=PIPE).communicate()
+    print "wait result: " + str( res[0] ) + "\t" + str( res[1] )
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
