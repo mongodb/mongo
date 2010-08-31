@@ -266,7 +266,7 @@ namespace mongo {
             loadLastOpTimeWritten();
         }
         catch(std::exception& e) { 
-            log() << "replSet ERROR FATAL couldn't query the local " << rsoplog << " collection.  Terminating mongod after 30 seconds." << rsLog;
+            log() << "replSet error fatal couldn't query the local " << rsoplog << " collection.  Terminating mongod after 30 seconds." << rsLog;
             log() << e.what() << rsLog;
             sleepsecs(30);
             dbexit( EXIT_REPLICATION_ERROR );
