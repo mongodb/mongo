@@ -66,6 +66,12 @@ namespace mongo {
         if( box.getState().primary() ) {
             log() << "replSet relinquishing primary state" << rsLog;
             changeState(MemberState::RS_RECOVERING);
+            
+            /* close sockets that were talking to us */
+            log() << "replSet closing sockets after reqlinquishing primary" << rsLog;
+            MessagingPort::closeAllSockets(1);
+
+            // todo: >
             //changeState(MemberState::RS_SECONDARY);
         }
         else if( box.getState().startup2() ) {

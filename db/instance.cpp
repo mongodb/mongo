@@ -62,7 +62,6 @@ namespace mongo {
     bool useCursors = true;
     bool useHints = true;
     
-    void closeAllSockets();
     void flushOpLog( stringstream &ss ) {
         if( _diaglog.f && _diaglog.f->is_open() ) {
             ss << "flushing op log and files\n";
@@ -742,7 +741,7 @@ namespace mongo {
 
         /* must do this before unmapping mem or you may get a seg fault */
         log() << "shutdown: going to close sockets..." << endl;
-        boost::thread close_socket_thread(closeAllSockets);
+        boost::thread close_socket_thread( boost::bind(MessagingPort::closeAllSockets, 0) );
 
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
