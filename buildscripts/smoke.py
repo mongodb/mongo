@@ -219,7 +219,7 @@ def check_db_hashes(master, slave):
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
-        mongod.dict = Connection(port=mongod.port).test.command("dbhash")["collections"]
+        mongod.dict = Connection(port=mongod.port, slave_okay=True).test.command("dbhash")["collections"]
 
     global lost_in_slave, lost_in_master, screwy_in_slave, replicated_dbs
 
