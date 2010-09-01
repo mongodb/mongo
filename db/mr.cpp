@@ -105,6 +105,7 @@ namespace mongo {
 
 
             if ( finalize ){
+                Scope::NoDBAccess no = s->disableDBAccess( "can't access db inside finalize" );
                 BSONObjBuilder b(endSizeEstimate);
                 b.appendAs( key.firstElement() , "_id" );
                 s->append( b , "value" , "return" );
