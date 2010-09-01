@@ -49,8 +49,6 @@ from subprocess import (Popen,
 import sys
 import time
 
-from pymongo import Connection
-
 import utils
 
 # TODO clean this up so we don't need globals...
@@ -161,12 +159,11 @@ class mongod(object):
             raise Exception("Failed to start mongod")
 
         if self.slave:
-            local = Connection(port=self.port).local
-            synced = False
-            while not synced:
-                synced = True
-                for source in local.sources.find(fields=["syncedTo"]):
-                    synced = synced and "syncedTo" in source and source["syncedTo"]
+            while True:
+                argv = [shell_executable, "--port", str(self.port), "--quiet", "--eval", 'db.printSlaveReplicationInfo()']
+                res = Popen(argv, stdout=PIPE).communicate()[0]
+                if res.find('initial sync') < 0:
+                    break
 
     def stop(self):
         if not self.proc:
@@ -214,12 +211,17 @@ def check_db_hashes(master, slave):
     if not slave.slave:
         raise(Bug("slave instance doesn't have slave attribute set"))
 
-    print "waiting for slave to catch up, result:"
-    print Connection(port=master.port).test.smokeWait.insert({}, w=2, wtimeout=120000)
+    print "waiting for slave to catch up..."
+    argv = [shell_executable, "--port", str(master.port), "--quiet", "--eval", 'db.smokeWait.insert( {} ); printjson( db.getLastErrorCmd(2, 120000) );']
+    res = Popen(argv, stdout=PIPE).communicate()
+    print "wait result: " + str( res[0] ) + "\t" + str( res[1] )
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
-        mongod.dict = Connection(port=mongod.port).test.command("dbhash")["collections"]
+        argv = [shell_executable, "--port", str(mongod.port), "--quiet", "--eval", "x=db.runCommand('dbhash'); printjson(x.collections)"]
+        hashstr = Popen(argv, stdout=PIPE).communicate()[0]
+        # WARNING FIXME KLUDGE et al.: this is sleazy and unsafe.
+        mongod.dict = eval(hashstr)
 
     global lost_in_slave, lost_in_master, screwy_in_slave, replicated_dbs
 
