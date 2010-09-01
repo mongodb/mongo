@@ -161,7 +161,7 @@ class mongod(object):
             raise Exception("Failed to start mongod")
 
         if self.slave:
-            local = Connection(port=self.port).local
+            local = Connection(port=self.port, slave_okay=True).local
             synced = False
             while not synced:
                 synced = True
