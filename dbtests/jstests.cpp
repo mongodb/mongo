@@ -938,6 +938,27 @@ namespace JSTests {
         }
     };
 
+    class RenameTest {
+    public:
+        void run(){
+            auto_ptr<Scope> s;
+            s.reset( globalScriptEngine->newScope() );
+            
+            s->setNumber( "x" , 5 );
+            ASSERT_EQUALS( 5 , s->getNumber( "x" ) );
+            ASSERT_EQUALS( Undefined , s->type( "y" ) );
+            
+            s->rename( "x" , "y" );
+            ASSERT_EQUALS( 5 , s->getNumber( "y" ) );
+            ASSERT_EQUALS( Undefined , s->type( "x" ) );
+
+            s->rename( "y" , "x" );
+            ASSERT_EQUALS( 5 , s->getNumber( "x" ) );
+            ASSERT_EQUALS( Undefined , s->type( "y" ) );
+        }
+    };
+            
+
     class All : public Suite {
     public:
         All() : Suite( "js" ) {
@@ -960,7 +981,8 @@ namespace JSTests {
             add< TypeConservation >();
             add< NumberLong >();
             add< NumberLong2 >();
-            
+            add< RenameTest >();
+
             add< WeirdObjects >();
             add< CodeTests >();
             add< DBRefTest >();
