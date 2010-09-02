@@ -1528,6 +1528,18 @@ namespace mongo {
             case BSONObj::opNEAR: {
                 BSONObj n = e.embeddedObject();
                 e = n.firstElement();
+
+                const char* suffix = e.fieldName() + 5; // strlen("$near") == 5;
+                GeoDistType type;
+                if (suffix[0] == '\0') {
+                    type = GEO_PLAIN;
+                } else if (strcmp(suffix, "Sphere") == 0) {
+                    type = GEO_SPHERE;
+                } else {
+                    uassert(13454, string("invalid $near search type: ") + e.fieldName(), false);
+                    type = GEO_PLAIN; // prevents uninitialized warning
+                }
+
                 double maxDistance = numeric_limits<double>::max();
                 if ( e.isABSONObj() && e.embeddedObject().nFields() > 2 ){
                     BSONObjIterator i(e.embeddedObject());
@@ -1542,7 +1554,7 @@ namespace mongo {
                     if ( e.isNumber() )
                         maxDistance = e.numberDouble();
                 }
-                shared_ptr<GeoSearch> s( new GeoSearch( this , _tohash(e) , numWanted , query , maxDistance ) );
+                shared_ptr<GeoSearch> s( new GeoSearch( this , _tohash(e) , numWanted , query , maxDistance, type ) );
                 s->exec();
                 shared_ptr<Cursor> c;
                 c.reset( new GeoSearchCursor( s ) );

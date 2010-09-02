@@ -282,7 +282,7 @@ namespace mongo {
             else if ( fn[1] == 'n' && fn[2] == 'e' ){
                 if ( fn[3] == 0 )
                     return BSONObj::NE;
-                if ( fn[3] == 'a' && fn[4] == 'r' && fn[5] == 0 )
+                if ( fn[3] == 'a' && fn[4] == 'r') // matches anything with $near prefix
                     return BSONObj::opNEAR;
             }
             else if ( fn[1] == 'm' ){
