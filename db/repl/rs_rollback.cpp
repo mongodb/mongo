@@ -431,6 +431,7 @@ namespace mongo {
                    log() << "replSet error rolling back : " << err << ". A full resync will be necessary." << rsLog;
                    /* todo: reset minvalid so that we are permanently in fatal state */
                    /* todo: don't be fatal, but rather, get all the data first. */
+                   sethbmsg("rollback error");
                    throw rsfatal();
                }
            }
@@ -648,6 +649,11 @@ namespace mongo {
             incRBID();
             try { 
                 syncFixUp(how, r);
+            }
+            catch( rsfatal& ) { 
+                sethbmsg("rollback fixup error");
+                _fatal();
+                return 2;
             }
             catch(...) { 
                 incRBID(); throw;

@@ -206,7 +206,7 @@ namespace mongo {
         }
         void noteRemoteIsPrimary(const Member *remote) { 
             scoped_lock lk(m);
-            if( !sp.state.secondary() )
+            if( !sp.state.secondary() && !sp.state.fatal() )
                 sp.state = MemberState::RS_RECOVERING;
             sp.primary = remote;
         }

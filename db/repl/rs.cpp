@@ -493,6 +493,7 @@ namespace mongo {
                 startupStatusMsg = "replSet error loading set config (BADCONFIG)";
                 log() << "replSet error loading configurations " << e.toString() << rsLog;
                 log() << "replSet error replication will not start" << rsLog;
+                sethbmsg("error loading set config");
                 _fatal();
                 throw;
             }
@@ -506,8 +507,8 @@ namespace mongo {
     { 
         //lock l(this);
         box.set(MemberState::RS_FATAL, 0);
-        sethbmsg("fatal error");
-        log() << "replSet error fatal error, stopping replication" << rsLog; 
+        //sethbmsg("fatal error");
+        log() << "replSet error fatal, stopping replication" << rsLog; 
     }
 
     void ReplSet::haveNewConfig(ReplSetConfig& newConfig, bool addComment) { 
