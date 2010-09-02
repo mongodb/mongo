@@ -256,20 +256,15 @@ namespace mongo {
         void endOldHealthTasks();
         void startHealthTaskFor(Member *m);
 
-    private:
         Consensus elect;
-        bool ok() const { return !box.getState().fatal(); }
-
         void relinquish();
         void forgetPrimary();
-
     protected:
         bool _stepDown();
     private:
         void assumePrimary();
         void loadLastOpTimeWritten();
         void changeState(MemberState s);
-
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm" 
