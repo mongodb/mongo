@@ -67,7 +67,8 @@ namespace mongo {
 
     inline double computeXScanDistance(double y, double maxDistDegrees){
         // TODO: this overestimates for large madDistDegrees far from the equator
-        return maxDistDegrees / min(cos(deg2rad(y + maxDistDegrees)), cos(deg2rad(y - maxDistDegrees)));
+        return maxDistDegrees / min(cos(deg2rad(min(+89.0, y + maxDistDegrees))), 
+                                    cos(deg2rad(max(-89.0, y - maxDistDegrees))));
     }
 
     GeoBitSets geoBitSets;
@@ -920,26 +921,31 @@ namespace mongo {
             {
                 // 2
                 double farthest = hopper->farthest();
+                GEODEBUGPRINT(hopper->farthest());
                 if (farthest == -1){
                     // Nothing found in Phase 1
                     farthest = _scanDistance;
                 } else if (_type == GEO_SPHERE) {
                     farthest = std::min(_scanDistance, computeXScanDistance(_startPt._y, rad2deg(farthest)));
                 }
+                GEODEBUGPRINT(farthest);
 
                 Box want( _startPt._x - farthest , _startPt._y - farthest , farthest * 2 );
+                GEODEBUGPRINT(want.toString());
 
                 _prefix = _start;
                 while (_prefix.constrains() && _spec->sizeEdge( _prefix ) < farthest ){
                     _prefix = _prefix.up();
                 }
 
-                if (!_prefix.constrains()){
+                PREFIXDEBUG(_prefix, _spec);
+
+                if (_prefix.getBits() <= 1){
                     // TODO consider walking in $natural order
 
-                    while ( min.advance( -1 , _found , hopper ) )
+                    while ( min.checkCur(_found, hopper) && min.advance(-1, _found, NULL) )
                         _nscanned++;
-                    while ( max.advance( 1 , _found , hopper ) )
+                    while ( max.checkCur(_found, hopper) && max.advance(+1, _found, NULL) )
                         _nscanned++;
 
                     GEODEBUG( "done search after scanning whole collection" )
@@ -955,7 +961,7 @@ namespace mongo {
                     for ( int y=-1; y<=1; y++ ){
                         GeoHash toscan = _prefix;
                         toscan.move( x , y );
-                        
+
                         // 3 & 4
                         doBox( id , want , toscan );
                     }
