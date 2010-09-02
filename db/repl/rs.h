@@ -357,9 +357,10 @@ namespace mongo {
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }
+
         void fatal() { _fatal(); }
-        bool isPrimary();
-        bool isSecondary();
+        bool isPrimary() { return box.getState().primary(); }
+        bool isSecondary() {  return box.getState().secondary(); }
         MemberState state() const { return ReplSetImpl::state(); }
         string name() const { return ReplSetImpl::name(); }
         const ReplSetConfig& config() { return ReplSetImpl::config(); }
@@ -419,15 +420,6 @@ namespace mongo {
     { 
         if( self )
             _hbinfo.health = 1.0;
-    }
-
-    inline bool ReplSet::isPrimary() {         
-        /* todo replset */
-        return box.getState().primary();
-    }
-
-    inline bool ReplSet::isSecondary() { 
-      return box.getState().secondary();
     }
 
 }
