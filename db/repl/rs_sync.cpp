@@ -350,6 +350,10 @@ namespace mongo {
             sleepsecs(1);
             return;
         }
+        if( sp.state.fatal() ) { 
+            sleepsecs(5);
+            return;
+        }
 
         /* later, we can sync from up secondaries if we want. tbd. */
         if( sp.primary == 0 )
