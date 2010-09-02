@@ -214,8 +214,9 @@ def check_db_hashes(master, slave):
     if not slave.slave:
         raise(Bug("slave instance doesn't have slave attribute set"))
 
-    print "waiting for slave to catch up, result:"
-    print Connection(port=master.port).test.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
+    print "waiting for slave to catch up"
+    Connection(port=master.port).test.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
+    print "caught up!"
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
