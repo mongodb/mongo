@@ -249,6 +249,11 @@ namespace mongo {
             b.move( 1 , 1 );
             unhash( a, ax, ay );
             unhash( b, bx, by );
+
+            // _min and _max are a singularity
+            if (bx == _min)
+                bx = _max;
+
             return (fabs(ax-bx));
         }
 
@@ -978,15 +983,21 @@ namespace mongo {
                 for ( int i=0; i<depth; i++ )
                     cout << "\t";
                 cout << " doBox: " << testBox.toString() << "\t" << toscan.toString() << " scanned so far: " << _nscanned << endl;
+            } else {
+                GEODEBUGPRINT(testBox.toString());
             }
 
-            if (_alreadyScanned.contains(testBox, _spec->_error))
+            if (_alreadyScanned.contains(testBox, _spec->_error)){
+                GEODEBUG("skipping box: already scanned");
                 return; // been here, done this
+            }
 
             double intPer = testBox.intersects( want );
             
-            if ( intPer <= 0 )
+            if ( intPer <= 0 ){
+                GEODEBUG("skipping box: not in want");
                 return;
+            }
             
             bool goDeeper = intPer < .5 && depth < 2;
 
