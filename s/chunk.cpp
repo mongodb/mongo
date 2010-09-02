@@ -841,7 +841,7 @@ namespace mongo {
         
         DistributedLock lockSetup( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , getns() );
         dist_lock_try dlk( &lockSetup  , "drop" );
-        uassert( 13331 ,  "locking namespace failed" , dlk.got() );
+        uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );
         
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
         
