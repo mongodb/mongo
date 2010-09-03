@@ -131,10 +131,10 @@ namespace mongo {
         static void printShardInfo( ostream& out );
 
         /**
-         * @parm exclude - disconsiders this shard when selecting one available
-         * @return the currently best known shard to put a chunk/database or EMPTY
+         * @parm current - shard where the chunk/database currently lives in
+         * @return the currently emptiest shard, if best then current, or EMPTY
          */
-        static Shard pick( const Shard& exclude = EMPTY );
+        static Shard pick( const Shard& current = EMPTY );
         
         static void reloadShardInfo();
 

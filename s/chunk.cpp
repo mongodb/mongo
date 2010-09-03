@@ -427,10 +427,10 @@ namespace mongo {
 
         assert( toMove );
         
-        Shard newLocation = Shard::pick();
+        Shard newLocation = Shard::pick( getShard() );
         if ( getShard() == newLocation ){
-            // if this is the best server, then we shouldn't do anything!
-            log(1) << "not moving chunk: " << toString() << " b/c would move to same place  " << newLocation.toString() << " -> " << getShard().toString() << endl;
+            // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
+            log(1) << "recently split chunk: " << toString() << "already in the best shard" << endl;
             return 0;
         }
 
