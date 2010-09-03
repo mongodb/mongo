@@ -1238,13 +1238,13 @@ namespace mongo {
                 _xScanDistance = _maxDistance;
                 _yScanDistance = _maxDistance;
             } else if (type == "$centerSphere") {
-                uassert(13451, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
+                uassert(13461, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
 
                 _type = GEO_SPHERE;
                 _yScanDistance = rad2deg(_maxDistance);
                 _xScanDistance = computeXScanDistance(_startPt._y, _yScanDistance);
 
-                uassert(13452, "Spherical distance would require wrapping, which isn't implemented yet", 
+                uassert(13462, "Spherical distance would require wrapping, which isn't implemented yet", 
                                (_startPt._x + _xScanDistance < 180) && (_startPt._x - _xScanDistance > -180) &&
                                (_startPt._y + _yScanDistance < 90) && (_startPt._y - _yScanDistance > -90));
 
@@ -1252,7 +1252,7 @@ namespace mongo {
                 GEODEBUGPRINT(_xScanDistance);
                 GEODEBUGPRINT(_yScanDistance);
             } else {
-                uassert(13450, "invalid $center query type: " + type, false);
+                uassert(13460, "invalid $center query type: " + type, false);
             }
 
             ok();
@@ -1547,7 +1547,7 @@ namespace mongo {
                 } else if (strcmp(suffix, "Sphere") == 0) {
                     type = GEO_SPHERE;
                 } else {
-                    uassert(13454, string("invalid $near search type: ") + e.fieldName(), false);
+                    uassert(13464, string("invalid $near search type: ") + e.fieldName(), false);
                     type = GEO_PLAIN; // prevents uninitialized warning
                 }
 
