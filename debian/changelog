@@ -1,8 +1,16 @@
+mongodb (1.7.0) unstable; urgency=low
+
+  * sharding lots of changes
+  * replica_sets lots of changes
+
+ -- Richard Kreuter <richard@10gen.com>  Fri, 03 Sep 2010 16:56:28 -0500
+
 mongodb (1.5.8) unstable; urgency=low
 
   * sharding lots of changes
   * replica_sets lots of changes
 
+ -- Richard Kreuter <richard@10gen.com>  Tue, 03 Aug 2010 16:56:28 -0500
 
 mongodb (1.5.7) unstable; urgency=low
 
