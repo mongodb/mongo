@@ -155,7 +155,7 @@ namespace mongo {
             sz = 1000000000;
         int z = ((int)sz) & 0xffffff00;
         assert( z > len );
-        DEV tlog() << "initialExtentSize(" << len << ") returns " << z << endl;
+        //DEV tlog() << "initialExtentSize(" << len << ") returns " << z << endl;
         return z;
     }
 
@@ -416,8 +416,8 @@ namespace mongo {
 
         addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
-        DEV tlog() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
-                   << " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
+        DEV tlog(1) << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
+                    << " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
         return e;
     }
 
@@ -749,8 +749,11 @@ namespace mongo {
             try { 
                 assert( dropIndexes(d, name.c_str(), "*", errmsg, result, true) );
             }
-            catch( DBException& ) {
-                uasserted(12503,"drop: dropIndexes for collection failed - consider trying repair");
+            catch( DBException& e ) {
+                stringstream ss;
+                ss << "drop: dropIndexes for collection failed - consider trying repair ";
+                ss << " cause: " << e.what();
+                uasserted(12503,ss.str());
             }
             assert( d->nIndexes == 0 );
         }

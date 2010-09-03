@@ -131,9 +131,10 @@ namespace mongo {
         static void printShardInfo( ostream& out );
 
         /**
-         * picks a Shard for more load
+         * @parm current - shard where the chunk/database currently lives in
+         * @return the currently emptiest shard, if best then current, or EMPTY
          */
-        static Shard pick();
+        static Shard pick( const Shard& current = EMPTY );
         
         static void reloadShardInfo();
 

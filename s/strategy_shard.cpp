@@ -185,10 +185,15 @@ namespace mongo {
 
             uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! ( upsert && multi ) );
 
-            if ( upsert && !(manager->hasShardKey(toupdate) ||
-                             (toupdate.firstElement().fieldName()[0] == '$' && manager->hasShardKey(query))))
-            {
-                throw UserException( 8012 , "can't upsert something without shard key" );
+            if (upsert){
+                uassert(8012, "can't upsert something without shard key",
+                             (manager->hasShardKey(toupdate) ||
+                             (toupdate.firstElement().fieldName()[0] == '$' && manager->hasShardKey(query))));
+
+                BSONObj key = manager->getShardKey().extractKey(query);
+                BSONForEach(e, key){
+                    uassert(13465, "shard key in upsert query must be an exact match", getGtLtOp(e) == BSONObj::Equality);
+                }
             }
 
             bool save = false;

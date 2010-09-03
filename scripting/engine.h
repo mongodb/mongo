@@ -54,7 +54,22 @@ namespace mongo {
         
         virtual void localConnect( const char * dbName ) = 0;
         virtual void externalSetup() = 0;
-        
+
+        class NoDBAccess {
+            Scope * _s;
+        public:
+            NoDBAccess( Scope * s ){
+                _s = s;
+            }
+            ~NoDBAccess(){
+                _s->rename( "____db____" , "db" );
+            }
+        };
+        NoDBAccess disableDBAccess( const char * why ){
+            rename( "db" , "____db____" );
+            return NoDBAccess( this );
+        }
+
         virtual double getNumber( const char *field ) = 0;
         virtual int getNumberInt( const char *field ){ return (int)getNumber( field ); }
         virtual long long getNumberLongLong( const char *field ){ return (long long)getNumber( field ); }
@@ -75,6 +90,7 @@ namespace mongo {
                     
         virtual ScriptingFunction createFunction( const char * code );
         
+        virtual void rename( const char * from , const char * to ) = 0;
         /**
          * @return 0 on success
          */

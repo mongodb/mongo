@@ -189,17 +189,21 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype() const { return WRITE; } 
+        virtual LockType locktype() const { return NONE; } 
         virtual void help( stringstream& help ) const {
             help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
         }
         CmdShutdown() : Command("shutdown") {}
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Client * c = currentClient.get();
-            if ( c )
+            if ( c ) {
                 c->shutdown();
+            }
+            
             log() << "terminating, shutdown command received" << endl;
-            dbexit( EXIT_CLEAN ); // this never returns
+
+            dbexit( EXIT_CLEAN , "shutdown called" , true ); // this never returns
+            assert(0);
             return true;
         }
     } cmdShutdown;

@@ -427,10 +427,10 @@ namespace mongo {
 
         assert( toMove );
         
-        Shard newLocation = Shard::pick();
+        Shard newLocation = Shard::pick( getShard() );
         if ( getShard() == newLocation ){
-            // if this is the best server, then we shouldn't do anything!
-            log(1) << "not moving chunk: " << toString() << " b/c would move to same place  " << newLocation.toString() << " -> " << getShard().toString() << endl;
+            // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
+            log(1) << "recently split chunk: " << toString() << "already in the best shard" << endl;
             return 0;
         }
 
@@ -841,7 +841,7 @@ namespace mongo {
         
         DistributedLock lockSetup( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , getns() );
         dist_lock_try dlk( &lockSetup  , "drop" );
-        uassert( 13331 ,  "locking namespace failed" , dlk.got() );
+        uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );
         
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
         

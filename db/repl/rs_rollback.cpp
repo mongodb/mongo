@@ -167,12 +167,13 @@ namespace mongo {
                     return;
                 }
                 else if( cmdname == "dropDatabase" ) { 
-                    log() << "replSet ERROR rollback : can't rollback drop database full resync will be required" << rsLog;
+                    log() << "replSet error rollback : can't rollback drop database full resync will be required" << rsLog;
                     log() << "replSet " << o.toString() << rsLog;
                     throw rsfatal();
                 }
                 else { 
-                    log() << "replSet ERROR can't rollback this command yet: " << o.toString() << rsLog;
+                    log() << "replSet error can't rollback this command yet: " << o.toString() << rsLog;
+                    log() << "replSet cmdname=" << cmdname << rsLog;
                     throw rsfatal();
                 }
             }
@@ -304,7 +305,7 @@ namespace mongo {
 
     static void setMinValid(bo newMinValid) { 
        try {
-           log() << "replSet set minvalid=" << newMinValid["ts"]._opTime().toString() << rsLog;
+           log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
        }
        catch(...) { }
        {
@@ -652,6 +653,11 @@ namespace mongo {
                 incRBID(); throw;
             }
             incRBID();
+
+            /* success - leave "ROLLBACK" state 
+               can go to SECONDARY once minvalid is achieved
+            */
+            box.change(MemberState::RS_RECOVERING, _self);
         }
 
         return 0;

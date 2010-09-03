@@ -399,7 +399,7 @@ namespace mongo {
     class CountOp : public QueryOp {
     public:
         CountOp( const string& ns , const BSONObj &spec ) :
-            _ns(ns), count_(),
+            _ns(ns), count_(), _myCount(),
             skip_( spec["skip"].numberLong() ),
             limit_( spec["limit"].numberLong() ),
             bc_(){
@@ -476,7 +476,9 @@ namespace mongo {
             return ret;
         }
         long long count() const { return count_; }
-        virtual bool mayRecordPlan() const { return true; }
+        virtual bool mayRecordPlan() const {
+            return ( _myCount > limit_ / 2 ) || ( complete() && !stopRequested() );
+        }
     private:
         
         void _gotOne(){
@@ -491,11 +493,13 @@ namespace mongo {
             }
 
             count_++;
+            _myCount++;
         }
 
         string _ns;
         
         long long count_;
+        long long _myCount;
         long long skip_;
         long long limit_;
         shared_ptr<Cursor> c_;
@@ -826,7 +830,9 @@ namespace mongo {
             _buf.decouple();
         }
         
-        virtual bool mayRecordPlan() const { return _pq.getNumToReturn() != 1; }
+        virtual bool mayRecordPlan() const {
+            return ( _pq.getNumToReturn() != 1 ) && ( ( _n > _pq.getNumToReturn() / 2 ) || ( complete() && !stopRequested() ) );
+        }
         
         virtual QueryOp *_createChild() const {
             if ( _pq.isExplain() ) {

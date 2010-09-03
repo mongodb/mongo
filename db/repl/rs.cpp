@@ -66,6 +66,12 @@ namespace mongo {
         if( box.getState().primary() ) {
             log() << "replSet relinquishing primary state" << rsLog;
             changeState(MemberState::RS_RECOVERING);
+            
+            /* close sockets that were talking to us */
+            /*log() << "replSet closing sockets after reqlinquishing primary" << rsLog;
+            MessagingPort::closeAllSockets(1);*/
+
+            // todo: >
             //changeState(MemberState::RS_SECONDARY);
         }
         else if( box.getState().startup2() ) {
@@ -260,7 +266,7 @@ namespace mongo {
             loadLastOpTimeWritten();
         }
         catch(std::exception& e) { 
-            log() << "replSet ERROR FATAL couldn't query the local " << rsoplog << " collection.  Terminating mongod after 30 seconds." << rsLog;
+            log() << "replSet error fatal couldn't query the local " << rsoplog << " collection.  Terminating mongod after 30 seconds." << rsLog;
             log() << e.what() << rsLog;
             sleepsecs(30);
             dbexit( EXIT_REPLICATION_ERROR );

@@ -296,6 +296,14 @@ namespace mongo {
         argv[0] = v8::External::New( createWrapperHolder( obj , true , false ) );
         _this = Persistent< v8::Object >::New( _wrapper->NewInstance( 1, argv ) );
     }
+
+    void V8Scope::rename( const char * from , const char * to ){
+        V8_SIMPLE_HEADER;
+        v8::Local<v8::String> f = v8::String::New( from );
+        v8::Local<v8::String> t = v8::String::New( to );
+        _global->Set( t , _global->Get( f ) );
+        _global->Set( f , v8::Undefined() );
+    }
     
     int V8Scope::invoke( ScriptingFunction func , const BSONObj& argsObject, int timeoutMs , bool ignoreReturn ){
         V8_SIMPLE_HEADER

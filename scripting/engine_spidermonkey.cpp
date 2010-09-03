@@ -1323,6 +1323,15 @@ namespace mongo {
             }
         }
 
+        void rename( const char * from , const char * to ){
+            smlock;
+            jsval v;
+            assert( JS_GetProperty( _context , _global , from , &v ) );
+            assert( JS_SetProperty( _context , _global , to , &v ) );
+            v = JSVAL_VOID;
+            assert( JS_SetProperty( _context , _global , from , &v ) );
+        }
+
         // ---- functions -----
 
         ScriptingFunction _createFunction( const char * code ){

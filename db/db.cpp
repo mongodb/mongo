@@ -515,7 +515,7 @@ sendmore:
             l << ( is32bit ? " 32" : " 64" ) << "-bit " << endl;
         }
         DEV log() << "_DEBUG build (which is slower)" << endl;
-        show_32_warning();
+        show_warnings();
         log() << mongodVersion() << endl;
         printGitVersion();
         printSysInfo();
@@ -622,7 +622,7 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 void show_help_text(po::options_description options) {
-    show_32_warning();
+    show_warnings();
     cout << options << endl;
 };
 

@@ -135,6 +135,8 @@ namespace mongo {
         int _timeout;
         int _logLevel; // passed to log() when logging errors
 
+        static void closeAllSockets(unsigned tagMask = 0xffffffff);
+
         /* ports can be tagged with various classes.  see closeAllSockets(tag). defaults to 0. */
         unsigned tag;
 

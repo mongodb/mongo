@@ -219,7 +219,7 @@ namespace mongo {
         staticShardInfo.remove( name );
     }
 
-    Shard Shard::pick(){
+    Shard Shard::pick( const Shard& current ){
         vector<Shard> all;
         staticShardInfo.getAllShards( all );
         if ( all.size() == 0 ){
@@ -229,15 +229,19 @@ namespace mongo {
                 return EMPTY;
         }
         
+        // if current shard was provided, pick a different shard only if it is a better choice
         ShardStatus best = all[0].getStatus();
-        
-        for ( size_t i=1; i<all.size(); i++ ){
+        if ( current != EMPTY ){
+            best = current.getStatus();
+        }
+            
+        for ( size_t i=0; i<all.size(); i++ ){
             ShardStatus t = all[i].getStatus();
             if ( t < best )
                 best = t;
         }
 
-        log(1) << "picking shard: " << best << endl;
+        log(1) << "best shard for new allocation is " << best << endl;
         return best.shard();
     }
 

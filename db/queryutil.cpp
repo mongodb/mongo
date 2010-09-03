@@ -181,10 +181,12 @@ namespace mongo {
 
         if ( e.eoo() )
             return;
+        int op = e.getGtLtOp();
         if ( e.type() == RegEx
              || (e.type() == Object && !e.embeddedObject()["$regex"].eoo())
            )
         {
+            uassert( 13454, "invalid regular expression operator", op == BSONObj::Equality || op == BSONObj::opREGEX );
             if ( !isNot ) { // no optimization for negated regex - we could consider creating 2 intervals comprising all nonmatching prefixes
                 const string r = simpleRegex(e);
                 if ( r.size() ) {
@@ -216,15 +218,17 @@ namespace mongo {
             }
             return;
         }
-        int op = e.getGtLtOp();
         if ( isNot ) {
             switch( op ) {
                 case BSONObj::Equality:
+                    return;
+//                    op = BSONObj::NE;
+//                    break;
                 case BSONObj::opALL:
                 case BSONObj::opMOD: // NOTE for mod and type, we could consider having 1-2 intervals comprising the complementary types (multiple intervals already possible with $in)
                 case BSONObj::opTYPE:
-                    op = BSONObj::NE; // no bound calculation
-                    break;
+                     // no bound calculation
+                    return;
                 case BSONObj::NE:
                     op = BSONObj::Equality;
                     break;
@@ -248,6 +252,19 @@ namespace mongo {
         case BSONObj::Equality:
             lower = upper = e;
             break;
+        case BSONObj::NE: {
+            // this will invalidate the upper/lower references above
+            _intervals.push_back( FieldInterval() );
+            // optimize doesn't make sense for negative ranges
+            _intervals[ 0 ]._upper._bound = e;
+            _intervals[ 0 ]._upper._inclusive = false;
+            _intervals[ 1 ]._lower._bound = e;
+            _intervals[ 1 ]._lower._inclusive = false;
+            _intervals[ 1 ]._upper._bound = maxKey.firstElement();
+            _intervals[ 1 ]._upper._inclusive = true;
+            optimize = false; // don't run optimize code below
+            break;
+        }
         case BSONObj::LT:
             upperInclusive = false;
         case BSONObj::LTE:
@@ -386,12 +403,14 @@ namespace mongo {
         vector< FieldInterval >::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             FieldInterval overlap;
-            if ( fieldIntervalOverlap( *i, *j, overlap ) )
+            if ( fieldIntervalOverlap( *i, *j, overlap ) ) {
                 newIntervals.push_back( overlap );
-            if ( i->_upper == minFieldBound( i->_upper, j->_upper ) )
+            }
+            if ( i->_upper == minFieldBound( i->_upper, j->_upper ) ) {
                 ++i;
-            else
-                ++j;      
+            } else {
+                ++j;
+            }
         }
         finishOperation( newIntervals, other );
         return *this;

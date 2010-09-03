@@ -201,10 +201,12 @@ namespace mongo {
                     if ( x == ECONNABORTED || x == EBADF ) {
                         log() << "Listener on port " << _port << " aborted" << endl;
                         return;
-                    } if ( x == 0 && inShutdown() ){
+                    } 
+                    if ( x == 0 && inShutdown() ) {
                         return;   // socket closed
                     }
-                    log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x) << endl;
+                    if( !inShutdown() )
+                        log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x) << endl;
                     continue;
                 } 
                 if (from.getType() != AF_UNIX)
@@ -255,14 +257,10 @@ namespace mongo {
             _cur = _buf;
         }
 
-        int len() {
-            return _cur - _buf;
-        }
+        int len() const { return _cur - _buf; }
 
     private:
-
         MessagingPort* _port;
-
         char * _buf;
         char * _cur;
     };
@@ -272,10 +270,13 @@ namespace mongo {
         mongo::mutex m;
     public:
         Ports() : ports(), m("Ports") {}
-        void closeAll() {
+        void closeAll(unsigned skip_mask) {
             scoped_lock bl(m);
-            for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
+            for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ ) {
+                if( (*i)->tag & skip_mask )
+                    continue;
                 (*i)->shutdown();
+            }
         }
         void insert(MessagingPort* p) { 
             scoped_lock bl(m);
@@ -291,8 +292,8 @@ namespace mongo {
     // are being destructed during termination.
     Ports& ports = *(new Ports());
 
-    void closeAllSockets() {
-        ports.closeAll();
+    void MessagingPort::closeAllSockets(unsigned mask) {
+        ports.closeAll(mask);
     }
 
     MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far), _timeout(), tag(0) {

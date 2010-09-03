@@ -120,11 +120,23 @@ doTest = function (signal) {
             max2 = dbs[2].bar.find().sort({ z: -1 }).limit(1).next();
         }
         catch (e) {
-            if (countExceptions++ > 500) {
-                assert(false, "too many exceptions, failing");
+            if (countExceptions++ > 300) {
+                print("dbs[1]:");
+                try {
+                    printjson(dbs[1].isMaster());
+                    printjson(dbs[1].bar.count());
+                }
+                catch (e) { print(e); }
+                print("dbs[2]:");
+                try {
+                    printjson(dbs[2].isMaster());
+                    printjson(dbs[2].bar.count());
+                }
+                catch (e) { print(e); }
+                assert(false, "sync1.js too many exceptions, failing");
             }
             print("\nsync1.js: exception querying; will sleep and try again " + e);
-            sleep(2000);
+            sleep(3000);
             continue;
         }
 

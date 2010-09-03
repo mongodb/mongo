@@ -49,9 +49,9 @@ namespace mongo {
         _needRecord = 
         alwaysUseRecord || 
         ! ( _docMatcher->keyMatch() && 
-           _keyMatcher.sameCriteriaCount( *_docMatcher ) &&
-           ! _keyMatcher.hasType( BSONObj::opEXISTS ) );
+           _keyMatcher.sameCriteriaCount( *_docMatcher ) );
         ;        
+        _useRecordOnly = _keyMatcher.hasType( BSONObj::opEXISTS );
     }
     
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ){
@@ -62,12 +62,16 @@ namespace mongo {
         if ( details )
             details->reset();
         
-        if ( !_keyMatcher.matches(key, details ) ){
-            return false;
-        }
+        if ( !_useRecordOnly ) {
+            
+            if ( !_keyMatcher.matches(key, details ) ){
+                return false;
+            }
         
-        if ( ! _needRecord ){
-            return true;
+            if ( ! _needRecord ){
+                return true;
+            }
+            
         }
 
         if ( details )

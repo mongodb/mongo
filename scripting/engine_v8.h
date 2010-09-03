@@ -55,6 +55,8 @@ namespace mongo {
         virtual void setElement( const char *field , const BSONElement& e );
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly);
         virtual void setThis( const BSONObj * obj );
+
+        virtual void rename( const char * from , const char * to );
         
         virtual ScriptingFunction _createFunction( const char * code );
         Local< v8::Function > __createFunction( const char * code );

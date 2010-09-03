@@ -518,7 +518,7 @@ namespace JSTests {
     class NumberLong {
     public:
         void run() {
-            Scope * s = globalScriptEngine->newScope();
+            auto_ptr<Scope> s( globalScriptEngine->newScope() );
             s->localConnect( "blah" );
             BSONObjBuilder b;
             long long val = (long long)( 0xbabadeadbeefbaddULL );
@@ -541,7 +541,7 @@ namespace JSTests {
             ASSERT( s->exec( "c = {c:a.a.toString()}", "foo", false, true, false ) );
             out = s->getObject( "c" );
             stringstream ss;
-            ss << "NumberLong( \"" << val << "\" )";
+            ss << "NumberLong(\"" << val << "\")";
             ASSERT_EQUALS( ss.str(), out.firstElement().valuestr() );
 
             ASSERT( s->exec( "d = {d:a.a.toNumber()}", "foo", false, true, false ) );
@@ -573,6 +573,34 @@ namespace JSTests {
             ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
             ASSERT_EQUALS( 4, out.firstElement().numberLong() );     
             
+        }
+    };
+
+    class NumberLong2 {
+    public:
+        void run() {
+            auto_ptr<Scope> s( globalScriptEngine->newScope() );
+            s->localConnect( "blah" );
+            
+            BSONObj in;
+            {
+                BSONObjBuilder b;
+                b.append( "a" , 5 );
+                b.append( "b" , (long long)5 );
+                b.append( "c" , (long long)pow( 2.0, 29 ) );
+                b.append( "d" , (long long)pow( 2.0, 30 ) );
+                b.append( "e" , (long long)pow( 2.0, 31 ) );
+                b.append( "f" , (long long)pow( 2.0, 45 ) );
+                in = b.obj();
+            }
+            s->setObject( "a" , in );
+            
+            ASSERT( s->exec( "x = tojson( a ); " ,"foo" , false , true , false ) );
+            string outString = s->getString( "x" );
+
+            ASSERT( s->exec( (string)"y = " + outString , "foo2" , false , true , false ) );
+            BSONObj out = s->getObject( "y" );
+            ASSERT_EQUALS( in , out );
         }
     };
     
@@ -910,6 +938,27 @@ namespace JSTests {
         }
     };
 
+    class RenameTest {
+    public:
+        void run(){
+            auto_ptr<Scope> s;
+            s.reset( globalScriptEngine->newScope() );
+            
+            s->setNumber( "x" , 5 );
+            ASSERT_EQUALS( 5 , s->getNumber( "x" ) );
+            ASSERT_EQUALS( Undefined , s->type( "y" ) );
+            
+            s->rename( "x" , "y" );
+            ASSERT_EQUALS( 5 , s->getNumber( "y" ) );
+            ASSERT_EQUALS( Undefined , s->type( "x" ) );
+
+            s->rename( "y" , "x" );
+            ASSERT_EQUALS( 5 , s->getNumber( "x" ) );
+            ASSERT_EQUALS( Undefined , s->type( "y" ) );
+        }
+    };
+            
+
     class All : public Suite {
     public:
         All() : Suite( "js" ) {
@@ -931,7 +980,9 @@ namespace JSTests {
             add< SpecialDBTypes >();
             add< TypeConservation >();
             add< NumberLong >();
-            
+            add< NumberLong2 >();
+            add< RenameTest >();
+
             add< WeirdObjects >();
             add< CodeTests >();
             add< DBRefTest >();

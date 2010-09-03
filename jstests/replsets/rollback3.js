@@ -5,8 +5,6 @@
 //   mongo --nodb rollback.js | tee out | grep -v ^m31
 //
 
-print("rollback3.js");
-
 var debugging = 0;
 
 function pause(s) {
@@ -30,7 +28,7 @@ function wait(f) {
     var n = 0;
     while (!f()) {
         if (n % 4 == 0)
-            print("waiting " + w);
+            print("rollback3.js waiting " + w);
         if (++n == 4) {
             print("" + f);
         }
@@ -125,6 +123,16 @@ function doItemsToRollBack(db) {
     db.newname.renameCollection("fooname");
 
     assert(db.fooname.count() > 0, "count rename");
+
+    // test roll back (drop) a whole database   
+    abc = db.getSisterDB("abc");
+    abc.foo.insert({ x: 1 });
+    abc.bar.insert({ y: 999 });
+
+    // test making and dropping a database
+    //mkd = db.getSisterDB("mkd");
+    //mkd.c.insert({ y: 99 });
+    //mkd.dropDatabase();
 }
 
 function doWritesToKeep2(db) {
@@ -204,10 +212,9 @@ doTest = function (signal) {
 
     assert( dbs_match(a,b), "server data sets do not match after rollback, something is wrong");
 
-    pause("SUCCESS");
+    pause("rollback3.js SUCCESS");
     replTest.stopSet(signal);
 }
 
+print("rollback3.js");
 doTest( 15 );
-
-print("rollback3.js done success");

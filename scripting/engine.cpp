@@ -385,6 +385,10 @@ namespace mongo {
             return _real->createFunction( code );
         }
 
+        void rename( const char * from , const char * to ){
+            _real->rename( from , to );
+        }
+
         /**
          * @return 0 on success
          */
