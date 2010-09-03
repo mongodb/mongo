@@ -42,6 +42,8 @@ namespace mongo {
         bool startService = false;
 
         std::wstring windowsServiceName = L"MongoDB";
+        std::wstring windowsServiceDisplayName = L"Mongo DB";
+        std::wstring windowsServiceDescription = L"Mongo DB Server";
         std::wstring windowsServiceUser = L"";
         std::wstring windowsServicePassword = L"";
 
@@ -73,6 +75,20 @@ namespace mongo {
                 windowsServiceName[i] = x[i];
 	    }
         }
+        if (params.count("serviceDisplayName")){
+            string x = params["serviceDisplayName"].as<string>();
+            windowsServiceDisplayName = wstring(x.size(),L' ');
+            for ( size_t i=0; i<x.size(); i++) {
+                windowsServiceDisplayName[i] = x[i];
+	    }
+        }
+        if (params.count("serviceDescription")){
+            string x = params["serviceDescription"].as<string>();
+            windowsServiceDescription = wstring(x.size(),L' ');
+            for ( size_t i=0; i<x.size(); i++) {
+                windowsServiceDescription[i] = x[i];
+	    }
+        }
         if (params.count("serviceUser")){
             string x = params["serviceUser"].as<string>();
             windowsServiceUser = wstring(x.size(),L' ');
@@ -92,7 +108,7 @@ namespace mongo {
             ServiceController::removeService( windowsServiceName );
 	}
 	if ( installService || reinstallService ) {
-            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", windowsServiceUser, windowsServicePassword, dbpath, argc, argv ) )
+            if ( !ServiceController::installService( windowsServiceName , windowsServiceDisplayName, windowsServiceDescription, windowsServiceUser, windowsServicePassword, dbpath, argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
