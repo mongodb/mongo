@@ -192,8 +192,6 @@ namespace mongo {
 
                 BSONObj key = manager->getShardKey().extractKey(query);
                 BSONForEach(e, key){
-                    PRINT(e);
-                    PRINT(getGtLtOp(e));
                     uassert(13465, "shard key in upsert query must be an exact match", getGtLtOp(e) == BSONObj::Equality);
                 }
             }
