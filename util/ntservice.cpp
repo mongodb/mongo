@@ -146,8 +146,13 @@ namespace mongo {
                 commandLine << arg << "  \"" << dbpath << "\"  ";
                 i++;
                 continue;
+            } else if ( arg == "--logpath" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
             } else if ( arg.length() > 9 && arg.substr(0, 9) == "--service" ) {
                 // Strip off --service(Name|User|Password) arguments
+                i++;
                 continue;
             }
             commandLine << arg << "  ";
