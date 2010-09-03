@@ -48,19 +48,6 @@ check( "initial at end" )
 
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
-function dist(){
-    var x = {}
-    s.config.chunks.find( { ns : "test.foo" } ).forEach(
-        function(z){
-            if ( x[z.shard] )
-                x[z.shard]++
-            else
-                x[z.shard] = 1;
-        }
-    );
-    return x;
-}
-
 function check( msg , dontAssert ){
     for ( var x in counts ){
         var e = counts[x];
@@ -98,14 +85,14 @@ function diff(){
         check(); // SERVER-1430  TODO
     }
 
-    var x = dist();
+    var x = s.chunkCounts( "foo" )
     if ( Math.random() > .999 )
         printjson( x )
     return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
 function sum(){
-    var x = dist();
+    var x = s.chunkCounts( "foo" )
     return x.shard0000 + x.shard0001;
 }
 
