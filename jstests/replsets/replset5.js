@@ -29,10 +29,9 @@ doTest = function (signal) {
       master.getDB(testDB).foo.insert({ n: n });
     }
 
-    // *** NOTE ***: The default doesn't seem to be propogating.
-    // When I run getlasterror with no defaults, the slaves don't have the data:
-    // These getlasterror commands can be run individually to verify this.
-    //master.getDB("admin").runCommand({ getlasterror: 1, w: 1, wtimeout: 20000 });
+    // If you want to test failure, just add values for w and wtimeout
+    // to the following command. This will override the default set above and
+    // prevent replication from happening in time for the count tests below.
     master.getDB("admin").runCommand({getlasterror: 1});
 
     var slaves = replTest.liveNodes.slaves;
