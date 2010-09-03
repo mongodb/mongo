@@ -13,7 +13,7 @@ GeoNearRandomTest = function(name) {
 
 GeoNearRandomTest.prototype.mkPt = function mkPt(scale){
     scale = scale || 1; // scale is good for staying away from edges
-    return [((Random.rand() * 360) - 180) * scale, ((Random.rand() * 180) - 90) * scale];
+    return [((Random.rand() * 359.8) - 179.9) * scale, ((Random.rand() * 180) - 90) * scale];
 }
 
 GeoNearRandomTest.prototype.insertPts = function(nPts) {
