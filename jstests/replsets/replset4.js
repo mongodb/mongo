@@ -16,10 +16,10 @@ doTest = function( signal ) {
     }
 
     var result = master.getDB("admin").runCommand({ismaster: 1});
-    printjson( result );
+    //printjson( result );
     assert.soon(function() {
         var result = master.getDB("admin").runCommand({ismaster: 1});
-        printjson( result );
+        //printjson( result );
         return (result['ok'] == 1 && result['ismaster'] == false);
     }, "Master fails to step down when orphaned.");
 
@@ -27,3 +27,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 );
+print("replset4.js SUCCESS");

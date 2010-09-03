@@ -517,17 +517,19 @@ namespace mongo {
         DEBUGUPDATE( "\t\t createNewFromMods root: " << root );
         BSONObjIteratorSorted es( obj );
         BSONElement e = es.next();
-
+        
         ModStateHolder::iterator m = _mods.lower_bound( root );
-        ModStateHolder::iterator mend = _mods.lower_bound( root + '{' );
-
+        StringBuilder buf(root.size() + 2 );
+        buf << root << (char)255;
+        ModStateHolder::iterator mend = _mods.lower_bound( buf.str() );
+        
         set<string> onedownseen;
         
         while ( e.type() && m != mend ){
             string field = root + e.fieldName();
             FieldCompareResult cmp = compareDottedFieldNames( m->second.m->fieldName , field );
 
-            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second.m->fieldName << "\t cmp:" << cmp );
+            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second.m->fieldName << "\t cmp:" << cmp << "\t short: " << e.fieldName() );
             
             switch ( cmp ){
                 
@@ -549,6 +551,13 @@ namespace mongo {
                     // inc both as we handled both
                     e = es.next();
                     m++;
+                }
+                else {
+                    // this is a very weird case
+                    // have seen it in production, but can't reproduce
+                    // this assert prevents an inf. loop
+                    // but likely isn't the correct solution
+                    assert(0);
                 }
                 continue;
             }

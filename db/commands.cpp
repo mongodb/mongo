@@ -38,7 +38,7 @@ namespace mongo {
         }
         ss << "\n<tr><td>";
         bool web = _webCommands->count(name) != 0;
-        if( web ) ss << "<a href=\"/" << name << "?text\">";
+        if( web ) ss << "<a href=\"/" << name << "?text=1\">";
         ss << name;
         if( web ) ss << "</a>";
         ss << "</td>\n";

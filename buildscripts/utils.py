@@ -8,7 +8,7 @@ import os
 def getGitBranch():
     if not os.path.exists( ".git" ):
         return None
-    
+
     version = open( ".git/HEAD" ,'r' ).read().strip()
     if not version.startswith( "ref: " ):
         return version
@@ -45,7 +45,6 @@ def getGitVersion():
         return version
     return open( f , 'r' ).read().strip()
 
-
 def execsys( args ):
     import subprocess
     if isinstance( args , str ):
@@ -65,7 +64,6 @@ def getprocesslist():
     r = re.compile( "[\r\n]+" )
     return r.split( raw )
 
-    
 def removeIfInList( lst , thing ):
     if thing in lst:
         lst.remove( thing )

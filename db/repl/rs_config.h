@@ -77,7 +77,7 @@ namespace mongo {
         string toString() const { return asBson().toString(); }
 
         /** validate the settings. does not call check() on each member, you have to do that separately. */
-        void check() const;
+        void checkRsConfig() const;
 
         /** check if modification makes sense */
         static bool legalChange(const ReplSetConfig& old, const ReplSetConfig& n, string& errmsg);

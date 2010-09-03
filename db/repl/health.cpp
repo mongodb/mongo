@@ -99,7 +99,7 @@ namespace mongo {
         }
         s << td( grey(hbinfo().lastHeartbeatMsg,!ok) );
         stringstream q;
-        q << "/_replSetOplog?" << id();
+        q << "/_replSetOplog?_id=" << id();
         s << td( a(q.str(), "", never ? "?" : hbinfo().opTime.toString()) );
         if( hbinfo().skew > INT_MIN ) {
             s << td( grey(str::stream() << hbinfo().skew,!ok) );
@@ -309,7 +309,7 @@ namespace mongo {
                 td( stateAsHtml(box.getState()) + (_self->config().hidden?" (hidden)":"") );
             s << td( _hbmsg );
             stringstream q;
-            q << "/_replSetOplog?" << _self->id();
+            q << "/_replSetOplog?_id=" << _self->id();
             s << td( a(q.str(), myMinValid, theReplSet->lastOpTimeWritten.toString()) );
             s << td(""); // skew
             s << _tr();

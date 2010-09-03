@@ -134,7 +134,7 @@ namespace mongo {
             
             scoped_lock lk(_mutex);
             for ( NSVersionMap::iterator i=_versions.begin(); i!=_versions.end(); ++i ){
-                bb.appendTimestamp( i->first.c_str() , i->second );
+                bb.appendTimestamp( i->first , i->second );
             }
             bb.done();
         }
@@ -336,6 +336,12 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
  
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+
+            // Debugging code for SERVER-1633. Commands have already a coarser timer for
+            // normal operation.
+            Timer timer;
+            vector<int> laps;
+
             lastError.disableForCommand();
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
 
@@ -364,6 +370,9 @@ namespace mongo {
                     configServer.init( configdb );
                 }
             }
+
+            // SERVER-1633
+            laps.push_back( timer.millis() );
             
             if ( cmdObj["shard"].type() == String ){
                 shardingState.gotShardName( cmdObj["shard"].String() );
@@ -387,6 +396,9 @@ namespace mongo {
                     }
                 }
             }
+
+            // SERVER-1633
+            laps.push_back( timer.millis() );
             
             unsigned long long version = extractVersion( cmdObj["version"] , errmsg );
 
@@ -414,6 +426,9 @@ namespace mongo {
                 return 1;
             }
 
+            // SERVER-1633
+            laps.push_back( timer.millis() );
+
             if ( version == 0 && globalVersion > 0 ){
                 if ( ! authoritative ){
                     result.appendBool( "need_authoritative" , true );
@@ -439,6 +454,9 @@ namespace mongo {
                 return false;
             }
             
+            // SERVER-1633
+            laps.push_back( timer.millis() );
+
             if ( version < globalVersion ){
                 while ( shardingState.inCriticalMigrateSection() ){
                     dbtemprelease r;
@@ -459,6 +477,9 @@ namespace mongo {
                 return false;
             }
 
+            // SERVER-1633
+            laps.push_back( timer.millis() );
+
             {
                 dbtemprelease unlock;
                 shardingState.getChunkMatcher( ns );
@@ -467,6 +488,15 @@ namespace mongo {
             result.appendTimestamp( "oldVersion" , oldVersion );
             oldVersion = version;
             globalVersion = version;
+
+            // SERVER-1633
+            ostringstream lapString;
+            lapString << name /* command name */ << " partials: " ;
+            for (size_t i = 1; i<laps.size(); ++i){ 
+                lapString << (laps[i] - laps[i-1]) / 1000 << " ";
+            }
+            lapString << endl;
+            logIfSlow( timer, lapString.str() );
 
             result.append( "ok" , 1 );
             return 1;
@@ -523,7 +553,7 @@ namespace mongo {
      * @ return true if not in sharded mode
                      or if version for this client is ok
      */
-    bool shardVersionOk( const string& ns , string& errmsg ){
+    bool shardVersionOk( const string& ns , bool isWriteOp , string& errmsg ){
         if ( ! shardingState.enabled() )
             return true;
 
@@ -549,7 +579,7 @@ namespace mongo {
 
         if ( version == 0 && clientVersion > 0 ){
             stringstream ss;
-            ss << "version: " << version << " clientVersion: " << clientVersion;
+            ss << "collection was dropped or this shard no longer valied version: " << version << " clientVersion: " << clientVersion;
             errmsg = ss.str();
             return false;
         }
@@ -563,6 +593,13 @@ namespace mongo {
             ss << "client in sharded mode, but doesn't have version set for this collection: " << ns << " myVersion: " << version;
             errmsg = ss.str();
             return false;
+        }
+
+        if ( isWriteOp && version.majorVersion() == clientVersion.majorVersion() ){
+            // this means there was just a split 
+            // since on a split w/o a migrate this server is ok
+            // going to accept write
+            return true;
         }
 
         stringstream ss;

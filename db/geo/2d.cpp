@@ -888,7 +888,7 @@ namespace mongo {
                     farthest = _spec->sizeDiag( _prefix );
                 Box want( center._x - farthest , center._y - farthest , farthest * 2 );
                 _prefix = _n;
-                while ( _spec->sizeEdge( _prefix ) < ( farthest / 2 ) ){
+                while ( _spec->sizeEdge( _prefix ) < farthest ){
                     _prefix = _prefix.up();
                 }
                 

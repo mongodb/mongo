@@ -40,12 +40,13 @@ namespace mongo {
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;
 
-    Client::Client(const char *desc) : 
+    Client::Client(const char *desc, MessagingPort *p) : 
       _context(0),
       _shutdown(false),
       _desc(desc),
       _god(0),
-      _lastOp(0)
+      _lastOp(0), 
+      _mp(p)
     {
         _curOp = new CurOp( this );
         scoped_lock bl(clientsMutex);
@@ -53,15 +54,21 @@ namespace mongo {
     }
 
     Client::~Client() { 
-        delete _curOp;
         _god = 0;
 
         if ( _context )
-            cout << "ERROR: Client::~Client _context should be NULL: " << _desc << endl;
-        if ( !_shutdown ) 
-            cout << "ERROR: Client::shutdown not called: " << _desc << endl;
-    }
+            error() << "Client::~Client _context should be null but is not; client:" << _desc << endl;
 
+        if ( ! _shutdown ) {
+            error() << "Client::shutdown not called: " << _desc << endl;
+        }
+        
+        scoped_lock bl(clientsMutex);
+        if ( ! _shutdown )
+            clients.erase(this);
+        delete _curOp;
+    }
+    
     void Client::_dropns( const string& ns ){
         Top::global.collectionDropped( ns );
                     
@@ -76,7 +83,7 @@ namespace mongo {
             dropCollection( ns , err , b );
         }
         catch ( ... ){
-            log() << "error dropping temp collection: " << ns << endl;
+            warning() << "error dropping temp collection: " << ns << endl;
         }
 
     }
@@ -134,7 +141,7 @@ namespace mongo {
         return didAnything;
     }
 
-    BSONObj CurOp::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
+    BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     AtomicUInt CurOp::_nextOpNum;
     
     Client::Context::Context( string ns , Database * db, bool doauth )
@@ -199,7 +206,7 @@ namespace mongo {
 
         if ( _client->_curOp->getOp() != dbGetMore ){ // getMore's are special and should be handled else where
             string errmsg;
-            if ( ! shardVersionOk( _ns , errmsg ) ){
+            if ( ! shardVersionOk( _ns , lockState > 0 , errmsg ) ){
                 msgasserted( StaleConfigInContextCode , (string)"[" + _ns + "] shard version not ok in Client::Context: " + errmsg );
             }
         }
@@ -238,7 +245,7 @@ namespace mongo {
 
     string sayClientState(){
         Client* c = currentClient.get();
-        if ( ! c )
+        if ( !c )
             return "no client";
         return c->toString();
     }
@@ -260,7 +267,16 @@ namespace mongo {
         }
     }
 
-    BSONObj CurOp::infoNoauth( int attempt ) {
+    CurOp::~CurOp(){
+        if ( _wrapped ){
+            scoped_lock bl(Client::clientsMutex);
+            _client->_curOp = _wrapped;
+        }
+        
+        _client = 0;
+    }
+
+    BSONObj CurOp::infoNoauth() {
         BSONObjBuilder b;
         b.append("opid", _opNum);
         bool a = _active && _start;
@@ -277,31 +293,7 @@ namespace mongo {
         
         b.append("ns", _ns);
         
-        {
-            int size = querySize();
-            if ( size == 0 ){
-                // do nothing
-            }
-            else if ( size == 1 ){
-                b.append( "query" , _tooBig );
-            }
-            else if ( attempt > 2 ){
-                b.append( "query" , BSON( "err" << "can't get a clean object" ) );
-                log( LL_WARNING ) << "CurOp changing too much to get reading" << endl;
-                         
-            }
-            else {
-                int before = checksum( _queryBuf , size );
-                b.appendObject( "query" , _queryBuf , size );
-                int after = checksum( _queryBuf , size );
-                
-                if ( after != before ){
-                    // this means something changed
-                    // going to retry
-                    return infoNoauth( attempt + 1 );
-                }
-            }
-        }
+        _query.append( b , "query" );
 
         // b.append("inLock",  ??
         stringstream clientStr;
@@ -402,8 +394,9 @@ namespace mongo {
                         tablecell( ss , "" );
                     tablecell( ss , co.getOp() );
                     tablecell( ss , co.getNS() );
-                    if ( co.haveQuery() )
-                        tablecell( ss , co.query() );
+                    if ( co.haveQuery() ){
+                        tablecell( ss , co.query( true ) );
+                    }
                     else
                         tablecell( ss , "" );
                     tablecell( ss , co.getRemoteString() );

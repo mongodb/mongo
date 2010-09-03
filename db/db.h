@@ -176,10 +176,6 @@ namespace mongo {
 
     extern DatabaseHolder dbHolder;
 
-    // shared functionality for removing references to a database from this program instance
-    // does not delete the files on disk
-    void closeDatabase( const char *cl, const string& path = dbpath );
-    
     struct dbtemprelease {
         Client::Context * _context;
         int _locktype;

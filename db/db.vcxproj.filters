@@ -401,6 +401,7 @@
     <ClCompile Include="..\shell\mongo_vstudio.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

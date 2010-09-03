@@ -31,6 +31,16 @@ namespace mongo {
 
     void logOpInitiate(const bo&);
 
+    void assertOnlyHas(BSONObj o, const set<string>& fields) { 
+        BSONObj::iterator i(o);
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if( !fields.count( e.fieldName() ) ) {
+                uasserted(13434, str::stream() << "unexpected field '" << e.fieldName() << "'in object");
+            }
+        }
+    }
+
     list<HostAndPort> ReplSetConfig::otherMemberHostnames() const { 
         list<HostAndPort> L;
         for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++ ) {
@@ -42,7 +52,7 @@ namespace mongo {
     
     /* comment MUST only be set when initiating the set by the initiator */
     void ReplSetConfig::saveConfigLocally(bo comment) { 
-        check();
+        checkRsConfig();
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
         { 
             writelock lk("");
@@ -173,23 +183,13 @@ namespace mongo {
         _ok = false;
     }
 
-    void ReplSetConfig::check() const { 
+    void ReplSetConfig::checkRsConfig() const { 
         uassert(13132,
             "nonmatching repl set name in _id field; check --replSet command line",
             _id == cmdLine.ourSetName());
         uassert(13308, "replSet bad config version #", version > 0);
         uassert(13133, "replSet bad config no members", members.size() >= 1);
         uassert(13309, "replSet bad config maximum number of members is 7 (for now)", members.size() <= 7);
-    }
-
-    void assertOnlyHas(BSONObj o, const set<string>& fields) { 
-        BSONObj::iterator i(o);
-        while( i.more() ) {
-            BSONElement e = i.next();
-            if( !fields.count( e.fieldName() ) ) {
-                uasserted(13434, str::stream() << "unexpected field '" << e.fieldName() << "'in object");
-            }
-        }
     }
 
     void ReplSetConfig::from(BSONObj o) {
@@ -231,6 +231,10 @@ namespace mongo {
             BSONObj mobj = members[i].Obj();
             MemberCfg m;
             try {
+                static const string legal[] = {"_id","votes","priority","host","hidden","slaveDelay","arbiterOnly"};
+                static const set<string> legals(legal, legal + 7);
+                assertOnlyHas(mobj, legals);
+
                 try { 
                     m._id = (int) mobj["_id"].Number();
                 } catch(...) { 
@@ -354,6 +358,7 @@ namespace mongo {
         BSONObj o = c->nextSafe();
         uassert(13109, "multiple rows in " + rsConfigNs + " not supported", !c->more());
         from(o);
+        checkRsConfig();
         _ok = true;
         log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
     }

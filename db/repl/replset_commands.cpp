@@ -224,16 +224,18 @@ namespace mongo {
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ){
             
-            string s = str::after(url, "/_replSetOplog?");
-            if( !s.empty() )
-                responseMsg = _replSetOplog(s);
-            else
+            if( url == "/_replSetOplog" ) {
+                cout << params.toString() << endl;
+                responseMsg = _replSetOplog(params);
+            } else
                 responseMsg = _replSet();
             responseCode = 200;
         }
 
 
-        string _replSetOplog(string parms) { 
+        string _replSetOplog(bo parms) { 
+            int _id = parms["_id"].numberInt();
+
             stringstream s;
             string t = "Replication oplog";
             s << start(t);
@@ -249,7 +251,7 @@ namespace mongo {
             }
             else {
                 try {
-                    theReplSet->getOplogDiagsAsHtml(stringToNum(parms.c_str()), s);
+                    theReplSet->getOplogDiagsAsHtml(_id, s);
                 }
                 catch(std::exception& e) { 
                     s << "error querying oplog: " << e.what() << '\n'; 
@@ -266,7 +268,7 @@ namespace mongo {
             s << start("Replica Set Status " + prettyHostName());
             s << p( a("/", "back", "Home") + " | " + 
                     a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
-                    a("/replSetGetStatus?text", "", "replSetGetStatus") + " | " +
+                    a("/replSetGetStatus?text=1", "", "replSetGetStatus") + " | " +
                     a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
                   );
 
