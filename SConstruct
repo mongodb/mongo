@@ -110,6 +110,13 @@ AddOption('--asio',
           action="store",
           help="Use Asynchronous IO (NOT READY YET)" )
 
+AddOption( "--cppflags",
+           dest="cppflags",
+           type="string",
+           nargs=1,
+           action="store",
+           help="set custom cppflags, overriding everything else")
+
 AddOption( "--d",
            dest="debugBuild",
            type="string",
@@ -756,9 +763,14 @@ else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
 if nix:
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
-    if linux:
-        env.Append( CPPFLAGS=" -Werror " )
+    cppflags = GetOption("cppflags")
+
+    if cppflags:
+        env.Append( CPPFLAGS= cppflags )
+    else:
+        env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
+        if linux:
+            env.Append( CPPFLAGS=" -Werror " )
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
@@ -769,7 +781,7 @@ if nix:
     if debugBuild:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
-    else:
+    elif not cppflags:
         env.Append( CPPFLAGS=" -O3" )
 
     if debugLogging:
