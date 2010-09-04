@@ -14,7 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* storage.h
+/* @file diskloc.h
 
    Storage subsystem management.
    Lays out our datafiles on disk, manages disk space.
@@ -26,7 +26,6 @@
 
 namespace mongo {
 
-
     class Record;
     class DeletedRecord;
     class Extent;
@@ -34,43 +33,40 @@ namespace mongo {
     class MongoDataFile;
 
 #pragma pack(1)
+	/** represents a disk location/offset on disk in a database.  64 bits. 
+		it is assumed these will be passed around by value a lot so don't do anything to make them large 
+		(such as adding a virtual function)
+	 */
     class DiskLoc {
-        int fileNo; /* this will be volume, file #, etc. */
+        int fileNo;  // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
         int ofs;
+
     public:
-        // Note: MaxFiles imposes a limit of about 32TB of data per process
-        enum SentinelValues { MaxFiles=16000, NullOfs = -1 };
 
-        int a() const {
-            return fileNo;
-        }
+        enum SentinelValues { 
+		  MaxFiles=16000, // thus a limit of about 32TB of data per db
+		  NullOfs = -1 
+		};
 
-        DiskLoc(int a, int b) : fileNo(a), ofs(b) {
-            //assert(ofs!=0);
-        }
+	    DiskLoc(int a, int b) : fileNo(a), ofs(b) { }
         DiskLoc() { Null(); }
         DiskLoc(const DiskLoc& l) {
             fileNo=l.fileNo;
             ofs=l.ofs;
         }
 
-        bool questionable() {
+        bool questionable() const {
             return ofs < -1 ||
                    fileNo < -1 ||
                    fileNo > 524288;
         }
 
-        bool isNull() const {
-            return fileNo == -1;
-            //            return ofs == NullOfs;
-        }
+        bool isNull() const { return fileNo == -1; }
         void Null() {
-            fileNo = -1;
+            fileNo = NullOfs;
             ofs = 0;
         }
-        void assertOk() {
-            assert(!isNull());
-        }
+        void assertOk() { assert(!isNull()); }
         void setInvalid() {
             fileNo = -2; 
             ofs = 0;
@@ -91,12 +87,10 @@ namespace mongo {
             return BSON( "file" << fileNo << "offset" << ofs );
         }
 
-        int& GETOFS() {
-            return ofs;
-        }
-        int getOfs() const {
-            return ofs;
-        }
+        int a() const      { return fileNo; }
+
+        int& GETOFS()      { return ofs; }
+        int getOfs() const { return ofs; }
         void set(int a, int b) {
             fileNo=a;
             ofs=b;
@@ -137,9 +131,10 @@ namespace mongo {
             return compare(b) < 0;
         }
 
-        /* get the "thing" associated with this disk location.
-           it is assumed the object is what it is -- you must asure that:
-           think of this as an unchecked type cast.
+        /* Get the "thing" associated with this disk location.
+           it is assumed the object is what you say it is -- you must assure that
+           (think of this as an unchecked type cast)
+           Note: set your Context first so that the database to which the diskloc applies is known.
         */
         BSONObj obj() const;
         Record* rec() const;
