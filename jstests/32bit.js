@@ -116,7 +116,7 @@ function f() {
 }
 
 var h = (new Date()).getHours();
-if (!db._adminCommand("buildInfo").debug) {
+if (!db._adminCommand("buildInfo").debug && !db.runCommand( { serverStatus : 1 , repl : 1 } ).repl ){
     if (forceSeedToBe || h <= 2 || h >= 22) {
         /* this test is slow, so don't run during the day */
         print("\n32bit.js running - this test is slow so only runs at night.");

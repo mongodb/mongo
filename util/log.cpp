@@ -83,7 +83,7 @@ namespace mongo {
             }
             
             
-            FILE* tmp = fopen(_path.c_str(), (_append ? "a" : "w"));
+            FILE* tmp = freopen(_path.c_str(), (_append ? "a" : "w"), stdout);
             if (!tmp){
                 cerr << "can't open: " << _path.c_str() << " for log file" << endl;
                 dbexit( EXIT_BADOPTIONS );
@@ -91,10 +91,6 @@ namespace mongo {
             }
 
             Logstream::setLogFile(tmp); // after this point no thread will be using old file
-
-            if (_file){
-                fclose(_file);
-            }
 
             _file = tmp;
             _opened = time(0);
