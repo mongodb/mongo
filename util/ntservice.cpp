@@ -35,7 +35,8 @@ namespace mongo {
 
     bool initService();
 
-    void serviceParamsCheck( program_options::variables_map& params, const std::string dbpath, int argc, char* argv[] ) {
+    // returns true if the service is started.
+    bool serviceParamsCheck( program_options::variables_map& params, const std::string dbpath, int argc, char* argv[] ) {
         bool installService = false;
         bool removeService = false;
         bool reinstallService = false;
@@ -120,8 +121,9 @@ namespace mongo {
         else if ( startService ) {
             if ( !ServiceController::startService( windowsServiceName , mongo::initService ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
-            dbexit( EXIT_CLEAN );
+	    return true;
         }
+	return false;
     }
     
     bool ServiceController::installService( const std::wstring& serviceName, const std::wstring& displayName, const std::wstring& serviceDesc, const std::wstring& serviceUser, const std::wstring& servicePassword, const std::string dbpath, int argc, char* argv[] ) {
@@ -326,6 +328,7 @@ namespace mongo {
 		reportStatus( SERVICE_START_PENDING, 1000 );
 		
 		_serviceCallback();
+		dbexit( EXIT_CLEAN );
 		
 		reportStatus( SERVICE_STOPPED );
 	}

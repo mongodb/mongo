@@ -1032,13 +1032,15 @@ int main(int argc, char* argv[], char *envp[] )
             return 0;
         }
 
+        if( cmdLine.pretouch )
+            log() << "--pretouch " << cmdLine.pretouch << endl; 
+
 #if defined(_WIN32)
-        serviceParamsCheck( params, dbpath, argc, argv );
+        if (serviceParamsCheck( params, dbpath, argc, argv )) {
+            return 0;
+        }
 #endif
     }
-
-    if( cmdLine.pretouch )
-        log() << "--pretouch " << cmdLine.pretouch << endl;
 
     initAndListen(cmdLine.port, appsrvPath);
     dbexit(EXIT_CLEAN);
