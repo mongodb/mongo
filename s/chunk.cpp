@@ -135,8 +135,6 @@ namespace mongo {
         }
 
         BSONObj median = result.getObjectField( "median" ).getOwned();
-        conn.done();
-
 
         if (median == getMin()){
             Query q;
@@ -147,6 +145,8 @@ namespace mongo {
             median = _manager->getShardKey().extractKey( median );
         }
         
+        conn.done();
+
         if ( median < getMin() || median >= getMax() ){
             stringstream ss;
             ss << "medianKey returned value out of range.  " 
@@ -352,7 +352,7 @@ namespace mongo {
             return _splitIfShould( dataWritten );
         }
         catch ( std::exception& e ){
-            log( LL_ERROR ) << "splitIfShould failed: " << e.what() << endl;
+            error() << "splitIfShould failed: " << e.what() << endl;
             return false;
         }
     }
@@ -390,7 +390,8 @@ namespace mongo {
         
         BSONObj splitPoint = pickSplitPoint();
         if ( splitPoint.isEmpty() || _min == splitPoint || _max == splitPoint) {
-            log() << "SHARD PROBLEM** shard is too big, but can't split: " << toString() << endl;
+            error() << "want to split chunk, but can't find split point " 
+                    << " chunk: " << toString() << " got: " << splitPoint << endl;
             return false;
         }
 
