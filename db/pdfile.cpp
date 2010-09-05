@@ -196,21 +196,22 @@ namespace mongo {
             addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
 
         long long size = initialExtentSize(128);
-        BSONElement e = options.getField("size");
-        if ( e.isNumber() ) {
-            size = e.numberLong();
-            size += 256;
-            size &= 0xffffffffffffff00LL;
+        {
+            BSONElement e = options.getField("size");
+            if ( e.isNumber() ) {
+                size = e.numberLong();
+                size += 256;
+                size &= 0xffffffffffffff00LL;
+            }
         }
         
         uassert( 10083 ,  "invalid size spec", size > 0 );
 
         bool newCapped = false;
         int mx = 0;
-        e = options.getField("capped");
-        if ( e.type() == Bool && e.boolean() ) {
+        if( options.getBoolField("capped") ) {
             newCapped = true;
-            e = options.getField("max");
+            BSONElement e = options.getField("max");
             if ( e.isNumber() ) {
                 mx = e.numberInt();
             }
@@ -218,7 +219,7 @@ namespace mongo {
 
         // $nExtents just for debug/testing.  We create '$nExtents' extents,
         // each of size 'size'.
-        e = options.getField( "$nExtents" );
+        BSONElement e = options.getField( "$nExtents" );
         int nExtents = int( e.number() );
         Database *database = cc().database();
         if ( nExtents > 0 ) {
