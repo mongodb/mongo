@@ -143,7 +143,7 @@ namespace mongo {
         BtreeBucket* btree() const;
         BtreeBucket* btreemod() const; // marks modified / dirty
 
-        MongoDataFile& pdf() const;
+        /*MongoDataFile& pdf() const;*/
     };
 #pragma pack()
 

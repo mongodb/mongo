@@ -463,10 +463,10 @@ namespace mongo {
         return nsindex(ns)->details(ns);
     }
 
-    inline MongoDataFile& DiskLoc::pdf() const {
+    /*inline MongoDataFile& DiskLoc::pdf() const {
         assert( fileNo != -1 );
         return *cc().database()->getFile(fileNo);
-    }
+    }*/
 
     inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
         assert( dl.a() != -1 );
