@@ -339,8 +339,7 @@ namespace mongo {
     void MongoDataFile::open( const char *filename, int minSize, bool preallocateOnly ) {
         {
             /* check quotas
-               very simple temporary implementation - we will in future look up
-               the quota from the grid database
+               very simple temporary implementation for now
             */
             if ( cmdLine.quota && fileNo > cmdLine.quotaFiles && !MMF::exists(filename) ) {
                 /* todo: if we were adding / changing keys in an index did we do some
