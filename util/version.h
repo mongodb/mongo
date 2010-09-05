@@ -17,7 +17,7 @@ namespace mongo {
     string sysInfo();
     void printSysInfo();
 
-    void show_32_warning();
+    void show_warnings();
 
 }  // namespace mongo
 

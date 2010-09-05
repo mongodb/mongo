@@ -27,6 +27,8 @@ namespace mongo {
 
     typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
 
+    const int BSONObjMaxSize = 32 * 1024 * 1024;
+
     /**
 	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
        object in a binary representation.
@@ -67,6 +69,7 @@ namespace mongo {
      */
     class BSONObj {
     public:
+        
         /** Construct a BSONObj from data in the proper format. 
             @param ifree true if the BSONObj should free() the msgdata when 
             it destructs. 

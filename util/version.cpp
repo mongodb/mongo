@@ -14,7 +14,7 @@ namespace mongo {
     // mongo processes version support
     //
 
-    const char versionString[] = "1.7.0-pre-";
+    const char versionString[] = "1.7.1-pre-";
 
     string mongodVersion() {
         stringstream ss;
@@ -61,26 +61,37 @@ namespace mongo {
     // 32 bit systems warning
     //
 
-    void show_32_warning(){
+    void show_warnings(){
+        // each message adds a leading but not a trailing newline
+
         bool warned = false;
         {
             const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );
             if ( ( 2 * ( bar / 2 ) ) != bar ) {
                 cout << "\n** NOTE: This is a development version (" << versionString << ") of MongoDB.";
-                cout << "\n**       Not recommended for production. \n" << endl;
+                cout << "\n**       Not recommended for production." << endl;
                 warned = true;
             }
         }
 
-        if ( sizeof(int*) != 4 )
-            return;
-
-        if( !warned ) // prettier this way 
+        if ( sizeof(int*) == 4 ) {
             cout << endl;
-        cout << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
-        cout << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations" << endl;
-        cout << endl;
+            cout << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
+            cout << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations" << endl;
+            warned = true;
+        }
+
+#ifdef __linux__
+        if (boost::filesystem::exists("/proc/vz") && !boost::filesystem::exists("/proc/bc")){
+            cout << endl;
+            cout << "** WARNING: You are running in OpenVZ. This is known to be broken!!!" << endl;
+            warned = true;
+        }
+#endif
+
+        if (warned)
+            cout << endl;
     }
 
 }
