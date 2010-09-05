@@ -20,7 +20,6 @@
 todo:
 _ table scans must be sequential, not next/prev pointers
 _ coalesce deleted
-
 _ disallow system* manipulations from the database.
 */
 
@@ -114,7 +113,6 @@ namespace mongo {
     DataFileMgr theDataFileMgr;
     DatabaseHolder dbHolder;
     int MAGIC = 0x1000;
-//    int curOp = -2;
 
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
@@ -140,10 +138,6 @@ namespace mongo {
             }
         }
         return ss.str();
-    }
-
-    BSONObj::BSONObj(const Record *r) {
-        init(r->data, false);
     }
 
     /*---------------------------------------------------------------------*/
@@ -183,7 +177,6 @@ namespace mongo {
             sz = 1000000000;
         int z = ((int)sz) & 0xffffff00;
         assert( z > len );
-        //DEV tlog() << "initialExtentSize(" << len << ") returns " << z << endl;
         return z;
     }
 

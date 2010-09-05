@@ -476,4 +476,9 @@ namespace mongo {
         
         return strcmp( ns, "local.oplog.$main" ) == 0;
     }
+
+    inline BSONObj::BSONObj(const Record *r) {
+        init(r->data, false);
+    }
+
 } // namespace mongo
