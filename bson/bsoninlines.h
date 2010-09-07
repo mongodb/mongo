@@ -510,8 +510,11 @@ namespace mongo {
     }
 
     inline BSONObj::BSONObj() {
-        /* LITTLE ENDIAN */
-        static char p[] = { 5, 0, 0, 0, 0 };
+        /* little endian ordering here, but perhaps that is ok regardless as BSON is spec'd 
+           to be little endian external to the system. (i.e. the rest of the implementation of bson, 
+           not this part, fails to support big endian)
+        */
+        static char p[] = { /*size*/5, 0, 0, 0, /*eoo*/0 };
         _objdata = p;
     }
 

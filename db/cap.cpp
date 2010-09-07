@@ -1,4 +1,5 @@
 // @file cap.cpp capped collection related 
+// the "old" version (<= v1.6)
 
 /**
 *    Copyright (C) 2008 10gen Inc.
