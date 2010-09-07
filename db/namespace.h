@@ -31,33 +31,6 @@ namespace mongo {
 
     const int MaxDatabaseLen = 256; // max str len for the db name, including null char
 
-	// "database.a.b.c" -> "database"
-    inline void nsToDatabase(const char *ns, char *database) {
-        const char *p = ns;
-        char *q = database;
-        while ( *p != '.' ) {
-            if ( *p == 0 )
-                break;
-            *q++ = *p++;
-        }
-        *q = 0;
-        if (q-database>=MaxDatabaseLen) {
-            log() << "nsToDatabase: ns too long. terminating, buf overrun condition" << endl;
-            dbexit( EXIT_POSSIBLE_CORRUPTION );
-        }
-    }
-    inline string nsToDatabase(const char *ns) {
-        char buf[MaxDatabaseLen];
-        nsToDatabase(ns, buf);
-        return buf;
-    }
-    inline string nsToDatabase(const string& ns) {
-        size_t i = ns.find( '.' );
-        if ( i == string::npos )
-            return ns;
-        return ns.substr( 0 , i );
-    }
-
 	/* e.g.
 	   NamespaceString ns("acme.orders");
 	   cout << ns.coll; // "orders"
@@ -674,5 +647,32 @@ namespace mongo {
     // Rename a namespace within current 'client' db.
     // (Arguments should include db name)
     void renameNamespace( const char *from, const char *to );
+
+	// "database.a.b.c" -> "database"
+    inline void nsToDatabase(const char *ns, char *database) {
+        const char *p = ns;
+        char *q = database;
+        while ( *p != '.' ) {
+            if ( *p == 0 )
+                break;
+            *q++ = *p++;
+        }
+        *q = 0;
+        if (q-database>=MaxDatabaseLen) {
+            log() << "nsToDatabase: ns too long. terminating, buf overrun condition" << endl;
+            dbexit( EXIT_POSSIBLE_CORRUPTION );
+        }
+    }
+    inline string nsToDatabase(const char *ns) {
+        char buf[MaxDatabaseLen];
+        nsToDatabase(ns, buf);
+        return buf;
+    }
+    inline string nsToDatabase(const string& ns) {
+        size_t i = ns.find( '.' );
+        if ( i == string::npos )
+            return ns;
+        return ns.substr( 0 , i );
+    }
 
 } // namespace mongo
