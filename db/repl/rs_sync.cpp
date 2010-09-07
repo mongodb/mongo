@@ -36,7 +36,7 @@ namespace mongo {
     void ReplSetImpl::syncApply(const BSONObj &o) {
         //const char *op = o.getStringField("op");
         
-        char db[MaxDatabaseLen];
+        char db[MaxDatabaseNameLen];
         const char *ns = o.getStringField("ns");
         nsToDatabase(ns, db);
 

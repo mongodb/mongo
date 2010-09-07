@@ -861,7 +861,7 @@ namespace mongo {
         if( op.getStringField("op")[0] == 'n' )
             return;
 
-        char clientName[MaxDatabaseLen];
+        char clientName[MaxDatabaseNameLen];
         const char *ns = op.getStringField("ns");
         nsToDatabase(ns, clientName);
 

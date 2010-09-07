@@ -29,7 +29,7 @@ namespace mongo {
 
 	/* in the mongo source code, "client" means "database". */
 
-    const int MaxDatabaseLen = 256; // max str len for the db name, including null char
+    const int MaxDatabaseNameLen = 256; // max str len for the db name, including null char
 
 	/* e.g.
 	   NamespaceString ns("acme.orders");
@@ -658,13 +658,13 @@ namespace mongo {
             *q++ = *p++;
         }
         *q = 0;
-        if (q-database>=MaxDatabaseLen) {
+        if (q-database>=MaxDatabaseNameLen) {
             log() << "nsToDatabase: ns too long. terminating, buf overrun condition" << endl;
             dbexit( EXIT_POSSIBLE_CORRUPTION );
         }
     }
     inline string nsToDatabase(const char *ns) {
-        char buf[MaxDatabaseLen];
+        char buf[MaxDatabaseNameLen];
         nsToDatabase(ns, buf);
         return buf;
     }
