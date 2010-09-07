@@ -46,7 +46,12 @@ namespace mongo {
                 Status* ss = i->second;
                 assert( ss );
                 if ( ss->avail ){
-                    release( addr , ss->avail );
+                    /* if we're shutting down, don't want to initiate release mechanism as it is slow, 
+                       and isn't needed since all connections will be closed anyway */
+                    if ( inShutdown() )
+                        delete ss->avail;
+                    else
+                        release( addr , ss->avail );
                     ss->avail = 0;
                 }
                 delete ss;
