@@ -125,10 +125,18 @@ namespace mongo {
         void release( const string& addr , DBClientBase * conn ){
             resetShardVersion( conn );
             BSONObj res;
-            if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) )
-                pool.release( addr , conn );
-            else {
-                log(LL_ERROR) << " couldn't unset sharding :( " << res << endl;
+            
+            try {
+                if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) ){
+                    pool.release( addr , conn );
+                }
+                else {
+                    log(LL_ERROR) << " couldn't unset sharding :( " << res << endl;
+                    delete conn;
+                }
+            }
+            catch ( std::exception& e ){
+                log(LL_ERROR) << "couldn't unsert sharding : " << e.what() << endl;
                 delete conn;
             }
         }
