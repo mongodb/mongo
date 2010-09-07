@@ -287,7 +287,7 @@ namespace mongo {
                     if ( left <= 0 )
                         throw e;
                     left--;
-                    log() << "update failed b/c of StaleConfigException, retrying " 
+                    log() << "delete failed b/c of StaleConfigException, retrying " 
                           << " left:" << left << " ns: " << r.getns() << " patt: " << pattern << endl;
                     r.reset( false );
                     shards.clear();
