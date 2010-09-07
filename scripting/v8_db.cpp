@@ -367,15 +367,19 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> internalCursorNext(const v8::Arguments& args){    
-        mongo::DBClientCursor * cursor = getCursor( args );
-        if ( ! cursor )
-            return v8::Undefined();
-        BSONObj o;
-        {
-            v8::Unlocker u;
-            o = cursor->next();
+        try {
+            mongo::DBClientCursor * cursor = getCursor( args );
+            if ( ! cursor )
+                return v8::Undefined();
+            BSONObj o;
+            {
+                v8::Unlocker u;
+                o = cursor->next();
+            }
+            return mongoToV8( o );
+        } catch ( ... ) {
+            return v8::ThrowException( v8::String::New( "unexpected exception in internalCursorNext()" ) );
         }
-        return mongoToV8( o );
     }
 
     v8::Handle<v8::Value> internalCursorHasNext(const v8::Arguments& args){
