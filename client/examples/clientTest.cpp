@@ -19,9 +19,14 @@
  * a simple test for the c++ driver
  */
 
+// this header should be first to ensure that it includes cleanly in any context
+#include "client/dbclient.h"
+
 #include <iostream>
 
-#include "client/dbclient.h"
+#ifndef assert
+#  define assert(x) MONGO_assert(x)
+#endif
 
 using namespace std;
 using namespace mongo;

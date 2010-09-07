@@ -39,5 +39,5 @@ int main( int argc, const char **argv ) {
     cout << "[" << url << "]" << endl;
 
     HttpClient c;
-    assert( c.get( url ) == 200 );
+    MONGO_assert( c.get( url ) == 200 );
 }
