@@ -621,6 +621,7 @@
     <ClInclude Include="geo\core.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />
+    <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="oplogreader.h" />
     <ClInclude Include="repl.h" />
     <ClInclude Include="replpair.h" />

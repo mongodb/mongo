@@ -508,7 +508,7 @@ namespace mongo {
 
     DiskLoc Extent::reuse(const char *nsname) { 
 		/*TODOMMF - work to do when extent is freed. */
-        log(3) << "reset extent was:" << nsDiagnostic.buf << " now:" << nsname << '\n';
+        log(3) << "reset extent was:" << nsDiagnostic.toString() << " now:" << nsname << '\n';
         massert( 10360 ,  "Extent::reset bad magic value", magic == 0x41424344 );
         xnext.Null();
         xprev.Null();

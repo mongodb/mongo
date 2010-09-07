@@ -785,6 +785,9 @@
     <ClInclude Include="capped-inl.h">
       <Filter>db\capped</Filter>
     </ClInclude>
+    <ClInclude Include="namespace-inl.h">
+      <Filter>db\core\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">

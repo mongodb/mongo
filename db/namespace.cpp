@@ -31,6 +31,8 @@
 
 namespace mongo {
 
+    BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
+
     BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
@@ -41,6 +43,14 @@ namespace mongo {
         0x8000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000, 0x200000,
         0x400000, 0x800000
     };
+
+    string Namespace::getSisterNS( const char * local ) const {
+        assert( local && local[0] != '.' );
+        string old(buf);
+        if ( old.find( "." ) != string::npos )
+            old = old.substr( 0 , old.find( "." ) );
+        return old + "." + local;
+    }
 
     NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool _capped ) {
         /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
@@ -371,7 +381,7 @@ namespace mongo {
                 if ( e == capExtent )
                     out() << " (capExtent)";
                 out() << '\n';
-                out() << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->nsDiagnostic.buf << '\n';
+                out() << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->nsDiagnostic.toString() << '\n';
                 out() << "    fr: " << e.ext()->firstRecord.toString() <<
                      " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
             }
