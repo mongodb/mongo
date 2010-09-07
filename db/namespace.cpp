@@ -44,14 +44,6 @@ namespace mongo {
         0x400000, 0x800000
     };
 
-    string Namespace::getSisterNS( const char * local ) const {
-        assert( local && local[0] != '.' );
-        string old(buf);
-        if ( old.find( "." ) != string::npos )
-            old = old.substr( 0 , old.find( "." ) );
-        return old + "." + local;
-    }
-
     NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool _capped ) {
         /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
         firstExtent = lastExtent = capExtent = loc;
