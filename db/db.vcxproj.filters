@@ -402,6 +402,9 @@
       <Filter>scripting</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
+    <ClCompile Include="capped\capped.cpp">
+      <Filter>db\capped</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -776,6 +779,12 @@
     <ClInclude Include="matcher.h">
       <Filter>db\core\h</Filter>
     </ClInclude>
+    <ClInclude Include="capped\capped.h">
+      <Filter>db\capped</Filter>
+    </ClInclude>
+    <ClInclude Include="capped\capped_impl.h">
+      <Filter>db\capped</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
@@ -843,6 +852,9 @@
     </Filter>
     <Filter Include="db\core\h">
       <UniqueIdentifier>{de119f0e-3d04-429f-b88b-69e28b1e02fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\capped">
+      <UniqueIdentifier>{9a274b34-0759-4360-a17a-9787a926eaa5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
