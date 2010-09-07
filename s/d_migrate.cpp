@@ -107,7 +107,8 @@ namespace mongo {
 
         int loops = 0;
         Timer t;
-        while ( t.seconds() < 600 ){ // 10 minutes
+        while ( t.seconds() < 900 ){ // 15 minutes
+            assert( dbMutex.getState() == 0 );
             sleepmillis( 20 );
             
             set<CursorId> now;
@@ -519,6 +520,7 @@ namespace mongo {
             
             // 4. 
             for ( int i=0; i<86400; i++ ){ // don't want a single chunk move to take more than a day
+                assert( dbMutex.getState() == 0 );
                 sleepsecs( 1 ); 
                 ScopedDbConnection conn( to );
                 BSONObj res;
@@ -537,6 +539,8 @@ namespace mongo {
 
                 if ( res["state"].String() == "steady" )
                     break;
+
+                killCurrentOp.checkForInterrupt();
             }
             timing.done(4);
 
