@@ -1217,6 +1217,7 @@ mongosniff_built = False
 if darwin or clientEnv["_HAVEPCAP"]:
     mongosniff_built = True
     sniffEnv = clientEnv.Clone()
+    sniffEnv.Append( CPPDEFINES="MONGO_EXPOSE_MACROS" )
     if not windows:
         sniffEnv.Append( LIBS=[ "pcap" ] )
     else:
