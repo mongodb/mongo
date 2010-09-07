@@ -35,7 +35,6 @@
 
 from __future__ import with_statement
 
-import atexit
 import glob
 from optparse import OptionParser
 import os
@@ -65,11 +64,6 @@ one_mongod_per_test = None
 tests = []
 winners = []
 losers = {}
-
-# Finally, atexit functions seem to be a little oblivious to whether
-# Python is exiting because of an error, so we'll use this to
-# communicate with the report() function.
-exit_bad = True
 
 # For replication hash checking
 replicated_dbs = []
@@ -319,6 +313,7 @@ def run_tests(tests):
 
     return 0
 
+
 def report():
     print "%d test%s succeeded" % (len(winners), '' if len(winners) == 1 else 's')
     num_missed = len(tests) - (len(winners) + len(losers.keys()))
@@ -344,11 +339,9 @@ at the end of testing:"""
             print "%s\t %s" % (db, screwy_in_slave[db])
     if small_oplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
         print "replication ok for %d collections" % (len(replicated_dbs))
-    if (exit_bad or losers or lost_in_slave or lost_in_master or screwy_in_slave):
-        status = 1
-    else:
-        status = 0
-    exit (status)
+    if losers or lost_in_slave or lost_in_master or screwy_in_slave:
+        raise Exception("Test failures")
+
 
 def expand_suites(suites):
     globstr = None
@@ -405,7 +398,9 @@ def expand_suites(suites):
             tests += [(path, usedb) for path in paths]
     return tests
 
+
 def main():
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, one_mongod_per_test, small_oplog, smoke_db_prefix, test_path
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
@@ -439,7 +434,6 @@ def main():
 
     print tests
 
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, one_mongod_per_test, small_oplog, smoke_db_prefix, test_path
     test_path = options.test_path
     mongod_executable = options.mongod_executable
     mongod_port = options.mongod_port
@@ -466,11 +460,11 @@ def main():
     if not tests:
         raise Exception( "no tests specified" )
 
-    run_tests(tests)
-    global exit_bad
-    exit_bad = False
+    try:
+        run_tests(tests)
+    finally:
+        report()
 
-atexit.register(report)
 
 if __name__ == "__main__":
     main()
