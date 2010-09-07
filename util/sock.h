@@ -115,10 +115,10 @@ namespace mongo {
         return "/tmp/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
     }
 
-    inline void setSockTimeouts(int sock, int secs) {
+    inline void setSockTimeouts(int sock, double secs) {
         struct timeval tv;
-        tv.tv_sec = secs;
-        tv.tv_usec = 0;
+        tv.tv_sec = (int)secs;
+        tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
         bool report = logLevel > 3; // solaris doesn't provide these
         DEV report = true;
         bool ok = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
