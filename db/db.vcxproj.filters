@@ -402,7 +402,7 @@
       <Filter>scripting</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
-    <ClCompile Include="capped\capped.cpp">
+    <ClCompile Include="capped.cpp">
       <Filter>db\capped</Filter>
     </ClCompile>
   </ItemGroup>
@@ -779,10 +779,10 @@
     <ClInclude Include="matcher.h">
       <Filter>db\core\h</Filter>
     </ClInclude>
-    <ClInclude Include="capped\capped.h">
+    <ClInclude Include="capped.h">
       <Filter>db\capped</Filter>
     </ClInclude>
-    <ClInclude Include="capped\capped_impl.h">
+    <ClInclude Include="capped-inl.h">
       <Filter>db\capped</Filter>
     </ClInclude>
   </ItemGroup>

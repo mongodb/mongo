@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "../cursor.h"
+#include "cursor.h"
 
 namespace mongo {
 
