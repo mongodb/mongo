@@ -204,11 +204,17 @@ namespace mongo {
         if ( doauth )
             _auth( lockState );
 
-        if ( _client->_curOp->getOp() != dbGetMore ){ // getMore's are special and should be handled else where
+        switch ( _client->_curOp->getOp() ){
+        case dbGetMore: // getMore's are special and should be handled else where
+        case dbUpdate: // update & delete check shard version in instance.cpp, so don't check here as well
+        case dbDelete: 
+            break;
+        default: {
             string errmsg;
             if ( ! shardVersionOk( _ns , lockState > 0 , errmsg ) ){
                 msgasserted( StaleConfigInContextCode , (string)"[" + _ns + "] shard version not ok in Client::Context: " + errmsg );
             }
+        }
         }
     }
     
