@@ -201,7 +201,7 @@ namespace mongo {
                 if ( multi ){
                 }
                 else if ( strcmp( query.firstElement().fieldName() , "_id" ) || query.nFields() != 1 ){
-                    throw UserException( 8013 , "can't do update with query that doesn't have the shard key" );
+                    throw UserException( 8013 , "can't do non-multi update with query that doesn't have the shard key" );
                 }
                 else {
                     save = true;
