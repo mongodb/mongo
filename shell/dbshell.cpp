@@ -354,6 +354,9 @@ bool isBalanced( string code ){
             i++;
             while ( i < code.size() && code[i] != '\'' ) i++;
             break;
+        case '\\':
+            if ( i+1 < code.size() && code[i+1] == '/') i++;
+            continue;
         }
     }
 
@@ -373,6 +376,8 @@ public:
         assert( isBalanced( "// {" ) );
         assert( ! isBalanced( "// \n {" ) );
         assert( ! isBalanced( "\"//\" {" ) );
+        assert( isBalanced( "{x:/x\\//}" ) );
+        assert( ! isBalanced( "{ \\/// }" ) );
 
     }
 } balnaced_test;
