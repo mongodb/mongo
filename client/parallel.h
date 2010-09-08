@@ -283,12 +283,9 @@ namespace mongo {
             friend class Future;
         };
         
-        static void commandThread();
+        static void commandThread(shared_ptr<CommandResult> res);
         
         static shared_ptr<CommandResult> spawnCommand( const string& server , const string& db , const BSONObj& cmd );
-
-    private:
-        static shared_ptr<CommandResult> * _grab;
     };
 
     
