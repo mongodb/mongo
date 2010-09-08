@@ -52,15 +52,15 @@ namespace mongo {
 
         _this = Persistent< v8::Object >::New( v8::Object::New() );
 
-        _global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print)->GetFunction() );
-        _global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version)->GetFunction() );
+        _global->Set(v8::String::New("print"), newV8Function< Print >()->GetFunction() );
+        _global->Set(v8::String::New("version"), newV8Function< Version >()->GetFunction() );
 
         _global->Set(v8::String::New("load"),
-                     v8::FunctionTemplate::New(loadCallback, v8::External::New(this))->GetFunction() );
+                     v8::FunctionTemplate::New( v8Callback< loadCallback >, v8::External::New(this))->GetFunction() );
         
         _wrapper = Persistent< v8::Function >::New( getObjectWrapperTemplate()->GetFunction() );
         
-        _global->Set(v8::String::New("gc"), v8::FunctionTemplate::New(GCV8)->GetFunction() );
+        _global->Set(v8::String::New("gc"), newV8Function< GCV8 >()->GetFunction() );
 
 
         installDBTypes( _global );
@@ -388,7 +388,7 @@ namespace mongo {
     void V8Scope::injectNative( const char *field, NativeFunction func ){
         V8_SIMPLE_HEADER
         
-        Handle< FunctionTemplate > f( v8::FunctionTemplate::New( nativeCallback ) );
+        Handle< FunctionTemplate > f( newV8Function< nativeCallback >() );
         f->Set( v8::String::New( "_native_function" ), External::New( (void*)func ) );
         _global->Set( v8::String::New( field ), f->GetFunction() );
     }        

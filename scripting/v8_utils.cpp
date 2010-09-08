@@ -16,6 +16,7 @@
  */
 
 #include "v8_utils.h"
+#include "v8_db.h"
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -275,10 +276,10 @@ namespace mongo {
         
         Local<v8::Object> o = args[0]->ToObject();
         
-        o->Set( v8::String::New( "init" ) , FunctionTemplate::New( ThreadInit )->GetFunction() );
-        o->Set( v8::String::New( "start" ) , FunctionTemplate::New( ThreadStart )->GetFunction() );
-        o->Set( v8::String::New( "join" ) , FunctionTemplate::New( ThreadJoin )->GetFunction() );
-        o->Set( v8::String::New( "returnData" ) , FunctionTemplate::New( ThreadReturnData )->GetFunction() );
+        o->Set( v8::String::New( "init" ) , newV8Function< ThreadInit >()->GetFunction() );
+        o->Set( v8::String::New( "start" ) , newV8Function< ThreadStart >()->GetFunction() );
+        o->Set( v8::String::New( "join" ) , newV8Function< ThreadJoin >()->GetFunction() );
+        o->Set( v8::String::New( "returnData" ) , newV8Function< ThreadReturnData >()->GetFunction() );
         
         return v8::Undefined();    
     }
@@ -289,7 +290,7 @@ namespace mongo {
         
         Local<v8::Object> o = args[0]->ToObject();
         
-        o->Set( v8::String::New( "init" ) , FunctionTemplate::New( ScopedThreadInit )->GetFunction() );
+        o->Set( v8::String::New( "init" ) , newV8Function< ScopedThreadInit >()->GetFunction() );
         // inheritance takes care of other member functions
         
         return v8::Undefined();
@@ -298,8 +299,8 @@ namespace mongo {
     void installFork( v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context ) {
         if ( baseContext_.IsEmpty() ) // if this is the shell, first call will be with shell context, otherwise don't expect to use fork() anyway
             baseContext_ = context;
-        global->Set( v8::String::New( "_threadInject" ), FunctionTemplate::New( ThreadInject )->GetFunction() );
-        global->Set( v8::String::New( "_scopedThreadInject" ), FunctionTemplate::New( ScopedThreadInject )->GetFunction() );
+        global->Set( v8::String::New( "_threadInject" ), newV8Function< ThreadInject >()->GetFunction() );
+        global->Set( v8::String::New( "_scopedThreadInject" ), newV8Function< ScopedThreadInject >()->GetFunction() );
     }
 
     Handle<v8::Value> GCV8(const Arguments& args) {

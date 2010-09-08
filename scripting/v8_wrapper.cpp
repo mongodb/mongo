@@ -17,6 +17,7 @@
 
 #include "v8_wrapper.h"
 #include "v8_utils.h"
+#include "v8_db.h"
 
 #include <iostream>
 
@@ -602,7 +603,7 @@ namespace mongo {
     }
 
     v8::Handle<v8::FunctionTemplate> getObjectWrapperTemplate(){
-        v8::Local<v8::FunctionTemplate> t = FunctionTemplate::New( wrapperCons );
+        v8::Local<v8::FunctionTemplate> t = newV8Function< wrapperCons >();
         t->InstanceTemplate()->SetNamedPropertyHandler( wrapperGetHandler );
         return t;
     }
