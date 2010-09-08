@@ -240,7 +240,7 @@ def runTest(test):
     (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
     if skipTest(path):
-        print "skippping " + path
+        print "skipping " + path
         return
     if ext == ".js":
         argv = [shell_executable, "--port", mongod_port]
