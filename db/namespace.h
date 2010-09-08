@@ -106,21 +106,49 @@ namespace mongo {
     extern int bucketSizes[];
 
 #pragma pack(1)
-    /* this is the "header" for a collection that has all its details.  in the .ns file.
+    /* NamespaceDetails : this is the "header" for a collection that has all its details.  
+       It's in the .ns file and this is a memory mapped region (thus the pack pragma above).
     */
     class NamespaceDetails {
-        friend class NamespaceIndex;
-        enum { NIndexesExtra = 30,
-               NIndexesBase  = 10
-        };
     public:
-        struct ExtraOld {
-            // note we could use this field for more chaining later, so don't waste it:
-            unsigned long long reserved1;
-            IndexDetails details[NIndexesExtra];
-            unsigned reserved2;
-            unsigned reserved3;
-        };
+        enum { NIndexesMax = 64, NIndexesExtra = 30, NIndexesBase  = 10 };
+
+        /* data fields, as present on disk : */
+        DiskLoc firstExtent;
+        DiskLoc lastExtent;
+        /* NOTE: capped collections v1 override the meaning of deletedList.  
+                 deletedList[0] points to a list of free records (DeletedRecord's) for all extents in
+                 the capped namespace.
+                 deletedList[1] points to the last record in the prev extent.  When the "current extent" 
+                 changes, this value is updated.  !deletedList[1].isValid() when this value is not 
+                 yet computed.
+        */
+        DiskLoc deletedList[Buckets];
+        long long datasize;
+        long long nrecords;
+        int lastExtentSize;
+        int nIndexes;
+    private:
+        IndexDetails _indexes[NIndexesBase];
+    public:
+        int capped;
+        int max;                              // max # of objects for a capped table.  TODO: should this be 64 bit? 
+        double paddingFactor;                 // 1.0 = no padding.
+        int flags;
+        DiskLoc capExtent;
+        DiskLoc capFirstNewRecord;
+		unsigned short dataFileVersion;       // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
+		unsigned short indexFileVersion;
+        unsigned long long multiKeyIndexBits;
+    private:
+        unsigned long long reservedA;
+        long long extraOffset;                // where the $extra info is located (bytes relative to this)
+    public:
+        int backgroundIndexBuildInProgress;   // 1 if in prog
+        char reserved[76];
+
+        explicit NamespaceDetails( const DiskLoc &loc, bool _capped );
+
         class Extra { 
             long long _next;
 		public:
@@ -146,50 +174,16 @@ namespace mongo {
                 _next = 0;
             }
         };
-
         Extra* extra() { 
             if( extraOffset == 0 ) return 0;
             return (Extra *) (((char *) this) + extraOffset);
         }
-
         /* add extra space for indexes when more than 10 */
         Extra* allocExtra(const char *ns, int nindexessofar);
-
         void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
-
-        enum { NIndexesMax = 64 };
-
-        BOOST_STATIC_ASSERT( NIndexesMax <= NIndexesBase + NIndexesExtra*2 );
-        BOOST_STATIC_ASSERT( NIndexesMax <= 64 ); // multiKey bits
-		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::ExtraOld) == 496 );
-		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) == 496 );
-
         /* called when loaded from disk */
         void onLoad(const Namespace& k);
-
-        NamespaceDetails( const DiskLoc &loc, bool _capped );
-
-        DiskLoc firstExtent;
-        DiskLoc lastExtent;
-
-        /* NOTE: capped collections override the meaning of deleted list.  
-                 deletedList[0] points to a list of free records (DeletedRecord's) for all extents in
-                 the capped namespace.
-                 deletedList[1] points to the last record in the prev extent.  When the "current extent" 
-                 changes, this value is updated.  !deletedList[1].isValid() when this value is not 
-                 yet computed.
-        */
-        DiskLoc deletedList[Buckets];
-
         void dumpExtents();
-
-        long long datasize;
-        long long nrecords;
-        int lastExtentSize;
-        int nIndexes;
-
-    private:
-        IndexDetails _indexes[NIndexesBase];
 
     private:
         Extent *theCapExtent() const { return capExtent.ext(); }
@@ -198,6 +192,7 @@ namespace mongo {
         DiskLoc cappedAlloc(const char *ns, int len);
         DiskLoc &cappedFirstDeletedInCurExtent();
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
+
     public:
         DiskLoc& cappedListOfAllDeletedRecords() { return deletedList[0]; }
         DiskLoc& cappedLastDelRecLastExtent()    { return deletedList[1]; }
@@ -208,29 +203,6 @@ namespace mongo {
         void cappedTruncateAfter(const char *ns, DiskLoc after, bool inclusive); /** remove rest of the capped collection from this point onward */
         void emptyCappedCollection(const char *ns);
         
-        int capped;
-
-        int max; // max # of objects for a capped table.  TODO: should this be 64 bit? 
-        double paddingFactor; // 1.0 = no padding.
-        int flags;
-
-        DiskLoc capExtent;
-        DiskLoc capFirstNewRecord;
-
-        /* NamespaceDetails version.  So we can do backward compatibility in the future.
-		   See filever.h
-        */
-		unsigned short dataFileVersion;
-		unsigned short indexFileVersion;
-
-        unsigned long long multiKeyIndexBits;
-    private:
-        unsigned long long reservedA;
-        long long extraOffset; // where the $extra info is located (bytes relative to this)
-    public:
-        int backgroundIndexBuildInProgress; // 1 if in prog
-        char reserved[76];
-
         /* when a background index build is in progress, we don't count the index in nIndexes until 
            complete, yet need to still use it in _indexRecord() - thus we use this function for that.
         */
@@ -336,7 +308,7 @@ namespace mongo {
                 paddingFactor = x;
         }
 
-        //returns offset in indexes[]
+        // @return offset in indexes[]
         int findIndexByName(const char *name) {
             IndexIterator i = ii();
             while( i.more() ) {
@@ -346,7 +318,7 @@ namespace mongo {
             return -1;
         }
 
-        //returns offset in indexes[]
+        // @return offset in indexes[]
         int findIndexByKeyPattern(const BSONObj& keyPattern) {
             IndexIterator i = ii();
             while( i.more() ) {
@@ -386,18 +358,13 @@ namespace mongo {
 
         /* allocate a new record.  lenToAlloc includes headers. */
         DiskLoc alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc);
-
         /* add a given record to the deleted chains for this NS */
         void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
-
         void dumpDeleted(set<DiskLoc> *extents = 0);
-
         // Start from firstExtent by default.
         DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
-
         // Start from lastExtent by default.
         DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
-
         long long storageSize( int * numExtents = 0 );
         
     private:
@@ -405,6 +372,18 @@ namespace mongo {
         void maybeComplain( const char *ns, int len ) const;
         DiskLoc __stdAlloc(int len);
         void compact(); // combine adjacent deleted records
+        friend class NamespaceIndex;
+        struct ExtraOld {
+            // note we could use this field for more chaining later, so don't waste it:
+            unsigned long long reserved1;
+            IndexDetails details[NIndexesExtra];
+            unsigned reserved2;
+            unsigned reserved3;
+        };
+        BOOST_STATIC_ASSERT( NIndexesMax <= NIndexesBase + NIndexesExtra*2 );
+        BOOST_STATIC_ASSERT( NIndexesMax <= 64 ); // multiKey bits
+		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::ExtraOld) == 496 );
+		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) == 496 );
     }; // NamespaceDetails
 #pragma pack()
 
