@@ -969,6 +969,7 @@ namespace mongo {
             temp.append( b.obj() );
             temp.done();
         }
+        // TODO preCondition for initial chunk or starting collection 
 
         BSONObj cmd = cmdBuilder.obj();
         
