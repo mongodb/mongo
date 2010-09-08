@@ -737,9 +737,14 @@ namespace mongo {
     
     v8::Handle<v8::Value> bsonsize( const v8::Arguments& args ) {
         
-        if (args.Length() != 1 || !args[ 0 ]->IsObject()) {
-            return v8::ThrowException( v8::String::New( "bonsisze needs 1 object" ) );
-        }
+        if ( args.Length() != 1 )
+            return v8::ThrowException( v8::String::New( "bonsisze needs 1 argument" ) );
+
+        if ( args[0]->IsNull() )
+            return v8::Number::New(0);
+
+        if ( ! args[ 0 ]->IsObject() ) 
+            return v8::ThrowException( v8::String::New( "argument to bonsisze has to be an object" ) );
 
         return v8::Number::New( v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
     }
