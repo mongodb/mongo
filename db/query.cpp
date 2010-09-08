@@ -588,7 +588,7 @@ namespace mongo {
                 BSONObjBuilder b;
                 b << "clauses" << _c->arr();
                 b.appendNumber( "nscanned", nscanned );
-                b.appendNumber( "nscanneObjects", nscannedObjects );
+                b.appendNumber( "nscannedObjects", nscannedObjects );
                 b << "n" << n;
                 b << "millis" << millis;
                 b.appendElements( suffix );
