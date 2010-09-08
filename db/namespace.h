@@ -145,14 +145,13 @@ namespace mongo {
                 memcpy(this, &e, sizeof(Extra));
                 _next = 0;
             }
-        }; // Extra
+        };
 
         Extra* extra() { 
             if( extraOffset == 0 ) return 0;
             return (Extra *) (((char *) this) + extraOffset);
         }
 
-    public:
         /* add extra space for indexes when more than 10 */
         Extra* allocExtra(const char *ns, int nindexessofar);
 
