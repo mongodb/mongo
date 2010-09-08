@@ -796,7 +796,7 @@ namespace mongo {
         void _checkConnection();
         void checkConnection() { if( failed ) _checkConnection(); }
 		map< string, pair<string,string> > authCache;
-        int _timeout;
+        double _timeout;
         
         bool _connect( string& errmsg );
     public:
@@ -807,7 +807,7 @@ namespace mongo {
            @param timeout tcp timeout in seconds - this is for read/write, not connect.  
            Connect timeout is fixed, but short, at 5 seconds.
          */
-        DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, int timeout=0) :
+        DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double timeout=0) :
                 clientSet(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _timeout(timeout) { }
 
         /** Connect to a Mongo database server.

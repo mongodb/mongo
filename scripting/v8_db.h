@@ -76,3 +76,19 @@ namespace mongo {
     v8::Handle<v8::Value> bsonsize( const v8::Arguments& args );
 
 }
+
+template < v8::Handle< v8::Value > ( *f ) ( const v8::Arguments& ) >
+v8::Handle< v8::Value > v8Callback( const v8::Arguments &args ) {
+    try {
+        return f( args );
+    } catch( const std::exception &e ) {
+        return v8::ThrowException( v8::String::New( e.what() ) );
+    } catch( ... ) {
+        return v8::ThrowException( v8::String::New( "unknown exception" ) );
+    }
+}
+
+template < v8::Handle< v8::Value > ( *f ) ( const v8::Arguments& ) >
+v8::Local< v8::FunctionTemplate > newV8Function() {
+    return v8::FunctionTemplate::New( v8Callback< f > );
+}

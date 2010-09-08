@@ -271,6 +271,14 @@ void quitAbruptly( int sig ) {
     exit(14);
 }
 
+// this will be called in certain c++ error cases, for example if there are two active
+// exceptions
+void myterminate() {
+    mongo::rawOut( "terminate() called in shell, printing stack:" );
+    mongo::printStackTrace();
+    exit(14);
+}
+
 void setupSignals() {
     signal( SIGINT , quitNicely );
     signal( SIGTERM , quitNicely );
@@ -279,6 +287,7 @@ void setupSignals() {
     signal( SIGSEGV , quitAbruptly );
     signal( SIGBUS , quitAbruptly );
     signal( SIGFPE , quitAbruptly );
+    set_terminate( myterminate );
 }
 #else
 inline void setupSignals() {}

@@ -32,21 +32,26 @@ namespace mongo {
 #define DDD(x)
 
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local ){
-        v8::Local<v8::FunctionTemplate> mongo = FunctionTemplate::New( local ? mongoConsLocal : mongoConsExternal );
+        v8::Local<v8::FunctionTemplate> mongo;
+        if ( local ) {
+            mongo = newV8Function< mongoConsLocal >();
+        } else {
+            mongo = newV8Function< mongoConsExternal >();
+        }
         mongo->InstanceTemplate()->SetInternalFieldCount( 1 );
         
         v8::Local<v8::Template> proto = mongo->PrototypeTemplate();
 
-        proto->Set( v8::String::New( "find" ) , FunctionTemplate::New( mongoFind ) );
-        proto->Set( v8::String::New( "insert" ) , FunctionTemplate::New( mongoInsert ) );
-        proto->Set( v8::String::New( "remove" ) , FunctionTemplate::New( mongoRemove ) );
-        proto->Set( v8::String::New( "update" ) , FunctionTemplate::New( mongoUpdate ) );
+        proto->Set( v8::String::New( "find" ) , newV8Function< mongoFind >() );
+        proto->Set( v8::String::New( "insert" ) , newV8Function< mongoInsert >() );
+        proto->Set( v8::String::New( "remove" ) , newV8Function< mongoRemove >() );
+        proto->Set( v8::String::New( "update" ) , newV8Function< mongoUpdate >() );
 
-        Local<FunctionTemplate> ic = FunctionTemplate::New( internalCursorCons );
+        Local<FunctionTemplate> ic = newV8Function< internalCursorCons >();
         ic->InstanceTemplate()->SetInternalFieldCount( 1 );
-        ic->PrototypeTemplate()->Set( v8::String::New("next") , FunctionTemplate::New( internalCursorNext ) );
-        ic->PrototypeTemplate()->Set( v8::String::New("hasNext") , FunctionTemplate::New( internalCursorHasNext ) );
-        ic->PrototypeTemplate()->Set( v8::String::New("objsLeftInBatch") , FunctionTemplate::New( internalCursorObjsLeftInBatch ) );
+        ic->PrototypeTemplate()->Set( v8::String::New("next") , newV8Function< internalCursorNext >() );
+        ic->PrototypeTemplate()->Set( v8::String::New("hasNext") , newV8Function< internalCursorHasNext >() );
+        ic->PrototypeTemplate()->Set( v8::String::New("objsLeftInBatch") , newV8Function< internalCursorObjsLeftInBatch >() );
         proto->Set( v8::String::New( "internalCursor" ) , ic );
         
 
@@ -55,44 +60,44 @@ namespace mongo {
     }
 
     v8::Handle<v8::FunctionTemplate> getNumberLongFunctionTemplate() {
-        v8::Local<v8::FunctionTemplate> numberLong = FunctionTemplate::New( numberLongInit );
+        v8::Local<v8::FunctionTemplate> numberLong = newV8Function< numberLongInit >();
         v8::Local<v8::Template> proto = numberLong->PrototypeTemplate();
         
-        proto->Set( v8::String::New( "valueOf" ) , FunctionTemplate::New( numberLongValueOf ) );        
-        proto->Set( v8::String::New( "toNumber" ) , FunctionTemplate::New( numberLongToNumber ) );        
-        proto->Set( v8::String::New( "toString" ) , FunctionTemplate::New( numberLongToString ) );
+        proto->Set( v8::String::New( "valueOf" ) , newV8Function< numberLongValueOf >() );        
+        proto->Set( v8::String::New( "toNumber" ) , newV8Function< numberLongToNumber >() );        
+        proto->Set( v8::String::New( "toString" ) , newV8Function< numberLongToString >() );
         
         return numberLong;
     }
 
     v8::Handle<v8::FunctionTemplate> getBinDataFunctionTemplate() {
-        v8::Local<v8::FunctionTemplate> binData = FunctionTemplate::New( binDataInit );
+        v8::Local<v8::FunctionTemplate> binData = newV8Function< binDataInit >();
         v8::Local<v8::Template> proto = binData->PrototypeTemplate();
         
-        proto->Set( v8::String::New( "toString" ) , FunctionTemplate::New( binDataToString ) );        
+        proto->Set( v8::String::New( "toString" ) , newV8Function< binDataToString >() );        
         
         return binData;
     }    
     
     void installDBTypes( Handle<ObjectTemplate>& global ){
-        v8::Local<v8::FunctionTemplate> db = FunctionTemplate::New( dbInit );
+        v8::Local<v8::FunctionTemplate> db = newV8Function< dbInit >();
         db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
         global->Set(v8::String::New("DB") , db );
         
-        v8::Local<v8::FunctionTemplate> dbCollection = FunctionTemplate::New( collectionInit );
+        v8::Local<v8::FunctionTemplate> dbCollection = newV8Function< collectionInit >();
         dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
         global->Set(v8::String::New("DBCollection") , dbCollection );
 
 
-        v8::Local<v8::FunctionTemplate> dbQuery = FunctionTemplate::New( dbQueryInit );
+        v8::Local<v8::FunctionTemplate> dbQuery = newV8Function< dbQueryInit >();
         dbQuery->InstanceTemplate()->SetIndexedPropertyHandler( dbQueryIndexAccess );
         global->Set(v8::String::New("DBQuery") , dbQuery );
 
-        global->Set( v8::String::New("ObjectId") , FunctionTemplate::New( objectIdInit ) );
+        global->Set( v8::String::New("ObjectId") , newV8Function< objectIdInit >() );
 
-        global->Set( v8::String::New("DBRef") , FunctionTemplate::New( dbRefInit ) );
+        global->Set( v8::String::New("DBRef") , newV8Function< dbRefInit >() );
 
-        global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit ) );
+        global->Set( v8::String::New("DBPointer") , newV8Function< dbPointerInit >() );
 
         global->Set( v8::String::New("BinData") , getBinDataFunctionTemplate() );
 
@@ -101,24 +106,24 @@ namespace mongo {
     }
 
     void installDBTypes( Handle<v8::Object>& global ){
-        v8::Local<v8::FunctionTemplate> db = FunctionTemplate::New( dbInit );
+        v8::Local<v8::FunctionTemplate> db = newV8Function< dbInit >();
         db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
         global->Set(v8::String::New("DB") , db->GetFunction() );
         
-        v8::Local<v8::FunctionTemplate> dbCollection = FunctionTemplate::New( collectionInit );
+        v8::Local<v8::FunctionTemplate> dbCollection = newV8Function< collectionInit >();
         dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
         global->Set(v8::String::New("DBCollection") , dbCollection->GetFunction() );
 
 
-        v8::Local<v8::FunctionTemplate> dbQuery = FunctionTemplate::New( dbQueryInit );
+        v8::Local<v8::FunctionTemplate> dbQuery = newV8Function< dbQueryInit >();
         dbQuery->InstanceTemplate()->SetIndexedPropertyHandler( dbQueryIndexAccess );
         global->Set(v8::String::New("DBQuery") , dbQuery->GetFunction() );
 
-        global->Set( v8::String::New("ObjectId") , FunctionTemplate::New( objectIdInit )->GetFunction() );
+        global->Set( v8::String::New("ObjectId") , newV8Function< objectIdInit >()->GetFunction() );
 
-        global->Set( v8::String::New("DBRef") , FunctionTemplate::New( dbRefInit )->GetFunction() );
+        global->Set( v8::String::New("DBRef") , newV8Function< dbRefInit >()->GetFunction() );
         
-        global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit )->GetFunction() );
+        global->Set( v8::String::New("DBPointer") , newV8Function< dbPointerInit >()->GetFunction() );
 
         global->Set( v8::String::New("BinData") , getBinDataFunctionTemplate()->GetFunction() );
 
@@ -132,7 +137,7 @@ namespace mongo {
         global->Set( v8::String::New("MaxKey"), mongoToV8Element( i.next() ) );
         global->Set( v8::String::New("MinKey"), mongoToV8Element( i.next() ) );
         
-        global->Get( v8::String::New( "Object" ) )->ToObject()->Set( v8::String::New("bsonsize") , FunctionTemplate::New( bsonsize )->GetFunction() );
+        global->Get( v8::String::New( "Object" ) )->ToObject()->Set( v8::String::New("bsonsize") , newV8Function< bsonsize >()->GetFunction() );
     }
 
     void destroyConnection( Persistent<Value> self, void* parameter){
@@ -733,9 +738,14 @@ namespace mongo {
     
     v8::Handle<v8::Value> bsonsize( const v8::Arguments& args ) {
         
-        if (args.Length() != 1 || !args[ 0 ]->IsObject()) {
-            return v8::ThrowException( v8::String::New( "bonsisze needs 1 object" ) );
-        }
+        if ( args.Length() != 1 )
+            return v8::ThrowException( v8::String::New( "bonsisze needs 1 argument" ) );
+
+        if ( args[0]->IsNull() )
+            return v8::Number::New(0);
+
+        if ( ! args[ 0 ]->IsObject() ) 
+            return v8::ThrowException( v8::String::New( "argument to bonsisze has to be an object" ) );
 
         return v8::Number::New( v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
     }

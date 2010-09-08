@@ -47,7 +47,7 @@ int main( int argc, const char **argv ) {
     bool ok = conn.auth( "test" , "eliot" , "bar" , errmsg );
     if ( ! ok )
         cout << errmsg << endl;
-    assert( ok );
+    MONGO_assert( ok );
 
-    assert( ! conn.auth( "test" , "eliot" , "bars" , errmsg ) );
+    MONGO_assert( ! conn.auth( "test" , "eliot" , "bars" , errmsg ) );
 }

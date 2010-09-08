@@ -301,7 +301,7 @@ namespace mongo {
         ports.insert(this);
     }
 
-    MessagingPort::MessagingPort( int timeout, int ll ) : tag(0) {
+    MessagingPort::MessagingPort( double timeout, int ll ) : tag(0) {
         _logLevel = ll;
         ports.insert(this);
         sock = -1;

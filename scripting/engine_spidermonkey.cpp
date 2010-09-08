@@ -959,10 +959,16 @@ namespace mongo {
             JS_ReportError( cx , "bsonsize requires one valid object" );
             return JS_FALSE;
         }
-        
-        JSObject * o = JSVAL_TO_OBJECT( argv[0] );
 
         Convertor c(cx);
+        
+        if ( argv[0] == JSVAL_VOID || argv[0] == JSVAL_NULL ){
+            *rval = c.toval( 0.0 );
+            return JS_TRUE;
+        }
+
+        JSObject * o = JSVAL_TO_OBJECT( argv[0] );
+
         double size = 0;
 
         if ( JS_InstanceOf( cx , o , &bson_ro_class , 0 ) ||

@@ -1147,7 +1147,7 @@ clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )
 clientEnv.Prepend( LIBS=[ "mongoclient"] )
 clientEnv.Prepend( LIBPATH=["."] )
-#clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
+clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
 l = clientEnv[ "LIBS" ]
 removeIfInList( l , "pcre" )
 removeIfInList( l , "pcrecpp" )
@@ -1203,7 +1203,7 @@ clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.
 clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
-# clientTests += [ clientEnv.Program( "bsondemo" , [ "bson/bsondemo/bsondemo.cpp" ] ) ] #TODO
+clientTests += [ clientEnv.Program( "bsondemo" , [ "bson/bsondemo/bsondemo.cpp" ] ) ]
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
@@ -1217,6 +1217,7 @@ mongosniff_built = False
 if darwin or clientEnv["_HAVEPCAP"]:
     mongosniff_built = True
     sniffEnv = clientEnv.Clone()
+    sniffEnv.Append( CPPDEFINES="MONGO_EXPOSE_MACROS" )
     if not windows:
         sniffEnv.Append( LIBS=[ "pcap" ] )
     else:

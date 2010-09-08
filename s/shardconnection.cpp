@@ -46,7 +46,12 @@ namespace mongo {
                 Status* ss = i->second;
                 assert( ss );
                 if ( ss->avail ){
-                    release( addr , ss->avail );
+                    /* if we're shutting down, don't want to initiate release mechanism as it is slow, 
+                       and isn't needed since all connections will be closed anyway */
+                    if ( inShutdown() )
+                        delete ss->avail;
+                    else
+                        release( addr , ss->avail );
                     ss->avail = 0;
                 }
                 delete ss;
@@ -120,10 +125,18 @@ namespace mongo {
         void release( const string& addr , DBClientBase * conn ){
             resetShardVersion( conn );
             BSONObj res;
-            if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) )
-                pool.release( addr , conn );
-            else {
-                log(LL_ERROR) << " couldn't unset sharding :( " << res << endl;
+            
+            try {
+                if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) ){
+                    pool.release( addr , conn );
+                }
+                else {
+                    log(LL_ERROR) << " couldn't unset sharding :( " << res << endl;
+                    delete conn;
+                }
+            }
+            catch ( std::exception& e ){
+                log(LL_ERROR) << "couldn't unsert sharding : " << e.what() << endl;
                 delete conn;
             }
         }
