@@ -59,7 +59,6 @@ mongod_executable = None
 mongod_port = None
 shell_executable = None
 continue_on_failure = None
-one_mongod_per_test = None
 
 tests = []
 winners = []
@@ -279,23 +278,16 @@ def runTest(test):
     print ""
 
 def run_tests(tests):
-    # If we're in one-mongo-per-test mode, we instantiate a Nothing
-    # around the loop, and a mongod inside the loop.
-
     # FIXME: some suites of tests start their own mongod, so don't
     # need this.  (So long as there are no conflicts with port,
     # dbpath, etc., and so long as we shut ours down properly,
     # starting this mongod shouldn't break anything, though.)
-    with Nothing() if one_mongod_per_test else mongod(small_oplog=small_oplog) as master1:
-        with Nothing() if one_mongod_per_test else (mongod(slave=True) if small_oplog else Nothing()) as slave1:
+    with mongod(small_oplog=small_oplog) as master:
+        with mongod(slave=True) if small_oplog else Nothing() as slave:
             for test in tests:
                 try:
-                    with mongod(small_oplog=small_oplog) if one_mongod_per_test else Nothing() as master2:
-                        with mongod(slave=True) if one_mongod_per_test and small_oplog else Nothing() as slave2:
-                            runTest(test)
+                    runTest(test)
                     winners.append(test)
-                    if isinstance(slave2, mongod):
-                        check_db_hashes(master2, slave2)
                 except TestFailure, f:
                     try:
                         print f
@@ -303,13 +295,12 @@ def run_tests(tests):
                         losers[f.path] = f.status
                         raise f
                     except TestServerFailure, f:
-                        if not one_mongod_per_test:
-                            return 2
+                        return 2
                     except TestFailure, f:
                         if not continue_on_failure:
                             return 1
-            if isinstance(slave1, mongod):
-                check_db_hashes(master1, slave1)
+            if isinstance(slave, mongod):
+                check_db_hashes(master, slave)
 
     return 0
 
@@ -400,7 +391,7 @@ def expand_suites(suites):
 
 
 def main():
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, one_mongod_per_test, small_oplog, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, smoke_db_prefix, test_path
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
@@ -419,9 +410,6 @@ def main():
     parser.add_option('--continue-on-failure', dest='continue_on_failure',
                       action="store_true", default=False,
                       help='If supplied, continue testing even after a test fails')
-    parser.add_option('--one-mongod-per-test', dest='one_mongod_per_test',
-                      action="store_true", default=False,
-                      help='If supplied, run each test in a fresh mongod')
     parser.add_option('--from-file', dest='File',
                       help="Run tests/suites named in FILE, one test per line, '-' means stdin")
     parser.add_option('--smoke-db-prefix', dest='smoke_db_prefix', default=smoke_db_prefix,
@@ -439,7 +427,6 @@ def main():
     mongod_port = options.mongod_port
     shell_executable = options.shell_executable
     continue_on_failure = options.continue_on_failure
-    one_mongod_per_test = options.one_mongod_per_test
     smoke_db_prefix = options.smoke_db_prefix
     small_oplog = options.small_oplog
 
