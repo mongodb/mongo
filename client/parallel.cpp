@@ -461,8 +461,14 @@ namespace mongo {
     }
 
     bool Future::CommandResult::join(){
-        while ( ! _done )
-            sleepmicros( 50 );
+        if (_done)
+            return _ok;
+
+        _barrier.take();
+        _barrier.put(true); // so others can take again
+
+        assert(_done);
+
         return _ok;
     }
 
@@ -470,6 +476,7 @@ namespace mongo {
         ScopedDbConnection conn( res->_server );
         res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
         res->_done = true;
+        res->_barrier.put(true);
         conn.done();
     }
 

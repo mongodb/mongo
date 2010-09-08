@@ -24,6 +24,7 @@
 #include "redef_macros.h"
 #include "../db/dbmessage.h"
 #include "../db/matcher.h"
+#include "../util/concurrency/mvar.h"
 
 namespace mongo {
 
@@ -279,6 +280,8 @@ namespace mongo {
             BSONObj _res;
             bool _done;
             bool _ok;
+
+            MVar<bool> _barrier; // initially empty; full when done; value should be ignored
             
             friend class Future;
         };
