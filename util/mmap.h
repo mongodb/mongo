@@ -51,7 +51,8 @@ namespace mongo {
         virtual unsigned long long length() const = 0;
 
         enum Options {
-            SEQUENTIAL = 1 // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
+            SEQUENTIAL = 1, // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
+            READONLY = 2    // not contractually guaranteed, but if specified the impl has option to fault writes
         };
 
         static int flushAll( bool sync ); // returns n flushed
@@ -146,7 +147,8 @@ namespace mongo {
         void close();
         
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
-        void* map( const char *filename );
+        void* map(const char *filename);
+        void* mapWithOptions(const char *filename, int options);
 
         /*To replace map():
         

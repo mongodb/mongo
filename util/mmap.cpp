@@ -48,6 +48,10 @@ namespace mongo {
         unsigned long long l = boost::filesystem::file_size( filename );
         return map( filename , l );
     }
+    void* MemoryMappedFile::mapWithOptions(const char *filename, int options) {
+        unsigned long long l = boost::filesystem::file_size( filename );
+        return map( filename , l, options );
+    }
 
     void printMemInfo( const char * where ){
         cout << "mem info: ";

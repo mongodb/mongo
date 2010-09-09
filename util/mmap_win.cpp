@@ -69,11 +69,18 @@ namespace mongo {
         DWORD createOptions = FILE_ATTRIBUTE_NORMAL;
         if ( options & SEQUENTIAL )
             createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
+        DWORD rw = GENERIC_READ | GENERIC_WRITE;
+        if ( options & READONLY ) 
+            rw = GENERIC_READ;
 
         fd = CreateFile(
                  toNativeString(filename).c_str(),
-                 GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ,
-                 NULL, OPEN_ALWAYS, createOptions , NULL);
+                 rw, // desired access
+                 FILE_SHARE_READ, // share mode
+                 NULL, // security
+                 OPEN_ALWAYS, // create disposition
+                 createOptions , // flags
+                 NULL); // hTemplateFile
         if ( fd == INVALID_HANDLE_VALUE ) {
             log() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
             return 0;
