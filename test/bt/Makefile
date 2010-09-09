@@ -1,7 +1,7 @@
 CFLAGS=-g -W -Wall -Wpointer-arith -Wmissing-prototypes
 
 WT=	../build_posix
-BDB=	../../bdb.releases/db-4.8.26
+BDB=	../../db-4.8.26
 LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a ${EXTLIB}
 
 SRCS=	bdb.c config.c t.c util.c wts.c wts.h config.h
