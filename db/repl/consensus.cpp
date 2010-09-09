@@ -72,7 +72,7 @@ namespace mongo {
         for( Member *m = rs.head(); m; m=m->next() ) 
             vTot += m->config().votes;
         if( vTot % 2 == 0 && vTot && complain++ == 0 )
-            log() << "replSet warning total number of votes is even - considering giving one member an extra vote" << rsLog;
+            log() << "replSet " /*buildbot! warning */ "total number of votes is even - add arbiter or give one member an extra vote" << rsLog;
         return vTot;
     }
 

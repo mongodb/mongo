@@ -13,6 +13,7 @@ namespace mongo {
         // must be in write lock for these:
         void create(string path, string ns, NamespaceDetails *nsd, unsigned long long approxSize);
         void open  (string path, string db, NamespaceDetails *nsd);
+        void close (NamespaceDetails *nsd);
 
         class Insert : boost::noncopyable {
         public:

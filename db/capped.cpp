@@ -52,6 +52,8 @@ namespace mongo {
     public:
         MMF file;
         MMF::Pointer ptr;
+
+        ~CappedCollection2() { file.close(); }
         Region* regionHeader(unsigned i) { 
             size_t ofs = 8192 + i * RegionSize;
             return (Region *) ptr.at(ofs, 8);
@@ -62,10 +64,14 @@ namespace mongo {
         }
     };
 
-    void findAFileNumber(boost::filesystem::path p, unsigned& fileNumber, unsigned toTry) { 
+    inline CappedCollection2*& cc2(NamespaceDetails *nsd) { 
+        return (CappedCollection2*&) nsd->capped2.cc2_ptr;
+    }
+
+    void findAFileNumber(boost::filesystem::path partialpath, unsigned& fileNumber, unsigned toTry) { 
         if( toTry == 0 ) return; // 0 not allowed that's our null sentinel
-        p /= (str::stream() << hex << toTry);
-        if( MMF::exists(p) ) 
+        string fname = (str::stream() << partialpath.string() << hex << toTry);
+        if( MMF::exists(fname) ) 
             return;
         fileNumber = toTry;
     }
@@ -73,19 +79,28 @@ namespace mongo {
     string filename(string path, string db, unsigned fileNumber) { 
         boost::filesystem::path p(path);
         stringstream ss;
-        ss << db << ".c_" << hex << fileNumber;
+        ss << db << ".cap." << hex << fileNumber;
         p /= ss.str();
         return p.string();
     }
 
     void cappedcollection::open(string path, string db, NamespaceDetails *nsd) { 
-        if( nsd->capped2.cc2_ptr ) // already open
+        if( cc2(nsd) ) // already open
             return;
         assertInWriteLock();
         uassert(13466, str::stream() << "bad filenumber for capped collection in db " << db << " - try repair?", nsd->capped2.fileNumber);
         auto_ptr<CappedCollection2> cc( new CappedCollection2 );
         cc->ptr = cc->file.map( filename(path, db, nsd->capped2.fileNumber).c_str() );
-        nsd->capped2.cc2_ptr = (unsigned long long) cc.release();
+        cc2(nsd) = cc.release();
+    }
+
+    void cappedcollection::close(NamespaceDetails *nsd) { 
+        assertInWriteLock();
+        CappedCollection2*& c = cc2(nsd);
+        if( c ) {
+            delete c;
+            c = 0;
+        }
     }
 
     void cappedcollection::create(string path, string ns, NamespaceDetails *nsd, unsigned long long sz) { 
@@ -94,12 +109,13 @@ namespace mongo {
         NamespaceString nsstr(ns);
         {
             stringstream ss;
-            ss << nsstr.db << ".c_";
+            ss << nsstr.db << ".cap.";
             p /= ss.str();
         }
 
         massert(13467, str::stream() << "bad cappedcollection::create filenumber - try repair?" << ns, nsd->capped2.fileNumber == 0);
 
+        // we start with small random #s just to be polite (not really important)
         unsigned n = 0;
         for( int i = 0; i < 3 && n == 0; i++ ) {
             findAFileNumber(p, n, ((unsigned) rand()) % 0x100);
@@ -107,8 +123,9 @@ namespace mongo {
         for( int i = 0; i < 3 && n == 0; i++ ) {
             findAFileNumber(p, n, ((unsigned) rand()) % 0x1000);
         }
-        for( int i = 0; i < 10 && n == 0; i++ ) {
-            findAFileNumber(p, n, (unsigned) security.getNonce());
+        for( int i = 0; i < 20 && n == 0; i++ ) {
+            // our file #s for capped2 are 18 bits
+            findAFileNumber(p, n, ((unsigned) security.getNonce()) % 0x40000);
         }
         if( n == 0 ) { 
             uasserted(10000, str::stream() << "couldn't find a file number to assign to new capped collection " << ns);
@@ -131,12 +148,19 @@ namespace mongo {
                 FileHeader *h = (FileHeader *) cc->ptr.at(0, 8192);
                 if( ns.size() < sizeof(h->ns) )
                     strcpy(h->ns, ns.c_str());
+                h->reserved[0] = 0x1a; // just make console output of the file nicer maybe...
+                h->reserved[1] = 4;
                 h->ver1 = 1;
                 h->ver2 = 1;
                 h->fileSize = realSize;
                 h->regionSize = RegionSize;
-                h->nRegions = (unsigned) ((realSize - 8192) / RegionSize);
-                assert( h->nRegions >= 1 );
+                {
+                    unsigned long long net = (realSize - 8192);
+                    unsigned long long nr = net / RegionSize;
+                    if( nr == 0 )
+                        nr = 1;
+                    h->nRegions = (unsigned) nr;
+                }
 
                 // init region headers
                 for( unsigned r = 0; r < h->nRegions-1; r++ ) {
@@ -147,7 +171,7 @@ namespace mongo {
                 assert( left > 0 && left <= RegionSize );
                 cc->regionHeader(h->nRegions-1)->size = (unsigned) left;
             }
-            nsd->capped2.cc2_ptr = (unsigned long long) cc.release();
+            cc2(nsd) = cc.release();
             nsd->capped2.fileNumber = n;
         }
     }
