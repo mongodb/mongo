@@ -263,7 +263,6 @@
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="..\db\cap.cpp" />
-    <ClCompile Include="..\db\capped.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
@@ -625,7 +624,6 @@
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="basictests.cpp" />
     <ClCompile Include="btreetests.cpp" />
-    <ClCompile Include="capped2tests.cpp" />
     <ClCompile Include="clienttests.cpp" />
     <ClCompile Include="cursortests.cpp" />
     <ClCompile Include="dbtests.cpp" />

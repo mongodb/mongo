@@ -698,12 +698,6 @@
     <ClCompile Include="..\util\concurrency\spin_lock.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\capped.cpp">
-      <Filter>db</Filter>
-    </ClCompile>
-    <ClCompile Include="capped2tests.cpp">
-      <Filter>dbtests</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
