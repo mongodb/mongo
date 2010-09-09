@@ -108,6 +108,8 @@ namespace mongo {
             */
             void* at(int offset, int len);
 
+            void* atAsIndicated(int offset);
+
             /** indicate that we wrote to the range (from a previous at() call) and that it needs 
                 flushing to disk.
                 */
@@ -131,6 +133,7 @@ namespace mongo {
             Pointer() : _base(0) { }
             Pointer(void *p) : _base((char*) p) { }
             void* at(int offset, int maxLen) { return _base + offset; } 
+            void* atAsIndicated(int offset) { return _base + offset; } 
 			void grow(int offset, int len) { /* no action required with mem mapped file */ }
             bool isNull() const { return _base == 0; }
         };

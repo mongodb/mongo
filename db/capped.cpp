@@ -29,12 +29,13 @@ namespace mongo {
     };
     struct RecordHeader { 
         unsigned long long ord;
-        unsigned recordSize;
+        int prevRecordDelta;       // previous in this region - for reverse cursors. negative #.
+        unsigned recordSize;       // <- this could be the beginning of the bson but that might be bad if there are updates that shrink records.
         // then: data[recordSize]
         // then: unsigned recordSizeRepeats;
     };
     struct Region {
-        unsigned size; // size of this region. the last region in the file may be smaller than the rest
+        unsigned size;     // size of this region. the last region in the file may be smaller than the rest
         unsigned zero;     // future
         char reserved[8192 - 8];
         union {
@@ -48,21 +49,80 @@ namespace mongo {
     };
 #pragma pack()
 
+    /* ---------------------------------------------------------------- */
+
     class CappedCollection2 : boost::noncopyable {
+        DiskLoc oldest, newest;
+        mutex m;
     public:
         MMF file;
         MMF::Pointer ptr;
 
+        CappedCollection2() : m("cc2") { }
         ~CappedCollection2() { file.close(); }
+
+        FileHeader * fileHeader() { return (FileHeader *) ptr.at(0, 8192); }
+
+        unsigned nRegions() { return fileHeader()->nRegions; }
+
         Region* regionHeader(unsigned i) { 
             size_t ofs = 8192 + i * RegionSize;
             return (Region *) ptr.at(ofs, 8);
         }
+        Region* fullRegion(unsigned i) { 
+            size_t ofs = 8192 + i * RegionSize;
+            return (Region *) ptr.atAsIndicated(ofs);
+        }
+
         RecordHeader* firstRecordHeaderForRegion(unsigned i) { 
             size_t ofs = 8192 + i * RegionSize + 8192;
             return (RecordHeader *) ptr.at(ofs, 8);
         }
+
+        void findStartAndEnd();
+        void markAsEmpty();
+        bool regionIsValid(unsigned);
     };
+
+    bool CappedCollection2::regionIsValid(unsigned i) { 
+        Region *r = fullRegion(i);
+        // not done
+        return false;
+    }
+
+    void CappedCollection2::findStartAndEnd() { 
+        mutex::scoped_lock lk(m);
+
+        unsigned nr = nRegions();
+        vector<unsigned long long> ords;
+        for( unsigned i = 0; i < nr; i++ )
+            ords.push_back( firstRecordHeaderForRegion(i)->ord );
+
+        while( 1 ) { 
+            // look for region with the highest ordinal.
+            unsigned long long max = 0;
+            unsigned maxi;
+            for( unsigned i = 0; i < nr; i++ ) {
+                if( ords[i] > max ) { 
+                    max = ords[i];
+                    maxi = i;
+                }
+            }
+            if( max == 0 ) { 
+                // empty. null values for oldest/newest are fine
+                return;
+            }
+            if( !regionIsValid(maxi) ) {
+                /* region was not fully written to disk. try again. */
+                ords[maxi] = firstRecordHeaderForRegion(maxi)->ord = 0; // clean up for next time
+                continue;
+            }
+            /* maxi is the region with the highest ord.  we now have to find the exact boundary */
+            log() << "NOT YET IMPLEMENTED cc2" << endl;
+        }
+    }
+
+    /* ---------------------------------------------------------------- */
 
     inline CappedCollection2*& cc2(NamespaceDetails *nsd) { 
         return (CappedCollection2*&) nsd->capped2.cc2_ptr;
@@ -145,7 +205,7 @@ namespace mongo {
             cc->ptr = cc->file.create( filename(path, nsstr.db, n), realSize, true);
             {
                 // init file header
-                FileHeader *h = (FileHeader *) cc->ptr.at(0, 8192);
+                FileHeader *h = cc->fileHeader();
                 if( ns.size() < sizeof(h->ns) )
                     strcpy(h->ns, ns.c_str());
                 h->reserved[0] = 0x1a; // just make console output of the file nicer maybe...
