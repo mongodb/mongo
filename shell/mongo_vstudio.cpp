@@ -216,7 +216,7 @@ const StringData _jscode_raw_utils =
 "for ( var k in src ){\n" 
 "var v = src[k];\n" 
 "if ( deep && typeof(v) == \"object\" ){\n" 
-"if ( \"floatApprox\" in v ) {\n" 
+"if ( \"floatApprox\" in v ) { // convert NumberLong properly\n" 
 "eval( \"v = \" + tojson( v ) );\n" 
 "} else {\n" 
 "v = Object.extend( typeof ( v.length ) == \"number\" ? [] : {} , v , true );\n" 
