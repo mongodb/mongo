@@ -22,20 +22,28 @@
 
 namespace mongo {
 
-    /*static*/ void MemoryMappedFile::updateLength( const char *filename, long &length ) {
+    /* Create. Must not exist. 
+    @param zero fill file with zeros when true
+    */
+    void* MemoryMappedFile::create(string filename, unsigned long long len, bool zero) {
+        uassert( 13468, string("can't create file already exists ") + filename, !exists(filename) );
+        void *p = map(filename.c_str(), len);
+        if( p )
+            memset(p, 0, len);
+        return p;
+    }
+
+    /*static*/ void MemoryMappedFile::updateLength( const char *filename, unsigned long long &length ) {
         if ( !boost::filesystem::exists( filename ) )
             return;
         // make sure we map full length if preexisting file.
         boost::uintmax_t l = boost::filesystem::file_size( filename );
-        assert( l <= 0x7fffffff );
-        length = (long) l;
+        length = l;
     }
 
     void* MemoryMappedFile::map(const char *filename) {
         boost::uintmax_t l = boost::filesystem::file_size( filename );
-        assert( l <= 0x7fffffff );
-        long i = (long)l;
-        return map( filename , i );
+        return map( filename , l );
     }
 
     void printMemInfo( const char * where ){

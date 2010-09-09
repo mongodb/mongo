@@ -7,30 +7,34 @@
 
 namespace mongo {
 
-    class CappedCollection : boost::noncopyable { 
-    public:
-        /* open */
-        CappedCollection(string z, const string &dbpath, const string& ns);
+    class NamespaceDetails;
 
-        /* create */
-        CappedCollection(const string& dbpath, const string& ns, unsigned long long size);
+    namespace cappedcollection { 
+        // must be in write lock for these:
+        void create(string path, string ns, NamespaceDetails *nsd, unsigned long long approxSize);
+        void open  (string path, string db, NamespaceDetails *nsd);
 
-        /* closes file */
-        ~CappedCollection();
-
-        struct InsertJob : boost::noncopyable { 
-            void * data;
-            DiskLoc loc;
-            InsertJob(CappedCollection *cc);
-            ~InsertJob();
-        private:
-            CappedCollection *_cc;
+        class Insert : boost::noncopyable {
+        public:
+            void* start(unsigned recLen);
+            DiskLoc finish();
+        //private:
+        //    CappedCollection *_cc;
         };
 
-        void truncateFrom(DiskLoc x);
+    }
 
-        // drop?
-    };
+    /* operations 
+       closefile???
+       open
+       create
+       insert
+       insert getting a ptr and then finishing
+       truncateFrom
+       drop
+       empty
+       cursors
+       */
 
     class ForwardCappedCursor2 : public BasicCursor, public AdvanceStrategy {
     public:

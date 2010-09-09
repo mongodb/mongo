@@ -123,12 +123,12 @@ extern StoreToUse *btreeStore;
 const int BucketSize = 8192;
 
 inline BtreeBucket* DiskLoc::btree() const {
-    assert( fileNo != -1 );
+    assert( _a != -1 );
     return (BtreeBucket*) btreeStore->get(*this, BucketSize);
 }
 
 inline BtreeBucket* DiskLoc::btreemod() const {
-    assert( fileNo != -1 );
+    assert( _a != -1 );
     BtreeBucket *b = (BtreeBucket*) btreeStore->get(*this, BucketSize);
     btreeStore->modified(*this);
     return b;

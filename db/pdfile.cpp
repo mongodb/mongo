@@ -376,8 +376,13 @@ namespace mongo {
             }
             return;
         }
-        
-        _p = mmf.map(filename, size);
+
+        {
+            unsigned long long sz = size;
+            _p = mmf.map(filename, sz);
+            assert( sz <= 0x7fffffff );
+            size = (int) sz;
+        }
         header = (DataFileHeader *) _p.at(0, DataFileHeader::HeaderSize);
         if( sizeof(char *) == 4 ) 
             uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", header);
@@ -429,9 +434,9 @@ namespace mongo {
             return cc().database()->addAFile( 0, true )->createExtent(ns, approxSize, newCapped, loops+1);
         }
         int offset = header->unused.getOfs();
-        header->unused.setOfs( fileNo, offset + ExtentSize );
+        header->unused.set( fileNo, offset + ExtentSize );
         header->unusedLength -= ExtentSize;
-        loc.setOfs(fileNo, offset);
+        loc.set(fileNo, offset);
         Extent *e = _getExtent(loc);
         DiskLoc emptyLoc = e->init(ns, ExtentSize, fileNo, offset);
 
@@ -536,7 +541,7 @@ namespace mongo {
     /* assumes already zeroed -- insufficient for block 'reuse' perhaps */
     DiskLoc Extent::init(const char *nsname, int _length, int _fileNo, int _offset) {
         magic = 0x41424344;
-        myLoc.setOfs(_fileNo, _offset);
+        myLoc.set(_fileNo, _offset);
         xnext.Null();
         xprev.Null();
         nsDiagnostic = nsname;
@@ -850,13 +855,13 @@ namespace mongo {
                 if ( todelete->nextOfs == DiskLoc::NullOfs )
                     e->firstRecord.Null();
                 else
-                    e->firstRecord.setOfs(dl.a(), todelete->nextOfs);
+                    e->firstRecord.set(dl.a(), todelete->nextOfs);
             }
             if ( e->lastRecord == dl ) {
                 if ( todelete->prevOfs == DiskLoc::NullOfs )
                     e->lastRecord.Null();
                 else
-                    e->lastRecord.setOfs(dl.a(), todelete->prevOfs);
+                    e->lastRecord.set(dl.a(), todelete->prevOfs);
             }
         }
 

@@ -310,7 +310,7 @@ namespace mongo {
                 fileLength = filelength;
                 version = VERSION;
                 versionMinor = VERSION_MINOR;
-                unused.setOfs( fileno, HeaderSize );
+                unused.set( fileno, HeaderSize );
                 assert( (data-(char*)this) == HeaderSize );
                 unusedLength = fileLength - HeaderSize - 16;
                 //memcpy(data+unusedLength, "      \nthe end\n", 16);
@@ -396,7 +396,7 @@ namespace mongo {
         return BSONObj(rec());
     }
     inline DeletedRecord* DiskLoc::drec() const {
-        assert( fileNo != -1 );
+        assert( _a != -1 );
         return (DeletedRecord*) rec();
     }
     inline Extent* DiskLoc::ext() const {

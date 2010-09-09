@@ -67,6 +67,9 @@ namespace mongo {
         reservedA = 0;
         extraOffset = 0;
         backgroundIndexBuildInProgress = 0;
+        reservedB = 0;
+        capped2.cc2_ptr = 0;
+        capped2.fileNumber = 0;
         memset(reserved, 0, sizeof(reserved));
     }
 
@@ -104,6 +107,7 @@ namespace mongo {
             log() << "backgroundIndexBuildInProgress was " << backgroundIndexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
             backgroundIndexBuildInProgress = 0;
         }
+        capped2.cc2_ptr = 0;
     }
 
     static void namespaceOnLoadCallback(const Namespace& k, NamespaceDetails& v) { 
@@ -125,7 +129,7 @@ namespace mongo {
             i.dbDropped();
         }
 		*/
-		int len = -1;
+		unsigned long long len = 0;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
         MMF::Pointer p;
@@ -143,10 +147,10 @@ namespace mongo {
 			// use lenForNewNsFiles, we are making a new database
 			massert( 10343 ,  "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
             maybeMkdir();
-			long l = lenForNewNsFiles;
+			unsigned long long l = lenForNewNsFiles;
 			p = f.map(pathString.c_str(), l);
             if( !p.isNull() ) {
-                len = (int) l;
+                len = l;
                 assert( len == lenForNewNsFiles );
             }
 		}
@@ -156,7 +160,8 @@ namespace mongo {
             dbexit( EXIT_FS );
         }
 
-        ht = new HashTable<Namespace,NamespaceDetails,MMF::Pointer>(p, len, "namespace index");
+        assert( len <= 0x7fffffff );
+        ht = new HashTable<Namespace,NamespaceDetails,MMF::Pointer>(p, (int) len, "namespace index");
         if( checkNsFilesOnLoad )
             ht->iterAll(namespaceOnLoadCallback);
     }

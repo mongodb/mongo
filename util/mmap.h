@@ -48,7 +48,7 @@ namespace mongo {
 
     public:
         virtual ~MongoFile() {}
-        virtual long length() = 0;
+        virtual unsigned long long length() const = 0;
 
         enum Options {
             SEQUENTIAL = 1 // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
@@ -156,7 +156,12 @@ namespace mongo {
         /* Creates with length if DNE, otherwise uses existing file length,
            passed length.
         */
-        void* map(const char *filename, long &length, int options = 0 );
+        void* map(const char *filename, unsigned long long &length, int options = 0 );
+
+        /* Create. Must not exist. 
+           @param zero fill file with zeros when true
+        */
+        void* create(string filename, unsigned long long len, bool zero);
 
         void flush(bool sync);
         virtual Flushable * prepareFlush();
@@ -165,19 +170,18 @@ namespace mongo {
             return view;
         }*/
 
-        long length() {
-            return len;
-        }
+        long shortLength() const { return (long) len; }
+        unsigned long long length() const { return len; }
 
         string filename() const { return _filename; }
 
     private:
-        static void updateLength( const char *filename, long &length );
+        static void updateLength( const char *filename, unsigned long long &length );
         
         HANDLE fd;
         HANDLE maphandle;
         void *view;
-        long len;
+        unsigned long long len;
         string _filename;
 
 #ifdef _WIN32

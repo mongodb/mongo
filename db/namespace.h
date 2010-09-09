@@ -113,7 +113,7 @@ namespace mongo {
     public:
         enum { NIndexesMax = 64, NIndexesExtra = 30, NIndexesBase  = 10 };
 
-        /* data fields, as present on disk : */
+        /*-------- data fields, as present on disk : */
         DiskLoc firstExtent;
         DiskLoc lastExtent;
         /* NOTE: capped collections v1 override the meaning of deletedList.  
@@ -124,16 +124,20 @@ namespace mongo {
                  yet computed.
         */
         DiskLoc deletedList[Buckets];
+        // ofs 168 (8 byte aligned)
         long long datasize;
         long long nrecords;
         int lastExtentSize;
         int nIndexes;
     private:
+        // ofs 192
         IndexDetails _indexes[NIndexesBase];
     public:
+        // ofs 352 (16 byte aligned)
         int capped;
         int max;                              // max # of objects for a capped table.  TODO: should this be 64 bit? 
         double paddingFactor;                 // 1.0 = no padding.
+        // ofs 386 (16)
         int flags;
         DiskLoc capExtent;
         DiskLoc capFirstNewRecord;
@@ -141,11 +145,19 @@ namespace mongo {
 		unsigned short indexFileVersion;
         unsigned long long multiKeyIndexBits;
     private:
+        // ofs 400 (16)
         unsigned long long reservedA;
         long long extraOffset;                // where the $extra info is located (bytes relative to this)
     public:
         int backgroundIndexBuildInProgress;   // 1 if in prog
-        char reserved[76];
+        unsigned reservedB;
+        // ofs 424 (8)
+        struct Capped2 { 
+            unsigned long long cc2_ptr;       // see capped.cpp
+            unsigned fileNumber;
+        } capped2;
+        char reserved[60];
+        /*-------- end data 496 bytes */
 
         explicit NamespaceDetails( const DiskLoc &loc, bool _capped );
 
