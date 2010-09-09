@@ -301,6 +301,10 @@ namespace mongo {
 
             c->checkLocation();
 
+            if ( yield && ! cc->yieldSometimes() ){
+                // cursor got finished by someone else, so we're done
+                break;
+            }
         }
 
         return num;
