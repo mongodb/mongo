@@ -379,8 +379,10 @@ void processDiagLog( const char * file ){
     Connection c;
     MemoryMappedFile f;
     long length;
-    
-    char * root = (char*)f.map( file , length , MemoryMappedFile::SEQUENTIAL );
+    unsigned long long L = 0;
+    char * root = (char*)f.map( file , L, MemoryMappedFile::SEQUENTIAL );
+    assert( L < 0x80000000 );
+    length = (long) L;
     assert( root );
     assert( length > 0 );
     

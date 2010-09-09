@@ -66,9 +66,8 @@ namespace mongo {
         static OID gen() { OID o; o.init(); return o; }
         
         static unsigned staticMachine(){ return _machine; }
-        /**
-           sets the contents to a new oid / randomized value
-        */
+
+        /** sets the contents to a new oid / randomized value */
         void init();
 
         /** Set to the hex string value specified. */
