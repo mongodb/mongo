@@ -55,7 +55,7 @@ namespace mongo {
 
     extern char *appsrvPath;
     extern int diagLogging;
-    extern int lenForNewNsFiles;
+    extern unsigned lenForNewNsFiles;
     extern int lockFile;
     extern bool checkNsFilesOnLoad;    
     extern string repairpath;

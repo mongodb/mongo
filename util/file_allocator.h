@@ -69,7 +69,7 @@ namespace mongo {
         }
         // Returns when file has been allocated.  If file exists, size is
         // updated to match existing file size.
-        void allocateAsap( const string &name, long &size ) {
+        void allocateAsap( const string &name, unsigned long long &size ) {
 #if !defined(_WIN32)
             scoped_lock lk( pendingMutex_ );
             long oldSize = prevSize( name );

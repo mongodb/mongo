@@ -94,7 +94,7 @@ namespace mongo {
             BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( dir ) );
     }
     
-	int lenForNewNsFiles = 16 * 1024 * 1024;
+	unsigned lenForNewNsFiles = 16 * 1024 * 1024;
     
     void NamespaceDetails::onLoad(const Namespace& k) { 
         if( k.isExtra() ) { 

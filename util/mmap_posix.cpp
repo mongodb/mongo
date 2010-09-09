@@ -50,7 +50,7 @@ namespace mongo {
 #define O_NOATIME 0
 #endif
 
-    void* MemoryMappedFile::map(const char *filename, long &length, int options) {
+    void* MemoryMappedFile::map(const char *filename, unsigned long long &length, int options) {
         // length may be updated by callee.
         _filename = filename;
         theFileAllocator().allocateAsap( filename, length );
@@ -65,7 +65,7 @@ namespace mongo {
             return 0;
         }
 
-        off_t filelen = lseek(fd, 0, SEEK_END);
+        unsigned long long filelen = lseek(fd, 0, SEEK_END);
         if ( filelen != length ){
             cout << "wanted length: " << length << " filelen: " << filelen << endl;
             cout << sizeof(size_t) << endl;
@@ -77,7 +77,7 @@ namespace mongo {
         if ( view == MAP_FAILED ) {
             out() << "  mmap() failed for " << filename << " len:" << length << " " << errnoWithDescription() << endl;
             if ( errno == ENOMEM ){
-                out() << "     mmap failed with out of memory, if you're using 32-bits, then you probably need to upgrade to 64" << endl;
+                out() << "mmap failed with out of memory, if you're using 32-bits, then you probably need to upgrade to 64" << endl;
             }
             return 0;
         }
