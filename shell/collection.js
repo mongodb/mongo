@@ -68,6 +68,9 @@ DBCollection.prototype.help = function () {
 DBCollection.prototype.getFullName = function(){
     return this._fullName;
 }
+DBCollection.prototype.getMongo = function(){
+    return this._db.getMongo();
+}
 DBCollection.prototype.getDB = function(){
     return this._db;
 }

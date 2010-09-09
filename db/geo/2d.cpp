@@ -165,7 +165,7 @@ namespace mongo {
             _hash( embed ).append( b , "" );
 
             for ( size_t i=0; i<_other.size(); i++ ){
-                BSONElement e = obj[_other[i]];
+                BSONElement e = obj.getFieldDotted(_other[i]);
                 if ( e.eoo() )
                     e = _spec->missingField();
                 b.appendAs( e , "" );

@@ -29,3 +29,4 @@ for( i = 1; i <= 10; ++i ) {
 
 assert.eq.automsg( "55", "t.group( {key:'y', reduce:function(doc,out){ out.i += doc.i; }, initial:{i:0} } )[ 0 ].i" );
 
+assert.eq.automsg( "NumberLong(10)", "t.group( {$reduce: function(doc, prev) { prev.count += 1; }, initial: {count: new NumberLong(0) }} )[ 0 ].count" );

@@ -903,17 +903,19 @@ namespace mongo {
     
     void ChunkManager::save_inlock( bool major ){
         
-        ShardChunkVersion a = getVersion_inlock();
-        assert( a > 0 || _chunkMap.size() <= 1 );
-        ShardChunkVersion nextChunkVersion = a;
+        ShardChunkVersion version = getVersion_inlock();
+        assert( version > 0 || _chunkMap.size() <= 1 );
+        ShardChunkVersion nextChunkVersion = version;
         nextChunkVersion.inc( major );
 
         vector<ChunkPtr> toFix;
         vector<ShardChunkVersion> newVersions;
         
+        // Instead of upating the 'chunks' collection directly, we use the 'applyOps' command. It allows us 
+        // (a) to serialize the changes to that collection and (b) to only actually perform the update if this
+        // ChunkManager has the proper ShardChunkVersion.
         BSONObjBuilder cmdBuilder;
         BSONArrayBuilder updates( cmdBuilder.subarrayStart( "applyOps" ) );
-        
         
         int numOps = 0;
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
@@ -929,15 +931,19 @@ namespace mongo {
             toFix.push_back( c );
             newVersions.push_back( myVersion );
 
+            // build an update operation against the chunks collection of the config database with 
+            // upsert true
             BSONObjBuilder op;
             op.append( "op" , "u" );
             op.appendBool( "b" , true );
             op.append( "ns" , ShardNS::chunk );
 
+            // add the modified (new) chunk infomation as the update object
             BSONObjBuilder n( op.subobjStart( "o" ) );
-            c->serialize( n , myVersion );
+            c->serialize( n , myVersion ); // n will get full 'c' info plus version
             n.done();
 
+            // add the chunk's _id as the query part of the update statement
             BSONObjBuilder q( op.subobjStart( "o2" ) );
             q.append( "_id" , c->genID() );
             q.done();
@@ -950,19 +956,20 @@ namespace mongo {
         
         updates.done();
         
-        if ( a > 0 || _chunkMap.size() > 1 ){
+        if ( version > 0 || _chunkMap.size() > 1 ){
             BSONArrayBuilder temp( cmdBuilder.subarrayStart( "preCondition" ) );
             BSONObjBuilder b;
             b.append( "ns" , ShardNS::chunk );
             b.append( "q" , BSON( "query" << BSON( "ns" << _ns ) << "orderby" << BSON( "lastmod" << -1 ) ) );
             {
                 BSONObjBuilder bb( b.subobjStart( "res" ) );
-                bb.appendTimestamp( "lastmod" , a );
+                bb.appendTimestamp( "lastmod" , version );
                 bb.done();
             }
             temp.append( b.obj() );
             temp.done();
         }
+        // TODO preCondition for initial chunk or starting collection 
 
         BSONObj cmd = cmdBuilder.obj();
         
@@ -984,7 +991,7 @@ namespace mongo {
             toFix[i]->_lastmod = newVersions[i];
         }
 
-        massert( 10417 ,  "how did version get smalled" , getVersion_inlock() >= a );
+        massert( 10417 ,  "how did version get smalled" , getVersion_inlock() >= version );
         
         ensureIndex_inlock(); // TODO: this is too aggressive - but not really sooo bad
     }

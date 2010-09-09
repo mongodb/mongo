@@ -402,23 +402,25 @@ namespace mongo {
     // ----- db access -----
 
     void V8Scope::localConnect( const char * dbName ){
-        V8_SIMPLE_HEADER
+        {
+            V8_SIMPLE_HEADER
 
-        if ( _connectState == EXTERNAL )
-            throw UserException( 12510, "externalSetup already called, can't call externalSetup" );
-        if ( _connectState ==  LOCAL ){
-            if ( _localDBName == dbName )
-                return;
-            throw UserException( 12511, "localConnect called with a different name previously" );
+            if ( _connectState == EXTERNAL )
+                throw UserException( 12510, "externalSetup already called, can't call externalSetup" );
+            if ( _connectState ==  LOCAL ){
+                if ( _localDBName == dbName )
+                    return;
+                throw UserException( 12511, "localConnect called with a different name previously" );
+            }
+
+            //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
+            _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( true )->GetFunction() );
+            execCoreFiles();
+            exec( "_mongo = new Mongo();" , "local connect 2" , false , true , true , 0 );
+            exec( (string)"db = _mongo.getDB(\"" + dbName + "\");" , "local connect 3" , false , true , true , 0 );
+            _connectState = LOCAL;
+            _localDBName = dbName;
         }
-
-        //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
-        _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( true )->GetFunction() );
-        execCoreFiles();
-        exec( "_mongo = new Mongo();" , "local connect 2" , false , true , true , 0 );
-        exec( (string)"db = _mongo.getDB(\"" + dbName + "\");" , "local connect 3" , false , true , true , 0 );
-        _connectState = LOCAL;
-        _localDBName = dbName;
         loadStored();
     }
     
