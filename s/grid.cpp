@@ -242,8 +242,8 @@ namespace mongo {
             DBConfigPtr config = getDBConfig( *it , false );
             if ( config.get() != NULL ){
                 ostringstream ss;
-                ss << "trying to add shard " << servers.toString() << " because local database " << *it;
-                ss << " exists in another " << config->getPrimary().toString();
+                ss << "can't add shard " << servers.toString() << " because a local database '" << *it;
+                ss << "' exists in another " << config->getPrimary().toString();
                 errMsg = ss.str();
                 return false;
             }
