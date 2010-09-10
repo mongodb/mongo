@@ -22,7 +22,6 @@
 #include "grid.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
-#include "../client/distlock.h"
 #include "../db/queryutil.h"
 #include "cursors.h"
 #include "strategy.h"
@@ -190,6 +189,12 @@ namespace mongo {
     }
     
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
+        dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
+        uassert( 10166 , "locking namespace failed" , dlk.got() );
+        return multiSplit_inlock( m );
+    }
+    
+    ChunkPtr Chunk::multiSplit_inlock( const vector<BSONObj>& m ){
         const size_t maxSplitPoints = 256;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -197,9 +202,6 @@ namespace mongo {
         uassert( 13333 , "can't split a chunk in that many parts", m.size() < maxSplitPoints );
         uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
 
-        DistributedLock lockSetup( ConnectionString( modelServer() , ConnectionString::SYNC ) , getns() );
-        dist_lock_try dlk( &lockSetup , string("split-") + toString() );
-        uassert( 10166 , "locking namespace failed" , dlk.got() );
         
         {
             ShardChunkVersion onServer = getVersionOnConfigServer();
@@ -380,32 +382,40 @@ namespace mongo {
             return false;
         
         if ( ! chunkSplitLock.lock_try(0) )
-            return false;
-        
+            return false;        
         rwlock lk( chunkSplitLock , 1 , true );
 
-        log(3) << "\t splitIfShould : " << *this << endl;
+        ChunkPtr newShard;
+        {
+            // putting this in its own scope so moveIfShould is done outside
 
-        _dataWritten = 0;
-        
-        BSONObj splitPoint = pickSplitPoint();
-        if ( splitPoint.isEmpty() || _min == splitPoint || _max == splitPoint) {
-            error() << "want to split chunk, but can't find split point " 
-                    << " chunk: " << toString() << " got: " << splitPoint << endl;
-            return false;
+            dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
+            if ( ! dlk.got() )
+                return false;
+            
+            log(3) << "\t splitIfShould : " << *this << endl;
+            
+            _dataWritten = 0;
+            
+            BSONObj splitPoint = pickSplitPoint();
+            if ( splitPoint.isEmpty() || _min == splitPoint || _max == splitPoint) {
+                error() << "want to split chunk, but can't find split point " 
+                        << " chunk: " << toString() << " got: " << splitPoint << endl;
+                return false;
+            }
+            
+            long size = getPhysicalSize();
+            if ( size < splitThreshold )
+                return false;
+            
+            log() << "autosplitting " << _manager->getns() << " size: " << size << " shard: " << toString() 
+                  << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")" << endl;
+            
+            vector<BSONObj> splitPoints;
+            splitPoints.push_back( splitPoint );
+            newShard = multiSplit_inlock( splitPoints );
         }
-
-        long size = getPhysicalSize();
-        if ( size < splitThreshold )
-            return false;
         
-        log() << "autosplitting " << _manager->getns() << " size: " << size << " shard: " << toString() 
-              << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")" << endl;
-
-        vector<BSONObj> splitPoints;
-        splitPoints.push_back( splitPoint );
-        ChunkPtr newShard = multiSplit( splitPoints );
-
         moveIfShould( newShard );
         
         return true;
@@ -587,7 +597,8 @@ namespace mongo {
     ChunkManager::ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique ) : 
         _config( config ) , _ns( ns ) , 
         _key( pattern ) , _unique( unique ) , 
-        _sequenceNumber(  ++NextSequenceNumber ), _lock("rw:ChunkManager")
+        _sequenceNumber(  ++NextSequenceNumber ), 
+        _lock("rw:ChunkManager"), _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
     {
         _reload_inlock();
         
@@ -840,8 +851,7 @@ namespace mongo {
 
         configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
         
-        DistributedLock lockSetup( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , getns() );
-        dist_lock_try dlk( &lockSetup  , "drop" );
+        dist_lock_try dlk( &_nsLock  , "drop" );
         uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );
         
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );

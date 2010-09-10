@@ -26,6 +26,7 @@
 #include "../pch.h"
 #include "../client/dbclient.h"
 #include "../client/model.h"
+#include "../client/distlock.h"
 #include "../bson/util/atomic_int.h"
 #include "shardkey.h"
 #include "shard.h"
@@ -142,6 +143,7 @@ namespace mongo {
     private:
 
         bool _splitIfShould( long dataWritten );
+        ChunkPtr multiSplit_inlock( const vector<BSONObj>& splitPoints );
 
         // main shard info
         
@@ -326,6 +328,7 @@ namespace mongo {
         unsigned long long _sequenceNumber;
         
         mutable RWLock _lock;
+        DistributedLock _nsLock;
 
         // This should only be called from Chunk after it has been migrated
         void _migrationNotification(Chunk* c);
