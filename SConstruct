@@ -763,6 +763,10 @@ if nix:
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
 
+    #make scons colorgcc friendly
+    env['ENV']['HOME'] = os.environ['HOME']
+    env['ENV']['TERM'] = os.environ['TERM']
+
     if linux and GetOption( "sharedclient" ):
         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
