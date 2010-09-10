@@ -381,6 +381,9 @@ namespace mongo {
         if ( _dataWritten < splitThreshold / 5 )
             return false;
         
+        // TODO chunkSplitLock predates the ns metadata distlock (_manager->_nsLock) and could
+        // possibly be removed. As of now, it is preventing other threads on this mongo to
+        // split.
         if ( ! chunkSplitLock.lock_try(0) )
             return false;        
         rwlock lk( chunkSplitLock , 1 , true );
@@ -416,6 +419,7 @@ namespace mongo {
             newShard = multiSplit_inlock( splitPoints );
         }
         
+        // since a chunk move is done by the donor shard, it should be responsible for locking the ns 
         moveIfShould( newShard );
         
         return true;
