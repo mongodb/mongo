@@ -64,15 +64,18 @@ namespace mongo {
         mongo::mutex _mutex;
         map<string,PoolForHost> _pools; // servername -> pool
         list<DBConnectionHook*> _hooks;
-
+        string _name;
+        
         DBClientBase* _get( const string& ident );
         
         DBClientBase* _finishCreate( const string& ident , DBClientBase* conn );
 
     public:        
-        DBConnectionPool() : _mutex("DBConnectionPool") { }
+        DBConnectionPool() : _mutex("DBConnectionPool") , _name( "dbconnectionpool" ) { }
         ~DBConnectionPool();
-
+        
+        /** right now just controls some asserts.  defaults to "dbconnectionpool" */
+        void setName( const string& name ) { _name = name; }
 
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );

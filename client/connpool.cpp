@@ -62,7 +62,7 @@ namespace mongo {
         
         string errmsg;
         c = url.connect( errmsg );
-        uassert( 13328 ,  (string)"dbconnectionpool: connect failed " + url.toString() + " : " + errmsg , c );
+        uassert( 13328 ,  _name + ": connect failed " + url.toString() + " : " + errmsg , c );
         
         return _finishCreate( url.toString() , c );
     }
@@ -79,7 +79,7 @@ namespace mongo {
         uassert( 13071 , (string)"invalid hostname [" + host + "]" + errmsg , cs.isValid() );
         
         c = cs.connect( errmsg );
-        uassert( 11002 ,  (string)"dbconnectionpool: connect failed " + host + " : " + errmsg , c );
+        uassert( 11002 ,  _name + ": connect failed " + host + " : " + errmsg , c );
         return _finishCreate( host , c );
     }
 

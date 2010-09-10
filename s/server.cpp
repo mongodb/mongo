@@ -257,6 +257,7 @@ int main(int argc, char* argv[], char *envp[] ) {
     }
     
     pool.addHook( &shardingConnectionHook );
+    pool.setName( "mongos connectionpool" );
 
     if ( argc <= 1 ) {
         usage( argv );
