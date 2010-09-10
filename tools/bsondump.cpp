@@ -63,7 +63,14 @@ public:
                 return 1;
             }
         }
-        processFile( getParam( "file" ) );
+        
+        path root = getParam( "file" );
+        if ( root == "" ) {
+            printExtraHelp(cout);
+            return 1;
+        }
+        
+        processFile( root );
         return 0;
     }
     
