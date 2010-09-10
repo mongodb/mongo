@@ -50,6 +50,8 @@ namespace mongo {
         static string urlDecode(const char* s);
         static string urlDecode(string s) {return urlDecode(s.c_str());}
 
+        virtual bool primaryListener() const { return false; }
+
     private:
         void accepted(int s, const SockAddr &from);
         static bool fullReceive( const char *buf );

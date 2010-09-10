@@ -199,6 +199,8 @@ namespace mongo {
     }
 
     bool ListeningSockets::listeningOn(const HostAndPort& addr) { 
+        assert(get()->isReady()); // this shouldn't be called before server is ready
+
         if( addr.port() != cmdLine.port )
             return false;
 
