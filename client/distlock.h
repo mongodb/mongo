@@ -20,6 +20,8 @@
  * distributed locking mechanism
  */
 
+#pragma once
+
 #include "../pch.h"
 #include "dbclient.h"
 #include "connpool.h"
