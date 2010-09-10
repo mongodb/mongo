@@ -165,6 +165,9 @@ namespace mongo {
 
         /** @return INT_MIN if not present - does some type conversions */
         int getIntField(const char *name) const;
+        
+        /** @return DBL_MIN if not present - does some type conversions */
+        double getDoubleField(const char *name) const;
 
         /** @return false if not present */
         bool getBoolField(const char *name) const;

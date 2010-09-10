@@ -24,6 +24,7 @@
 #include "../util/base64.h"
 #include "../util/md5.hpp"
 #include <limits>
+#include <float.h>
 #include "../util/unittest.h"
 #include "../util/embedded_builder.h"
 #include "json.h"
@@ -818,6 +819,11 @@ namespace mongo {
     int BSONObj::getIntField(const char *name) const {
         BSONElement e = getField(name);
         return e.isNumber() ? (int) e.number() : INT_MIN;
+    }
+
+    double BSONObj::getDoubleField(const char *name) const {
+        BSONElement e = getField(name);
+        return e.isNumber() ? (double) e.number() : DBL_MIN;
     }
 
     bool BSONObj::getBoolField(const char *name) const {
