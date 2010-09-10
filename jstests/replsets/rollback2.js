@@ -1,8 +1,8 @@
-// test rollback in replica sets
-
+// a test of rollback in replica sets
+//
 // try running as :
 // 
-//   mongo --nodb rollback.js | tee out | grep -v ^m31
+//   mongo --nodb rollback2.js | tee out | grep -v ^m31
 //
 
 var debugging = 0;
