@@ -206,7 +206,7 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << "mongod " << prettyHostName();
+                z << cmdLine.binaryName << ' ' << prettyHostName();
                 dbname = z.str();
             }
             ss << start(dbname) << h2(dbname);

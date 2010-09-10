@@ -77,6 +77,13 @@ namespace mongo {
                          boost::program_options::variables_map &params ){
         
         
+        { // setup binary name
+            cmdLine.binaryName = argv[0];
+            size_t i = cmdLine.binaryName.rfind( '/' );
+            if ( i != string::npos )
+                cmdLine.binaryName = cmdLine.binaryName.substr( i + 1 );
+        }
+        
         /* don't allow guessing - creates ambiguities when some options are
          * prefixes of others. allow long disguises and don't allow guessing
          * to get away with our vvvvvvv trick. */

@@ -24,6 +24,8 @@ namespace mongo {
     */
     /* concurrency: OK/READ */
     struct CmdLine { 
+        string binaryName;     // mongod or mongos
+
         int port;              // --port
         string bind_ip;        // --bind_ip
         bool rest;             // --rest
@@ -56,7 +58,7 @@ namespace mongo {
 
         int pretouch;          // --pretouch for replication application (experimental)
         bool moveParanoia;     // for move chunk paranoia 
-
+        
         enum { 
             DefaultDBPort = 27017,
 			ConfigServerPort = 27019,
