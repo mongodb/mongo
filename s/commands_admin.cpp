@@ -777,7 +777,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "test if this is master half of a replica pair";
             }
-            CmdIsMaster() : Command("ismaster") { }
+            CmdIsMaster() : Command("isMaster" , false , "ismaster") { }
             virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("ismaster", 1.0 );
                 result.append("msg", "isdbgrid");
