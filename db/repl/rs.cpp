@@ -205,7 +205,7 @@ namespace mongo {
                 uassert(13096, "bad --replSet command line config string - dups?", seedSet.count(m) == 0 );
                 seedSet.insert(m);
                 //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
-                if( m.isSelf() ) {
+                if( ListeningSockets::listeningOn(m) ) {
                     log(1) << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
                 } else
                     seeds.push_back(m);
@@ -239,7 +239,7 @@ namespace mongo {
             replSetCmdline.seedSet.erase(m->h());
         }
         for( set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin(); i != replSetCmdline.seedSet.end(); i++ ) {
-            if( i->isSelf() ) {
+            if( ListeningSockets::listeningOn(*i) ) {
                 if( sss == 1 ) 
                     log(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
             } else
@@ -304,7 +304,7 @@ namespace mongo {
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
                 const ReplSetConfig::MemberCfg& m = *i;
-                if( m.h.isSelf() ) {
+                if( ListeningSockets::listeningOn(m.h) ) {
                     nfound++;
                     me++;
                     if( !reconf || (_self && _self->id() == (unsigned) m._id) )
@@ -380,7 +380,7 @@ namespace mongo {
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
             Member *mi;
-            if( m.h.isSelf() ) {
+            if( ListeningSockets::listeningOn(m.h) ) {
                 assert( _self == 0 );
                 mi = _self = new Member(m.h, m._id, &m, true);
                 if( (int)mi->id() == oldPrimaryId )

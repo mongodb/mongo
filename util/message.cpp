@@ -26,7 +26,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include "../db/cmdline.h"
-#include "../db/commands.h"
 #include "../client/dbclient.h"
 
 #ifndef _WIN32
@@ -712,65 +711,5 @@ namespace mongo {
     }
 
     TicketHolder connTicketHolder(20000);
-
-    namespace {
-        map<string, bool> isSelfCache; // host, isSelf
-    }
-    
-    const OID& getServerID(){
-        static OID serverID;
-        ONCE {
-            serverID.init();
-        }
-        return serverID;
-    }
-
-    class ServerIDCommand : public Command { 
-        public:
-            ServerIDCommand() : Command( "serverID" ) { }
-            virtual bool slaveOk() const { return true; }
-            virtual LockType locktype() const { return NONE; } 
-            virtual void help(stringstream& h) const { h << "internal"; }
-            virtual bool adminOnly() const { return true; }
-
-            virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-                result.append("serverID", getServerID());
-                return 1;
-            }
-
-    } serverIDCommand;
-
-    bool HostAndPort::isSelf() const { 
-        int p = _port == -1 ? CmdLine::DefaultDBPort : _port;
-
-        if( p != cmdLine.port ){
-            return false;
-        } else if (sameHostname(getHostName(), _host) || isLocalHost()) {
-            return true;
-        } else {
-            map<string, bool>::const_iterator it = isSelfCache.find(_host);
-            if (it != isSelfCache.end()){
-                return it->second;
-            }
-
-            bool ret = false;
-
-            try {
-                DBClientConnection c (false, NULL, 0.001); // 1ms timeout
-                c.connect(this->toString());
-
-                BSONObj out;
-                if (c.runCommand("admin", BSON("serverID"<<1), out) && out["serverID"].OID() == getServerID()){
-                    ret = true;
-                }
-            } catch (...) {
-                /* ignore */
-            }
-
-            isSelfCache[_host] = ret;
-
-            return ret;
-        }
-    }
 
 } // namespace mongo
