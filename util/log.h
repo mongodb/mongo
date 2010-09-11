@@ -339,7 +339,7 @@ namespace mongo {
         stringstream s;
         s << "errno:" << x << ' ';
 
-#if defined(_WIN32TEMPTEMPTEMP)
+#if defined(_WIN32)
         LPTSTR errorText = NULL;
         FormatMessage(
             FORMAT_MESSAGE_FROM_SYSTEM
