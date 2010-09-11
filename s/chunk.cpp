@@ -641,7 +641,8 @@ namespace mongo {
             sleepmillis(10 * (3-tries));
             sleepsecs(10);
         }
-        msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 tries. Giving up");
+
+        msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.");
         
     }
 
