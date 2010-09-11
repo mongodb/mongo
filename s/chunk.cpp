@@ -37,8 +37,6 @@ namespace mongo {
         return true;
     }
 
-    RWLock chunkSplitLock("rw:chunkSplitLock");
-
     // -------  Shard --------
 
     int Chunk::MaxChunkSize = 1024 * 1024 * 200;
@@ -381,13 +379,6 @@ namespace mongo {
         if ( _dataWritten < splitThreshold / 5 )
             return false;
         
-        // TODO chunkSplitLock predates the ns metadata distlock (_manager->_nsLock) and could
-        // possibly be removed. As of now, it is preventing other threads on this mongo to
-        // split.
-        if ( ! chunkSplitLock.lock_try(0) )
-            return false;        
-        rwlock lk( chunkSplitLock , 1 , true );
-
         ChunkPtr newShard;
         {
             // putting this in its own scope so moveIfShould is done outside
