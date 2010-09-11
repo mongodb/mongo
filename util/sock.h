@@ -26,7 +26,7 @@
 
 namespace mongo {
 
-    class HostAndPort;
+    struct HostAndPort;
 
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
 
