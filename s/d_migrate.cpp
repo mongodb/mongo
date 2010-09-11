@@ -179,8 +179,7 @@ namespace mongo {
     class MigrateFromStatus {
     public:
         
-        MigrateFromStatus()
-            : _mutex( "MigrateFromStatus" ){
+        MigrateFromStatus(){
             _active = false;
             _inCriticalSection = false;
         }
@@ -208,12 +207,13 @@ namespace mongo {
             _active = false;
             _inCriticalSection = false;
 
-            scoped_lock lk( _mutex );
             _deleted.clear();
             _reload.clear();
         }
         
         void logOp( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ){
+            assert( dbMutex.getState() );
+
             if ( ! _active )
                 return;
 
@@ -241,7 +241,6 @@ namespace mongo {
                 
             case 'd': {
                 // can't filter deletes :(
-                scoped_lock lk( _mutex );
                 _deleted.push_back( ide.wrap() );
                 return;
             }
@@ -262,7 +261,6 @@ namespace mongo {
             if ( ! isInRange( it , _min , _max ) )
                 return;
             
-            scoped_lock lk( _mutex );
             _reload.push_back( ide.wrap() );
         }
 
@@ -294,7 +292,11 @@ namespace mongo {
             
             arr.done();
         }
-
+        
+        /**
+         * called from the dest of a migrate
+         * transfers mods from src to dest
+         */
         bool transferMods( string& errmsg , BSONObjBuilder& b ){
             if ( ! _active ){
                 errmsg = "no active migration!";
@@ -307,7 +309,6 @@ namespace mongo {
                 readlock rl( _ns );
                 Client::Context cx( _ns );
                 
-                scoped_lock lk( _mutex );
                 xfer( &_deleted , b , "deleted" , size , false );
                 xfer( &_reload , b , "reload" , size , true );
             }
@@ -329,8 +330,6 @@ namespace mongo {
 
         list<BSONObj> _reload;
         list<BSONObj> _deleted;
-
-        mongo::mutex _mutex;
         
     } migrateFromStatus;
     
