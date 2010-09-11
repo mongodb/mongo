@@ -161,7 +161,7 @@ namespace mongo {
         }
         
         virtual void help( stringstream& help ) const {
-            help << "internal should not be calling this directly" << endl;
+            help << "internal - should not be called directly" << endl;
         }
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
