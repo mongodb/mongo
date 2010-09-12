@@ -359,18 +359,7 @@ namespace mongo {
     bool Chunk::_splitIfShould( long dataWritten ){
         _dataWritten += dataWritten;
         
-        // split faster in early chunks helps spread out an initial load better
-        int splitThreshold;
-        const int minChunkSize = 1 << 20;  // 1 MBytes
-        int numChunks = getManager()->numChunks();
-        if ( numChunks < 10 ){
-            splitThreshold = max( MaxChunkSize / 4 , minChunkSize );
-        } else if ( numChunks < 20 ){
-            splitThreshold = max( MaxChunkSize / 2 , minChunkSize );
-        } else {
-            splitThreshold = max( MaxChunkSize , minChunkSize );
-        }
-        
+        int splitThreshold = getManager()->getCurrentDesiredChunkSize();
         if ( minIsInf() || maxIsInf() ){
             splitThreshold = (int) ((double)splitThreshold * .9);
         }
@@ -1213,6 +1202,24 @@ namespace mongo {
             shared_ptr<ChunkRange> cr (new ChunkRange(first, begin));
             _ranges[cr->getMax()] = cr;
         }
+    }
+
+    int ChunkManager::getCurrentDesiredChunkSize() const {
+        // split faster in early chunks helps spread out an initial load better
+        const int minChunkSize = 1 << 20;  // 1 MBytes
+
+        int splitThreshold = Chunk::MaxChunkSize;
+        
+        int nc = numChunks();
+        
+        if ( nc < 10 ){
+            splitThreshold = max( splitThreshold / 4 , minChunkSize );
+        } 
+        else if ( nc < 20 ){
+            splitThreshold = max( splitThreshold / 2 , minChunkSize );
+        }
+        
+        return splitThreshold;
     }
     
     class ChunkObjUnitTest : public UnitTest {

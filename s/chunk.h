@@ -297,6 +297,7 @@ namespace mongo {
 
         void _printChunks() const;
         
+        int getCurrentDesiredChunkSize() const;
     private:
         
         void _reload();
