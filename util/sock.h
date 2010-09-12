@@ -1,4 +1,4 @@
-// sock.h
+// @file sock.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -34,12 +34,8 @@ namespace mongo {
 
     typedef short sa_family_t;
     typedef int socklen_t;
-    inline int getLastError() {
-        return WSAGetLastError();
-    }
-    inline const char* gai_strerror(int code) {
-        return ::gai_strerrorA(code);
-    }
+    inline int getLastError() { return WSAGetLastError(); }
+    string getAddrInfoStrError(int code);
     inline void disableNagle(int sock) {
         int x = 1;
         if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
@@ -47,8 +43,7 @@ namespace mongo {
         if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
             out() << "ERROR: SO_KEEPALIVE failed" << endl;
     }
-    inline void prebindOptions( int sock ) {
-    }
+    inline void prebindOptions( int sock ) { }
 
     // This won't actually be used on windows
     struct sockaddr_un {
@@ -179,7 +174,7 @@ namespace mongo {
                     const int buflen=128;
                     char buffer[buflen];
                     int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-                    massert(13082, gai_strerror(ret), ret == 0);
+                    massert(13082, getAddrInfoStrError(ret), ret == 0);
                     return buffer;
                 }
 

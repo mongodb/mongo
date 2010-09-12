@@ -1,4 +1,4 @@
-// sock.cpp
+// @file sock.cpp
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -27,6 +27,15 @@ namespace mongo {
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
     bool IPv6Enabled() { return ipv6; }
+
+    string getAddrInfoStrError(int code) { 
+#if !defined(_WIN32)
+        return gai_strerror(code);
+#else
+        /* gai_strerrorA is not threadsafe on windows. don't use it. */
+        return errnoWithDescription(code);
+#endif
+    }
 
     SockAddr::SockAddr(int sourcePort) {
         memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
