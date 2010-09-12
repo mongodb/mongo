@@ -234,7 +234,7 @@ namespace mongo {
             
         conn.done();
             
-        log(1) << "dist_lock lock gotLock: " << gotLock << " now: " << now << endl;
+        log(2) << "dist_lock lock gotLock: " << gotLock << " now: " << now << endl;
 
         return gotLock;
     }
@@ -247,7 +247,7 @@ namespace mongo {
             try {
                 ScopedDbConnection conn( _conn );
                 conn->update( _ns , _id, BSON( "$set" << BSON( "state" << 0 ) ) );
-                log(1) << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
+                log(2) << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
                 conn.done();
 
                 return;
