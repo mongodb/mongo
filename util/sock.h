@@ -27,15 +27,14 @@
 namespace mongo {
 
     struct HostAndPort;
-
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
+    string getAddrInfoStrError(int code);
 
 #if defined(_WIN32)
 
     typedef short sa_family_t;
     typedef int socklen_t;
     inline int getLastError() { return WSAGetLastError(); }
-    string getAddrInfoStrError(int code);
     inline void disableNagle(int sock) {
         int x = 1;
         if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
