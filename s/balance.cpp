@@ -250,7 +250,7 @@ namespace mongo {
 
                 dist_lock_try lk( &balanceLock , "doing balance round" );
                 if ( ! lk.got() ){
-                    log(1) << "skipping balancing round during ongoing split or move activity." << endl;
+                    log(1) << "skipping balancing round because another balancer is active" << endl;
                     conn.done();
 
                     sleepsecs( 30 ); // no need to wake up soon
