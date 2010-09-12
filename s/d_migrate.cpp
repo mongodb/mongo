@@ -179,8 +179,7 @@ namespace mongo {
     class MigrateFromStatus {
     public:
         
-        MigrateFromStatus()
-            : _mutex( "MigrateFromStatus" ){
+        MigrateFromStatus(){
             _active = false;
             _inCriticalSection = false;
         }
@@ -205,12 +204,12 @@ namespace mongo {
         void done(){
             if ( ! _active )
                 return;
-            _active = false;
-            _inCriticalSection = false;
-
-            scoped_lock lk( _mutex );
+            
             _deleted.clear();
             _reload.clear();
+            
+            _active = false;
+            _inCriticalSection = false;
         }
         
         void logOp( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ){
@@ -241,7 +240,6 @@ namespace mongo {
                 
             case 'd': {
                 // can't filter deletes :(
-                scoped_lock lk( _mutex );
                 _deleted.push_back( ide.wrap() );
                 return;
             }
@@ -262,7 +260,6 @@ namespace mongo {
             if ( ! isInRange( it , _min , _max ) )
                 return;
             
-            scoped_lock lk( _mutex );
             _reload.push_back( ide.wrap() );
         }
 
@@ -308,7 +305,9 @@ namespace mongo {
             long long size = 0;
 
             {
-                scoped_lock lk( _mutex );
+                readlock rl( _ns );
+                Client::Context cx( _ns );
+
                 xfer( &_deleted , b , "deleted" , size , false );
                 xfer( &_reload , b , "reload" , size , true );
             }
@@ -331,8 +330,6 @@ namespace mongo {
         list<BSONObj> _reload;
         list<BSONObj> _deleted;
 
-        mongo::mutex _mutex;
-        
     } migrateFromStatus;
     
     struct MigrateStatusHolder {
