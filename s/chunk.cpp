@@ -62,7 +62,7 @@ namespace mongo {
     void Chunk::setShard( const Shard& s ){
         _shard = s;
         _manager->_migrationNotification(this);
-        _markModified();
+        _modified = true;
     }
     
     bool Chunk::contains( const BSONObj& obj ) const{
@@ -224,7 +224,7 @@ namespace mongo {
         vector<ChunkPtr> newChunks;
         vector<BSONObj>::const_iterator i = m.begin();
         BSONObj nextPoint = i->getOwned();
-        _markModified();
+        _modified = true;
         do {
             BSONObj splitPoint = nextPoint;
             log(4) << "splitPoint: " << splitPoint << endl;
@@ -238,9 +238,9 @@ namespace mongo {
                 uasserted( 13395, ss.str() );
             }
 
-            ChunkPtr s( new Chunk( _manager, splitPoint , nextPoint , _shard) );
-            s->_markModified();
-            newChunks.push_back(s);
+            ChunkPtr c( new Chunk( _manager, splitPoint , nextPoint , _shard) );
+            c->_modified = true;
+            newChunks.push_back( c );
         } while ( i != m.end() );
 
         // Have the chunk manager reflect the key change for the first chunk and create an entry for every
@@ -549,10 +549,6 @@ namespace mongo {
         return o["lastmod"];
     }
 
-    void Chunk::_markModified(){
-        _modified = true;
-    }
-
     string Chunk::toString() const {
         stringstream ss;
         ss << "ns:" << _manager->getns() << " at: " << _shard.toString() << " lastmod: " << _lastmod.toString() << " min: " << _min << " max: " << _max;
@@ -577,7 +573,7 @@ namespace mongo {
         
         if ( _chunkMap.empty() ){
             ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), config->getPrimary()) );
-            c->_markModified();
+            c->setModified( true );
             
             _chunkMap[c->getMax()] = c;
             _chunkRanges.reloadAll(_chunkMap);
@@ -902,7 +898,7 @@ namespace mongo {
         int numOps = 0;
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
             ChunkPtr c = i->second;
-            if ( ! c->_modified )
+            if ( ! c->getModified() )
                 continue;
 
             numOps++;
@@ -966,6 +962,7 @@ namespace mongo {
 
         for ( unsigned i=0; i<toFix.size(); i++ ){
             toFix[i]->_lastmod = newVersions[i];
+            toFix[i]->setModified( false );
         }
 
         massert( 10417 ,  "how did version get smalled" , getVersion_inlock() >= a );
@@ -1239,6 +1236,5 @@ namespace mongo {
         
         return conn.runCommand( "admin" , cmd , result );
     }
-
 
 } // namespace mongo
