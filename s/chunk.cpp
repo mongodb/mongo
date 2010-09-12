@@ -638,10 +638,12 @@ namespace mongo {
             if (_chunkMap.size() < 10){ 
                 _printChunks();
             }
+            // TODO which one is it? millis or secs?
             sleepmillis(10 * (3-tries));
             sleepsecs(10);
         }
-        msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 tries. Giving up");
+
+        msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.");
         
     }
 
@@ -650,6 +652,7 @@ namespace mongo {
         
         ScopedDbConnection conn( temp.modelServer() );
 
+        // TODO really need the sort?
         auto_ptr<DBClientCursor> cursor = conn->query(temp.getNS(), QUERY("ns" << _ns).sort("lastmod",1), 0, 0, 0, 0,
                 (DEBUG_BUILD ? 2 : 1000000)); // batch size. Try to induce potential race conditions in debug builds
         assert( cursor.get() );
