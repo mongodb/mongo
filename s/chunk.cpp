@@ -199,7 +199,6 @@ namespace mongo {
         uassert( 13332 , "need a split key to split chunk" , !m.empty() );
         uassert( 13333 , "can't split a chunk in that many parts", m.size() < maxSplitPoints );
         uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
-
         
         {
             ShardChunkVersion onServer = getVersionOnConfigServer();
@@ -279,7 +278,7 @@ namespace mongo {
         }
 
         // Save the new key boundaries in the configDB.
-        _manager->save( false );
+        _manager->save( false /* does not inc 'major', ie no moves, in ShardChunkVersion control */);
 
         // Log all these changes in the configDB's log. We log a simple split differently than a multi-split.
         if ( newChunks.size() == 1) {
@@ -995,6 +994,7 @@ namespace mongo {
             msgasserted( 13327 , ss.str() );
         }
 
+        // instead of reloading, adjust ShardChunkVersion for the chunks that were updated in the configdb
         for ( unsigned i=0; i<toFix.size(); i++ ){
             toFix[i]->_lastmod = newVersions[i];
         }
