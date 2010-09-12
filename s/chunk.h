@@ -128,8 +128,6 @@ namespace mongo {
         
         void appendShortVersion( const char * name , BSONObjBuilder& b );
 
-        void _markModified();
-        
         static int MaxChunkSize;
 
         string genID() const;
@@ -137,7 +135,8 @@ namespace mongo {
 
         const ChunkManager* getManager() const { return _manager; }
         
-        bool modified();
+        bool getModified() { return _modified; }
+        void setModified( bool modified ) { _modified = modified; }
 
         ShardChunkVersion getVersionOnConfigServer() const;
     private:
