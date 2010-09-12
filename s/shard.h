@@ -1,4 +1,4 @@
-// shard.h
+// @file shard.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -25,6 +25,11 @@ namespace mongo {
 
     class ShardConnection;
     class ShardStatus;
+
+    /*
+     * A "shard" is a database (replica pair typically) which represents
+     * one partition of the overall database.
+     */
 
     class Shard {
     public:

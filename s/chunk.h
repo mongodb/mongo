@@ -1,9 +1,4 @@
-// shard.h
-
-/*
-   A "shard" is a database (replica pair typically) which represents
-   one partition of the overall database.
-*/
+// @file chunk.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
