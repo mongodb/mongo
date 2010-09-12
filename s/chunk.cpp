@@ -155,7 +155,7 @@ namespace mongo {
         return median;
     }
 
-    void Chunk::pickSplitVector( vector<BSONObj>* splitPoints , int chunkSize /* in bytes */) const { 
+    void Chunk::pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize /* in bytes */) const { 
         // Ask the mongod holding this chunk to figure out the split points.
         ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
@@ -175,7 +175,7 @@ namespace mongo {
 
         BSONObjIterator it( result.getObjectField( "splitKeys" ) );
         while ( it.more() ){
-            splitPoints->push_back( it.next().Obj().getOwned() );
+            splitPoints.push_back( it.next().Obj().getOwned() );
         }
         conn.done();
     }
@@ -375,7 +375,7 @@ namespace mongo {
             if ( ! dlk.got() )
                 return false;
             
-            log(3) << "\t splitIfShould : " << *this << endl;
+            log(3) << "\t splitIfShould entering decision area : " << *this << endl;
             
             _dataWritten = 0;
             
@@ -995,7 +995,7 @@ namespace mongo {
 
         ChunkPtr soleChunk = _chunkMap.begin()->second;
         vector<BSONObj> splitPoints;
-        soleChunk->pickSplitVector( &splitPoints , Chunk::MaxChunkSize );
+        soleChunk->pickSplitVector( splitPoints , Chunk::MaxChunkSize );
         if ( splitPoints.empty() ){
             log(1) << "not enough data to warrant chunking " << getns() << endl;
             return;
