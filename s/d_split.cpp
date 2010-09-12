@@ -158,8 +158,10 @@ namespace mongo {
             }
 
             // If there's not enough data for more than one chunk, no point continuing.
+            const long long recCount = d->nrecords;
             const long long dataSize = d->datasize;
-            if ( dataSize < maxChunkSize ) {
+            
+            if ( dataSize < maxChunkSize || recCount == 0 ) {
                 vector<BSONObj> emptyVector;
                 result.append( "splitKeys" , emptyVector );
                 return true;
@@ -167,12 +169,8 @@ namespace mongo {
 
             // We'll use the average object size and number of object to find approximately how many keys
             // each chunk should have. We'll split at half the maxChunkSize.
-            const long long recCount = d->nrecords;
-            long long keyCount = 0;
-            if (( dataSize > 0 ) && ( recCount > 0 )){
-                const long long avgRecSize = dataSize / recCount;
-                keyCount = maxChunkSize / (2 * avgRecSize);
-            }
+            const long long avgRecSize = dataSize / recCount;
+            long long keyCount = maxChunkSize / (2 * avgRecSize);
 
             // We traverse the index and add the keyCount-th key to the result vector. If that key
             // appeared in the vector before, we omit it. The assumption here is that all the 
@@ -197,7 +195,8 @@ namespace mongo {
             }
 
             ostringstream os;
-            os << "Finding the split vector for " <<  ns << " over "<< keyPattern;
+            os << "Finding the split vector for " <<  ns << " over "<< keyPattern 
+               << " keyCount: " << keyCount << " numSplits: " << splitKeys.size();
             logIfSlow( timer , os.str() );
 
             // Warning: we are sending back an array of keys but are currently limited to 
