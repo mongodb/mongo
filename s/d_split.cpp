@@ -134,15 +134,26 @@ namespace mongo {
                 errmsg = "either provide both min and max or leave both empty";
                 return false;
             }
-
+            
             long long maxChunkSize = 0;
-            BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
-            if ( maxSizeElem.eoo() ){
-                errmsg = "need to specify the desired max chunk size";
-                return false;
+            {
+                BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
+                if ( maxSizeElem.isNumber() ){
+                    maxChunkSize = maxSizeElem.numberLong() * 1<<20; 
+                }
+                else {
+                    maxSizeElem = jsobj["maxChunkSizeBytes"];
+                    if ( maxSizeElem.isNumber() ){
+                        maxChunkSize = maxSizeElem.numberLong();
+                    }
+                }
+                
+                if ( maxChunkSize <= 0 ){
+                    errmsg = "need to specify the desired max chunk size (maxChunkSize or maxChunkSizeBytes)";
+                    return false;
+                }
             }
-            maxChunkSize = maxSizeElem.numberLong() * 1<<20; 
-
+            
             Client::Context ctx( ns );
             NamespaceDetails *d = nsdetails( ns );
             

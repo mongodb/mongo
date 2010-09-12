@@ -88,9 +88,17 @@ namespace mongo {
         bool minIsInf() const;
         bool maxIsInf() const;
 
-        BSONObj pickSplitPoint() const;
+        /**
+         * @param a vector of possible split points
+         *        used as a hint only
+         */
+        BSONObj pickSplitPoint( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
         ChunkPtr split();
 
+        /**
+         * @param splitPoints - vector to be filled in
+         * @param chunkSize  - chunk size to target in bytes
+         */
         void pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize ) const;
         ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
 

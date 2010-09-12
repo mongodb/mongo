@@ -83,7 +83,7 @@ namespace mongo {
         return _manager->getShardKey().globalMax().woCompare( getMax() ) == 0;
     }
     
-    BSONObj Chunk::pickSplitPoint() const{
+    BSONObj Chunk::pickSplitPoint( const vector<BSONObj> * possibleSplitPoints ) const{
         int sort = 0;
         
         if ( minIsInf() ){
@@ -117,6 +117,9 @@ namespace mongo {
             if ( ! end.isEmpty() )
                 return _manager->getShardKey().extractKey( end );
         }
+
+        if ( possibleSplitPoints && possibleSplitPoints->size() )
+            return possibleSplitPoints->at(0);
         
         BSONObj cmd = BSON( "medianKey" << _manager->getns()
                             << "keyPattern" << _manager->getShardKey().key()
@@ -164,7 +167,7 @@ namespace mongo {
         cmd.append( "keyPattern" , _manager->getShardKey().key() );
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
-        cmd.append( "maxChunkSize" , chunkSize / (1<<20) /* in MBs */ );
+        cmd.append( "maxChunkSizeBytes" , chunkSize );
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , result )){
@@ -377,21 +380,35 @@ namespace mongo {
             
             log(3) << "\t splitIfShould entering decision area : " << *this << endl;
             
-            _dataWritten = 0;
+            _dataWritten = 0; // reset so we check often enough
             
-            BSONObj splitPoint = pickSplitPoint();
+            // TODO: add a max number of split points to find
+            //       that way if we get a mega chunk for some reason - 
+            //       this won't take an inordinant amount of time
+            vector<BSONObj> possibleSplitPoints;
+            pickSplitVector( possibleSplitPoints , splitThreshold );
+            
+            if ( possibleSplitPoints.size() <= 1 ) {
+                // no split points means there isn't enough data to split on
+                // 1 split point means we have between half the chunk size to full chunk size
+                // so we shouldn't split
+                return false;
+            }
+
+            BSONObj splitPoint = pickSplitPoint( &possibleSplitPoints );
             if ( splitPoint.isEmpty() || _min == splitPoint || _max == splitPoint) {
+                // TODO: this check might be redundany, but probably not that bad
                 error() << "want to split chunk, but can't find split point " 
                         << " chunk: " << toString() << " got: " << splitPoint << endl;
                 return false;
             }
             
-            long size = getPhysicalSize();
-            if ( size < splitThreshold )
-                return false;
-            
-            log() << "autosplitting " << _manager->getns() << " size: " << size << " shard: " << toString() 
-                  << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")" << endl;
+            log() << "autosplitting " << _manager->getns() << " shard: " << toString() 
+                  << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")" 
+#ifdef _DEBUG
+                  << " size: " << getPhysicalSize() // slow - but can be usefule when debugging
+#endif
+                  << endl;
             
             vector<BSONObj> splitPoints;
             splitPoints.push_back( splitPoint );
