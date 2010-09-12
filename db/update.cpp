@@ -527,7 +527,7 @@ namespace mongo {
             string field = root + e.fieldName();
             FieldCompareResult cmp = compareDottedFieldNames( m->second.m->fieldName , field );
 
-            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second.m->fieldName << "\t cmp:" << cmp );
+            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second.m->fieldName << "\t cmp:" << cmp << "\t short: " << e.fieldName() );
             
             switch ( cmp ){
                 
@@ -549,6 +549,13 @@ namespace mongo {
                     // inc both as we handled both
                     e = es.next();
                     m++;
+                }
+                else {
+                    // this is a very weird case
+                    // have seen it in production, but can't reproduce
+                    // this assert prevents an inf. loop
+                    // but likely isn't the correct solution
+                    assert(0);
                 }
                 continue;
             }

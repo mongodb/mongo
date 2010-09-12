@@ -196,11 +196,17 @@ namespace mongo {
         if ( doauth )
             _auth( lockState );
 
-        if ( _client->_curOp->getOp() != dbGetMore ){ // getMore's are special and should be handled else where
+        switch ( _client->_curOp->getOp() ){
+        case dbGetMore: // getMore's are special and should be handled else where
+        case dbUpdate: // update & delete check shard version in instance.cpp, so don't check here as well
+        case dbDelete: 
+            break;
+        default: {
             string errmsg;
             if ( ! shardVersionOk( _ns , errmsg ) ){
                 msgasserted( StaleConfigInContextCode , (string)"[" + _ns + "] shard version not ok in Client::Context: " + errmsg );
             }
+        }
         }
     }
     
@@ -258,6 +264,29 @@ namespace mongo {
             co->gotLock();
         }
     }
+
+    BSONObj CurOp::query( bool threadSafe ) {
+        if( querySize() == 1 ) { 
+            return _tooBig;
+        }
+        
+        if ( ! threadSafe ){
+            BSONObj o(_queryBuf);
+            return o;
+        }
+
+        int size = querySize();        
+        int before = checksum( _queryBuf , size );
+        BSONObj a(_queryBuf);
+        BSONObj b = a.copy();
+        int after = checksum( _queryBuf , size );
+        
+        if ( before == after )
+            return b;
+        
+        return BSON( "msg" << "query changed while capturing" );
+    }
+
 
     BSONObj CurOp::infoNoauth( int attempt ) {
         BSONObjBuilder b;
@@ -402,7 +431,7 @@ namespace mongo {
                     tablecell( ss , co.getOp() );
                     tablecell( ss , co.getNS() );
                     if ( co.haveQuery() )
-                        tablecell( ss , co.query() );
+                        tablecell( ss , co.query( true ) );
                     else
                         tablecell( ss , "" );
                     tablecell( ss , co.getRemoteString() );

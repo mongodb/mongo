@@ -1,19 +1,33 @@
-mongodb (1.6.0) unstable; urgency=low
+mongodb (1.6.2) unstable; urgency=low
+
+  * replica_sets some fixes
+  * sharding some fixes with rs
+  * full change log http://jira.mongodb.org/browse/SERVER/fixforversion/10187
+
+  -- Richard Kreuter <richard@10gen.com>  Wed, 1 Sep 2010 16:56:28 -0500
+
+
+mongodb (1.6.1) unstable; urgency=low
 
   * replica_sets some fixes
   * sharding some fixes with rs
   * full change log http://jira.mongodb.org/browse/SERVER/fixforversion/10183
+
+  -- Richard Kreuter <richard@10gen.com>  Tue, 17 Aug 2010 16:56:28 -0500
 
 mongodb (1.6.0) unstable; urgency=low
 
   * sharding stable
   * replica_sets stable
 
+  -- Richard Kreuter <richard@10gen.com>  Thu, 05 Aug 2010 16:56:28 -0500
+
 mongodb (1.5.8) unstable; urgency=low
 
   * sharding lots of changes
   * replica_sets lots of changes
 
+  -- Richard Kreuter <richard@10gen.com>  Tue, 03 Aug 2010 16:56:28 -0500
 
 mongodb (1.5.7) unstable; urgency=low
 

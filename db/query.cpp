@@ -654,11 +654,12 @@ namespace mongo {
                 if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
                     _c.reset();
                     _cc.reset();
+                    _so.reset();
                     massert( 13338, "cursor dropped during query", false );
                     // TODO maybe we want to prevent recording the winning plan as well?
                 } 
             }
-        }        
+        }
         
         virtual void next() {
             if ( _findingStartCursor.get() ) {
@@ -772,7 +773,8 @@ namespace mongo {
                 _n = _inMemSort ? _so->size() : _n;
             } 
             else if ( _inMemSort ) {
-                _so->fill( _buf, _pq.getFields() , _n );
+                if( _so.get() )
+                    _so->fill( _buf, _pq.getFields() , _n );
             }
             
             if ( _pq.hasOption( QueryOption_CursorTailable ) && _pq.getNumToReturn() != 1 )

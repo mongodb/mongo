@@ -728,8 +728,11 @@ namespace mongo {
             try { 
                 assert( dropIndexes(d, name.c_str(), "*", errmsg, result, true) );
             }
-            catch( DBException& ) {
-                uasserted(12503,"drop: dropIndexes for collection failed - consider trying repair");
+            catch( DBException& e ) {
+                stringstream ss;
+                ss << "drop: dropIndexes for collection failed - consider trying repair ";
+                ss << " cause: " << e.what();
+                uasserted(12503,ss.str());
             }
             assert( d->nIndexes == 0 );
         }
@@ -1892,7 +1895,10 @@ namespace mongo {
         bb.done();
         if( nNotClosed )
             result.append("nNotClosed", nNotClosed);
-        
+        else {
+            ClientCursor::assertNoCursors();
+        }
+
         return true;
     }
     

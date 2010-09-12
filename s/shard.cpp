@@ -76,6 +76,12 @@ namespace mongo {
                 Shard s( name , host , maxSize , isDraining );
                 _lookup[name] = s;
                 _lookup[host] = s;
+
+                // add rs name to lookup (if it exists)
+                size_t pos;
+                if ((pos = host.find('/', 0)) != string::npos) {
+                    _lookup[host.substr(0, pos)] = s;
+                }
             }
 
         }
@@ -90,6 +96,13 @@ namespace mongo {
             {
                 scoped_lock lk( _mutex );
                 map<string,Shard>::iterator i = _lookup.find( ident );
+
+                // if normal find didn't find anything, try to find by rs name
+                size_t pos;
+                if ( i == _lookup.end() && (pos = ident.find('/', 0)) != string::npos) {
+                    i = _lookup.find( ident.substr(0, pos) );
+                }
+
                 if ( i != _lookup.end() )
                     return i->second;
             }

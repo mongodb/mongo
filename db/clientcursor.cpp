@@ -32,27 +32,37 @@
 
 namespace mongo {
 
-    CCById ClientCursor::clientCursorsById;
-    CCByLoc ClientCursor::byLoc;
-    boost::recursive_mutex ClientCursor::ccmutex;
+    typedef multimap<DiskLoc, ClientCursor*> CCByLoc;
 
-    unsigned ClientCursor::byLocSize() { 
+    CCById ClientCursor::clientCursorsById;
+    boost::recursive_mutex ClientCursor::ccmutex;
+    long long ClientCursor::numberTimedOut = 0;
+
+    /*static*/ void ClientCursor::assertNoCursors() { 
         recursive_scoped_lock lock(ccmutex);
-        return byLoc.size();
+        if( clientCursorsById.size() ) { 
+            log() << "ERROR clientcursors exist but should not at this point" << endl;
+            ClientCursor *cc = clientCursorsById.begin()->second;
+            log() << "first one: " << cc->cursorid << ' ' << cc->ns << endl;
+            clientCursorsById.clear();
+            assert(false);
+        }
     }
+
 
     void ClientCursor::setLastLoc_inlock(DiskLoc L) {
         if ( L == _lastLoc )
             return;
 
+        CCByLoc& bl = byLoc();
         if ( !_lastLoc.isNull() ) {
-            CCByLoc::iterator i = kv_find(byLoc, _lastLoc, this);
-            if ( i != byLoc.end() )
-                byLoc.erase(i);
+            CCByLoc::iterator i = kv_find(bl, _lastLoc, this);
+            if ( i != bl.end() )
+                bl.erase(i);
         }
 
         if ( !L.isNull() )
-            byLoc.insert( make_pair(L, this) );
+            bl.insert( make_pair(L, this) );
         _lastLoc = L;
     }
 
@@ -76,24 +86,52 @@ namespace mongo {
         {
             recursive_scoped_lock lock(ccmutex);
 
-            for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
+            Database *db = cc().database();
+            assert(db);
+            assert( str::startsWith(nsPrefix, db->name) );
+
+            for( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); ++i ) {
                 ClientCursor *cc = i->second;
-                if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 )
+                if( cc->_db != db ) 
+                    continue;
+                if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 ) {
                     toDelete.push_back(i->second);
+                }
             }
+
+            /*
+            note : we can't iterate byloc because clientcursors may exist with a loc of null in which case
+                   they are not in the map.  perhaps they should not exist though in the future?  something to 
+                   change???
+                   
+            CCByLoc& bl = db->ccByLoc;
+            for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); ++i ) {
+                ClientCursor *cc = i->second;
+                if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 ) {
+                    assert( cc->_db == db );
+                    toDelete.push_back(i->second);
+                }
+            }*/
 
             for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
                 delete (*i);
         }
     }
 
+    bool ClientCursor::shouldTimeout( unsigned millis ){
+        _idleAgeMillis += millis;
+        return _idleAgeMillis > 600000 && _pinValue == 0;
+    }
+
     /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
     void ClientCursor::idleTimeReport(unsigned millis) {
+        readlock lk("");
         recursive_scoped_lock lock(ccmutex);
-        for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
-            CCByLoc::iterator j = i;
+        for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end();  ) {
+            CCById::iterator j = i;
             i++;
             if( j->second->shouldTimeout( millis ) ){
+                numberTimedOut++;
                 log(1) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns 
                        << " idle:" << j->second->idleTime() << "ms\n";
                 delete j->second;
@@ -106,10 +144,12 @@ namespace mongo {
     */
     void ClientCursor::informAboutToDeleteBucket(const DiskLoc& b) {
         recursive_scoped_lock lock(ccmutex);
-        RARELY if ( byLoc.size() > 70 ) {
-            log() << "perf warning: byLoc.size=" << byLoc.size() << " in aboutToDeleteBucket\n";
+        Database *db = cc().database();
+        CCByLoc& bl = db->ccByLoc;
+        RARELY if ( bl.size() > 70 ) {
+            log() << "perf warning: byLoc.size=" << bl.size() << " in aboutToDeleteBucket\n";
         }
-        for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
+        for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); i++ )
             i->second->c->aboutToDeleteBucket(b);
     }
     void aboutToDeleteBucket(const DiskLoc& b) {
@@ -120,8 +160,11 @@ namespace mongo {
     void ClientCursor::aboutToDelete(const DiskLoc& dl) {
         recursive_scoped_lock lock(ccmutex);
 
-        CCByLoc::iterator j = byLoc.lower_bound(dl);
-        CCByLoc::iterator stop = byLoc.upper_bound(dl);
+        Database *db = cc().database();
+        assert(db);
+        CCByLoc& bl = db->ccByLoc;
+        CCByLoc::iterator j = bl.lower_bound(dl);
+        CCByLoc::iterator stop = bl.upper_bound(dl);
         if ( j == stop )
             return;
 
@@ -139,6 +182,7 @@ namespace mongo {
         
         for ( vector<ClientCursor*>::iterator i = toAdvance.begin(); i != toAdvance.end(); ++i ){
             ClientCursor* cc = *i;
+            wassert(cc->_db == db);
             
             if ( cc->_doingDeletes ) continue;
 
@@ -157,7 +201,9 @@ namespace mongo {
             c->advance();
             if ( c->eof() ) {
                 // advanced to end
-                // leave ClieneCursor in place so next getMore doesn't fail
+                // leave ClientCursor in place so next getMore doesn't fail
+                // still need to mark new location though
+                cc->updateLocation();
             }
             else {
                 wassert( c->refLoc() != dl );
@@ -296,6 +342,13 @@ namespace mongo {
 
     int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
     long long ClientCursor::allocCursorId_inlock() {
+        if( 0 ) { 
+            static long long z;
+            ++z;
+            cout << "TEMP alloccursorid " << z << endl;
+            return z;
+        }
+
         long long x;
         int ctm = (int) curTimeMillis();
         while ( 1 ) {
@@ -328,7 +381,13 @@ namespace mongo {
     }
 
 
-
+    void ClientCursor::appendStats( BSONObjBuilder& result ){
+        recursive_scoped_lock lock(ccmutex);
+        result.appendNumber("totalOpen", (int)clientCursorsById.size() );
+        result.appendNumber("clientCursors_size", (int) numCursors());
+        result.appendNumber("timedOut" , (int)numberTimedOut);
+    }
+    
     // QUESTION: Restrict to the namespace from which this command was issued?
     // Alternatively, make this command admin-only?
     class CmdCursorInfo : public Command {
@@ -339,11 +398,8 @@ namespace mongo {
             help << " example: { cursorInfo : 1 }";
         }
         virtual LockType locktype() const { return NONE; }
-        bool run(const string&, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            recursive_scoped_lock lock(ClientCursor::ccmutex);
-            result.append("totalOpen", unsigned( ClientCursor::clientCursorsById.size() ) );
-            result.append("byLocation_size", unsigned( ClientCursor::byLoc.size() ) );
-            result.append("clientCursors_size", unsigned( ClientCursor::clientCursorsById.size() ) );
+        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            ClientCursor::appendStats( result );
             return true;
         }
     } cmdCursorInfo;

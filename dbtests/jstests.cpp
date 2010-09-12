@@ -541,7 +541,7 @@ namespace JSTests {
             ASSERT( s->exec( "c = {c:a.a.toString()}", "foo", false, true, false ) );
             out = s->getObject( "c" );
             stringstream ss;
-            ss << "NumberLong( \"" << val << "\" )";
+            ss << "NumberLong(\"" << val << "\")";
             ASSERT_EQUALS( ss.str(), out.firstElement().valuestr() );
 
             ASSERT( s->exec( "d = {d:a.a.toNumber()}", "foo", false, true, false ) );

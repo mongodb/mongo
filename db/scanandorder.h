@@ -88,16 +88,17 @@ namespace mongo {
 
         void _add(BSONObj& k, BSONObj o, DiskLoc* loc) {
             if (!loc){
-                best.insert(make_pair(k,o));
+                best.insert(make_pair(k.getOwned(),o.getOwned()));
             } else {
                 BSONObjBuilder b;
                 b.appendElements(o);
                 b.append("$diskLoc", loc->toBSONObj());
-                best.insert(make_pair(k, b.obj()));
+                best.insert(make_pair(k.getOwned(), b.obj().getOwned()));
             }
         }
 
         void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
+            /* todo : we don't correct approxSize here. */
             const BSONObj& worstBestKey = i->first;
             int c = worstBestKey.woCompare(k, order.pattern);
             if ( c > 0 ) {
@@ -124,7 +125,11 @@ namespace mongo {
             BSONObj k = order.getKeyFromObject(o);
             if ( (int) best.size() < limit ) {
                 approxSize += k.objsize();
-                uassert( 10128 ,  "too much key data for sort() with no index.  add an index or specify a smaller limit", approxSize < 1 * 1024 * 1024 );
+                approxSize += o.objsize();
+
+                /* note : adjust when bson return limit adjusts. note this limit should be a bit higher. */
+                uassert( 10128 ,  "too much data for sort() with no index.  add an index or specify a smaller limit", approxSize < 32 * 1024 * 1024 );
+
                 _add(k, o, loc);
                 return;
             }

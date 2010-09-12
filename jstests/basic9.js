@@ -1,5 +1,5 @@
 
-t = db.getCollection( "foo" );
+t = db.getCollection( "foo_basic9" );
 
 t.save( { "foo$bar" : 5 } );
 
