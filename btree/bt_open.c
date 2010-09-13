@@ -102,7 +102,7 @@ __wt_bt_open_verify_sizes(DB *db)
 	 * a lot of space.
 	 */
 	if (db->allocsize == 0)
-		db->allocsize = 512;
+		db->allocsize = WT_BTREE_ALLOCATION_SIZE;
 
 	/*
 	 * Internal pages are also usually small, we want it to fit into the
