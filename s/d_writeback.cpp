@@ -75,7 +75,7 @@ namespace mongo {
                 log(1) << "WriteBackCommand got : " << z << endl;
                 result.append( "data" , z );
             }
-            catch ( BlockingQueue<BSONObj>::Timeout& t ){
+            catch ( BlockingQueue<BSONObj>::Timeout& ){
                 result.appendBool( "noop" , true );
             }
             
