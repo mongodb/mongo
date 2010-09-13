@@ -9,9 +9,9 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_config_default(DB *);
-static int __wt_idb_config_default(DB *);
-static int __wt_idb_destroy(DB *, int);
+static int __wt_db_config(DB *);
+static int __wt_idb_config(DB *);
+static int __wt_idb_destroy(DB *);
 
 /*
  * __wt_env_db --
@@ -37,8 +37,8 @@ __wt_env_db(ENV *env, DB **dbp)
 	db->env = env;
 
 	/* Configure the DB and the IDB. */
-	WT_ERR(__wt_db_config_default(db));
-	WT_ERR(__wt_idb_config_default(db));
+	WT_ERR(__wt_db_config(db));
+	WT_ERR(__wt_idb_config(db));
 
 	*dbp = db;
 	return (0);
@@ -48,26 +48,25 @@ err:	(void)__wt_db_destroy(db);
 }
 
 /*
- * __wt_db_config_default --
- *	Set default configuration for a just-created DB handle.
+ * __wt_db_config --
+ *	Set configuration for a just-created DB handle.
  */
 static int
-__wt_db_config_default(DB *db)
+__wt_db_config(DB *db)
 {
+	__wt_methods_db_config_default(db);
 	__wt_methods_db_lockout(db);
 	__wt_methods_db_init_transition(db);
-
-	db->btree_compare = db->btree_compare_dup = __wt_bt_lex_compare;
 
 	return (0);
 }
 
 /*
- * __wt_idb_config_default --
- *	Set default configuration for a just-created IDB handle.
+ * __wt_idb_config --
+ *	Set configuration for a just-created IDB handle.
  */
 static int
-__wt_idb_config_default(DB *db)
+__wt_idb_config(DB *db)
 {
 	ENV *env;
 	IDB *idb;
@@ -103,7 +102,7 @@ __wt_db_destroy(DB *db)
 	env = db->env;
 
 	/* Discard the underlying IDB object. */
-	ret = __wt_idb_destroy(db, 0);
+	ret = __wt_idb_destroy(db);
 
 	/* Discard the DB object. */
 	__wt_free(env, db, sizeof(DB));
@@ -116,7 +115,7 @@ __wt_db_destroy(DB *db)
  *	IDB handle destructor.
  */
 static int
-__wt_idb_destroy(DB *db, int refresh)
+__wt_idb_destroy(DB *db)
 {
 	ENV *env;
 	IDB *idb;
@@ -152,26 +151,11 @@ __wt_idb_destroy(DB *db, int refresh)
 	__wt_free(env, idb->stats, 0);
 	__wt_free(env, idb->dstats, 0);
 
-	/*
-	 * This is the guts of the split between the public/private, DB/IDB
-	 * handles.  If a Db.open fails for any reason, the user may use the
-	 * DB structure again, but the IDB structure may have been modified
-	 * in the attempt.  So, we overwrite the IDB structure, as if it was
-	 * just allocated.  This requires the IDB structure never be modified
-	 * by DB configuration, we'd lose that configuration here.
-	 */
-	if (refresh) {
-		memset(idb, 0, sizeof(idb));
-		WT_TRET(__wt_idb_config_default(db));
-		return (ret);
-	}
-
 	__wt_lock(env, ienv->mtx);		/* Delete from the ENV's list */
 	TAILQ_REMOVE(&ienv->dbqh, idb, q);
 	__wt_unlock(env, ienv->mtx);
 
 	__wt_free(env, idb, sizeof(IDB));
-
 	db->idb = NULL;
 	return (0);
 }

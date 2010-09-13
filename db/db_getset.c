@@ -108,8 +108,7 @@ __wt_db_btree_pagesize_set_verify(DB *db, u_int32_t allocsize,
 
 	if (intlmin > intlmax || leafmin > leafmax) {
 		__wt_api_db_errx(db,
-		    "minimum sizes must be less than or equal to "
-		    "maximum sizes");
+		    "minimum sizes must be less than or equal to maximum sizes");
 		return (WT_ERROR);
 	}
 
