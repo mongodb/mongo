@@ -26,7 +26,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include "../db/cmdline.h"
-#include "../db/commands.h"
 #include "../client/dbclient.h"
 
 #ifndef _WIN32
@@ -717,29 +716,6 @@ namespace mongo {
         map<string, bool> isSelfCache; // host, isSelf
     }
     
-    const OID& getServerID(){
-        static OID serverID;
-        ONCE {
-            serverID.init();
-        }
-        return serverID;
-    }
-
-    class ServerIDCommand : public Command { 
-        public:
-            ServerIDCommand() : Command( "serverID" ) { }
-            virtual bool slaveOk() const { return true; }
-            virtual LockType locktype() const { return NONE; } 
-            virtual void help(stringstream& h) const { h << "internal"; }
-            virtual bool adminOnly() const { return true; }
-
-            virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-                result.append("serverID", getServerID());
-                return 1;
-            }
-
-    } serverIDCommand;
-
     bool HostAndPort::isSelf() const { 
         int p = _port == -1 ? CmdLine::DefaultDBPort : _port;
 
@@ -753,21 +729,14 @@ namespace mongo {
                 return it->second;
             }
 
-            bool ret = false;
+            SockAddr addr (_host.c_str(), 0); // port 0 is dynamically assigned
+            SOCKET sock = ::socket(addr.getType(), SOCK_STREAM, 0);
+            assert(sock != INVALID_SOCKET);
 
-            try {
-                DBClientConnection c (false, NULL, 0.001); // 1ms timeout
-                c.connect(this->toString());
-
-                BSONObj out;
-                if (c.runCommand("admin", BSON("serverID"<<1), out) && out["serverID"].OID() == getServerID()){
-                    ret = true;
-                }
-            } catch (...) {
-                /* ignore */
-            }
-
+            bool ret = (::bind(sock, addr.raw(), addr.addressSize) == 0);
             isSelfCache[_host] = ret;
+
+            closesocket(sock);
 
             return ret;
         }
