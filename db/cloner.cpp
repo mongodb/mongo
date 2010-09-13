@@ -437,7 +437,7 @@ namespace mongo {
             }
             {
                 HostAndPort h(fromhost);
-                if( ListeningSockets::listeningOn(h) ) { 
+                if( h.isSelf() ) { 
                     errmsg = "can't cloneCollection from self";
                     return false;
                 }

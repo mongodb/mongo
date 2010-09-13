@@ -44,7 +44,7 @@ namespace mongo {
     list<HostAndPort> ReplSetConfig::otherMemberHostnames() const { 
         list<HostAndPort> L;
         for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++ ) {
-            if( !ListeningSockets::listeningOn(i->h) )
+            if( !i->h.isSelf() )
                 L.push_back(i->h);
         }
         return L;
@@ -164,7 +164,7 @@ namespace mongo {
                     uasserted(13432, "_id may not change for members");
                 }
             }
-            if( ListeningSockets::listeningOn(m.h) ) 
+            if( m.h.isSelf() ) 
                 me++;
         }
 
@@ -307,7 +307,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c;
         int v = -5;
         try {
-            if( ListeningSockets::listeningOn(h) ) {
+            if( h.isSelf() ) {
                 ;
             }
             else {
@@ -360,7 +360,7 @@ namespace mongo {
         from(o);
         checkRsConfig();
         _ok = true;
-        log(level) << "replSet load config ok from " << (ListeningSockets::listeningOn(h) ? "self" : h.toString()) << rsLog;
+        log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
     }
 
 }

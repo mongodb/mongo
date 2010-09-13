@@ -229,20 +229,5 @@ namespace mongo {
     } cmdForceError;
 
     
-    class ServerIDCommand : public Command { 
-    public:
-        ServerIDCommand() : Command( "_serverID" ) { }
-        virtual bool requiresAuth() { return false; }
-        virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; } 
-        virtual void help(stringstream& h) const { h << "internal"; }
-        virtual bool adminOnly() const { return true; }
-
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            result.append("serverID", getServerID());
-            return 1;
-        }
-    } serverIDCommand;
-
 
 }

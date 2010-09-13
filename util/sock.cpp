@@ -17,8 +17,6 @@
 
 #include "pch.h"
 #include "sock.h"
-#include "hostandport.h"
-#include "../client/dbclient.h"
 
 namespace mongo {
 
@@ -207,43 +205,6 @@ namespace mongo {
         return _instance;
     }
 
-    bool ListeningSockets::listeningOn(const HostAndPort& addr) { 
-        if( addr.port() != cmdLine.port )
-            return false;
-
-        static map<string, bool> isSelfCache; // host, isSelf
-
-        map<string, bool>::const_iterator it = isSelfCache.find(addr.host());
-        if (it != isSelfCache.end()){
-            return it->second;
-        }
-
-        bool ret = false;
-
-        try {
-            DBClientConnection c (false, NULL, 0.001); // 1ms timeout
-            c.connect(addr.toString());
-
-            BSONObj out;
-            if (c.runCommand("admin", BSON("_serverID"<<1), out) && out["serverID"].OID() == getServerID()){
-                ret = true;
-            }
-        } catch (...) {
-            /* ignore - if failed can't be one of my addresses */
-        }
-
-        isSelfCache[addr.host()] = ret;
-
-        return ret;
-    }
-
-    const OID& getServerID(){
-        static OID serverID;
-        ONCE {
-            serverID.init();
-        }
-        return serverID;
-    }
     
     string getHostNameCached(){
         static string host;

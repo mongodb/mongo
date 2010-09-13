@@ -26,7 +26,6 @@
 
 namespace mongo {
 
-    struct HostAndPort;
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
     string getAddrInfoStrError(int code);
 
@@ -247,8 +246,6 @@ namespace mongo {
 
     string getHostNameCached();
 
-    const OID& getServerID();
-
     class ListeningSockets {
     public:
         ListeningSockets() : _mutex("ListeningSockets"), _sockets( new set<int>() ) { }
@@ -274,9 +271,6 @@ namespace mongo {
             }            
         }
         static ListeningSockets* get();
-
-        /* returns true if the host/port combo identifies this process instance. */
-        static bool listeningOn(const HostAndPort& addr);
     private:
         mongo::mutex _mutex;
         set<int>* _sockets;

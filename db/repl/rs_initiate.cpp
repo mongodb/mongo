@@ -40,7 +40,7 @@ namespace mongo {
         int failures = 0;
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
-            if( ListeningSockets::listeningOn(i->h) ) {
+            if( i->h.isSelf() ) {
                 me++;
                 if( !i->potentiallyHot() ) { 
                     uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
@@ -114,7 +114,7 @@ namespace mongo {
             if( initial ) {
                 bool hasData = res["hasData"].Bool();
                 uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.", 
-                    !hasData || ListeningSockets::listeningOn(i->h));
+                    !hasData || i->h.isSelf());
             }
         }
     }
