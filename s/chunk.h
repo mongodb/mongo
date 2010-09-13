@@ -147,6 +147,13 @@ namespace mongo {
         bool _splitIfShould( long dataWritten );
         ChunkPtr multiSplit_inlock( const vector<BSONObj>& splitPoints );
 
+        /**
+         * if sort 1, return lowest key
+         * if sort -1, return highest key
+         * will return empty object if have none
+         */
+        BSONObj _getExtremeKey( int sort ) const;
+
         // main shard info
         
         ChunkManager * _manager;

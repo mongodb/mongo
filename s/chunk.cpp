@@ -82,44 +82,55 @@ namespace mongo {
     bool Chunk::maxIsInf() const {
         return _manager->getShardKey().globalMax().woCompare( getMax() ) == 0;
     }
-    
-    BSONObj Chunk::pickSplitPoint( const vector<BSONObj> * possibleSplitPoints ) const{
-        int sort = 0;
-        
-        if ( minIsInf() ){
-            sort = 1;
+
+    BSONObj Chunk::_getExtremeKey( int sort ) const {
+        ShardConnection conn( getShard().getConnString() , _manager->getns() );
+        Query q;
+        if ( sort == 1 ) {
+            q.sort( _manager->getShardKey().key() );
         }
-        else if ( maxIsInf() ){
-            sort = -1;
-        }
-        
-        if ( sort ){
-            ShardConnection conn( getShard().getConnString() , _manager->getns() );
-            Query q;
-            if ( sort == 1 )
-                q.sort( _manager->getShardKey().key() );
-            else {
-                BSONObj k = _manager->getShardKey().key();
-                BSONObjBuilder r;
-                
-                BSONObjIterator i(k);
-                while( i.more() ) {
-                    BSONElement e = i.next();
-                    uassert( 10163 ,  "can only handle numbers here - which i think is correct" , e.isNumber() );
-                    r.append( e.fieldName() , -1 * e.number() );
-                }
-                
-                q.sort( r.obj() );
+        else {
+            // need to invert shard key pattern to sort backwards
+            // TODO: make a helper in ShardKeyPattern?
+
+            BSONObj k = _manager->getShardKey().key();
+            BSONObjBuilder r;
+            
+            BSONObjIterator i(k);
+            while( i.more() ) {
+                BSONElement e = i.next();
+                uassert( 10163 ,  "can only handle numbers here - which i think is correct" , e.isNumber() );
+                r.append( e.fieldName() , -1 * e.number() );
             }
-            BSONObj end = conn->findOne( _manager->getns() , q );
-            conn.done();
-
-            if ( ! end.isEmpty() )
-                return _manager->getShardKey().extractKey( end );
+            
+            q.sort( r.obj() );
         }
+        
+        // find the extreme key
+        BSONObj end = conn->findOne( _manager->getns() , q );
+        conn.done();
+        
+        if ( end.isEmpty() )
+            return BSONObj();
+        
+        return _manager->getShardKey().extractKey( end );
+    }
+    
+    BSONObj Chunk::pickSplitPoint( const vector<BSONObj> * possibleSplitPoints ) const {
+        
+        // check to see if we're at the edge of the key range
+        // if so, split on the edge for sequential insertion efficienc
 
+        if ( minIsInf() ) 
+            return _getExtremeKey( 1 );
+        if ( maxIsInf() )
+            return _getExtremeKey( -1 );
+
+        // we're not at an edge, so use the hint if we have one
         if ( possibleSplitPoints && possibleSplitPoints->size() )
             return possibleSplitPoints->at(0);
+        
+        // no edge, no hint, so find the median of the range
         
         BSONObj cmd = BSON( "medianKey" << _manager->getns()
                             << "keyPattern" << _manager->getShardKey().key()
@@ -136,7 +147,12 @@ namespace mongo {
 
         BSONObj median = result.getObjectField( "median" ).getOwned();
 
-        if (median == getMin()){
+        if ( median == getMin() ) {
+            // if the median is the same as the min
+            // we don't want to split on the median, 
+            // but the maximum real value
+            // otherwise we'll never be able to split up a chunk with lots of key dups
+
             Query q;
             q.minKey(_min).maxKey(_max);
             q.sort(_manager->getShardKey().key());
@@ -146,7 +162,8 @@ namespace mongo {
         }
         
         conn.done();
-
+        
+        // sanity check median - purely defensive
         if ( median < getMin() || median >= getMax() ){
             stringstream ss;
             ss << "medianKey returned value out of range.  " 
