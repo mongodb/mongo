@@ -34,6 +34,7 @@
 
 #ifndef _WIN32
 #include <sys/resource.h>
+#include <sys/stat.h>
 #else
 
 // errno doesn't work for winsock.
@@ -143,6 +144,14 @@ namespace mongo {
                 closesocket(sock);
                 return;
             }
+
+#if !defined(_WIN32)
+            if (me.getType() == AF_UNIX){
+                if (chmod(me.getAddr().c_str(), 0777) == -1){
+                    log() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
+                }
+            }
+#endif
 
             if ( ::listen(sock, 128) != 0 ) {
                 log() << "listen(): listen() failed " << errnoWithDescription() << endl;
