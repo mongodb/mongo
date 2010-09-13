@@ -270,9 +270,8 @@ namespace mongo {
         ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
         
-        ShardKeyPattern& getShardKey(){  return _key; }
         const ShardKeyPattern& getShardKey() const {  return _key; }
-        bool isUnique(){ return _unique; }
+        bool isUnique() const { return _unique; }
 
         void maybeChunkCollection();
         
@@ -296,9 +295,7 @@ namespace mongo {
         /**
          * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
          */
-        unsigned long long getSequenceNumber(){
-            return _sequenceNumber;
-        }
+        unsigned long long getSequenceNumber() const { return _sequenceNumber; }
         
         void getInfo( BSONObjBuilder& b ){
             b.append( "key" , _key.key() );
