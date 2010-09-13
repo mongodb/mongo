@@ -217,10 +217,10 @@ __wt_drain_trickle(WT_TOC *toc)
 	 * trying to amortize the cost of building and sorting the drain and
 	 * hazard arrays.)
 	 */
-	if (cache->drain_elem > WT_CACHE_DRAIN_CNT) {
+	if (cache->drain_elem > env->cache_drain_cnt) {
 		qsort(cache->drain, (size_t)cache->drain_elem,
 		    sizeof(WT_CACHE_ENTRY *), __wt_drain_compare_lru);
-		cache->drain_elem = WT_CACHE_DRAIN_CNT;
+		cache->drain_elem = env->cache_drain_cnt;
 	}
 
 	/*
