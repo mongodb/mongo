@@ -198,12 +198,11 @@ namespace mongo {
             while ( cc->ok() ){ 
                 currCount++;
                 if ( currCount > keyCount ){
-                    if ( ! currKey.isEmpty() && (currKey.woCompare( c->currKey() ) == 0 ) ) 
-                         continue;
-
-                    currKey = c->currKey();
-                    splitKeys.push_back( bc->prettyKey( currKey ) );
-                    currCount = 0;
+                    if ( currKey.isEmpty() || currKey.woCompare( c->currKey() ) ){ 
+                        currKey = c->currKey();
+                        splitKeys.push_back( bc->prettyKey( currKey ) );
+                        currCount = 0;
+                    }
                 }
                 cc->advance();
                 
