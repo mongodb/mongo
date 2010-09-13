@@ -190,19 +190,29 @@ namespace mongo {
             long long currCount = 0;
             vector<BSONObj> splitKeys;
             BSONObj currKey;
-            BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+            
+            BtreeCursor * bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+            shared_ptr<Cursor> c( bc );
+            scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
 
-            while ( c.ok() ){ 
+            while ( cc->ok() ){ 
                 currCount++;
                 if ( currCount > keyCount ){
-                    if ( ! currKey.isEmpty() && (currKey.woCompare( c.currKey() ) == 0 ) ) 
+                    if ( ! currKey.isEmpty() && (currKey.woCompare( c->currKey() ) == 0 ) ) 
                          continue;
 
-                    currKey = c.currKey();
-                    splitKeys.push_back( c.prettyKey( currKey ) );
+                    currKey = c->currKey();
+                    splitKeys.push_back( bc->prettyKey( currKey ) );
                     currCount = 0;
                 }
-                c.advance();
+                cc->advance();
+                
+                if ( ! cc->yieldSometimes() ){
+                    // we were near and and got pushed to the end
+                    // i think returning the splits we've already found is fine
+                    bc = NULL; // defensive
+                    break;
+                }
             }
 
             ostringstream os;
