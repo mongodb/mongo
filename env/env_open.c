@@ -112,7 +112,7 @@ __wt_env_close(ENV *env)
 	WT_TRET(__wt_cache_destroy(env));
 
 	/* Re-cycle the underlying ENV/IENV structures. */
-	WT_TRET(__wt_ienv_destroy(env, 0));
+	WT_TRET(__wt_ienv_destroy(env));
 
 	/* Free the Env structure. */
 	__wt_free(NULL, env, sizeof(ENV));

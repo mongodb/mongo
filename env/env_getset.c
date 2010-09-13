@@ -38,8 +38,8 @@ __wt_env_cache_hash_size_set_verify(ENV *env, u_int32_t hash_size)
 int
 __wt_env_hazard_size_set_verify(ENV *env, u_int32_t hazard_size)
 {
-	return (__wt_api_arg_min(env, "Env.hazard_size_set",
-	    "hazard size", hazard_size, WT_HAZARD_SIZE_DEFAULT));
+	return (__wt_api_arg_min(env,
+	    "Env.hazard_size_set", "hazard size", hazard_size, 1));
 }
 
 /*
