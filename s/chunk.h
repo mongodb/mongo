@@ -1,9 +1,4 @@
-// shard.h
-
-/*
-   A "shard" is a database (replica pair typically) which represents
-   one partition of the overall database.
-*/
+// @file chunk.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -93,10 +88,18 @@ namespace mongo {
         bool minIsInf() const;
         bool maxIsInf() const;
 
-        BSONObj pickSplitPoint() const;
+        /**
+         * @param a vector of possible split points
+         *        used as a hint only
+         */
+        BSONObj pickSplitPoint( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
         ChunkPtr split();
 
-        void pickSplitVector( vector<BSONObj>* splitPoints , int chunkSize ) const;
+        /**
+         * @param splitPoints - vector to be filled in
+         * @param chunkSize  - chunk size to target in bytes
+         */
+        void pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize ) const;
         ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
 
         /**
@@ -128,8 +131,6 @@ namespace mongo {
         
         void appendShortVersion( const char * name , BSONObjBuilder& b );
 
-        void _markModified();
-        
         static int MaxChunkSize;
 
         string genID() const;
@@ -137,13 +138,21 @@ namespace mongo {
 
         const ChunkManager* getManager() const { return _manager; }
         
-        bool modified();
+        bool getModified() { return _modified; }
+        void setModified( bool modified ) { _modified = modified; }
 
         ShardChunkVersion getVersionOnConfigServer() const;
     private:
 
         bool _splitIfShould( long dataWritten );
         ChunkPtr multiSplit_inlock( const vector<BSONObj>& splitPoints );
+
+        /**
+         * if sort 1, return lowest key
+         * if sort -1, return highest key
+         * will return empty object if have none
+         */
+        BSONObj _getExtremeKey( int sort ) const;
 
         // main shard info
         
@@ -261,9 +270,8 @@ namespace mongo {
         ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
         
-        ShardKeyPattern& getShardKey(){  return _key; }
         const ShardKeyPattern& getShardKey() const {  return _key; }
-        bool isUnique(){ return _unique; }
+        bool isUnique() const { return _unique; }
 
         void maybeChunkCollection();
         
@@ -287,9 +295,7 @@ namespace mongo {
         /**
          * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
          */
-        unsigned long long getSequenceNumber(){
-            return _sequenceNumber;
-        }
+        unsigned long long getSequenceNumber() const { return _sequenceNumber; }
         
         void getInfo( BSONObjBuilder& b ){
             b.append( "key" , _key.key() );
@@ -303,6 +309,7 @@ namespace mongo {
 
         void _printChunks() const;
         
+        int getCurrentDesiredChunkSize() const;
     private:
         
         void _reload();

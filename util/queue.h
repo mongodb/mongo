@@ -63,6 +63,33 @@ namespace mongo {
             _queue.pop();
             return t;    
         }
+
+        
+        /**
+         * blocks waiting for an object until maxSecondsToWait passes
+         * if maxSecondsToWait passes, an Timeout exception is thrown
+         */
+        T blockingPop( int maxSecondsToWait ){
+            
+            Timer timer;
+
+            boost::xtime xt;
+            boost::xtime_get(&xt, boost::TIME_UTC);
+            xt.sec += maxSecondsToWait;
+
+            scoped_lock l( _lock );
+            while( _queue.empty() ){
+                _condition.timed_wait( l.boost() , xt );
+                if ( timer.seconds() >= maxSecondsToWait )
+                    throw Timeout();
+            }
+            
+            T t = _queue.front();
+            _queue.pop();
+            return t;    
+        }
+
+        class Timeout {};
         
     private:
         std::queue<T> _queue;

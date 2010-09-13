@@ -26,25 +26,74 @@
 
 namespace mongo {
 
+    // ------ PoolForHost ------
+    
+    PoolForHost::~PoolForHost(){
+        while ( ! _pool.empty() ){
+            StoredConnection sc = _pool.top();
+            delete sc.conn;
+            _pool.pop();
+        }
+    }
+
+    void PoolForHost::done( DBClientBase * c ) {
+        _pool.push(c);
+    }
+    
+    DBClientBase * PoolForHost::get() {
+        
+        time_t now = time(0);
+        
+        while ( ! _pool.empty() ){
+            StoredConnection sc = _pool.top();
+            _pool.pop();
+            if ( sc.ok( now ) )
+                return sc.conn;
+            delete sc.conn;
+        }
+        
+        return NULL;
+    }
+    
+    void PoolForHost::flush() {
+        vector<StoredConnection> all;
+        while ( ! _pool.empty() ){
+            StoredConnection c = _pool.top();
+            _pool.pop();
+            all.push_back( c );
+            bool res;
+            c.conn->isMaster( res );
+        }
+        
+        for ( vector<StoredConnection>::iterator i=all.begin(); i != all.end(); ++i ){
+            _pool.push( *i );
+        }
+    }
+
+    PoolForHost::StoredConnection::StoredConnection( DBClientBase * c ){
+        conn = c;
+        when = time(0);
+    }
+
+    bool PoolForHost::StoredConnection::ok( time_t now ){
+        // if connection has been idle for an hour, kill it
+        return ( now - when ) < 3600;
+    }
+    // ------ DBConnectionPool ------
+
     DBConnectionPool pool;
     
     DBClientBase* DBConnectionPool::_get(const string& ident) {
         scoped_lock L(_mutex);
-        
         PoolForHost& p = _pools[ident];
-        if ( p.pool.empty() )
-            return 0;
-        
-        DBClientBase *c = p.pool.top();
-        p.pool.pop();
-        return c;
+        return p.get();
     }
 
     DBClientBase* DBConnectionPool::_finishCreate( const string& host , DBClientBase* conn ){
         {
             scoped_lock L(_mutex);
             PoolForHost& p = _pools[host];
-            p.created++;
+            p.createdOne();
         }
 
         onCreate( conn );
@@ -84,34 +133,14 @@ namespace mongo {
     }
 
     DBConnectionPool::~DBConnectionPool(){
-        for ( map<string,PoolForHost>::iterator i = _pools.begin(); i != _pools.end(); i++ ){
-            PoolForHost& p = i->second;
-
-            while ( ! p.pool.empty() ){
-                DBClientBase * c = p.pool.top();
-                delete c;
-                p.pool.pop();
-            }
-        }
+        // connection closing is handled by ~PoolForHost
     }
 
     void DBConnectionPool::flush(){
         scoped_lock L(_mutex);
         for ( map<string,PoolForHost>::iterator i = _pools.begin(); i != _pools.end(); i++ ){
             PoolForHost& p = i->second;
-
-            vector<DBClientBase*> all;
-            while ( ! p.pool.empty() ){
-                DBClientBase * c = p.pool.top();
-                p.pool.pop();
-                all.push_back( c );
-                bool res;
-                c->isMaster( res );
-            }
-            
-            for ( vector<DBClientBase*>::iterator i=all.begin(); i != all.end(); i++ ){
-                p.pool.push( *i );
-            }
+            p.flush();
         }
     }
 
@@ -143,8 +172,8 @@ namespace mongo {
         for ( map<string,PoolForHost>::iterator i=_pools.begin(); i!=_pools.end(); ++i ){
             string s = i->first;
             BSONObjBuilder temp( bb.subobjStart( s ) );
-            temp.append( "available" , (int)(i->second.pool.size()) );
-            temp.appendNumber( "created" , i->second.created );
+            temp.append( "available" , i->second.numAvailable() );
+            temp.appendNumber( "created" , i->second.numCreated() );
             temp.done();
         }
         bb.done();

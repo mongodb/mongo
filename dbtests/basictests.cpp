@@ -23,6 +23,7 @@
 #include "../util/base64.h"
 #include "../util/array.h"
 #include "../util/text.h"
+#include "../util/queue.h"
 
 namespace BasicTests {
 
@@ -496,6 +497,20 @@ namespace BasicTests {
     };
 
 
+    class QueueTest {
+    public:
+        void run(){
+            BlockingQueue<int> q;
+            Timer t;
+            try {
+                q.blockingPop( 5 );
+            }
+            catch ( BlockingQueue<int>::Timeout& t ){
+            }
+            ASSERT( t.seconds() > 3 && t.seconds() < 9 );
+
+        }
+    };
 
     class All : public Suite {
     public:
@@ -523,6 +538,8 @@ namespace BasicTests {
 
             add< StringSplitterTest >();
             add< IsValidUTF8Test >();
+
+            add< QueueTest >();
         }
     } myall;
     
