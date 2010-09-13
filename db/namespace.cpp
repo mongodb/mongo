@@ -133,8 +133,8 @@ namespace mongo {
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
         MMF::Pointer p;
-        if( MMF::exists(nsPath) ) { 
-			p = f.map(pathString.c_str());
+        if( MMF::exists(nsPath) ) {
+			p = f.mapWithOptions(pathString.c_str(), durable?MMF::READONLY:0);
             if( !p.isNull() ) {
                 len = f.length();
                 if ( len % (1024*1024) != 0 ){
@@ -148,7 +148,7 @@ namespace mongo {
 			massert( 10343 ,  "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
             maybeMkdir();
 			unsigned long long l = lenForNewNsFiles;
-			p = f.map(pathString.c_str(), l);
+			p = f.map(pathString.c_str(), l, durable?MMF::READONLY:0);
             if( !p.isNull() ) {
                 len = l;
                 assert( len == lenForNewNsFiles );
