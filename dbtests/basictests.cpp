@@ -505,7 +505,7 @@ namespace BasicTests {
             try {
                 q.blockingPop( 5 );
             }
-            catch ( BlockingQueue<int>::Timeout& t ){
+            catch ( BlockingQueue<int>::Timeout&  ){
             }
             ASSERT( t.seconds() > 3 && t.seconds() < 9 );
 

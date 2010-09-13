@@ -9,7 +9,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59-9DC7-4BF1-A431-1BD4966899A5}"
 	ProjectSection(SolutionItems) = preProject
 		..\tools\bridge.cpp = ..\tools\bridge.cpp
-		..\tools\bsondump.cpp = ..\tools\bsondump.cpp
 		..\tools\export.cpp = ..\tools\export.cpp
 		..\tools\import.cpp = ..\tools\import.cpp
 		..\tools\restore.cpp = ..\tools\restore.cpp
