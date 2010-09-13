@@ -223,7 +223,7 @@ namespace mongo {
         bool ret = false;
 
         try {
-            DBClientConnection c (false, NULL, 0.1); // 100ms timeout
+            DBClientConnection c (false, NULL, 0.001); // 1ms timeout
             c.connect(addr.toString());
 
             BSONObj out;
