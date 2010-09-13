@@ -122,12 +122,26 @@ DB.prototype.createCollection = function(name, opt) {
 }
 
 /**
+ * @deprecated use getProfilingStatus
  *  Returns the current profiling level of this database
  *  @return SOMETHING_FIXME or null on error
  */
- DB.prototype.getProfilingLevel  = function() { 
+DB.prototype.getProfilingLevel  = function() { 
     var res = this._dbCommand( { profile: -1 } );
     return res ? res.was : null;
+}
+
+/**
+ *  @return the current profiling status
+ *  example { was : 0, slowms : 100 }
+ *  @return SOMETHING_FIXME or null on error
+ */
+DB.prototype.getProfilingStatus  = function() { 
+    var res = this._dbCommand( { profile: -1 } );
+    if ( ! res.ok )
+        throw "profile command failed: " + tojson( res );
+    delete res.ok
+    return res;
 }
 
 
@@ -270,7 +284,8 @@ DB.prototype.help = function() {
     print("\tdb.getMongo().setSlaveOk() allow this connection to read from the nonmaster member of a replica pair");
     print("\tdb.getName()");
     print("\tdb.getPrevError()");
-    print("\tdb.getProfilingLevel()");
+    print("\tdb.getProfilingLevel() - deprecated");
+    print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold ");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSisterDB(name) get the db at the same server as this one");
     print("\tdb.isMaster() check replica primary status");

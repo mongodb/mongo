@@ -245,6 +245,7 @@ namespace mongo {
             help << "enable or disable performance profiling\n";
             help << "{ profile : <n> }\n";
             help << "0=off 1=log slow ops 2=log all\n";
+            help << "-1 to get current values\n";
             help << "http://www.mongodb.org/display/DOCS/Database+Profiler";
         }
         virtual LockType locktype() const { return WRITE; } 
