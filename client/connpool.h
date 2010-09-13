@@ -57,7 +57,17 @@ namespace mongo {
 
         void flush();
     private:
-        std::stack<DBClientBase*> _pool;
+        
+        struct StoredConnection {
+            StoredConnection( DBClientBase * c );
+
+            bool ok( time_t now );
+
+            DBClientBase* conn;
+            time_t when;
+        };
+
+        std::stack<StoredConnection> _pool;
         long long _created;
     };
     

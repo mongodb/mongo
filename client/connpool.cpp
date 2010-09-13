@@ -25,11 +25,13 @@
 #include "../s/shard.h"
 
 namespace mongo {
+
+    // ------ PoolForHost ------
     
     PoolForHost::~PoolForHost(){
         while ( ! _pool.empty() ){
-            DBClientBase * c = _pool.top();
-            delete c;
+            StoredConnection sc = _pool.top();
+            delete sc.conn;
             _pool.pop();
         }
     }
@@ -37,30 +39,47 @@ namespace mongo {
     void PoolForHost::done( DBClientBase * c ) {
         _pool.push(c);
     }
-
+    
     DBClientBase * PoolForHost::get() {
-        if ( _pool.empty() )
-            return NULL;
         
-        DBClientBase *c = _pool.top();
-        _pool.pop();
-        return c;
+        time_t now = time(0);
+        
+        while ( ! _pool.empty() ){
+            StoredConnection sc = _pool.top();
+            _pool.pop();
+            if ( sc.ok( now ) )
+                return sc.conn;
+            delete sc.conn;
+        }
+        
+        return NULL;
     }
     
     void PoolForHost::flush() {
-        vector<DBClientBase*> all;
+        vector<StoredConnection> all;
         while ( ! _pool.empty() ){
-            DBClientBase * c = _pool.top();
+            StoredConnection c = _pool.top();
             _pool.pop();
             all.push_back( c );
             bool res;
-            c->isMaster( res );
+            c.conn->isMaster( res );
         }
         
-        for ( vector<DBClientBase*>::iterator i=all.begin(); i != all.end(); i++ ){
+        for ( vector<StoredConnection>::iterator i=all.begin(); i != all.end(); ++i ){
             _pool.push( *i );
         }
     }
+
+    PoolForHost::StoredConnection::StoredConnection( DBClientBase * c ){
+        conn = c;
+        when = time(0);
+    }
+
+    bool PoolForHost::StoredConnection::ok( time_t now ){
+        // if connection has been idle for an hour, kill it
+        return ( now - when ) < 3600;
+    }
+    // ------ DBConnectionPool ------
 
     DBConnectionPool pool;
     
