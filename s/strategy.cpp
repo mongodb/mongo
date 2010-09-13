@@ -150,6 +150,9 @@ namespace mongo {
                         r.init();
                         r.process();
                     }
+                    else if ( result["noop"].trueValue() ){
+                        // no-op
+                    }
                     else {
                         log() << "unknown writeBack result: " << result << endl;
                     }
