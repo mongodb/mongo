@@ -164,14 +164,21 @@ namespace mongo {
             return v8::ThrowException( v8::String::New( errmsg.c_str() ) );
         
         
-        DBClientWithCommands * conn = cs.connect( errmsg );
+        DBClientWithCommands * conn;
+        {
+            Unlocker ul;
+            conn = cs.connect( errmsg );
+        }
         if ( ! conn )
             return v8::ThrowException( v8::String::New( errmsg.c_str() ) );
         
         Persistent<v8::Object> self = Persistent<v8::Object>::New( args.Holder() );
         self.MakeWeak( conn , destroyConnection );
 
-        ScriptEngine::runConnectCallback( *conn );
+        {
+            Unlocker ul;
+            ScriptEngine::runConnectCallback( *conn );
+        }
 
         args.This()->SetInternalField( 0 , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
@@ -185,7 +192,11 @@ namespace mongo {
         if ( args.Length() > 0 )
             return v8::ThrowException( v8::String::New( "local Mongo constructor takes no args" ) );
 
-        DBClientBase * conn = createDirectClient();
+        DBClientBase * conn;
+        {
+            Unlocker ul;
+            conn = createDirectClient();
+        }
 
         Persistent<v8::Object> self = Persistent<v8::Object>::New( args.This() );
         self.MakeWeak( conn , destroyConnection );
