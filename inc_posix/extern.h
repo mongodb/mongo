@@ -369,7 +369,7 @@ __wt_huffman_decode(void *huffman_arg,
     u_int8_t *from, u_int32_t from_len,
     void *top, u_int32_t *to_len, u_int32_t *out_bytes_used);
 u_int32_t
-__wt_nlpo2(u_int32_t x);
+__wt_nlpo2(u_int32_t v);
 u_int32_t
 __wt_prime(u_int32_t n);
 void
