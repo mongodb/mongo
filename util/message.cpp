@@ -28,6 +28,10 @@
 #include "../db/cmdline.h"
 #include "../client/dbclient.h"
 
+#ifdef __linux__
+# include <ifaddrs.h>
+#endif
+
 #ifndef _WIN32
 #include <sys/resource.h>
 #else
@@ -714,6 +718,83 @@ namespace mongo {
 
     namespace {
         map<string, bool> isSelfCache; // host, isSelf
+
+#ifdef __linux__
+
+        vector<string> getMyAddrs(){
+            ifaddrs * addrs;
+
+            int status = getifaddrs(&addrs);
+            massert(13469, "getifaddrs failure: " + errnoWithDescription(errno), status == 0);
+
+            vector<string> out;
+
+            // based on example code from linux getifaddrs manpage
+            for (ifaddrs * addr = addrs; addr != NULL; addr = addr->ifa_next){
+                int family = addr->ifa_addr->sa_family;
+                char host[NI_MAXHOST];
+
+                if (family == AF_INET || family == AF_INET6) {
+                   status = getnameinfo(addr->ifa_addr,
+                                        (family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)),
+                                        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+
+                   massert(13470, string("getnameinfo() failed: ") + gai_strerror(status), status == 0);
+
+                   out.push_back(host);
+               }
+
+            }
+
+            if (logLevel >= 1){ 
+                log(1) << "getMyAddrs():";
+                for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it){
+                    log(1) << " [" << *it << ']';
+                }
+                log(1) << endl;
+            }
+
+            return out;
+        }
+
+        vector<string> getAllIPs(StringData iporhost){
+            addrinfo* addrs = NULL;
+            addrinfo hints;
+            memset(&hints, 0, sizeof(addrinfo));
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
+
+            int ret = getaddrinfo(iporhost.data(), "0", &hints, &addrs);
+            massert(13471, string("getaddrinfo(\"") + iporhost.data() + "\") failed: " + gai_strerror(ret), ret == 0);
+
+            vector<string> out;
+            for (addrinfo* addr = addrs; addr != NULL; addr = addr->ai_next){
+                int family = addr->ai_family;
+                char host[NI_MAXHOST];
+
+                if (family == AF_INET || family == AF_INET6) {
+                    int status = getnameinfo(addr->ai_addr, addr->ai_addrlen, host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+
+                    massert(13472, string("getnameinfo() failed: ") + gai_strerror(status), status == 0);
+
+                    out.push_back(host);
+                }
+
+            }
+
+            freeaddrinfo(addrs);
+
+            if (logLevel >= 1){ 
+                log(1) << "getallIPs(\"" << iporhost << "\"):";
+                for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it){
+                    log(1) << " [" << *it << ']';
+                }
+                log(1) << endl;
+            }
+
+            return out;
+        }
+#endif
     }
     
     bool HostAndPort::isSelf() const { 
@@ -729,14 +810,31 @@ namespace mongo {
                 return it->second;
             }
 
+#ifdef __linux__
+
+            static const vector<string> myaddrs = getMyAddrs();
+            const vector<string> addrs = getAllIPs(_host);
+
+            bool ret=false;
+            for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end(); i!=iend; ++i){
+                for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end(); j!=jend; ++j){
+                    if (*i == *j){
+                        ret = true;
+                        break;
+                    }
+                }
+            }
+
+#else
             SockAddr addr (_host.c_str(), 0); // port 0 is dynamically assigned
             SOCKET sock = ::socket(addr.getType(), SOCK_STREAM, 0);
             assert(sock != INVALID_SOCKET);
 
             bool ret = (::bind(sock, addr.raw(), addr.addressSize) == 0);
-            isSelfCache[_host] = ret;
-
             closesocket(sock);
+#endif
+
+            isSelfCache[_host] = ret;
 
             return ret;
         }
