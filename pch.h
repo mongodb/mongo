@@ -96,7 +96,9 @@ namespace mongo {
     /* this likely goes away later. to facilitate testing for a while without impacting other things. */
 #if defined(_DURABLE)
     const bool durable = true;
-#error do not use this yet
+#if !defined(_DEBUG)
+#error not done - do not use this yet
+#endif
 #else
     const bool durable = false;
 #endif

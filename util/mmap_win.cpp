@@ -70,8 +70,8 @@ namespace mongo {
         if ( options & SEQUENTIAL )
             createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
         DWORD rw = GENERIC_READ | GENERIC_WRITE;
-        if ( options & READONLY ) 
-            rw = GENERIC_READ;
+        //if ( options & READONLY ) 
+        //    rw = GENERIC_READ;
 
         fd = CreateFile(
                  toNativeString(filename).c_str(),
@@ -80,7 +80,7 @@ namespace mongo {
                  NULL, // security
                  OPEN_ALWAYS, // create disposition
                  createOptions , // flags
-                 NULL); // hTemplateFile
+                 NULL); // hTempl
         if ( fd == INVALID_HANDLE_VALUE ) {
             log() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
             return 0;
@@ -88,7 +88,7 @@ namespace mongo {
 
         mapped += length;
 
-        DWORD flProtect = (options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
+        DWORD flProtect = PAGE_READWRITE; //(options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
         maphandle = CreateFileMapping(fd, NULL, flProtect, 
             length >> 32 /*maxsizehigh*/, 
             (unsigned) length /*maxsizelow*/, 
@@ -99,7 +99,10 @@ namespace mongo {
             return 0;
         }
 
-        view = MapViewOfFile(maphandle, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+        {
+            DWORD access = (options&READONLY)? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
+            view = MapViewOfFile(maphandle, access, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
+        }
         if ( view == 0 ) {
             DWORD e = GetLastError();
             log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << endl;
