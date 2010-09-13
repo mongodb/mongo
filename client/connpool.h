@@ -25,17 +25,40 @@ namespace mongo {
 
     class Shard;
     
-    struct PoolForHost {
+    /**
+     * not thread safe
+     * thread safety is handled by DBConnectionPool
+     */
+    class PoolForHost {
+    public:
         PoolForHost()
-            : created(0){}
+            : _created(0){}
+        
         PoolForHost( const PoolForHost& other ){
-            assert(other.pool.size() == 0);
-            created = other.created;
-            assert( created == 0 );
+            assert(other._pool.size() == 0);
+            _created = other._created;
+            assert( _created == 0 );
         }
-            
-        std::stack<DBClientBase*> pool;
-        long long created;
+
+        ~PoolForHost();
+
+        int numAvailable() const { return (int)_pool.size(); }
+
+        void createdOne(){ _created++; }
+        long long numCreated() const { return _created; }
+
+        
+        /** 
+         * gets a connection or return NULL
+         */
+        DBClientBase * get();
+
+        void done( DBClientBase * c );
+
+        void flush();
+    private:
+        std::stack<DBClientBase*> _pool;
+        long long _created;
     };
     
     class DBConnectionHook {
@@ -91,7 +114,7 @@ namespace mongo {
                 return;
             }
             scoped_lock L(_mutex);
-            _pools[host].pool.push(c);
+            _pools[host].done(c);
         }
         void addHook( DBConnectionHook * hook );
         void appendInfo( BSONObjBuilder& b );
