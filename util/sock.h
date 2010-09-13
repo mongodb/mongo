@@ -251,7 +251,7 @@ namespace mongo {
 
     class ListeningSockets {
     public:
-        ListeningSockets() : _mutex("ListeningSockets"), _sockets( new set<int>() ), _ready(false) { }
+        ListeningSockets() : _mutex("ListeningSockets"), _sockets( new set<int>() ) { }
         void add( int sock ){
             scoped_lock lk( _mutex );
             _sockets->insert( sock );
@@ -273,10 +273,6 @@ namespace mongo {
                 closesocket( sock );
             }            
         }
-
-        void setReady() { _ready = true; }
-        bool isReady() { return _ready; }
-
         static ListeningSockets* get();
 
         /* returns true if the host/port combo identifies this process instance. */
@@ -285,8 +281,6 @@ namespace mongo {
         mongo::mutex _mutex;
         set<int>* _sockets;
         static ListeningSockets* _instance;
-
-        volatile bool _ready;
     };
 
 } // namespace mongo

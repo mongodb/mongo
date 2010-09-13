@@ -550,20 +550,6 @@ namespace mongo {
     */
     void startReplSets(ReplSetCmdline *replSetCmdline) {
         Client::initThread("startReplSets");
-
-        // Wait for network layer to be ready
-        for (int i=0; true; i++){
-            if (ListeningSockets::get()->isReady())
-                break;
-
-            massert(13466, "Network layer not up after 5 minutes. Giving up", i < 5*60);
-
-            if (i && i%10 == 0)
-                log() << "Network layer not up after " << i << " seconds. Will keep trying" << endl;
-
-            sleepsecs(1);
-        }
-
         try { 
             assert( theReplSet == 0 );
             if( replSetCmdline == 0 ) {

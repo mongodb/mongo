@@ -152,9 +152,6 @@ namespace mongo {
             if (sock > maxfd)
                 maxfd = sock;
         }
-        
-        if (this->primaryListener())
-            ListeningSockets::get()->setReady();
 
         static long connNumber = 0;
         struct timeval maxSelectTime;

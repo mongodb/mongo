@@ -66,8 +66,6 @@ namespace mongo {
             return 0;
         }
 
-        virtual bool primaryListener() const { return true; }
-
     private:
         string _ip;
         bool _logConnect;
