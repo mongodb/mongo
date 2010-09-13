@@ -234,16 +234,6 @@ namespace mongo {
             /* ignore - if failed can't be one of my addresses */
         }
 
-        if (!ret){
-            SockAddr a (addr.host().c_str(), 0);
-
-            string ip = a.getAddr();
-
-            if (startsWith(ip, "127.") || ip == "::1"){
-                log() << "warning: hostname \"" << addr.host() << "\" resolves to a local address (" << ip << ") not listed in --bind_ip" << endl;
-            }
-        }
-
         isSelfCache[addr.host()] = ret;
 
         return ret;
