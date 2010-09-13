@@ -69,13 +69,13 @@ namespace mongo {
             
             const OID id = e.__oid();
             
-            try {
-                // we want to do something every 5 minutes so sockets don't timeout
-                BSONObj z = getWritebackQueue(id.str())->blockingPop( 5 * 60 /* 5 minutes */ );
+            // we want to do something every 5 minutes so sockets don't timeout
+            BSONObj z;
+            if ( getWritebackQueue(id.str())->blockingPop( z, 5 * 60 /* 5 minutes */ ) ) {
                 log(1) << "WriteBackCommand got : " << z << endl;
                 result.append( "data" , z );
             }
-            catch ( BlockingQueue<BSONObj>::Timeout& ){
+            else {
                 result.appendBool( "noop" , true );
             }
             

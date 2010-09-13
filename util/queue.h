@@ -67,9 +67,10 @@ namespace mongo {
         
         /**
          * blocks waiting for an object until maxSecondsToWait passes
-         * if maxSecondsToWait passes, an Timeout exception is thrown
+         * if got one, return true and set in t
+         * otherwise return false and t won't be changed
          */
-        T blockingPop( int maxSecondsToWait ){
+        bool blockingPop( T& t , int maxSecondsToWait ){
             
             Timer timer;
 
@@ -81,15 +82,13 @@ namespace mongo {
             while( _queue.empty() ){
                 _condition.timed_wait( l.boost() , xt );
                 if ( timer.seconds() >= maxSecondsToWait )
-                    throw Timeout();
+                    return false;
             }
             
-            T t = _queue.front();
+            t = _queue.front();
             _queue.pop();
-            return t;    
+            return true;
         }
-
-        class Timeout {};
         
     private:
         std::queue<T> _queue;
