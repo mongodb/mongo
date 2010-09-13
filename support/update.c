@@ -49,7 +49,7 @@ __wt_update_alloc(WT_TOC *toc, u_int32_t size, void *retp)
 	 * If the room we need is greater than the maximum data we'll group
 	 * into WT_DATA_UPDATE buffers, allocate a single WT_DATA_UPDATE area.
 	 */
-	if (align_size > WT_UPDATE_MAX_DATA) {
+	if (align_size > env->data_update_max) {
 		alloc_size = size + sizeof(WT_DATA_UPDATE);
 		single_use = 1;
 		goto alloc;
@@ -81,7 +81,7 @@ __wt_update_alloc(WT_TOC *toc, u_int32_t size, void *retp)
 	 * Allocate the next power-of-two larger than 4 times the requested
 	 * size, and at least the default buffer size.
 	 */
-	alloc_size = __wt_nlpo2(WT_MAX(size * 4, WT_UPDATE_DEF_DATA));
+	alloc_size = __wt_nlpo2(WT_MAX(size * 4, env->data_update_initial));
 	single_use = 0;
 
 alloc:	WT_RET(__wt_calloc(env, 1, alloc_size, &upd));

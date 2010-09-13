@@ -356,9 +356,15 @@ struct __env {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * ENV getter/setter variables: BEGIN
 	 */
+	u_int32_t cache_drain_cnt;
+
 	u_int32_t cache_hash_size;
 
 	u_int32_t cache_size;
+
+	u_int32_t data_update_initial;
+
+	u_int32_t data_update_max;
 
 	void (*errcall)(const ENV *, const char *);
 
@@ -384,6 +390,12 @@ struct __env {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * ENV methods: BEGIN
 	 */
+	int (*cache_drain_cnt_get)(
+	    ENV *, u_int32_t *);
+
+	int (*cache_drain_cnt_set)(
+	    ENV *, u_int32_t );
+
 	int (*cache_hash_size_get)(
 	    ENV *, u_int32_t *);
 
@@ -397,6 +409,18 @@ struct __env {
 	    ENV *, u_int32_t );
 
 	int (*close)(
+	    ENV *, u_int32_t );
+
+	int (*data_update_initial_get)(
+	    ENV *, u_int32_t *);
+
+	int (*data_update_initial_set)(
+	    ENV *, u_int32_t );
+
+	int (*data_update_max_get)(
+	    ENV *, u_int32_t *);
+
+	int (*data_update_max_set)(
 	    ENV *, u_int32_t );
 
 	int (*db)(

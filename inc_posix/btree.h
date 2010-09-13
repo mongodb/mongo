@@ -40,8 +40,9 @@ extern "C" {
  * unsigned integers, meaning the largest record number is "huge".
  */
 
-#define	WT_MAX_ALLOCATION_UNIT	(128 * WT_MEGABYTE)
-#define	WT_MAX_PAGE_SIZE	(256 * WT_MEGABYTE)
+#define	WT_BTREE_ALLOCATION_SIZE	512
+#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
+#define	WT_BTREE_PAGE_SIZE_MAX		(256 * WT_MEGABYTE)
 
 /*
  * Underneath the database layer is the cache and file layers.  In both, sizes

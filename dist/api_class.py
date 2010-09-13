@@ -32,10 +32,12 @@
 #		setter	 -- setter method
 #		toc	 -- function takes a WT_TOC/DB argument pair
 #		verify	 -- setter methods call validation function
-#	3: a list of argument and name/declaration pairs
-#		An argument to the method.  In an argument declaration, "@S"
-#		is replaced by the argument name when needed (sometimes we.
-#		need the name in a declaration, and sometimes we don't).
+#     3: a slash-separated list of argument names, declaration and optional
+#         default value triplets, that is, first the name of the argument,
+#         the declaration for the argument, and, in the case of a setter, an
+#         optional default value.  In the declaration, "@S" is replaced by
+#         the argument name when needed (sometimes we need the name in a
+#         declaration, and sometimes we don't).
 #	4: a list of flags, if any.
 #		If there's a flags variable, but the method doesn't currently
 #		take any flags, enter '__NONE__'.
@@ -70,6 +72,19 @@ methods['wt_toc.close'] = Api(
 ###################################################
 # ENV method declarations
 ###################################################
+methods['env.cache_drain_cnt_get'] = Api(
+	'env.cache_drain_cnt_get',
+	'method, getter',
+	['cache_drain_cnt/u_int32_t *@S'],
+	[],
+	['init'], [])
+methods['env.cache_drain_cnt_set'] = Api(
+	'env.cache_drain_cnt_set',
+	'method, setter',
+	['cache_drain_cnt/u_int32_t @S/10'],
+	[],
+	['init'], [])
+
 methods['env.cache_hash_size_get'] = Api(
 	'env.cache_hash_size_get',
 	'method, getter',
@@ -101,6 +116,32 @@ methods['env.close'] = Api(
 	'method',
 	['flags/u_int32_t @S'],
 	['__NONE__'],
+	['init'], [])
+
+methods['env.data_update_initial_get'] = Api(
+	'env.data_update_initial_get',
+	'method, getter',
+	['data_update_initial/u_int32_t *@S'],
+	[],
+	['init'], [])
+methods['env.data_update_initial_set'] = Api(
+	'env.data_update_initial_set',
+	'method, setter',
+	['data_update_initial/u_int32_t @S/8 * 1024'],
+	[],
+	['init'], [])
+
+methods['env.data_update_max_get'] = Api(
+	'env.data_update_max_get',
+	'method, getter',
+	['data_update_max/u_int32_t *@S'],
+	[],
+	['init'], [])
+methods['env.data_update_max_set'] = Api(
+	'env.data_update_max_set',
+	'method, setter',
+	['data_update_max/u_int32_t @S/32 * 1024'],
+	[],
 	['init'], [])
 
 methods['env.db'] = Api(
@@ -287,7 +328,7 @@ methods['db.btree_compare_get'] = Api(
 methods['db.btree_compare_set'] = Api(
 	'db.btree_compare_set',
 	'method, setter',
-	['btree_compare/int (*@S)(DB *, const DBT *, const DBT *)'],
+	['btree_compare/int (*@S)(DB *, const DBT *, const DBT *)/__wt_bt_lex_compare'],
 	[],
 	['init'], ['open'])
 
@@ -300,7 +341,7 @@ methods['db.btree_compare_dup_get'] = Api(
 methods['db.btree_compare_dup_set'] = Api(
 	'db.btree_compare_dup_set',
 	'method, setter',
-	['btree_compare_dup/int (*@S)(DB *, const DBT *, const DBT *)'],
+	['btree_compare_dup/int (*@S)(DB *, const DBT *, const DBT *)/__wt_bt_lex_compare'],
 	[],
 	['init'], ['open'])
 

@@ -33,6 +33,20 @@ def func_method_single(handle, method, config, args, func, f):
 		f.write(', ' + l.split('/')[1].replace('@S', ''))
 	f.write('))\n\t    __wt_' + handle + '_' + func + ';\n')
 
+# func_method_init --
+#     Set getter/setter initialization values.
+def func_method_init(handle, decl, f):
+	f.write('void\n__wt_methods_' +
+	    handle + '_config_default(' + decl + ')\n{\n')
+	for i in sorted(filter(lambda _i:
+	    _i[1].handle == handle, api.iteritems())):
+		for l in i[1].args:
+			if l.count('/') == 2:
+				f.write('\t' + handle + '->' +
+				  l.split('/')[0] + ' = ' +
+				  l.split('/')[2] + ';\n')
+	f.write('}\n\n')
+
 # func_method_lockout --
 #	Set a handle's methods to the lockout function (skipping the close
 #	method, it's always legal).
@@ -368,10 +382,12 @@ for i in sorted(api.iteritems()):
 	else:
 		func_method(i[1], tfile)
 
-# Write the method lockout and transition functions.
+# Write the method default initialization, lockout and transition functions.
+func_method_init('db', 'DB *db', tfile)
 func_method_lockout('db', 'DB *db', tfile)
 func_method_transition('db', 'DB *db', tfile)
 
+func_method_init('env', 'ENV *env', tfile)
 func_method_lockout('env', 'ENV *env', tfile)
 func_method_transition('env', 'ENV *env', tfile)
 

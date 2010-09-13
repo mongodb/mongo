@@ -221,7 +221,7 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 67, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 73, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].desc =
 	    "db.btree_compare_dup_get";
@@ -267,6 +267,10 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_STAT_PRINT].desc = "db.stat_print";
 	stats[WT_STAT_DB_SYNC].desc = "db.sync";
 	stats[WT_STAT_DB_VERIFY].desc = "db.verify";
+	stats[WT_STAT_ENV_CACHE_DRAIN_CNT_GET].desc =
+	    "env.cache_drain_cnt_get";
+	stats[WT_STAT_ENV_CACHE_DRAIN_CNT_SET].desc =
+	    "env.cache_drain_cnt_set";
 	stats[WT_STAT_ENV_CACHE_HASH_SIZE_GET].desc =
 	    "env.cache_hash_size_get";
 	stats[WT_STAT_ENV_CACHE_HASH_SIZE_SET].desc =
@@ -274,6 +278,14 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_ENV_CACHE_SIZE_GET].desc = "env.cache_size_get";
 	stats[WT_STAT_ENV_CACHE_SIZE_SET].desc = "env.cache_size_set";
 	stats[WT_STAT_ENV_CLOSE].desc = "env.close";
+	stats[WT_STAT_ENV_DATA_UPDATE_INITIAL_GET].desc =
+	    "env.data_update_initial_get";
+	stats[WT_STAT_ENV_DATA_UPDATE_INITIAL_SET].desc =
+	    "env.data_update_initial_set";
+	stats[WT_STAT_ENV_DATA_UPDATE_MAX_GET].desc =
+	    "env.data_update_max_get";
+	stats[WT_STAT_ENV_DATA_UPDATE_MAX_SET].desc =
+	    "env.data_update_max_set";
 	stats[WT_STAT_ENV_DB].desc = "env.db";
 	stats[WT_STAT_ENV_ERRCALL_GET].desc = "env.errcall_get";
 	stats[WT_STAT_ENV_ERRCALL_SET].desc = "env.errcall_set";
@@ -343,11 +355,17 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_STAT_PRINT].v = 0;
 	stats[WT_STAT_DB_SYNC].v = 0;
 	stats[WT_STAT_DB_VERIFY].v = 0;
+	stats[WT_STAT_ENV_CACHE_DRAIN_CNT_GET].v = 0;
+	stats[WT_STAT_ENV_CACHE_DRAIN_CNT_SET].v = 0;
 	stats[WT_STAT_ENV_CACHE_HASH_SIZE_GET].v = 0;
 	stats[WT_STAT_ENV_CACHE_HASH_SIZE_SET].v = 0;
 	stats[WT_STAT_ENV_CACHE_SIZE_GET].v = 0;
 	stats[WT_STAT_ENV_CACHE_SIZE_SET].v = 0;
 	stats[WT_STAT_ENV_CLOSE].v = 0;
+	stats[WT_STAT_ENV_DATA_UPDATE_INITIAL_GET].v = 0;
+	stats[WT_STAT_ENV_DATA_UPDATE_INITIAL_SET].v = 0;
+	stats[WT_STAT_ENV_DATA_UPDATE_MAX_GET].v = 0;
+	stats[WT_STAT_ENV_DATA_UPDATE_MAX_SET].v = 0;
 	stats[WT_STAT_ENV_DB].v = 0;
 	stats[WT_STAT_ENV_ERRCALL_GET].v = 0;
 	stats[WT_STAT_ENV_ERRCALL_SET].v = 0;

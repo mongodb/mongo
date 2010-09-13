@@ -52,14 +52,6 @@ extern "C" {
 #include "stat.h"
 
 /*******************************************
- * Default values -- grouped together so it's obvious what to re-configure.
- *******************************************/
-#define	WT_CACHE_DRAIN_CNT	(10)	/* Default pages to drain at a time */
-#define	WT_CACHE_SIZE_DEFAULT	(20)	/* Default cache size in MB */
-#define	WT_HAZARD_SIZE_DEFAULT	(15)	/* Default number of hazard refs */
-#define	WT_TOC_SIZE_DEFAULT	(50)	/* Default number of TOCs */
-
-/*******************************************
  * WT_TOC support.
  *******************************************/
 /*
@@ -83,9 +75,6 @@ struct __wt_data_update {
 	u_int16_t in;				/* Buffer chunks in use */
 	u_int16_t out;				/* Buffer chunks not in use */
 };
-
-#define	WT_UPDATE_DEF_DATA	(8 * 1024)	/* *KB is the default */
-#define	WT_UPDATE_MAX_DATA	(32 * 1024)	/* Max data we'll buffer */
 
 /*******************************************
  * Cursor handle information that doesn't persist.

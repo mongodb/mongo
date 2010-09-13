@@ -204,7 +204,7 @@ __wt_breakpoint(void);
 int
 __wt_env_create(u_int32_t flags, ENV **envp);
 int
-__wt_ienv_destroy(ENV *env, int refresh);
+__wt_ienv_destroy(ENV *env);
 void
 __wt_msg(ENV *env, const char *fmt, ...);
 void
@@ -301,11 +301,15 @@ __wt_thread_join(pthread_t tid);
 void
 __wt_yield(void);
 void
+__wt_methods_db_config_default(DB *db);
+void
 __wt_methods_db_lockout(DB *db);
 void
 __wt_methods_db_init_transition(DB *db);
 void
 __wt_methods_db_open_transition(DB *db);
+void
+__wt_methods_env_config_default(ENV *env);
 void
 __wt_methods_env_lockout(ENV *env);
 void

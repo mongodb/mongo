@@ -749,6 +749,36 @@ static int __wt_api_db_verify(
 	return (ret);
 }
 
+static int __wt_api_env_cache_drain_cnt_get(
+	ENV *env,
+	u_int32_t *cache_drain_cnt);
+static int __wt_api_env_cache_drain_cnt_get(
+	ENV *env,
+	u_int32_t *cache_drain_cnt)
+{
+	IENV *ienv = env->ienv;
+	__wt_lock(env, ienv->mtx);
+	WT_STAT_INCR(ienv->method_stats, ENV_CACHE_DRAIN_CNT_GET);
+	*cache_drain_cnt = env->cache_drain_cnt;
+	__wt_unlock(env, ienv->mtx);
+	return (0);
+}
+
+static int __wt_api_env_cache_drain_cnt_set(
+	ENV *env,
+	u_int32_t cache_drain_cnt);
+static int __wt_api_env_cache_drain_cnt_set(
+	ENV *env,
+	u_int32_t cache_drain_cnt)
+{
+	IENV *ienv = env->ienv;
+	__wt_lock(env, ienv->mtx);
+	WT_STAT_INCR(ienv->method_stats, ENV_CACHE_DRAIN_CNT_SET);
+	env->cache_drain_cnt = cache_drain_cnt;
+	__wt_unlock(env, ienv->mtx);
+	return (0);
+}
+
 static int __wt_api_env_cache_hash_size_get(
 	ENV *env,
 	u_int32_t *cache_hash_size);
@@ -828,6 +858,66 @@ static int __wt_api_env_close(
 	WT_STAT_INCR(ienv->method_stats, ENV_CLOSE);
 	ret = __wt_env_close(env);
 	return (ret);
+}
+
+static int __wt_api_env_data_update_initial_get(
+	ENV *env,
+	u_int32_t *data_update_initial);
+static int __wt_api_env_data_update_initial_get(
+	ENV *env,
+	u_int32_t *data_update_initial)
+{
+	IENV *ienv = env->ienv;
+	__wt_lock(env, ienv->mtx);
+	WT_STAT_INCR(ienv->method_stats, ENV_DATA_UPDATE_INITIAL_GET);
+	*data_update_initial = env->data_update_initial;
+	__wt_unlock(env, ienv->mtx);
+	return (0);
+}
+
+static int __wt_api_env_data_update_initial_set(
+	ENV *env,
+	u_int32_t data_update_initial);
+static int __wt_api_env_data_update_initial_set(
+	ENV *env,
+	u_int32_t data_update_initial)
+{
+	IENV *ienv = env->ienv;
+	__wt_lock(env, ienv->mtx);
+	WT_STAT_INCR(ienv->method_stats, ENV_DATA_UPDATE_INITIAL_SET);
+	env->data_update_initial = data_update_initial;
+	__wt_unlock(env, ienv->mtx);
+	return (0);
+}
+
+static int __wt_api_env_data_update_max_get(
+	ENV *env,
+	u_int32_t *data_update_max);
+static int __wt_api_env_data_update_max_get(
+	ENV *env,
+	u_int32_t *data_update_max)
+{
+	IENV *ienv = env->ienv;
+	__wt_lock(env, ienv->mtx);
+	WT_STAT_INCR(ienv->method_stats, ENV_DATA_UPDATE_MAX_GET);
+	*data_update_max = env->data_update_max;
+	__wt_unlock(env, ienv->mtx);
+	return (0);
+}
+
+static int __wt_api_env_data_update_max_set(
+	ENV *env,
+	u_int32_t data_update_max);
+static int __wt_api_env_data_update_max_set(
+	ENV *env,
+	u_int32_t data_update_max)
+{
+	IENV *ienv = env->ienv;
+	__wt_lock(env, ienv->mtx);
+	WT_STAT_INCR(ienv->method_stats, ENV_DATA_UPDATE_MAX_SET);
+	env->data_update_max = data_update_max;
+	__wt_unlock(env, ienv->mtx);
+	return (0);
 }
 
 static int __wt_api_env_db(
@@ -1213,6 +1303,13 @@ static int __wt_api_wt_toc_close(
 }
 
 void
+__wt_methods_db_config_default(DB *db)
+{
+	db->btree_compare_dup = __wt_bt_lex_compare;
+	db->btree_compare = __wt_bt_lex_compare;
+}
+
+void
 __wt_methods_db_lockout(DB *db)
 {
 	db->btree_compare_dup_get = (int (*)
@@ -1393,8 +1490,22 @@ __wt_methods_db_open_transition(DB *db)
 }
 
 void
+__wt_methods_env_config_default(ENV *env)
+{
+	env->cache_drain_cnt = 10;
+	env->data_update_initial = 8 * 1024;
+	env->data_update_max = 32 * 1024;
+}
+
+void
 __wt_methods_env_lockout(ENV *env)
 {
+	env->cache_drain_cnt_get = (int (*)
+	    (ENV *, u_int32_t *))
+	    __wt_env_lockout;
+	env->cache_drain_cnt_set = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout;
 	env->cache_hash_size_get = (int (*)
 	    (ENV *, u_int32_t *))
 	    __wt_env_lockout;
@@ -1405,6 +1516,18 @@ __wt_methods_env_lockout(ENV *env)
 	    (ENV *, u_int32_t *))
 	    __wt_env_lockout;
 	env->cache_size_set = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout;
+	env->data_update_initial_get = (int (*)
+	    (ENV *, u_int32_t *))
+	    __wt_env_lockout;
+	env->data_update_initial_set = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout;
+	env->data_update_max_get = (int (*)
+	    (ENV *, u_int32_t *))
+	    __wt_env_lockout;
+	env->data_update_max_set = (int (*)
 	    (ENV *, u_int32_t ))
 	    __wt_env_lockout;
 	env->db = (int (*)
@@ -1484,11 +1607,17 @@ __wt_methods_env_lockout(ENV *env)
 void
 __wt_methods_env_init_transition(ENV *env)
 {
+	env->cache_drain_cnt_get = __wt_api_env_cache_drain_cnt_get;
+	env->cache_drain_cnt_set = __wt_api_env_cache_drain_cnt_set;
 	env->cache_hash_size_get = __wt_api_env_cache_hash_size_get;
 	env->cache_hash_size_set = __wt_api_env_cache_hash_size_set;
 	env->cache_size_get = __wt_api_env_cache_size_get;
 	env->cache_size_set = __wt_api_env_cache_size_set;
 	env->close = __wt_api_env_close;
+	env->data_update_initial_get = __wt_api_env_data_update_initial_get;
+	env->data_update_initial_set = __wt_api_env_data_update_initial_set;
+	env->data_update_max_get = __wt_api_env_data_update_max_get;
+	env->data_update_max_set = __wt_api_env_data_update_max_set;
 	env->err = __wt_api_env_err;
 	env->errcall_get = __wt_api_env_errcall_get;
 	env->errcall_set = __wt_api_env_errcall_set;

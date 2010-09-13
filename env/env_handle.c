@@ -9,8 +9,8 @@
 
 #include "wt_internal.h"
 
-static int __wt_env_config_default(ENV *);
-static int __wt_ienv_config_default(ENV *);
+static int __wt_env_config(ENV *);
+static int __wt_ienv_config(ENV *);
 
 /*
  * __wt_env_create --
@@ -41,8 +41,8 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 		F_SET(env, WT_MEMORY_CHECK);
 
 	/* Configure the ENV and the IENV. */
-	WT_ERR(__wt_env_config_default(env));
-	WT_ERR(__wt_ienv_config_default(env));
+	WT_ERR(__wt_env_config(env));
+	WT_ERR(__wt_ienv_config(env));
 
 	*envp = env;
 	return (0);
@@ -52,16 +52,13 @@ err:	(void)__wt_env_close(env);
 }
 
 /*
- * __wt_env_config_default --
- *	Set default configuration for a just-created ENV handle.
+ * __wt_env_config --
+ *	Set configuration for a just-created ENV handle.
  */
 static int
-__wt_env_config_default(ENV *env)
+__wt_env_config(ENV *env)
 {
-	env->cache_size = WT_CACHE_SIZE_DEFAULT;
-	env->hazard_size = WT_HAZARD_SIZE_DEFAULT;
-	env->toc_size = WT_TOC_SIZE_DEFAULT;
-
+	__wt_methods_env_config_default(env);
 	__wt_methods_env_lockout(env);
 	__wt_methods_env_init_transition(env);
 	return (0);
@@ -69,11 +66,11 @@ __wt_env_config_default(ENV *env)
 
 
 /*
- * __wt_ienv_config_default --
- *	Set default configuration for a just-created IENV handle.
+ * __wt_ienv_config --
+ *	Set configuration for a just-created IENV handle.
  */
 static int
-__wt_ienv_config_default(ENV *env)
+__wt_ienv_config(ENV *env)
 {
 	IENV *ienv;
 
@@ -112,7 +109,7 @@ __wt_ienv_config_default(ENV *env)
  *	Destroy the ENV's underlying IENV structure.
  */
 int
-__wt_ienv_destroy(ENV *env, int refresh)
+__wt_ienv_destroy(ENV *env)
 {
 	IENV *ienv;
 	int ret;
@@ -142,21 +139,6 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	__wt_mtrack_free(env);
 #endif
 
-	/*
-	 * This is the guts of the split between the public/private, ENV/IENV
-	 * handles.  If an Env.open fails for any reason, the user may use the
-	 * ENV structure again, but the IENV structure may have been modified
-	 * in the attempt.  So, we overwrite the IENV structure, as if it was
-	 * just allocated.  This requires the IENV structure never be modified
-	 * by ENV configuration, we'd lose that configuration here.
-	 */
-	if (refresh) {
-		memset(ienv, 0, sizeof(ienv));
-		WT_RET(__wt_ienv_config_default(env));
-		return (ret);
-	}
-
-	/* If we're truly done, discard the actual memory. */
 	__wt_free(NULL, ienv, sizeof(IENV));
 	env->ienv = NULL;
 	return (0);
