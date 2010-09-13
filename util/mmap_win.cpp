@@ -88,16 +88,21 @@ namespace mongo {
 
         mapped += length;
 
-        maphandle = CreateFileMapping(fd, NULL, PAGE_READWRITE, length >> 32, (unsigned) length, NULL);
+        DWORD flProtect = (options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
+        maphandle = CreateFileMapping(fd, NULL, flProtect, 
+            length >> 32 /*maxsizehigh*/, 
+            (unsigned) length /*maxsizelow*/, 
+            NULL/*lpName*/);
         if ( maphandle == NULL ) {
-            log() << "CreateFileMapping failed " << filename << ' ' << GetLastError() << endl;
+            DWORD e = GetLastError(); // log() call was killing lasterror before we get to that point in the stream
+            log() << "CreateFileMapping failed " << filename << ' ' << errnoWithDescription(e) << endl;
             return 0;
         }
 
         view = MapViewOfFile(maphandle, FILE_MAP_ALL_ACCESS, 0, 0, 0);
         if ( view == 0 ) {
-            log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription() << " " << 
-                GetLastError() << endl;
+            DWORD e = GetLastError();
+            log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << endl;
         }
         len = length;
         return view;

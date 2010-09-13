@@ -123,7 +123,7 @@ namespace mongo {
         void commit();
         
         Pointer open(const char *filename);
-        Pointer open(const char *_filename, long &length, int options=0);
+        Pointer open(const char *_filename, long &length, /*MongoFile::Options*/ int options=0);
     };
 
     class MemoryMappedFile : public MongoFile {
@@ -160,6 +160,7 @@ namespace mongo {
 
         /* Creates with length if DNE, otherwise uses existing file length,
            passed length.
+           @param options MongoFile::Options bits
         */
         void* map(const char *filename, unsigned long long &length, int options = 0 );
 
