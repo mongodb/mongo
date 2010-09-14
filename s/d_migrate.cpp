@@ -601,10 +601,8 @@ namespace mongo {
                         log() << "moveChunk updating self to: " << myVersion << endl;
                     }
                     else {
-                        //++myVersion;
+                        log() << "moveChunk: i have no chunks left" << endl;
                         shardingState.setVersion( ns , 0 );
-
-                        log() << "moveChunk now i'm empty" << endl;
                     }
                 }
 
