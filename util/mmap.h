@@ -63,17 +63,13 @@ namespace mongo {
         static void lockAll();
         static void unlockAll();
 
-        /* can be "overriden" if necessary */
-        static bool exists(boost::filesystem::path p) {
-            return boost::filesystem::exists(p);
-        }
+        static bool exists(boost::filesystem::path p) { return boost::filesystem::exists(p); }
     };
 
 #ifndef _DEBUG
     // no-ops in production
     inline void MongoFile::lockAll() {}
     inline void MongoFile::unlockAll() {}
-
 #endif
 
     struct MongoFileAllowWrites {
@@ -145,7 +141,10 @@ namespace mongo {
             close();
         }
         void close();
-        
+
+        void* testGetCopyOnWriteView();
+        void  testCloseCopyOnWriteView(void *);
+
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
         void* map(const char *filename);
         void* mapWithOptions(const char *filename, int options);
