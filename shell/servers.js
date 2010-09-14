@@ -29,6 +29,7 @@ createMongoArgs = function( binaryName , args ){
     if ( args.length == 1 && isObject( args[0] ) ){
         var o = args[0];
         for ( var k in o ){
+          if ( o.hasOwnProperty(k) ){
             if ( k == "v" && isNumber( o[k] ) ){
                 var n = o[k];
                 if ( n > 0 ){
@@ -43,6 +44,7 @@ createMongoArgs = function( binaryName , args ){
                 if ( o[k] != "" )
                     fullArgs.push( "" + o[k] );
             }
+          }
         }
     }
     else {
