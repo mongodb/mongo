@@ -810,8 +810,6 @@ namespace mongo {
 
         if( p != cmdLine.port ){
             return false;
-        } else if (sameHostname(getHostName(), _host) || isLocalHost()) {
-            return true;
         } else {
             map<string, bool>::const_iterator it = isSelfCache.find(_host);
             if (it != isSelfCache.end()){
