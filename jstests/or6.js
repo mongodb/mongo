@@ -7,8 +7,8 @@ assert.eq.automsg( "2", "t.find( {$or:[{a:{$gt:2}},{a:{$gt:0}}]} ).explain().cla
 assert.eq.automsg( "2", "t.find( {$or:[{a:{$lt:2}},{a:{$lt:4}}]} ).explain().clauses[ 1 ].indexBounds.a[ 0 ][ 0 ]" );
 
 assert.eq.automsg( "2", "t.find( {$or:[{a:{$gt:2,$lt:10}},{a:{$gt:0,$lt:5}}]} ).explain().clauses[ 1 ].indexBounds.a[ 0 ][ 1 ]" );
-assert.eq.automsg( "0", "t.find( {$or:[{a:{$gt:2,$lt:10}},{a:{$gt:0,$lt:15}}]} ).explain().clauses[ 1 ].indexBounds.a[ 0 ][ 0 ]" );
-assert.eq.automsg( "15", "t.find( {$or:[{a:{$gt:2,$lt:10}},{a:{$gt:0,$lt:15}}]} ).explain().clauses[ 1 ].indexBounds.a[ 0 ][ 1 ]" );
+
+assert.eq( [ [ 0, 2 ], [ 10, 15 ] ], t.find( {$or:[{a:{$gt:2,$lt:10}},{a:{$gt:0,$lt:15}}]} ).explain().clauses[ 1 ].indexBounds.a );
 
 // no separate clauses
 assert.eq.automsg( "null", "t.find( {$or:[{a:{$gt:2,$lt:10}},{a:{$gt:3,$lt:5}}]} ).explain().clauses" );

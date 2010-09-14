@@ -34,6 +34,7 @@ namespace mongo {
         QueryPlan(NamespaceDetails *_d, 
                   int _idxNo, // -1 = no index
                   const FieldRangeSet &fbs,
+                  const FieldRangeSet &originalFrs,
                   const BSONObj &originalQuery,
                   const BSONObj &order,
                   const BSONObj &startKey = BSONObj(),
@@ -62,6 +63,8 @@ namespace mongo {
         BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return fbs_.simplifiedQuery( fields ); }
         const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
+        shared_ptr< FieldRangeVector > originalFrv() const { return _originalFrv; }
+        // just for testing
         shared_ptr< FieldRangeVector > frv() const { return _frv; }
     private:
         NamespaceDetails *d;
@@ -75,6 +78,7 @@ namespace mongo {
         bool exactKeyMatch_;
         int direction_;
         shared_ptr< FieldRangeVector > _frv;
+        shared_ptr< FieldRangeVector > _originalFrv;
         BSONObj _startKey;
         BSONObj _endKey;
         bool endKeyInclusive_;
@@ -145,7 +149,7 @@ namespace mongo {
         shared_ptr< CoveredIndexMatcher > matcher() const { return _matcher; }
     protected:
         void setComplete() {
-            _orConstraint = qp().frv();
+            _orConstraint = qp().originalFrv();
             _complete = true;
         }
         void setStop() { setComplete(); _stopRequested = true; }
@@ -177,6 +181,7 @@ namespace mongo {
 
         QueryPlanSet( const char *ns,
                      auto_ptr< FieldRangeSet > frs,
+                     auto_ptr< FieldRangeSet > originalFrs,
                      const BSONObj &originalQuery,
                      const BSONObj &order,
                      const BSONElement *hint = 0,
@@ -196,6 +201,7 @@ namespace mongo {
         PlanPtr getBestGuess() const;
         //for testing
         const FieldRangeSet &fbs() const { return *fbs_; }
+        const FieldRangeSet &originalFrs() const { return *_originalFrs; }
     private:
         void addOtherPlans( bool checkFirst );
         void addPlan( PlanPtr plan, bool checkFirst ) {
@@ -219,6 +225,7 @@ namespace mongo {
         const char *ns;
         BSONObj _originalQuery;
         auto_ptr< FieldRangeSet > fbs_;
+        auto_ptr< FieldRangeSet > _originalFrs;
         PlanSet plans_;
         bool mayRecordPlan_;
         bool usingPrerecordedPlan_;
@@ -419,7 +426,8 @@ namespace mongo {
             return shared_ptr< Cursor >( new MultiCursor( ns, query, sort ) );
         } else {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
-            shared_ptr< Cursor > ret = QueryPlanSet( ns, frs, query, sort ).getBestGuess()->newCursor();
+            auto_ptr< FieldRangeSet > origFrs( new FieldRangeSet( *frs ) );
+            shared_ptr< Cursor > ret = QueryPlanSet( ns, frs, origFrs, query, sort ).getBestGuess()->newCursor();
             if ( !query.isEmpty() ) {
                 shared_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
                 ret->setMatcher( matcher );

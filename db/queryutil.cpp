@@ -465,6 +465,7 @@ namespace mongo {
     }
     
     const FieldRange &FieldRange::operator-=( const FieldRange &other ) {
+        vector< FieldInterval > newIntervals;
         vector< FieldInterval >::iterator i = _intervals.begin();
         vector< FieldInterval >::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
@@ -473,33 +474,38 @@ namespace mongo {
                 ( cmp == 0 && i->_lower._inclusive && !j->_lower._inclusive ) ) {
                 int cmp2 = i->_upper._bound.woCompare( j->_lower._bound, false );
                 if ( cmp2 < 0 ) {
+                    newIntervals.push_back( *i );
                     ++i;
                 } else if ( cmp2 == 0 ) {
-                    if ( i->_upper._inclusive && j->_lower._inclusive ) {
-                        i->_upper._inclusive = false;
+                    newIntervals.push_back( *i );
+                    if ( newIntervals.back()._upper._inclusive && j->_lower._inclusive ) {
+                        newIntervals.back()._upper._inclusive = false;
                     }
                     ++i;
                 } else {
+                    newIntervals.push_back( *i );
+                    newIntervals.back()._upper = j->_lower;
+                    newIntervals.back()._upper.flipInclusive();
                     int cmp3 = i->_upper._bound.woCompare( j->_upper._bound, false );
                     if ( cmp3 < 0 ||
                         ( cmp3 == 0 && ( !i->_upper._inclusive || j->_upper._inclusive ) ) ) {
-                        i->_upper = j->_lower;
-                        i->_upper.flipInclusive();
                         ++i;
                     } else {
+                        i->_lower = j->_upper;
+                        i->_lower.flipInclusive();
                         ++j;
                     }
                 }
             } else {
                 int cmp2 = i->_lower._bound.woCompare( j->_upper._bound, false );
                 if ( cmp2 > 0 ||
-                    ( cmp2 == 0 && ( !i->_lower._inclusive || !j->_lower._inclusive ) ) ) {
+                    ( cmp2 == 0 && ( !i->_lower._inclusive || !j->_upper._inclusive ) ) ) {
                     ++j;
                 } else {
                     int cmp3 = i->_upper._bound.woCompare( j->_upper._bound, false );
                     if ( cmp3 < 0 ||
                         ( cmp3 == 0 && ( !i->_upper._inclusive || j->_upper._inclusive ) ) ) {
-                        i = _intervals.erase( i );
+                        ++i;
                     } else {
                         i->_lower = j->_upper;
                         i->_lower.flipInclusive();                        
@@ -508,7 +514,11 @@ namespace mongo {
                 }                
             }
         }
-        finishOperation( _intervals, other );
+        while( i != _intervals.end() ) {
+            newIntervals.push_back( *i );
+            ++i;
+        }
+        finishOperation( newIntervals, other );
         return *this;        
     }
     
@@ -650,6 +660,7 @@ namespace mongo {
                     massert( 13263, "$or array must contain objects", f.type() == Object );                                                                                                                     
                     _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
                     massert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
+                    _originalOrSets.push_back( _orSets.back() );
                 }
                 _orFound = true;
                 continue;
