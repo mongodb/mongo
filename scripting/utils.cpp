@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    void installBenchmarkSystem( Scope& scope );
+
     BSONObj jsmd5( const BSONObj &a ){
         uassert( 10261 ,  "js md5 needs a string" , a.firstElement().type() == String );
         const char * s = a.firstElement().valuestrsafe();
@@ -43,9 +45,16 @@ namespace mongo {
         return BSONObj();
     }
 
+
+    // ---------------------------------
+    // ---- installer           --------
+    // ---------------------------------
+
     void installGlobalUtils( Scope& scope ){
         scope.injectNative( "hex_md5" , jsmd5 );
         scope.injectNative( "version" , JSVersion );
+
+        installBenchmarkSystem( scope );
     }
 
 }

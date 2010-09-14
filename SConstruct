@@ -453,7 +453,7 @@ serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
-scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" ]
+scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
 
 if usesm:
     scriptingFiles += [ "scripting/engine_spidermonkey.cpp" ]
