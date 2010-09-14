@@ -28,13 +28,12 @@
 #include "../db/cmdline.h"
 #include "../client/dbclient.h"
 
-#ifdef __linux__
-# include <ifaddrs.h>
-#endif
-
 #ifndef _WIN32
-#include <sys/resource.h>
-#include <sys/stat.h>
+# ifndef __sunos__
+#  include <ifaddrs.h>
+# endif
+# include <sys/resource.h>
+# include <sys/stat.h>
 #else
 
 // errno doesn't work for winsock.
@@ -728,7 +727,7 @@ namespace mongo {
     namespace {
         map<string, bool> isSelfCache; // host, isSelf
 
-#ifdef __linux__
+#if !defined(_WIN32) && !defined(__sunos__)
 
         vector<string> getMyAddrs(){
             ifaddrs * addrs;
@@ -773,7 +772,9 @@ namespace mongo {
             hints.ai_socktype = SOCK_STREAM;
             hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
 
-            int ret = getaddrinfo(iporhost.data(), "0", &hints, &addrs);
+            static string portNum = BSONObjBuilder::numStr(cmdLine.port);
+
+            int ret = getaddrinfo(iporhost.data(), portNum.c_str(), &hints, &addrs);
             massert(13471, string("getaddrinfo(\"") + iporhost.data() + "\") failed: " + gai_strerror(ret), ret == 0);
 
             vector<string> out;
@@ -811,15 +812,13 @@ namespace mongo {
 
         if( p != cmdLine.port ){
             return false;
-        } else if (sameHostname(getHostName(), _host) || isLocalHost()) {
-            return true;
         } else {
             map<string, bool>::const_iterator it = isSelfCache.find(_host);
             if (it != isSelfCache.end()){
                 return it->second;
             }
 
-#ifdef __linux__
+#if !defined(_WIN32) && !defined(__sunos__)
 
             static const vector<string> myaddrs = getMyAddrs();
             const vector<string> addrs = getAllIPs(_host);
