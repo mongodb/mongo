@@ -773,7 +773,9 @@ namespace mongo {
             hints.ai_socktype = SOCK_STREAM;
             hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
 
-            int ret = getaddrinfo(iporhost.data(), "0", &hints, &addrs);
+            static string portNum = BSONObjBuilder::numStr(cmdLine.port);
+
+            int ret = getaddrinfo(iporhost.data(), portNum.c_str(), &hints, &addrs);
             massert(13471, string("getaddrinfo(\"") + iporhost.data() + "\") failed: " + gai_strerror(ret), ret == 0);
 
             vector<string> out;
