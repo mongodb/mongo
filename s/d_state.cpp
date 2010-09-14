@@ -147,9 +147,10 @@ namespace mongo {
         
         if ( ! ShardedConnectionInfo::get( false ) )
             return ChunkMatcherPtr();
-
+        
         ConfigVersion version;
-        {
+        { 
+            // check cache
             scoped_lock lk( _mutex );
             version = _versions[ns];
             
@@ -157,8 +158,10 @@ namespace mongo {
                 return ChunkMatcherPtr();
             
             ChunkMatcherPtr p = _chunks[ns];
-            if ( p && p->_version >= version )
+            if ( p && p->_version >= version ){
+                // our cached version is good, so just return
                 return p;                
+            }
         }
 
         BSONObj q;
@@ -169,6 +172,9 @@ namespace mongo {
             q = b.obj();
         }
 
+        // have to get a connection to the config db
+        // special case if i'm the congigdb since i'm locked and if i connect to myself
+        // its a deadlock
         auto_ptr<ScopedDbConnection> scoped;
         auto_ptr<DBDirectClient> direct;
         
@@ -183,9 +189,12 @@ namespace mongo {
             conn = scoped->get();
         }
 
+        // actually query all the chunks
+        // sorting so we can efficiently bucket them
         auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
         assert( cursor.get() );
         if ( ! cursor->more() ){
+            // TODO: should we update the local version or cache this result?
             if ( scoped.get() )
                 scoped->done();
             return ChunkMatcherPtr();
