@@ -632,6 +632,7 @@
     <ClCompile Include="jsontests.cpp" />
     <ClCompile Include="jstests.cpp" />
     <ClCompile Include="matchertests.cpp" />
+    <ClCompile Include="mmaptests.cpp" />
     <ClCompile Include="namespacetests.cpp" />
     <ClCompile Include="pairingtests.cpp" />
     <ClCompile Include="pdfiletests.cpp" />
