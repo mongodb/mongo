@@ -775,6 +775,11 @@ if nix:
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
     else:
         env.Append( CPPFLAGS=" -O3" )
+        #env.Append( CPPFLAGS=" -fprofile-generate" )
+        #env.Append( LINKFLAGS=" -fprofile-generate" )
+        # then:
+        #env.Append( CPPFLAGS=" -fprofile-use" )
+        #env.Append( LINKFLAGS=" -fprofile-use" )        
 
     if debugLogging:
         env.Append( CPPFLAGS=" -D_DEBUG" );
