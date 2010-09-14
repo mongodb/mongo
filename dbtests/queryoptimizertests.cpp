@@ -312,6 +312,16 @@ namespace QueryOptimizerTests {
             }
         };
 		
+        class UnionBound {
+        public:
+            void run() {
+                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:9,$lt:12}}" ) );
+                FieldRange ret = frs.range( "a" );
+                ret |= frs.range( "b" );
+                ASSERT_EQUALS( 2U, ret.intervals().size() );
+            }
+        };
+        
 		class MultiBound {
 		public:
 			void run() {
@@ -1611,6 +1621,7 @@ namespace QueryOptimizerTests {
             add< FieldRangeTests::Numeric >();
             add< FieldRangeTests::InLowerBound >();
             add< FieldRangeTests::InUpperBound >();
+            add< FieldRangeTests::UnionBound >();
             add< FieldRangeTests::MultiBound >();
             add< FieldRangeTests::Diff1 >();
             add< FieldRangeTests::Diff2 >();

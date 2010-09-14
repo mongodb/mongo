@@ -419,7 +419,8 @@ namespace mongo {
         if ( low._bound.eoo() ) {
             low = lower._lower; high = lower._upper;
         } else {
-            if ( high._bound.woCompare( lower._lower._bound, false ) < 0 ) { // when equal but neither inclusive, just assume they overlap, since current btree scanning code just as efficient either way
+            int cmp = high._bound.woCompare( lower._lower._bound, false );
+            if ( ( cmp < 0 ) || ( cmp == 0 && !high._inclusive && !lower._lower._inclusive ) ) {
                 FieldInterval tmp;
                 tmp._lower = low;
                 tmp._upper = high;
