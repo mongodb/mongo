@@ -92,10 +92,10 @@ namespace mongo {
     
     extern ShardingState shardingState;
 
-    // --------------
-    // --- per connection ---
-    // --------------
-    
+    /**
+     * one per connection from mongos
+     * holds version state for each namesapce
+     */
     class ShardedConnectionInfo {
     public:
         ShardedConnectionInfo();
@@ -110,31 +110,31 @@ namespace mongo {
         static ShardedConnectionInfo* get( bool create );
         static void reset();
         
-        bool inForceMode() const { 
-            return _forceMode;
+        bool inForceVersionOkMode() const { 
+            return _forceVersionOk;
         }
         
-        void enterForceMode(){ _forceMode = true; }
-        void leaveForceMode(){ _forceMode = false; }
+        void enterForceVersionOkMode(){ _forceVersionOk = true; }
+        void leaveForceVersionOkMode(){ _forceVersionOk = false; }
 
     private:
         
         OID _id;
         NSVersionMap _versions;
-        bool _forceMode;
+        bool _forceVersionOk; // if this is true, then chunk version #s aren't check, and all ops are allowed
 
         static boost::thread_specific_ptr<ShardedConnectionInfo> _tl;
     };
 
-    struct ShardForceModeBlock {
-        ShardForceModeBlock(){
+    struct ShardForceVersionOkModeBlock {
+        ShardForceVersionOkModeBlock(){
             info = ShardedConnectionInfo::get( false );
             if ( info )
-                info->enterForceMode();
+                info->enterForceVersionOkMode();
         }
-        ~ShardForceModeBlock(){
+        ~ShardForceVersionOkModeBlock(){
             if ( info )
-                info->leaveForceMode();
+                info->leaveForceVersionOkMode();
         }
 
         ShardedConnectionInfo * info;

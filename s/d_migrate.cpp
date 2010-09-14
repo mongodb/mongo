@@ -93,7 +93,7 @@ namespace mongo {
         BSONObj max;
         set<CursorId> initial;
         void doRemove(){
-            ShardForceModeBlock sf;
+            ShardForceVersionOkModeBlock sf;
             writelock lk(ns);
             RemoveSaver rs("moveChunk",ns,"post-cleanup");
             long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );

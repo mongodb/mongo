@@ -235,7 +235,7 @@ namespace mongo {
     boost::thread_specific_ptr<ShardedConnectionInfo> ShardedConnectionInfo::_tl;
 
     ShardedConnectionInfo::ShardedConnectionInfo(){
-        _forceMode = false;
+        _forceVersionOk = false;
         _id.clear();
     }
     
@@ -566,7 +566,7 @@ namespace mongo {
             return true;
         }
         
-        if ( info->inForceMode() ){
+        if ( info->inForceVersionOkMode() ){
             return true;
         }
 
