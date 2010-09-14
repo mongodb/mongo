@@ -29,7 +29,9 @@
 #include "../client/dbclient.h"
 
 #ifndef _WIN32
-# include <ifaddrs.h>
+# ifndef __sunos__
+#  include <ifaddrs.h>
+# endif
 # include <sys/resource.h>
 # include <sys/stat.h>
 #else
@@ -725,7 +727,7 @@ namespace mongo {
     namespace {
         map<string, bool> isSelfCache; // host, isSelf
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__sunos__)
 
         vector<string> getMyAddrs(){
             ifaddrs * addrs;
@@ -816,7 +818,7 @@ namespace mongo {
                 return it->second;
             }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__sunos__)
 
             static const vector<string> myaddrs = getMyAddrs();
             const vector<string> addrs = getAllIPs(_host);
