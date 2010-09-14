@@ -151,12 +151,11 @@ namespace mongo {
         BSONObjBuilder b;
         b.append( "clusteredType" , type() );
 
-        long long nscanned = 0;
-        long long nscannedObjects = 0;
-        long long n = 0;
         long long millis = 0;
         double numExplains = 0;
-        
+
+        map<string,long long> counters;
+
         map<string,list<BSONObj> > out;
         {
             _explain( out );
@@ -169,10 +168,16 @@ namespace mongo {
                 for ( list<BSONObj>::iterator j=l.begin(); j!=l.end(); ++j ){
                     BSONObj temp = *j;
                     y.append( temp );
-
-                    nscanned += temp["nscanned"].numberLong();
-                    nscannedObjects += temp["nscannedObjects"].numberLong();
-                    n += temp["n"].numberLong();
+                    
+                    BSONObjIterator k( temp );
+                    while ( k.more() ){
+                        BSONElement z = k.next();
+                        if ( z.fieldName()[0] != 'n' )
+                            continue;
+                        long long& c = counters[z.fieldName()];
+                        c += z.numberLong();
+                    }
+                    
                     millis += temp["millis"].numberLong();
                     numExplains++;
                 }
@@ -181,9 +186,9 @@ namespace mongo {
             x.done();
         }
 
-        b.appendNumber( "nscanned" , nscanned );
-        b.appendNumber( "nscannedObjects" , nscannedObjects );
-        b.appendNumber( "n" , n );
+        for ( map<string,long long>::iterator i=counters.begin(); i!=counters.end(); ++i )
+            b.appendNumber( i->first , i->second );
+
         b.appendNumber( "millisTotal" , millis );
         b.append( "millisAvg" , (int)((double)millis / numExplains ) );
         b.append( "numQueries" , (int)numExplains );
