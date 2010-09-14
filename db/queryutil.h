@@ -238,6 +238,18 @@ namespace mongo {
         }
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         string getSpecial() const;
+        // Btree scanning for a multidimentional key range will yield a 
+        // multidimensional box.  The idea here is that if an 'other'
+        // multidimensional box contains the current box we don't have to scan
+        // the current box.  If the 'other' box contains the current box in
+        // all dimensions but one, we can safely subtract the values of 'other'
+        // along that one dimension from the values for the current box on the
+        // same dimension.  In other situations, subtracting the 'other'
+        // box from the current box yields a result that is not a box (but
+        // rather can be expressed as a union of boxes).  We don't support
+        // such splitting currently in calculating index ranges.  Note that
+        // where I have said 'box' above, I actually mean sets of boxes because
+        // a field range can consist of multiple intervals.
         const FieldRangeSet &operator-=( const FieldRangeSet &other ) {
             int nUnincluded = 0;
             string unincludedKey;
