@@ -229,8 +229,6 @@ static int __wt_api_db_btree_pagesize_set(
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
 
-	WT_RET((__wt_db_btree_pagesize_set_verify(
-	    db, allocsize, intlmin, intlmax, leafmin, leafmax)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, DB_BTREE_PAGESIZE_SET);
 	db->allocsize = allocsize;

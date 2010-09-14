@@ -160,9 +160,6 @@ int
 __wt_db_column_set_verify(DB *db,
     u_int32_t fixed_len, const char *dictionary, u_int32_t flags);
 int
-__wt_db_btree_pagesize_set_verify(DB *db, u_int32_t allocsize,
-    u_int32_t intlmin, u_int32_t intlmax, u_int32_t leafmin, u_int32_t leafmax);
-int
 __wt_env_db(ENV *env, DB **dbp);
 int
 __wt_db_destroy(DB *db);
@@ -374,6 +371,8 @@ __wt_huffman_decode(void *huffman_arg,
     void *top, u_int32_t *to_len, u_int32_t *out_bytes_used);
 u_int32_t
 __wt_nlpo2(u_int32_t v);
+int
+__wt_ispo2(u_int32_t v);
 u_int32_t
 __wt_prime(u_int32_t n);
 void

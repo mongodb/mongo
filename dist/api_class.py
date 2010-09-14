@@ -398,7 +398,7 @@ methods['db.btree_pagesize_get'] = Api(
 	['init'], [])
 methods['db.btree_pagesize_set'] = Api(
 	'db.btree_pagesize_set',
-	'method, setter, verify',
+	'method, setter',
 	['allocsize/u_int32_t @S',
 	 'intlmin/u_int32_t @S',
 	 'intlmax/u_int32_t @S',

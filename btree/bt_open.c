@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_bt_open_verify(DB *);
-static int __wt_bt_open_verify_sizes(DB *);
+static int __wt_bt_open_verify_page_sizes(DB *);
 
 /*
  * __wt_bt_open --
@@ -64,7 +64,7 @@ __wt_bt_open_verify(DB *db)
 	idb = db->idb;
 
 	/* Verify the page sizes. */
-	WT_RET(__wt_bt_open_verify_sizes(db));
+	WT_RET(__wt_bt_open_verify_page_sizes(db));
 
 	/* Verify other configuration combinations. */
 	if (db->fixed_len != 0 && (idb->huffman_key || idb->huffman_data)) {
@@ -78,11 +78,11 @@ __wt_bt_open_verify(DB *db)
 }
 
 /*
- * __wt_bt_open_verify_sizes --
+ * __wt_bt_open_verify_page_sizes --
  *	Verify the page sizes.
  */
 static int
-__wt_bt_open_verify_sizes(DB *db)
+__wt_bt_open_verify_page_sizes(DB *db)
 {
 	IDB *idb;
 
@@ -103,6 +103,27 @@ __wt_bt_open_verify_sizes(DB *db)
 	 */
 	if (db->allocsize == 0)
 		db->allocsize = WT_BTREE_ALLOCATION_SIZE;
+
+	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
+	if (!__wt_ispo2(db->allocsize)) {
+		__wt_api_db_errx(db,
+		   "the allocation size must be a power of two");
+		return (WT_ERROR);
+	}
+
+	/*
+	 * Limit allocation units to 256MB, and page sizes to 128MB.  There's
+	 * no reason (other than testing) we can't support larger sizes (any
+	 * sizes up to the smaller of an off_t and a size_t should work), but
+	 * an application specifying larger allocation or page sizes is almost
+	 * certainly making a mistake.
+	 */
+	if (db->allocsize > WT_BTREE_ALLOCATION_SIZE_MAX) {
+		__wt_api_db_errx(db,
+		   "the allocation size must less than or equal to %luMB",
+		    (u_long)(WT_BTREE_PAGE_SIZE_MAX / WT_MEGABYTE));
+		return (WT_ERROR);
+	}
 
 	/*
 	 * Internal pages are also usually small, we want it to fit into the
@@ -155,6 +176,34 @@ __wt_bt_open_verify_sizes(DB *db)
 			db->leafitemsize = db->leafmin / 40;
 	}
 
+	/* Final checks for safety. */
+	if (db->intlmin % db->allocsize != 0 ||
+	    db->intlmax % db->allocsize != 0 ||
+	    db->leafmin % db->allocsize != 0 ||
+	    db->leafmax % db->allocsize != 0) {
+		__wt_api_db_errx(db,
+		    "all page sizes must be a multiple of %lu bytes",
+		    (u_long)db->allocsize);
+		return (WT_ERROR);
+	}
+
+	if (db->intlmin > db->intlmax || db->leafmin > db->leafmax) {
+		__wt_api_db_errx(db,
+		    "minimum page sizes must be less than or equal to maximum "
+		    "page sizes");
+		return (WT_ERROR);
+	}
+
+	if (db->intlmin > WT_BTREE_PAGE_SIZE_MAX ||
+	    db->intlmax > WT_BTREE_PAGE_SIZE_MAX ||
+	    db->leafmin > WT_BTREE_PAGE_SIZE_MAX ||
+	    db->leafmax > WT_BTREE_PAGE_SIZE_MAX) {
+		__wt_api_db_errx(db,
+		    "all page sizes must less than or equal to %luMB",
+		    (u_long)WT_BTREE_PAGE_SIZE_MAX / WT_MEGABYTE);
+		return (WT_ERROR);
+	}
+
 	/*
 	 * We only have 3 bytes of length for on-page items, so the maximum
 	 * on-page item size is limited to 16MB.
@@ -170,20 +219,6 @@ __wt_bt_open_verify_sizes(DB *db)
 	 */
 	if (db->btree_dup_offpage == 0)
 		db->btree_dup_offpage = 4;
-
-	/* Check everything for safety. */
-	if (db->allocsize < 512 || db->allocsize % 512 != 0) {
-		__wt_api_db_errx(db,
-		    "The fragment size must be a multiple of 512B");
-		return (WT_ERROR);
-	}
-	if (db->intlmin % db->allocsize != 0 ||
-	    db->leafmin % db->allocsize != 0) {
-		__wt_api_db_errx(db,
-		    "The internal and leaf sizes must be a multiple of the "
-		    "fragment size");
-		return (WT_ERROR);
-	}
 
 	/*
 	 * A leaf page must hold at least 2 key/data pairs, otherwise the

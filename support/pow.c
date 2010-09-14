@@ -44,3 +44,13 @@ __wt_nlpo2(u_int32_t v)
 	v++;
 	return (v);
 }
+
+/*
+ * __wt_ispo2 --
+ *	Return if a number is a power-of-two.
+ */
+int
+__wt_ispo2(u_int32_t v)
+{
+	return ((v & (v - 1)) == 0 ? 1 : 0);
+}
