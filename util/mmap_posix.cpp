@@ -82,6 +82,7 @@ namespace mongo {
             return 0;
         }
 
+
 #if defined(__sunos__)
 #warning madvise not supported on solaris yet
 #else
@@ -97,6 +98,16 @@ namespace mongo {
         }
 
         return view;
+    }
+    
+    void* MemoryMappedFile::testGetCopyOnWriteView(){
+        void * x = mmap( NULL , len , PROT_READ | PROT_WRITE , MAP_PRIVATE , fd , 0 );
+        assert( x );
+        return x;
+    }
+    
+    void  MemoryMappedFile::testCloseCopyOnWriteView(void * x ){
+        munmap(x,len);
     }
     
     void MemoryMappedFile::flush(bool sync) {
