@@ -227,27 +227,9 @@ namespace mongo {
             Flag_HaveIdIndex = 1 << 0 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
         };
 
-        IndexDetails& idx(int idxNo, bool missingExpected = false ) {
-            if( idxNo < NIndexesBase ) 
-                return _indexes[idxNo];
-            Extra *e = extra();
-            if ( ! e ){
-                if ( missingExpected )
-                    throw MsgAssertionException( 13283 , "Missing Extra" );
-                massert(13282, "missing Extra", e);
-            }
-            int i = idxNo - NIndexesBase;
-            if( i >= NIndexesExtra ) {
-                e = e->next(this);
-                if ( ! e ){
-                    if ( missingExpected )
-                        throw MsgAssertionException( 13283 , "missing extra" );
-                    massert(13283, "missing Extra", e);
-                }
-                i -= NIndexesExtra;
-            }
-            return e->details[i];
-        }
+        IndexDetails& idx(int idxNo, bool missingExpected = false );
+
+        /** get the IndexDetails for the index currently being built in the background. (there is at most one) */
         IndexDetails& backgroundIdx() { 
             DEV assert(backgroundIndexBuildInProgress);
             return idx(nIndexes);
@@ -255,14 +237,9 @@ namespace mongo {
 
         class IndexIterator { 
             friend class NamespaceDetails;
-            int i;
-            int n;
+            int i, n;
             NamespaceDetails *d;
-            IndexIterator(NamespaceDetails *_d) { 
-                d = _d;
-                i = 0;
-                n = d->nIndexes;
-            }
+            IndexIterator(NamespaceDetails *_d);
         public:
             int pos() { return i; } // note this is the next one to come
             bool more() { return i < n; }
@@ -271,25 +248,14 @@ namespace mongo {
 
         IndexIterator ii() { return IndexIterator(this); }
 
-        /* hackish - find our index # in the indexes array
-        */
-        int idxNo(IndexDetails& idx) { 
-            IndexIterator i = ii();
-            while( i.more() ) {
-                if( &i.next() == &idx )
-                    return i.pos()-1;
-            }
-            massert( 10349 , "E12000 idxNo fails", false);
-            return -1;
-        }
+        /* hackish - find our index # in the indexes array */
+        int idxNo(IndexDetails& idx);
 
         /* multikey indexes are indexes where there are more than one key in the index
              for a single document. see multikey in wiki.
            for these, we have to do some dedup work on queries.
         */
-        bool isMultikey(int i) {
-            return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0;
-        }
+        bool isMultikey(int i) { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
         void setIndexIsMultikey(int i) { 
             dassert( i < NIndexesMax );
             multiKeyIndexBits |= (((unsigned long long) 1) << i);
@@ -321,24 +287,10 @@ namespace mongo {
         }
 
         // @return offset in indexes[]
-        int findIndexByName(const char *name) {
-            IndexIterator i = ii();
-            while( i.more() ) {
-                if ( strcmp(i.next().info.obj().getStringField("name"),name) == 0 )
-                    return i.pos()-1;
-            }
-            return -1;
-        }
+        int findIndexByName(const char *name);
 
         // @return offset in indexes[]
-        int findIndexByKeyPattern(const BSONObj& keyPattern) {
-            IndexIterator i = ii();
-            while( i.more() ) {
-                if( i.next().keyPattern() == keyPattern ) 
-                    return i.pos()-1;
-            }
-            return -1;
-        }
+        int findIndexByKeyPattern(const BSONObj& keyPattern);
         
         void findIndexByType( const string& name , vector<int>& matches ) {
             IndexIterator i = ii();

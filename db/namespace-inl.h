@@ -39,4 +39,61 @@ namespace mongo {
         return old + "." + local;
     }
 
+    inline IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected ) {
+        if( idxNo < NIndexesBase ) 
+            return _indexes[idxNo];
+        Extra *e = extra();
+        if ( ! e ){
+            if ( missingExpected )
+                throw MsgAssertionException( 13283 , "Missing Extra" );
+            massert(13282, "missing Extra", e);
+        }
+        int i = idxNo - NIndexesBase;
+        if( i >= NIndexesExtra ) {
+            e = e->next(this);
+            if ( ! e ){
+                if ( missingExpected )
+                    throw MsgAssertionException( 13283 , "missing extra" );
+                massert(13283, "missing Extra", e);
+            }
+            i -= NIndexesExtra;
+        }
+        return e->details[i];
+    }
+
+    inline int NamespaceDetails::idxNo(IndexDetails& idx) { 
+        IndexIterator i = ii();
+        while( i.more() ) {
+            if( &i.next() == &idx )
+                return i.pos()-1;
+        }
+        massert( 10349 , "E12000 idxNo fails", false);
+        return -1;
+    }
+
+    inline int NamespaceDetails::findIndexByKeyPattern(const BSONObj& keyPattern) {
+        IndexIterator i = ii();
+        while( i.more() ) {
+            if( i.next().keyPattern() == keyPattern ) 
+                return i.pos()-1;
+        }
+        return -1;
+    }
+
+    // @return offset in indexes[]
+    inline int NamespaceDetails::findIndexByName(const char *name) {
+        IndexIterator i = ii();
+        while( i.more() ) {
+            if ( strcmp(i.next().info.obj().getStringField("name"),name) == 0 )
+                return i.pos()-1;
+        }
+        return -1;
+    }
+
+    inline NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d) { 
+        d = _d;
+        i = 0;
+        n = d->nIndexes;
+    }
+
 }
