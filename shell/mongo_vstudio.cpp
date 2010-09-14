@@ -2550,7 +2550,7 @@ const StringData _jscode_raw_query =
 "var n = this.clone();\n" 
 "n._ensureSpecial();\n" 
 "n._query.$explain = true;\n" 
-"n._limit = n._limit * -1;\n" 
+"n._limit = Math.abs(n._limit) * -1;\n" 
 "var e = n.next();\n" 
 "if (!verbose) {\n" 
 "delete e.allPlans;\n" 
