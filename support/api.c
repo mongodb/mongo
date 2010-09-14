@@ -1491,8 +1491,11 @@ void
 __wt_methods_env_config_default(ENV *env)
 {
 	env->cache_drain_cnt = 10;
+	env->cache_size = 20;
 	env->data_update_initial = 8 * 1024;
 	env->data_update_max = 32 * 1024;
+	env->hazard_size = 15;
+	env->toc_size = 50;
 }
 
 void

@@ -87,13 +87,6 @@ __wt_ienv_config(ENV *env)
 	TAILQ_INIT(&ienv->dbqh);		/* DB list */
 	TAILQ_INIT(&ienv->fhqh);		/* File list */
 
-	/* WT_TOC and hazard arrays. */
-	WT_RET(__wt_calloc(env, env->toc_size, sizeof(WT_TOC *), &ienv->toc));
-	WT_RET(
-	    __wt_calloc(env, env->toc_size, sizeof(WT_TOC), &ienv->toc_array));
-	WT_RET(__wt_calloc(env,
-	   env->toc_size * env->hazard_size, sizeof(WT_PAGE *), &ienv->hazard));
-
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_env_stats(env, &ienv->stats));
 	WT_RET(__wt_stat_alloc_method_stats(env, &ienv->method_stats));

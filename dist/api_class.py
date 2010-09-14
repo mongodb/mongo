@@ -107,7 +107,7 @@ methods['env.cache_size_get'] = Api(
 methods['env.cache_size_set'] = Api(
 	'env.cache_size_set',
 	'method, setter, verify',
-	['cache_size/u_int32_t @S'],
+	['cache_size/u_int32_t @S/20'],
 	[],
 	['init'], ['open'])
 
@@ -209,7 +209,7 @@ methods['env.errx'] = Api(
 methods['env.hazard_size_get'] = Api(
 	'env.hazard_size_get',
 	'method, getter',
-	['hazard_size/u_int32_t *@S'],
+	['hazard_size/u_int32_t *@S/15'],
 	[],
 	['init'], [])
 methods['env.hazard_size_set'] = Api(
@@ -294,7 +294,7 @@ methods['env.toc_size_get'] = Api(
 methods['env.toc_size_set'] = Api(
 	'env.toc_size_set',
 	'method, setter, verify',
-	['toc_size/u_int32_t @S'],
+	['toc_size/u_int32_t @S/50'],
 	[],
 	['init'], ['open'])
 

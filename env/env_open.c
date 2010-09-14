@@ -25,6 +25,13 @@ __wt_env_open(ENV *env, const char *home, mode_t mode)
 	ienv = env->ienv;
 	ret = 0;
 
+	/* WT_TOC and hazard arrays. */
+	WT_RET(__wt_calloc(env, env->toc_size, sizeof(WT_TOC *), &ienv->toc));
+	WT_RET(
+	    __wt_calloc(env, env->toc_size, sizeof(WT_TOC), &ienv->toc_array));
+	WT_RET(__wt_calloc(env,
+	   env->toc_size * env->hazard_size, sizeof(WT_PAGE *), &ienv->hazard));
+
 	/* Create the cache. */
 	WT_RET(__wt_cache_create(env));
 
