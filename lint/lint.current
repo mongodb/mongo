@@ -49,6 +49,14 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_cmp.c (C)
 
 --- Module:   ../btree/bt_debug.c (C)
+                                                                        _
+		    (u_long)off->addr, (u_long)off->size, WT_RECORDS(off));
+../btree/bt_debug.c  426  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+                                                             _
+		    (u_long)off->size, (u_quad)WT_RECORDS(off));
+../btree/bt_debug.c  453  Info 740: Unusual pointer cast (incompatible indirect
+    types)
 
 --- Module:   ../btree/bt_desc.c (C)
 
@@ -313,6 +321,9 @@ _
 #...  ((ret = (__wt_calloc_func(env, 1 << huffman->max_depth, sizeof(WT_STATIC_
 	    sizeof(WT_STATIC_HUFFMAN_NODE), &huffman->nodes));
 ../support/huffman.c  325  Info 701: Shift left of signed quantity (int)
+                                                       _
+		for (i = 0, n = 1 << huffman->max_depth; i < n; ++i) {
+../support/huffman.c  386  Info 701: Shift left of signed quantity (int)
                                    _
 	n = 1 << huffman->max_depth;
 ../support/huffman.c  460  Info 701: Shift left of signed quantity (int)
