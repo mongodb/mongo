@@ -28,13 +28,10 @@
 #include "../db/cmdline.h"
 #include "../client/dbclient.h"
 
-#ifdef __linux__
-# include <ifaddrs.h>
-#endif
-
 #ifndef _WIN32
-#include <sys/resource.h>
-#include <sys/stat.h>
+# include <ifaddrs.h>
+# include <sys/resource.h>
+# include <sys/stat.h>
 #else
 
 // errno doesn't work for winsock.
@@ -728,7 +725,7 @@ namespace mongo {
     namespace {
         map<string, bool> isSelfCache; // host, isSelf
 
-#ifdef __linux__
+#ifndef _WIN32
 
         vector<string> getMyAddrs(){
             ifaddrs * addrs;
@@ -821,7 +818,7 @@ namespace mongo {
                 return it->second;
             }
 
-#ifdef __linux__
+#ifndef _WIN32
 
             static const vector<string> myaddrs = getMyAddrs();
             const vector<string> addrs = getAllIPs(_host);
