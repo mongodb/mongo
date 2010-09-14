@@ -44,7 +44,6 @@ namespace mongo {
         
     }
 
-    
     void Top::record( const string& ns , int op , int lockType , long long micros , bool command ){
         //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
         scoped_lock lk(_lock);
@@ -59,13 +58,6 @@ namespace mongo {
         _record( _global , op , lockType , micros , command );
     }
 
-    void Top::collectionDropped( const string& ns ){
-        //cout << "collectionDropped: " << ns << endl;
-        scoped_lock lk(_lock);
-        _usage.erase(ns);
-        _lastDropped = ns;
-    }
-    
     void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ){
         c.total.inc( micros );
         
@@ -108,43 +100,50 @@ namespace mongo {
 
     }
 
-    void Top::cloneMap(Top::UsageMap& out){
+    void Top::collectionDropped( const string& ns ){
+        //cout << "collectionDropped: " << ns << endl;
+        scoped_lock lk(_lock);
+        _usage.erase(ns);
+        _lastDropped = ns;
+    }
+    
+    void Top::cloneMap(Top::UsageMap& out) const {
         scoped_lock lk(_lock);
         out = _usage;
     }
 
     void Top::append( BSONObjBuilder& b ){
         scoped_lock lk( _lock );
-        append( b , _usage );
+        _appendToUsageMap( b , _usage );
     }
 
-    void Top::append( BSONObjBuilder& b , const char * name , const UsageData& map ){
-        BSONObjBuilder bb( b.subobjStart( name ) );
-        bb.appendNumber( "time" , map.time );
-        bb.appendNumber( "count" , map.count );
-        bb.done();
-    }
-
-    void Top::append( BSONObjBuilder& b , const UsageMap& map ){
+    void Top::_appendToUsageMap( BSONObjBuilder& b , const UsageMap& map ) const {
         for ( UsageMap::const_iterator i=map.begin(); i!=map.end(); i++ ){
             BSONObjBuilder bb( b.subobjStart( i->first ) );
             
             const CollectionData& coll = i->second;
             
-            append( b , "total" , coll.total );
+            _appendStatsEntry( b , "total" , coll.total );
             
-            append( b , "readLock" , coll.readLock );
-            append( b , "writeLock" , coll.writeLock );
+            _appendStatsEntry( b , "readLock" , coll.readLock );
+            _appendStatsEntry( b , "writeLock" , coll.writeLock );
 
-            append( b , "queries" , coll.queries );
-            append( b , "getmore" , coll.getmore );
-            append( b , "insert" , coll.insert );
-            append( b , "update" , coll.update );
-            append( b , "remove" , coll.remove );
-            append( b , "commands" , coll.commands );
+            _appendStatsEntry( b , "queries" , coll.queries );
+            _appendStatsEntry( b , "getmore" , coll.getmore );
+            _appendStatsEntry( b , "insert" , coll.insert );
+            _appendStatsEntry( b , "update" , coll.update );
+            _appendStatsEntry( b , "remove" , coll.remove );
+            _appendStatsEntry( b , "commands" , coll.commands );
             
             bb.done();
         }
+    }
+
+    void Top::_appendStatsEntry( BSONObjBuilder& b , const char * statsName , const UsageData& map ) const {
+        BSONObjBuilder bb( b.subobjStart( statsName ) );
+        bb.appendNumber( "time" , map.time );
+        bb.appendNumber( "count" , map.count );
+        bb.done();
     }
 
     class TopCmd : public Command {

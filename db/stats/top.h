@@ -31,8 +31,7 @@ namespace mongo {
     public:
         Top() : _lock("Top") { }
 
-        class UsageData {
-        public:
+        struct UsageData {
             UsageData() : time(0) , count(0){}
             UsageData( const UsageData& older , const UsageData& newer );
             long long time;
@@ -44,8 +43,7 @@ namespace mongo {
             }
         };
 
-        class CollectionData {
-        public:
+        struct CollectionData {
             /**
              * constructs a diff
              */
@@ -70,21 +68,19 @@ namespace mongo {
     public:
         void record( const string& ns , int op , int lockType , long long micros , bool command );
         void append( BSONObjBuilder& b );
-        void cloneMap(UsageMap& out);
-        CollectionData getGlobalData(){ return _global; }
+        void cloneMap(UsageMap& out) const;
+        CollectionData getGlobalData() const { return _global; }
         void collectionDropped( const string& ns );
 
     public: // static stuff
         static Top global;
         
-        void append( BSONObjBuilder& b , const char * name , const UsageData& map );
-        void append( BSONObjBuilder& b , const UsageMap& map );
-        
     private:
-        
+        void _appendToUsageMap( BSONObjBuilder& b , const UsageMap& map ) const;        
+        void _appendStatsEntry( BSONObjBuilder& b , const char * statsName , const UsageData& map ) const;        
         void _record( CollectionData& c , int op , int lockType , long long micros , bool command );
 
-        mongo::mutex _lock;
+        mutable mongo::mutex _lock;
         CollectionData _global;
         UsageMap _usage;
         string _lastDropped;
