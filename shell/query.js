@@ -238,7 +238,7 @@ DBQuery.prototype.explain = function (verbose) {
     var n = this.clone();
     n._ensureSpecial();
     n._query.$explain = true;
-    n._limit = n._limit * -1;
+    n._limit = Math.abs(n._limit) * -1;
     var e = n.next();
     if (!verbose) {
         delete e.allPlans;
