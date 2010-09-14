@@ -41,9 +41,10 @@ printjson( primary._db._adminCommand( "shardingState" ) );
 
 // --- filtering ---
 
-function doCounts( name , total ){
+function doCounts( name , total , onlyItCounts ){
     total = total || ( primary.count() + secondary.count() );
-    assert.eq( total , a.count() , name + " count" );    
+    if ( ! onlyItCounts )
+        assert.eq( total , a.count() , name + " count" );    
     assert.eq( total , a.find().sort( { n : 1 } ).itcount() , name + " itcount - sort n" );
     assert.eq( total , a.find().itcount() , name + " itcount" );
     assert.eq( total , a.find().sort( { _id : 1 } ).itcount() , name + " itcount - sort _id" );
@@ -51,8 +52,12 @@ function doCounts( name , total ){
 }
 
 var total = doCounts( "before wrong save" )
-//secondary.save( { num : -3 } );
-//doCounts( "after wrong save" , total )
+secondary.save( { num : -3 } );
+doCounts( "after wrong save" , total , true )
+e = a.find().explain();
+assert.eq( 3 , e.n , "ex1" )
+assert.eq( 4 , e.nscanned , "ex2" )
+assert.eq( 1 , e.nChunkSkips , "ex3" )
 
 // --- move all to 1 ---
 print( "MOVE ALL TO 1" );
