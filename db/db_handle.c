@@ -157,7 +157,7 @@ __wt_idb_destroy(DB *db)
 
 	__wt_free(env, idb, sizeof(IDB));
 	db->idb = NULL;
-	return (0);
+	return (ret);
 }
 
 int

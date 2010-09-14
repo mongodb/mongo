@@ -134,5 +134,5 @@ __wt_ienv_destroy(ENV *env)
 
 	__wt_free(NULL, ienv, sizeof(IENV));
 	env->ienv = NULL;
-	return (0);
+	return (ret);
 }
