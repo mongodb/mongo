@@ -10,6 +10,8 @@
 #      scons --distname=0.8 s3dist
 #      all s3 pushes require settings.py and simples3
 
+EnsureSConsVersion(1,0)
+
 import os
 import sys
 import imp
