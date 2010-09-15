@@ -61,11 +61,19 @@ namespace mongo {
             memset(&hints, 0, sizeof(addrinfo));
             hints.ai_socktype = SOCK_STREAM;
             //hints.ai_flags = AI_ADDRCONFIG; // This is often recommended but don't do it. SERVER-1579
+            hints.ai_flags |= AI_NUMERICHOST; // first pass tries w/o DNS lookup
             hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
 
             stringstream ss;
             ss << port;
             int ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
+
+            if (ret == EAI_NONAME ){ 
+                // iporhost isn't an IP address, allow DNS lookup
+                hints.ai_flags &= ~AI_NUMERICHOST;
+                ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
+            }
+
             if (ret){
                 log() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
                 *this = SockAddr(port); 
