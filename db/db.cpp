@@ -498,6 +498,10 @@ sendmore:
         double _sleepsecs; // default value controlled by program options
     } dataFileSync;
 
+    const char * jsInterruptCallback() {
+        return killCurrentOp.checkForInterruptNoAssert();
+    }
+    
     void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
 
         bool is32bit = sizeof(int*) == 4;
@@ -555,6 +559,7 @@ sendmore:
 
         if ( useJNI ) {
             ScriptEngine::setup();
+            globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
         }
 
         repairDatabases();

@@ -360,5 +360,17 @@ namespace mongo {
                 }
             }
         }
+        
+        const char *checkForInterruptNoAssert() {
+            if( state != Off ) { 
+                if( state == All ) 
+                    return "interrupted at shutdown";
+                if( cc().curop()->opNum() == toKill ) { 
+                    state = Off;
+                    return "interrupted";
+                }
+            }
+            return "";
+        }
     } killCurrentOp;
 }

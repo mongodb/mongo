@@ -443,6 +443,7 @@ namespace mongo {
     }
     
     void ( *ScriptEngine::_connectCallback )( DBClientWithCommands & ) = 0;
+    const char * ( *ScriptEngine::_checkInterruptCallback )() = 0;
     
     ScriptEngine * globalScriptEngine;
 

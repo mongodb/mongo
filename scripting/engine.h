@@ -197,6 +197,11 @@ namespace mongo {
             if ( _connectCallback )
                 _connectCallback( c );
         }
+        static void setCheckInterruptCallback( const char * ( *func )() ) { _checkInterruptCallback = func; }
+        static bool haveCheckInterruptCallback() { return _checkInterruptCallback; }
+        static const char * checkInterrupt() {
+            return _checkInterruptCallback ? _checkInterruptCallback() : "";
+        }
         
     protected:
         virtual Scope * createScope() = 0;
@@ -204,6 +209,7 @@ namespace mongo {
     private:
         void ( *_scopeInitCallback )( Scope & );
         static void ( *_connectCallback )( DBClientWithCommands & );
+        static const char * ( *_checkInterruptCallback )();
     };
 
     bool hasJSReturn( const string& s );

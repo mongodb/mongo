@@ -1352,10 +1352,18 @@ namespace mongo {
             int count;
         };
 
-        static JSBool _checkTimeout( JSContext *cx ){
+        static JSBool _interrupt( JSContext *cx ){
             TimeoutSpec &spec = *(TimeoutSpec *)( JS_GetContextPrivate( cx ) );
             if ( ++spec.count % 1000 != 0 )
                 return JS_TRUE;
+            const char * interrupt = ScriptEngine::checkInterrupt();
+            if ( interrupt && interrupt[ 0 ] ) {
+                JS_ReportError( cx, interrupt );
+                return JS_FALSE;
+            }
+            if ( spec.timeout.ticks() == 0 ) {
+                return JS_TRUE;
+            }
             boost::posix_time::time_duration elapsed = ( boost::posix_time::microsec_clock::local_time() - spec.start );
             if ( elapsed < spec.timeout ) {
                 return JS_TRUE;
@@ -1364,28 +1372,29 @@ namespace mongo {
             return JS_FALSE;
 
         }
-        static JSBool checkTimeout( JSContext *cx, JSScript *script ){
-            return _checkTimeout( cx );
+        
+        static JSBool interrupt( JSContext *cx, JSScript *script ){
+            return _interrupt( cx );
         }
 
 
-        void installCheckTimeout( int timeoutMs ) {
-            if ( timeoutMs > 0 ) {
+        void installInterrupt( int timeoutMs ) {
+            if ( timeoutMs != 0 || ScriptEngine::haveCheckInterruptCallback() ) {
                 TimeoutSpec *spec = new TimeoutSpec;
                 spec->timeout = boost::posix_time::millisec( timeoutMs );
                 spec->start = boost::posix_time::microsec_clock::local_time();
                 spec->count = 0;
                 JS_SetContextPrivate( _context, (void*)spec );
 #if defined(SM181) && !defined(XULRUNNER190)
-                JS_SetOperationCallback( _context, _checkTimeout );
+                JS_SetOperationCallback( _context, _interrupt );
 #else
-                JS_SetBranchCallback( _context, checkTimeout );
+                JS_SetBranchCallback( _context, interrupt );
 #endif
             }
         }
 
-        void uninstallCheckTimeout( int timeoutMs ) {
-            if ( timeoutMs > 0 ) {
+        void uninstallInterrupt( int timeoutMs ) {
+            if ( timeoutMs != 0 || ScriptEngine::haveCheckInterruptCallback() ) {
 #if defined(SM181) && !defined(XULRUNNER190)
                 JS_SetOperationCallback( _context , 0 );
 #else
@@ -1407,9 +1416,9 @@ namespace mongo {
 
             jsval ret = JSVAL_VOID;
 
-            installCheckTimeout( timeoutMs );
+            installInterrupt( timeoutMs );
             JSBool worked = JS_EvaluateScript( _context , _global , code.data() , code.size() , name.c_str() , 0 , &ret );
-            uninstallCheckTimeout( timeoutMs );
+            uninstallInterrupt( timeoutMs );
 
             if ( ! worked && _error.size() == 0 ){
                 jsval v;
@@ -1461,10 +1470,10 @@ namespace mongo {
 
             JS_LeaveLocalRootScope( _context );
 
-            installCheckTimeout( timeoutMs );
+            installInterrupt( timeoutMs );
             jsval rval;
             JSBool ret = JS_CallFunction( _context , _this ? _this : _global , func , nargs , smargsPtr.get() , &rval );
-            uninstallCheckTimeout( timeoutMs );
+            uninstallInterrupt( timeoutMs );
 
             if ( !ret ) {
                 return -3;
