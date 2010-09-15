@@ -660,7 +660,6 @@ namespace mongo {
 
 
     MSGID NextMsgId;
-    bool usingClientIds = 0;
     ThreadLocalValue<int> clientId;
 
     struct MsgStart {
@@ -672,12 +671,6 @@ namespace mongo {
     
     MSGID nextMessageId(){
         MSGID msgid = NextMsgId++;
-        
-        if ( usingClientIds ){
-            msgid = msgid & 0xFFFF;
-            msgid = msgid | clientId.get();
-        }
-
         return msgid;
     }
 
@@ -686,9 +679,6 @@ namespace mongo {
     }
     
     void setClientId( int id ){
-        usingClientIds = true;
-        id = id & 0xFFFF0000;
-        massert( 10445 ,  "invalid id" , id );
         clientId.set( id );
     }
     

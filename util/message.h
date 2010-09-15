@@ -86,6 +86,7 @@ namespace mongo {
         virtual int getClientId(){
             int x = remotePort();
             x = x << 16;
+            x |= ( 0xFF & (long long)this );
             return x;
         }
     };
