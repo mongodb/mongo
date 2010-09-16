@@ -96,10 +96,12 @@ namespace mongo {
         ChunkPtr split();
 
         /**
-         * @param splitPoints - vector to be filled in
-         * @param chunkSize  - chunk size to target in bytes
+         * @param splitPoints vector to be filled in
+         * @param chunkSize chunk size to target in bytes
+         * @param maxPoints limits the number of split points that are needed, zero is max (optional)
+         * @param maxObjs limits the number of objects in each chunk, zero is as max (optional)
          */
-        void pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize ) const;
+        void pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize , int maxPoints = 0, int maxObjs = 0) const;
         ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
 
         /**
