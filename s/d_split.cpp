@@ -66,8 +66,22 @@ namespace mongo {
             int num = 0;
             NamespaceDetails *d = nsdetails(ns);
             int idxNo = d->idxNo(*id);
-            for( BtreeCursor c( d, idxNo, *id, min, max, false, 1 ); c.ok(); c.advance(), ++num );
+            
+            // only yielding on firt half for now
+            // after this it should be in ram, so 2nd should be fast
+            {
+                shared_ptr<Cursor> c( new BtreeCursor( d, idxNo, *id, min, max, false, 1 ) );
+                scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                while ( c->ok() ){
+                    num++;
+                    c->advance();
+                    if ( ! cc->yieldSometimes() )
+                        break;
+                }
+            }
+            
             num /= 2;
+            
             BtreeCursor c( d, idxNo, *id, min, max, false, 1 );
             for( ; num; c.advance(), --num );
 
