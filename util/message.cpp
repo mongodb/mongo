@@ -27,6 +27,7 @@
 #include <errno.h>
 #include "../db/cmdline.h"
 #include "../client/dbclient.h"
+#include "../util/time_support.h"
 
 #ifndef _WIN32
 # ifndef __sunos__

@@ -22,6 +22,7 @@
 #include "client.h"
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/spin_lock.h"
+#include "../util/time_support.h"
 #include "db.h"
 
 namespace mongo { 

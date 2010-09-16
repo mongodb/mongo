@@ -19,6 +19,7 @@
 #pragma once
 
 #include "mutex.h"
+#include "../time_support.h"
 
 #if BOOST_VERSION >= 103500
   #define BOOST_RWLOCK

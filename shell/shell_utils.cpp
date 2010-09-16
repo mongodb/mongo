@@ -46,6 +46,7 @@
 #include "../util/processinfo.h"
 #include "../util/text.h"
 #include "../util/heapcheck.h"
+#include "../util/time_support.h"
 
 namespace mongo {
 #ifdef _WIN32

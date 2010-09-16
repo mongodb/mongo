@@ -25,6 +25,8 @@
 #include "../db/json.h"
 #include "../db/lasterror.h"
 
+#include "../util/timer.h"
+
 #include "dbtests.h"
 
 namespace mongo {

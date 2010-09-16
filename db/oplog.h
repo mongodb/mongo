@@ -30,6 +30,7 @@
 #include "queryoptimizer.h"
 #include "../client/dbclient.h"
 #include "../util/optime.h"
+#include "../util/timer.h"
 
 namespace mongo {
 

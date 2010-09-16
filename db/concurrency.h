@@ -31,6 +31,7 @@
 
 #include "../util/concurrency/rwlock.h"
 #include "../util/mmap.h"
+#include "../util/time_support.h"
 
 namespace mongo {
 
