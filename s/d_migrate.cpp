@@ -52,6 +52,7 @@ namespace mongo {
         MoveTimingHelper( const string& where , const string& ns )
             : _where( where ) , _ns( ns ){
             _next = 1;
+            _nextNote = 0;
         }
 
         ~MoveTimingHelper(){
@@ -76,6 +77,18 @@ namespace mongo {
         }
         
         
+        void note( const string& s ){
+            string field = "note";
+            if ( _nextNote > 0 ){
+                StringBuilder buf;
+                buf << "note" << _nextNote;
+                field = buf.str();
+            }
+            _nextNote++;
+            
+            _b.append( field , s );
+        }
+
     private:
         Timer _t;
 
@@ -83,8 +96,10 @@ namespace mongo {
         string _ns;
         
         int _next;
+        int _nextNote;
         
         BSONObjBuilder _b;
+
     };
 
     struct OldDataCleanup {
@@ -182,6 +197,7 @@ namespace mongo {
         MigrateFromStatus(){
             _active = false;
             _inCriticalSection = false;
+            _memoryUsed = 0;
         }
 
         void start( string ns , const BSONObj& min , const BSONObj& max ){
@@ -195,18 +211,17 @@ namespace mongo {
             _min = min;
             _max = max;
             
-            _deleted.clear();
-            _reload.clear();
-            
+            assert( _deleted.size() == 0 );
+            assert( _reload.size() == 0 );
+            assert( _memoryUsed == 0 );
+
             _active = true;
         }
         
         void done(){
-            if ( ! _active )
-                return;
-            
             _deleted.clear();
             _reload.clear();
+            _memoryUsed = 0;
             
             _active = false;
             _inCriticalSection = false;
@@ -241,6 +256,7 @@ namespace mongo {
             case 'd': {
                 // can't filter deletes :(
                 _deleted.push_back( ide.wrap() );
+                _memoryUsed += ide.size() + 5;
                 return;
             }
                 
@@ -261,6 +277,7 @@ namespace mongo {
                 return;
             
             _reload.push_back( ide.wrap() );
+            _memoryUsed += ide.size() + 5;
         }
 
         void xfer( list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ){
@@ -317,6 +334,8 @@ namespace mongo {
             return true;
         }
 
+        long long mbUsed() const { return _memoryUsed / ( 1024 * 1024 ); }
+
         bool _inCriticalSection;
 
     private:
@@ -329,6 +348,7 @@ namespace mongo {
 
         list<BSONObj> _reload;
         list<BSONObj> _deleted;
+        long long _memoryUsed; // bytes in _reload + _deleted
 
     } migrateFromStatus;
     
@@ -526,7 +546,7 @@ namespace mongo {
                 res = res.getOwned();
                 conn.done();
                 
-                log(0) << "_recvChunkStatus : " << res << endl;
+                log(0) << "_recvChunkStatus : " << res << " my mem used: " << migrateFromStatus.mbUsed() << endl;
                 
                 if ( ! ok || res["state"].String() == "fail" ){
                     log( LL_ERROR ) << "_recvChunkStatus error : " << res << endl;
@@ -537,6 +557,20 @@ namespace mongo {
 
                 if ( res["state"].String() == "steady" )
                     break;
+
+                if ( migrateFromStatus.mbUsed() > (500 * 1024 * 1024) ){
+                    // this is too much memory for us to use for this
+                    // so we're going to abort the migrate
+                    ScopedDbConnection conn( to );
+                    BSONObj res;
+                    conn->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
+                    res = res.getOwned();
+                    conn.done();
+                    error() << "aborting migrate because too much memory used res: " << res << endl;
+                    errmsg = "aborting migrate because too much memory used";
+                    result.appendBool( "split" , true );
+                    return false;
+                }
 
                 killCurrentOp.checkForInterrupt();
             }
@@ -770,12 +804,19 @@ namespace mongo {
                         break;
                     
                     apply( res );
+
+                    if ( state == ABORT ){
+                        timing.note( "aborted" );
+                        return;
+                    }
                 }
 
                 timing.done(4);
             }
             
             { // 5. wait for commit
+                Timer timeWaitingForCommit;
+
                 state = STEADY;
                 while ( state == STEADY || state == COMMIT_START ){
                     BSONObj res;
@@ -795,7 +836,18 @@ namespace mongo {
 
                     sleepmillis( 10 );
                 }
+
+                if ( state == ABORT ){
+                    timing.note( "aborted" );
+                    return;
+                }
                 
+                if ( timeWaitingForCommit.seconds() > 86400 ){
+                    state = FAIL;
+                    errmsg = "timed out waiting for commit";
+                    return;
+                }
+
                 timing.done(5);
             }
             
@@ -866,6 +918,7 @@ namespace mongo {
             case COMMIT_START: return "commitStart";
             case DONE: return "done";
             case FAIL: return "fail";
+            case ABORT: return "abort";
             }
             assert(0);
             return "";
@@ -885,6 +938,11 @@ namespace mongo {
             return false;
         }
 
+        void abort(){
+            state = ABORT;
+            errmsg = "aborted";
+        }
+
         bool active;
         
         string ns;
@@ -897,7 +955,7 @@ namespace mongo {
         long long numCatchup;
         long long numSteady;
 
-        enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , FAIL } state;
+        enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , FAIL , ABORT } state;
         string errmsg;
         
     } migrateStatus;
@@ -961,6 +1019,18 @@ namespace mongo {
         }
 
     } recvChunkCommitCommand;
+
+    class RecvChunkAbortCommand : public ChunkCommandHelper {
+    public:
+        RecvChunkAbortCommand() : ChunkCommandHelper( "_recvChunkAbort" ){}
+        
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            migrateStatus.abort();
+            migrateStatus.status( result );
+            return true;
+        }
+
+    } recvChunkAboortCommand;
 
 
     class IsInRangeTest : public UnitTest {
