@@ -575,8 +575,12 @@ namespace mongo {
                     return false;
                 }
                 
-                if ( ! c->moveAndCommit( to , errmsg ) )
+                BSONObj res;
+                if ( ! c->moveAndCommit( to , res ) ){
+                    errmsg = "move failed";
+                    result.append( "cause" , res );
                     return false;
+                }
 
                 result.append( "millis" , t.millis() );
                 return true;

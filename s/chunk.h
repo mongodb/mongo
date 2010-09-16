@@ -124,7 +124,7 @@ namespace mongo {
          */
         bool moveIfShould( ChunkPtr newShard = ChunkPtr() );
 
-        bool moveAndCommit( const Shard& to , string& errmsg );
+        bool moveAndCommit( const Shard& to , BSONObj& res );
 
         const char * getNS(){ return "config.chunks"; }
         void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);

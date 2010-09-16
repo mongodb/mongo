@@ -333,7 +333,7 @@ namespace mongo {
         return newChunks[0];
     }
 
-    bool Chunk::moveAndCommit( const Shard& to , string& errmsg ){
+    bool Chunk::moveAndCommit( const Shard& to , BSONObj& res ){
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
         
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
@@ -342,7 +342,6 @@ namespace mongo {
         
         ScopedDbConnection fromconn( from);
 
-        BSONObj res;
         bool worked = fromconn->runCommand( "admin" ,
                                             BSON( "moveChunk" << _manager->getns() << 
                                                   "from" << from.getConnString() <<
@@ -361,9 +360,7 @@ namespace mongo {
             _manager->_reload();
             return true;
         }
-        
-        errmsg = res["errmsg"].String();
-        errmsg += " " + res.toString();
+
         return false;
     }
     
@@ -467,9 +464,10 @@ namespace mongo {
 
         log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objects: " << toMove->countObjects() << endl;
 
-        string errmsg;
-        massert( 10412 ,  (string)"moveAndCommit failed: " + errmsg , 
-                 toMove->moveAndCommit( newLocation , errmsg ) );
+        BSONObj res;
+        massert( 10412 , 
+                 (string)"moveAndCommit failed: " + res.toString() , 
+                 toMove->moveAndCommit( newLocation , res ) );
         
         return true;
     }

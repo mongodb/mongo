@@ -810,14 +810,19 @@ namespace mongo {
             }
 
 #if !defined(_WIN32) && !defined(__sunos__)
-
+            
             static const vector<string> myaddrs = getMyAddrs();
             const vector<string> addrs = getAllIPs(_host);
 
             bool ret=false;
             for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end(); i!=iend; ++i){
                 for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end(); j!=jend; ++j){
-                    if (*i == *j){
+                    string a = *i;
+                    string b = *j;
+
+                    if ( a == b ||
+                         ( a.find( "127." ) == 0 && b.find( "127." ) == 0 )  // 127. is all loopback
+                         ){
                         ret = true;
                         break;
                     }
