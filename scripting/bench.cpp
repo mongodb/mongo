@@ -64,7 +64,7 @@ namespace mongo {
         bool error;
     };
     
-    void runBench( BenchRunConfig * config ){
+    static void benchThread( BenchRunConfig * config ){
         ScopedDbConnection conn( config->host );
         config->threadsReady++;        
         
@@ -121,7 +121,7 @@ namespace mongo {
         //    start threads
         vector<boost::thread*> all;
         for ( unsigned i=0; i<config.parallel; i++ )
-            all.push_back( new boost::thread( boost::bind( runBench , &config ) ) );
+            all.push_back( new boost::thread( boost::bind( benchThread , &config ) ) );
         
         //    give them time to init
         while ( config.threadsReady < config.parallel )
