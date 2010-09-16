@@ -20,6 +20,7 @@
 #include "unittest.h"
 #include "file_allocator.h"
 #include "optime.h"
+#include "time_support.h"
 
 namespace mongo {
 

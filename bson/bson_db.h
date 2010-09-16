@@ -26,6 +26,7 @@
 #pragma once
 
 #include "../util/optime.h"
+#include "../util/time_support.h"
 
 namespace mongo {
 

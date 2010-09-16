@@ -22,6 +22,8 @@
 #include <sys/stat.h>
 #endif
 
+#include "timer.h"
+
 #ifndef O_NOATIME
 #define O_NOATIME 0
 #endif

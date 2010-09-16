@@ -16,9 +16,12 @@
  */
 
 #include "pch.h"
-#include "goodies.h"
-#include "background.h"
+
 #include <list>
+
+#include "goodies.h"
+#include "time_support.h"
+#include "background.h"
 
 namespace mongo {
 

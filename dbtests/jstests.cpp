@@ -22,6 +22,7 @@
 
 #include "../pch.h"
 #include "../scripting/engine.h"
+#include "../util/timer.h"
 
 #include "dbtests.h"
 
