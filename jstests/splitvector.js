@@ -74,6 +74,7 @@ numDocs = 20000;
 for( i=1; i<numDocs; i++ ){
     f.save( { x: i, y: filler } );
 }
+db.getLastError();
 res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 } );
 
 // splitVector aims at getting half-full chunks after split
@@ -95,6 +96,7 @@ numDocs = 10000;
 for( i=1; i<numDocs; i++ ){
     f.save( { x: i, y: filler } );
 }
+db.getLastError();
 res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 , maxSplitPoints: 1} );
 
 assert.eq( true , res.ok , "5a" );
@@ -112,9 +114,10 @@ numDocs = 10000;
 for( i=1; i<numDocs; i++ ){
     f.save( { x: i, y: filler } );
 }
-res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 , maxChunkObjects: 1000} );
+db.getLastError();
+res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 , maxChunkObjects: 500} );
 
 assert.eq( true , res.ok , "6a" );
-assert.eq( 10 , res.splitKeys.length , "6b" );
+assert.eq( 19 , res.splitKeys.length , "6b" );
 
 print("PASSED");

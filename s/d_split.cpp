@@ -211,8 +211,11 @@ namespace mongo {
             // provided.
             const long long avgRecSize = dataSize / recCount;
             long long keyCount = maxChunkSize / (2 * avgRecSize);
-            if ( maxChunkObjects && ( maxChunkObjects < keyCount ) )
+            if ( maxChunkObjects && ( maxChunkObjects < keyCount ) ) {
+                log() << "limiting split vector to " << maxChunkObjects << " (from " << keyCount << ") objects for chunk "
+                      << ns << " " << min << "-->>" << max << endl;
                 keyCount = maxChunkObjects;
+            }
 
             // We traverse the index and add the keyCount-th key to the result vector. If that key
             // appeared in the vector before, we omit it. The assumption here is that all the 
@@ -242,6 +245,9 @@ namespace mongo {
 
                 // Stop if we have enough split points.
                 if ( maxSplitPoints && ( numChunks >= maxSplitPoints ) ){
+                    log(1) << "max number of requested split points reached (" << numChunks 
+                           << ") before the end of chunk " << ns << " " << min << "-->>" << max 
+                           << endl;
                     break;
                 }
                 
