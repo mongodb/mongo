@@ -93,6 +93,7 @@ namespace mongo {
         lock lk(this);
         if( box.getState().primary() ) { 
             changeState(MemberState::RS_RECOVERING);
+            //changeState(MemberState::RS_SECONDARY);
             elect.steppedDown = time(0) + 60;
             log() << "replSet info stepped down as primary" << rsLog;
             return true;
