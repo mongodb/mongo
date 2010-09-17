@@ -136,6 +136,7 @@ namespace mongo {
     }
 
     void start( const MessageServer::Options& opts ){
+        setThreadName( "mongosMain" );
         balancer.go();
         cursorCache.startTimeoutThread();
 
