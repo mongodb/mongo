@@ -190,6 +190,7 @@
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\db\dbwebserver.cpp" />
+    <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />

@@ -402,6 +402,9 @@
       <Filter>scripting</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
+    <ClCompile Include="..\scripting\bench.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
