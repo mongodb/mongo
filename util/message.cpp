@@ -730,6 +730,7 @@ namespace mongo {
 
             // based on example code from linux getifaddrs manpage
             for (ifaddrs * addr = addrs; addr != NULL; addr = addr->ifa_next){
+                if ( addr->ifa_addr == NULL ) continue;
                 int family = addr->ifa_addr->sa_family;
                 char host[NI_MAXHOST];
 
@@ -737,13 +738,19 @@ namespace mongo {
                    status = getnameinfo(addr->ifa_addr,
                                         (family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)),
                                         host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-
-                   massert(13470, string("getnameinfo() failed: ") + gai_strerror(status), status == 0);
+                   if ( status != 0 ){
+                       freeifaddrs( addrs );
+                       addrs = NULL;
+                       msgasserted( 13470, string("getnameinfo() failed: ") + gai_strerror(status) );
+                   }
 
                    out.push_back(host);
                }
 
             }
+
+            freeifaddrs( addrs );
+            addrs = NULL;
 
             if (logLevel >= 1){ 
                 log(1) << "getMyAddrs():";
