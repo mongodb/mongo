@@ -31,6 +31,8 @@
 #include "../db/dbmessage.h"
 #include "../db/query.h"
 #include "../db/cmdline.h"
+#include "../db/queryoptimizer.h"
+#include "../db/btree.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -396,6 +398,9 @@ namespace mongo {
             // 1. parse options
             // 2. make sure my view is complete and lock
             // 3. start migrate
+            //    a) lock mongod to make sure we know about all writes
+            //    b) in a read lock, get all DiskLoc and sort so we can do as little seeking as possible
+            //    c) tell to start transferring
             // 4. pause till migrate caught up
             // 5. LOCK
             //    a) update my config, essentially locking
@@ -506,12 +511,45 @@ namespace mongo {
             
             // 3.
             MigrateStatusHolder statusHolder( ns , min , max );
-            {
+            { // 3.a
                 dblock lk;
                 // this makes sure there wasn't a write inside the .cpp code we can miss
             }
             
-            {
+            if ( 0 ) { // 3.b TODO(erh) - not done yet
+                
+                readlock l( ns );
+                Client::Context ctx( ns );
+                NamespaceDetails *d = nsdetails( ns.c_str() );
+                if ( ! d ){
+                    errmsg = "ns not found, should be impossible";
+                    return false;
+                }
+                
+                BSONObj keyPattern;
+                // the copies are needed because the command destrory the input
+                BSONObj minCopy = min.copy();
+                BSONObj maxCopy = max.copy();
+                IndexDetails *idx = indexDetailsForRange( ns.c_str() , errmsg , minCopy , maxCopy , keyPattern ); 
+                if ( idx == NULL ){
+                    return false;
+                }
+
+                set<DiskLoc> locs;
+                
+                BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+                while ( c.ok() ){
+                    DiskLoc dl = c.currLoc();
+                    locs.insert( dl );
+                    c.advance();
+                    // TODO: should we yield? 
+                }
+
+                
+                
+            }
+            
+            { // 3.c
                 
                 ScopedDbConnection conn( to );
                 BSONObj res;
