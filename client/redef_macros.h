@@ -50,6 +50,9 @@
 #define RARELY MONGO_RARELY
 #define ONCE MONGO_ONCE
 
+// util/log.h
+#define LOG MONGO_LOG
+
 #undef MONGO_MACROS_CLEANED
 #endif
 
