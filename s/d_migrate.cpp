@@ -708,6 +708,7 @@ namespace mongo {
             errmsg = "";
 
             numCloned = 0;
+            clonedBytes = 0;
             numCatchup = 0;
             numSteady = 0;
 
@@ -783,6 +784,7 @@ namespace mongo {
                         Helpers::upsert( ns , o );
                     }
                     numCloned++;
+                    clonedBytes += o.objsize();
                 }
 
                 timing.done(3);
@@ -869,6 +871,7 @@ namespace mongo {
             {
                 BSONObjBuilder bb( b.subobjStart( "counts" ) );
                 bb.append( "cloned" , numCloned );
+                bb.append( "clonedBytes" , clonedBytes );
                 bb.append( "catchup" , numCatchup );
                 bb.append( "steady" , numSteady );
                 bb.done();
@@ -952,6 +955,7 @@ namespace mongo {
         BSONObj max;
         
         long long numCloned;
+        long long clonedBytes;
         long long numCatchup;
         long long numSteady;
 
