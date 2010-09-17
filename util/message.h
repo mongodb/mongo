@@ -86,7 +86,7 @@ namespace mongo {
         virtual int getClientId(){
             int x = remotePort();
             x = x << 16;
-            x |= ( 0xFF & (long long)this );
+            x |= ( ( 0xFF0 & (long long)this ) >> 8 ); // lowest byte in pointer often meaningless
             return x;
         }
     };
