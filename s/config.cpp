@@ -257,6 +257,9 @@ namespace mongo {
             if ( ! i->second.isDirty() )
                 continue;
             i->second.save( i->first , conn.get() );
+            
+            err = conn->getLastError();
+            uassert( 13473 , (string)"DBConfig save failed for collection (" + i->first + "): " + err , err.size() == 0 );
         }
 
         conn.done();
