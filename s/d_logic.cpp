@@ -60,7 +60,7 @@ namespace mongo {
             return false;
         }
 
-        log() << "shardVersionOk failed  ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
+        log(1) << "connection meta data too old - will retry ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
         
         if ( doesOpGetAResponse( op ) ){
             assert( dbresponse );
