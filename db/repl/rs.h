@@ -348,6 +348,7 @@ namespace mongo {
     public:
         ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {  }
 
+        // for the replSetStepDown command
         bool stepDown() { return _stepDown(); }
 
         string selfFullName() { 
