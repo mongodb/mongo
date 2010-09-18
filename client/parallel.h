@@ -279,6 +279,7 @@ namespace mongo {
             
             BSONObj _res;
             bool _ok;
+            bool _done;
             
             friend class Future;
         };

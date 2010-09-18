@@ -462,10 +462,12 @@ namespace mongo {
         _server = server;
         _db = db;
         _cmd = cmd;
+        _done = false;
     }
 
     bool Future::CommandResult::join(){
         _thr->join();
+        assert( _done );
         return _ok;
     }
 
@@ -481,6 +483,7 @@ namespace mongo {
             error() << "Future::commandThread exception: " << e.what() << endl;
             res->_ok = false;
         }
+        res->_done = true;
     }
 
     shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd ){
