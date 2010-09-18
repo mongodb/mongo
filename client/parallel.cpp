@@ -462,33 +462,31 @@ namespace mongo {
         _server = server;
         _db = db;
         _cmd = cmd;
-        _done = false;
     }
 
     bool Future::CommandResult::join(){
-        if (_done)
-            return _ok;
-
-        _barrier.take();
-        _barrier.put(true); // so others can take again
-
-        assert(_done);
-
+        _thr->join();
         return _ok;
     }
 
     void Future::commandThread(shared_ptr<CommandResult> res){
-        ScopedDbConnection conn( res->_server );
-        res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
-        res->_done = true;
-        res->_barrier.put(true);
-        conn.done();
+        setThreadName( "future" );
+        
+        try {
+            ScopedDbConnection conn( res->_server );
+            res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
+            conn.done();
+        }
+        catch ( std::exception& e ){
+            error() << "Future::commandThread exception: " << e.what() << endl;
+            res->_ok = false;
+        }
     }
 
     shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd ){
         shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd ));
-        boost::thread thr( boost::bind(Future::commandThread, res) );
-
+        res->_thr.reset( new boost::thread( boost::bind(Future::commandThread, res) ) );
+        
         return res;
     }
     
