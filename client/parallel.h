@@ -274,7 +274,7 @@ namespace mongo {
             string _db;
             BSONObj _cmd;
 
-            boost::thread _thr;
+            scoped_ptr<boost::thread> _thr;
             
             BSONObj _res;
             bool _done;
@@ -283,12 +283,9 @@ namespace mongo {
             friend class Future;
         };
         
-        static void commandThread();
+        static void commandThread( shared_ptr<CommandResult> res );
         
         static shared_ptr<CommandResult> spawnCommand( const string& server , const string& db , const BSONObj& cmd );
-
-    private:
-        static shared_ptr<CommandResult> * _grab;
     };
 
     
