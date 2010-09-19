@@ -80,37 +80,38 @@ namespace mongo {
 
         updateLength( filename, length );
 
-        DWORD createOptions = FILE_ATTRIBUTE_NORMAL;
-        if ( options & SEQUENTIAL )
-            createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
-        DWORD rw = GENERIC_READ | GENERIC_WRITE;
-        //if ( options & READONLY ) 
-        //    rw = GENERIC_READ;
-
-        fd = CreateFile(
-                 toNativeString(filename).c_str(),
-                 rw, // desired access
-                 FILE_SHARE_READ, // share mode
-                 NULL, // security
-                 OPEN_ALWAYS, // create disposition
-                 createOptions , // flags
-                 NULL); // hTempl
-        if ( fd == INVALID_HANDLE_VALUE ) {
-            log() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
-            return 0;
+        {
+            DWORD createOptions = FILE_ATTRIBUTE_NORMAL;
+            if ( options & SEQUENTIAL )
+                createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
+            DWORD rw = GENERIC_READ | GENERIC_WRITE;
+            fd = CreateFile(
+                     toNativeString(filename).c_str(),
+                     rw, // desired access
+                     FILE_SHARE_READ, // share mode
+                     NULL, // security
+                     OPEN_ALWAYS, // create disposition
+                     createOptions , // flags
+                     NULL); // hTempl
+            if ( fd == INVALID_HANDLE_VALUE ) {
+                log() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
+                return 0;
+            }
         }
 
         mapped += length;
 
-        DWORD flProtect = PAGE_READWRITE; //(options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
-        maphandle = CreateFileMapping(fd, NULL, flProtect, 
-            length >> 32 /*maxsizehigh*/, 
-            (unsigned) length /*maxsizelow*/, 
-            NULL/*lpName*/);
-        if ( maphandle == NULL ) {
-            DWORD e = GetLastError(); // log() call was killing lasterror before we get to that point in the stream
-            log() << "CreateFileMapping failed " << filename << ' ' << errnoWithDescription(e) << endl;
-            return 0;
+        {
+            DWORD flProtect = PAGE_READWRITE; //(options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
+            maphandle = CreateFileMapping(fd, NULL, flProtect, 
+                length >> 32 /*maxsizehigh*/, 
+                (unsigned) length /*maxsizelow*/, 
+                NULL/*lpName*/);
+            if ( maphandle == NULL ) {
+                DWORD e = GetLastError(); // log() call was killing lasterror before we get to that point in the stream
+                log() << "CreateFileMapping failed " << filename << ' ' << errnoWithDescription(e) << endl;
+                return 0;
+            }
         }
 
         {
