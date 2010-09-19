@@ -410,8 +410,11 @@ namespace mongo {
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
             
-            if ( Listener::getElapsedTimeMillis() - start > 1000 )
-                result.append( "timing" , timeBuilder.obj() );
+            if ( Listener::getElapsedTimeMillis() - start > 1000 ){
+                BSONObj t = timeBuilder.obj();
+                log() << "serverStatus was very slow: " << t << endl;
+                result.append( "timing" , t );
+            }
 
             return true;
         }
