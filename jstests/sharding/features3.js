@@ -24,7 +24,7 @@ assert.eq( N / 2 , x.shards.shard0001.count , "count on shard0001" )
 start = new Date()
 
 print( "about to fork shell: " + Date() )
-join = startParallelShell( "db.foo.find( function(){ x = \"\"; for ( i=0; i<5000; i++ ){ x+=i; } return true; } ).itcount()" )
+join = startParallelShell( "db.foo.find( function(){ x = \"\"; for ( i=0; i<10000; i++ ){ x+=i; } return true; } ).itcount()" )
 print( "after forking shell: " + Date() )
 
 function getMine( printInprog ){
@@ -43,7 +43,7 @@ function getMine( printInprog ){
 state = 0; // 0 = not found, 1 = killed, 
 killTime = null;
 
-for ( i=0; i<200000; i++ ){
+for ( i=0; i<( 100* 1000 ); i++ ){
     mine = getMine( state == 0 && i > 20 );
     if ( state == 0 ){
         if ( mine.length == 0 ){
@@ -59,6 +59,7 @@ for ( i=0; i<200000; i++ ){
             state = 2;
             break;
         }
+        sleep(1)
         continue;
     }
 }
