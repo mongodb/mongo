@@ -11,6 +11,7 @@ function debug( x ) {
 for( i = 0; i < 10; ++i ) {
     t.save( {i:i} );
 }
+db.getLastError();
 
 ev = "while( 1 ) { db.jstests_evald.count( {i:10} ); }"
 
