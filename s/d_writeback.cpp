@@ -32,13 +32,15 @@
 using namespace std;
 
 namespace mongo {
+    typedef map< string , BlockingQueue<BSONObj>* > WriteBackQueuesMap;
 
-    map< string , BlockingQueue<BSONObj>* > writebackQueue;
-    mongo::mutex writebackQueueLock("sharding:writebackQueueLock");
+    // 'writebackQueueLock' protects only the map itself, since each queue is syncrhonized.
+    static mongo::mutex writebackQueueLock("sharding:writebackQueueLock");
+    static WriteBackQueuesMap writebackQueues;
 
     BlockingQueue<BSONObj>* getWritebackQueue( const string& remote ){
         scoped_lock lk (writebackQueueLock );
-        BlockingQueue<BSONObj>*& q = writebackQueue[remote];
+        BlockingQueue<BSONObj>*& q = writebackQueues[remote];
         if ( ! q )
             q = new BlockingQueue<BSONObj>();
         return q;
@@ -69,7 +71,8 @@ namespace mongo {
             
             const OID id = e.__oid();
             
-            // we want to do something every 5 minutes so sockets don't timeout
+            // the command issuer is blocked awaiting a response
+            // we want to do return at least at every 5 minutes so sockets don't timeout
             BSONObj z;
             if ( getWritebackQueue(id.str())->blockingPop( z, 5 * 60 /* 5 minutes */ ) ) {
                 log(1) << "WriteBackCommand got : " << z << endl;
@@ -83,4 +86,36 @@ namespace mongo {
         }
     } writeBackCommand;
 
-}
+    class WriteBacksQueuedCommand : public Command {
+    public:
+        virtual LockType locktype() const { return NONE; } 
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+        
+        WriteBacksQueuedCommand() : Command( "writeBackQueued" ){}
+
+        void help(stringstream& help) const { 
+            help << "Returns whether there are operations in the writeback queue at the time the command was called. "
+                 << "This is an internal comand"; 
+        }
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool hasOpsQueued = false;
+            {
+                scoped_lock lk(writebackQueueLock );
+                for ( WriteBackQueuesMap::const_iterator it = writebackQueues.begin(); it != writebackQueues.end(); ++it ){
+                    const BlockingQueue<BSONObj>* queue = it->second;
+                    if (! queue->empty() ){
+                        hasOpsQueued = true;
+                        break;
+                    }
+                }
+            }
+
+            result.appendBool( "hasOpsQueued" , hasOpsQueued );
+            return true;
+        }
+
+    } writeBacksQueuedCommand;
+
+}  // namespace mongo
