@@ -59,6 +59,8 @@ function check( msg , dontAssert ){
         if ( dontAssert )
             return false;
 
+        // we will assert past this point but wait a bit to see if it is because the missing update
+        // was being held in the writeback roundtrip
         sleep( 10000 );
         
         var y = db.foo.findOne( { _id : parseInt( x ) } )
@@ -66,6 +68,8 @@ function check( msg , dontAssert ){
         if ( y ){
             delete y.s;
         }
+
+        s.printChunks( "test.foo" )
         
         assert( z , "couldn't find : " + x + " y:" + tojson(y) + " e: " + e + " " + msg )
         assert.eq( e , z.x , "count for : " + x + " y:" + tojson(y) + " " + msg )
