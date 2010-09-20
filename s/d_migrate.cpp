@@ -551,17 +551,17 @@ namespace mongo {
             
             { // 3.c
                 
-                ScopedDbConnection conn( to );
+                ScopedDbConnection connTo( to );
                 BSONObj res;
-                bool ok = conn->runCommand( "admin" , 
-                                            BSON( "_recvChunkStart" << ns <<
-                                                  "from" << from <<
-                                                  "min" << min <<
-                                                  "max" << max <<
-                                                  "configServer" << configServer.modelServer()
+                bool ok = connTo->runCommand( "admin" , 
+                                              BSON( "_recvChunkStart" << ns <<
+                                                    "from" << from <<
+                                                    "min" << min <<
+                                                    "max" << max <<
+                                                    "configServer" << configServer.modelServer()
                                                   ) , 
-                                            res );
-                conn.done();
+                                              res );
+                connTo.done();
 
                 if ( ! ok ){
                     errmsg = "_recvChunkStart failed: ";
