@@ -32,6 +32,8 @@
 using namespace std;
 
 namespace mongo {
+    // a map from mongos's serverIDs to queues of "rejected" operations
+    // an operation is rejected if it targets data that does not live on this shard anymore
     typedef map< string , BlockingQueue<BSONObj>* > WriteBackQueuesMap;
 
     // 'writebackQueueLock' protects only the map itself, since each queue is syncrhonized.
@@ -68,7 +70,8 @@ namespace mongo {
                 errmsg = "need oid as first value";
                 return 0;
             }
-            
+
+            // get the command issuer's (a mongos) serverID
             const OID id = e.__oid();
             
             // the command issuer is blocked awaiting a response
