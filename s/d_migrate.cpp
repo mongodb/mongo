@@ -668,9 +668,10 @@ namespace mongo {
                         
                         shardingState.setVersion( ns , myVersion );
 
-                        conn->update( ShardNS::chunk , x["_id"].wrap() , BSON( "$set" << temp2.obj() ) );
+                        BSONObj chunkIDDoc = x["_id"].wrap();
+                        conn->update( ShardNS::chunk , chunkIDDoc , BSON( "$set" << temp2.obj() ) );
                         
-                        log() << "moveChunk updating self to: " << myVersion << endl;
+                        log() << "moveChunk updating self to: " << myVersion << " through " << chunkIDDoc << endl;
                     }
                     else {
                         log() << "moveChunk: i have no chunks left" << endl;
