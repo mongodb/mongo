@@ -633,11 +633,11 @@ namespace mongo {
                 // 5.b
                 {
                     BSONObj res;
-                    ScopedDbConnection conn( to );
-                    bool ok = conn->runCommand( "admin" , 
-                                                BSON( "_recvChunkCommit" << 1 ) ,
-                                                res );
-                    conn.done();
+                    ScopedDbConnection connTo( to );
+                    bool ok = connTo->runCommand( "admin" , 
+                                                  BSON( "_recvChunkCommit" << 1 ) ,
+                                                  res );
+                    connTo.done();
                     log() << "moveChunk commit result: " << res << endl;
                     if ( ! ok ){
                         log() << "_recvChunkCommit failed: " << res << endl;
