@@ -1203,7 +1203,7 @@ mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + s
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
 if GetOption( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
-env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
+env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + shardServerFiles + ["client/gridfs.cpp"])
 env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
 
 clientTests = []
