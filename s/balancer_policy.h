@@ -79,6 +79,14 @@ namespace mongo {
             : ns( a_ns ) , to( a_to ) , from( a_from ), chunk( a_chunk ){}
     };
 
+    /**
+     * Field names used in the 'limits' map.
+     */
+    struct LimitsFields {
+        // we use 'draining' and 'maxSize' from the 'shards' collection plus the following
+        static BSONField<long long> currSize; // currently used disk space in bytes
+    };
+        
 }  // namespace mongo
 
 #endif  // S_BALANCER_POLICY_HEADER

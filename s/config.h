@@ -48,7 +48,6 @@ namespace mongo {
     struct ShardFields {
         static BSONField<bool> draining;
         static BSONField<long long> maxSize;
-        static BSONField<long long> currSize;
     };
         
     class ConfigServer;

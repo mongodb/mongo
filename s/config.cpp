@@ -45,7 +45,6 @@ namespace mongo {
 
     BSONField<bool>      ShardFields::draining("draining");
     BSONField<long long> ShardFields::maxSize ("maxSize");
-    BSONField<long long> ShardFields::currSize("currSize");
 
     OID serverID;
 
