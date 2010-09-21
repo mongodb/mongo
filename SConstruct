@@ -467,8 +467,7 @@ else:
 coreServerFiles += scriptingFiles
 
 coreShardFiles = [ "s/config.cpp" , "s/grid.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" ]
-shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" ]
-shardOnlyFiles = [ "s/s_only.cpp" ]
+shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" , "s/d_writeback.cpp" , "s/d_migrate.cpp" , "s/d_state.cpp" , "s/d_split.cpp" , "client/distlock_test.cpp" ]
 
 serverOnlyFiles += [ "db/module.cpp" ] + Glob( "db/modules/*.cpp" )
@@ -1198,13 +1197,13 @@ env.Program( "bsondump" , allToolFiles + [ "tools/bsondump.cpp" ] )
 env.Program( "mongobridge" , allToolFiles + [ "tools/bridge.cpp" ] )
 
 # mongos
-mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles + shardOnlyFiles )
+mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles )
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
 if GetOption( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
-env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + shardServerFiles + ["client/gridfs.cpp"])
+env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
 env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
 
 clientTests = []
@@ -1221,7 +1220,7 @@ clientTests += [ clientEnv.Program( "bsondemo" , [ "bson/bsondemo/bsondemo.cpp" 
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 if windows:
     testEnv.Alias( "test" , "test.exe" )
-#perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
+perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
@@ -1331,7 +1330,7 @@ def addSmoketest( name, deps ):
     addTest(name, deps, [ "python buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
 
 addSmoketest( "smoke", [ add_exe( "test" ) ] )
-#addSmoketest( "smokePerf", [ "perftest" ]  )
+addSmoketest( "smokePerf", [ "perftest" ]  )
 addSmoketest( "smokeClient" , clientTests )
 addSmoketest( "mongosTest" , [ mongos[0].abspath ] )
 
@@ -1416,7 +1415,7 @@ def recordPerformance( env, target, source ):
             print( sys.exc_info() )
     return False
 
-#addTest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
+addTest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
 def run_shell_tests(env, target, source):
     from buildscripts import test_shell
