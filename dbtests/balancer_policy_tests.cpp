@@ -74,8 +74,8 @@ namespace BalancerPolicyTests {
 
             // no limits
             BalancerPolicy::ShardToLimitsMap limitsMap;
-            BSONObj limits0 = BSON( sf::maxSize(0LL) << lf::currSize(2LL) << sf::draining(false) );
-            BSONObj limits1 = BSON( sf::maxSize(0LL) << lf::currSize(0LL) << sf::draining(false) );
+            BSONObj limits0 = BSON( sf::maxSize(0LL) << lf::currSize(2LL) << sf::draining(false) << lf::hasOpsQueued(false) );
+            BSONObj limits1 = BSON( sf::maxSize(0LL) << lf::currSize(0LL) << sf::draining(false) << lf::hasOpsQueued(false) );
             limitsMap["shard0"] = limits0;
             limitsMap["shard1"] = limits1;
 	    
@@ -158,12 +158,14 @@ namespace BalancerPolicyTests {
                                    "max" << BSON( "x" << BSON( "$maxkey"<<1 ))));
             chunkMap["shard1"] = chunks;
 
-            // shard0 is draining, shard1 is maxed out
+            // shard0 is draining, shard1 is maxed out, shard2 has writebacks pending
             BalancerPolicy::ShardToLimitsMap limitsMap;
             BSONObj limits0 = BSON( sf::maxSize(0LL) << lf::currSize(2LL) << sf::draining(true) );
             BSONObj limits1 = BSON( sf::maxSize(1LL) << lf::currSize(1LL) << sf::draining(false) );
+            BSONObj limits2 = BSON( sf::maxSize(0LL) << lf::currSize(1LL) << lf::hasOpsQueued(true) );
             limitsMap["shard0"] = limits0;
             limitsMap["shard1"] = limits1;
+            limitsMap["shard2"] = limits2;
 	    
             BalancerPolicy::ChunkInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );

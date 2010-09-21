@@ -29,7 +29,8 @@
 namespace mongo {
 
     // limits map fields
-    BSONField<long long> LimitsFields::currSize("currSize");
+    BSONField<long long> LimitsFields::currSize( "currSize" );
+    BSONField<bool> LimitsFields::hasOpsQueued( "hasOpsQueued" );
 
     BalancerPolicy::ChunkInfo* BalancerPolicy::balance( const string& ns, 
                                                         const ShardToLimitsMap& shardToLimitsMap,  
@@ -41,18 +42,22 @@ namespace mongo {
 	        
         for (ShardToChunksIter i = shardToChunksMap.begin(); i!=shardToChunksMap.end(); ++i ){
 
-            // Find whether this shard has reached its size cap or whether it is being removed.
+            // Find whether this shard's capacity or availability are exhausted
             const string& shard = i->first;
             BSONObj shardLimits;
             ShardToLimitsIter it = shardToLimitsMap.find( shard );
             if ( it != shardToLimitsMap.end() ) shardLimits = it->second;
             const bool maxedOut = isSizeMaxed( shardLimits );
             const bool draining = isDraining( shardLimits );
+            const bool opsQueued = hasOpsQueued( shardLimits );
 
-            // Check whether this shard is a better chunk receiver then the current one. 
-            // Maxed out shards or draining shards cannot be considered receivers.
+            // Is this shard a better chunk receiver then the current one?
+            // Shards that would be bad receiver candidates:
+            // + maxed out shards 
+            // + draining shards 
+            // + shards with operations queued for writeback
             const unsigned size = i->second.size();
-            if ( ! maxedOut && ! draining ){
+            if ( ! maxedOut && ! draining && ! opsQueued ){
                 if ( size < min.second ){
                     min = make_pair( shard , size );
                 }
@@ -152,6 +157,14 @@ namespace mongo {
             return false;
         }
 
+        return true;
+    }
+
+    bool BalancerPolicy::hasOpsQueued( BSONObj limits ){
+        BSONElement opsQueued = limits[ LimitsFields::hasOpsQueued.name() ];
+        if ( opsQueued.eoo() || ! opsQueued.Bool() ){
+            return false;
+        }
         return true;
     }
 
