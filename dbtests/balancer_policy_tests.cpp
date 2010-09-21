@@ -19,10 +19,16 @@
 #include "pch.h"
 #include "dbtests.h"
 
-#include "../s/config.h" // for ShardFields
-#include "../s/balancer_policy.h"
+// TODO SERVER-1822
+//#include "../s/config.h" // for ShardFields
+//#include "../s/balancer_policy.h"
 
 namespace BalancerPolicyTests {
+
+//
+// TODO SERVER-1822
+//
+#if 0
 
     typedef mongo::ShardFields sf;  // fields from 'shards' colleciton
     typedef mongo::LimitsFields lf; // fields from the balancer's limits map
@@ -173,18 +179,24 @@ namespace BalancerPolicyTests {
         }
     };
 
+//
+// TODO SERVER-1822
+//
+#endif // #if 0
+
     class All : public Suite {
     public:
         All() : Suite( "balancer_policy" ){
         }
 
         void setupTests(){
-            add< SizeMaxedShardTest >();
-            add< DrainingShardTest >();
-            add< BalanceNormalTest >();
-            add< BalanceDrainingTest >();
-            add< BalanceEndedDrainingTest >();
-            add< BalanceImpasseTest >();
+            // TODO SERVER-1822
+            // add< SizeMaxedShardTest >();
+            // add< DrainingShardTest >();
+            // add< BalanceNormalTest >();
+            // add< BalanceDrainingTest >();
+            // add< BalanceEndedDrainingTest >();
+            // add< BalanceImpasseTest >();
         } 
     } allTests; 
  

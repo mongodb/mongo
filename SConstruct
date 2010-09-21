@@ -1203,7 +1203,7 @@ mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + s
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
 if GetOption( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
-env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + shardServerFiles + ["client/gridfs.cpp"])
+env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
 env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
 
 clientTests = []
@@ -1220,7 +1220,7 @@ clientTests += [ clientEnv.Program( "bsondemo" , [ "bson/bsondemo/bsondemo.cpp" 
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 if windows:
     testEnv.Alias( "test" , "test.exe" )
-#perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
+perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
@@ -1330,7 +1330,7 @@ def addSmoketest( name, deps ):
     addTest(name, deps, [ "python buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
 
 addSmoketest( "smoke", [ add_exe( "test" ) ] )
-#addSmoketest( "smokePerf", [ "perftest" ]  )
+addSmoketest( "smokePerf", [ "perftest" ]  )
 addSmoketest( "smokeClient" , clientTests )
 addSmoketest( "mongosTest" , [ mongos[0].abspath ] )
 
@@ -1344,7 +1344,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ] )
-#    addSmoketest( "smokeJsPerf", [ "mongo" ] )
+    addSmoketest( "smokeJsPerf", [ "mongo" ] )
     addSmoketest("smokeJsSlowNightly", [add_exe("mongo")])
     addSmoketest("smokeJsSlowWeekly", [add_exe("mongo")])
     addSmoketest( "smokeQuota", [ "mongo" ] )
@@ -1415,7 +1415,7 @@ def recordPerformance( env, target, source ):
             print( sys.exc_info() )
     return False
 
-#addTest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
+addTest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
 def run_shell_tests(env, target, source):
     from buildscripts import test_shell
