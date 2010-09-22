@@ -43,7 +43,7 @@ namespace mongo {
         }
 
         static HostAndPort me() { 
-            const char* ips = string(cmdLine.bind_ip).c_str();
+            const char* ips = cmdLine.bind_ip.c_str();
             while(*ips){
                 string ip;
                 const char * comma = strchr(ips, ',');
