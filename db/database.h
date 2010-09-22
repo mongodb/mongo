@@ -189,6 +189,16 @@ namespace mongo {
 
         void flushFiles( bool sync );
         
+        /**
+         * @return true if ns is part of the database
+         *         ns=foo.bar, db=foo returns true
+         */
+        bool ownsNS( const string& ns ) const {
+            if ( ! startsWith( ns , name ) )
+                return false;
+            return ns[name.size()] == '.';
+        }
+        
         vector<MongoDataFile*> files;
         const string name; // "alleyinsider"
         const string path;
