@@ -185,7 +185,7 @@ namespace mongo {
             BSONObj limitsObj = BSON( ShardFields::maxSize( s.getMaxSize() ) << 
                                       LimitsFields::currSize( status.mapped() ) <<
                                       ShardFields::draining( s.isDraining() )  <<
-                                      LimitsFields::hasOpsQueued( false )  // TODO SERVER-1713 
+                                      LimitsFields::hasOpsQueued( status.hasOpsQueued() )
                                     );
 
             shardLimitsMap[ s.getName() ] = limitsObj;

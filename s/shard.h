@@ -184,9 +184,14 @@ namespace mongo {
             return _mapped;
         }
 
+        bool hasOpsQueued() const {
+            return _hasOpsQueued;
+        }
+
     private:
         Shard _shard;
         long long _mapped;
+        bool _hasOpsQueued;  // true if 'writebacks' are pending
         double _writeLock;
     };
 
