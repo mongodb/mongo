@@ -28,7 +28,7 @@
 // error codes 8010-8040
 
 namespace mongo {
-    
+
     class ShardStrategy : public Strategy {
 
         virtual void queryOp( Request& r ){
@@ -144,6 +144,65 @@ namespace mongo {
                         throw UserException( 8011 , "tried to insert object without shard key" );
                     }
                     
+                }
+
+                {
+                    // Move Shard Key to front of object
+                    // Current implementation only works on top-level keys
+                    const ShardKeyPattern& sk = manager->getShardKey();
+
+                    vector<const char*> keysToMove;
+                    keysToMove.push_back("_id");
+                    BSONForEach(e, sk.key()){
+                        if (strchr(e.fieldName(), '.') == NULL)
+                            keysToMove.push_back(e.fieldName());
+                    }
+
+                    if (keysToMove.size() > 1){
+                        BufBuilder buf (o.objsize());
+                        buf.appendNum(o.objsize());
+
+                        vector<pair<const char*, size_t> > copies;
+                        pair<const char*, size_t> toCopy (NULL, 0);
+
+                        BSONForEach(e, o){
+                            bool moveToFront = false;
+                            for (vector<const char*>::const_iterator it(keysToMove.begin()), end(keysToMove.end()); it!=end; ++it){
+                                if (strcmp(e.fieldName(), *it) == 0){
+                                    moveToFront = true;
+                                    break;
+                                }
+                            }
+
+                            if (moveToFront){
+                                buf.appendBuf(e.fieldName()-1, e.size());
+                                if (toCopy.first){
+                                    copies.push_back(toCopy);
+                                    toCopy.first = NULL;
+                                }
+                            } else {
+                                if (!toCopy.first){
+                                    toCopy.first = e.fieldName()-1;
+                                    toCopy.second = e.size();
+                                } else {
+                                    toCopy.second += e.size();
+                                }
+                            }
+                        }
+
+                        for (vector<pair<const char*, size_t> >::const_iterator it(copies.begin()), end(copies.end()); it!=end; ++it){
+                            buf.appendBuf(it->first, it->second);
+                        }
+
+                        if (toCopy.first){
+                            buf.appendBuf(toCopy.first, toCopy.second);
+                        }
+
+                        buf.appendChar('\0');
+
+                        o = BSONObj(buf.buf(), true);
+                        buf.decouple();
+                    } 
                 }
                 
                 bool gotThrough = false;
