@@ -817,8 +817,10 @@ namespace mongo {
             if ( _pq.isExplain()) {
                 _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(), _curop.elapsedMillis(), useHints && !_pq.getHint().eoo(), _nYields , _nChunkSkips);
             } else {
-                _response.appendData( _buf.buf(), _buf.len() );
-                _buf.decouple();
+                if (_buf.len()) {
+                    _response.appendData( _buf.buf(), _buf.len() );
+                    _buf.decouple();
+                }
             }
             if ( stop ) {
                 setStop();
