@@ -20,6 +20,7 @@
 #include "chunk.h"
 #include "../db/jsobj.h"
 #include "../util/unittest.h"
+#include "../util/timer.h"
 
 namespace mongo {
 
@@ -196,6 +197,29 @@ namespace mongo {
 
             ret = sk.moveToFront(BSON("z" << 1 << "y" << 1 << "a" << 1 << "b" << 1 << "Z" << 1 << "Y" << 1));
             assert(ret.woEqual(BSON("a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "Z" << 1 << "Y" << 1)));
+
+        }
+        
+        void moveToFrontBenchmark(int numFields){
+                BSONObjBuilder bb;
+                bb.append("_id", 1);
+                for (int i=0; i < numFields; i++)
+                    bb.append(BSONObjBuilder::numStr(i), 1);
+                bb.append("key", 1);
+                BSONObj o = bb.obj();
+
+                ShardKeyPattern sk (BSON("key" << 1));
+
+                Timer t;
+                const int iterations = 100*1000;
+                for (int i=0; i< iterations; i++){
+                    sk.moveToFront(o);
+                }
+
+                const double secs = t.micros() / 1000000.0;
+                const double ops_per_sec = iterations / secs;
+
+                cout << "moveToFront (" << numFields << " fields) secs: " << secs << " ops_per_sec: " << ops_per_sec << endl;
         }
         void run(){
             extractkeytest();
@@ -226,6 +250,12 @@ namespace mongo {
             
             testIsPrefixOf();
             // add middle multitype tests
+            
+            moveToFrontTest();
+
+            moveToFrontBenchmark(0);
+            moveToFrontBenchmark(10);
+            moveToFrontBenchmark(100);
 
             log(1) << "shardKeyTest passed" << endl;
         }
