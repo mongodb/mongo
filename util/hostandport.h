@@ -43,6 +43,22 @@ namespace mongo {
         }
 
         static HostAndPort me() { 
+            const char* ips = string(cmdLine.bind_ip).c_str();
+            while(*ips){
+                string ip;
+                const char * comma = strchr(ips, ',');
+                if (comma){
+                    ip = string(ips, comma - ips);
+                    ips = comma + 1;
+                }else{
+                    ip = string(ips);
+                    ips = "";
+                }
+                HostAndPort h = HostAndPort(ip, cmdLine.port);
+                if (!h.isLocalHost()) {
+                    return h;
+                }
+            }
             return HostAndPort("localhost", cmdLine.port);
         }
 
