@@ -38,6 +38,8 @@ namespace mongo {
     boost::recursive_mutex ClientCursor::ccmutex;
     long long ClientCursor::numberTimedOut = 0;
 
+    void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl ); // from s/d_logic.h
+
     /*static*/ void ClientCursor::assertNoCursors() { 
         recursive_scoped_lock lock(ccmutex);
         if( clientCursorsById.size() ) { 
@@ -171,6 +173,9 @@ namespace mongo {
 
         Database *db = cc().database();
         assert(db);
+
+        aboutToDeleteForSharding( db , dl );
+
         CCByLoc& bl = db->ccByLoc;
         CCByLoc::iterator j = bl.lower_bound(dl);
         CCByLoc::iterator stop = bl.upper_bound(dl);

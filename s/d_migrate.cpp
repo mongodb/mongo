@@ -213,6 +213,7 @@ namespace mongo {
             _min = min;
             _max = max;
             
+            assert( _cloneLocs.size() == 0 );
             assert( _deleted.size() == 0 );
             assert( _reload.size() == 0 );
             assert( _memoryUsed == 0 );
@@ -223,6 +224,7 @@ namespace mongo {
         void done(){
             _deleted.clear();
             _reload.clear();
+            _cloneLocs.clear();
             _memoryUsed = 0;
             
             _active = false;
@@ -336,6 +338,80 @@ namespace mongo {
             return true;
         }
 
+        /** 
+         * @return ok
+         */
+        bool storeCurrentLocs( string& errmsg ){
+            readlock l( _ns ); 
+            Client::Context ctx( _ns );
+            NamespaceDetails *d = nsdetails( _ns.c_str() );
+            if ( ! d ){
+                errmsg = "ns not found, should be impossible";
+                return false;
+            }
+            
+            BSONObj keyPattern;
+            // the copies are needed because the indexDetailsForRange destrorys the input
+            BSONObj min = _min.copy();
+            BSONObj max = _max.copy();
+            IndexDetails *idx = indexDetailsForRange( _ns.c_str() , errmsg , min , max , keyPattern ); 
+            if ( idx == NULL ){
+                errmsg = "can't find index in storeCurrentLocs";
+                return false;
+            }
+            
+            BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+            while ( c.ok() ){
+                DiskLoc dl = c.currLoc();
+                _cloneLocs.insert( dl );
+                c.advance();
+                // TODO: should we yield? 
+            }
+            
+            return true;
+        }
+
+        bool clone( string& errmsg , BSONObjBuilder& result ){
+            if ( ! _active ){
+                errmsg = "not active";
+                return false;
+            }
+
+            readlock l( _ns ); 
+            Client::Context ctx( _ns );
+            
+            BSONArrayBuilder a( result.subarrayStart( "objects" ) );
+            
+            int bytesSoFar = 0;
+            
+            set<DiskLoc>::iterator i = _cloneLocs.begin();
+            for ( ; i!=_cloneLocs.end(); ++i ){
+                DiskLoc dl = *i;
+                BSONObj o = dl.obj();
+                if ( ( o.objsize() + bytesSoFar ) > ( 4 * 1024 * 1024 ) ){
+                    i--;
+                    break;
+                }
+                a.append( o );
+            }
+            a.done();
+
+            _cloneLocs.erase( _cloneLocs.begin() , i );
+            return true;
+        }
+
+        void aboutToDelete( const Database* db , const DiskLoc& dl ){
+            dbMutex.assertWriteLocked();
+
+            if ( ! _active )
+                return;
+            
+            if ( ! db->ownsNS( _ns ) )
+                return;
+
+            _cloneLocs.erase( dl );
+        }
+            
         long long mbUsed() const { return _memoryUsed / ( 1024 * 1024 ); }
 
         bool _inCriticalSection;
@@ -347,6 +423,13 @@ namespace mongo {
         string _ns;
         BSONObj _min;
         BSONObj _max;
+
+
+        // disk locs yet to be transferred from here to the other side
+        // no locking needed because build by 1 thread in a read lock
+        // depleted by 1 thread in a read lock
+        // updates applied by 1 thread in a write lock
+        set<DiskLoc> _cloneLocs;
 
         list<BSONObj> _reload;
         list<BSONObj> _deleted;
@@ -367,6 +450,10 @@ namespace mongo {
         migrateFromStatus.logOp( opstr , ns , obj , patt );
     }
 
+    void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl ){
+        migrateFromStatus.aboutToDelete( db , dl );
+    }
+
     class TransferModsCommand : public ChunkCommandHelper{
     public:
         TransferModsCommand() : ChunkCommandHelper( "_transferMods" ){}
@@ -375,6 +462,17 @@ namespace mongo {
             return migrateFromStatus.transferMods( errmsg, result );
         }
     } transferModsCommand;
+
+
+    class InitialCloneCommand : public ChunkCommandHelper{
+    public:
+        InitialCloneCommand() : ChunkCommandHelper( "_migrateClone" ){}
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            return migrateFromStatus.clone( errmsg, result );
+        }
+    } initialCloneCommand;
+
 
     /**
      * this is the main entry for moveChunk
@@ -398,9 +496,8 @@ namespace mongo {
             // 1. parse options
             // 2. make sure my view is complete and lock
             // 3. start migrate
-            //    a) lock mongod to make sure we know about all writes
-            //    b) in a read lock, get all DiskLoc and sort so we can do as little seeking as possible
-            //    c) tell to start transferring
+            //    in a read lock, get all DiskLoc and sort so we can do as little seeking as possible
+            //    tell to start transferring
             // 4. pause till migrate caught up
             // 5. LOCK
             //    a) update my config, essentially locking
@@ -511,46 +608,11 @@ namespace mongo {
             
             // 3.
             MigrateStatusHolder statusHolder( ns , min , max );
-            { // 3.a
-                dblock lk;
-                // this makes sure there wasn't a write inside the .cpp code we can miss
-            }
-            
-            if ( 0 ) { // 3.b TODO(erh) - not done yet
-                
-                readlock l( ns );
-                Client::Context ctx( ns );
-                NamespaceDetails *d = nsdetails( ns.c_str() );
-                if ( ! d ){
-                    errmsg = "ns not found, should be impossible";
+            { 
+                // this gets a read lock, so we know we have a checkpoint for mods
+                if ( ! migrateFromStatus.storeCurrentLocs( errmsg ) )
                     return false;
-                }
-                
-                BSONObj keyPattern;
-                // the copies are needed because the command destrory the input
-                BSONObj minCopy = min.copy();
-                BSONObj maxCopy = max.copy();
-                IndexDetails *idx = indexDetailsForRange( ns.c_str() , errmsg , minCopy , maxCopy , keyPattern ); 
-                if ( idx == NULL ){
-                    return false;
-                }
 
-                set<DiskLoc> locs;
-                
-                BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
-                while ( c.ok() ){
-                    DiskLoc dl = c.currLoc();
-                    locs.insert( dl );
-                    c.advance();
-                    // TODO: should we yield? 
-                }
-
-                
-                
-            }
-            
-            { // 3.c
-                
                 ScopedDbConnection connTo( to );
                 BSONObj res;
                 bool ok = connTo->runCommand( "admin" , 
@@ -814,7 +876,9 @@ namespace mongo {
             
             { // 3. initial bulk clone
                 state = CLONE;
-                auto_ptr<DBClientCursor> cursor = conn->query( ns , Query().minKey( min ).maxKey( max ) , /* QueryOption_Exhaust */ 0 );
+                
+                /*
+                auto_ptr<DBClientCursor> cursor = conn->query( ns , Query().minKey( min ).maxKey( max )  );
                 assert( cursor.get() );
                 while ( cursor->more() ){
                     BSONObj o = cursor->next().getOwned();
@@ -824,6 +888,36 @@ namespace mongo {
                     }
                     numCloned++;
                     clonedBytes += o.objsize();
+                }
+                */
+                
+                while ( true ){
+                    BSONObj res;
+                    if ( ! conn->runCommand( "admin" , BSON( "_migrateClone" << 1 ) , res ) ){
+                        state = FAIL;
+                        errmsg = "_migrateClone failed: ";
+                        errmsg += res.toString();
+                        error() << errmsg << endl;
+                        conn.done();
+                        return;
+                    }
+                    
+                    BSONObj arr = res["objects"].Obj();
+                    int thisTime = 0;
+
+                    writelock lk( ns );
+
+                    BSONObjIterator i( arr );
+                    while( i.more() ){
+                        BSONObj o = i.next().Obj();
+                        Helpers::upsert( ns , o );
+                        thisTime++;
+                        numCloned++;
+                        clonedBytes += o.objsize();
+                    }
+                    
+                    if ( thisTime == 0 )
+                        break;
                 }
 
                 timing.done(3);
