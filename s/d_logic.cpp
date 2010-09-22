@@ -1,4 +1,4 @@
-// d_logic.cpp
+// @file d_logic.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -37,6 +37,7 @@
 
 #include "shard.h"
 #include "d_logic.h"
+#include "d_writeback.h"
 
 using namespace std;
 
@@ -106,7 +107,7 @@ namespace mongo {
         b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
         log(2) << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
-        queueWriteBack( clientID.str() , b.obj() );
+        writeBackManager.queueWriteBack( clientID.str() , b.obj() );
 
         return true;
     }

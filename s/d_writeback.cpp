@@ -19,38 +19,49 @@
 #include "pch.h"
 
 #include "../db/commands.h"
-#include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-#include "../db/query.h"
-
-#include "../client/connpool.h"
-
 #include "../util/queue.h"
 
-#include "shard.h"
+#include "d_writeback.h"
 
 using namespace std;
 
 namespace mongo {
-    // a map from mongos's serverIDs to queues of "rejected" operations
-    // an operation is rejected if it targets data that does not live on this shard anymore
-    typedef map< string , BlockingQueue<BSONObj>* > WriteBackQueuesMap;
 
-    // 'writebackQueueLock' protects only the map itself, since each queue is syncrhonized.
-    static mongo::mutex writebackQueueLock("sharding:writebackQueueLock");
-    static WriteBackQueuesMap writebackQueues;
+    // ---------- WriteBackManager class ----------
 
-    BlockingQueue<BSONObj>* getWritebackQueue( const string& remote ){
-        scoped_lock lk (writebackQueueLock );
-        BlockingQueue<BSONObj>*& q = writebackQueues[remote];
+    // TODO init at mongod startup
+    WriteBackManager writeBackManager;
+
+    WriteBackManager::WriteBackManager() : _writebackQueueLock("sharding:writebackQueueLock"){
+    }
+
+    WriteBackManager::~WriteBackManager(){
+    }
+
+    void WriteBackManager::queueWriteBack( const string& remote , const BSONObj& o ){
+        getWritebackQueue( remote )->push( o );
+    }
+
+    BlockingQueue<BSONObj>* WriteBackManager::getWritebackQueue( const string& remote ){
+        scoped_lock lk ( _writebackQueueLock );
+        BlockingQueue<BSONObj>*& q = _writebackQueues[remote];
         if ( ! q )
             q = new BlockingQueue<BSONObj>();
         return q;
+    }    
+
+    bool WriteBackManager::queuesEmpty() const{
+        scoped_lock lk( _writebackQueueLock );
+        for ( WriteBackQueuesMap::const_iterator it = _writebackQueues.begin(); it != _writebackQueues.end(); ++it ){
+            const BlockingQueue<BSONObj>* queue = it->second;
+            if (! queue->empty() ){
+                return false;
+            }
+        }
+        return true;
     }
-    
-    void queueWriteBack( const string& remote , const BSONObj& o ){
-        getWritebackQueue( remote )->push( o );
-    }
+
+    // ---------- admin commands ----------
 
     // Note, this command will block until there is something to WriteBack
     class WriteBackCommand : public Command {
@@ -77,7 +88,7 @@ namespace mongo {
             // the command issuer is blocked awaiting a response
             // we want to do return at least at every 5 minutes so sockets don't timeout
             BSONObj z;
-            if ( getWritebackQueue(id.str())->blockingPop( z, 5 * 60 /* 5 minutes */ ) ) {
+            if ( writeBackManager.getWritebackQueue(id.str())->blockingPop( z, 5 * 60 /* 5 minutes */ ) ) {
                 log(1) << "WriteBackCommand got : " << z << endl;
                 result.append( "data" , z );
             }
@@ -95,7 +106,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         
-        WriteBacksQueuedCommand() : Command( "writeBackQueued" ){}
+        WriteBacksQueuedCommand() : Command( "writeBacksQueued" ){}
 
         void help(stringstream& help) const { 
             help << "Returns whether there are operations in the writeback queue at the time the command was called. "
@@ -103,19 +114,7 @@ namespace mongo {
         }
 
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-            bool hasOpsQueued = false;
-            {
-                scoped_lock lk(writebackQueueLock );
-                for ( WriteBackQueuesMap::const_iterator it = writebackQueues.begin(); it != writebackQueues.end(); ++it ){
-                    const BlockingQueue<BSONObj>* queue = it->second;
-                    if (! queue->empty() ){
-                        hasOpsQueued = true;
-                        break;
-                    }
-                }
-            }
-
-            result.appendBool( "hasOpsQueued" , hasOpsQueued );
+            result.appendBool( "hasOpsQueued" , ! writeBackManager.queuesEmpty() );
             return true;
         }
 
