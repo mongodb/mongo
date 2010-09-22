@@ -57,7 +57,7 @@ namespace mongo {
     Manager::~Manager() { 
         log() << "ERROR: ~Manager should never be called" << rsLog;
         rs->mgr = 0;
-        assert(false);
+        //assert(false);
     }
 
     void Manager::starting() { 
