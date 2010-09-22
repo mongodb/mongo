@@ -31,7 +31,7 @@ namespace mongo {
 
     void ensureHaveIdIndex(const char *ns);
 
-    bool replAuthenticate(DBClientConnection *);
+    bool replAuthenticate(DBClientBase *);
 
     class Cloner: boost::noncopyable {
         auto_ptr< DBClientWithCommands > conn;
@@ -272,13 +272,14 @@ namespace mongo {
                 if ( conn.get() ) {
                     // nothing to do
                 } else if ( !masterSameProcess ) {
-                    auto_ptr< DBClientConnection > c( new DBClientConnection() );
-                    if ( !c->connect( masterHost, errmsg ) )
+                    ConnectionString cs = ConnectionString::parse( masterHost, errmsg );
+                    auto_ptr<DBClientBase> con( cs.connect( errmsg ));
+                    if ( !con.get() )
                         return false;
-                    if( !replAuthenticate(c.get()) )
+                    if( !replAuthenticate(con.get()) )
                         return false;
                     
-                    conn = c;
+                    conn = con;
                 } else {
                     conn.reset( new DBDirectClient() );
                 }
