@@ -253,9 +253,11 @@ namespace mongo {
             
             moveToFrontTest();
 
-            moveToFrontBenchmark(0);
-            moveToFrontBenchmark(10);
-            moveToFrontBenchmark(100);
+            if (0){ // toggle to run benchmark
+                moveToFrontBenchmark(0);
+                moveToFrontBenchmark(10);
+                moveToFrontBenchmark(100);
+            }
 
             log(1) << "shardKeyTest passed" << endl;
         }
