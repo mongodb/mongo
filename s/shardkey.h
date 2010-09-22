@@ -86,6 +86,11 @@ namespace mongo {
          * true if 'this' is a prefix (not necessarily contained) of 'otherPattern'.
          */
         bool isPrefixOf( const BSONObj& otherPattern ) const;
+
+        /**
+         * @return BSONObj with _id and shardkey at front. May return original object.
+         */
+        BSONObj moveToFront(const BSONObj& obj) const;
         
     private:
         BSONObj pattern;
