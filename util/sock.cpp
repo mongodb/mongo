@@ -68,7 +68,8 @@ namespace mongo {
             ss << port;
             int ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
 
-            if (ret == EAI_NONAME ){ 
+            // old C compilers on IPv6-capable hosts return EAI_NODATA error
+            if (ret == EAI_NONAME || ret == EAI_NODATA){ 
                 // iporhost isn't an IP address, allow DNS lookup
                 hints.ai_flags &= ~AI_NUMERICHOST;
                 ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
