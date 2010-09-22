@@ -45,7 +45,6 @@ namespace mongo {
 
     BSONField<bool>      ShardFields::draining("draining");
     BSONField<long long> ShardFields::maxSize ("maxSize");
-    BSONField<long long> ShardFields::currSize("currSize");
 
     OID serverID;
 
@@ -81,6 +80,9 @@ namespace mongo {
             _cm->getInfo( val );
         
         conn->update( ShardNS::collection , key , val.obj() , true );
+        string err = conn->getLastError();
+        uassert( 13473 , (string)"DBConfig save failed for collection (" + ns + "): " + err , err.size() == 0 );
+
         _dirty = false;
     }
 

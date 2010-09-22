@@ -730,6 +730,7 @@ namespace mongo {
 
             // based on example code from linux getifaddrs manpage
             for (ifaddrs * addr = addrs; addr != NULL; addr = addr->ifa_next){
+                if ( addr->ifa_addr == NULL ) continue;
                 int family = addr->ifa_addr->sa_family;
                 char host[NI_MAXHOST];
 
@@ -737,13 +738,19 @@ namespace mongo {
                    status = getnameinfo(addr->ifa_addr,
                                         (family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)),
                                         host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-
-                   massert(13470, string("getnameinfo() failed: ") + gai_strerror(status), status == 0);
+                   if ( status != 0 ){
+                       freeifaddrs( addrs );
+                       addrs = NULL;
+                       msgasserted( 13470, string("getnameinfo() failed: ") + gai_strerror(status) );
+                   }
 
                    out.push_back(host);
                }
 
             }
+
+            freeifaddrs( addrs );
+            addrs = NULL;
 
             if (logLevel >= 1){ 
                 log(1) << "getMyAddrs():";
@@ -810,14 +817,19 @@ namespace mongo {
             }
 
 #if !defined(_WIN32) && !defined(__sunos__)
-
+            
             static const vector<string> myaddrs = getMyAddrs();
             const vector<string> addrs = getAllIPs(_host);
 
             bool ret=false;
             for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end(); i!=iend; ++i){
                 for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end(); j!=jend; ++j){
-                    if (*i == *j){
+                    string a = *i;
+                    string b = *j;
+
+                    if ( a == b ||
+                         ( a.find( "127." ) == 0 && b.find( "127." ) == 0 )  // 127. is all loopback
+                         ){
                         ret = true;
                         break;
                     }

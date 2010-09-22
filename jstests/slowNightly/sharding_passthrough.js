@@ -1,4 +1,4 @@
-s = new ShardingTest( "auto1" , 2 , 1 , 1 );
+s = new ShardingTest( "sharding_passthrough" , 2 , 1 , 1 );
 s.adminCommand( { enablesharding : "test" } );
 db=s.getDB("test");
 

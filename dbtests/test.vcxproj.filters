@@ -701,6 +701,9 @@
     <ClCompile Include="mmaptests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
+    <ClCompile Include="..\scripting\bench.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

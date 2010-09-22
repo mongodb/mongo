@@ -546,6 +546,7 @@
     <ClCompile Include="..\db\json.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
     <ClCompile Include="..\db\matcher.cpp" />
+    <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\s\chunk.cpp" />
     <ClCompile Include="..\s\config.cpp" />
     <ClCompile Include="..\s\d_migrate.cpp" />

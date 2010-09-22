@@ -457,6 +457,8 @@ sendmore:
         }
     }
     
+    void flushDiagLog();
+
     /**
      * does background async flushes of mmapped files
      */
@@ -472,6 +474,7 @@ sendmore:
                 log(1) << "--syncdelay " << _sleepsecs << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ){
+                flushDiagLog();
                 if ( _sleepsecs == 0 ){
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);

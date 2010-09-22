@@ -580,6 +580,20 @@ ShardingTest.prototype.chunkCounts = function( collName , dbName ){
 
 }
 
+ShardingTest.prototype.chunkDiff = function( collName , dbName ){
+    var c = this.chunkCounts( collName , dbName );
+    var min = 100000000;
+    var max = 0;
+    for ( var s in c ){
+        if ( c[s] < min )
+            min = c[s];
+        if ( c[s] > max )
+            max = c[s];
+    }
+    print( "input: " + tojson( c ) + " min: " + min + " max: " + max  );
+    return max - min;
+}
+
 ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
     split = split || key;
     move = move || split;

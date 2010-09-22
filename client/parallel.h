@@ -275,13 +275,11 @@ namespace mongo {
             string _db;
             BSONObj _cmd;
 
-            boost::thread _thr;
+            scoped_ptr<boost::thread> _thr;
             
             BSONObj _res;
-            bool _done;
             bool _ok;
-
-            MVar<bool> _barrier; // initially empty; full when done; value should be ignored
+            bool _done;
             
             friend class Future;
         };

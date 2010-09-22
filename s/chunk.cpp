@@ -175,7 +175,7 @@ namespace mongo {
         return median;
     }
 
-    void Chunk::pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize /* in bytes */) const { 
+    void Chunk::pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize /* bytes */, int maxPoints, int maxObjs ) const { 
         // Ask the mongod holding this chunk to figure out the split points.
         ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
@@ -185,6 +185,8 @@ namespace mongo {
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
         cmd.append( "maxChunkSizeBytes" , chunkSize );
+        cmd.append( "maxSplitPoints" , maxPoints );
+        cmd.append( "maxChunkObjects" , maxObjs );
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , result )){
@@ -331,7 +333,7 @@ namespace mongo {
         return newChunks[0];
     }
 
-    bool Chunk::moveAndCommit( const Shard& to , string& errmsg ){
+    bool Chunk::moveAndCommit( const Shard& to , BSONObj& res ){
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
         
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
@@ -340,7 +342,6 @@ namespace mongo {
         
         ScopedDbConnection fromconn( from);
 
-        BSONObj res;
         bool worked = fromconn->runCommand( "admin" ,
                                             BSON( "moveChunk" << _manager->getns() << 
                                                   "from" << from.getConnString() <<
@@ -359,9 +360,7 @@ namespace mongo {
             _manager->_reload();
             return true;
         }
-        
-        errmsg = res["errmsg"].String();
-        errmsg += " " + res.toString();
+
         return false;
     }
     
@@ -399,12 +398,13 @@ namespace mongo {
             
             _dataWritten = 0; // reset so we check often enough
             
-            // TODO: add a max number of split points to find
-            //       that way if we get a mega chunk for some reason - 
-            //       this won't take an inordinant amount of time
+            // We limit the amount of objects we're willing to split away and don't bother
+            // getting all the split points. If we're in a jumbo chunk, that would prevent
+            // traversing the whole chunk.
+            const int maxPoints = 2; 
+            const int maxObjs = 100000;
             vector<BSONObj> possibleSplitPoints;
-            pickSplitVector( possibleSplitPoints , splitThreshold );
-            
+            pickSplitVector( possibleSplitPoints , splitThreshold , maxPoints , maxObjs );            
             if ( possibleSplitPoints.size() <= 1 ) {
                 // no split points means there isn't enough data to split on
                 // 1 split point means we have between half the chunk size to full chunk size
@@ -464,9 +464,10 @@ namespace mongo {
 
         log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objects: " << toMove->countObjects() << endl;
 
-        string errmsg;
-        massert( 10412 ,  (string)"moveAndCommit failed: " + errmsg , 
-                 toMove->moveAndCommit( newLocation , errmsg ) );
+        BSONObj res;
+        massert( 10412 , 
+                 (string)"moveAndCommit failed: " + res.toString() , 
+                 toMove->moveAndCommit( newLocation , res ) );
         
         return true;
     }

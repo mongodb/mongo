@@ -67,14 +67,19 @@ namespace mongo {
                 }
             }
         
-            string errmsg;
-            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , errmsg ) ){
+            BSONObj res;
+            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , res ) ){
                 movedCount++;
                 continue;
             }
 
-            log() << "MOVE FAILED **** " << errmsg << "\n"
+            log() << "MOVE FAILED **** " << res << "\n"
                   << "           from: " << chunkInfo.from << " to: " << chunkInfo.to << " chunk: " << chunkToMove << endl;
+
+            if ( res["split"].trueValue() ) {
+                log() << "move asked for a split of " << c << endl;
+                c->split();
+            }
         }
 
         return movedCount;
@@ -178,8 +183,10 @@ namespace mongo {
             ShardStatus status = s.getStatus();
 
             BSONObj limitsObj = BSON( ShardFields::maxSize( s.getMaxSize() ) << 
-                                      ShardFields::currSize( status.mapped() ) <<
-                                      ShardFields::draining( s.isDraining()) );
+                                      LimitsFields::currSize( status.mapped() ) <<
+                                      ShardFields::draining( s.isDraining() )  <<
+                                      LimitsFields::hasOpsQueued( false )  // TODO SERVER-1713 
+                                    );
 
             shardLimitsMap[ s.getName() ] = limitsObj;
         }

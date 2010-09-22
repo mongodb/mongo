@@ -44,7 +44,7 @@
 namespace mongo {
 
     extern int otherTraceLevel;
-    void flushOpLog( stringstream &ss );
+    void flushDiagLog();
 
     /* reset any errors so that getlasterror comes back clean.
 
@@ -410,8 +410,11 @@ namespace mongo {
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
             
-            if ( Listener::getElapsedTimeMillis() - start > 1000 )
-                result.append( "timing" , timeBuilder.obj() );
+            if ( Listener::getElapsedTimeMillis() - start > 1000 ){
+                BSONObj t = timeBuilder.obj();
+                log() << "serverStatus was very slow: " << t << endl;
+                result.append( "timing" , t );
+            }
 
             return true;
         }
@@ -457,9 +460,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; } 
         bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
-            stringstream ss;
-            flushOpLog( ss );
-            out() << ss.str() << endl;
+            flushDiagLog();
             if ( !cmdLine.quiet )
                 tlog() << "CMD: diagLogging set to " << _diaglog.level << " from: " << was << endl;
             result.append( "was" , was );

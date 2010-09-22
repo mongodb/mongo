@@ -127,12 +127,14 @@ namespace mongo {
                 "Internal command.\n"
                 "example: { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, maxChunkSize:200 }\n"
                 "maxChunkSize unit in MBs\n"
+                "May optionally specify 'maxSplitPoints' and 'maxChunkObjects' to avoid traversing the whole chunk\n"
                 "NOTE: This command may take a while to run";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             const char* ns = jsobj.getStringField( "splitVector" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
+            // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
             if ( min.isEmpty() && max.isEmpty() ){
@@ -167,10 +169,22 @@ namespace mongo {
                     return false;
                 }
             }
-            
+
+            long long maxSplitPoints = 0;
+            BSONElement maxSplitPointsElem = jsobj[ "maxSplitPoints" ];
+            if ( maxSplitPointsElem.isNumber() ){
+                maxSplitPoints = maxSplitPointsElem.numberLong();
+            }
+
+            long long maxChunkObjects = 0;
+            BSONElement MaxChunkObjectsElem = jsobj[ "maxChunkObjects" ];
+            if ( MaxChunkObjectsElem.isNumber() ){
+                maxChunkObjects = MaxChunkObjectsElem.numberLong();
+            }
+
+            // Get the size estimate for this namespace
             Client::Context ctx( ns );
             NamespaceDetails *d = nsdetails( ns );
-            
             if ( ! d ){
                 errmsg = "ns not found";
                 return false;
@@ -182,10 +196,10 @@ namespace mongo {
                 return false;
             }
 
-            // If there's not enough data for more than one chunk, no point continuing.
             const long long recCount = d->nrecords;
             const long long dataSize = d->datasize;
             
+            // If there's not enough data for more than one chunk, no point continuing.
             if ( dataSize < maxChunkSize || recCount == 0 ) {
                 vector<BSONObj> emptyVector;
                 result.append( "splitKeys" , emptyVector );
@@ -193,15 +207,22 @@ namespace mongo {
             }
 
             // We'll use the average object size and number of object to find approximately how many keys
-            // each chunk should have. We'll split at half the maxChunkSize.
+            // each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects, if 
+            // provided.
             const long long avgRecSize = dataSize / recCount;
             long long keyCount = maxChunkSize / (2 * avgRecSize);
+            if ( maxChunkObjects && ( maxChunkObjects < keyCount ) ) {
+                log() << "limiting split vector to " << maxChunkObjects << " (from " << keyCount << ") objects for chunk "
+                      << ns << " " << min << "-->>" << max << endl;
+                keyCount = maxChunkObjects;
+            }
 
             // We traverse the index and add the keyCount-th key to the result vector. If that key
             // appeared in the vector before, we omit it. The assumption here is that all the 
             // instances of a key value live in the same chunk.
             Timer timer;
             long long currCount = 0;
+            long long numChunks = 0;
             vector<BSONObj> splitKeys;
             BSONObj currKey;
             
@@ -216,9 +237,19 @@ namespace mongo {
                         currKey = c->currKey();
                         splitKeys.push_back( bc->prettyKey( currKey ) );
                         currCount = 0;
+                        numChunks++;
+                        log(4) << "picked a split key: " << currKey << endl;
                     }
                 }
                 cc->advance();
+
+                // Stop if we have enough split points.
+                if ( maxSplitPoints && ( numChunks >= maxSplitPoints ) ){
+                    log(1) << "max number of requested split points reached (" << numChunks 
+                           << ") before the end of chunk " << ns << " " << min << "-->>" << max 
+                           << endl;
+                    break;
+                }
                 
                 if ( ! cc->yieldSometimes() ){
                     // we were near and and got pushed to the end

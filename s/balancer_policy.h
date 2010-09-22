@@ -1,4 +1,4 @@
-// balancer_policy.h
+// @file balancer_policy.h
 
 /**
 *    Copyright (C) 2010 10gen Inc.
@@ -62,6 +62,11 @@ namespace mongo {
          */
         static bool isDraining( BSONObj shardLimits );
 
+        /**
+         * Returns true if a shard currently has operations in any of its writeback queues
+         */
+        static bool hasOpsQueued( BSONObj shardLimits );
+
     private:
         // Convenience types
         typedef ShardToChunksMap::const_iterator ShardToChunksIter;
@@ -79,6 +84,15 @@ namespace mongo {
             : ns( a_ns ) , to( a_to ) , from( a_from ), chunk( a_chunk ){}
     };
 
+    /**
+     * Field names used in the 'limits' map.
+     */
+    struct LimitsFields {
+        // we use 'draining' and 'maxSize' from the 'shards' collection plus the following
+        static BSONField<long long> currSize; // currently used disk space in bytes
+        static BSONField<bool> hasOpsQueued;  // writeback queue is not empty?
+    };
+        
 }  // namespace mongo
 
 #endif  // S_BALANCER_POLICY_HEADER
