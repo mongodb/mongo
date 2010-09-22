@@ -74,8 +74,11 @@ namespace mongo {
 
         BSONObj extractKey(const BSONObj& from) const;
         
+        bool partOfShardKey(const char* key ) const {
+            return pattern.hasField(key);
+        }
         bool partOfShardKey(const string& key ) const {
-            return patternfields.count( key ) > 0;
+            return pattern.hasField(key.c_str());
         }
 
         /**
