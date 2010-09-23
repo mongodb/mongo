@@ -1548,9 +1548,13 @@ namespace mongo {
                 uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
                 db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
 
-                if (cmdObj["new"].trueValue()){
-                    BSONObj gle = db.getLastErrorDetailed();
+                BSONObj gle = db.getLastErrorDetailed();
+                if (gle["err"].type() == String){
+                    errmsg = gle["err"].String();
+                    return false;
+                }
 
+                if (cmdObj["new"].trueValue()){
                     BSONElement _id = gle["upserted"];
                     if (_id.eoo())
                         _id = origQuery["_id"];
@@ -1582,6 +1586,12 @@ namespace mongo {
                     BSONElement update = cmdObj["update"];
                     uassert(12516, "must specify remove or update", !update.eoo());
                     db.update(ns, q, update.embeddedObjectUserCheck());
+
+                    BSONObj gle = db.getLastErrorDetailed();
+                    if (gle["err"].type() == String){
+                        errmsg = gle["err"].String();
+                        return false;
+                    }
 
                     if (cmdObj["new"].trueValue())
                         out = db.findOne(ns, idQuery, fields);
