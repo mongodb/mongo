@@ -95,7 +95,7 @@ namespace mongo {
             buf.appendNum(obj.objsize());
 
             vector<pair<const char*, size_t> > copies;
-            pair<const char*, size_t> toCopy (NULL, 0);
+            pair<const char*, size_t> toCopy ((const char*)NULL, 0); // C++ NULL isn't a pointer type yet
 
             BSONForEach(e, obj){
                 bool moveToFront = false;
