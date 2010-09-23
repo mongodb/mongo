@@ -1,3 +1,11 @@
+mongodb (1.6.3) unstable; urgency=low
+
+  * replica_sets slavedelay, rollback
+  * sharding optimization for larger than ram data sets
+  * full change log http://jira.mongodb.org/browse/SERVER/fixforversion/10190
+
+  -- Richard Kreuter <richard@10gen.com>  Thu, 23 Sep 2010 16:56:28 -0500
+
 mongodb (1.6.2) unstable; urgency=low
 
   * replica_sets some fixes
