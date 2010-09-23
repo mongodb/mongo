@@ -37,7 +37,7 @@ public:
 
     void doCollection( const string coll , ostream &out , ProgressMeter *m ) {
         Query q;
-        if ( _query.isEmpty() )
+        if ( _query.isEmpty() && !hasParam("dbpath"))
             q.snapshot();
         else
             q = _query;
