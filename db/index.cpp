@@ -231,13 +231,20 @@ namespace mongo {
             ensureHaveIdIndex( sourceNS.c_str() );
             return false;
         }
+        
+        string pluginName = IndexPlugin::findPluginName( key );
+        IndexPlugin * plugin = pluginName.size() ? IndexPlugin::get( pluginName ) : 0;
+        
+        if ( plugin ){
+            fixedIndexObject = plugin->adjustIndexSpec( io );
+        }
+        else {
+            BSONObjBuilder b( io.objsize() + 32 );
+            b.appendElements( io );
+            b.append( "v" , 0 );
+            fixedIndexObject = b.obj();
+        }
 
-        /* TODO
-        BSONObjBuilder b( io.objsize() + 32 );
-        b.appendElements( io );
-        b.append( "v" , 1 );
-        fixedIndexObject = b.obj();
-        */
         return true;
     }
 

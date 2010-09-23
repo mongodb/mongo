@@ -83,17 +83,10 @@ namespace mongo {
         string getName() const { return _name; }
 
         /**
-         * override this if an index format changes
-         * then logic in IndexType can change based on version #
-         * @return the current version for new indexes
-         */
-        virtual int getCurrentVersion() const { return 0; }
-
-        /**
          * @return new keyPattern
          * if nothing changes, should return keyPattern
          */
-        virtual BSONObj adjustKeyPattern( const BSONObj& keyPattern ) const { return keyPattern; } 
+        virtual BSONObj adjustIndexSpec( const BSONObj& spec ) const { return spec; } 
 
         // ------- static below -------
 
