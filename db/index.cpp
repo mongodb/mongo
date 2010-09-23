@@ -159,7 +159,7 @@ namespace mongo {
          sourceNS - source NS we are indexing
          sourceCollection - its details ptr
     */
-    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection) {
+    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection, BSONObj& fixedIndexObject ) {
         sourceCollection = 0;
 
         // logical name of the index.  todo: get rid of the name, we don't need it!
@@ -230,6 +230,12 @@ namespace mongo {
             return false;
         }
 
+        /* TODO
+        BSONObjBuilder b( io.objsize() + 32 );
+        b.appendElements( io );
+        b.append( "v" , 1 );
+        fixedIndexObject = b.obj();
+        */
         return true;
     }
 
