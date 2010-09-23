@@ -89,7 +89,20 @@ namespace mongo {
             return i->second;
         }
 
+        /**
+         * @param keyPattern { x : "fts" }
+         * @return "" or the name
+         */
+        static string getPluginName( const BSONObj& keyPattern );
+
         string getName() const { return _name; }
+
+        /**
+         * override this if an index format changes
+         * then logic in IndexType can change based on version #
+         * @return the current version for new indexes
+         */
+        virtual int getCurrentVersion() const { return 0; }
     private:
         string _name;
         static map<string,IndexPlugin*> * _plugins;
