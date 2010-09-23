@@ -46,7 +46,7 @@ namespace mongo {
         (*_plugins)[name] = this;
     }
 
-    string IndexPlugin::getPluginName( const BSONObj& keyPattern ){
+    string IndexPlugin::findPluginName( const BSONObj& keyPattern ){
         string pluginName = "";
         
         BSONObjIterator i( keyPattern );
@@ -70,7 +70,7 @@ namespace mongo {
     void IndexSpec::_init(){
         assert( keyPattern.objsize() );
         
-        string pluginName = IndexPlugin::getPluginName( keyPattern );
+        string pluginName = IndexPlugin::findPluginName( keyPattern );
         
         BSONObjBuilder nullKeyB;
         BSONObjIterator i( keyPattern );

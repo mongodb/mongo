@@ -79,6 +79,23 @@ namespace mongo {
         virtual ~IndexPlugin(){}
         
         virtual IndexType* generate( const IndexSpec * spec ) const = 0;
+        
+        string getName() const { return _name; }
+
+        /**
+         * override this if an index format changes
+         * then logic in IndexType can change based on version #
+         * @return the current version for new indexes
+         */
+        virtual int getCurrentVersion() const { return 0; }
+
+        /**
+         * @return new keyPattern
+         * if nothing changes, should return keyPattern
+         */
+        virtual BSONObj adjustKeyPattern( const BSONObj& keyPattern ) const { return keyPattern; } 
+
+        // ------- static below -------
 
         static IndexPlugin* get( const string& name ){
             if ( ! _plugins )
@@ -93,21 +110,13 @@ namespace mongo {
          * @param keyPattern { x : "fts" }
          * @return "" or the name
          */
-        static string getPluginName( const BSONObj& keyPattern );
+        static string findPluginName( const BSONObj& keyPattern );
 
-        string getName() const { return _name; }
-
-        /**
-         * override this if an index format changes
-         * then logic in IndexType can change based on version #
-         * @return the current version for new indexes
-         */
-        virtual int getCurrentVersion() const { return 0; }
     private:
         string _name;
         static map<string,IndexPlugin*> * _plugins;
     };
-
+    
     /* precomputed details about an index, used for inserting keys on updates
        stored/cached in NamespaceDetailsTransient, or can be used standalone
        */
