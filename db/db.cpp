@@ -458,7 +458,7 @@ sendmore:
     }
     
     void flushDiagLog();
-
+    
     /**
      * does background async flushes of mmapped files
      */
@@ -503,6 +503,10 @@ sendmore:
 
     const char * jsInterruptCallback() {
         return killCurrentOp.checkForInterruptNoAssert();
+    }
+    
+    unsigned jsGetInterruptSpecCallback() {
+        return cc().curop()->opNum();
     }
     
     void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
@@ -563,6 +567,7 @@ sendmore:
         if ( useJNI ) {
             ScriptEngine::setup();
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
+            globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
         }
 
         repairDatabases();

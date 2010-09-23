@@ -24,6 +24,7 @@
 #include "../util/concurrency/spin_lock.h"
 #include "../util/time_support.h"
 #include "db.h"
+#include "../scripting/engine.h"
 
 namespace mongo { 
 
@@ -348,15 +349,26 @@ namespace mongo {
         enum { Off, On, All } state;
         AtomicUInt toKill;
     public:
-        void killAll() { state = All; }
-        void kill(AtomicUInt i) { toKill = i; state = On; }
+        // the kill functions are not called with a mutex
+        void killAll() { state = All; interruptJs( 0 ); }
+        void kill(AtomicUInt i) { toKill = i; state = On; interruptJs( &i ); }
+        
+        // this is called without a mutex also, which means we can miss some
+        // kill requests; it's no worse than what the code was doing before,
+        // though, so I don't feel too bad about adding this function.
+        // hopefully we will have time for SERVER-1816 to fix this
+        void finishOp() {
+            if( state == On && cc().curop()->opNum() == toKill ) { 
+                state = Off;
+            }
+        }
         
         void checkForInterrupt() { 
             if( state != Off ) { 
-                if( state == All ) 
+                if( state == All ) {
                     uasserted(11600,"interrupted at shutdown");
+                }
                 if( cc().curop()->opNum() == toKill ) { 
-                    state = Off;
                     uasserted(11601,"interrupted");
                 }
             }
@@ -367,11 +379,21 @@ namespace mongo {
                 if( state == All ) 
                     return "interrupted at shutdown";
                 if( cc().curop()->opNum() == toKill ) { 
-                    state = Off;
                     return "interrupted";
                 }
             }
             return "";
+        }
+        
+        void interruptJs( AtomicUInt *op ) {
+            if ( !globalScriptEngine ) {
+                return;
+            }
+            if ( !op ) {
+                globalScriptEngine->interruptAll();
+            } else {
+                globalScriptEngine->interrupt( *op );
+            }
         }
     } killCurrentOp;
 }

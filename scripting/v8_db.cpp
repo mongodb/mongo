@@ -18,7 +18,7 @@
 #include "v8_wrapper.h"
 #include "v8_utils.h"
 #include "v8_db.h"
-#include "engine.h"
+#include "engine_v8.h"
 #include "util/base64.h"
 #include "util/text.h"
 #include "../client/syncclusterconnection.h"
@@ -166,7 +166,7 @@ namespace mongo {
         
         DBClientWithCommands * conn;
         {
-            Unlocker ul;
+            V8Unlock ul;
             conn = cs.connect( errmsg );
         }
         if ( ! conn )
@@ -176,7 +176,7 @@ namespace mongo {
         self.MakeWeak( conn , destroyConnection );
 
         {
-            Unlocker ul;
+            V8Unlock ul;
             ScriptEngine::runConnectCallback( *conn );
         }
 
@@ -194,7 +194,7 @@ namespace mongo {
 
         DBClientBase * conn;
         {
-            Unlocker ul;
+            V8Unlock ul;
             conn = createDirectClient();
         }
 
@@ -267,7 +267,7 @@ namespace mongo {
             int nToSkip = (int)(args[4]->ToNumber()->Value());
             int batchSize = (int)(args[5]->ToNumber()->Value());
             {
-                v8::Unlocker u;
+                V8Unlock u;
                 cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? QueryOption_SlaveOk : 0 , batchSize );
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
@@ -302,7 +302,7 @@ namespace mongo {
 
         DDD( "want to save : " << o.jsonString() );
         try {
-            v8::Unlocker u;
+            V8Unlock u;
             conn->insert( ns , o );
         }
         catch ( ... ){
@@ -329,7 +329,7 @@ namespace mongo {
 
         DDD( "want to remove : " << o.jsonString() );
         try {
-            v8::Unlocker u;
+            V8Unlock u;
             conn->remove( ns , o , justOne );
         }
         catch ( ... ){
@@ -356,7 +356,7 @@ namespace mongo {
         try {
             BSONObj q1 = v8ToMongo( q );
             BSONObj o1 = v8ToMongo( o );
-            v8::Unlocker u;
+            V8Unlock u;
             conn->update( ns , q1 , o1 , upsert, multi );
         }
         catch ( ... ){
@@ -388,7 +388,7 @@ namespace mongo {
             return v8::Undefined();
         BSONObj o;
         {
-            v8::Unlocker u;
+            V8Unlock u;
             o = cursor->next();
         }
         return mongoToV8( o );
@@ -400,7 +400,7 @@ namespace mongo {
             return Boolean::New( false );
         bool ret;
         {
-            v8::Unlocker u;
+            V8Unlock u;
             ret = cursor->more();
         }
         return Boolean::New( ret );
@@ -412,7 +412,7 @@ namespace mongo {
             return v8::Number::New( (double) 0 );
         int ret;
         {
-            v8::Unlocker u;
+            V8Unlock u;
             ret = cursor->objsLeftInBatch();
         }
         return v8::Number::New( (double) ret );
@@ -760,4 +760,51 @@ namespace mongo {
 
         return v8::Number::New( v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
     }
+
+    // to be called with v8 mutex
+    void enableV8Interrupt() {
+        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
+            __interruptSpecToThreadId[ globalScriptEngine->getInterruptSpec() ] = v8::V8::GetCurrentThreadId();
+        }
+    }
+    
+    // to be called with v8 mutex
+    void disableV8Interrupt() {
+        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
+            __interruptSpecToThreadId.erase( globalScriptEngine->getInterruptSpec() );
+        }        
+    }
+
+    namespace v8Locks {
+        boost::mutex& __v8Mutex = *( new boost::mutex );
+        ThreadLocalValue< bool > __locked;
+
+        RecursiveLock::RecursiveLock() : _unlock() {
+            if ( !__locked.get() ) {
+                __v8Mutex.lock();
+                __locked.set( true );
+                _unlock = true;
+            }
+        }
+        RecursiveLock::~RecursiveLock() {
+            if ( _unlock ) {
+                __v8Mutex.unlock();
+                __locked.set( false );
+            }
+        }
+            
+        RecursiveUnlock::RecursiveUnlock() : _lock() {
+            if ( __locked.get() ) {
+                __v8Mutex.unlock();
+                __locked.set( false );
+                _lock = true;
+            }
+        }
+        RecursiveUnlock::~RecursiveUnlock() {
+            if ( _lock ) {
+                __v8Mutex.lock();
+                __locked.set( true );
+            }
+        }
+    } // namespace v8Locks
 }
