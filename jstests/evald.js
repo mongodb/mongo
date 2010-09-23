@@ -40,7 +40,7 @@ function doIt( ev, wait, where ) {
     assert.soon( function() { o = op( ev, where ); return o != -1 } );
 
     if ( wait ) {
-        sleep( 5000 );
+        sleep( 2000 );
     }
 
     debug( "going to kill" );
