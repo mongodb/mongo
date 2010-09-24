@@ -56,8 +56,8 @@ namespace mongo {
             if ( e.type() != String )
                 continue;
             
-            uassert( 13007 , "can only have 1 index plugin / bad index key pattern" , pluginName.size() == 0 );
-            pluginName = e.valuestr();
+            uassert( 13007 , "can only have 1 index plugin / bad index key pattern" , pluginName.size() == 0 || pluginName == e.String() );
+            pluginName = e.String();
         }
         
         return pluginName;
