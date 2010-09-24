@@ -192,7 +192,7 @@ namespace mongo {
         static map<string,WriteBackListener*> _cache;
         static mongo::mutex _cacheLock;
         
-        static set<OID> _seenWritebacks;
+        static set<OID> _seenWritebacks; // TODO: this can grow unbounded
         static mongo::mutex _seenWritebacksLock;
         
     public:
@@ -293,6 +293,7 @@ namespace mongo {
         ShardChunkVersion version = 0;
         if ( isSharded ){
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
+            assert( officialSequenceNumber == manager->getSequenceNumber() ); // this is to make sure there isn't a race condition
         }
         
         log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns 
