@@ -40,6 +40,9 @@ namespace mongo {
             // if elt isn't an object, then comparison will work
             return toMatch.woCompare( elt , false ) == 0;
         }
+        
+        if ( matcherOnPrimitive )
+            return matcher->matches( toMatch.wrap( "" ) );
 
         if ( toMatch.type() != Object ){
             // looking for an object, so this can't match
