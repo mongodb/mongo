@@ -238,7 +238,10 @@ namespace mongo {
         if ( plugin ){
             fixedIndexObject = plugin->adjustIndexSpec( io );
         }
-        else {
+        else if ( io["v"].eoo() ) { 
+            // add "v" if it doesn't exist
+            // if it does - leave whatever value was there
+            // this is for testing and replication
             BSONObjBuilder b( io.objsize() + 32 );
             b.appendElements( io );
             b.append( "v" , 0 );
