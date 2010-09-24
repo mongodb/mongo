@@ -594,12 +594,15 @@ DB.prototype.getReplicationInfo = function() {
     var result = { };
     var ol = db.system.namespaces.findOne({name:"local.oplog.$main"});
     if( ol && ol.options ) {
-	result.logSizeMB = ol.options.size / 1000 / 1000;
+	result.logSizeMB = ol.options.size / ( 1024 * 1024 );
     } else {
 	result.errmsg  = "local.oplog.$main, or its options, not found in system.namespaces collection (not --master?)";
 	return result;
     }
 
+    result.usedMB = db.oplog.$main.stats().size / ( 1024 * 1024 );
+    result.usedMB = Math.ceil( result.usedMB * 100 ) / 100;
+    
     var firstc = db.oplog.$main.find().sort({$natural:1}).limit(1);
     var lastc = db.oplog.$main.find().sort({$natural:-1}).limit(1);
     if( !firstc.hasNext() || !lastc.hasNext() ) { 
