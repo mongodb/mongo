@@ -86,7 +86,7 @@ function diff(){
 
     if ( Math.random() > .99 ){
         db.getLastError()
-        check(); // SERVER-1430  TODO
+        check( "random late check" ); // SERVER-1430 
     }
 
     var x = s.chunkCounts( "foo" )
