@@ -1485,6 +1485,8 @@ namespace mongo {
 
                 if (!cc->yieldSometimes())
                     break;
+
+                RARELY killCurrentOp.checkForInterrupt();
             }
 
             BSONArrayBuilder b( result.subarrayStart( "values" ) );
