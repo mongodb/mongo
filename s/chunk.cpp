@@ -889,7 +889,6 @@ namespace mongo {
         _chunkMap.clear();
         _chunkRanges.clear();
         _shards.clear();
-
         
         // delete data from mongod
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ){
@@ -917,7 +916,6 @@ namespace mongo {
                 throw UserException( 8071 , (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
             conn.done();
         }
-
 
         log(1) << "ChunkManager::drop : " << _ns << "\t DONE" << endl;        
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
