@@ -24,7 +24,7 @@ flag_name = {}		# Dictionary [flag] : [name ...]
 name_mask = {}		# Dictionary [name] : [used flag mask]
 
 # Step through the flags dictionary and build our local dictionaries.
-for method in flags.iteritems():
+for method in flags.items():
 	name_mask[method[0]] = 0x0
 	for flag in method[1]:
 		if flag == '__NONE__':
@@ -43,14 +43,14 @@ bits = [2 ** i for i in range(0, 32)]
 # each flag, find a bit that's not currently in use by any method using the
 # flag.
 flag_bit = {}		# Dictionary [flag] : [bit value]
-for f in sorted(flag_cnt.iteritems(),\
-    key = lambda (k, v) : (v, k), reverse = True):
+for f in sorted(flag_cnt.items(),\
+    key = lambda k_v : (k_v[1], k_v[0]), reverse = True):
 	mask = 0xffffffff
 	for m in flag_name[f[0]]:
 		mask &= ~name_mask[m]
 	if mask == 0:
-		print >> sys.stderr,\
-		    "api_flags: ran out of flags at %s method" % m
+		print("api_flags: ran out of flags at " + m + " method",
+		    file=sys.stderr)
 		sys.exit(1)
 	for b in bits:
 		if mask & b:
@@ -63,19 +63,20 @@ for f in sorted(flag_cnt.iteritems(),\
 # Print out the flag masks in hex.
 #	Assumes tab stops set to 8 characters.
 flag_info = ''
-for f in sorted(flag_cnt.iteritems()):
+for f in sorted(flag_cnt.items()):
 	flag_info += "#define\tWT_%s%s%#010x\n" %\
 	    (f[0],\
-	    "\t" * max(1, 6 - (len(f[0]) + len('WT_')) / 8), flag_bit[f[0]])
+	    "\t" * max(1, 6 - int((len('WT_') + len(f[0])) / 8)),\
+	    flag_bit[f[0]])
 
 # Print out the API masks in hex.
 #	Assumes tab stops set to 8 characters.
 flag_info += '\n'
-for f in sorted(name_mask.iteritems()):
+for f in sorted(name_mask.items()):
 	# Only write out masks for API/method functions.
 	flag_info += "#define\tWT_APIMASK_%s%s%#010x\n" %\
 	    (f[0].upper().replace('.', '_'),\
-	    "\t" * max(1, 6 - (len(f[0]) + len('WT_APIMASK_')) / 8), f[1])
+	    "\t" * max(1, 6 - int((len('WT_APIMASK_') + len(f[0])) / 8)), f[1])
 
 # Update the wiredtiger.in file with the flags information.
 tmp_file = '__tmp'

@@ -39,7 +39,7 @@ def func_method_init(handle, decl, f):
 	f.write('void\n__wt_methods_' +
 	    handle + '_config_default(' + decl + ')\n{\n')
 	for i in sorted(filter(lambda _i:
-	    _i[1].handle == handle, api.iteritems())):
+	    _i[1].handle == handle, api.items())):
 		for l in i[1].args:
 			if l.count('/') == 2:
 				f.write('\t' + handle + '->' +
@@ -55,7 +55,7 @@ def func_method_lockout(handle, decl, f):
 	f.write('void\n__wt_methods_' + handle + '_lockout(' + decl + ')\n{\n')
 	for i in sorted(filter(lambda _i:
 	    _i[1].handle == handle and _i[1].method != 'close',
-	    api.iteritems())):
+	    api.items())):
 		func_method_single(i[1].handle,
 		    i[1].method, i[1].config, i[1].args, 'lockout', f)
 		quiet = 0;
@@ -72,7 +72,7 @@ def func_method_transition(handle, decl, f):
 	off={}
 	trans=[]
 	for i in sorted(filter(lambda _i:
-	    _i[1].handle == handle, api.iteritems())):
+	    _i[1].handle == handle, api.items())):
 		for j in i[1].off:
 			if j not in off:
 				off[j] = []
@@ -103,7 +103,7 @@ def func_method_transition(handle, decl, f):
 #	Write out the struct entries for a handle's methods.
 def func_struct_all(handle, f):
 	for i in sorted(filter(lambda _i:
-	    _i[1].handle.count(handle), api.iteritems())):
+	    _i[1].handle.count(handle), api.items())):
 		func_struct(i[1], f)
 
 # func_struct --
@@ -130,7 +130,7 @@ def func_struct_variable_all(handle, f):
 	for i in sorted(filter(lambda _i:
 	    _i[1].handle.count(handle) and
 	    _i[1].config.count('setter') and not
-	    _i[1].config.count('extfunc'), api.iteritems())):
+	    _i[1].config.count('extfunc'), api.items())):
 		func_struct_variable(i[1].args, f)
 
 # func_struct_variable
@@ -374,7 +374,7 @@ tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
 tfile.write('#include "wt_internal.h"\n\n')
 
 # We need an API function for any method not marked 'noauto'.
-for i in sorted(api.iteritems()):
+for i in sorted(api.items()):
 	if i[1].config.count('noauto'):
 		continue
 	if i[1].config.count('getter') or i[1].config.count('setter'):

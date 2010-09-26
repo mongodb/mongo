@@ -24,7 +24,7 @@ class Stat:
 method_stats = {}
 import api_class
 api = api_class.methods
-for l in sorted(api.iteritems()):
+for l in sorted(api.items()):
 	if l[1].config.count('noauto'):
 		continue
 	# Stat counter per method.
@@ -42,10 +42,10 @@ def print_def(title, list):
 	f.write('/*\n')
 	f.write(' * Statistics entries for ' + title + '.\n')
 	f.write(' */\n')
-	for l in sorted(list.iteritems()):
+	for l in sorted(list.items()):
 		n = 'WT_STAT_' + l[0]
 		f.write('#define\t' + n +
-		    "\t" * max(1, 5 - len(n) / 8) + "%5d" % def_cnt + '\n')
+		    "\t" * max(1, 5 - int(len(n) / 8)) + "%5d" % def_cnt + '\n')
 		def_cnt += 1
 	f.write('\n')
 
@@ -83,7 +83,7 @@ def print_func(handle, list):
 	f.write('\tWT_RET(__wt_calloc(env, ' +
 	    str(len(list) + 1) + ', sizeof(WT_STATS), &stats));\n\n')
 
-	for l in sorted(list.iteritems()):
+	for l in sorted(list.items()):
 		o = '\tstats[WT_STAT_' + l[0] + '].desc = "' + l[1].str + '";\n'
 		if len(o) + 7  > 80:
 			o = o.replace('= ', '=\n\t    ')
@@ -98,7 +98,7 @@ def print_func(handle, list):
 	f.write('__wt_stat_clear_' +
 	    handle.lower() + '_stats(WT_STATS *stats)\n')
 	f.write('{\n')
-	for l in sorted(list.iteritems()):
+	for l in sorted(list.items()):
 		# Items marked permanent aren't cleared by the stat clear
 		# methods.
 		if not l[1].config.count('perm'):

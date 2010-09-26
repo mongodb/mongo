@@ -21,7 +21,7 @@ def source_files_list():
 #	Print a list of the source file names in filelist.
 def source_files():
 	for line in source_files_list():
-		print line
+		print(line)
 
 # source_paths_list --
 #	Return a list of the source file paths in filelist.
@@ -37,7 +37,7 @@ def source_paths_list():
 #	Print a list of the source file paths in filelist.
 def source_paths():
 	for line in source_paths_list():
-		print line
+		print(line)
 
 # directory_files_list --
 #	Return a list of the directories in filelist.
@@ -53,12 +53,12 @@ def directory_files_list():
 #	Print a list of the directories in filelist.
 def directory_files():
 	for entry in directory_files_list():
-		print entry
+		print(entry)
 
 # compare_srcfile --
 #	Compare two files, and if they differ, update the source file.
 def compare_srcfile(tmp, src):
 	if not os.path.isfile(src) or \
 	    not filecmp.cmp(tmp, src, False):
-		print 'Updating ' + src
+		print('Updating ' + src)
 		shutil.copyfile(tmp, src)

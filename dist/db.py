@@ -28,4 +28,4 @@ for o, a in opts:
 random.seed(seed)
 for i in range(pairs):
 	fmt = "%010d\ndata: %0" + str(random.randrange(dmin, dmax)) + "d"
-	print fmt % (i, i)
+	print(fmt % (i, i))

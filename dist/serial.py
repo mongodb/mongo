@@ -54,7 +54,7 @@ serial['cache_in'] = Serial(
 #	Loop through the serial dictionary and output #defines to schedule
 #	work for the workQ thread.
 def func_serial(f):
-	for entry in sorted(serial.iteritems()):
+	for entry in sorted(serial.items()):
 		# structure declaration
 		f.write('\n')
 		f.write('typedef struct {\n')

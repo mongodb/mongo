@@ -16,15 +16,15 @@ for line in open('memory.out', 'r').readlines():
 	op, addr = string.split(line)
 	if op == "A":
 		if entries.has_key(addr):
-			print "address 0x%s repeatedly allocated" % addr
+			print("address 0x" + addr + "repeatedly allocated")
 		else:
 			entries[addr] = 1
 	else:
 		if entries.has_key(addr):
 			del entries[addr]
 		else:
-			print "unallocated address 0x%s freed" % addr
+			print("unallocated address 0x" + addr + "freed")
 
 # Print out any addresses never freed.
 for entry in entries.keys():
-	print "address 0x%s allocated but never freed" % entry
+	print("address 0x" + entry + "allocated but never freed")
