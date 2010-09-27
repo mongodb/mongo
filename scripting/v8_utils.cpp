@@ -171,7 +171,7 @@ namespace mongo {
         }
         void join() {
             jsassert( started_ && !done_, "Thread not running" );
-            Unlocker u;
+            V8Unlock u;
             thread_->join();
             done_ = true;
         }
@@ -185,7 +185,7 @@ namespace mongo {
         public:
             JSThread( JSThreadConfig &config ) : config_( config ) {}
             void operator()() {
-                Locker l;
+                V8Lock l;
                 HandleScope handle_scope;
                 Handle< Context > context;
                 Handle< v8::Function > fun;
@@ -304,7 +304,7 @@ namespace mongo {
     }
 
     Handle<v8::Value> GCV8(const Arguments& args) {
-        Locker l;
+        V8Lock l;
         while( V8::IdleNotification() );
         return v8::Undefined();
     }

@@ -28,7 +28,7 @@
 // error codes 8010-8040
 
 namespace mongo {
-    
+
     class ShardStrategy : public Strategy {
 
         virtual void queryOp( Request& r ){
@@ -145,7 +145,10 @@ namespace mongo {
                     }
                     
                 }
-                
+
+                // Many operations benefit from having the shard key early in the object
+                o = manager->getShardKey().moveToFront(o);
+
                 bool gotThrough = false;
                 for ( int i=0; i<10; i++ ){
                     try {

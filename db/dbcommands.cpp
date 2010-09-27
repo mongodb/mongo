@@ -40,11 +40,12 @@
 #include "stats/counters.h"
 #include "background.h"
 #include "../util/version.h"
+#include "../s/d_writeback.h"
 
 namespace mongo {
 
     extern int otherTraceLevel;
-    void flushOpLog( stringstream &ss );
+    void flushDiagLog();
 
     /* reset any errors so that getlasterror comes back clean.
 
@@ -407,6 +408,8 @@ namespace mongo {
 
             timeBuilder.appendNumber( "after asserts" , Listener::getElapsedTimeMillis() - start );            
 
+            result.append( "writeBacksQueued" , ! writeBackManager.queuesEmpty() );
+
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
             
@@ -460,9 +463,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; } 
         bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
-            stringstream ss;
-            flushOpLog( ss );
-            out() << ss.str() << endl;
+            flushDiagLog();
             if ( !cmdLine.quiet )
                 tlog() << "CMD: diagLogging set to " << _diaglog.level << " from: " << was << endl;
             result.append( "was" , was );
@@ -1484,6 +1485,8 @@ namespace mongo {
 
                 if (!cc->yieldSometimes())
                     break;
+
+                RARELY killCurrentOp.checkForInterrupt();
             }
 
             BSONArrayBuilder b( result.subarrayStart( "values" ) );
@@ -1547,9 +1550,13 @@ namespace mongo {
                 uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
                 db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
 
-                if (cmdObj["new"].trueValue()){
-                    BSONObj gle = db.getLastErrorDetailed();
+                BSONObj gle = db.getLastErrorDetailed();
+                if (gle["err"].type() == String){
+                    errmsg = gle["err"].String();
+                    return false;
+                }
 
+                if (cmdObj["new"].trueValue()){
                     BSONElement _id = gle["upserted"];
                     if (_id.eoo())
                         _id = origQuery["_id"];
@@ -1581,6 +1588,12 @@ namespace mongo {
                     BSONElement update = cmdObj["update"];
                     uassert(12516, "must specify remove or update", !update.eoo());
                     db.update(ns, q, update.embeddedObjectUserCheck());
+
+                    BSONObj gle = db.getLastErrorDetailed();
+                    if (gle["err"].type() == String){
+                        errmsg = gle["err"].String();
+                        return false;
+                    }
 
                     if (cmdObj["new"].trueValue())
                         out = db.findOne(ns, idQuery, fields);

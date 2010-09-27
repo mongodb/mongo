@@ -262,7 +262,7 @@ namespace mongo {
         return replPair || replSettings.slave || replSettings.master;
     }
 
-    bool replAuthenticate(DBClientConnection *conn);
+    bool replAuthenticate(DBClientBase *conn);
     
     void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ){
         
@@ -1393,7 +1393,7 @@ namespace mongo {
 
 	BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
     
-	bool replAuthenticate(DBClientConnection *conn) {
+	bool replAuthenticate(DBClientBase *conn) {
 		if( ! cc().isAdmin() ){
 			log() << "replauthenticate: requires admin permissions, failing\n";
 			return false;

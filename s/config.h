@@ -46,9 +46,8 @@ namespace mongo {
      * Field names used in the 'shards' collection.
      */
     struct ShardFields {
-        static BSONField<bool> draining;
-        static BSONField<long long> maxSize;
-        static BSONField<long long> currSize;
+        static BSONField<bool> draining;      // is it draining chunks?
+        static BSONField<long long> maxSize;  // max allowed disk space usage
     };
         
     class ConfigServer;

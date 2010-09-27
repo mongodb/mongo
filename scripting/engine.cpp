@@ -444,8 +444,9 @@ namespace mongo {
     
     void ( *ScriptEngine::_connectCallback )( DBClientWithCommands & ) = 0;
     const char * ( *ScriptEngine::_checkInterruptCallback )() = 0;
+    unsigned ( *ScriptEngine::_getInterruptSpecCallback )() = 0;
     
-    ScriptEngine * globalScriptEngine;
+    ScriptEngine * globalScriptEngine = 0;
 
     bool hasJSReturn( const string& code ){
         size_t x = code.find( "return" );

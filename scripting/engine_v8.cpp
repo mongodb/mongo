@@ -21,10 +21,13 @@
 #include "v8_utils.h"
 #include "v8_db.h"
 
-#define V8_SIMPLE_HEADER Locker l; HandleScope handle_scope; Context::Scope context_scope( _context );
+#define V8_SIMPLE_HEADER V8Lock l; HandleScope handle_scope; Context::Scope context_scope( _context );
 
 namespace mongo {
 
+    // guarded by v8 mutex
+    map< unsigned, int > __interruptSpecToThreadId;
+    
     // --- engine ---
 
     V8ScriptEngine::V8ScriptEngine() {}
@@ -37,6 +40,23 @@ namespace mongo {
             globalScriptEngine = new V8ScriptEngine();
         }
     }
+    
+    void V8ScriptEngine::interrupt( unsigned opSpec ) {
+        v8::Locker l;
+        if ( __interruptSpecToThreadId.count( opSpec ) ) {
+            V8::TerminateExecution( __interruptSpecToThreadId[ opSpec ] );
+        }
+    }
+    void V8ScriptEngine::interruptAll() {
+        v8::Locker l;
+        vector< int > toKill; // v8 mutex could potentially be yielded during the termination call
+        for( map< unsigned, int >::const_iterator i = __interruptSpecToThreadId.begin(); i != __interruptSpecToThreadId.end(); ++i ) {
+            toKill.push_back( i->second );
+        }
+        for( vector< int >::const_iterator i = toKill.begin(); i != toKill.end(); ++i ) {
+            V8::TerminateExecution( *i );            
+        }
+    }
 
     // --- scope ---
     
@@ -44,7 +64,7 @@ namespace mongo {
         : _engine( engine ) , 
           _connectState( NOT ){
 
-        Locker l;
+        V8Lock l;
         HandleScope handleScope;              
         _context = Context::New();
         Context::Scope context_scope( _context );
@@ -67,7 +87,7 @@ namespace mongo {
     }
 
     V8Scope::~V8Scope(){
-        Locker l;
+        V8Lock l;
         Context::Scope context_scope( _context );        
         _wrapper.Dispose();
         _this.Dispose();
@@ -79,7 +99,7 @@ namespace mongo {
     }
 
     Handle< Value > V8Scope::nativeCallback( const Arguments &args ) {
-        Locker l;
+        V8Lock l;
         HandleScope handle_scope;
         Local< External > f = External::Cast( *args.Callee()->Get( v8::String::New( "_native_function" ) ) );
         NativeFunction function = (NativeFunction)(f->Value());
@@ -102,7 +122,7 @@ namespace mongo {
     }
 
     Handle< Value > V8Scope::loadCallback( const Arguments &args ) {
-        Locker l;
+        V8Lock l;
         HandleScope handle_scope;
         Handle<External> field = Handle<External>::Cast(args.Data());
         void* ptr = field->Value();
@@ -121,7 +141,7 @@ namespace mongo {
     // ---- global stuff ----
 
     void V8Scope::init( BSONObj * data ){
-        Locker l;
+        V8Lock l;
         if ( ! data )
             return;
         
@@ -254,6 +274,7 @@ namespace mongo {
         code = fn + " = " + code;
 
         TryCatch try_catch;
+        // this might be time consuming, consider allowing an interrupt
         Handle<Script> script = v8::Script::Compile( v8::String::New( code.c_str() ) , 
                                                      v8::String::New( fn.c_str() ) );
         if ( script.IsEmpty() ){
@@ -323,11 +344,24 @@ namespace mongo {
         } else {
             _global->Set( v8::String::New( "args" ), v8::Undefined() );
         }
+        if ( globalScriptEngine->interrupted() ) {
+            stringstream ss;
+            ss << "error in invoke: " << globalScriptEngine->checkInterrupt();
+            _error = ss.str();
+            log() << _error << endl;
+            return 1;
+        }
+        enableV8Interrupt(); // because of v8 locker we can check interrupted, then enable
         Local<Value> result = ((v8::Function*)(*funcValue))->Call( _this , nargs , args.get() );
+        disableV8Interrupt();
                 
         if ( result.IsEmpty() ){
             stringstream ss;
-            ss << "error in invoke: " << toSTLString( &try_catch );
+            if ( try_catch.HasCaught() && !try_catch.CanContinue() ) {
+                ss << "error in invoke: " << globalScriptEngine->checkInterrupt();
+            } else {
+                ss << "error in invoke: " << toSTLString( &try_catch );
+            }
             _error = ss.str();
             log() << _error << endl;
             return 1;
@@ -366,9 +400,25 @@ namespace mongo {
             return false;
         } 
     
+        if ( globalScriptEngine->interrupted() ) {
+            _error = (string)"exec error: " + globalScriptEngine->checkInterrupt();
+            if ( reportError ) {
+                log() << _error << endl;
+            }
+            if ( assertOnError ) {
+                uassert( 13475 ,  _error , 0 );
+            }
+            return false;
+        }
+        enableV8Interrupt(); // because of v8 locker we can check interrupted, then enable
         Handle<v8::Value> result = script->Run();
+        disableV8Interrupt();
         if ( result.IsEmpty() ){
-            _error = (string)"exec error: " + toSTLString( &try_catch );
+            if ( try_catch.HasCaught() && !try_catch.CanContinue() ) {
+                _error = (string)"exec error: " + globalScriptEngine->checkInterrupt();
+            } else {
+                _error = (string)"exec error: " + toSTLString( &try_catch );
+            }
             if ( reportError )
                 log() << _error << endl;
             if ( assertOnError )
@@ -395,7 +445,7 @@ namespace mongo {
     
     void V8Scope::gc() {
         cout << "in gc" << endl;
-        Locker l;
+        V8Lock l;
         while( V8::IdleNotification() );
     }
 
@@ -412,6 +462,9 @@ namespace mongo {
                     return;
                 throw UserException( 12511, "localConnect called with a different name previously" );
             }
+
+            // needed for killop / interrupt support
+            v8::Locker::StartPreemption( 50 );
 
             //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
             _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( true )->GetFunction() );

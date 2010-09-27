@@ -10,5 +10,5 @@ assert.eq( o , t.findOne() , "A1" )
 o.a = o.a.filter( function(z){ return z >= 6; } )
 t.update( {} , { $pull : { a : { $lt : 6 } } } )
 
-//assert.eq( o.a , t.findOne().a , "A2" )
+assert.eq( o.a , t.findOne().a , "A2" )
 

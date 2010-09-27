@@ -79,6 +79,16 @@ namespace mongo {
         virtual ~IndexPlugin(){}
         
         virtual IndexType* generate( const IndexSpec * spec ) const = 0;
+        
+        string getName() const { return _name; }
+
+        /**
+         * @return new keyPattern
+         * if nothing changes, should return keyPattern
+         */
+        virtual BSONObj adjustIndexSpec( const BSONObj& spec ) const { return spec; } 
+
+        // ------- static below -------
 
         static IndexPlugin* get( const string& name ){
             if ( ! _plugins )
@@ -89,12 +99,17 @@ namespace mongo {
             return i->second;
         }
 
-        string getName() const { return _name; }
+        /**
+         * @param keyPattern { x : "fts" }
+         * @return "" or the name
+         */
+        static string findPluginName( const BSONObj& keyPattern );
+
     private:
         string _name;
         static map<string,IndexPlugin*> * _plugins;
     };
-
+    
     /* precomputed details about an index, used for inserting keys on updates
        stored/cached in NamespaceDetailsTransient, or can be used standalone
        */

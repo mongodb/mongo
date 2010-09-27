@@ -163,13 +163,6 @@ namespace mongo {
     bool handlePossibleShardedMessage( Message &m, DbResponse * dbresponse );
 
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
-    void aboutToDeleteForSharding( const DiskLoc& dl );
-
-    // -----------------
-    // --- writeback ---
-    // -----------------
-
-    /* queue a write back on a remote server for a failed write */
-    void queueWriteBack( const string& remote , const BSONObj& o );
+    void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl );
 
 }

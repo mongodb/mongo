@@ -45,7 +45,6 @@ namespace mongo {
 
     BSONField<bool>      ShardFields::draining("draining");
     BSONField<long long> ShardFields::maxSize ("maxSize");
-    BSONField<long long> ShardFields::currSize("currSize");
 
     OID serverID;
 
@@ -62,6 +61,7 @@ namespace mongo {
     void DBConfig::CollectionInfo::shard( DBConfig * db , const string& ns , const ShardKeyPattern& key , bool unique ){
         _cm.reset( new ChunkManager( db, ns , key , unique ) );
         _dirty = true;
+        _dropped = false;
     }
 
     void DBConfig::CollectionInfo::unshard(){
@@ -82,11 +82,10 @@ namespace mongo {
         
         conn->update( ShardNS::collection , key , val.obj() , true );
         string err = conn->getLastError();
-        uassert( 13473 , (string)"DBConfig save failed for collection (" + ns + "): " + err , err.size() == 0 );
+        uassert( 13473 , (string)"failed to save collection (" + ns + "): " + err , err.size() == 0 );
 
         _dirty = false;
     }
-
 
     bool DBConfig::isSharded( const string& ns ){
         if ( ! _shardingEnabled )
@@ -127,7 +126,7 @@ namespace mongo {
         scoped_lock lk( _lock );
 
         CollectionInfo& ci = _collections[ns];
-        uassert( 8043 , "already sharded" , ! ci.isSharded() );
+        uassert( 8043 , "collection already sharded" , ! ci.isSharded() );
 
         log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
 

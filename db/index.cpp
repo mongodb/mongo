@@ -159,7 +159,7 @@ namespace mongo {
          sourceNS - source NS we are indexing
          sourceCollection - its details ptr
     */
-    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection) {
+    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection, BSONObj& fixedIndexObject ) {
         sourceCollection = 0;
 
         // logical name of the index.  todo: get rid of the name, we don't need it!
@@ -172,11 +172,6 @@ namespace mongo {
         uassert(10097, "bad table to index name on add index attempt", 
             cc().database()->name == nsToDatabase(sourceNS.c_str()));
 
-        /* we can't build a new index for the ns if a build is already in progress in the background - 
-           EVEN IF this is a foreground build.
-           */
-        uassert(12588, "cannot add index with a background operation in progress", 
-            !BackgroundOperation::inProgForNs(sourceNS.c_str()));
 
         BSONObj key = io.getObjectField("key");
         uassert(12524, "index key pattern too large", key.objsize() <= 2048);
@@ -222,12 +217,35 @@ namespace mongo {
             uasserted(12505,s);
         }
 
+        /* we can't build a new index for the ns if a build is already in progress in the background - 
+           EVEN IF this is a foreground build.
+           */
+        uassert(12588, "cannot add index with a background operation in progress", 
+            !BackgroundOperation::inProgForNs(sourceNS.c_str()));
+
+
         /* this is because we want key patterns like { _id : 1 } and { _id : <someobjid> } to 
            all be treated as the same pattern.
         */
         if ( !god && IndexDetails::isIdIndexPattern(key) ) {
             ensureHaveIdIndex( sourceNS.c_str() );
             return false;
+        }
+        
+        string pluginName = IndexPlugin::findPluginName( key );
+        IndexPlugin * plugin = pluginName.size() ? IndexPlugin::get( pluginName ) : 0;
+        
+        if ( plugin ){
+            fixedIndexObject = plugin->adjustIndexSpec( io );
+        }
+        else if ( io["v"].eoo() ) { 
+            // add "v" if it doesn't exist
+            // if it does - leave whatever value was there
+            // this is for testing and replication
+            BSONObjBuilder b( io.objsize() + 32 );
+            b.appendElements( io );
+            b.append( "v" , 0 );
+            fixedIndexObject = b.obj();
         }
 
         return true;

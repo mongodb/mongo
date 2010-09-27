@@ -77,6 +77,7 @@ namespace mongo {
         BSONType type;
 
         shared_ptr<Matcher> subMatcher;
+        bool subMatcherOnPrimitives ;
 
         vector< shared_ptr<Matcher> > allMatchers;
     };

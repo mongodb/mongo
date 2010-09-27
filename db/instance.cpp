@@ -62,9 +62,9 @@ namespace mongo {
     bool useCursors = true;
     bool useHints = true;
     
-    void flushOpLog( stringstream &ss ) {
+    void flushDiagLog() {
         if( _diaglog.f && _diaglog.f->is_open() ) {
-            ss << "flushing op log and files\n";
+            log() << "flushing diag log" << endl;
             _diaglog.flush();
         }
     }
@@ -340,6 +340,7 @@ namespace mongo {
         }
         currentOp.ensureStarted();
         currentOp.done();
+        killCurrentOp.finishOp();
         int ms = currentOp.totalTimeMillis();
         
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);
@@ -745,9 +746,7 @@ namespace mongo {
         ListeningSockets::get()->closeAll();
 
         log() << "shutdown: going to flush oplog..." << endl;
-        stringstream ss2;
-        flushOpLog( ss2 );
-        rawOut( ss2.str() );
+        flushDiagLog();
 
         /* must do this before unmapping mem or you may get a seg fault */
         log() << "shutdown: going to close sockets..." << endl;

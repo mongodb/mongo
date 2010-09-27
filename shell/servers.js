@@ -459,13 +459,15 @@ printShardingStatus = function( configDB ){
             if (db.partitioned){
                 configDB.collections.find( { _id : new RegExp( "^" + db._id + "\." ) } ).sort( { _id : 1 } ).forEach(
                     function( coll ){
-                        output("\t\t" + coll._id + " chunks:");
-                        configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
-                            function(chunk){
-                                output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
-                                        " on : " + chunk.shard + " " + tojson( chunk.lastmod ) );
-                            }
-                        );
+                        if ( coll.dropped == false ){
+                            output("\t\t" + coll._id + " chunks:");
+                            configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
+                                function(chunk){
+                                    output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
+                                            " on : " + chunk.shard + " " + tojson( chunk.lastmod ) );
+                                }
+                            );
+                        }
                     }
                 )
             }

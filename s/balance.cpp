@@ -183,8 +183,10 @@ namespace mongo {
             ShardStatus status = s.getStatus();
 
             BSONObj limitsObj = BSON( ShardFields::maxSize( s.getMaxSize() ) << 
-                                      ShardFields::currSize( status.mapped() ) <<
-                                      ShardFields::draining( s.isDraining()) );
+                                      LimitsFields::currSize( status.mapped() ) <<
+                                      ShardFields::draining( s.isDraining() )  <<
+                                      LimitsFields::hasOpsQueued( status.hasOpsQueued() )
+                                    );
 
             shardLimitsMap[ s.getName() ] = limitsObj;
         }

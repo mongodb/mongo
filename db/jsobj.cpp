@@ -693,7 +693,7 @@ namespace mongo {
                         const char * temp = next + 1;
                         while ( isdigit( *temp ) )
                             temp++;
-                        allDigits = *temp == '.';
+                        allDigits = (*temp == '.' || *temp == '\0');
                     }
                     if (allDigits) {
                         e.embeddedObject().getFieldsDotted(next, ret);

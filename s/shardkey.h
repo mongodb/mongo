@@ -74,8 +74,11 @@ namespace mongo {
 
         BSONObj extractKey(const BSONObj& from) const;
         
+        bool partOfShardKey(const char* key ) const {
+            return pattern.hasField(key);
+        }
         bool partOfShardKey(const string& key ) const {
-            return patternfields.count( key ) > 0;
+            return pattern.hasField(key.c_str());
         }
 
         /**
@@ -83,6 +86,11 @@ namespace mongo {
          * true if 'this' is a prefix (not necessarily contained) of 'otherPattern'.
          */
         bool isPrefixOf( const BSONObj& otherPattern ) const;
+
+        /**
+         * @return BSONObj with _id and shardkey at front. May return original object.
+         */
+        BSONObj moveToFront(const BSONObj& obj) const;
         
     private:
         BSONObj pattern;

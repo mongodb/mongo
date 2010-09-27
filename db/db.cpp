@@ -457,6 +457,8 @@ sendmore:
         }
     }
     
+    void flushDiagLog();
+    
     /**
      * does background async flushes of mmapped files
      */
@@ -472,6 +474,7 @@ sendmore:
                 log(1) << "--syncdelay " << _sleepsecs << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ){
+                flushDiagLog();
                 if ( _sleepsecs == 0 ){
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);
@@ -500,6 +503,10 @@ sendmore:
 
     const char * jsInterruptCallback() {
         return killCurrentOp.checkForInterruptNoAssert();
+    }
+    
+    unsigned jsGetInterruptSpecCallback() {
+        return cc().curop()->opNum();
     }
     
     void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
@@ -560,6 +567,7 @@ sendmore:
         if ( useJNI ) {
             ScriptEngine::setup();
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
+            globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
         }
 
         repairDatabases();
@@ -1024,13 +1032,15 @@ int main(int argc, char* argv[], char *envp[] )
             return 0;
         }
 
+        if( cmdLine.pretouch )
+            log() << "--pretouch " << cmdLine.pretouch << endl; 
+
 #if defined(_WIN32)
-        serviceParamsCheck( params, dbpath, argc, argv );
+        if (serviceParamsCheck( params, dbpath, argc, argv )) {
+            return 0;
+        }
 #endif
     }
-
-    if( cmdLine.pretouch )
-        log() << "--pretouch " << cmdLine.pretouch << endl;
 
     initAndListen(cmdLine.port, appsrvPath);
     dbexit(EXIT_CLEAN);

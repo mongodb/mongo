@@ -87,7 +87,8 @@ namespace mongo {
         where = 0;
     }
 
-    ElementMatcher::ElementMatcher( BSONElement _e , int _op, bool _isNot ) : toMatch( _e ) , compareOp( _op ), isNot( _isNot ) {
+    ElementMatcher::ElementMatcher( BSONElement _e , int _op, bool _isNot ) 
+        : toMatch( _e ) , compareOp( _op ), isNot( _isNot ), subMatcherOnPrimitives(false){
         if ( _op == BSONObj::opMOD ){
             BSONObj o = _e.embeddedObject();
             mod = o["0"].numberInt();
@@ -101,12 +102,21 @@ namespace mongo {
         else if ( _op == BSONObj::opELEM_MATCH ){
             BSONElement m = _e;
             uassert( 12517 , "$elemMatch needs an Object" , m.type() == Object );
-            subMatcher.reset( new Matcher( m.embeddedObject() ) );
+            BSONObj x = m.embeddedObject();
+            if ( x.firstElement().getGtLtOp() == 0 ){
+                subMatcher.reset( new Matcher( x ) );
+                subMatcherOnPrimitives = false;
+            }
+            else {
+                // meant to act on primitives
+                subMatcher.reset( new Matcher( BSON( "" << x ) ) );
+                subMatcherOnPrimitives = true;
+            }
         }
     }
 
     ElementMatcher::ElementMatcher( BSONElement _e , int _op , const BSONObj& array, bool _isNot ) 
-        : toMatch( _e ) , compareOp( _op ), isNot( _isNot ) {
+        : toMatch( _e ) , compareOp( _op ), isNot( _isNot ), subMatcherOnPrimitives(false) {
         
         myset.reset( new set<BSONElement,element_lt>() );
         
@@ -691,11 +701,19 @@ namespace mongo {
                 BSONElement z = ai.next();
                 
                 if ( compareOp == BSONObj::opELEM_MATCH ){
-                    // SERVER-377
-                    if ( z.type() == Object && em.subMatcher->matches( z.embeddedObject() ) ){
-                        if ( details )
-                            details->elemMatchKey = z.fieldName();
-                        return 1;
+                    if ( z.type() == Object ){
+                        if ( em.subMatcher->matches( z.embeddedObject() ) ){
+                            if ( details )
+                                details->elemMatchKey = z.fieldName();
+                            return 1;
+                        }
+                    }
+                    else if ( em.subMatcherOnPrimitives ){
+                        if ( z.type() && em.subMatcher->matches( z.wrap( "" ) ) ){
+                            if ( details )
+                                details->elemMatchKey = z.fieldName();
+                            return 1;
+                        }
                     }
                 }
                 else {

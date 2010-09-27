@@ -1,41 +1,71 @@
 t = db.jstests_evald;
 t.drop();
 
-// only run in spidermonkey, not in v8 - see SERVER-387
-if ( typeof _threadInject == "undefined" ){
-
 function debug( x ) {
-//    print( x );
+//    printjson( x );
 }
 
 for( i = 0; i < 10; ++i ) {
     t.save( {i:i} );
 }
+db.getLastError();
 
-ev = "while( 1 ) { db.jstests_evald.count( {i:10} ); }"
-
-function op() {
+function op( ev, where ) {
     p = db.currentOp().inprog;
+    debug( p );
     for ( var i in p ) {
         var o = p[ i ];
-        if ( o.active && o.query && o.query.$eval && o.query.$eval == ev ) {
-            return o.opid;
+        if ( where ) {
+            if ( o.active && o.query && o.query.query && o.query.query.$where && o.ns == "test.jstests_evald" ) {
+                return o.opid;
+            }
+        } else {
+            if ( o.active && o.query && o.query.$eval && o.query.$eval == ev ) {
+                return o.opid;
+            }
         }
     }
     return -1;
 }
 
-s = startParallelShell( "db.eval( '" + ev + "' )" );
+function doIt( ev, wait, where ) {
 
-o = null;
-assert.soon( function() { o = op(); return o != -1 } );
+    if ( where ) {
+        s = startParallelShell( ev );
+    } else {
+        s = startParallelShell( "db.eval( '" + ev + "' )" );        
+    }
 
-debug( "going to kill" );
+    o = null;
+    assert.soon( function() { o = op( ev, where ); return o != -1 } );
 
-db.killOp( o );
+    if ( wait ) {
+        sleep( 2000 );
+    }
 
-debug( "sent kill" );
+    debug( "going to kill" );
 
-s();
+    db.killOp( o );
+
+    debug( "sent kill" );
+
+    s();
 
 }
+
+doIt( "db.jstests_evald.count( { $where: function() { while( 1 ) { ; } } } )", true, true );
+doIt( "db.jstests_evald.count( { $where: function() { while( 1 ) { ; } } } )", false, true );
+doIt( "while( true ) {;}", false );
+doIt( "while( true ) {;}", true );
+doIt( "while( 1 ) { db.jstests_evald.count( {i:10} ); }", true );
+doIt( "while( 1 ) { db.jstests_evald.count( {i:10} ); }", false );
+doIt( "while( 1 ) { db.jstests_evald.count(); }", true );
+doIt( "while( 1 ) { db.jstests_evald.count(); }", false );
+
+// these two are SERVER-1841
+//doIt( "while( 1 ) { try { db.jstests_evald.count( {i:10} ); } catch ( e ) { } }", true );
+//doIt( "while( 1 ) { try { while( 1 ) { ; } } catch ( e ) { } }", true );
+
+// the following won't work in v8 currently, see SERVER-1840
+//doIt( "while( 1 ) { db.jstests_evald.count( {$where:function(){ while( 1 ) {;}} } ); }", false );
+//doIt( "while( 1 ) { db.jstests_evald.count( {$where:function(){ while( 1 ) {;}} } ); }", true );

@@ -1287,7 +1287,8 @@ namespace mongo {
             case dbUpdate: {
                 int flags = d.pullInt();
                 BSONObj q = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q;
+                BSONObj o = d.nextJsObj();
+                ss << " flags: " << flags << " query: " << q << " update: " << o;
                 break;
             }
             case dbInsert:

@@ -35,13 +35,16 @@ namespace mongo {
 
     bool initService();
 
-    void serviceParamsCheck( program_options::variables_map& params, const std::string dbpath, int argc, char* argv[] ) {
+    // returns true if the service is started.
+    bool serviceParamsCheck( program_options::variables_map& params, const std::string dbpath, int argc, char* argv[] ) {
         bool installService = false;
         bool removeService = false;
         bool reinstallService = false;
         bool startService = false;
 
         std::wstring windowsServiceName = L"MongoDB";
+        std::wstring windowsServiceDisplayName = L"Mongo DB";
+        std::wstring windowsServiceDescription = L"Mongo DB Server";
         std::wstring windowsServiceUser = L"";
         std::wstring windowsServicePassword = L"";
 
@@ -73,6 +76,20 @@ namespace mongo {
                 windowsServiceName[i] = x[i];
 	    }
         }
+        if (params.count("serviceDisplayName")){
+            string x = params["serviceDisplayName"].as<string>();
+            windowsServiceDisplayName = wstring(x.size(),L' ');
+            for ( size_t i=0; i<x.size(); i++) {
+                windowsServiceDisplayName[i] = x[i];
+	    }
+        }
+        if (params.count("serviceDescription")){
+            string x = params["serviceDescription"].as<string>();
+            windowsServiceDescription = wstring(x.size(),L' ');
+            for ( size_t i=0; i<x.size(); i++) {
+                windowsServiceDescription[i] = x[i];
+	    }
+        }
         if (params.count("serviceUser")){
             string x = params["serviceUser"].as<string>();
             windowsServiceUser = wstring(x.size(),L' ');
@@ -92,7 +109,7 @@ namespace mongo {
             ServiceController::removeService( windowsServiceName );
 	}
 	if ( installService || reinstallService ) {
-            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", windowsServiceUser, windowsServicePassword, dbpath, argc, argv ) )
+            if ( !ServiceController::installService( windowsServiceName , windowsServiceDisplayName, windowsServiceDescription, windowsServiceUser, windowsServicePassword, dbpath, argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
@@ -104,8 +121,9 @@ namespace mongo {
         else if ( startService ) {
             if ( !ServiceController::startService( windowsServiceName , mongo::initService ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
-            dbexit( EXIT_CLEAN );
+	    return true;
         }
+	return false;
     }
     
     bool ServiceController::installService( const std::wstring& serviceName, const std::wstring& displayName, const std::wstring& serviceDesc, const std::wstring& serviceUser, const std::wstring& servicePassword, const std::string dbpath, int argc, char* argv[] ) {
@@ -130,8 +148,13 @@ namespace mongo {
                 commandLine << arg << "  \"" << dbpath << "\"  ";
                 i++;
                 continue;
+            } else if ( arg == "--logpath" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
             } else if ( arg.length() > 9 && arg.substr(0, 9) == "--service" ) {
                 // Strip off --service(Name|User|Password) arguments
+                i++;
                 continue;
             }
             commandLine << arg << "  ";
@@ -305,6 +328,7 @@ namespace mongo {
 		reportStatus( SERVICE_START_PENDING, 1000 );
 		
 		_serviceCallback();
+		dbexit( EXIT_CLEAN );
 		
 		reportStatus( SERVICE_STOPPED );
 	}

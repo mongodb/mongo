@@ -106,12 +106,6 @@ namespace mongo {
             _finishInit();
         }
 
-        // TODO Delete if nobody is using
-        //ConnectionString( ConnectionType type , const vector<HostAndPort>& servers )
-        //    : _type( type ) , _servers( servers ){
-        //    _finishInit();
-        //}
-        
         ConnectionString( ConnectionType type , const string& s , const string& setName = "" ){
             _type = type;
             _setName = setName;

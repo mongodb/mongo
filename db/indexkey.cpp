@@ -45,6 +45,23 @@ namespace mongo {
             _plugins = new map<string,IndexPlugin*>();
         (*_plugins)[name] = this;
     }
+
+    string IndexPlugin::findPluginName( const BSONObj& keyPattern ){
+        string pluginName = "";
+        
+        BSONObjIterator i( keyPattern );
+        
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.type() != String )
+                continue;
+            
+            uassert( 13007 , "can only have 1 index plugin / bad index key pattern" , pluginName.size() == 0 || pluginName == e.String() );
+            pluginName = e.String();
+        }
+        
+        return pluginName;
+    }
     
     int IndexType::compare( const BSONObj& l , const BSONObj& r ) const {
         return l.woCompare( r , _spec->keyPattern );
@@ -53,20 +70,16 @@ namespace mongo {
     void IndexSpec::_init(){
         assert( keyPattern.objsize() );
         
-        string pluginName = "";
-
-        BSONObjIterator i( keyPattern );
+        string pluginName = IndexPlugin::findPluginName( keyPattern );
+        
         BSONObjBuilder nullKeyB;
+        BSONObjIterator i( keyPattern );
+        
         while( i.more() ) {
             BSONElement e = i.next();
             _fieldNames.push_back( e.fieldName() );
             _fixed.push_back( BSONElement() );
-            nullKeyB.appendNull( "" );
-            if ( e.type() == String ){
-                uassert( 13007 , "can only have 1 index plugin / bad index key pattern" , pluginName.size() == 0 );
-                pluginName = e.valuestr();
-            }
-                
+            nullKeyB.appendNull( "" );            
         }
         
         _nullKey = nullKeyB.obj();

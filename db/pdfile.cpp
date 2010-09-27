@@ -1396,7 +1396,7 @@ namespace mongo {
         insert( ns, o.objdata(), o.objsize(), god );
     }
 
-    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection);
+    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection, BSONObj& fixedIndexObject );
 
     // We are now doing two btree scans for all unique indexes (one here, and one when we've
     // written the record to the collection.  This could be made more efficient inserting
@@ -1461,11 +1461,18 @@ namespace mongo {
         NamespaceDetails *tableToIndex = 0;
 
         string tabletoidxns;
+        BSONObj fixedIndexObject;
         if ( addIndex ) {
             assert( obuf );
             BSONObj io((const char *) obuf);
-            if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) )
+            if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex, fixedIndexObject ) )
                 return DiskLoc();
+
+            if ( ! fixedIndexObject.isEmpty() ){
+                obuf = fixedIndexObject.objdata();
+                len = fixedIndexObject.objsize();
+            }
+            
         }
 
         const BSONElement *newId = &writeId;

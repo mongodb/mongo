@@ -90,8 +90,11 @@ public:
             return -1;
         }
 
+        Query q( getParam( "query" , "" ) );
+        if ( q.getFilter().isEmpty() && !hasParam("dbpath"))
+            q.snapshot();
 
-        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , ((Query)(getParam( "query" , "" ))).snapshot() , 0 , 0 , fieldsToReturn , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
+        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , q , 0 , 0 , fieldsToReturn , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
 
         if ( csv ){
             for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ){

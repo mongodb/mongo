@@ -75,6 +75,8 @@ namespace mongoutils {
             return strncmp(s.c_str()+x-l, p.c_str(), l) == 0;
         }
 
+        inline bool equals( const char * a , const char * b ) { return strcmp( a , b ) == 0; }
+
         /** find char x, and return rest of string thereafter, or "" if not found */
         inline const char * after(const char *s, char x) {
             const char *p = strchr(s, x);

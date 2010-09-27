@@ -43,12 +43,22 @@ namespace mongo {
         
         BSONElement elt; // x:5 note: this is the actual element from the updateobj
         boost::shared_ptr<Matcher> matcher;
+        bool matcherOnPrimitive;
 
         void init( Op o , BSONElement& e ){
             op = o;
             elt = e;
-            if ( op == PULL && e.type() == Object )
-                matcher.reset( new Matcher( e.embeddedObject() ) );
+            if ( op == PULL && e.type() == Object ){
+                BSONObj t = e.embeddedObject();
+                if ( t.firstElement().getGtLtOp() == 0 ){
+                    matcher.reset( new Matcher( t ) );
+                    matcherOnPrimitive = false;
+                }
+                else {
+                    matcher.reset( new Matcher( BSON( "" << t ) ) );
+                    matcherOnPrimitive = true;
+                }
+            }
         }
 
         void setFieldName( const char * s ){
