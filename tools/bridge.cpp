@@ -38,37 +38,41 @@ public:
             sleepmillis( 500 );
         Message m;
         while( 1 ) {
-            m.reset();
-            if ( !mp_.recv( m ) ) {
-                cout << "end connection " << mp_.farEnd.toString() << endl;
-                mp_.shutdown();
-                break;
-            }
-
-            int oldId = m.header()->id;
-            if ( m.operation() == dbQuery || m.operation() == dbMsg || m.operation() == dbGetMore ) {
-                bool exhaust = false;
-                if ( m.operation() == dbQuery ) {
-                    DbMessage d( m );
-                    QueryMessage q( d );
-                    exhaust = q.queryOptions & QueryOption_Exhaust;
+            try {
+                m.reset();
+                if ( !mp_.recv( m ) ) {
+                    cout << "end connection " << mp_.farEnd.toString() << endl;
+                    mp_.shutdown();
+                    break;
                 }
-                Message response;
-                dest.port().call( m, response );
-                mp_.reply( m, response, oldId );
-                while ( exhaust ) {
-                    MsgData *header = response.header();
-                    QueryResult *qr = (QueryResult *) header;
-                    if ( qr->cursorId ) {
-                        response.reset();
-                        dest.port().recv( response );
-                        mp_.reply( m, response ); // m argument is ignored anyway                    
-                    } else {
-                        exhaust = false;
+                
+                int oldId = m.header()->id;
+                if ( m.operation() == dbQuery || m.operation() == dbMsg || m.operation() == dbGetMore ) {
+                    bool exhaust = false;
+                    if ( m.operation() == dbQuery ) {
+                        DbMessage d( m );
+                        QueryMessage q( d );
+                        exhaust = q.queryOptions & QueryOption_Exhaust;
                     }
+                    Message response;
+                    dest.port().call( m, response );
+                    mp_.reply( m, response, oldId );
+                    while ( exhaust ) {
+                        MsgData *header = response.header();
+                        QueryResult *qr = (QueryResult *) header;
+                        if ( qr->cursorId ) {
+                            response.reset();
+                            dest.port().recv( response );
+                            mp_.reply( m, response ); // m argument is ignored anyway                    
+                        } else {
+                            exhaust = false;
+                        }
+                    }
+                } else {
+                    dest.port().say( m, oldId );
                 }
-            } else {
-                dest.port().say( m, oldId );
+            } catch ( ... ) {
+                log() << "caught exception in Forwarder, continuing" << endl;
             }
         }
     }
@@ -98,6 +102,12 @@ void cleanup( int sig ) {
     ::exit( 0 );
 }
 
+void myterminate() {
+    rawOut( "bridge terminate() called, printing stack:" );
+    printStackTrace();
+    abort();
+}
+
 void setupSignals() {
     signal( SIGINT , cleanup );
     signal( SIGTERM , cleanup );
@@ -106,6 +116,7 @@ void setupSignals() {
     signal( SIGSEGV , cleanup );
     signal( SIGBUS , cleanup );
     signal( SIGFPE , cleanup );
+    set_terminate( myterminate );
 }
 #else
 inline void setupSignals() {}
