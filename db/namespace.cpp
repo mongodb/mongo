@@ -184,7 +184,7 @@ namespace mongo {
         dur::assertReading(this);
 		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
         dassert( dloc.drec() == d );
-        DeletedRecord *dold = d;
+        //DeletedRecord *dold = d;
         d = dur::writing(d);
         {
             // defensive code: try to make us notice if we reference a deleted record
