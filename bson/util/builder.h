@@ -233,6 +233,10 @@ namespace mongo {
 
     private:
         BufBuilder _buf;
+
+        // non-copyable, non-assignable
+        StringBuilder( const StringBuilder& );
+        StringBuilder& operator=( const StringBuilder& );
     };
 
 } // namespace mongo
