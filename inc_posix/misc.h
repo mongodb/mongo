@@ -102,7 +102,10 @@ extern "C" {
  *
  * Generally, addr/size pair locations are not declared volatile, they live
  * on random Btree pages; for that reason, use a memory barrier instruction
- * before retrying the call.
+ * before retrying the call.  (In other words, some other thread modified
+ * the addr/size pair, and caused a WT_RESTART to be returned to us -- the
+ * memory barrier is to ensure we get the new values, by flushing our saved
+ * information.)
  */
 #define	WT_ERR(a) do {							\
 	if ((ret = (a)) != 0)						\
