@@ -24,6 +24,7 @@
 
 #include "../pch.h"
 #include <map>
+#include "../db/dur.h"
 
 namespace mongo {
 
@@ -127,35 +128,28 @@ namespace mongo {
             bool found;
             int i = _find(k, found);
             if ( i >= 0 && found ) {
-                Node& n = nodes(i);
-                n.k.kill();
-                n.setUnused();
+                Node* n = &nodes(i);
+                n = dur::writing(n);
+                n->k.kill();
+                n->setUnused();
             }
         }
-/*
-        void drop(const Key& k) {
-            bool found;
-            int i = _find(k, found);
-            if ( i >= 0 && found ) {
-                nodes[i].setUnused();
-            }
-        }
-*/
+
         /** returns false if too full */
         bool put(const Key& k, const Type& value) {
             bool found;
             int i = _find(k, found);
             if ( i < 0 )
                 return false;
-            Node& n = nodes(i);
+            Node* n = dur::writing( &nodes(i) );
             if ( !found ) {
-                n.k = k;
-                n.hash = k.hash();
+                n->k = k;
+                n->hash = k.hash();
             }
             else {
-                assert( n.hash == k.hash() );
+                assert( n->hash == k.hash() );
             }
-            n.value = value;
+            n->value = value;
             return true;
         }
         

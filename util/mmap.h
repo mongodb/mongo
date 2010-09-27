@@ -136,10 +136,12 @@ namespace mongo {
         };
 
         MemoryMappedFile();
+
         ~MemoryMappedFile() {
-            destroyed();
+            destroyed(); // cleans up from the master list of mmaps
             close();
         }
+
         void close();
 
         void* testGetCopyOnWriteView();
@@ -171,14 +173,14 @@ namespace mongo {
         void flush(bool sync);
         virtual Flushable * prepareFlush();
 
-        /*void* viewOfs() {
-            return view;
-        }*/
-
         long shortLength() const { return (long) len; }
         unsigned long long length() const { return len; }
 
         string filename() const { return _filename; }
+
+#if defined(_DURABLE) && defined(_DEBUG)
+        static void* getWriteViewFor(void *ptr);
+#endif
 
     private:
         static void updateLength( const char *filename, unsigned long long &length );
@@ -192,7 +194,9 @@ namespace mongo {
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;
 #endif
-
+#if defined(_DURABLE)
+        void *writeView;
+#endif
     protected:
         // only posix mmap implementations will support this
         virtual void _lock();

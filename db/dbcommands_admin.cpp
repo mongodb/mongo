@@ -128,7 +128,7 @@ namespace mongo {
                 ss << " extent asserted ";
             }
 
-            ss << "  datasize?:" << d->datasize << " nrecords?:" << d->nrecords << " lastExtentSize:" << d->lastExtentSize << '\n';
+            ss << "  datasize?:" << d->stats.datasize << " nrecords?:" << d->stats.nrecords << " lastExtentSize:" << d->lastExtentSize << '\n';
             ss << "  padding:" << d->paddingFactor << '\n';
             try {
 
@@ -175,7 +175,7 @@ namespace mongo {
                         else ss << " (OK)";
                         ss << '\n';
                     }
-                    ss << "  " << n << " objects found, nobj:" << d->nrecords << '\n';
+                    ss << "  " << n << " objects found, nobj:" << d->stats.nrecords << '\n';
                     ss << "  " << len << " bytes data w/headers\n";
                     ss << "  " << nlen << " bytes data wout/headers\n";
                 }

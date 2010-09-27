@@ -47,7 +47,7 @@ namespace mongo {
     NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool _capped ) {
         /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
         firstExtent = lastExtent = capExtent = loc;
-        datasize = nrecords = 0;
+        stats.datasize = stats.nrecords = 0;
         lastExtentSize = 0;
         nIndexes = 0;
         capped = _capped;
@@ -181,41 +181,43 @@ namespace mongo {
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
+        dur::assertReading(this);
 		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
+        dassert( dloc.drec() == d );
+        DeletedRecord *dold = d;
+        d = dur::writing(d);
         {
             // defensive code: try to make us notice if we reference a deleted record
             (unsigned&) (((Record *) d)->data) = 0xeeeeeeee;
         }
-        dassert( dloc.drec() == d );
-        DEBUGGING out() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
+        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
         if ( capped ) {
             if ( !cappedLastDelRecLastExtent().isValid() ) {
                 // Initial extent allocation.  Insert at end.
                 d->nextDeleted = DiskLoc();
                 if ( cappedListOfAllDeletedRecords().isNull() )
-                    cappedListOfAllDeletedRecords() = dloc;
+                    dur::writingDiskLoc( cappedListOfAllDeletedRecords() ) = dloc;
                 else {
                     DiskLoc i = cappedListOfAllDeletedRecords();
-                    for (; !i.drec()->nextDeleted.isNull(); i = i.drec()->nextDeleted );
-                    i.drec()->nextDeleted = dloc;
+                    for (; !i.drec()->nextDeleted.isNull(); i = i.drec()->nextDeleted )
+                        ;
+                    i.drec()->nextDeleted.writing() = dloc;
                 }
             } else {
                 d->nextDeleted = cappedFirstDeletedInCurExtent();
-                cappedFirstDeletedInCurExtent() = dloc;
+                dur::writingDiskLoc( cappedFirstDeletedInCurExtent() ) = dloc;
                 // always compact() after this so order doesn't matter
             }
         } else {
             int b = bucket(d->lengthWithHeaders);
             DiskLoc& list = deletedList[b];
             DiskLoc oldHead = list;
-            list = dloc;
+            dur::writingDiskLoc(list) = dloc;
             d->nextDeleted = oldHead;
         }
     }
 
-    /*
-       lenToAlloc is WITH header
-    */
+    // lenToAlloc is WITH header
     DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
         lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         DiskLoc loc = _alloc(ns, lenToAlloc);
@@ -223,6 +225,7 @@ namespace mongo {
             return loc;
 
         DeletedRecord *r = loc.drec();
+        r = dur::writing(r);
 
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
@@ -247,9 +250,10 @@ namespace mongo {
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
-        newDel->extentOfs = r->extentOfs;
-        newDel->lengthWithHeaders = left;
-        newDel->nextDeleted.Null();
+        DeletedRecord *newDelW = dur::writing(newDel);
+        newDelW->extentOfs = r->extentOfs;
+        newDelW->lengthWithHeaders = left;
+        newDelW->nextDeleted.Null();
 
         addDeletedRec(newDel, newDelLoc);
 
@@ -323,8 +327,8 @@ namespace mongo {
 
         /* unlink ourself from the deleted list */
         {
-            DeletedRecord *bmr = bestmatch.drec();
-            *bestprev = bmr->nextDeleted;
+            DeletedRecord *bmr = dur::writing(bestmatch.drec());
+            *dur::writing(bestprev) = bmr->nextDeleted;
             bmr->nextDeleted.setInvalid(); // defensive.
             assert(bmr->extentOfs < bestmatch.getOfs());
         }
@@ -394,6 +398,21 @@ namespace mongo {
         return cappedAlloc(ns,len);
     }
 
+    void NamespaceIndex::kill_ns(const char *ns) {
+        if ( !ht )
+            return;
+        Namespace n(ns);
+        ht->kill(n);
+
+        for( int i = 0; i<=1; i++ ) {
+            try {
+                Namespace extra(n.extraName(i).c_str());
+                ht->kill(extra);
+            }
+            catch(DBException&) { }
+        }
+    }
+
     /* extra space for indexes when more than 10 */
     NamespaceDetails::Extra* NamespaceIndex::newExtra(const char *ns, int i, NamespaceDetails *d) {
         assert( i >= 0 && i <= 1 );
@@ -440,7 +459,7 @@ namespace mongo {
             id = &idx(nIndexes,false);
         }
 
-        nIndexes++;
+        (*dur::writing(&nIndexes))++;
         if ( resetTransient )
             NamespaceDetailsTransient::get_w(thisns).addedIndex();
         return *id;

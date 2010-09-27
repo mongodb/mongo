@@ -69,9 +69,7 @@ namespace mongo {
         */
         Extent* createExtent(const char *ns, int approxSize, bool capped = false, int loops = 0);
 
-        DataFileHeader *getHeader() {
-            return header;
-        }
+        DataFileHeader *getHeader() { return header; }
 
         /* return max size an extent may be */
         static int maxSize();
@@ -292,10 +290,7 @@ namespace mongo {
             return ( version == VERSION ) && ( versionMinor == VERSION_MINOR );
         }
 
-        bool uninitialized() const {
-            if ( version == 0 ) return true;
-            return false;
-        }
+        bool uninitialized() const { return version == 0; }
 
         /*Record* __getRecord(DiskLoc dl) {
             int ofs = dl.getOfs();
@@ -307,12 +302,13 @@ namespace mongo {
             if ( uninitialized() ) {
                 assert(filelength > 32768 );
                 assert( HeaderSize == 8192 );
-                fileLength = filelength;
-                version = VERSION;
-                versionMinor = VERSION_MINOR;
-                unused.set( fileno, HeaderSize );
+                DataFileHeader *h = dur::writing(this);
+                h->fileLength = filelength;
+                h->version = VERSION;
+                h->versionMinor = VERSION_MINOR;
+                h->unused.set( fileno, HeaderSize );
                 assert( (data-(char*)this) == HeaderSize );
-                unusedLength = fileLength - HeaderSize - 16;
+                h->unusedLength = fileLength - HeaderSize - 16;
                 //memcpy(data+unusedLength, "      \nthe end\n", 16);
             }
         }

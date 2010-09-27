@@ -31,6 +31,12 @@ namespace mongo {
 
 #define VERIFYTHISLOC dassert( thisLoc.btree() == this );
 
+    BtreeBucket* DiskLoc::btreemod() const {
+        assert( _a != -1 );
+        BtreeBucket *b = (BtreeBucket*) btreeStore->get(*this, BucketSize);
+        return dur::writing(b);
+    }
+
     KeyNode::KeyNode(const BucketBasics& bb, const _KeyNode &k) :
             prevChildBucket(k.prevChildBucket),
             recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
@@ -50,8 +56,8 @@ namespace mongo {
     /* BucketBasics --------------------------------------------------- */
 
     inline void BucketBasics::modified(const DiskLoc& thisLoc) {
-        VERIFYTHISLOC
-        btreeStore->modified(thisLoc);
+//        VERIFYTHISLOC
+//        btreeStore->modified(thisLoc);
     }
 
     int BucketBasics::Size() const {
@@ -222,6 +228,7 @@ namespace mongo {
        the keynodes grow from the front.
     */
     inline int BucketBasics::_alloc(int bytes) {
+        dur::assertWriting(this);
         topSize += bytes;
         emptySize -= bytes;
         int ofs = totalDataSize() - topSize;
@@ -284,7 +291,6 @@ namespace mongo {
 
     /* insert a key in a bucket with no complexity -- no splits required */
     bool BucketBasics::basicInsert(const DiskLoc& thisLoc, int &keypos, const DiskLoc& recordLoc, const BSONObj& key, const Ordering &order) {
-        modified(thisLoc);
         assert( keypos >= 0 && keypos <= n );
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
         if ( bytesNeeded > emptySize ) {
@@ -294,13 +300,16 @@ namespace mongo {
         }
         for ( int j = n; j > keypos; j-- ) // make room
             k(j) = k(j-1);
-        n++;
-        emptySize -= sizeof(_KeyNode);
-        _KeyNode& kn = k(keypos);
+
+        BucketBasics *b = this;//dur::writing(this);
+
+        b->n++;
+        b->emptySize -= sizeof(_KeyNode);
+        _KeyNode& kn = b->k(keypos);
         kn.prevChildBucket.Null();
         kn.recordLoc = recordLoc;
-        kn.setKeyDataOfs((short) _alloc(key.objsize()) );
-        char *p = dataAt(kn.keyDataOfs());
+        kn.setKeyDataOfs((short) b->_alloc(key.objsize()) );
+        char *p = b->dataAt(kn.keyDataOfs());
         memcpy(p, key.objdata(), key.objsize());
         return true;
     }
@@ -633,7 +642,7 @@ found:
         bool found;
         DiskLoc loc = locate(id, thisLoc, key, Ordering::make(id.keyPattern()), pos, found, recordLoc, 1);
         if ( found ) {
-            loc.btree()->delKeyAtPos(loc, id, pos);
+            loc.btreemod()->delKeyAtPos(loc, id, pos);
             return true;
         }
         return false;
@@ -661,16 +670,10 @@ found:
             fix(thisLoc, k(i).prevChildBucket);
     }
 
-    /* insert a key in this bucket, splitting if necessary.
-       keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
-       NOTE this function may free some data, and as a result the value passed for keypos may
-       be invalid after calling insertHere()
-    */
-    void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
+    void BtreeBucket::_insertHere(DiskLoc thisLoc, int keypos,
                                  DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
                                  DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
     {
-        modified(thisLoc);
         if ( insert_debug )
             out() << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' '
                  << lchild.toString() << ' ' << rchild.toString() << " keypos:" << keypos << endl;
@@ -804,6 +807,20 @@ found:
 
         if ( split_debug )
             out() << "     split end " << hex << thisLoc.getOfs() << dec << endl;
+    }
+
+    /* insert a key in this bucket, splitting if necessary.
+       keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
+       NOTE this function may free some data, and as a result the value passed for keypos may
+       be invalid after calling insertHere()
+    */
+    void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
+                                 DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
+                                 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
+    {
+        modified(thisLoc);
+        BtreeBucket *b = dur::writing(this);
+        b->_insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
     }
 
     /* start a new index off, empty */
@@ -1247,7 +1264,7 @@ namespace mongo {
         while( 1 ) { 
             if( loc.btree()->tempNext().isNull() ) { 
                 // only 1 bucket at this level. we are done.
-                idx.head = loc;
+                dur::writingDiskLoc(idx.head) = loc;
                 break;
             }
             levels++;

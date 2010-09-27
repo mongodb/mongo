@@ -125,8 +125,10 @@ namespace mongo {
         */
         DiskLoc deletedList[Buckets];
         // ofs 168 (8 byte aligned)
-        long long datasize;
-        long long nrecords;
+        struct Stats {
+            long long datasize; //datasize and nrecords MUST Be adjacent code assumes!
+            long long nrecords;
+        } stats;
         int lastExtentSize;
         int nIndexes;
     private:
@@ -503,20 +505,7 @@ namespace mongo {
             return d;
         }
 
-        void kill_ns(const char *ns) {
-            if ( !ht )
-                return;
-            Namespace n(ns);
-            ht->kill(n);
-
-            for( int i = 0; i<=1; i++ ) {
-                try {
-                    Namespace extra(n.extraName(i).c_str());
-                    ht->kill(extra);
-                }
-                catch(DBException&) { }
-            }
-        }
+        void kill_ns(const char *ns);
 
         bool find(const char *ns, DiskLoc& loc) {
             NamespaceDetails *l = details(ns);

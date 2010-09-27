@@ -55,9 +55,12 @@ namespace mongo {
     }
     
     Manager::~Manager() { 
-        log() << "ERROR: ~Manager should never be called" << rsLog;
+        /* we don't destroy the replset object we sit in; however, the destructor could have thrown on init. 
+           the log message below is just a reminder to come back one day and review this code more, and to 
+           make it cleaner. 
+           */
+        log() << "info: ~Manager called" << rsLog;
         rs->mgr = 0;
-        assert(false);
     }
 
     void Manager::starting() { 
