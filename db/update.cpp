@@ -139,8 +139,13 @@ namespace mongo {
                     toadd.erase( cur );
                 }
                 
-                for ( BSONElementSet::iterator j=toadd.begin(); j!=toadd.end(); j++ ){
-                    bb.appendAs( *j , BSONObjBuilder::numStr( n++ ) );
+                {
+                    BSONObjIterator i( getEach() );
+                    while ( i.more() ){
+                        BSONElement e = i.next();
+                        if ( toadd.count(e) )
+                            bb.appendAs( e , BSONObjBuilder::numStr( n++ ) );
+                    }
                 }
 
             }
