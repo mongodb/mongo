@@ -253,9 +253,14 @@ namespace mongo {
             return keyOfs >= n ? BSONObj() : keyNode(keyOfs).key;
         }
         static BtreeBucket* allocTemp(); /* caller must release with free() */
+
+        void _insertHere(DiskLoc thisLoc, int keypos,
+                        DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
+                        DiskLoc lchild, DiskLoc rchild, IndexDetails&);
         void insertHere(DiskLoc thisLoc, int keypos,
                         DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
                         DiskLoc lchild, DiskLoc rchild, IndexDetails&);
+
         int _insert(DiskLoc thisLoc, DiskLoc recordLoc,
                     const BSONObj& key, const Ordering &order, bool dupsAllowed,
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);

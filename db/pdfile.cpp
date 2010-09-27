@@ -396,24 +396,25 @@ namespace mongo {
     }
 
     void addNewExtentToNamespace(const char *ns, Extent *e, DiskLoc eloc, DiskLoc emptyLoc, bool capped) { 
-        DiskLoc oldExtentLoc;
         NamespaceIndex *ni = nsindex(ns);
         NamespaceDetails *details = ni->details(ns);
         if ( details ) {
             assert( !details->lastExtent.isNull() );
             assert( !details->firstExtent.isNull() );
-            e->xprev = details->lastExtent;
-            details->lastExtent.ext()->xnext = eloc;
+            dur::writingDiskLoc(e->xprev) = details->lastExtent;
+            dur::writingDiskLoc(details->lastExtent.ext()->xnext) = eloc;
             assert( !eloc.isNull() );
-            details->lastExtent = eloc;
+            dur::writingDiskLoc(details->lastExtent) = eloc;
         }
         else {
             ni->add_ns(ns, eloc, capped);
             details = ni->details(ns);
         }
 
-        details->lastExtentSize = e->length;
-        DEBUGGING out() << "temp: newextent adddelrec " << ns << endl;
+        {
+            NamespaceDetails *dw = dur::writing(details);
+            dw->lastExtentSize = e->length;
+        }
         details->addDeletedRec(emptyLoc.drec(), emptyLoc);
     }
 
@@ -434,11 +435,13 @@ namespace mongo {
             return cc().database()->addAFile( 0, true )->createExtent(ns, approxSize, newCapped, loops+1);
         }
         int offset = header->unused.getOfs();
-        header->unused.set( fileNo, offset + ExtentSize );
-        header->unusedLength -= ExtentSize;
+
+        DataFileHeader *h = dur::writing(header);
+        h->unused.set( fileNo, offset + ExtentSize );
+        h->unusedLength -= ExtentSize;
         loc.set(fileNo, offset);
         Extent *e = _getExtent(loc);
-        DiskLoc emptyLoc = e->init(ns, ExtentSize, fileNo, offset);
+        DiskLoc emptyLoc = dur::writing(e)->init(ns, ExtentSize, fileNo, offset);
 
         addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
@@ -553,9 +556,7 @@ namespace mongo {
         emptyLoc.inc( (int) (_extentData-(char*)this) );
 
         int l = _length - (_extentData - (char *) this);
-        //DeletedRecord *empty1 = (DeletedRecord *) extentData;
-        DeletedRecord *empty = DataFileMgr::makeDeletedRecord(emptyLoc, l);
-        //assert( empty == empty1 );
+        DeletedRecord *empty = dur::writing( DataFileMgr::makeDeletedRecord(emptyLoc, l) );
         empty->lengthWithHeaders = l;
         empty->extentOfs = myLoc.getOfs();
         return emptyLoc;
@@ -750,12 +751,11 @@ namespace mongo {
             else { 
                 DiskLoc a = freeExtents->firstExtent;
                 assert( a.ext()->xprev.isNull() );
-                a.ext()->xprev = d->lastExtent;
-                d->lastExtent.ext()->xnext = a;
-                freeExtents->firstExtent = d->firstExtent;
-
-                d->firstExtent.setInvalid();
-                d->lastExtent.setInvalid();
+                dur::writingDiskLoc( a.ext()->xprev ) = d->lastExtent;
+                dur::writingDiskLoc( d->lastExtent.ext()->xnext ) = a;
+                dur::writingDiskLoc( freeExtents->firstExtent ) = d->firstExtent;
+                dur::writingDiskLoc( d->firstExtent ).setInvalid();
+                dur::writingDiskLoc( d->lastExtent ).setInvalid();
             }
         }
 
@@ -843,14 +843,14 @@ namespace mongo {
         /* remove ourself from the record next/prev chain */
         {
             if ( todelete->prevOfs != DiskLoc::NullOfs )
-                todelete->getPrev(dl).rec()->nextOfs = todelete->nextOfs;
+                dur::writingInt( todelete->getPrev(dl).rec()->nextOfs ) = todelete->nextOfs;
             if ( todelete->nextOfs != DiskLoc::NullOfs )
-                todelete->getNext(dl).rec()->prevOfs = todelete->prevOfs;
+                dur::writingInt( todelete->getNext(dl).rec()->prevOfs ) = todelete->prevOfs;
         }
 
         /* remove ourself from extent pointers */
         {
-            Extent *e = todelete->myExtent(dl);
+            Extent *e = dur::writing( todelete->myExtent(dl) );
             if ( e->firstRecord == dl ) {
                 if ( todelete->nextOfs == DiskLoc::NullOfs )
                     e->firstRecord.Null();
@@ -867,18 +867,26 @@ namespace mongo {
 
         /* add to the free list */
         {
-            d->nrecords--;
-            d->datasize -= todelete->netLength();
-            /* temp: if in system.indexes, don't reuse, and zero out: we want to be
-               careful until validated more, as IndexDetails has pointers
-               to this disk location.  so an incorrectly done remove would cause
-               a lot of problems.
-            */
+            {
+                NamespaceDetails::Stats *s = dur::writing(&d->stats);
+                s->datasize -= todelete->netLength();
+                s->nrecords--;
+            }
+
             if ( strstr(ns, ".system.indexes") ) {
-                memset(todelete, 0, todelete->lengthWithHeaders);
+                /* temp: if in system.indexes, don't reuse, and zero out: we want to be
+                   careful until validated more, as IndexDetails has pointers
+                   to this disk location.  so an incorrectly done remove would cause
+                   a lot of problems.
+                */
+                memset(dur::writingPtr(todelete, todelete->lengthWithHeaders), 0, todelete->lengthWithHeaders);
             }
             else {
-                DEV memset(todelete->data, 0, todelete->netLength()); // attempt to notice invalid reuse.
+                DEV {
+                    unsigned long long *p = (unsigned long long *) todelete->data;
+                    *dur::writing(p) = 0;
+                    //DEV memset(todelete->data, 0, todelete->netLength()); // attempt to notice invalid reuse.
+                }
                 d->addDeletedRec((DeletedRecord*)todelete, dl);
             }
         }
@@ -1082,7 +1090,7 @@ namespace mongo {
         bool dropDups = idx.dropDups() || inDBRepair;
         BSONObj order = idx.keyPattern();
 
-        idx.head.Null();
+        dur::writingDiskLoc(idx.head).Null();
         
         if ( logLevel > 1 ) printMemInfo( "before index start" );
 
@@ -1090,9 +1098,9 @@ namespace mongo {
         unsigned long long n = 0;
         shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         BSONObjExternalSorter sorter(order);
-        sorter.hintNumObjects( d->nrecords );
+        sorter.hintNumObjects( d->stats.nrecords );
         unsigned long long nkeys = 0;
-        ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->nrecords , 10 ) );
+        ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->stats.nrecords , 10 ) );
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();
@@ -1180,7 +1188,7 @@ namespace mongo {
             bool dupsAllowed = !idx.unique();
             bool dropDups = idx.dropDups();
 
-            ProgressMeter& progress = cc().curop()->setMessage( "bg index build" , d->nrecords );
+            ProgressMeter& progress = cc().curop()->setMessage( "bg index build" , d->stats.nrecords );
 
             unsigned long long n = 0;
             auto_ptr<ClientCursor> cc;
@@ -1333,7 +1341,7 @@ namespace mongo {
         if ( d == 0 || (d->flags & NamespaceDetails::Flag_HaveIdIndex) )
             return;
 
-        d->flags |= NamespaceDetails::Flag_HaveIdIndex;
+        *dur::writing(&d->flags) |= NamespaceDetails::Flag_HaveIdIndex;
 
         {
             NamespaceDetails::IndexIterator i = d->ii();
@@ -1532,6 +1540,7 @@ namespace mongo {
 
         Record *r = loc.rec();
         assert( r->lengthWithHeaders >= lenWHdr );
+        r = (Record*) dur::writingPtr(r, lenWHdr);
         if( addID ) { 
             /* a little effort was made here to avoid a double copy when we add an ID */
             ((int&)*r->data) = *((int*) obuf) + newId->size();
@@ -1542,22 +1551,25 @@ namespace mongo {
             if( obuf )
                 memcpy(r->data, obuf, len);
         }
-        Extent *e = r->myExtent(loc);
+        Extent *e = dur::writing(r->myExtent(loc));
         if ( e->lastRecord.isNull() ) {
             e->firstRecord = e->lastRecord = loc;
             r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
         }
         else {
-
             Record *oldlast = e->lastRecord.rec();
             r->prevOfs = e->lastRecord.getOfs();
             r->nextOfs = DiskLoc::NullOfs;
-            oldlast->nextOfs = loc.getOfs();
+            dur::writing(oldlast)->nextOfs = loc.getOfs();
             e->lastRecord = loc;
         }
 
-        d->nrecords++;
-        d->datasize += r->netLength();
+        /* durability todo : this could be a bit annoying / slow to record constantly */
+        {
+            NamespaceDetails::Stats *s = dur::writing(&d->stats);
+            s->datasize += r->netLength();
+            s->nrecords++;
+        }
 
         // we don't bother clearing those stats for the god tables - also god is true when adidng a btree bucket
         if ( !god )
@@ -1578,7 +1590,7 @@ namespace mongo {
 
             int idxNo = tableToIndex->nIndexes;
             IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str(), !background); // clear transient info caches so they refresh; increments nIndexes
-            idx.info = loc;
+            dur::writingDiskLoc(idx.info) = loc;
             try {
                 buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background);
             } catch( DBException& e ) {
@@ -1669,8 +1681,12 @@ namespace mongo {
             e->lastRecord = loc;
         }
 
-        d->nrecords++;
-        d->datasize += r->netLength();
+        /* todo: don't update for oplog?  seems wasteful. */
+        {
+            NamespaceDetails::Stats *s = dur::writing(&d->stats);
+            s->datasize += r->netLength();
+            s->nrecords++;
+        }
 
         return r;
     }

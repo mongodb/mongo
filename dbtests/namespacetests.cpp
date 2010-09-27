@@ -604,7 +604,7 @@ namespace NamespaceTests {
                         ++count;
                     }
                 }
-                ASSERT_EQUALS( count, nsd()->nrecords );
+                ASSERT_EQUALS( count, nsd()->stats.nrecords );
                 return count;
             }
             int nExtents() const {
@@ -620,7 +620,7 @@ namespace NamespaceTests {
                 return ns_;
             }
             NamespaceDetails *nsd() const {
-                return nsdetails( ns() );
+                return dur::writing( nsdetails( ns() ) );
             }
             static BSONObj bigObj() {
                 string as( 187, 'a' );
@@ -737,9 +737,9 @@ namespace NamespaceTests {
                 }
 
                 DiskLoc d = l[6];
-                long long n = nsd->nrecords;
+                long long n = nsd->stats.nrecords;
                 nsd->cappedTruncateAfter(ns(), d, false);
-                ASSERT_EQUALS( nsd->nrecords , n-1 );
+                ASSERT_EQUALS( nsd->stats.nrecords , n-1 );
 
                 {
                     ForwardCappedCursor c(nsd);
@@ -770,7 +770,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 nsd()->deletedList[ 2 ] = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted;
-                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted = DiskLoc();
+                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted.writing() = DiskLoc();
                 nsd()->cappedLastDelRecLastExtent().Null();
                 NamespaceDetails *d = nsd();
                 zero( &d->capExtent );

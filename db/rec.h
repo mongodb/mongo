@@ -51,7 +51,7 @@ public:
         theDataFileMgr._deleteRecord(nsdetails_notinline(ns), ns, d.rec(), d);
     }
 
-    VIRT void modified(DiskLoc d) { }
+//goingaway    VIRT void modified(DiskLoc d) { }
 
     VIRT void drop(const char *ns) { 
         dropNS(ns);
@@ -125,13 +125,6 @@ const int BucketSize = 8192;
 inline BtreeBucket* DiskLoc::btree() const {
     assert( _a != -1 );
     return (BtreeBucket*) btreeStore->get(*this, BucketSize);
-}
-
-inline BtreeBucket* DiskLoc::btreemod() const {
-    assert( _a != -1 );
-    BtreeBucket *b = (BtreeBucket*) btreeStore->get(*this, BucketSize);
-    btreeStore->modified(*this);
-    return b;
 }
 
 }

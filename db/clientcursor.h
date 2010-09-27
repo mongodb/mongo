@@ -292,33 +292,22 @@ namespace mongo {
         void storeOpForSlave( DiskLoc last );
         void updateSlaveLocation( CurOp& curop );
         
-        unsigned idleTime(){
-            return _idleAgeMillis;
-        }
+        unsigned idleTime() const { return _idleAgeMillis; }
 
         static void idleTimeReport(unsigned millis);
 private:
         // cursors normally timeout after an inactivy period to prevent excess memory use
         // setting this prevents timeout of the cursor in question.
-        void noTimeout() { 
-            _pinValue++;
-        }
+        void noTimeout() { _pinValue++; }
 
-        multimap<DiskLoc, ClientCursor*>& byLoc() { 
-            return _db->ccByLoc;
-        }
+        multimap<DiskLoc, ClientCursor*>& byLoc() { return _db->ccByLoc; }
 public:
-        void setDoingDeletes( bool doingDeletes ){
-            _doingDeletes = doingDeletes;
-        }
+        void setDoingDeletes( bool doingDeletes ) {_doingDeletes = doingDeletes; }
         
         static void appendStats( BSONObjBuilder& result );
-
         static unsigned numCursors() { return clientCursorsById.size(); }
-
         static void informAboutToDeleteBucket(const DiskLoc& b);
         static void aboutToDelete(const DiskLoc& dl);
-
         static void find( const string& ns , set<CursorId>& all );
     };
 

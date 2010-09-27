@@ -525,7 +525,7 @@ namespace mongo {
         
         // count of all objects
         if ( query.isEmpty() ){
-            return applySkipLimit( d->nrecords , cmd );
+            return applySkipLimit( d->stats.nrecords , cmd );
         }
         MultiPlanScanner mps( ns, query, BSONObj(), 0, true, BSONObj(), BSONObj(), false, true );
         CountOp original( ns , cmd );

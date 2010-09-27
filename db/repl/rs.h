@@ -75,7 +75,7 @@ namespace mongo {
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
-        ~Manager();
+        virtual ~Manager();
         void msgReceivedNewConfig(BSONObj);
         void msgCheckNewState();
     };

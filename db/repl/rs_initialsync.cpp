@@ -74,7 +74,7 @@ namespace mongo {
 		NamespaceDetails *d = nsdetails(rsoplog);
 
 		// temp
-		if( d && d->nrecords == 0 )
+		if( d && d->stats.nrecords == 0 )
 		  return; // already empty, ok.
 
         log(1) << "replSet empty oplog" << rsLog;

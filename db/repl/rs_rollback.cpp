@@ -524,7 +524,7 @@ namespace mongo {
                            }
                        }
                        // did we just empty the collection?  if so let's check if it even exists on the source.
-                       if( nsd->nrecords == 0 ) {
+                       if( nsd->stats.nrecords == 0 ) {
                            try { 
                                string sys = cc().database()->name + ".system.namespaces";
                                bo o = them->findOne(sys, QUERY("name"<<d.ns));

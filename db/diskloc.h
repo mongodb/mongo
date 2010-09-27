@@ -127,6 +127,8 @@ namespace mongo {
             return compare(b) < 0;
         }
 
+        DiskLoc& writing(); // see dur.h
+
         /* Get the "thing" associated with this disk location.
            it is assumed the object is what you say it is -- you must assure that
            (think of this as an unchecked type cast)

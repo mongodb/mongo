@@ -22,8 +22,11 @@
 
 namespace mongo {
 
+    static map<void *, MemoryMappedFile*> viewToWriteable;
+    static mutex viewToWriteableMutex("viewToWriteableMutex");
+
     MemoryMappedFile::MemoryMappedFile()
-        : _flushMutex(new mutex("flushMutex"))
+        : _flushMutex(new mutex("flushMutex")), _filename("??")
     {
         fd = 0;
         maphandle = 0;
@@ -33,8 +36,17 @@ namespace mongo {
     }
 
     void MemoryMappedFile::close() {
-        if ( view )
+        //log() << "dur mmap close " << filename() << endl;
+        if ( view ) {
+            {
+                mutex::scoped_lock lk(viewToWriteableMutex);
+                viewToWriteable.erase(view);
+            }
             UnmapViewOfFile(view);
+#if defined(_DURABLE)
+            UnmapViewOfFile(writeView);
+#endif
+        }
         view = 0;
         if ( maphandle )
             CloseHandle(maphandle);
@@ -61,6 +73,9 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::map(const char *filenameIn, unsigned long long &length, int options) {
+#if defined(_DURABLE)
+        options |= READONLY;
+#endif
         _filename = filenameIn;
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];
@@ -80,37 +95,38 @@ namespace mongo {
 
         updateLength( filename, length );
 
-        DWORD createOptions = FILE_ATTRIBUTE_NORMAL;
-        if ( options & SEQUENTIAL )
-            createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
-        DWORD rw = GENERIC_READ | GENERIC_WRITE;
-        //if ( options & READONLY ) 
-        //    rw = GENERIC_READ;
-
-        fd = CreateFile(
-                 toNativeString(filename).c_str(),
-                 rw, // desired access
-                 FILE_SHARE_READ, // share mode
-                 NULL, // security
-                 OPEN_ALWAYS, // create disposition
-                 createOptions , // flags
-                 NULL); // hTempl
-        if ( fd == INVALID_HANDLE_VALUE ) {
-            log() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
-            return 0;
+        {
+            DWORD createOptions = FILE_ATTRIBUTE_NORMAL;
+            if ( options & SEQUENTIAL )
+                createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
+            DWORD rw = GENERIC_READ | GENERIC_WRITE;
+            fd = CreateFile(
+                     toNativeString(filename).c_str(),
+                     rw, // desired access
+                     FILE_SHARE_READ, // share mode
+                     NULL, // security
+                     OPEN_ALWAYS, // create disposition
+                     createOptions , // flags
+                     NULL); // hTempl
+            if ( fd == INVALID_HANDLE_VALUE ) {
+                log() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
+                return 0;
+            }
         }
 
         mapped += length;
 
-        DWORD flProtect = PAGE_READWRITE; //(options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
-        maphandle = CreateFileMapping(fd, NULL, flProtect, 
-            length >> 32 /*maxsizehigh*/, 
-            (unsigned) length /*maxsizelow*/, 
-            NULL/*lpName*/);
-        if ( maphandle == NULL ) {
-            DWORD e = GetLastError(); // log() call was killing lasterror before we get to that point in the stream
-            log() << "CreateFileMapping failed " << filename << ' ' << errnoWithDescription(e) << endl;
-            return 0;
+        {
+            DWORD flProtect = PAGE_READWRITE; //(options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
+            maphandle = CreateFileMapping(fd, NULL, flProtect, 
+                length >> 32 /*maxsizehigh*/, 
+                (unsigned) length /*maxsizelow*/, 
+                NULL/*lpName*/);
+            if ( maphandle == NULL ) {
+                DWORD e = GetLastError(); // log() call was killing lasterror before we get to that point in the stream
+                log() << "CreateFileMapping failed " << filename << ' ' << errnoWithDescription(e) << endl;
+                return 0;
+            }
         }
 
         {
@@ -122,8 +138,57 @@ namespace mongo {
             log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << endl;
         }
         len = length;
+
+#if defined(_DURABLE)
+        {
+            if( !( options & READONLY ) ) { 
+                log() << "dur: not readonly view which is wrong : " << filename << endl;
+            }
+            void *p = MapViewOfFile(maphandle, FILE_MAP_ALL_ACCESS, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
+            assert( p );
+            writeView = p;
+            {
+                mutex::scoped_lock lk(viewToWriteableMutex);
+                viewToWriteable[view] = this;
+            }
+            log() << filenameIn << endl;
+            log() << "  ro: " << view << " - " << (void*) (((char *)view)+length) << endl;
+            log() << "  w : " << writeView << " - " << (void*) (((char *)writeView)+length) << endl;
+        }
+#endif
+
         return view;
     }
+
+#if defined(_DURABLE) && defined(_DEBUG)
+  void* MemoryMappedFile::getWriteViewFor(void *p) { 
+        mutex::scoped_lock lk(viewToWriteableMutex);
+        std::map< void*, MemoryMappedFile* >::iterator i = 
+            viewToWriteable.upper_bound(((char *)p)+1);
+        i--;
+        assert( i != viewToWriteable.end() );
+        MemoryMappedFile *mmf = i->second;
+        assert( mmf );
+
+        size_t ofs = ((char *)p) - ((char*)mmf->view);
+
+        if( ofs >= mmf->len ) {
+            log() << "getWriteViewFor error? " << p << endl;
+            for( std::map<void*,MemoryMappedFile*>::iterator i = viewToWriteable.begin(); i != viewToWriteable.end(); i++ ) { 
+                char *wl = (char *) i->second->writeView;
+                char *wh = wl + i->second->length();
+                if( p >= wl && p < wh ) { 
+                    log() << "dur ERROR p " << p << " is already in the writable view of " << i->second->filename() << endl;
+                    //wassert(false);
+                    // could do this:
+                    return p;
+                }
+            }
+            assert( ofs < mmf->len ); // did you call writing() with a pointer that isn't into a datafile?
+        }
+        return ((char *)mmf->writeView) + ofs;
+    }
+#endif
 
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:

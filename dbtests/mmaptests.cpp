@@ -1,5 +1,4 @@
-// socktests.cpp : sock.{h,cpp} unit tests.
-//
+// @file mmaptests.cpp
 
 /**
  *    Copyright (C) 2008 10gen Inc.

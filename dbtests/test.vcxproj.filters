@@ -704,6 +704,9 @@
     <ClCompile Include="..\scripting\bench.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\dur.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

@@ -954,7 +954,7 @@ namespace mongo {
             Client::Context ctx( ns );
             NamespaceDetails *d = nsdetails(ns.c_str());
             
-            if ( ! d || d->nrecords == 0 ){
+            if ( ! d || d->stats.nrecords == 0 ){
                 result.appendNumber( "size" , 0 );
                 result.appendNumber( "numObjects" , 0 );
                 result.append( "millis" , timer.millis() );
@@ -966,8 +966,8 @@ namespace mongo {
             shared_ptr<Cursor> c;
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ){
-                    result.appendNumber( "size" , d->datasize );
-                    result.appendNumber( "numObjects" , d->nrecords );
+                    result.appendNumber( "size" , d->stats.datasize );
+                    result.appendNumber( "numObjects" , d->stats.nrecords );
                     result.append( "millis" , timer.millis() );
                     return 1;
                 }
@@ -985,7 +985,7 @@ namespace mongo {
                 c.reset( new BtreeCursor( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }
             
-            long long avgObjSize = d->datasize / d->nrecords;
+            long long avgObjSize = d->stats.datasize / d->stats.nrecords;
 
             long long maxSize = jsobj["maxSize"].numberLong();
             long long maxObjects = jsobj["maxObjects"].numberLong();
@@ -1043,9 +1043,9 @@ namespace mongo {
                     log() << "error: have index ["  << collNS << "] but no NamespaceDetails" << endl;
                     continue;
                 }
-                totalSize += mine->datasize;
+                totalSize += mine->stats.datasize;
                 if ( details )
-                    details->appendNumber( d.indexName() , mine->datasize / scale );
+                    details->appendNumber( d.indexName() , mine->stats.datasize / scale );
             }
             return totalSize;
         }
@@ -1085,10 +1085,10 @@ namespace mongo {
                 return false;
             }
 
-            long long size = nsd->datasize / scale;
-            result.appendNumber( "count" , nsd->nrecords );
+            long long size = nsd->stats.datasize / scale;
+            result.appendNumber( "count" , nsd->stats.nrecords );
             result.appendNumber( "size" , size );
-            result.append      ( "avgObjSize" , double(size) / double(nsd->nrecords) );
+            result.append      ( "avgObjSize" , double(size) / double(nsd->stats.nrecords) );
             int numExtents;
             result.appendNumber( "storageSize" , nsd->storageSize( &numExtents ) / scale );
             result.append( "numExtents" , numExtents );
@@ -1143,8 +1143,8 @@ namespace mongo {
                 }
 
                 ncollections += 1;
-                objects += nsd->nrecords;
-                size += nsd->datasize;
+                objects += nsd->stats.nrecords;
+                size += nsd->stats.datasize;
 
                 int temp;
                 storageSize += nsd->storageSize( &temp );
@@ -1191,7 +1191,7 @@ namespace mongo {
             string toNs = dbname + "." + to;
             NamespaceDetails *nsd = nsdetails( fromNs.c_str() );
             massert( 10301 ,  "source collection " + fromNs + " does not exist", nsd );
-            long long excessSize = nsd->datasize - size * 2; // datasize and extentSize can't be compared exactly, so add some padding to 'size'
+            long long excessSize = nsd->stats.datasize - size * 2; // datasize and extentSize can't be compared exactly, so add some padding to 'size'
             DiskLoc extent = nsd->firstExtent;
             for( ; excessSize > extent.ext()->length && extent != nsd->lastExtent; extent = extent.ext()->xnext ) {
                 excessSize -= extent.ext()->length;
@@ -1485,6 +1485,8 @@ namespace mongo {
 
                 if (!cc->yieldSometimes())
                     break;
+
+                RARELY killCurrentOp.checkForInterrupt();
             }
 
             BSONArrayBuilder b( result.subarrayStart( "values" ) );

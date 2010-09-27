@@ -225,11 +225,15 @@ struct OP_GETMORE : public MSGHEADER {
         int len; /* len of the msg, including this field */
         MSGID id; /* request/reply id's match... */
         MSGID responseTo; /* id of the message we are responding to */
-        int _operation;
+        short _operation;
+        char _flags;
+        char _version;
         int operation() const {
             return _operation;
         }
         void setOperation(int o) {
+            _flags = 0;
+            _version = 0;
             _operation = o;
         }
         char _data[4];
@@ -241,7 +245,7 @@ struct OP_GETMORE : public MSGHEADER {
         bool valid(){
             if ( len <= 0 || len > ( 1024 * 1024 * 10 ) )
                 return false;
-            if ( _operation < 0 || _operation > 100000 )
+            if ( _operation < 0 || _operation > 30000 )
                 return false;
             return true;
         }

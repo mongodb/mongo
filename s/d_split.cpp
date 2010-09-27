@@ -196,8 +196,8 @@ namespace mongo {
                 return false;
             }
 
-            const long long recCount = d->nrecords;
-            const long long dataSize = d->datasize;
+            const long long recCount = d->stats.nrecords;
+            const long long dataSize = d->stats.datasize;
             
             // If there's not enough data for more than one chunk, no point continuing.
             if ( dataSize < maxChunkSize || recCount == 0 ) {
