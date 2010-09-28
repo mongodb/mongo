@@ -1,3 +1,11 @@
+mongodb (1.7.1) unstable; urgency=low
+
+  * sharding lots of changes
+  * replica_sets lots of changes
+  * see http://jira.mongodb.org/browse/SERVER/fixforversion/10193
+
+ -- Richard Kreuter <richard@10gen.com>  Tue, 28 Sep 2010 16:56:28 -0500
+
 mongodb (1.7.0) unstable; urgency=low
 
   * sharding lots of changes
