@@ -236,7 +236,7 @@ namespace mongo {
             srand( (unsigned) seed );
             printGitVersion();
             printSysInfo();
-            out() << "random seed: " << seed << endl;
+            log() << "random seed: " << seed << endl;
 
             theFileAllocator().start();
 
