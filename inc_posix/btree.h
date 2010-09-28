@@ -144,7 +144,7 @@ struct __wt_page {
 	/*
 	 * This limits a page size to 4GB -- we could use off_t's here if we
 	 * need something bigger, but the page-size configuration code limits
-	 * page sizes to 128MB.
+	 * page sizes already.
 	 */
 	u_int32_t addr;			/* Page's file allocation address */
 	u_int32_t size;			/* Page size */
@@ -167,9 +167,7 @@ struct __wt_page {
 	 * a page: this means (1) the page has a hazard reference, and (2) no
 	 * other thread is modifying the page when the modified field is set.
 	 * For those reasons, the modified field doesn't need to be an atomic
-	 * set, and could even bit a bit flag, but it's not one for now -- I
-	 * don't want to introduce a bug where an update is lost because of a
-	 * read-modify-write cycle.
+	 * set, and could even be a bit flag.
 	 *
 	 * The modified set must be flushed before the page's hazard reference
 	 * is released and the cache drain server is able to select this page.
