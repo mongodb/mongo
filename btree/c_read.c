@@ -50,7 +50,6 @@ __wt_workq_read_server(ENV *env, int read_priority)
 	if (!cache->read_sleeping || (cache->read_lockout && !read_priority))
 		return;
 
-	WT_VERBOSE(env, WT_VERB_SERVERS, (env, "waking cache read server"));
 	cache->read_sleeping = 0;
 	__wt_unlock(env, cache->mtx_read);
 }
@@ -81,6 +80,8 @@ __wt_cache_read_server(void *arg)
 		    WT_VERB_SERVERS, (env, "cache read server sleeping"));
 		cache->read_sleeping = 1;
 		__wt_lock(env, cache->mtx_read);
+		WT_VERBOSE(
+		    env, WT_VERB_SERVERS, (env, "cache read server waking"));
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by

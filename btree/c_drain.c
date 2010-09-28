@@ -57,8 +57,6 @@ __wt_workq_drain_server(ENV *env)
 	 * Wake the cache drain thread; no memory flush needed, the
 	 * drain_sleeping field is declared volatile.
 	 */
-	WT_VERBOSE(env,
-	    WT_VERB_SERVERS, (env, "workQ waking cache drain server"));
 	cache->drain_sleeping = 0;
 	__wt_unlock(env, cache->mtx_drain);
 }
@@ -100,6 +98,8 @@ __wt_cache_drain_server(void *arg)
 		    WT_VERB_SERVERS, (env, "cache drain server sleeping"));
 		cache->drain_sleeping = 1;
 		__wt_lock(env, cache->mtx_drain);
+		WT_VERBOSE(env,
+		    WT_VERB_SERVERS, (env, "cache drain server waking"));
 
 		for (;;) {
 			/*
