@@ -40,6 +40,33 @@ doTest = function( signal ) {
   indexes = slave[1].stats().indexes;
   assert.eq(indexes, 1);
 
+  
+  indexes = slave[0].x.stats().indexSizes;
+  printjson(indexes);
+  
+  var count = 0;
+  for (var i in indexes) {
+    count++;
+    if (i == "_id_") {
+      continue;
+    }
+    print(i);
+    print(i.match(/y_/));
+    assert(i.match(/y_/));
+  }
+
+  assert.eq(count, 2);
+  
+  indexes = slave[1].x.stats().indexSizes;
+  printjson(indexes);
+
+  count = 0;
+  for (var i in indexes) {
+    count++;
+  }  
+
+  assert.eq(count, 1);
+
   replTest.stopSet(15);
 }
 
