@@ -351,7 +351,7 @@ namespace mongo {
                 v = -3;
                 c = conn->query( rsConfigNs, Query() );
             }
-            catch ( DBException& e) {
+            catch ( DBException& ) {
                 if ( !h.isSelf() ) {
                     throw;
                 }
