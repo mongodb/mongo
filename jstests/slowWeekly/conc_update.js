@@ -16,36 +16,39 @@ print("making an index (this will take a while)")
 db.conc.ensureIndex({x:1})
 
 var c1=db.conc.count({x:{$lt:NRECORDS}})
-// this is just a flag that the child will toggle when it's done.
-db.concflag.update({}, {inprog:true}, true)
 
 updater=startParallelShell("db=db.getSisterDB('concurrency');\
+                           db.concflag.insert( {inprog:true} );\
+                           sleep(20);\
 			   db.conc.update({}, {$inc:{x: "+NRECORDS+"}}, false, true);\
 			   e=db.getLastError();\
 			   print('update error: '+ e);\
 			   db.concflag.update({},{inprog:false});\
 			   assert.eq(e, null, \"update failed\");");
 
+assert.soon( function(){ var x = db.concflag.findOne(); return x && x.inprog; } , 
+             "wait for fork" , 30000 , 1 );
+
 querycount=0;
 decrements=0;
 misses=0
-while (1) {
-    if (db.concflag.findOne().inprog) {
+
+assert.soon( 
+    function(){
 	c2=db.conc.count({x:{$lt:NRECORDS}})
-	e=db.getLastError()
  	print(c2)
-	print(e)
-	assert.eq(e, null, "some count() failed")
 	querycount++;
 	if (c2<c1)
 	    decrements++;
 	else
 	    misses++;
-	c1 = c2;
-    } else
-	break;
-    sleep(10);
-}
+	c1 = c2;        
+        return ! db.concflag.findOne().inprog;
+    } , 
+    "update never finished" , 3600 * 1000 , 10 );
+
 print(querycount + " queries, " + decrements + " decrements, " + misses + " misses");
+
+assert.eq( NRECORDS , db.conc.count() , "AT END 1" )
 
 updater() // wait()
