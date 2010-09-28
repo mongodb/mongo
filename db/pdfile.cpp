@@ -261,7 +261,7 @@ namespace mongo {
         }
 
         if ( mx > 0 )
-            d->max = mx;
+            dur::writingInt( d->max ) = mx;
 
         return true;
     }
@@ -1108,9 +1108,9 @@ namespace mongo {
             idx.getKeysFromObject(o, keys);
             int k = 0;
             for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
-                if( ++k == 2 )
+                if( ++k == 2 ) {
                     d->setIndexIsMultikey(idxNo);
-                //cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
+                }
                 sorter.add(*i, loc);
                 nkeys++;
             }

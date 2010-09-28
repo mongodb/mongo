@@ -183,8 +183,12 @@ namespace mongo {
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
         dur::assertReading(this);
 		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
-        dassert( dloc.drec() == d );
-        //DeletedRecord *dold = d;
+
+#if defined(_DEBUG) && !defined(_DURABLE)
+        if( dloc.drec() != d ) {
+            assert(false);
+        }
+#endif
         d = dur::writing(d);
         {
             // defensive code: try to make us notice if we reference a deleted record

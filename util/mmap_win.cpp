@@ -173,17 +173,15 @@ namespace mongo {
         size_t ofs = ((char *)p) - ((char*)mmf->view);
 
         if( ofs >= mmf->len ) {
-            log() << "getWriteViewFor error? " << p << endl;
             for( std::map<void*,MemoryMappedFile*>::iterator i = viewToWriteable.begin(); i != viewToWriteable.end(); i++ ) { 
                 char *wl = (char *) i->second->writeView;
                 char *wh = wl + i->second->length();
                 if( p >= wl && p < wh ) { 
-                    log() << "dur ERROR p " << p << " is already in the writable view of " << i->second->filename() << endl;
-                    //wassert(false);
-                    // could do this:
+                    log() << "dur: perf warning p=" << p << " is already in the writable view of " << i->second->filename() << endl;
                     return p;
                 }
             }
+            log() << "getWriteViewFor error? " << p << endl;
             assert( ofs < mmf->len ); // did you call writing() with a pointer that isn't into a datafile?
         }
         return ((char *)mmf->writeView) + ofs;

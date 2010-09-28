@@ -260,11 +260,15 @@ namespace mongo {
         bool isMultikey(int i) { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
         void setIndexIsMultikey(int i) { 
             dassert( i < NIndexesMax );
-            multiKeyIndexBits |= (((unsigned long long) 1) << i);
+            unsigned long long x = ((unsigned long long) 1) << i;
+            if( multiKeyIndexBits & x ) return;
+            *dur::writing(&multiKeyIndexBits) |= x;
         }
         void clearIndexIsMultikey(int i) { 
             dassert( i < NIndexesMax );
-            multiKeyIndexBits &= ~(((unsigned long long) 1) << i);
+            unsigned long long x = ((unsigned long long) 1) << i;
+            if( (multiKeyIndexBits & x) == 0 ) return;
+            *dur::writing(&multiKeyIndexBits) &= ~x;
         }
 
         /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
