@@ -22,6 +22,7 @@
 #include "btree.h"
 #include "query.h"
 #include "background.h"
+#include "repl/rs.h"
 
 namespace mongo {
 
@@ -154,10 +155,9 @@ namespace mongo {
 
        throws DBException
 
-       @return 
-         true if ok to continue.  when false we stop/fail silently (index already exists)
-         sourceNS - source NS we are indexing
-         sourceCollection - its details ptr
+       @param sourceNS - source NS we are indexing
+       @param sourceCollection - its details ptr
+       @return true if ok to continue.  when false we stop/fail silently (index already exists)
     */
     bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection, BSONObj& fixedIndexObject ) {
         sourceCollection = 0;
@@ -223,13 +223,21 @@ namespace mongo {
         uassert(12588, "cannot add index with a background operation in progress", 
             !BackgroundOperation::inProgForNs(sourceNS.c_str()));
 
-
         /* this is because we want key patterns like { _id : 1 } and { _id : <someobjid> } to 
            all be treated as the same pattern.
         */
-        if ( !god && IndexDetails::isIdIndexPattern(key) ) {
-            ensureHaveIdIndex( sourceNS.c_str() );
-            return false;
+        if ( IndexDetails::isIdIndexPattern(key) ) {
+            if( !god ) {
+                ensureHaveIdIndex( sourceNS.c_str() );
+                return false;
+            }
+        }
+        else { 
+            /* is buildIndexes:false set for this replica set member? 
+               if so we don't build any indexes except _id
+            */
+            if( theReplSet && !theReplSet->buildIndexes() ) 
+                return false;
         }
         
         string pluginName = IndexPlugin::findPluginName( key );
