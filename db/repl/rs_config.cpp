@@ -337,9 +337,21 @@ namespace mongo {
             }
 
             v = -4;
-            ScopedConn conn(h.toString());
-            v = -3;
-            c = conn->query(rsConfigNs);
+            try {
+                ScopedConn conn(h.toString());
+                v = -3;
+                c = conn->query( rsConfigNs, Query() );
+            }
+            catch ( DBException& e) {
+                if ( !h.isSelf() ) {
+                    throw;
+                }
+
+                // on startup, socket is not listening yet
+                DBDirectClient cli;
+                c = cli.query( rsConfigNs, Query() );
+            }
+            
             if( c.get() == 0 ) {
                 version = v; return;
             }
