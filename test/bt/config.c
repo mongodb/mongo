@@ -87,6 +87,15 @@ config(void)
 		if (cp->flags & C_BOOL)
 			*cp->v = *cp->v == 1 ? 1 : 0;
 	}
+
+	/*
+	 * There are a couple of corrections the table doesn't handle, where
+	 * initialized values are relative to each other.
+	 */
+	if (g.c_intl_node_max < g.c_intl_node_min)
+		g.c_intl_node_max = g.c_intl_node_min;
+	if (g.c_leaf_node_max < g.c_leaf_node_min)
+		g.c_leaf_node_max = g.c_leaf_node_min;
 }
 
 /*
