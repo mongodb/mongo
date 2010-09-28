@@ -41,7 +41,7 @@ static CONFIG c[] = {
 	{ "read_pct",		0,		0,		0,	100,		&g.c_read_pct },
 	{ "repeat_comp",	C_FIX,		0,		0,	1,		&g.c_repeat_comp },
 	{ "repeat_comp_pct",	C_FIX,		0,		10,	90,		&g.c_repeat_comp_pct },
+	{ "rows",		0,		0,		100,	M(1),		&g.c_rows },
 	{ "runs",		0,		C_IGNORE,	0,	UINT_MAX,	&g.c_runs },
-	{ "total",		0,		0,		100,	M(1),		&g.c_total },
 	{ NULL, 0, 0, 0, 0, NULL }
 };

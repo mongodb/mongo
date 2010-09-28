@@ -267,8 +267,8 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 	db = NULL;					/* Lint */
 	++g.key_cnt;
 
-	if (g.key_cnt > g.c_total) {
-		g.key_cnt = g.c_total;
+	if (g.key_cnt > g.c_rows) {
+		g.key_cnt = g.c_rows;
 		return (1);
 	}
 
@@ -327,7 +327,7 @@ wts_ops()
 		 * it worked.
 		 */
 		op = wts_rand() % 100;
-		keyno = MMRAND(1, g.c_total);
+		keyno = MMRAND(1, g.c_rows);
 		if ((u_int32_t)op > g.c_read_pct) {
 			if (MMRAND(1, 5) == 1) {	/* 20% deletes */
 				switch (g.c_database_type) {
@@ -386,8 +386,8 @@ wts_read_row_scan()
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
 		cnt += wts_rand() % 17 + 1;
-		if (cnt > g.c_total)
-			cnt = g.c_total;
+		if (cnt > g.c_rows)
+			cnt = g.c_rows;
 		if (cnt - last_cnt > 1000) {
 			track("read row scan", cnt);
 			last_cnt = cnt;
@@ -468,10 +468,10 @@ wts_read_col_scan()
 	u_int64_t cnt, last_cnt;
 
 	/* Check a random subset of the records using the record number. */
-	for (last_cnt = cnt = 0; cnt < g.c_total;) {
+	for (last_cnt = cnt = 0; cnt < g.c_rows;) {
 		cnt += wts_rand() % 17 + 1;
-		if (cnt > g.c_total)
-			cnt = g.c_total;
+		if (cnt > g.c_rows)
+			cnt = g.c_rows;
 		if (cnt - last_cnt > 1000) {
 			track("read column scan", cnt);
 			last_cnt = cnt;
