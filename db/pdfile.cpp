@@ -492,13 +492,13 @@ namespace mongo {
                 Extent *e = best;
                 // remove from the free list
                 if( !e->xprev.isNull() )
-                    e->xprev.ext()->xnext = e->xnext;
+                    e->xprev.ext()->xnext.writing() = e->xnext;
                 if( !e->xnext.isNull() )
-                    e->xnext.ext()->xprev = e->xprev;
+                    e->xnext.ext()->xprev.writing() = e->xprev;
                 if( f->firstExtent == e->myLoc )
-                    f->firstExtent = e->xnext;
+                    f->firstExtent.writing() = e->xnext;
                 if( f->lastExtent == e->myLoc )
-                    f->lastExtent = e->xprev;
+                    f->lastExtent.writing() = e->xprev;
 
                 // use it
                 OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
@@ -515,7 +515,9 @@ namespace mongo {
     /*---------------------------------------------------------------------*/
 
     DiskLoc Extent::reuse(const char *nsname) { 
-		/*TODOMMF - work to do when extent is freed. */
+        return dur::writing(this)->_reuse(nsname);
+    }
+    DiskLoc Extent::_reuse(const char *nsname) { 
         log(3) << "reset extent was:" << nsDiagnostic.toString() << " now:" << nsname << '\n';
         massert( 10360 ,  "Extent::reset bad magic value", magic == 0x41424344 );
         xnext.Null();
@@ -528,12 +530,9 @@ namespace mongo {
         emptyLoc.inc( (int) (_extentData-(char*)this) );
 
         int delRecLength = length - (_extentData - (char *) this);
-        //DeletedRecord *empty1 = (DeletedRecord *) extentData;
+
         DeletedRecord *empty = DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength);//(DeletedRecord *) getRecord(emptyLoc);
-        //assert( empty == empty1 );
-
-        // do we want to zero the record? memset(empty, ...)
-
+        empty = dur::writing(empty);
         empty->lengthWithHeaders = delRecLength;
         empty->extentOfs = myLoc.getOfs();
         empty->nextDeleted.Null();

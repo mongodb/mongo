@@ -48,8 +48,7 @@ namespace mongo {
         typedef map<string,Database*> DBs;
         typedef map<string,DBs> Paths;
 
-        DatabaseHolder() : _size(0){
-        }
+        DatabaseHolder() : _size(0) { }
 
         bool isLoaded( const string& ns , const string& path ) const {
             dbMutex.assertAtLeastReadLocked();

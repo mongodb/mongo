@@ -37,6 +37,10 @@ namespace mongo {
         return dur::writing(b);
     }
 
+    _KeyNode& _KeyNode::writing() { 
+        return *dur::writing(this);
+    }
+
     KeyNode::KeyNode(const BucketBasics& bb, const _KeyNode &k) :
             prevChildBucket(k.prevChildBucket),
             recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
@@ -773,7 +777,7 @@ found:
                 p->pushBack(splitkey.recordLoc, splitkey.key, order, thisLoc);
                 p->nextChild = rLoc;
                 p->assertValid( order );
-                parent = idx.head = L;
+                parent = idx.head.writing() = L;
                 if ( split_debug )
                     out() << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
                 rLoc.btreemod()->parent = parent;
@@ -1071,17 +1075,17 @@ found:
                 log(4) << "btree _insert: reusing unused key" << endl;
                 massert( 10285 , "_insert: reuse key but lchild is not null", lChild.isNull());
                 massert( 10286 , "_insert: reuse key but rchild is not null", rChild.isNull());
-                kn.setUsed();
+                kn.writing().setUsed();
                 return 0;
             }
 
             DEV { 
-                out() << "_insert(): key already exists in index (ok for background:true)\n";
-                out() << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
-                out() << "  " << key.toString() << '\n';
-                out() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
-                out() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
-                out() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
+                log() << "_insert(): key already exists in index (ok for background:true)\n";
+                log() << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
+                log() << "  " << key.toString() << '\n';
+                log() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
+                log() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
+                log() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
             }
             alreadyInIndex();
         }

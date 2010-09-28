@@ -236,9 +236,7 @@ namespace mongo {
         /* like init(), but for a reuse case */
         DiskLoc reuse(const char *nsname);
 
-        void assertOk() {
-            assert(magic == 0x41424344);
-        }
+        void assertOk() { assert(magic == 0x41424344); }
 
         Record* newRecord(int len);
 
@@ -250,14 +248,12 @@ namespace mongo {
             return (Record *) (((char *) this) + x);
         }
 
-        Extent* getNextExtent() {
-            return xnext.isNull() ? 0 : DataFileMgr::getExtent(xnext);
-        }
-        Extent* getPrevExtent() {
-            return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev);
-        }
+        Extent* getNextExtent() { return xnext.isNull() ? 0 : DataFileMgr::getExtent(xnext); }
+        Extent* getPrevExtent() { return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev); }
         
         static int maxSize();
+    private:
+        DiskLoc _reuse(const char *nsname);
     };
 
     /*

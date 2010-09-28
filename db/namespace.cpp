@@ -448,7 +448,10 @@ namespace mongo {
 
     /* you MUST call when adding an index.  see pdfile.cpp */
     IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
+#if !defined(_DEBUG) || !defined(_DURABLE)
+        // in debug durable mode the write view could be "this" not the nsdetails returned view...
         assert( nsdetails(thisns) == this );
+#endif
 
         IndexDetails *id;
         try {

@@ -360,8 +360,9 @@ namespace BtreeTests {
                 c->advance();
             }
             // too much work to try to make this happen through inserts and deletes
-            const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket ) = DiskLoc();
-            const_cast< DiskLoc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() |= 1; // make unused
+            // we are intentionally manipulating the btree bucket directly here
+            dur::writingDiskLoc( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket ) ) = DiskLoc();
+            dur::writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
             BSONObj k = BSON( "a" << toInsert );
             Base::insert( k );
         }

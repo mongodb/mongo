@@ -27,6 +27,7 @@ namespace mongo {
 
 #pragma pack(1)
     struct _KeyNode {
+        _KeyNode& writing();
         DiskLoc prevChildBucket; // the lchild
         DiskLoc recordLoc; // location of the record associated with the key
         short keyDataOfs() const {
@@ -41,9 +42,7 @@ namespace mongo {
             _kdo = s;
             assert(s>=0);
         }
-        void setUsed() { 
-            recordLoc.GETOFS() &= ~1;
-        }
+        void setUsed() { recordLoc.GETOFS() &= ~1; }
         void setUnused() {
             /* Setting ofs to odd is the sentinel for unused, as real recordLoc's are always
                even numbers.
