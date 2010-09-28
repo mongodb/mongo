@@ -161,6 +161,7 @@ namespace mongo {
     }
 
 #if defined(_DURABLE) && defined(_DEBUG)
+  /** if file was opened read only, get a writeable view */
   void* MemoryMappedFile::getWriteViewFor(void *p) { 
         mutex::scoped_lock lk(viewToWriteableMutex);
         std::map< void*, MemoryMappedFile* >::iterator i = 
