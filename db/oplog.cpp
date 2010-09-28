@@ -238,17 +238,20 @@ namespace mongo {
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
 
-        char *p = r->data;
-        memcpy(p, partial.objdata(), posz);
-        *((unsigned *)p) += obj.objsize() + 1 + 2;
-        p += posz - 1;
-        *p++ = (char) Object;
-        *p++ = 'o';
-        *p++ = 0;
-        memcpy(p, obj.objdata(), obj.objsize());
-        p += obj.objsize();
-        *p = EOO;
-        
+        {
+            const int size2 = obj.objsize() + 1 + 2;
+            char *p = (char *) dur::writingPtr(r->data, size2+posz);
+            memcpy(p, partial.objdata(), posz);
+            *((unsigned *)p) += size2;
+            p += posz - 1;
+            *p++ = (char) Object;
+            *p++ = 'o';
+            *p++ = 0;
+            memcpy(p, obj.objdata(), obj.objsize());
+            p += obj.objsize();
+            *p = EOO;
+        }
+
         context.getClient()->setLastOp( ts.asDate() );
 
         if ( logLevel >= 6 ) {
