@@ -999,7 +999,8 @@ namespace mongo {
         }
 
         //	update in place
-        memcpy(toupdate->data, objNew.objdata(), objNew.objsize());
+        int sz = objNew.objsize();
+        memcpy(dur::writingPtr(toupdate->data, sz), objNew.objdata(), sz);
         return dl;
     }
 
