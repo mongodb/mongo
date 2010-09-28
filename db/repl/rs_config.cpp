@@ -238,8 +238,8 @@ namespace mongo {
             BSONObj mobj = members[i].Obj();
             MemberCfg m;
             try {
-                static const string legal[] = {"_id","votes","priority","host","hidden","slaveDelay","arbiterOnly"};
-                static const set<string> legals(legal, legal + 7);
+                static const string legal[] = {"_id","votes","priority","host","hidden","slaveDelay","arbiterOnly","buildIndexes"};
+                static const set<string> legals(legal, legal + 8);
                 assertOnlyHas(mobj, legals);
 
                 try { 
