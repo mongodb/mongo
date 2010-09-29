@@ -823,9 +823,9 @@ namespace mongo {
                 uassert( 10153 ,  "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
                 
                 if ( op == Mod::RENAME_TO ) {
-                    uassert( 13476, "$rename target must be a string", f.type() == String );
+                    uassert( 13494, "$rename target must be a string", f.type() == String );
                     const char *target = f.valuestr();
-                    uassert( 13477, "$rename source must differ from target", strcmp( fieldName, target ) != 0 );
+                    uassert( 13495, "$rename source must differ from target", strcmp( fieldName, target ) != 0 );
                     uassert( 13478, "invalid mod field name, source may not be empty", fieldName[0] );
                     uassert( 13479, "invalid mod field name, target may not be empty", target[0] );
                     uassert( 13480, "invalid mod field name, source may not begin or end in period", fieldName[0] != '.' && fieldName[ strlen( fieldName ) - 1 ] != '.' );
