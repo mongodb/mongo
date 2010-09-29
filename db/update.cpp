@@ -454,10 +454,9 @@ namespace mongo {
         return ss.str();
     }
     
-    void ModSetState::applyModsInPlace() {
+    void ModSetState::ApplyModsInPlace() {
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-            ModState& m = i->second;
-            
+            ModState& m = i->second;            
             switch ( m.m->op ){
             case Mod::UNSET:
             case Mod::PULL:
@@ -465,7 +464,31 @@ namespace mongo {
             case Mod::ADDTOSET:
                 // this should have been handled by prepare
                 break;
+            // [dm] the BSONElementManipulator statements below are for replication (correct?)
+            case Mod::INC:
+                m.m->IncrementMe( m.old );
+                m.fixedOpName = "$set";
+                m.fixed = &(m.old);
+                break;
+            case Mod::SET:
+                BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
+                break;
+            default:
+                uassert( 10144 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
+            }
+        }
+    }
 
+    void ModSetState::applyModsInPlace() {
+        for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
+            ModState& m = i->second;            
+            switch ( m.m->op ){
+            case Mod::UNSET:
+            case Mod::PULL:
+            case Mod::PULL_ALL:
+            case Mod::ADDTOSET:
+                // this should have been handled by prepare
+                break;
             // [dm] the BSONElementManipulator statements below are for replication (correct?)
             case Mod::INC:
                 m.m->incrementMe( m.old );
@@ -473,7 +496,7 @@ namespace mongo {
                 m.fixed = &(m.old);
                 break;
             case Mod::SET:
-                BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
+                BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
                 break;
             default:
                 uassert( 10144 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
@@ -835,7 +858,7 @@ namespace mongo {
             auto_ptr<ModSetState> mss = mods->prepare( onDisk );
                     
             if( mss->canApplyInPlace() ) {
-                mss->applyModsInPlace();                    
+                mss->ApplyModsInPlace();                    
                 DEBUGUPDATE( "\t\t\t updateById doing in place update" );
                 /*if ( profile )
                     ss << " fastmod "; */
@@ -1027,7 +1050,7 @@ namespace mongo {
                 }
                     
                 if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ){
-                    mss->applyModsInPlace();// const_cast<BSONObj&>(onDisk) );
+                    mss->ApplyModsInPlace();// const_cast<BSONObj&>(onDisk) );
                     
                     DEBUGUPDATE( "\t\t\t doing in place update" );
                     if ( profile )

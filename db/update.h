@@ -74,8 +74,23 @@ namespace mongo {
          * @param in incrememnts the actual value inside in
          */
         void incrementMe( BSONElement& in ) const {
-            BSONElementManipulator manip( in );
-            
+            BSONElementManipulator manip( in );            
+            switch ( in.type() ){
+            case NumberDouble:
+                manip.setNumber( elt.numberDouble() + in.numberDouble() );
+                break;
+            case NumberLong:
+                manip.setLong( elt.numberLong() + in.numberLong() );
+                break;
+            case NumberInt:
+                manip.setInt( elt.numberInt() + in.numberInt() );
+                break;
+            default:
+                assert(0);
+            }            
+        }
+        void IncrementMe( BSONElement& in ) const {
+            BSONElementManipulator manip( in );            
             switch ( in.type() ){
             case NumberDouble:
                 manip.SetNumber( elt.numberDouble() + in.numberDouble() );
@@ -88,8 +103,7 @@ namespace mongo {
                 break;
             default:
                 assert(0);
-            }
-            
+            }            
         }
         
         template< class Builder >
@@ -545,6 +559,7 @@ namespace mongo {
          * modified underlying _obj
          */
         void applyModsInPlace();
+        void ApplyModsInPlace();
 
         BSONObj createNewFromMods();
 

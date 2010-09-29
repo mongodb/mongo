@@ -744,8 +744,8 @@ namespace mongo {
                 massert( 10361 , "can't create .$freelist", freeExtents);
             }
             if( freeExtents->firstExtent.isNull() ) { 
-                freeExtents->firstExtent = d->firstExtent;
-                freeExtents->lastExtent = d->lastExtent;
+                freeExtents->firstExtent.writing() = d->firstExtent;
+                freeExtents->lastExtent.writing() = d->lastExtent;
             }
             else { 
                 DiskLoc a = freeExtents->firstExtent;
