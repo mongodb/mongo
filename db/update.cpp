@@ -561,12 +561,18 @@ namespace mongo {
 
     void ModSetState::applyModsInPlace() {
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-            ModState& m = i->second;            
+            ModState& m = i->second;  
+            if ( m.dontApply ) {
+                continue;
+            }
+            
             switch ( m.m->op ){
             case Mod::UNSET:
             case Mod::PULL:
             case Mod::PULL_ALL:
             case Mod::ADDTOSET:
+            case Mod::RENAME_FROM:
+            case Mod::RENAME_TO:
                 // this should have been handled by prepare
                 break;
             // [dm] the BSONElementManipulator statements below are for replication (correct?)
@@ -801,7 +807,7 @@ namespace mongo {
                     uassert( 13494, "$rename target must be a string", f.type() == String );
                     const char *target = f.valuestr();
                     uassert( 13495, "$rename source must differ from target", strcmp( fieldName, target ) != 0 );
-                    uassert( 13478, "invalid mod field name, source may not be empty", fieldName[0] );
+                    uassert( 13496, "invalid mod field name, source may not be empty", fieldName[0] );
                     uassert( 13479, "invalid mod field name, target may not be empty", target[0] );
                     uassert( 13480, "invalid mod field name, source may not begin or end in period", fieldName[0] != '.' && fieldName[ strlen( fieldName ) - 1 ] != '.' );
                     uassert( 13481, "invalid mod field name, target may not begin or end in period", target[0] != '.' && target[ strlen( target ) - 1 ] != '.' );
