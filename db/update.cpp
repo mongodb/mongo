@@ -31,7 +31,7 @@
 namespace mongo {
 
     const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
-                                    "$bitand" , "$bitor" , "$bit" , "$addToSet" };
+                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename" };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
 
     bool Mod::_pullElementMatch( BSONElement& toMatch ) const {
@@ -85,6 +85,10 @@ namespace mongo {
     
     template< class Builder >
     void Mod::apply( Builder& b , BSONElement in , ModState& ms ) const {
+        if ( ms.dontApply ) {
+            return;
+        }
+        
         switch ( op ){
         
         case INC: {
@@ -307,6 +311,15 @@ namespace mongo {
             break;
         }
 
+        case RENAME_FROM: {
+            break;
+        }
+
+        case RENAME_TO: {
+            b.appendAs( ms.newVal , shortFieldName, ms.newVal );
+            break;
+        }
+                
         default:
             stringstream ss;
             ss << "Mod::apply can't handle type: " << op;
@@ -314,6 +327,48 @@ namespace mongo {
         }
     }
 
+    // -1 inside a non-object (non-object could be array)
+    // 0 missing
+    // 1 found
+    int validRenamePath( BSONObj obj, const char *path ) {
+        while( const char *p = strchr( path, '.' ) ) {
+            string left( path, p - path );
+            BSONElement e = obj.getField( left );
+            if ( e.eoo() ) {
+                return 0;
+            }
+            if ( e.type() != Object ) {
+                return -1;
+            }
+            obj = e.embeddedObject();
+            path = p + 1;
+        }
+        return !obj.getField( path ).eoo();
+    }
+    
+    bool nameRewritePossible( const char *a, const char *b ) {
+        const char *ar = strrchr( a, '.' );
+        const char *br = strrchr( b, '.' );
+        if ( ar && br ) {
+            if ( ( ar - a ) != ( br - b ) ) {
+                return false;
+            }
+            if ( strncmp( a, b, ar - a ) != 0 ) {
+                return false;
+            }
+            if ( strlen( ar ) != strlen( br ) ) {
+                return false;
+            }
+        } else if ( !ar && !br ) {
+            if ( strlen( a ) != strlen( b ) ) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        return true;
+    }
+    
     auto_ptr<ModSetState> ModSet::prepare(const BSONObj &obj) const {
         DEBUGUPDATE( "\t start prepare" );
         ModSetState * mss = new ModSetState( obj );
@@ -330,6 +385,28 @@ namespace mongo {
             ms.m = &m;
             ms.old = e;
 
+            if ( m.op == Mod::RENAME_FROM ) {
+                int source = validRenamePath( obj, m.fieldName );
+                uassert( 13489, "$rename source field invalid", source != -1 );
+                if ( source != 1 ) {
+                    ms.dontApply = true;
+                }
+                continue;
+            }
+            
+            if ( m.op == Mod::RENAME_TO ) {
+                int source = validRenamePath( obj, m.renameFrom() );
+                if ( source == 1 ) {
+                    int target = validRenamePath( obj, m.fieldName );
+                    uassert( 13490, "$rename target field invalid", target != -1 );
+                    ms.newVal = obj.getFieldDotted( m.renameFrom() );
+                    mss->amIInPlacePossible( target == 0 && nameRewritePossible( m.renameFrom(), m.fieldName ) );
+                } else {
+                    ms.dontApply = true;
+                }
+                continue;                
+            }
+            
             if ( e.eoo() ) {
                 mss->amIInPlacePossible( m.op == Mod::UNSET );
                 continue;
@@ -425,11 +502,30 @@ namespace mongo {
     }
 
     void ModState::appendForOpLog( BSONObjBuilder& b ) const {
+        if ( dontApply ) {
+            return;
+        }
+        
         if ( incType ){
             DEBUGUPDATE( "\t\t\t\t\t appendForOpLog inc fieldname: " << m->fieldName << " short:" << m->shortFieldName );
             BSONObjBuilder bb( b.subobjStart( "$set" ) );
             appendIncValue( bb , true );
             bb.done();
+            return;
+        }
+
+        if ( m->op == Mod::RENAME_FROM ) {
+            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_FROM fielName:" << m->fieldName );
+            BSONObjBuilder bb( b.subobjStart( "$unset" ) );
+            bb.append( m->fieldName, 1 );
+            bb.done();
+            return;
+        }
+        
+        if ( m->op == Mod::RENAME_TO ) {
+            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_TO fielName:" << m->fieldName );
+            BSONObjBuilder bb( b.subobjStart( "$set" ) );
+            bb.appendAs( newVal, m->fieldName );
             return;
         }
         
@@ -438,10 +534,11 @@ namespace mongo {
         DEBUGUPDATE( "\t\t\t\t\t appendForOpLog name:" << name << " fixed: " << fixed << " fn: " << m->fieldName );
 
         BSONObjBuilder bb( b.subobjStart( name ) );
-        if ( fixed )
+        if ( fixed ) {
             bb.appendAs( *fixed , m->fieldName );
-        else
+        } else {
             bb.appendAs( m->elt , m->fieldName );
+        }
         bb.done();
     }
 
@@ -456,15 +553,23 @@ namespace mongo {
     
     void ModSetState::ApplyModsInPlace() {
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-            ModState& m = i->second;            
+            ModState& m = i->second;
+            if ( m.dontApply ) {
+                continue;
+            }
+
             switch ( m.m->op ){
             case Mod::UNSET:
             case Mod::PULL:
             case Mod::PULL_ALL:
             case Mod::ADDTOSET:
+            case Mod::RENAME_FROM:
                 // this should have been handled by prepare
                 break;
             // [dm] the BSONElementManipulator statements below are for replication (correct?)
+            case Mod::RENAME_TO:
+                BSONElementManipulator( m.newVal ).rewriteFieldName( m.m->shortFieldName );
+                break;
             case Mod::INC:
                 m.m->IncrementMe( m.old );
                 m.fixedOpName = "$set";
@@ -633,7 +738,7 @@ namespace mongo {
     BSONObj ModSetState::createNewFromMods() {
         BSONObjBuilder b( (int)(_obj.objsize() * 1.1) );
         createNewFromMods( "" , b , _obj );
-        return b.obj();
+        return _newFromMods = b.obj();
     }
 
     string ModSetState::toString() const {
@@ -717,17 +822,44 @@ namespace mongo {
                 uassert( 10152 ,  "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( 10153 ,  "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
                 
+                if ( op == Mod::RENAME_TO ) {
+                    uassert( 13476, "$rename target must be a string", f.type() == String );
+                    const char *target = f.valuestr();
+                    uassert( 13477, "$rename source must differ from target", strcmp( fieldName, target ) != 0 );
+                    uassert( 13478, "invalid mod field name, source may not be empty", fieldName[0] );
+                    uassert( 13479, "invalid mod field name, target may not be empty", target[0] );
+                    uassert( 13480, "invalid mod field name, source may not begin or end in period", fieldName[0] != '.' && fieldName[ strlen( fieldName ) - 1 ] != '.' );
+                    uassert( 13481, "invalid mod field name, target may not begin or end in period", target[0] != '.' && target[ strlen( target ) - 1 ] != '.' );
+                    uassert( 13482, "$rename affecting _id not allowed", !( fieldName[0] == '_' && fieldName[1] == 'i' && fieldName[2] == 'd' && ( !fieldName[3] || fieldName[3] == '.' ) ) );
+                    uassert( 13483, "$rename affecting _id not allowed", !( target[0] == '_' && target[1] == 'i' && target[2] == 'd' && ( !target[3] || target[3] == '.' ) ) );
+                    uassert( 13484, "field name duplication not allowed with $rename target", !haveModForField( target ) );
+                    uassert( 13485, "conflicting mods not allowed with $rename target", !haveConflictingMod( target ) );
+                    uassert( 13486, "$rename target may not be a parent of source", !( strncmp( fieldName, target, strlen( target ) ) == 0 && fieldName[ strlen( target ) ] == '.' ) );
+                    uassert( 13487, "$rename source may not be dynamic array", strstr( fieldName , ".$" ) == 0 );
+                    uassert( 13488, "$rename target may not be dynamic array", strstr( target , ".$" ) == 0 );
+
+                    Mod from;
+                    from.init( Mod::RENAME_FROM, f );
+                    from.setFieldName( fieldName );
+                    updateIsIndexed( from, idxKeys, backgroundKeys );
+                    _mods[ from.fieldName ] = from;
+
+                    Mod to;
+                    to.init( Mod::RENAME_TO, f );
+                    to.setFieldName( target );
+                    updateIsIndexed( to, idxKeys, backgroundKeys );
+                    _mods[ to.fieldName ] = to;
+                    
+                    DEBUGUPDATE( "\t\t " << fieldName << "\t" << from.fieldName << "\t" << to.fieldName );
+                    continue;
+                }
+                
                 _hasDynamicArray = _hasDynamicArray || strstr( fieldName , ".$" ) > 0;
                 
                 Mod m;
                 m.init( op , f );
                 m.setFieldName( f.fieldName() );
-                
-                if ( m.isIndexed( idxKeys ) ||
-                    (backgroundKeys && m.isIndexed(*backgroundKeys)) ) {
-                    _isIndexed++;
-                }
-
+                updateIsIndexed( m, idxKeys, backgroundKeys );
                 _mods[m.fieldName] = m;
 
                 DEBUGUPDATE( "\t\t " << fieldName << "\t" << m.fieldName << "\t" << _hasDynamicArray );

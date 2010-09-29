@@ -103,6 +103,10 @@ namespace mongo {
                 }
             }
         }
+        
+        void rewriteFieldName( const char *name ) {
+            strcpy( data() + 1, name );
+        }
     private:
         char *data() { return nonConst( _element.rawdata() ); }
         char *value() { return nonConst( _element.value() ); }
