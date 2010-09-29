@@ -972,7 +972,7 @@ namespace ReplTests {
             }            
         };
 
-        class RenameOverwrite : public Base {
+        class RenameReplace : public Base {
         public:
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );                
@@ -986,6 +986,22 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:3,b:100}" ) );
+            }            
+        };
+
+        class RenameOverwrite : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );                
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( BSON( "_id" << 0 << "b" << 3 << "z" << 1 ) , one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,z:1,a:3}" ) );
             }            
         };
         
@@ -1190,6 +1206,7 @@ namespace ReplTests {
             add< Idempotence::PopReverse >();
             add< Idempotence::BitOp >();
             add< Idempotence::Rename >();
+            add< Idempotence::RenameReplace >();
             add< Idempotence::RenameOverwrite >();
             add< Idempotence::NoRename >();
             add< DeleteOpIsIdBased >();

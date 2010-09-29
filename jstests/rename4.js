@@ -85,10 +85,18 @@ v( {a:{b:1}}, {$rename:{'a.b':'d'}}, {a:{},d:1} );
 v( {a:[5]}, {$rename:{a:'b'}}, {b:[5]} );
 v( {aa:[5]}, {$rename:{aa:'b'}}, {b:[5]} );
 v( {'0':1}, {$rename:{'0':'5'}}, {'5':1} );
-v( {a:1,b:2}, {$rename:{a:'c'},$set:{b:5}}, {c:1,b:5} );
+v( {a:1,b:2}, {$rename:{a:'c'},$set:{b:5}}, {b:5,c:1} );
 v( {aa:1,b:2}, {$rename:{aa:'c'},$set:{b:5}}, {b:5,c:1} );
 v( {a:1,b:2}, {$rename:{z:'c'},$set:{b:5}}, {a:1,b:5} );
 v( {aa:1,b:2}, {$rename:{z:'c'},$set:{b:5}}, {aa:1,b:5} );
+
+// (formerly) rewriting single field
+v( {a:{z:1,b:1}}, {$rename:{'a.b':'a.c'}}, {a:{c:1,z:1}} );
+v( {a:{z:1,tomato:1}}, {$rename:{'a.tomato':'a.potato'}}, {a:{potato:1,z:1}} );
+v( {a:{z:1,b:1,c:1}}, {$rename:{'a.b':'a.c'}}, {a:{c:1,z:1}} );
+v( {a:{z:1,tomato:1,potato:1}}, {$rename:{'a.tomato':'a.potato'}}, {a:{potato:1,z:1}} );
+v( {a:{z:1,b:1}}, {$rename:{'a.b':'a.cc'}}, {a:{cc:1,z:1}} );
+v( {a:{z:1,b:1,c:1}}, {$rename:{'a.b':'aa.c'}}, {a:{c:1,z:1},aa:{c:1}} );
 
 // invalid target, but missing source
 v( {a:1,c:4}, {$rename:{b:'c.d'}}, {a:1,c:4} );
@@ -97,17 +105,17 @@ v( {a:1,c:4}, {$rename:{b:'c.d'}}, {a:1,c:4} );
 t.drop();
 t.ensureIndex( {a:1} );
 
-function l( start, mod, expected ) {
+function l( start, mod, query, expected ) {
     t.remove();
     t.save( start );
     t.update( {}, mod );
     assert( !db.getLastError() );
-    var got = t.find().hint( {a:1} ).next();
+    var got = t.find( query ).hint( {a:1} ).next();
     delete got._id;
     assert.eq( expected, got );
 }
 
-l( {a:1}, {$rename:{a:'b'}}, {b:1} );
-l( {a:1}, {$rename:{a:'bb'}}, {bb:1} );
-l( {b:1}, {$rename:{b:'a'}}, {a:1} );
-l( {bb:1}, {$rename:{bb:'a'}}, {a:1} );
+l( {a:1}, {$rename:{a:'b'}}, {a:null}, {b:1} );
+l( {a:1}, {$rename:{a:'bb'}}, {a:null}, {bb:1} );
+l( {b:1}, {$rename:{b:'a'}}, {a:1}, {a:1} );
+l( {bb:1}, {$rename:{bb:'a'}}, {a:1}, {a:1} );

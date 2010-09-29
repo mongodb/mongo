@@ -346,29 +346,6 @@ namespace mongo {
         return !obj.getField( path ).eoo();
     }
     
-    bool nameRewritePossible( const char *a, const char *b ) {
-        const char *ar = strrchr( a, '.' );
-        const char *br = strrchr( b, '.' );
-        if ( ar && br ) {
-            if ( ( ar - a ) != ( br - b ) ) {
-                return false;
-            }
-            if ( strncmp( a, b, ar - a ) != 0 ) {
-                return false;
-            }
-            if ( strlen( ar ) != strlen( br ) ) {
-                return false;
-            }
-        } else if ( !ar && !br ) {
-            if ( strlen( a ) != strlen( b ) ) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-        return true;
-    }
-    
     auto_ptr<ModSetState> ModSet::prepare(const BSONObj &obj) const {
         DEBUGUPDATE( "\t start prepare" );
         ModSetState * mss = new ModSetState( obj );
@@ -400,7 +377,7 @@ namespace mongo {
                     int target = validRenamePath( obj, m.fieldName );
                     uassert( 13490, "$rename target field invalid", target != -1 );
                     ms.newVal = obj.getFieldDotted( m.renameFrom() );
-                    mss->amIInPlacePossible( target == 0 && nameRewritePossible( m.renameFrom(), m.fieldName ) );
+                    mss->amIInPlacePossible( false );
                 } else {
                     ms.dontApply = true;
                 }
@@ -564,12 +541,10 @@ namespace mongo {
             case Mod::PULL_ALL:
             case Mod::ADDTOSET:
             case Mod::RENAME_FROM:
+            case Mod::RENAME_TO:
                 // this should have been handled by prepare
                 break;
             // [dm] the BSONElementManipulator statements below are for replication (correct?)
-            case Mod::RENAME_TO:
-                BSONElementManipulator( m.newVal ).rewriteFieldName( m.m->shortFieldName );
-                break;
             case Mod::INC:
                 m.m->IncrementMe( m.old );
                 m.fixedOpName = "$set";
