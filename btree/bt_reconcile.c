@@ -9,6 +9,7 @@
 
 #include "wt_internal.h"
 
+static void __wt_bt_page_size_minimum(DB *, WT_PAGE *, WT_PAGE *);
 static int  __wt_bt_rcc_expand_compare(const void *, const void *);
 static int  __wt_bt_rcc_expand_sort(
 	ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, u_int32_t *);
@@ -231,6 +232,8 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++hdr->u.entries;
 	}
 
+	__wt_bt_page_size_minimum(db, page, new);
+
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
 	return (__wt_page_write(db, new));
@@ -343,6 +346,8 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			++hdr->u.entries;
 		}
 	}
+
+	__wt_bt_page_size_minimum(db, page, new);
 
 	/* Free the sort array. */
 	if (expsort != NULL)
@@ -490,6 +495,8 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++new->records;
 		++hdr->u.entries;
 	}
+
+	__wt_bt_page_size_minimum(db, page, new);
 
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
@@ -664,7 +671,31 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++new->records;
 	}
 
+	__wt_bt_page_size_minimum(db, page, new);
+
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
 	return (__wt_page_write(db, new));
+}
+
+/*
+ * __wt_bt_page_size_minimum --
+ *	Reset a reconciled page's size.
+ */
+static void
+__wt_bt_page_size_minimum(DB *db, WT_PAGE *old, WT_PAGE *new)
+{
+	/*
+	 * Reset the page's size to the minimum required, and if the resulting
+	 * page size is larger or smaller than the original page, we allocate
+	 * a new page.  The difference is that if the page is smaller, we don't
+	 * extend the file to get a replacement page, we just waste the space.
+	 */
+	new->size = WT_MAX(old->size,
+	    (new->size + (db->allocsize - 1)) % db->allocsize);
+
+	if (new->size > old->size) {
+		fprintf(stderr, "PAGE GREW: %lu\n", (u_long)new->addr);
+		__wt_abort(db->env);
+	}
 }
