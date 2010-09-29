@@ -98,12 +98,12 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_reconcile.c (C)
 _
 }
-../btree/bt_reconcile.c  161  Warning 550: Symbol 'rp' (line 157) not accessed
-../btree/bt_reconcile.c  157  Info 830: Location cited in prior message
+../btree/bt_reconcile.c  162  Warning 550: Symbol 'rp' (line 158) not accessed
+../btree/bt_reconcile.c  158  Info 830: Location cited in prior message
 _
 }
-../btree/bt_reconcile.c  172  Warning 550: Symbol 'rp' (line 168) not accessed
-../btree/bt_reconcile.c  168  Info 830: Location cited in prior message
+../btree/bt_reconcile.c  173  Warning 550: Symbol 'rp' (line 169) not accessed
+../btree/bt_reconcile.c  169  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_ret.c (C)
                                              _
@@ -187,19 +187,15 @@ _
 --- Module:   ../btree/col_put.c (C)
 
 --- Module:   ../btree/col_srch.c (C)
-                                                                               _
-						rcc_offset = recno - record_cnt;
-../btree/col_srch.c  59  Info 734: Loss of precision (assignment) (64 bits to
-    16 bits)
                                                           _
 #...                    WT_RECORDS((WT_OFF *)((cip)->data))
 				    WT_COL_OFF_RECORDS(cip) >= recno)
-../btree/col_srch.c  77  Info 740: Unusual pointer cast (incompatible indirect
+../btree/col_srch.c  80  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                     _
 #...                              WT_RECORDS((WT_OFF *)((cip)->data))
 				record_cnt += WT_COL_OFF_RECORDS(cip);
-../btree/col_srch.c  79  Info 740: Unusual pointer cast (incompatible indirect
+../btree/col_srch.c  82  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/row_get.c (C)
@@ -209,18 +205,18 @@ _
 --- Module:   ../btree/row_srch.c (C)
                                                                            _
 				cmp = db->btree_compare(db, key, (DBT *)rip);
-../btree/row_srch.c  74  Info 740: Unusual pointer cast (incompatible indirect
+../btree/row_srch.c  75  Info 740: Unusual pointer cast (incompatible indirect
     types)
                             _
 		if (cmp != 0)
-../btree/row_srch.c  97  Warning 644: Variable 'cmp' (line 26) may not have
+../btree/row_srch.c  98  Warning 644: Variable 'cmp' (line 27) may not have
     been initialized
-../btree/row_srch.c  26  Info 830: Location cited in prior message
+../btree/row_srch.c  27  Info 830: Location cited in prior message
                                           _
 		addr = WT_ROW_OFF_ADDR(rip);
-../btree/row_srch.c  105  Info 771: Symbol 'rip' (line 22) conceivably not
+../btree/row_srch.c  106  Info 771: Symbol 'rip' (line 23) conceivably not
     initialized
-../btree/row_srch.c  22  Info 830: Location cited in prior message
+../btree/row_srch.c  23  Info 830: Location cited in prior message
 
 --- Module:   ../db/db_err.c (C)
                                 _
