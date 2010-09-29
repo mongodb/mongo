@@ -6,10 +6,11 @@ if ( ! _isWindows() ) {
     } else {
         port = hoststring.substr(index + 1)
     }
-
+/*
     sock = new Mongo('/tmp/mongodb-' + port + '.sock')
     sockdb = sock.getDB(db.getName())
     assert( sockdb.runCommand('ping').ok )
+*/
 } else {
     print("Not testing unix sockets on Windows");
 }
