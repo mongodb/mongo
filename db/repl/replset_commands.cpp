@@ -239,7 +239,6 @@ namespace mongo {
             responseCode = 200;
         }
 
-
         string _replSetOplog(bo parms) { 
             int _id = (int) str::toUnsigned( parms["_id"].String() );
 
