@@ -112,9 +112,9 @@ __wt_cache_read_server(void *arg)
 }
 
 /*
-* __wt_cache_read --
-*	Read or allocate a new page for the cache.
-*/
+ * __wt_cache_read --
+ *	Read or allocate a new page for the cache.
+ */
 static int
 __wt_cache_read(WT_READ_REQ *rr)
 {
