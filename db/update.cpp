@@ -499,7 +499,7 @@ namespace mongo {
                 BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
                 break;
             default:
-                uassert( 10144 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
+                uassert( 13478 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
             }
         }
     }
