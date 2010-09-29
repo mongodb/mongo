@@ -284,12 +284,12 @@ namespace mongo {
         void paddingFits() {
             double x = paddingFactor - 0.01;
             if ( x >= 1.0 )
-                paddingFactor = x;
+                *dur::writingNoLog(&paddingFactor) = x;
         }
         void paddingTooSmall() {
             double x = paddingFactor + 0.6;
             if ( x <= 2.0 )
-                paddingFactor = x;
+                *dur::writingNoLog(&paddingFactor) = x;
         }
 
         // @return offset in indexes[]

@@ -1670,23 +1670,18 @@ namespace mongo {
 
         Extent *e = r->myExtent(loc);
         if ( e->lastRecord.isNull() ) {
-            {
-                DiskLoc *ptr = &e->firstRecord;
-                ptr = (DiskLoc *) dur::writingPtr(ptr, sizeof(DiskLoc)*2);
-                //e->firstRecord = e->lastRecord = loc;
-                ptr[0] = ptr[1] = loc;
-            }
-            {
-                int *ip = (int*) dur::writingPtr(&r->nextOfs, 8);
-                //r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
-                ip[0] = ip[1] = DiskLoc::NullOfs;
-            }
+            Extent::FL *fl = dur::writing( e->fl() );
+            fl->firstRecord = fl->lastRecord = loc;
+
+            Record::NP *np = dur::writing(r->np());
+            np->nextOfs = np->prevOfs = DiskLoc::NullOfs;
         }
         else {
             Record *oldlast = e->lastRecord.rec();
-            r->prevOfs = e->lastRecord.getOfs();
-            r->nextOfs = DiskLoc::NullOfs;
-            oldlast->nextOfs = loc.getOfs();
+            Record::NP *np = dur::writing(r->np());
+            np->prevOfs = e->lastRecord.getOfs();
+            np->nextOfs = DiskLoc::NullOfs;
+            dur::writingInt( oldlast->nextOfs ) = loc.getOfs();
             e->lastRecord.writing() = loc;
         }
 

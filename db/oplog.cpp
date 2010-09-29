@@ -245,7 +245,7 @@ namespace mongo {
             *((unsigned *)p) += size2;
             p += posz - 1;
             *p++ = (char) Object;
-            *p++ = 'o';
+            *p++ = 'o'; // { o : ... }
             *p++ = 0;
             memcpy(p, obj.objdata(), obj.objsize());
             p += obj.objsize();

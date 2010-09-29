@@ -78,13 +78,13 @@ namespace mongo {
             
             switch ( in.type() ){
             case NumberDouble:
-                manip.setNumber( elt.numberDouble() + in.numberDouble() );
+                manip.SetNumber( elt.numberDouble() + in.numberDouble() );
                 break;
             case NumberLong:
-                manip.setLong( elt.numberLong() + in.numberLong() );
+                manip.SetLong( elt.numberLong() + in.numberLong() );
                 break;
             case NumberInt:
-                manip.setInt( elt.numberInt() + in.numberInt() );
+                manip.SetInt( elt.numberInt() + in.numberInt() );
                 break;
             default:
                 assert(0);

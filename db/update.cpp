@@ -473,7 +473,7 @@ namespace mongo {
                 m.fixed = &(m.old);
                 break;
             case Mod::SET:
-                BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
+                BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
                 break;
             default:
                 uassert( 10144 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
