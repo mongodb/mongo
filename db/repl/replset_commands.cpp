@@ -233,7 +233,6 @@ namespace mongo {
                              vector<string>& headers,  const SockAddr &from ){
             
             if( url == "/_replSetOplog" ) {
-                cout << params.toString() << endl;
                 responseMsg = _replSetOplog(params);
             } else
                 responseMsg = _replSet();
@@ -242,7 +241,7 @@ namespace mongo {
 
 
         string _replSetOplog(bo parms) { 
-            int _id = parms["_id"].numberInt();
+            int _id = (int) str::toUnsigned( parms["_id"].String() );
 
             stringstream s;
             string t = "Replication oplog";
