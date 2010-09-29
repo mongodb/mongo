@@ -39,6 +39,7 @@ namespace mongo {
                 return _replSet;
             return _replSet.substr(0, sl);
         }
+        bool usingReplSets() const { return !_replSet.empty(); }
 
         string source;         // --source
         string only;           // --only
