@@ -33,7 +33,7 @@ __wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data)
 		return (WT_ERROR);
 	}
 
-	WT_ERR(__wt_bt_search_col(toc, recno));
+	WT_ERR(__wt_bt_search_col(toc, recno, 0));
 	ret = __wt_bt_dbt_return(toc, NULL, data, 0);
 
 	page = toc->srch_page;

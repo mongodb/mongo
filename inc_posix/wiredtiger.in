@@ -548,6 +548,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_WORKQ_RUN					0x00000001
 
 #define	WT_APIMASK_BT_PAGE_OUT				0x00000003
+#define	WT_APIMASK_BT_SEARCH_COL			0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000001
 #define	WT_APIMASK_DB_CLOSE				0x00000003

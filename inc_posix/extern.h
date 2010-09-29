@@ -101,7 +101,7 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc);
 int
 __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc);
 int
-__wt_bt_search_col(WT_TOC *toc, u_int64_t recno);
+__wt_bt_search_col(WT_TOC *toc, u_int64_t recno, u_int32_t flags);
 int
 __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
 int

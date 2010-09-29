@@ -452,6 +452,9 @@ struct __wt_col_expand {
 	 * number: it's the offset in the set of records maintained for the
 	 * index, that is, it's an offset from the starting record number
 	 * for the original, on-disk page index.
+	 *
+	 * We know we can store the offset in 16-bits because that's the
+	 * maximum number of records in a single compressed group.
 	 */
 	u_int16_t rcc_offset;		/* recno offset in this index */
 

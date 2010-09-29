@@ -14,7 +14,7 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
+__wt_bt_search_col(WT_TOC *toc, u_int64_t recno, u_int32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -37,6 +37,8 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	db = toc->db;
 	idb = db->idb;
 
+	WT_DB_FCHK(db, "__wt_bt_search_col", flags, WT_APIMASK_BT_SEARCH_COL);
+
 restart:
 	/* Check for a record past the end of the database. */
 	page = idb->root_page;
@@ -56,7 +58,8 @@ restart:
 					if (record_cnt +
 					    WT_FIX_REPEAT_COUNT(cip->data) >=
 					    recno) {
-						rcc_offset = recno - record_cnt;
+						rcc_offset = (u_int16_t)
+						    (recno - record_cnt);
 						break;
 					}
 					record_cnt +=
@@ -109,21 +112,22 @@ done:	/*
 		 * In a repeat-compressed column store:
 		 *
 		 * Search for an individual record in the page's WT_COL_EXPAND
-		 * array.  If found, the record has been modified before:
-		 * check for deletion, and return its WT_COL_EXPAND entry.  If
-		 * not found, check for deletion in the original index, and
-		 * return the original index.
+		 * array.  If found, the record has been modified before: check
+		 * for deletion, and return its WT_COL_EXPAND entry.  If not
+		 * found, check for deletion in the original index, and return
+		 * the original index.
 		 */
 		if (F_ISSET(idb, WT_REPEAT_COMP)) {
 			for (exp = WT_COL_EXPCOL(page, cip);
 			    exp != NULL; exp = exp->next)
 				if (exp->rcc_offset == rcc_offset) {
 					repl = exp->repl;
-					if (WT_REPL_DELETED_ISSET(repl->data))
+					if (!LF_ISSET(WT_INSERT) &&
+					    WT_REPL_DELETED_ISSET(repl->data))
 						goto notfound;
 					break;
 				}
-			if (exp == NULL &&
+			if (exp == NULL && !LF_ISSET(WT_INSERT) &&
 			    WT_FIX_DELETE_ISSET(WT_FIX_REPEAT_DATA(cip->data)))
 				goto notfound;
 			break;
@@ -135,24 +139,27 @@ done:	/*
 		 * not found, check for deletion in the original index.
 		 */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl->data))
+			if (!LF_ISSET(WT_INSERT) &&
+			    WT_REPL_DELETED_ISSET(repl->data))
 				goto notfound;
 			break;
 		}
-		if (WT_FIX_DELETE_ISSET(cip->data))
+		if (!LF_ISSET(WT_INSERT) && WT_FIX_DELETE_ISSET(cip->data))
 			goto notfound;
 		break;
 	case WT_PAGE_COL_VAR:
 	default:
 		/* Check for a replacement entry in the page's WT_REPL array. */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl->data))
+			if (!LF_ISSET(WT_INSERT) &&
+			    WT_REPL_DELETED_ISSET(repl->data))
 				goto notfound;
 			break;
 		}
 
 		/* Otherwise, check to see if the item is deleted. */
-		if (WT_ITEM_TYPE(cip->data) == WT_ITEM_DEL)
+		if (!LF_ISSET(WT_INSERT) &&
+		    WT_ITEM_TYPE(cip->data) == WT_ITEM_DEL)
 			goto notfound;
 		break;
 	}

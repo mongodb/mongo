@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_col_update(WT_TOC *, u_int64_t, DBT *);
+static int __wt_db_col_update(WT_TOC *, u_int64_t, DBT *, int);
 
 /*
  * __wt_db_col_put --
@@ -18,7 +18,7 @@ static int __wt_db_col_update(WT_TOC *, u_int64_t, DBT *);
 int
 __wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
 {
-	return (__wt_db_col_update(toc, recno, data));
+	return (__wt_db_col_update(toc, recno, data, 1));
 }
 
 /*
@@ -28,7 +28,7 @@ __wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
 int
 __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 {
-	return (__wt_db_col_update(toc, recno, NULL));
+	return (__wt_db_col_update(toc, recno, NULL, 0));
 }
 
 /*
@@ -36,7 +36,7 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
  *	Column store delete and update.
  */
 static int
-__wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data)
+__wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 {
 	ENV *env;
 	IDB *idb;
@@ -55,7 +55,7 @@ __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data)
 	repl = NULL;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_bt_search_col(toc, recno));
+	WT_RET(__wt_bt_search_col(toc, recno, insert ? WT_INSERT : 0));
 	page = toc->srch_page;
 
 	/*
