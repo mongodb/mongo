@@ -119,6 +119,14 @@ namespace mongo {
             return *this;
         }
 
+        /** append an element but with a new name, and make resulting element available */
+        BSONObjBuilder&  appendAs(const BSONElement& e, const StringData& fieldName, BSONElement &newElt) {
+            int len = _b.len();
+            BSONObjBuilder& ret = appendAs( e, fieldName );
+            newElt = BSONElement( _b.grow( 0 ) - ( _b.len() - len ) );
+            return ret;
+        }
+        
         /** add a subobject as a member */
         BSONObjBuilder& append(const StringData& fieldName, BSONObj subObj) {
             _b.appendNum((char) Object);
@@ -691,6 +699,10 @@ namespace mongo {
         void appendAs( const BSONElement &e, const char *name ) {
             fill( name );
             append( e );
+        }
+
+        void appendAs( const BSONElement &e, const char *name, BSONElement &newElt ) {
+            massert( 13493, "not implemented", false );
         }
         
     private:
