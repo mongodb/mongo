@@ -261,7 +261,7 @@ namespace mongo {
         }
 
         if ( mx > 0 )
-            d->max = mx;
+            dur::writingInt( d->max ) = mx;
 
         return true;
     }
@@ -492,13 +492,13 @@ namespace mongo {
                 Extent *e = best;
                 // remove from the free list
                 if( !e->xprev.isNull() )
-                    e->xprev.ext()->xnext = e->xnext;
+                    e->xprev.ext()->xnext.writing() = e->xnext;
                 if( !e->xnext.isNull() )
-                    e->xnext.ext()->xprev = e->xprev;
+                    e->xnext.ext()->xprev.writing() = e->xprev;
                 if( f->firstExtent == e->myLoc )
-                    f->firstExtent = e->xnext;
+                    f->firstExtent.writing() = e->xnext;
                 if( f->lastExtent == e->myLoc )
-                    f->lastExtent = e->xprev;
+                    f->lastExtent.writing() = e->xprev;
 
                 // use it
                 OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
@@ -515,7 +515,9 @@ namespace mongo {
     /*---------------------------------------------------------------------*/
 
     DiskLoc Extent::reuse(const char *nsname) { 
-		/*TODOMMF - work to do when extent is freed. */
+        return dur::writing(this)->_reuse(nsname);
+    }
+    DiskLoc Extent::_reuse(const char *nsname) { 
         log(3) << "reset extent was:" << nsDiagnostic.toString() << " now:" << nsname << '\n';
         massert( 10360 ,  "Extent::reset bad magic value", magic == 0x41424344 );
         xnext.Null();
@@ -528,12 +530,9 @@ namespace mongo {
         emptyLoc.inc( (int) (_extentData-(char*)this) );
 
         int delRecLength = length - (_extentData - (char *) this);
-        //DeletedRecord *empty1 = (DeletedRecord *) extentData;
+
         DeletedRecord *empty = DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength);//(DeletedRecord *) getRecord(emptyLoc);
-        //assert( empty == empty1 );
-
-        // do we want to zero the record? memset(empty, ...)
-
+        empty = dur::writing(empty);
         empty->lengthWithHeaders = delRecLength;
         empty->extentOfs = myLoc.getOfs();
         empty->nextDeleted.Null();
@@ -745,8 +744,8 @@ namespace mongo {
                 massert( 10361 , "can't create .$freelist", freeExtents);
             }
             if( freeExtents->firstExtent.isNull() ) { 
-                freeExtents->firstExtent = d->firstExtent;
-                freeExtents->lastExtent = d->lastExtent;
+                freeExtents->firstExtent.writing() = d->firstExtent;
+                freeExtents->lastExtent.writing() = d->lastExtent;
             }
             else { 
                 DiskLoc a = freeExtents->firstExtent;
@@ -1000,7 +999,8 @@ namespace mongo {
         }
 
         //	update in place
-        memcpy(toupdate->data, objNew.objdata(), objNew.objsize());
+        int sz = objNew.objsize();
+        memcpy(dur::writingPtr(toupdate->data, sz), objNew.objdata(), sz);
         return dl;
     }
 
@@ -1109,9 +1109,9 @@ namespace mongo {
             idx.getKeysFromObject(o, keys);
             int k = 0;
             for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
-                if( ++k == 2 )
+                if( ++k == 2 ) {
                     d->setIndexIsMultikey(idxNo);
-                //cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
+                }
                 sorter.add(*i, loc);
                 nkeys++;
             }
@@ -1670,15 +1670,19 @@ namespace mongo {
 
         Extent *e = r->myExtent(loc);
         if ( e->lastRecord.isNull() ) {
-            e->firstRecord = e->lastRecord = loc;
-            r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
+            Extent::FL *fl = dur::writing( e->fl() );
+            fl->firstRecord = fl->lastRecord = loc;
+
+            Record::NP *np = dur::writing(r->np());
+            np->nextOfs = np->prevOfs = DiskLoc::NullOfs;
         }
         else {
             Record *oldlast = e->lastRecord.rec();
-            r->prevOfs = e->lastRecord.getOfs();
-            r->nextOfs = DiskLoc::NullOfs;
-            oldlast->nextOfs = loc.getOfs();
-            e->lastRecord = loc;
+            Record::NP *np = dur::writing(r->np());
+            np->prevOfs = e->lastRecord.getOfs();
+            np->nextOfs = DiskLoc::NullOfs;
+            dur::writingInt( oldlast->nextOfs ) = loc.getOfs();
+            e->lastRecord.writing() = loc;
         }
 
         /* todo: don't update for oplog?  seems wasteful. */

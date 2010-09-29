@@ -93,6 +93,7 @@ namespace mongo {
         if( arbiterOnly ) b << "arbiterOnly" << true;
         if( slaveDelay ) b << "slaveDelay" << slaveDelay;
         if( hidden ) b << "hidden" << hidden;
+        if( !buildIndexes ) b << "buildIndexes" << buildIndexes;
         return b.obj();
     }
 
@@ -130,6 +131,7 @@ namespace mongo {
         uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
+        uassert(13477, "priority must be 0 when buildIndexes=false", priority == 0 || !hidden);
     }
 
     /** @param o old config
@@ -159,11 +161,16 @@ namespace mongo {
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = n.members.begin(); i != n.members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
             if( old.count(m.h) ) { 
-                if( old[m.h]->_id != m._id ) { 
+                const ReplSetConfig::MemberCfg& oldCfg = *old[m.h];
+                if( oldCfg._id != m._id ) { 
                     log() << "replSet reconfig error with member: " << m.h.toString() << rsLog;
                     uasserted(13432, "_id may not change for members");
                 }
-            }
+                if( oldCfg.buildIndexes != m.buildIndexes ) { 
+                    log() << "replSet reconfig error with member: " << m.h.toString() << rsLog;
+                    uasserted(13476, "buildIndexes may not change for members");
+                }
+           }
             if( m.h.isSelf() ) 
                 me++;
         }
@@ -231,8 +238,8 @@ namespace mongo {
             BSONObj mobj = members[i].Obj();
             MemberCfg m;
             try {
-                static const string legal[] = {"_id","votes","priority","host","hidden","slaveDelay","arbiterOnly"};
-                static const set<string> legals(legal, legal + 7);
+                static const string legal[] = {"_id","votes","priority","host","hidden","slaveDelay","arbiterOnly","buildIndexes"};
+                static const set<string> legals(legal, legal + 8);
                 assertOnlyHas(mobj, legals);
 
                 try { 
@@ -255,6 +262,8 @@ namespace mongo {
                 m.slaveDelay = mobj["slaveDelay"].numberInt();
                 if( mobj.hasElement("hidden") )
                     m.hidden = mobj.getBoolField("hidden");
+                if( mobj.hasElement("buildIndexes") ) 
+                    m.buildIndexes = mobj.getBoolField("buildIndexes");
                 if( mobj.hasElement("priority") )
                     m.priority = mobj["priority"].Number();
                 if( mobj.hasElement("votes") )
@@ -337,9 +346,21 @@ namespace mongo {
             }
 
             v = -4;
-            ScopedConn conn(h.toString());
-            v = -3;
-            c = conn->query(rsConfigNs);
+            try {
+                ScopedConn conn(h.toString());
+                v = -3;
+                c = conn->query( rsConfigNs, Query() );
+            }
+            catch ( DBException& ) {
+                if ( !h.isSelf() ) {
+                    throw;
+                }
+
+                // on startup, socket is not listening yet
+                DBDirectClient cli;
+                c = cli.query( rsConfigNs, Query() );
+            }
+            
             if( c.get() == 0 ) {
                 version = v; return;
             }

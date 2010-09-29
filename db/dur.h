@@ -24,6 +24,8 @@ namespace mongo {
         inline void assertReading(void *p) { }
         inline void assertWriting(void *p) { }
 
+        template <typename T> inline T* writingNoLog(T *x) { return x; }
+
 #else
 
         void* writingPtr(void *x, size_t len);
@@ -56,6 +58,19 @@ namespace mongo {
 
         void assertReading(void *p);
         void assertWriting(void *p);
+
+        /** declare our intent to write, but it doesn't have to be journaled, as this write is 
+            something 'unimportant'.
+        */
+        template <typename T> 
+        inline 
+        T* writingNoLog(T *x) { 
+#if defined(_DEBUG)
+            return (T*) writingPtr(x, sizeof(T));
+#else
+            return x;
+#endif
+        }
 
 #endif
 

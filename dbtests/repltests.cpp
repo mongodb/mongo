@@ -955,8 +955,73 @@ namespace ReplTests {
             }            
         };
 
-        
+        class Rename : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );                
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );                
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( BSON( "_id" << 0 << "a" << 50 << "b" << 3 ) , one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:3}" ) );
+            }            
+        };
 
+        class RenameReplace : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );                
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );                
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( BSON( "_id" << 0 << "a" << 50 << "b" << 3 ) , one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:3,b:100}" ) );
+            }            
+        };
+
+        class RenameOverwrite : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );                
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( BSON( "_id" << 0 << "b" << 3 << "z" << 1 ) , one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,z:1,a:3}" ) );
+            }            
+        };
+        
+        class NoRename : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{c:'b'},$set:{z:1}}" ) );                
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( BSON( "_id" << 0 << "a" << 3 << "z" << 1 ) , one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:3}" ) );
+            }            
+        };
+        
+        
     } // namespace Idempotence
     
     class DeleteOpIsIdBased : public Base {
@@ -1140,6 +1205,10 @@ namespace ReplTests {
             add< Idempotence::Pop >();
             add< Idempotence::PopReverse >();
             add< Idempotence::BitOp >();
+            add< Idempotence::Rename >();
+            add< Idempotence::RenameReplace >();
+            add< Idempotence::RenameOverwrite >();
+            add< Idempotence::NoRename >();
             add< DeleteOpIsIdBased >();
             add< DbIdsTest >();
             add< MemIdsTest >();

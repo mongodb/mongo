@@ -19,6 +19,7 @@
 #pragma once
 
 #include "jsobj.h"
+#include "dur.h"
 
 namespace mongo {
 
@@ -42,13 +43,28 @@ namespace mongo {
             else if ( _element.type() == NumberInt ) *reinterpret_cast< int * >( value() ) = (int) d;
             else assert(0);
         }
+        void SetNumber(double d) {
+            if ( _element.type() == NumberDouble ) 
+                *dur::writing( reinterpret_cast< double * >( value() )  ) = d;
+            else if ( _element.type() == NumberInt ) 
+                *dur::writing( reinterpret_cast< int * >( value() ) ) = (int) d;
+            else assert(0);
+        }
         void setLong(long long n) { 
             assert( _element.type() == NumberLong );
             *reinterpret_cast< long long * >( value() ) = n;
         }
+        void SetLong(long long n) { 
+            assert( _element.type() == NumberLong );
+            *dur::writing( reinterpret_cast< long long * >(value()) ) = n;
+        }
         void setInt(int n) { 
             assert( _element.type() == NumberInt );
             *reinterpret_cast< int * >( value() ) = n;
+        }
+        void SetInt(int n) { 
+            assert( _element.type() == NumberInt );
+            dur::writingInt( *reinterpret_cast< int * >( value() ) ) = n;
         }
 
         
@@ -57,6 +73,18 @@ namespace mongo {
         void replaceTypeAndValue( const BSONElement &e ) {
             *data() = e.type();
             memcpy( value(), e.value(), e.valuesize() );
+        }
+
+        /* dur:: version */
+        void ReplaceTypeAndValue( const BSONElement &e ) {
+            char *d = data();
+            char *v = value();
+            int valsize = e.valuesize();
+            int ofs = (int) (v-d);
+            dassert( ofs > 0 );
+            char *p = (char *) dur::writingPtr(d, valsize + ofs);
+            *p = e.type();
+            memcpy( p + ofs, e.value(), valsize );
         }
         
         static void lookForTimestamps( const BSONObj& obj ){

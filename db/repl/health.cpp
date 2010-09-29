@@ -353,6 +353,7 @@ namespace mongo {
             bb.append("name", h.toString());
             bb.append("health", 1.0);
             bb.append("state", (int) box.getState().s);
+            bb.append("stateStr", box.getState().toString());
             string s = _self->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
@@ -367,7 +368,10 @@ namespace mongo {
             bb.append("name", m->fullName());
             bb.append("health", m->hbinfo().health);
             bb.append("state", (int) m->state().s);
+            bb.append("stateStr", m->state().toString());
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
+            bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
+            bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
             string s = m->lhb();
             if( !s.empty() )

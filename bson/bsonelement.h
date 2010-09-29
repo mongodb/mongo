@@ -297,9 +297,7 @@ public:
     */
     int woCompare( const BSONElement &e, bool considerFieldName = true ) const;
 
-    const char * rawdata() const {
-        return data;
-    }
+    const char * rawdata() const { return data; }
         
     /** 0 == Equality, just not defined yet */
     int getGtLtOp( int def = 0 ) const;

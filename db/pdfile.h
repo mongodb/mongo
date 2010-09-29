@@ -191,6 +191,12 @@ namespace mongo {
         /* get the next record in the namespace, traversing extents as necessary */
         DiskLoc getNext(const DiskLoc& myLoc);
         DiskLoc getPrev(const DiskLoc& myLoc);
+
+        struct NP { 
+            int nextOfs;
+            int prevOfs;
+        };
+        NP* np() { return (NP*) &nextOfs; }
     };
 
     /* extents are datafile regions where all the records within the region
@@ -211,7 +217,8 @@ namespace mongo {
         Namespace nsDiagnostic; 
 
         int length;   /* size of the extent, including these fields */
-        DiskLoc firstRecord, lastRecord;
+        DiskLoc firstRecord;
+        DiskLoc lastRecord;
         char _extentData[4];
 
         static int HeaderSize() { return sizeof(Extent)-4; }
@@ -236,9 +243,7 @@ namespace mongo {
         /* like init(), but for a reuse case */
         DiskLoc reuse(const char *nsname);
 
-        void assertOk() {
-            assert(magic == 0x41424344);
-        }
+        void assertOk() { assert(magic == 0x41424344); }
 
         Record* newRecord(int len);
 
@@ -250,14 +255,18 @@ namespace mongo {
             return (Record *) (((char *) this) + x);
         }
 
-        Extent* getNextExtent() {
-            return xnext.isNull() ? 0 : DataFileMgr::getExtent(xnext);
-        }
-        Extent* getPrevExtent() {
-            return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev);
-        }
+        Extent* getNextExtent() { return xnext.isNull() ? 0 : DataFileMgr::getExtent(xnext); }
+        Extent* getPrevExtent() { return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev); }
         
         static int maxSize();
+
+        struct FL { 
+            DiskLoc firstRecord;
+            DiskLoc lastRecord;
+        };
+        FL* fl() { return (FL*) &firstRecord; }
+    private:
+        DiskLoc _reuse(const char *nsname);
     };
 
     /*

@@ -306,8 +306,10 @@ namespace mongo {
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const { return myConfig().potentiallyHot(); }
     protected:
-        Member *_self;        
-    private:
+        Member *_self;     
+        bool _buildIndexes;       // = _self->config().buildIndexes
+        void setSelfTo(Member *); // use this as it sets buildIndexes var
+   private:
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
@@ -355,6 +357,8 @@ namespace mongo {
             lock lk(this);
             return _self->fullName();
         }
+
+        bool buildIndexes() const { return _buildIndexes; }
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }

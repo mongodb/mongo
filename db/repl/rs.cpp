@@ -178,6 +178,8 @@ namespace mongo {
             b.append("slaveDelay", myConfig().slaveDelay);
         if( myConfig().hidden )
             b.append("hidden", true);
+        if( !myConfig().buildIndexes )
+            b.append("buildIndexes", false);
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
@@ -289,6 +291,12 @@ namespace mongo {
 
     extern BSONObj *getLastErrorDefault;
 
+    void ReplSetImpl::setSelfTo(Member *m) {
+        _self = m;
+        if( m ) _buildIndexes = m->config().buildIndexes;
+        else _buildIndexes = true;
+    }
+
     /** @param reconf true if this is a reconfiguration and not an initial load of the configuration.
         @return true if ok; throws if config really bad; false if config doesn't include self
     */
@@ -382,13 +390,14 @@ namespace mongo {
                 oldPrimaryId = p->id();
         }
         forgetPrimary();
-        _self = 0;
+        setSelfTo(0);
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
             Member *mi;
             if( m.h.isSelf() ) {
                 assert( _self == 0 );
-                mi = _self = new Member(m.h, m._id, &m, true);
+                mi = new Member(m.h, m._id, &m, true);
+                setSelfTo(mi);
                 if( (int)mi->id() == oldPrimaryId )
                     box.setSelfPrimary(mi);
             } else {

@@ -138,8 +138,18 @@ namespace mongo {
                 return false;
             }
 
+            BSONObj resIsMongos;
+            bool ok = newShardConn->runCommand( "admin" , BSON( "isdbgrid" << 1 ) , resIsMongos );
+
+            // should return ok=0, cmd not found if it's a normal mongod
+            if ( ok ) {
+                errMsg = "can't add a mongos process as a shard";
+                newShardConn.done();
+                return false;
+            }
+            
             BSONObj resIsMaster;
-            bool ok =  newShardConn->runCommand( "admin" , BSON( "isMaster" << 1 ) , resIsMaster );
+            ok =  newShardConn->runCommand( "admin" , BSON( "isMaster" << 1 ) , resIsMaster );
             if ( !ok ){
                 ostringstream ss;
                 ss << "failed running isMaster: " << resIsMaster;

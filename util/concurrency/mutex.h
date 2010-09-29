@@ -60,7 +60,7 @@ namespace mongo {
             if( a == m ) { 
                 aBreakPoint();
                 if( preceeding[b.c_str()] ) {
-                    cout << "mutex problem " << b << " was locked before " << a << endl;
+                    cout << "****** MutexDebugger error! warning " << b << " was locked before " << a << endl;
                     assert(false);
                 }
             }
