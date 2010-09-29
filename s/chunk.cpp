@@ -190,6 +190,7 @@ namespace mongo {
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , result )){
+            conn.done();
             ostringstream os;
             os << "splitVector command failed: " << result;
             uassert( 13345 , os.str() , 0 );
