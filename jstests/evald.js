@@ -2,7 +2,7 @@ t = db.jstests_evald;
 t.drop();
 
 function debug( x ) {
-    printjson( x );
+//    printjson( x );
 }
 
 for( i = 0; i < 10; ++i ) {
