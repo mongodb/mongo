@@ -50,7 +50,7 @@ __wt_update_alloc(WT_TOC *toc, u_int32_t size, void *retp)
 	 * into WT_DATA_UPDATE buffers, allocate a single WT_DATA_UPDATE area.
 	 */
 	if (align_size > env->data_update_max) {
-		alloc_size = size + sizeof(WT_DATA_UPDATE);
+		alloc_size = align_size + sizeof(WT_DATA_UPDATE);
 		single_use = 1;
 		goto alloc;
 	}
@@ -80,6 +80,9 @@ __wt_update_alloc(WT_TOC *toc, u_int32_t size, void *retp)
 	/*
 	 * Allocate the next power-of-two larger than 4 times the requested
 	 * size, and at least the default buffer size.
+	 *
+	 * XXX
+	 * Why allocate 4x the requested size?
 	 */
 	alloc_size = __wt_nlpo2(WT_MAX(size * 4, env->data_update_initial));
 	single_use = 0;
