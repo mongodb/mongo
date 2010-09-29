@@ -75,7 +75,7 @@ namespace mongo {
     ConnectionString ConnectionString::parse( const string& host , string& errmsg ){
         
         string::size_type i = host.find( '/' );
-        if ( i != string::npos ){
+        if ( i != string::npos && i != 0){
             // replica set
             return ConnectionString( SET , host.substr( i + 1 ) , host.substr( 0 , i ) );
         }
