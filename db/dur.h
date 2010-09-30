@@ -22,7 +22,6 @@ namespace mongo {
         inline int& writingInt(int& d) { return d; }
         template <typename T> inline T* writing(T *x) { return x; }
         inline void assertReading(void *p) { }
-        inline void assertWriting(void *p) { }
 
         template <typename T> inline T* writingNoLog(T *x) { return x; }
 
@@ -57,7 +56,6 @@ namespace mongo {
         }
 
         void assertReading(void *p);
-        void assertWriting(void *p);
 
         /** declare our intent to write, but it doesn't have to be journaled, as this write is 
             something 'unimportant'.

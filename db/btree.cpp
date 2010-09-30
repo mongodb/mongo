@@ -232,7 +232,6 @@ namespace mongo {
        the keynodes grow from the front.
     */
     inline int BucketBasics::_alloc(int bytes) {
-        dur::assertWriting(this);
         topSize += bytes;
         emptySize -= bytes;
         int ofs = totalDataSize() - topSize;

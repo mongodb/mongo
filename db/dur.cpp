@@ -19,11 +19,6 @@ namespace mongo {
             assert( MemoryMappedFile::getWriteViewFor(p) != 
                     p );
         }
-        void assertWriting(void *p) {
-            // todo: 
-            //assert( MemoryMappedFile::getWriteViewFor(p) == 
-            //        p );
-       }
 
 #endif
 
