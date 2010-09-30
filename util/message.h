@@ -307,6 +307,8 @@ struct OP_GETMORE : public MSGHEADER {
             return res;
         }
         
+        int dataSize() const { return size() - sizeof(MSGHEADER); }
+
         // concat multiple buffers - noop if <2 buffers already, otherwise can be expensive copy
         // can get rid of this if we make response handling smarter
         void concat() {
