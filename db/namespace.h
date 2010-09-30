@@ -23,7 +23,6 @@
 #include "queryutil.h"
 #include "diskloc.h"
 #include "../util/hashtab.h"
-#include "../util/mmap.h"
 
 namespace mongo {
 
@@ -534,7 +533,7 @@ namespace mongo {
         void maybeMkdir() const;
         
         MMF f;
-        HashTable<Namespace,NamespaceDetails,MMF::Pointer> *ht;
+        HashTable<Namespace,NamespaceDetails> *ht;
         string dir_;
         string database_;
     };

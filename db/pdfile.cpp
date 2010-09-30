@@ -379,11 +379,11 @@ namespace mongo {
 
         {
             unsigned long long sz = size;
-            _p = mmf.map(filename, sz);
+            _p = (char *) mmf.map(filename, sz);
             assert( sz <= 0x7fffffff );
             size = (int) sz;
         }
-        header = (DataFileHeader *) _p.at(0, DataFileHeader::HeaderSize);
+        header = (DataFileHeader *) _p;
         if( sizeof(char *) == 4 ) 
             uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", header);
         else

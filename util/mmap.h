@@ -81,83 +81,20 @@ namespace mongo {
         }
     };
 
-    /** template for what a new storage engine's class definition must implement 
-        PRELIMINARY - subject to change.
-    */
-    class StorageContainerTemplate : public MongoFile {
-    protected:
-        virtual void close();
-        virtual void flush(bool sync);
-    public:
-        virtual long length();
-
-        /** pointer to a range of space in this storage unit */
-        class Pointer {
-        public:
-            /** retried address of buffer at offset 'offset' withing the storage unit. returned range is a contiguous 
-                buffer reflecting what is in storage.  caller will not read or write past 'len'.
-
-                note calls may be received that are at different points in a range and different lengths. however 
-                for now assume that on writes, if a call is made, previously returned addresses are no longer valid. i.e.
-                  p = at(10000, 500);
-                  q = at(10000, 600);
-                after the second call it is ok if p is invalid.
-            */
-            void* at(int offset, int len);
-
-            void* atAsIndicated(int offset);
-
-            /** indicate that we wrote to the range (from a previous at() call) and that it needs 
-                flushing to disk.
-                */
-            void written(int offset, int len);
-
-            bool isNull() const;
-        };
-
-        /** commit written() calls from above. */
-        void commit();
-        
-        Pointer open(const char *filename);
-        Pointer open(const char *_filename, long &length, /*MongoFile::Options*/ int options=0);
-    };
-
     class MemoryMappedFile : public MongoFile {
     public:
-        class Pointer {
-            char *_base;
-        public:
-            Pointer() : _base(0) { }
-            Pointer(void *p) : _base((char*) p) { }
-            void* at(int offset, int maxLen) { return _base + offset; } 
-            void* atAsIndicated(int offset) { return _base + offset; } 
-			void grow(int offset, int len) { /* no action required with mem mapped file */ }
-            bool isNull() const { return _base == 0; }
-        };
-
         MemoryMappedFile();
 
-        ~MemoryMappedFile() {
+        virtual ~MemoryMappedFile() {
             destroyed(); // cleans up from the master list of mmaps
             close();
         }
 
         void close();
 
-        void* testGetCopyOnWriteView();
-        void  testCloseCopyOnWriteView(void *);
-
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
         void* map(const char *filename);
         void* mapWithOptions(const char *filename, int options);
-
-        /*To replace map():
-        
-          Pointer open( const char *filename ) {
-            void *p = map(filename);
-            uassert(13077, "couldn't open/map file", p);
-            return Pointer(p);
-        }*/
 
         /* Creates with length if DNE, otherwise uses existing file length,
            passed length.
@@ -173,14 +110,16 @@ namespace mongo {
         void flush(bool sync);
         virtual Flushable * prepareFlush();
 
-        long shortLength() const { return (long) len; }
+        long shortLength() const          { return (long) len; }
         unsigned long long length() const { return len; }
-
-        string filename() const { return _filename; }
+        string filename() const           { return _filename; }
 
 #if defined(_DURABLE) && defined(_DEBUG)
         static void* getWriteViewFor(void *ptr);
 #endif
+
+        void* testGetCopyOnWriteView();
+        void  testCloseCopyOnWriteView(void *);
 
     private:
         static void updateLength( const char *filename, unsigned long long &length );

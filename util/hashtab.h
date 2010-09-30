@@ -37,8 +37,7 @@ namespace mongo {
 
     template <
     class Key,
-    class Type,
-    class PTR
+    class Type
     >
     class HashTable : boost::noncopyable {
     public:
@@ -54,13 +53,11 @@ namespace mongo {
                 hash = 0;
             }
         };
-        PTR _buf;
+        Node *_buf;
         int n;
         int maxChain;
 
-        Node& nodes(int i) {
-            return *((Node*) _buf.at(i * sizeof(Node), sizeof(Node)));
-        }
+        Node& nodes(int i) { return _buf[i]; }
 
         int _find(const Key& k, bool& found) {
             found = false;
@@ -99,14 +96,14 @@ namespace mongo {
 
     public:
         /* buf must be all zeroes on initialization. */
-        HashTable(PTR buf, int buflen, const char *_name) : name(_name) {
+        HashTable(void *buf, int buflen, const char *_name) : name(_name) {
             int m = sizeof(Node);
             // out() << "hashtab init, buflen:" << buflen << " m:" << m << endl;
             n = buflen / m;
             if ( (n & 1) == 0 )
                 n--;
             maxChain = (int) (n * 0.05);
-            _buf = buf;
+            _buf = (Node*) buf;
             //nodes = (Node *) buf;
 
             if ( sizeof(Node) != 628 ){

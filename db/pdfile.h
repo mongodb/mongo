@@ -89,7 +89,7 @@ namespace mongo {
 		void grow(DiskLoc dl, int size);
 
         MMF mmf;
-        MMF::Pointer _p;
+        char* _p;
         DataFileHeader *header;
         int fileNo;
     };
@@ -133,7 +133,7 @@ namespace mongo {
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
         static DeletedRecord* makeDeletedRecord(const DiskLoc& dl, int len);
-		static void grow(const DiskLoc& dl, int len);
+		//static void grow(const DiskLoc& dl, int len);
 
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
@@ -331,7 +331,7 @@ namespace mongo {
 
     inline Extent* MongoDataFile::_getExtent(DiskLoc loc) {
         loc.assertOk();
-        Extent *e = (Extent *) _p.at(loc.getOfs(), Extent::HeaderSize());
+        Extent *e = (Extent *) (_p+loc.getOfs());
         return e;
     }
 
@@ -350,18 +350,13 @@ namespace mongo {
     inline Record* MongoDataFile::recordAt(DiskLoc dl) {
         int ofs = dl.getOfs();
         if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
-        return (Record*) _p.at(ofs, -1);
+        return (Record*) (_p+ofs);
     }
-
-	inline void MongoDataFile::grow(DiskLoc dl, int size) { 
-        int ofs = dl.getOfs();
-        _p.grow(ofs, size);
-	}
 
     inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) { 
         int ofs = dl.getOfs();	   
         if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
-        return (Record*) _p.at(ofs, size);
+        return (Record*) (_p+ofs);
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
@@ -457,10 +452,10 @@ namespace mongo {
 
 	BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
-	inline void DataFileMgr::grow(const DiskLoc& dl, int len) { 
+	/*inline void DataFileMgr::grow(const DiskLoc& dl, int len) { 
         assert( dl.a() != -1 );
         cc().database()->getFile(dl.a())->grow(dl, len);
-	}
+	}*/
 
     inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) { 
         assert( dl.a() != -1 );

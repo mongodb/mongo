@@ -132,10 +132,10 @@ namespace mongo {
 		unsigned long long len = 0;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
-        MMF::Pointer p;
+        void *p;
         if( MMF::exists(nsPath) ) {
 			p = f.mapWithOptions(pathString.c_str(), durable?MMF::READONLY:0);
-            if( !p.isNull() ) {
+            if( p ) {
                 len = f.length();
                 if ( len % (1024*1024) != 0 ){
                     log() << "bad .ns file: " << pathString << endl;
@@ -149,19 +149,20 @@ namespace mongo {
             maybeMkdir();
 			unsigned long long l = lenForNewNsFiles;
 			p = f.map(pathString.c_str(), l, durable?MMF::READONLY:0);
-            if( !p.isNull() ) {
+            if( p ) {
                 len = l;
                 assert( len == lenForNewNsFiles );
             }
 		}
 
-        if ( p.isNull() ) {
-            problem() << "couldn't open file " << pathString << " terminating" << endl;
+        if ( p == 0 ) {
+            /** TODO: this shouldn't terminate? */
+            log() << "error couldn't open file " << pathString << " terminating" << endl;
             dbexit( EXIT_FS );
         }
 
         assert( len <= 0x7fffffff );
-        ht = new HashTable<Namespace,NamespaceDetails,MMF::Pointer>(p, (int) len, "namespace index");
+        ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
         if( checkNsFilesOnLoad )
             ht->iterAll(namespaceOnLoadCallback);
     }
@@ -171,7 +172,6 @@ namespace mongo {
         if ( ! k.hasDollarSign() )
             l->push_back( (string)k );
     }
-
     void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {
         assert( onlyCollections ); // TODO: need to implement this
         //                                  need boost::bind or something to make this less ugly
@@ -243,14 +243,14 @@ namespace mongo {
         if ( capped == 0 ) {
             if ( left < 24 || left < (lenToAlloc >> 3) ) {
                 // you get the whole thing.
-				DataFileMgr::grow(loc, regionlen);
+				//DataFileMgr::grow(loc, regionlen);
                 return loc;
             }
         }
 
         /* split off some for further use. */
         r->lengthWithHeaders = lenToAlloc;
-		DataFileMgr::grow(loc, lenToAlloc);
+		//DataFileMgr::grow(loc, lenToAlloc);
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
