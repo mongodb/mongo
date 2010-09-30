@@ -41,9 +41,30 @@ namespace mongo {
     class ClientCursor;
     class ParsedQuery;
 
+    struct ByLocKey {
+        
+        ByLocKey( const DiskLoc & l , const CursorId& i ) : loc(l), id(i){}
+        
+        static ByLocKey min( const DiskLoc& l ){ return ByLocKey( l , numeric_limits<long long>::min() ); }
+        static ByLocKey max( const DiskLoc& l ){ return ByLocKey( l , numeric_limits<long long>::max() ); }
+
+        bool operator<( const ByLocKey &other ) const {
+            int x = loc.compare( other.loc );
+            if ( x )
+                return x < 0;
+            return id < other.id;
+        }
+
+        DiskLoc loc;
+        CursorId id;
+
+    };
+
     /* todo: make this map be per connection.  this will prevent cursor hijacking security attacks perhaps.
+     *       ERH: 9/2010 this may not work since some drivers send getMore over a different connection
     */
     typedef map<CursorId, ClientCursor*> CCById;
+    typedef map<ByLocKey, ClientCursor*> CCByLoc;
 
     extern BSONObj id_obj;
 
@@ -305,7 +326,7 @@ private:
         // setting this prevents timeout of the cursor in question.
         void noTimeout() { _pinValue++; }
 
-        multimap<DiskLoc, ClientCursor*>& byLoc() { return _db->ccByLoc; }
+        CCByLoc& byLoc() { return _db->ccByLoc; }
 public:
         void setDoingDeletes( bool doingDeletes ) {_doingDeletes = doingDeletes; }
         

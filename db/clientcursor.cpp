@@ -32,8 +32,6 @@
 
 namespace mongo {
 
-    typedef multimap<DiskLoc, ClientCursor*> CCByLoc;
-
     CCById ClientCursor::clientCursorsById;
     boost::recursive_mutex ClientCursor::ccmutex;
     long long ClientCursor::numberTimedOut = 0;
@@ -59,14 +57,13 @@ namespace mongo {
             return;
 
         CCByLoc& bl = byLoc();
+
         if ( !_lastLoc.isNull() ) {
-            CCByLoc::iterator i = kv_find(bl, _lastLoc, this);
-            if ( i != bl.end() )
-                bl.erase(i);
+            bl.erase( ByLocKey( _lastLoc, cursorid ) );
         }
 
         if ( !L.isNull() )
-            bl.insert( make_pair(L, this) );
+            bl[ByLocKey(L,cursorid)] = this;
         _lastLoc = L;
     }
 
@@ -177,8 +174,8 @@ namespace mongo {
         aboutToDeleteForSharding( db , dl );
 
         CCByLoc& bl = db->ccByLoc;
-        CCByLoc::iterator j = bl.lower_bound(dl);
-        CCByLoc::iterator stop = bl.upper_bound(dl);
+        CCByLoc::iterator j = bl.lower_bound(ByLocKey::min(dl));
+        CCByLoc::iterator stop = bl.upper_bound(ByLocKey::max(dl));
         if ( j == stop )
             return;
 
@@ -186,7 +183,7 @@ namespace mongo {
 
         while ( 1 ) {
             toAdvance.push_back(j->second);
-            DEV assert( j->first == dl );
+            DEV assert( j->first.loc == dl );
             ++j;
             if ( j == stop )
                 break;

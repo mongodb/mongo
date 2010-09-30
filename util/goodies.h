@@ -72,20 +72,6 @@ namespace mongo {
     /* set to TRUE if we are exiting */
     extern bool goingAway;
 
-    /* find the multimap member which matches a particular key and value.
-
-       note this can be slow if there are a lot with the same key.
-    */
-    template<class C,class K,class V> inline typename C::iterator kv_find(C& c, const K& k,const V& v) {
-        pair<typename C::iterator,typename C::iterator> p = c.equal_range(k);
-
-        for ( typename C::iterator it=p.first; it!=p.second; ++it)
-            if ( it->second == v )
-                return it;
-
-        return c.end();
-    }
-
     bool isPrime(int n);
     int nextPrime(int n);
 
