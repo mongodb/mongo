@@ -32,7 +32,7 @@ namespace mongoutils {
     inline unsigned hashAPointer(void *v) {
         unsigned x = 0;
         unsigned char *p = (unsigned char *) &v;
-        for( int i = 0; i < sizeof(void*); i++ ) {
+        for( unsigned i = 0; i < sizeof(void*); i++ ) {
             x = x * 131 + p[i];
         }
         return x;
