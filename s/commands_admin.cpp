@@ -976,6 +976,36 @@ namespace mongo {
         } cmdGetLastError;
         
     }
+
+    class CmdShardingResetError : public Command {
+    public:
+        CmdShardingResetError() : Command( "resetError" , false , "reseterror" ){}
+        
+        virtual LockType locktype() const { return NONE; } 
+        virtual bool requiresAuth() { return false; }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        
+        bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+            LastError *le = lastError.get();
+            if ( le )
+                le->reset();
+
+            ClientInfo * client = ClientInfo::get();
+            set<string> * shards = client->getPrev();
+
+            for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
+                string theShard = *i;
+                ShardConnection conn( theShard , "" );
+                BSONObj res;
+                conn->runCommand( dbName , cmdObj , res );
+                conn.done();
+            }
+            
+            return true;
+        }
+    } cmdShardingResetError;
     
     class CmdListDatabases : public Command {
     public:
