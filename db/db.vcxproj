@@ -523,7 +523,6 @@
     <ClCompile Include="pdfile.cpp" />
     <ClCompile Include="query.cpp" />
     <ClCompile Include="queryoptimizer.cpp" />
-    <ClCompile Include="..\util\ramstore.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="security_commands.cpp" />
     <ClCompile Include="tests.cpp" />
@@ -611,6 +610,7 @@
     <ClInclude Include="..\util\concurrency\mvar.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\thread_pool.h" />
+    <ClInclude Include="..\util\mongoutils\checksum.h" />
     <ClInclude Include="..\util\mongoutils\html.h" />
     <ClInclude Include="..\util\mongoutils\str.h" />
     <ClInclude Include="..\util\ramlog.h" />

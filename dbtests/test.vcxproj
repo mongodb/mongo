@@ -568,7 +568,6 @@
     <ClCompile Include="..\db\query.cpp" />
     <ClCompile Include="..\db\queryoptimizer.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
-    <ClCompile Include="..\util\ramstore.cpp" />
     <ClCompile Include="..\db\repl.cpp" />
     <ClCompile Include="..\db\security.cpp" />
     <ClCompile Include="..\db\security_commands.cpp" />

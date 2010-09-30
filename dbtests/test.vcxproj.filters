@@ -413,9 +413,6 @@
     <ClCompile Include="..\db\queryoptimizer.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\ramstore.cpp">
-      <Filter>db\cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\repl.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
