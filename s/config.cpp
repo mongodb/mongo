@@ -130,10 +130,19 @@ namespace mongo {
 
         log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
 
+        // mark the collection as sharded and save metadata before trying to chunk, which may throw
+        // TODO undo _collections state if ci.shard() or _save() fails
         ci.shard( this , ns , fieldsAndOrder , unique );
-        ci.getCM()->maybeChunkCollection();
-
         _save();
+
+        try {
+            ci.getCM()->maybeChunkCollection();
+        }
+        catch ( UserException& e ){
+            // failure to chunk is not critical enough to abort the command (and undo the _save()'d configDB state)
+            log() << "couldn't chunk recently created collection: " << ns << " " << e << endl;
+        }
+
         return ci.getCM();
     }
 
