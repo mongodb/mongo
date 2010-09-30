@@ -452,6 +452,7 @@ serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.
 serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/geo/*.cpp" )
 
 serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
+serverOnlyFiles += Glob( "db/commands/*.cpp" )
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
