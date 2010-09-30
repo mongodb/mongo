@@ -859,7 +859,7 @@ namespace mongo {
         //TODO in parallel?
         for ( set<Shard>::const_iterator i=_shards.begin(); i!=_shards.end(); ++i ){
             ScopedDbConnection conn( i->getConnString() );
-            conn->ensureIndex( getns() , getShardKey().key() , _unique );
+            conn->ensureIndex( getns() , getShardKey().key() , _unique , "" , false /* do not cache ensureIndex SERVER-1691 */ );
             conn.done();
         }
     }

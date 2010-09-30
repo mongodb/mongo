@@ -623,10 +623,12 @@ namespace mongo {
            @param keys the "key pattern" for the index.  e.g., { name : 1 }
            @param unique if true, indicates that key uniqueness should be enforced for this index
            @param name if not isn't specified, it will be created from the keys (recommended)
+           @param cache if set to false, the index cache for the connection won't remember this call
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
-        virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "" );
+        virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "", 
+                                  bool cache = true );
 
         /**
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
