@@ -402,12 +402,15 @@ namespace mongo {
     inline Extent* DiskLoc::ext() const {
         return DataFileMgr::getExtent(*this);
     }
+    inline BtreeBucket* DiskLoc::btree() const {
+        assert( _a != -1 );
+        return (BtreeBucket *) rec()->data;
+    }
 
     /*---------------------------------------------------------------------*/
 
 } // namespace mongo
 
-#include "rec.h"
 #include "database.h"
 
 namespace mongo {

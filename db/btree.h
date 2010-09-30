@@ -25,6 +25,8 @@
 
 namespace mongo {
 
+    const int BucketSize = 8192;
+
 #pragma pack(1)
     struct _KeyNode {
         _KeyNode& writing();
