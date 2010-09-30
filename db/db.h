@@ -87,32 +87,7 @@ namespace mongo {
             d = db;
         }
         
-        Database* getOrCreate( const string& ns , const string& path , bool& justCreated ){
-            dbMutex.assertWriteLocked();
-            DBs& m = _paths[path];
-            
-            string dbname = _todb( ns );
-
-            Database* & db = m[dbname];
-            if ( db ){
-                justCreated = false;
-                return db;
-            }
-            
-            log(1) << "Accessing: " << dbname << " for the first time" << endl;
-            try {
-                db = new Database( dbname.c_str() , justCreated , path );
-            }
-            catch ( ... ){
-                m.erase( dbname );
-                throw;
-            }
-            _size++;
-            return db;
-        }
-        
-
-
+        Database* getOrCreate( const string& ns , const string& path , bool& justCreated );
 
         void erase( const string& ns , const string& path ){
             dbMutex.assertWriteLocked();

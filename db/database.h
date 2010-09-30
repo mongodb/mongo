@@ -23,6 +23,8 @@
 namespace mongo {
 
     class ClientCursor;
+    struct ByLocKey;
+    typedef map<ByLocKey, ClientCursor*> CCByLoc;
 
     /**
      * Database represents a database database
@@ -205,7 +207,7 @@ namespace mongo {
         NamespaceIndex namespaceIndex;
         int profile; // 0=off.
         const string profileName; // "alleyinsider.system.profile"
-        multimap<DiskLoc, ClientCursor*> ccByLoc;
+        CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory 
     };
 
