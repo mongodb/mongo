@@ -295,9 +295,6 @@
     <ClCompile Include="stats\snapshots.cpp">
       <Filter>util\core</Filter>
     </ClCompile>
-    <ClCompile Include="storage.cpp">
-      <Filter>util\core</Filter>
-    </ClCompile>
     <ClCompile Include="tests.cpp">
       <Filter>util\core</Filter>
     </ClCompile>
@@ -618,18 +615,6 @@
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\ramstore.h">
-      <Filter>db\storage engine</Filter>
-    </ClInclude>
-    <ClInclude Include="recstore.h">
-      <Filter>db\storage engine</Filter>
-    </ClInclude>
-    <ClInclude Include="rec.h">
-      <Filter>db\storage engine</Filter>
-    </ClInclude>
-    <ClInclude Include="reccache.h">
-      <Filter>db\storage engine</Filter>
-    </ClInclude>
-    <ClInclude Include="reci.h">
       <Filter>db\storage engine</Filter>
     </ClInclude>
     <ClInclude Include="repl.h">

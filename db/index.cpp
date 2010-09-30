@@ -73,7 +73,7 @@ namespace mongo {
 
         /* important to catch exception here so we can finish cleanup below. */
         try { 
-            btreeStore->drop(ns.c_str());
+            dropNS(ns.c_str());
         }
         catch(DBException& ) { 
             log(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;

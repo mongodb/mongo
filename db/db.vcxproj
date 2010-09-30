@@ -480,7 +480,6 @@
     <ClCompile Include="repl\rs_sync.cpp" />
     <ClCompile Include="repl_block.cpp" />
     <ClCompile Include="restapi.cpp" />
-    <ClCompile Include="storage.cpp" />
     <ClCompile Include="..\client\connpool.cpp" />
     <ClCompile Include="..\client\dbclient.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
@@ -623,10 +622,6 @@
     <ClInclude Include="oplogreader.h" />
     <ClInclude Include="repl.h" />
     <ClInclude Include="replpair.h" />
-    <ClInclude Include="rec.h" />
-    <ClInclude Include="reccache.h" />
-    <ClInclude Include="reci.h" />
-    <ClInclude Include="recstore.h" />
     <ClInclude Include="repl\connections.h" />
     <ClInclude Include="repl\multicmd.h" />
     <ClInclude Include="repl\rsmember.h" />

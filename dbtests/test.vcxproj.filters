@@ -79,12 +79,6 @@
     <ClInclude Include="..\db\reccache.h">
       <Filter>storage related</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\reci.h">
-      <Filter>storage related</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\recstore.h">
-      <Filter>storage related</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\storage.h">
       <Filter>storage related</Filter>
     </ClInclude>
@@ -325,9 +319,6 @@
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcreposix.c">
       <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\storage.cpp">
-      <Filter>storage related</Filter>
     </ClCompile>
     <ClCompile Include="..\client\connpool.cpp">
       <Filter>client</Filter>

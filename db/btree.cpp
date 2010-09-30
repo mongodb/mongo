@@ -33,7 +33,7 @@ namespace mongo {
 
     BtreeBucket* DiskLoc::btreemod() const {
         assert( _a != -1 );
-        BtreeBucket *b = (BtreeBucket*) btreeStore->get(*this, BucketSize);
+        BtreeBucket *b = btree();
         return dur::writing(b);
     }
 
@@ -604,7 +604,7 @@ found:
         n = -1;
         parent.Null();
         string ns = id.indexNamespace();
-        btreeStore->deleteRecord(ns.c_str(), thisLoc);
+        theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), thisLoc.rec(), thisLoc);
 #endif
     }
 
@@ -828,14 +828,14 @@ found:
 
     /* start a new index off, empty */
     DiskLoc BtreeBucket::addBucket(IndexDetails& id) {
-        DiskLoc loc = btreeStore->insert(id.indexNamespace().c_str(), 0, BucketSize, true);
+        DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), 0, BucketSize, true);
         BtreeBucket *b = loc.btreemod();
         b->init();
         return loc;
     }
 
     void BtreeBucket::renameIndexNamespace(const char *oldNs, const char *newNs) {
-        btreeStore->rename( oldNs, newNs );
+        renameNamespace( oldNs, newNs );
     }
 
     DiskLoc BtreeBucket::getHead(const DiskLoc& thisLoc) {
@@ -1324,7 +1324,7 @@ namespace mongo {
             DiskLoc x = first;
             while( !x.isNull() ) { 
                 DiskLoc next = x.btree()->tempNext();
-                btreeStore->deleteRecord(idx.indexNamespace().c_str(), x);
+                theDataFileMgr._deleteRecord(nsdetails(idx.indexNamespace().c_str()), idx.indexNamespace().c_str(), x.rec(), x);
                 x = next;
             }
             assert( idx.head.isNull() );

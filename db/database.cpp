@@ -28,7 +28,6 @@ namespace mongo {
 
     Database::~Database() {
         magic = 0;
-        btreeStore->closeFiles(name, path);
         size_t n = files.size();
         for ( size_t i = 0; i < n; i++ )
             delete files[i];
