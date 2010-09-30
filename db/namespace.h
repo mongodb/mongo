@@ -23,6 +23,7 @@
 #include "queryutil.h"
 #include "diskloc.h"
 #include "../util/hashtab.h"
+#include "mongommf.h"
 
 namespace mongo {
 

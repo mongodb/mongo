@@ -162,7 +162,7 @@ namespace mongo {
         }
 
         assert( len <= 0x7fffffff );
-        ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
+        ht = new HashTable<Namespace,NamespaceDetails>(MoveableBuffer(p), (int) len, "namespace index");
         if( checkNsFilesOnLoad )
             ht->iterAll(namespaceOnLoadCallback);
     }
