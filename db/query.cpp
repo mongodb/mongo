@@ -250,16 +250,6 @@ namespace mongo {
 
     int nCaught = 0;
 
-    void killCursors(int n, long long *ids) {
-        int k = 0;
-        for ( int i = 0; i < n; i++ ) {
-            if ( ClientCursor::erase(ids[i]) )
-                k++;
-        }
-        if ( logLevel > 0 || k != n ){
-            log( k == n ) << "killcursors: found " << k << " of " << n << endl;
-        }
-    }
 
     BSONObj id_obj = fromjson("{\"_id\":1}");
     BSONObj empty_obj = fromjson("{}");

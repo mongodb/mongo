@@ -443,6 +443,19 @@ namespace mongo {
         }
     }
 
+    int ClientCursor::erase(int n, long long *ids) {
+        int found = 0;
+        for ( int i = 0; i < n; i++ ) {
+            if ( erase(ids[i]) )
+                found++;
+
+            if ( inShutdown() )
+                break;
+        }
+        return found;
+
+    }
+
 
     ClientCursorMonitor clientCursorMonitor;
 

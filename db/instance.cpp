@@ -374,17 +374,25 @@ namespace mongo {
         return true;
     } /* assembleResponse() */
 
-    void killCursors(int n, long long *ids);
     void receivedKillCursors(Message& m) {
         int *x = (int *) m.singleData()->_data;
         x++; // reserved
         int n = *x++;
+
+        assert( m.dataSize() == 8 + ( 8 * n ) ); 
+
         uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
         if ( n > 2000 ) {
             log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
             assert( n < 30000 );
         }
-        killCursors(n, (long long *) x);
+        
+        int found = ClientCursor::erase(n, (long long *) x);
+
+        if ( logLevel > 0 || found != n ){
+            log( found == n ) << "killcursors: found " << found << " of " << n << endl;
+        }
+
     }
 
     /* db - database name

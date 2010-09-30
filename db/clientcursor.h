@@ -270,6 +270,11 @@ namespace mongo {
             return false;
         }
 
+        /**
+         * @return number of cursors found
+         */
+        static int erase( int n , long long * ids );
+
         /* call when cursor's location changes so that we can update the
            cursorsbylocation map.  if you are locked and internally iterating, only
            need to call when you are ready to "unlock".
