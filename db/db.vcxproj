@@ -466,6 +466,9 @@
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="cap.cpp" />
+    <ClCompile Include="commands\distinct.cpp" />
+    <ClCompile Include="commands\group.cpp" />
+    <ClCompile Include="commands\mr.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
@@ -516,7 +519,6 @@
     <ClCompile Include="..\util\mmap_win.cpp" />
     <ClCompile Include="modules\mms.cpp" />
     <ClCompile Include="module.cpp" />
-    <ClCompile Include="mr.cpp" />
     <ClCompile Include="namespace.cpp" />
     <ClCompile Include="nonce.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />

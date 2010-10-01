@@ -241,9 +241,6 @@
     <ClCompile Include="module.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
-    <ClCompile Include="mr.cpp">
-      <Filter>db\core</Filter>
-    </ClCompile>
     <ClCompile Include="namespace.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
@@ -398,6 +395,15 @@
     <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
     <ClCompile Include="..\scripting\bench.cpp">
       <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\distinct.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\group.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\mr.cpp">
+      <Filter>db\commands</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -834,6 +840,9 @@
     </Filter>
     <Filter Include="db\core\h">
       <UniqueIdentifier>{de119f0e-3d04-429f-b88b-69e28b1e02fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\commands">
+      <UniqueIdentifier>{80ffe9bf-371a-44bb-9e2e-30543e97a656}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
