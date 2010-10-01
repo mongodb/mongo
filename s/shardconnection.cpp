@@ -24,6 +24,23 @@
 
 namespace mongo {
     
+    // The code in shardconnection may run not only in mongos context. When elsewhere, chunk shard versioning
+    // is disabled. To enable chunk shard versioning, provide the check/resetShardVerionCB's below
+    //
+    // TODO: better encapsulate this mechanism.
+
+    bool defaultCheckShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ){
+        // no-op in mongod
+        return false;
+    }
+    
+    void defaultResetShardVersion( DBClientBase * conn ){
+        // no-op in mongod
+    }
+
+    boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB = defaultCheckShardVersion;
+    boost::function1<void, DBClientBase*> resetShardVersionCB = defaultResetShardVersion;
+
     /**
      * holds all the actual db connections for a client to various servers
      * 1 pre thread, so don't have to worry about thread safety
@@ -118,12 +135,12 @@ namespace mongo {
                 assert( ss );
                 if ( ! ss->avail )
                     ss->avail = pool.get( i->first );
-                checkShardVersion( *ss->avail , ns );
+                checkShardVersionCB( *ss->avail , ns , false , 1 );
             }
         }
 
         void release( const string& addr , DBClientBase * conn ){
-            resetShardVersion( conn );
+            resetShardVersionCB( conn );
             BSONObj res;
             
             try {
@@ -193,7 +210,7 @@ namespace mongo {
         _finishedInit = true;
         
         if ( _ns.size() ){
-            _setVersion = checkShardVersion( *_conn , _ns );
+            _setVersion = checkShardVersionCB( *_conn , _ns , false , 1 );
         }
         else {
             _setVersion = false;

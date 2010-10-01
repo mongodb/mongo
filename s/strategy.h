@@ -43,7 +43,5 @@ namespace mongo {
     extern Strategy * SINGLE;
     extern Strategy * SHARDED;
 
-    bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result );
-
 }
 
