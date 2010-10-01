@@ -344,9 +344,9 @@ namespace mongo {
             }
             if( me == 0 ) {
                 // log() << "replSet config : " << _cfg->toString() << rsLog;
-                log() << "replSet error can't find self in the repl set configuration:" << rsLog;
+                log() << "replSet error self not present in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;
-                assert(false);
+                uasserted(13497, "replSet error self not present in the configuration");
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
 
@@ -538,7 +538,8 @@ namespace mongo {
             log() << "replSet replSetReconfig new config saved locally" << rsLog;
         }
         catch(DBException& e) { 
-            log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
+            if( e.getCode() != 13497 /* removed from set */ ) 
+                log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
             _fatal();
         }
         catch(...) { 
