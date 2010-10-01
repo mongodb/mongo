@@ -129,40 +129,41 @@ namespace mongo {
             i.dbDropped();
         }
 		*/
+
 		unsigned long long len = 0;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
-        void *p;
+        MoveableBuffer p;
         if( MMF::exists(nsPath) ) {
-			p = f.mapWithOptions(pathString.c_str(), durable?MMF::READONLY:0);
-            if( p ) {
+            if( f.open(pathString) ) {
                 len = f.length();
                 if ( len % (1024*1024) != 0 ){
                     log() << "bad .ns file: " << pathString << endl;
                     uassert( 10079 ,  "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
                 }
+                p = f.getView();
             }
 		}
 		else {
 			// use lenForNewNsFiles, we are making a new database
-			massert( 10343 ,  "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
+			massert( 10343, "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
             maybeMkdir();
 			unsigned long long l = lenForNewNsFiles;
-			p = f.map(pathString.c_str(), l, durable?MMF::READONLY:0);
-            if( p ) {
+            if( f.create(pathString, l) ) {
                 len = l;
                 assert( len == lenForNewNsFiles );
+                p = f.getView();
             }
 		}
 
-        if ( p == 0 ) {
+        if ( p.p == 0 ) {
             /** TODO: this shouldn't terminate? */
             log() << "error couldn't open file " << pathString << " terminating" << endl;
             dbexit( EXIT_FS );
         }
 
         assert( len <= 0x7fffffff );
-        ht = new HashTable<Namespace,NamespaceDetails>(MoveableBuffer(p), (int) len, "namespace index");
+        ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
         if( checkNsFilesOnLoad )
             ht->iterAll(namespaceOnLoadCallback);
     }

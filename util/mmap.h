@@ -42,13 +42,14 @@ namespace mongo {
         void created(); /* subclass must call after create */
         void destroyed(); /* subclass must call in destructor */
 
+        virtual unsigned long long length() const = 0;
+
         // only supporting on posix mmap
         virtual void _lock() {}
         virtual void _unlock() {}
 
     public:
         virtual ~MongoFile() {}
-        virtual unsigned long long length() const = 0;
 
         enum Options {
             SEQUENTIAL = 1, // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
@@ -114,9 +115,7 @@ namespace mongo {
         unsigned long long length() const { return len; }
         string filename() const           { return _filename; }
 
-#if defined(_DURABLE) && defined(_DEBUG)
-        static void* getWriteViewFor(void *ptr);
-#endif
+        void* createReadOnlyMap();
 
         void* testGetCopyOnWriteView();
         void  testCloseCopyOnWriteView(void *);
@@ -126,15 +125,12 @@ namespace mongo {
         
         HANDLE fd;
         HANDLE maphandle;
-        void *view;
+        vector<void *> views;
         unsigned long long len;
         string _filename;
 
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;
-#endif
-#if defined(_DURABLE)
-        void *writeView;
 #endif
     protected:
         // only posix mmap implementations will support this

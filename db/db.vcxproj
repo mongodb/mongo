@@ -472,6 +472,7 @@
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
+    <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
@@ -498,7 +499,6 @@
     <ClCompile Include="commands.cpp" />
     <ClCompile Include="common.cpp" />
     <ClCompile Include="cursor.cpp" />
-    <ClCompile Include="..\s\d_util.cpp" />
     <ClCompile Include="database.cpp" />
     <ClCompile Include="db.cpp" />
     <ClCompile Include="dbcommands.cpp" />
@@ -620,6 +620,7 @@
     <ClInclude Include="geo\core.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />
+    <ClInclude Include="mongommf.h" />
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="oplogreader.h" />
     <ClInclude Include="repl.h" />

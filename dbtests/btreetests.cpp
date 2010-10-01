@@ -60,7 +60,9 @@ namespace BtreeTests {
             return id().head;
         }
         IndexDetails& id() {
-            return nsdetails( ns() )->idx( 1 );
+            NamespaceDetails *nsd = nsdetails( ns() );
+            assert( nsd );
+            return nsd->idx( 1 );
         }
         // dummy, valid record loc
         static DiskLoc recordLoc() {

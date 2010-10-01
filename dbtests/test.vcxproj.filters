@@ -73,15 +73,6 @@
     <ClInclude Include="..\pcre-7.4\pcre.h">
       <Filter>misc and third party\pcre</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\rec.h">
-      <Filter>storage related</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\reccache.h">
-      <Filter>storage related</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\storage.h">
-      <Filter>storage related</Filter>
-    </ClInclude>
     <ClInclude Include="..\client\connpool.h">
       <Filter>client</Filter>
     </ClInclude>
@@ -231,6 +222,9 @@
     </ClInclude>
     <ClInclude Include="..\util\sock.h">
       <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\mongommf.h">
+      <Filter>storage related</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -599,9 +593,6 @@
     <ClCompile Include="..\s\shardconnection.cpp">
       <Filter>shard</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\d_util.cpp">
-      <Filter>shard</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\concurrency\thread_pool.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
@@ -694,6 +685,9 @@
     </ClCompile>
     <ClCompile Include="..\db\dur.cpp">
       <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\mongommf.cpp">
+      <Filter>storage related</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

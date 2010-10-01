@@ -22,32 +22,20 @@
 
 namespace mongo {
 
-    static map<void *, MemoryMappedFile*> viewToWriteable;
-    static mutex viewToWriteableMutex("viewToWriteableMutex");
-
     MemoryMappedFile::MemoryMappedFile()
         : _flushMutex(new mutex("flushMutex")), _filename("??")
     {
         fd = 0;
         maphandle = 0;
-        view = 0;
         len = 0;
         created();
     }
 
     void MemoryMappedFile::close() {
-        //log() << "dur mmap close " << filename() << endl;
-        if ( view ) {
-            {
-                mutex::scoped_lock lk(viewToWriteableMutex);
-                viewToWriteable.erase(view);
-            }
-            UnmapViewOfFile(view);
-#if defined(_DURABLE)
-            UnmapViewOfFile(writeView);
-#endif
+        for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
+            UnmapViewOfFile(*i);
         }
-        view = 0;
+        views.clear();
         if ( maphandle )
             CloseHandle(maphandle);
         maphandle = 0;
@@ -72,10 +60,17 @@ namespace mongo {
         return p;
     }
 
+    void* MemoryMappedFile::createReadOnlyMap() {
+        assert( maphandle );
+        void *p = MapViewOfFile(maphandle, FILE_MAP_READ, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
+        if ( p == 0 ) {
+            DWORD e = GetLastError();
+            log() << "FILE_MAP_READ MapViewOfFile failed " << _filename << " " << errnoWithDescription(e) << endl;
+        }
+        return p;
+    }
+
     void* MemoryMappedFile::map(const char *filenameIn, unsigned long long &length, int options) {
-#if defined(_DURABLE)
-        options |= READONLY;
-#endif
         _filename = filenameIn;
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];
@@ -129,6 +124,7 @@ namespace mongo {
             }
         }
 
+        void *view = 0;
         {
             DWORD access = (options&READONLY)? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
             view = MapViewOfFile(maphandle, access, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
@@ -139,7 +135,7 @@ namespace mongo {
         }
         len = length;
 
-#if defined(_DURABLE)
+#if 0
         {
             if( !( options & READONLY ) ) { 
                 log() << "dur: not readonly view which is wrong : " << filename << endl;
@@ -148,8 +144,8 @@ namespace mongo {
             assert( p );
             writeView = p;
             {
-                mutex::scoped_lock lk(viewToWriteableMutex);
-                viewToWriteable[view] = this;
+                mutex::scoped_lock lk(viewToWritableMutex);
+                viewToWritable[view] = this;
             }
             log() << filenameIn << endl;
             log() << "  ro: " << view << " - " << (void*) (((char *)view)+length) << endl;
@@ -157,37 +153,9 @@ namespace mongo {
         }
 #endif
 
+        views.push_back(view);
         return view;
     }
-
-#if defined(_DURABLE) && defined(_DEBUG)
-  /** if file was opened read only, get a writeable view */
-  void* MemoryMappedFile::getWriteViewFor(void *p) { 
-        mutex::scoped_lock lk(viewToWriteableMutex);
-        std::map< void*, MemoryMappedFile* >::iterator i = 
-            viewToWriteable.upper_bound(((char *)p)+1);
-        i--;
-        assert( i != viewToWriteable.end() );
-        MemoryMappedFile *mmf = i->second;
-        assert( mmf );
-
-        size_t ofs = ((char *)p) - ((char*)mmf->view);
-
-        if( ofs >= mmf->len ) {
-            for( std::map<void*,MemoryMappedFile*>::iterator i = viewToWriteable.begin(); i != viewToWriteable.end(); i++ ) { 
-                char *wl = (char *) i->second->writeView;
-                char *wh = wl + i->second->length();
-                if( p >= wl && p < wh ) { 
-                    log() << "dur: perf warning p=" << p << " is already in the writable view of " << i->second->filename() << endl;
-                    return p;
-                }
-            }
-            log() << "getWriteViewFor error? " << p << endl;
-            assert( ofs < mmf->len ); // did you call writing() with a pointer that isn't into a datafile?
-        }
-        return ((char *)mmf->writeView) + ofs;
-    }
-#endif
 
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
@@ -222,13 +190,14 @@ namespace mongo {
     
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
-        
-        WindowsFlushable f( view , fd , _filename , _flushMutex);
-        f.flush();
+        if( !views.empty() ) {
+            WindowsFlushable f( views[0] , fd , _filename , _flushMutex);
+            f.flush();
+        }
     }
 
-    MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush(){
-        return new WindowsFlushable( view , fd , _filename , _flushMutex );
+    MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
+        return new WindowsFlushable( views.empty() ? 0 : views[0] , fd , _filename , _flushMutex );
     }
     void MemoryMappedFile::_lock() {}
     void MemoryMappedFile::_unlock() {}
