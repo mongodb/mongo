@@ -115,7 +115,7 @@ namespace mongo {
         unsigned long long length() const { return len; }
         string filename() const           { return _filename; }
 
-        void* MemoryMappedFile::createReadOnlyMap();
+        void* createReadOnlyMap();
 
         void* testGetCopyOnWriteView();
         void  testCloseCopyOnWriteView(void *);
