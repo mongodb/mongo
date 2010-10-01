@@ -154,7 +154,7 @@ namespace mongo {
                 BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ){
                     // TODO: maybe this should clear, not sure yet
-                    log() << "lastPing is empty! this could be bad: " << o << endl;
+                    log() << "config.locks: " << _name << " lastPing is empty! this could be bad: " << o << endl;
                     conn.done();
                     return false;
                 }
