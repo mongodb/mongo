@@ -549,7 +549,6 @@
     <ClCompile Include="..\s\d_migrate.cpp" />
     <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />
-    <ClCompile Include="..\s\d_util.cpp" />
     <ClCompile Include="..\s\d_writeback.cpp" />
     <ClCompile Include="..\s\grid.cpp" />
     <ClCompile Include="..\s\shard.cpp" />

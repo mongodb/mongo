@@ -593,9 +593,6 @@
     <ClCompile Include="..\s\shardconnection.cpp">
       <Filter>shard</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\d_util.cpp">
-      <Filter>shard</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\concurrency\thread_pool.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>

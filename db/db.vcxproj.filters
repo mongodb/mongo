@@ -157,9 +157,6 @@
     <ClCompile Include="cursor.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\d_util.cpp">
-      <Filter>sharding</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\d_logic.cpp">
       <Filter>sharding</Filter>
     </ClCompile>
@@ -404,6 +401,9 @@
     </ClCompile>
     <ClCompile Include="commands\mr.cpp">
       <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="mongommf.cpp">
+      <Filter>db\storage engine</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -772,6 +772,9 @@
     </ClInclude>
     <ClInclude Include="..\util\mongoutils\checksum.h">
       <Filter>util\mongoutils</Filter>
+    </ClInclude>
+    <ClInclude Include="mongommf.h">
+      <Filter>db\storage engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
