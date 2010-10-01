@@ -41,6 +41,7 @@
 #include "grid.h"
 #include "strategy.h"
 #include "stats.h"
+#include "writeback_listener.h"
 
 namespace mongo {
 
@@ -853,7 +854,7 @@ namespace mongo {
                     return;
                 
                 for ( unsigned i=0; i<all.size(); i++ ){
-                    waitForWriteback( all[i] );
+                    WriteBackListener::waitFor( all[i] );
                 }
             }
             
