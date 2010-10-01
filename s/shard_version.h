@@ -1,7 +1,7 @@
-// util.cpp
+// @file shard_version.h
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2010 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -16,26 +16,16 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-/**
-   these are commands that live in mongod
-   mostly around shard management and checking
- */
-
-#include "pch.h"
-#include "util.h"
-
-using namespace std;
+#pragma once
 
 namespace mongo {
-
-    bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ){
-        // no-op in mongod
-        return false;
-    }
     
-    void resetShardVersion( DBClientBase * conn ){
-        // no-op in mongod
-    }
+    /*
+     * Install chunk shard vesion callbaks in shardconnection code. This activates
+     * the chunk shard version control that mongos needs.
+     *
+     * MUST be called before accepting any connections.
+     */
+    void installChunkShardVersioning();
 
-}
+}  // namespace mongo

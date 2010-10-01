@@ -34,6 +34,7 @@
 #include "balance.h"
 #include "grid.h"
 #include "cursors.h"
+#include "shard_version.h"
 
 namespace mongo {
     
@@ -138,6 +139,7 @@ namespace mongo {
 
     void start( const MessageServer::Options& opts ){
         setThreadName( "mongosMain" );
+        installChunkShardVersioning();
         balancer.go();
         cursorCache.startTimeoutThread();
 

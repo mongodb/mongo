@@ -78,13 +78,24 @@ namespace mongo {
                               BSON( "_id" << process ) , 
                               BSON( "$set" << BSON( "ping" << DATENOW ) ) ,
                               true );
-                
-                
+                string err = conn->getLastError();
+                if ( ! err.empty() ){
+                    log( LL_WARNING ) << "dist_lock ping failed: " << err << endl;
+                    sleepsecs(30);
+                    continue;
+                }
+
                 // remove really old entries
                 BSONObjBuilder f;
                 f.appendDate( "$lt" , jsTime() - ( 4 * 86400 * 1000 ) );
                 BSONObj r = BSON( "ping" << f.obj() );
                 conn->remove( lockPingNS , r );
+                err = conn->getLastError();
+                if ( ! err.empty() ){
+                    log ( LL_WARNING ) << "dist_lock cleanup failed: " << err << endl;
+                    sleepsecs(30);
+                    continue;
+                }
                 
                 // create index so remove is fast even with a lot of servers
                 if ( loops++ == 0 ){
@@ -94,7 +105,7 @@ namespace mongo {
                 conn.done();
             }
             catch ( std::exception& e ){
-                log( LL_WARNING ) << "dist_lock couldn't ping: " << e.what() << endl;
+                log( LL_WARNING ) << "dist_lock exception during ping: " << e.what() << endl;
             }
 
             log(4) << "dist_lock pinged successfully for: " << process << endl;
@@ -154,7 +165,7 @@ namespace mongo {
                 BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ){
                     // TODO: maybe this should clear, not sure yet
-                    log() << "lastPing is empty! this could be bad: " << o << endl;
+                    log() << "config.locks: " << _name << " lastPing is empty! this could be bad: " << o << endl;
                     conn.done();
                     return false;
                 }

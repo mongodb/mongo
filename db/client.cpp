@@ -442,10 +442,12 @@ namespace mongo {
             *writers = w;
         if ( readers )
             *readers = r;
+        
+        int time = r * 100;
+        time += r * 500;
+        
+        time = min( time , 1000000 );
 
-        if ( num > 50 )
-            num = 50;
-
-        return num * 100;
+        return time;
     }
 }

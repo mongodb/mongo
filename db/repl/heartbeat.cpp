@@ -163,15 +163,15 @@ namespace mongo {
 
                 time_t after = mem.lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
 
-                try {
-                    mem.skew = 0;
-                    long long t = info["time"].Long();
+                if ( info["time"].isNumber() ) {
+                    long long t = info["time"].numberLong();
                     if( t > after ) 
                         mem.skew = (int) (t - after);
                     else if( t < before ) 
                         mem.skew = (int) (t - before); // negative
                 }
-                catch(...) { 
+                else {
+                    warning() << "heatbeat.time isn't a number: " << info << endl;
                     mem.skew = INT_MIN;
                 }
 

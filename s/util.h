@@ -151,6 +151,7 @@ namespace mongo {
         string _ns;
     };
 
-    bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false , int tryNumber = 1 );
-    void resetShardVersion( DBClientBase * conn );
+    extern boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB;
+    extern boost::function1<void, DBClientBase*> resetShardVersionCB;
+
 }
