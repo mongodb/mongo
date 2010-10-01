@@ -287,21 +287,7 @@ namespace mongo {
                     break;
                 { 
                     BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
-                    {
-                        writelock lk("");
 
-                        /* if we have become primary, we dont' want to apply things from elsewhere
-                           anymore. assumePrimary is in the db lock so we are safe as long as 
-                           we check after we locked above. */
-                        if( box.getPrimary() != primary ) {
-                            if( box.getState().primary() )
-                                log(0) << "replSet stopping syncTail we are now primary" << rsLog;
-                            return;
-                        }
-
-                        syncApply(o);
-                        _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
-                    }
                     int sd = myConfig().slaveDelay;
                     if( sd ) { 
                         const OpTime ts = o["ts"]._opTime();
@@ -329,6 +315,23 @@ namespace mongo {
                                 }
                             }
                         }
+                        
+                    }
+
+                    {
+                        writelock lk("");
+
+                        /* if we have become primary, we dont' want to apply things from elsewhere
+                           anymore. assumePrimary is in the db lock so we are safe as long as 
+                           we check after we locked above. */
+                        if( box.getPrimary() != primary ) {
+                            if( box.getState().primary() )
+                                log(0) << "replSet stopping syncTail we are now primary" << rsLog;
+                            return;
+                        }
+
+                        syncApply(o);
+                        _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */                   
                     }
                 }
             }
