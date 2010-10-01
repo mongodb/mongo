@@ -24,6 +24,7 @@
 #include "../util/stringutils.h"
 #include "../util/version.h"
 #include "../util/signal_handlers.h"
+#include "../util/admin_access.h"
 #include "../db/dbwebserver.h"
 
 #include "server.h"
@@ -298,7 +299,7 @@ int main(int argc, char* argv[], char *envp[] ) {
 
     init();
 
-    boost::thread web( webServerThread );
+    boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
     
     MessageServer::Options opts;
     opts.port = cmdLine.port;

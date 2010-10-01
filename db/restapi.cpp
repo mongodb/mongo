@@ -29,6 +29,8 @@
 #include "clientcursor.h"
 #include "background.h"
 
+#include "restapi.h"
+
 namespace mongo {
 
     extern const char *replInfo;
@@ -232,13 +234,13 @@ namespace mongo {
 
     } restHandler;
 
-    bool webHaveAdminUsers(){
+    bool RestAdminAccess::haveAdminUsers() const {
         readlocktryassert rl("admin.system.users", 10000);
         Client::Context cx( "admin.system.users" );
         return ! Helpers::isEmpty("admin.system.users");
     }
 
-    BSONObj webGetAdminUser( const string& username ){
+    BSONObj RestAdminAccess::getAdminUser( const string& username ) const {
         Client::GodScope gs;
         readlocktryassert rl("admin.system.users", 10000);
         Client::Context cx( "admin.system.users" );

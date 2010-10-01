@@ -47,14 +47,6 @@ namespace mongo {
     Client::~Client(){}
     bool Client::shutdown(){ return true; }
 
-    bool webHaveAdminUsers(){
-        return false;
-    }
-
-    BSONObj webGetAdminUser( const string& username ){
-        return BSONObj();
-    }
-    
     bool execCommand( Command * c ,
                       Client& client , int queryOptions , 
                       const char *ns, BSONObj& cmdObj , 
