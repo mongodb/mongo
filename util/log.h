@@ -160,7 +160,6 @@ namespace mongo {
         static boost::scoped_ptr<ostream> stream;
         static vector<Tee*> * globalTees;
     public:
-
         inline static void logLockless( const StringData& s );
         
         static void setLogFile(FILE* f){

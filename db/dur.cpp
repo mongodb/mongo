@@ -4,6 +4,7 @@
 #include "dur.h"
 #include "../util/mmap.h"
 #include "../util/mongoutils/checksum.h"
+#include "mongommf.h"
 
 namespace mongo { 
 
@@ -49,7 +50,7 @@ namespace mongo {
             }
 #if defined(_DEBUG)
             cout << "TEMP writing " << x << ' ' << len << endl;
-            return MemoryMappedFile::getWriteViewFor(x);
+            return MongoMMF::switchToWritableView(x);
 #else
             return x;
 #endif
@@ -57,7 +58,7 @@ namespace mongo {
 
         void assertReading(void *p) { 
 #if defined(_DEBUG)
-            assert( MemoryMappedFile::getWriteViewFor(p) != p );
+            assert( MongoMMF::switchToWritableView(p) != p );
 #endif
         }
 

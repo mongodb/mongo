@@ -55,7 +55,7 @@ namespace mongo {
 
 #pragma pack(1)
 	/* This helper class is used to make the HashMap below in NamespaceDetails e.g. see line: 
-          HashTable<Namespace,NamespaceDetails,MMF::Pointer> *ht;
+          HashTable<Namespace,NamespaceDetails> *ht;
     */
     class Namespace {
     public:
@@ -533,7 +533,7 @@ namespace mongo {
     private:
         void maybeMkdir() const;
         
-        MMF f;
+        MongoMMF f;
         HashTable<Namespace,NamespaceDetails> *ht;
         string dir_;
         string database_;
