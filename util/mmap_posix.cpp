@@ -31,15 +31,14 @@ namespace mongo {
     MemoryMappedFile::MemoryMappedFile() {
         fd = 0;
         maphandle = 0;
-        view = 0;
         len = 0;
         created();
     }
-
+    
     void MemoryMappedFile::close() {
-        if ( view )
-            munmap(view, len);
-        view = 0;
+        for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
+            munmap(*i,len);
+        }
 
         if ( fd )
             ::close(fd);
@@ -73,7 +72,7 @@ namespace mongo {
         }
         lseek( fd, 0, SEEK_SET );
         
-        view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+        void * view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if ( view == MAP_FAILED ) {
             out() << "  mmap() failed for " << filename << " len:" << length << " " << errnoWithDescription() << endl;
             if ( errno == ENOMEM ){
@@ -97,6 +96,8 @@ namespace mongo {
             _unlock();
         }
 
+        views.push_back( view );
+
         return view;
     }
     
@@ -111,9 +112,9 @@ namespace mongo {
     }
     
     void MemoryMappedFile::flush(bool sync) {
-        if ( view == 0 || fd == 0 )
+        if ( views.empty() || fd == 0 )
             return;
-        if ( msync(view, len, sync ? MS_SYNC : MS_ASYNC) )
+        if ( msync(views[0], len, sync ? MS_SYNC : MS_ASYNC) )
             problem() << "msync " << errnoWithDescription() << endl;
     }
     
@@ -136,15 +137,15 @@ namespace mongo {
     };
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush(){
-        return new PosixFlushable( view , fd , len );
+        return new PosixFlushable( views.empty() ? 0 : views[0] , fd , len );
     }
 
     void MemoryMappedFile::_lock() {
-        if (view) assert(mprotect(view, len, PROT_READ | PROT_WRITE) == 0);
+        if (! views.empty() ) assert(mprotect(views[0], len, PROT_READ | PROT_WRITE) == 0);
     }
 
     void MemoryMappedFile::_unlock() {
-        if (view) assert(mprotect(view, len, PROT_READ) == 0);
+        if (! views.empty() ) assert(mprotect(views[0], len, PROT_READ) == 0);
     }
 
 } // namespace mongo
