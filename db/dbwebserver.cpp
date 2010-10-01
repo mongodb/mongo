@@ -32,6 +32,7 @@
 #include "../util/version.h"
 #include "../util/ramlog.h"
 #include <pcrecpp.h>
+#include "../util/admin_access.h"
 #include "dbwebserver.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #undef assert
@@ -59,11 +60,13 @@ namespace mongo {
 
     class DbWebServer : public MiniWebServer {
     public:
-        DbWebServer(const string& ip, int port) : MiniWebServer(ip, port) {
+        DbWebServer(const string& ip, int port, const AdminAccess* webUsers) 
+            : MiniWebServer(ip, port), _webUsers(webUsers) {
             WebStatusPlugin::initAll();
         }
 
     private:
+        const AdminAccess* _webUsers; // not owned here
 
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
@@ -75,13 +78,11 @@ namespace mongo {
             ss << "</pre>";
         }
 
-    private:
-        
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
             if ( from.isLocalHost() )
                 return true;
 
-            if ( ! webHaveAdminUsers() )
+            if ( ! _webUsers->haveAdminUsers() )
                 return true;
 
             string auth = getHeader( rq , "Authorization" );
@@ -98,7 +99,7 @@ namespace mongo {
                     parms[name] = val;
                 }
 
-                BSONObj user = webGetAdminUser( parms["username"] );
+                BSONObj user = _webUsers->getAdminUser( parms["username"] );
                 if ( ! user.isEmpty() ){
                     string ha1 = user["pwd"].str();
                     string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
@@ -120,8 +121,6 @@ namespace mongo {
                     if ( r1 == parms["response"] )
                         return true;
                 }
-
-                
             }
             
             stringstream authHeader;
@@ -249,8 +248,6 @@ namespace mongo {
             
             ss << "</body></html>\n";
             responseMsg = ss.str();
-
-
         }
 
         void _rejectREST( string& responseMsg , int& responseCode, vector<string>& headers ){
@@ -531,10 +528,11 @@ namespace mongo {
         return s.str();
     }
 
-    void webServerThread() {
+    void webServerThread(const AdminAccess* adminAccess) {
+        boost::scoped_ptr<const AdminAccess> adminAccessPtr(adminAccess); // adminAccess is owned here 
         Client::initThread("websvr");
         const int p = cmdLine.port + 1000;
-        DbWebServer mini(cmdLine.bind_ip, p);
+        DbWebServer mini(cmdLine.bind_ip, p, adminAccessPtr.get());
         log() << "web admin interface listening on port " << p << endl;
         mini.initAndListen();
         cc().shutdown();

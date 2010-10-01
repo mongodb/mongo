@@ -37,6 +37,7 @@
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
 #include "client.h"
+#include "restapi.h"
 #include "dbwebserver.h"
 
 #if defined(_WIN32)
@@ -167,7 +168,7 @@ namespace mongo {
         l.setAsTimeTracker();
         startReplication();
         if ( !noHttpInterface )
-            boost::thread thr(webServerThread);
+            boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
 
 #if(TESTEXHAUST)
         boost::thread thr(testExhaust);

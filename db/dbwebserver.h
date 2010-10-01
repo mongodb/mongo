@@ -17,6 +17,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "../util/admin_access.h"
+
 namespace mongo {
 
     class Prioritizable {
@@ -77,15 +79,7 @@ namespace mongo {
         
     };
 
-    void webServerThread();
+    void webServerThread( const AdminAccess* admins );
     string prettyHostName();
     
-    /** @return if there are any admin users.  this should not block for long and throw if can't get a lock if needed */
-    bool webHaveAdminUsers();
-    
-    /** @return admin user with this name.  this should not block for long and throw if can't get a lock if needed */
-    BSONObj webGetAdminUser( const string& username );
-
 };
-
-
