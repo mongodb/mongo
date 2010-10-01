@@ -220,6 +220,7 @@
     <ClCompile Include="grid.cpp" />
     <ClCompile Include="request.cpp" />
     <ClCompile Include="shardconnection.cpp" />
+    <ClCompile Include="shard_version.cpp" />
     <ClCompile Include="s_only.cpp" />
     <ClCompile Include="server.cpp" />
     <ClCompile Include="shard.cpp" />
@@ -520,6 +521,7 @@
     <ClCompile Include="..\util\sock.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
     <ClCompile Include="..\util\util.cpp" />
+    <ClCompile Include="writeback_listener.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\util\processinfo.h" />
