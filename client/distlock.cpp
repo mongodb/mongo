@@ -73,26 +73,30 @@ namespace mongo {
             try {
                 ScopedDbConnection conn( addr );
                 
-                // do ping
+                // refresh the entry corresponding to this process in the lockpings collection
                 conn->update( lockPingNS , 
                               BSON( "_id" << process ) , 
                               BSON( "$set" << BSON( "ping" << DATENOW ) ) ,
                               true );
                 string err = conn->getLastError();
                 if ( ! err.empty() ){
-                    log( LL_WARNING ) << "dist_lock ping failed: " << err << endl;
+                    log( LL_WARNING ) << "dist_lock process: " << process << " pinging: " << addr << " failed: " 
+                                      << err << endl;
+                    conn.done();
                     sleepsecs(30);
                     continue;
                 }
 
-                // remove really old entries
+                // remove really old entries from the lockpings collection
                 BSONObjBuilder f;
-                f.appendDate( "$lt" , jsTime() - ( 4 * 86400 * 1000 ) );
+                f.appendDate( "$lt" , jsTime() - ( 4 * 86400 * 1000 ) ); // 4 days
                 BSONObj r = BSON( "ping" << f.obj() );
                 conn->remove( lockPingNS , r );
                 err = conn->getLastError();
                 if ( ! err.empty() ){
-                    log ( LL_WARNING ) << "dist_lock cleanup failed: " << err << endl;
+                    log ( LL_WARNING ) << "dist_lock cleanup request from process: " << process << " to: " << addr 
+                                       << " failed: " << err << endl;
+                    conn.done();
                     sleepsecs(30);
                     continue;
                 }
