@@ -576,7 +576,7 @@ namespace mongo {
             }
             // shouldn't see RENAME_FROM here
             case Mod::RENAME_TO:
-                b.appendAs( ms.newVal, m.shortFieldName, ms.newVal );
+                b.appendAs( ms.newVal, m.shortFieldName, &ms.newVal );
                 break;
             default: 
                 stringstream ss;

@@ -316,7 +316,7 @@ namespace mongo {
         }
 
         case RENAME_TO: {
-            b.appendAs( ms.newVal , shortFieldName, ms.newVal );
+            b.appendAs( ms.newVal , shortFieldName, &ms.newVal );
             break;
         }
                 

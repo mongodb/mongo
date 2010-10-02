@@ -111,22 +111,18 @@ namespace mongo {
         }
 
         /** append an element but with a new name */
-        BSONObjBuilder&  appendAs(const BSONElement& e, const StringData& fieldName) {
+        BSONObjBuilder& appendAs(const BSONElement& e, const StringData& fieldName, BSONElement *newElt = 0) {
             assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+            int len = _b.len();
             _b.appendNum((char) e.type());
             _b.appendStr(fieldName);
             _b.appendBuf((void *) e.value(), e.valuesize());
+            if ( newElt ) {
+                *newElt = BSONElement( _b.grow( 0 ) - ( _b.len() - len ) );
+            }
             return *this;
         }
 
-        /** append an element but with a new name, and make resulting element available */
-        BSONObjBuilder&  appendAs(const BSONElement& e, const StringData& fieldName, BSONElement &newElt) {
-            int len = _b.len();
-            BSONObjBuilder& ret = appendAs( e, fieldName );
-            newElt = BSONElement( _b.grow( 0 ) - ( _b.len() - len ) );
-            return ret;
-        }
-        
         /** add a subobject as a member */
         BSONObjBuilder& append(const StringData& fieldName, BSONObj subObj) {
             _b.appendNum((char) Object);
@@ -696,13 +692,9 @@ namespace mongo {
             _b.appendArray( num(), subObj );
         }
         
-        void appendAs( const BSONElement &e, const char *name ) {
+        void appendAs( const BSONElement &e, const char *name, BSONElement *newElt = 0 ) {
             fill( name );
-            append( e );
-        }
-
-        void appendAs( const BSONElement &e, const char *name, BSONElement &newElt ) {
-            massert( 13493, "not implemented", false );
+            _b.appendAs( e, num(), newElt );
         }
         
     private:
