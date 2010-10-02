@@ -15,7 +15,7 @@ static int __wt_db_col_update(WT_TOC *, u_int64_t, DBT *, int);
  * __wt_db_col_put --
  *	Db.put method.
  */
-int
+inline int
 __wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
 {
 	return (__wt_db_col_update(toc, recno, data, 1));
@@ -25,7 +25,7 @@ __wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
  * __wt_db_col_del --
  *	Db.col_del method.
  */
-int
+inline int
 __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 {
 	return (__wt_db_col_update(toc, recno, NULL, 0));

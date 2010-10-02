@@ -92,9 +92,9 @@ int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 int
 __wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data);
-int
+inline int
 __wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data);
-int
+inline int
 __wt_db_col_del(WT_TOC *toc, u_int64_t recno);
 int
 __wt_bt_rcc_expand_serial_func(WT_TOC *toc);
@@ -104,9 +104,9 @@ int
 __wt_bt_search_col(WT_TOC *toc, u_int64_t recno, u_int32_t flags);
 int
 __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
-int
+inline int
 __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
-int
+inline int
 __wt_db_row_del(WT_TOC *toc, DBT *key);
 int
 __wt_bt_update_serial_func(WT_TOC *toc);
