@@ -1029,7 +1029,7 @@ namespace mongo {
             BSONElement kk = k.next();
             int number = (int) kk.number();
             bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
-            BSONElement e = obj.getField( kk.fieldName() );
+            BSONElement e = obj.getFieldDotted( kk.fieldName() );
             if ( e.eoo() ) {
                 e = staticNull.firstElement();
             }

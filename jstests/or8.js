@@ -14,3 +14,10 @@ t.find({ $or: [ { a: {$in:[]} } ] } ).toArray();
 assert.eq.automsg( "2", "t.find({ $or: [ { a: {$in:[]} }, {a:1}, {a:3} ] } ).toArray().length" );
 assert.eq.automsg( "2", "t.find({ $or: [ {a:1}, { a: {$in:[]} }, {a:3} ] } ).toArray().length" );
 assert.eq.automsg( "2", "t.find({ $or: [ {a:1}, {a:3}, { a: {$in:[]} } ] } ).toArray().length" );
+
+// nested negate field
+
+t.drop();
+t.save( {a:{b:1,c:1}} );
+t.ensureIndex( { 'a.b':1, 'a.c':1 } );
+assert.eq( 1, t.find( {$or: [ { 'a.b':1 }, { 'a.c':1 } ] } ).itcount() );
