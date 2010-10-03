@@ -1029,23 +1029,16 @@ namespace mongo {
             BSONElement kk = k.next();
             int number = (int) kk.number();
             bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
-            BSONElement e = obj.getFieldDotted( kk.fieldName() );
-            if ( e.eoo() ) {
-                e = staticNull.firstElement();
+            BSONElementSet keys;
+            obj.getFieldsDotted( kk.fieldName(), keys );
+            bool match = false;
+            for( BSONElementSet::const_iterator j = keys.begin(); j != keys.end(); ++j ) {
+                if ( matchesElement( *j, i, forward ) ) {
+                    match = true;
+                    break;
+                }
             }
-            if ( e.type() == Array ) {
-                BSONObjIterator j( e.embeddedObject() );
-                bool match = false;
-                while( j.more() ) {
-                    if ( matchesElement( j.next(), i, forward ) ) {
-                        match = true;
-                        break;
-                    }
-                }
-                if ( !match ) {
-                    return false;
-                }
-            } else if ( !matchesElement( e, i, forward ) ) {
+            if ( !match ) {
                 return false;
             }
         }
