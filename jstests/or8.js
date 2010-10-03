@@ -19,5 +19,10 @@ assert.eq.automsg( "2", "t.find({ $or: [ {a:1}, {a:3}, { a: {$in:[]} } ] } ).toA
 
 t.drop();
 t.save( {a:{b:1,c:1}} );
-t.ensureIndex( { 'a.b':1, 'a.c':1 } );
+t.ensureIndex( { 'a.b':1 } );
+t.ensureIndex( { 'a.c':1 } );
 assert.eq( 1, t.find( {$or: [ { 'a.b':1 }, { 'a.c':1 } ] } ).itcount() );
+
+t.remove();
+t.save( {a:[{b:1,c:1},{b:2,c:1}]} );
+assert.eq( 1, t.find( {$or: [ { 'a.b':2 }, { 'a.c':1 } ] } ).itcount() );
