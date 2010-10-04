@@ -181,5 +181,46 @@ namespace mongo {
             return true;
         }
     } cmdAuthenticate;
+
+    class CmdIsAuthorized : public Command {
+    public:
+        virtual bool requiresAuth() {
+            return false;
+        }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        void help(stringstream& h) const { h << "check-authentication"; }
+        virtual LockType locktype() const { return NONE; }
+        CmdIsAuthorized() : Command("isauthorized") {}
+        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            string mode = cmdObj.getStringField("mode");
+
+            AuthenticationInfo *ai = cc().getAuthenticationInfo();
+
+            bool status;
+            if ( mode.empty() ) {
+              status = ai->isAuthorized( dbname );
+            } else if ( mode == "read" ) {
+              status = ai->isAuthorizedReads( dbname );
+            } else if ( mode == "lock" ) {
+              int lockType = cmdObj.getIntField("locktype");
+              if ( INT_MIN == lockType ) {
+                errmsg = "No lock type specified";
+                return false;
+              } else {
+                status = ai->isAuthorizedForLock( dbname, lockType );
+              }
+            } else {
+              errmsg = "Bad mode for isauthorized";
+              return false;
+            }
+            result.append( "authorized", status );
+            return true;
+        }
+    } cmdIsAuthorized;
     
 } // namespace mongo

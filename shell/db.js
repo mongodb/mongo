@@ -72,6 +72,11 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
     return hex_md5( nonce + username + hex_md5( username + ":mongo:" + pass ) );
 }
 
+DB.prototype.isAuthed = function(){
+  var a = this.runCommand( "isauthorized" );
+  return a.authorized;
+}
+
 DB.prototype.auth = function( username , pass ){
     var n = this.runCommand( { getnonce : 1 } );
 
@@ -288,6 +293,7 @@ DB.prototype.help = function() {
     print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold ");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSisterDB(name) get the db at the same server as this one");
+    print("\tdb.isAuthed() - check if the current user is authorized");
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
