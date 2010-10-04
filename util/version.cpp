@@ -48,9 +48,6 @@ namespace mongo {
 #error _MT is not defined
 #endif
         ss << (sizeof(char *) == 8) ? " 64bit" : " 32bit";
-#if defined(_DURABLE)
-        ss << " _DURABLE";
-#endif
         return ss.str();
     }
 #else
@@ -58,7 +55,12 @@ namespace mongo {
 #endif
 #endif
 
-    void printSysInfo() { log() << "sys info: " << sysInfo() << endl; }
+    void printSysInfo() { 
+        log() << "sys info: " << sysInfo() << endl; 
+#if defined(_DURABLE)
+        log() << "_DURABLE defined, but durable is not finished" << endl;
+#endif
+    }
 
     //
     // 32 bit systems warning

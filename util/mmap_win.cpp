@@ -51,6 +51,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::testGetCopyOnWriteView() { 
+        assert(false); // todo: not added to views array yet...
         assert( maphandle );
         void *p = MapViewOfFile(maphandle, FILE_MAP_COPY, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         if ( p == 0 ) {
@@ -66,6 +67,9 @@ namespace mongo {
         if ( p == 0 ) {
             DWORD e = GetLastError();
             log() << "FILE_MAP_READ MapViewOfFile failed " << _filename << " " << errnoWithDescription(e) << endl;
+        }
+        else { 
+            views.push_back(p);
         }
         return p;
     }
@@ -133,6 +137,9 @@ namespace mongo {
             DWORD e = GetLastError();
             log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << endl;
         }
+        else { 
+            views.push_back(view);
+        }
         len = length;
 
 #if 0
@@ -153,7 +160,6 @@ namespace mongo {
         }
 #endif
 
-        views.push_back(view);
         return view;
     }
 

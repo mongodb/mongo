@@ -54,8 +54,10 @@ namespace mongo {
         }
 
         if( 1 ) { 
+            static int once;
             /* temp : not using MongoMMF yet for datafiles, just .ns.  more to do... */
-            RARELY log() << "TEMP TODO _DURABLE : use mongommf for datafiles" << endl;
+            if( once++ == 0 )
+                log() << "TEMP TODO _DURABLE : use mongommf for datafiles" << endl;
             return p;
         }
 
@@ -132,14 +134,19 @@ namespace mongo {
         view_write = view_private = view_readonly = 0; 
     }
 
-    MongoMMF::~MongoMMF() {
+    MongoMMF::~MongoMMF() { 
+        close();
+    }
+
+    /*virtual*/ void MongoMMF::close() {
 #if defined(_DEBUG) && defined(_DURABLE)
         {
             mutex::scoped_lock lk(our_views_mutex);
             our_read_views.erase(view_readonly);
         }
 #endif
-        view_write = view_private = view_readonly = 0; 
+        view_write = view_private = view_readonly = 0;
+        MemoryMappedFile::close();
     }
 
 }

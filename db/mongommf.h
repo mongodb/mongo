@@ -28,7 +28,8 @@ namespace mongo {
     class MongoMMF : private MemoryMappedFile { 
     public:
         MongoMMF();
-        ~MongoMMF();
+        virtual ~MongoMMF();
+        virtual void close();
         unsigned long long length() const { return MemoryMappedFile::length(); }
         bool open(string fname);
         bool create(string fname, unsigned long long& len);

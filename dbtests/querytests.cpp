@@ -512,7 +512,13 @@ namespace QueryTests {
         static const char *ns() { return "unittests.querytests.AutoResetIndexCache"; }
         static const char *idxNs() { return "unittests.system.indexes"; }
         void index() const { ASSERT( !client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
-        void noIndex() const { ASSERT( client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
+        void noIndex() const { 
+            BSONObj o = client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) );
+            if( !o.isEmpty() ) {
+                cout << o.toString() << endl;
+                ASSERT( false );
+            }
+        }
         void checkIndex() {
             client().ensureIndex( ns(), BSON( "a" << 1 ) );
             index();
