@@ -242,9 +242,8 @@ namespace mongo {
     inline void dbunlocking_read() { }
 
     struct writelock {
-        writelock(const string& ns) {
-            dbMutex.lock();
-        }
+        writelock() { dbMutex.lock(); }
+        writelock(const string& ns) { dbMutex.lock(); }
         ~writelock() { 
             DESTRUCTOR_GUARD(
                 dbunlocking_write();
@@ -257,6 +256,7 @@ namespace mongo {
         readlock(const string& ns) {
             dbMutex.lock_shared();
         }
+        readlock() { dbMutex.lock_shared(); }
         ~readlock() { 
             DESTRUCTOR_GUARD(
                 dbunlocking_read();
@@ -319,6 +319,9 @@ namespace mongo {
         int _prev;
     };
 
+    /* parameterized choice of read or write locking 
+       use readlock and writelock instead of this when statically known which you want
+    */
     class mongolock {
         bool _writelock;
     public:
@@ -344,12 +347,12 @@ namespace mongo {
         void releaseAndWriteLock();
     };
     
-    /* use writelock and readlock instead */
+    /* deprecated - use writelock and readlock instead */
     struct dblock : public writelock {
         dblock() : writelock("") { }
     };
 
-    // eliminate
+    // eliminate this - we should just type "dbMutex.assertWriteLocked();" instead
     inline void assertInWriteLock() { dbMutex.assertWriteLocked(); }
 
 }

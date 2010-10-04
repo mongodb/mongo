@@ -360,7 +360,7 @@ namespace mongo {
                 mongo::log(1) << "note: not profiling because recursive read lock" << endl;
             }
             else {
-                mongolock lk(true);
+                writelock lk;
                 if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ){
                     Client::Context c( currentOp.getNS() );
                     profile(ss.str().c_str(), ms);
@@ -453,7 +453,7 @@ namespace mongo {
             op.setQuery(query);
         }        
 
-        mongolock lk(1);
+        writelock lk;
 
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
@@ -515,7 +515,7 @@ namespace mongo {
         QueryResult* msgdata;
         while( 1 ) {
             try {
-                mongolock lk(false);
+                readlock lk;
                 Client::Context ctx(ns);
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
