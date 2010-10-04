@@ -1,6 +1,6 @@
-/** @file checksum.h */
+/** @file falsenegativeset.h */
 
-/*    Copyright 2009 10gen Inc.
+/*    Copyright 2010 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -17,16 +17,14 @@
 
 #pragma once
 
+#include "hash.h"
+
 namespace mongoutils {
 
-    /**
-     * this is a silly temporary implementation
-     */
-    inline int checksum( const char* x , int size ){
-        int ck = 0;
-        for ( int i=0; i<size; i++ )
-            ck += ( (int)x[i] * ( i + 1 ) );
-        return ck;
-    }
+    template<class T>
+    class FalseNegativeSet { 
+    public:
+        FalseNegativeSet() {}
+    };
 
 }

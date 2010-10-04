@@ -3,7 +3,7 @@
 #include "pch.h"
 #include "dur.h"
 #include "../util/mmap.h"
-#include "../util/mongoutils/checksum.h"
+#include "../util/mongoutils/hash.h"
 #include "mongommf.h"
 
 namespace mongo { 
