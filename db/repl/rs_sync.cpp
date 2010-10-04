@@ -289,7 +289,9 @@ namespace mongo {
                     BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
 
                     int sd = myConfig().slaveDelay;
-                    if( sd ) { 
+                    // ignore slaveDelay if the box is still initializing. once
+                    // it becomes secondary we can worry about it.
+                    if( sd && box.getState().secondary() ) { 
                         const OpTime ts = o["ts"]._opTime();
                         long long a = ts.getSecs();
                         long long b = time(0);
