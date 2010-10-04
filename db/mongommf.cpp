@@ -55,7 +55,7 @@ namespace mongo {
 
         if( 1 ) { 
             /* temp : not using MongoMMF yet for datafiles, just .ns.  more to do... */
-            RARELY log() << "TEMP TODO use mongommf for datafiels..." << endl;
+            RARELY log() << "TEMP TODO _DURABLE : use mongommf for datafiles" << endl;
             return p;
         }
 

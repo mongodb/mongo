@@ -48,6 +48,9 @@ namespace mongo {
 #error _MT is not defined
 #endif
         ss << (sizeof(char *) == 8) ? " 64bit" : " 32bit";
+#if defined(_DURABLE)
+        ss << " _DURABLE";
+#endif
         return ss.str();
     }
 #else
