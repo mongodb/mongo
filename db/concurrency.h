@@ -238,7 +238,11 @@ namespace mongo {
 
     extern MongoMutex &dbMutex;
 
+#if defined(_DURABLE)
+    void dbunlocking_write();
+#else
     inline void dbunlocking_write() { }
+#endif
     inline void dbunlocking_read() { }
 
     struct writelock {

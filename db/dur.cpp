@@ -13,6 +13,10 @@
 
 namespace mongo { 
 
+    void dbunlocking_write() {
+        // pending ...
+    }
+
     namespace dur { 
 
         struct WriteIntent { 
