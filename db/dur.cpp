@@ -33,7 +33,8 @@ namespace mongo {
             Already() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
             bool checkAndSet(const WriteIntent& w) {
-                unsigned x = mongoutils::hashAPointer(w.p);
+                mongoutils::hash(123);
+                unsigned x = mongoutils::hashPointer(w.p);
                 WriteIntent& n = nodes[x % N];
                 if( n.p != w.p || n.len < w.len ) {
                     n = w;

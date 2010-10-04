@@ -24,13 +24,18 @@ namespace mongoutils {
 
         is there a faster way to impl this that hashes just as well?
     */
-    inline unsigned hashAPointer(void *v) {
+    inline unsigned hashPointer(void *v) {
         unsigned x = 0;
         unsigned char *p = (unsigned char *) &v;
         for( unsigned i = 0; i < sizeof(void*); i++ ) {
             x = x * 131 + p[i];
         }
         return x;
+    }
+
+    inline unsigned hash(unsigned u) {
+        unsigned char *p = (unsigned char *) &u;
+        return (((((p[3] * 131) + p[2]) * 131) + p[1]) * 131) + p[0];
     }
 
 }
