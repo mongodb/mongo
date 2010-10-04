@@ -49,8 +49,8 @@ namespace mongo {
                 assert( writes.size() < 20000000 );
             }
 #if defined(_DEBUG)
-            cout << "TEMP writing " << x << ' ' << len << endl;
-            return MongoMMF::switchToWritableView(x);
+            //cout << "TEMP writing " << x << ' ' << len << endl;
+            return MongoMMF::switchToPrivateView(x);
 #else
             return x;
 #endif
@@ -58,7 +58,7 @@ namespace mongo {
 
         void assertReading(void *p) { 
 #if defined(_DEBUG)
-            assert( MongoMMF::switchToWritableView(p) != p );
+            assert( MongoMMF::switchToPrivateView(p) != p );
 #endif
         }
 

@@ -19,7 +19,7 @@
 #include "pch.h"
 #include "pdfile.h"
 #include "db.h"
-#include "../util/mmap.h"
+#include "mongommf.h"
 #include "../util/hashtab.h"
 #include "../scripting/engine.h"
 #include "btree.h"
@@ -102,12 +102,17 @@ namespace mongo {
             return;
         }
 
-        assertInWriteLock();
-        if( backgroundIndexBuildInProgress ) { 
-            log() << "backgroundIndexBuildInProgress was " << backgroundIndexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
-            backgroundIndexBuildInProgress = 0;
+        DEV assertInWriteLock();
+
+        if( backgroundIndexBuildInProgress || capped2.cc2_ptr ) {
+            assertInWriteLock();
+            NamespaceDetails *d = (NamespaceDetails *) MongoMMF::switchTo_WritableView(this);
+            if( backgroundIndexBuildInProgress ) { 
+                log() << "backgroundIndexBuildInProgress was " << backgroundIndexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
+                d->backgroundIndexBuildInProgress = 0;
+            }
+            d->capped2.cc2_ptr = 0;
         }
-        capped2.cc2_ptr = 0;
     }
 
     static void namespaceOnLoadCallback(const Namespace& k, NamespaceDetails& v) { 

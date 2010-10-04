@@ -25,10 +25,15 @@
 
 namespace mongo {
 
-    /* see dur.h */
+#if !defined(_DEBUG)
+    ///*static*/ void* MongoMMF::switchToPrivateView(void *p) { return p; }
+#else
+    // see dur.h.
     static map<void *, MongoMMF*> our_read_views;
     static mutex our_views_mutex("");
-    void* MongoMMF::switchToWritableView(void *p) { 
+
+    /*static*/ void* MongoMMF::switchToPrivateView(void *readonly_ptr) { 
+        void *p = readonly_ptr;
         assert( durable );
         assert( debug );
         mutex::scoped_lock lk(our_views_mutex);
@@ -50,7 +55,7 @@ namespace mongo {
 
         if( 1 ) { 
             /* temp : not using MongoMMF yet for datafiles, just .ns.  more to do... */
-            log() << "TEMP TODO" << endl;
+            RARELY log() << "TEMP TODO use mongommf for datafiels..." << endl;
             return p;
         }
 
@@ -66,6 +71,20 @@ namespace mongo {
         assert( false ); // did you call writing() with a pointer that isn't into a datafile?
         return 0;
     }
+#endif
+
+    /* switch to view_write.  normally, this is a bad idea since your changes will not 
+       show up in view_private if there have been changes there.  so this must be done 
+       with some care, such as during initialization it might be ok.
+    */
+    /*static*/ void* MongoMMF::switchTo_WritableView(void *p) { 
+        RARELY log() << "todo dur not done switchtowritable" << endl;
+#if defined(_DEBUG)
+        return switchToPrivateView(p);
+#else
+        return p;
+#endif
+    }
 
     bool MongoMMF::open(string fname) {
         view_write = map(fname.c_str());
@@ -73,9 +92,11 @@ namespace mongo {
         view_private = view_write;
         if( view_write ) { 
              if( durable ) {
-               view_readonly = MemoryMappedFile::createReadOnlyMap();
-                mutex::scoped_lock lk(our_views_mutex);
-                our_read_views[view_readonly] = this; 
+#if defined(_DEBUG)
+                 view_readonly = MemoryMappedFile::createReadOnlyMap();
+                 mutex::scoped_lock lk(our_views_mutex);
+                 our_read_views[view_readonly] = this; 
+#endif
              }
             return true;
         }
@@ -88,9 +109,11 @@ namespace mongo {
         view_private = view_write;
         if( view_write ) {
             if( durable ) {
+#if defined(_DEBUG)
                 view_readonly = MemoryMappedFile::createReadOnlyMap();
                 mutex::scoped_lock lk(our_views_mutex);
                 our_read_views[view_readonly] = this;
+#endif
             }
             return true;
         }

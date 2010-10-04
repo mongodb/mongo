@@ -22,37 +22,23 @@ namespace mongo {
         inline int& writingInt(int& d) { return d; }
         template <typename T> inline T* writing(T *x) { return x; }
         inline void assertReading(void *p) { }
-
         template <typename T> inline T* writingNoLog(T *x) { return x; }
-
 #else
 
         void* writingPtr(void *x, size_t len);
 
         inline DiskLoc& writingDiskLoc(DiskLoc& d) {
-#if defined(_DEBUG)
             return *((DiskLoc*) writingPtr(&d, sizeof(d)));
-#else
-            return d;
-#endif
         }
 
         inline int& writingInt(int& d) {
-#if defined(_DEBUG)
             return *((int*) writingPtr(&d, sizeof(d)));
-#else
-            return d;
-#endif
         }
 
         template <typename T> 
         inline 
         T* writing(T *x) { 
-#if defined(_DEBUG)
             return (T*) writingPtr(x, sizeof(T));
-#else
-            return x;
-#endif
         }
 
         void assertReading(void *p);
@@ -63,11 +49,8 @@ namespace mongo {
         template <typename T> 
         inline 
         T* writingNoLog(T *x) { 
-#if defined(_DEBUG)
+            log() << "todo dur" << endl;
             return (T*) writingPtr(x, sizeof(T));
-#else
-            return x;
-#endif
         }
 
 #endif
