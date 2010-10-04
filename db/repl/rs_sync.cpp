@@ -389,6 +389,12 @@ namespace mongo {
                 sleepsecs(60);
             }
             sleepsecs(1);
+
+            /* normally msgCheckNewState gets called periodically, but in a single node repl set there 
+               are no heartbeat threads, so we do it here to be sure.  this is relevant if the singleton 
+               member has done a stepDown() and needs to come back up. 
+               */
+            OCCASIONALLY mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
         }
     }
 
