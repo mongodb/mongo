@@ -36,7 +36,7 @@ namespace mongo {
         // we will re-map the private few frequently, thus the use of MoveableBuffer
         MoveableBuffer getView();
 
-        static void* switchTo_WritableView(void *private_ptr);
+        static void* _switchToWritableView(void *private_ptr);
 
         // for _DEBUG build
         static void* switchToPrivateView(void *debug_readonly_ptr);

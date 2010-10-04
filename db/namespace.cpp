@@ -106,7 +106,7 @@ namespace mongo {
 
         if( backgroundIndexBuildInProgress || capped2.cc2_ptr ) {
             assertInWriteLock();
-            NamespaceDetails *d = (NamespaceDetails *) MongoMMF::switchTo_WritableView(this);
+            NamespaceDetails *d = (NamespaceDetails *) MongoMMF::_switchToWritableView(this);
             if( backgroundIndexBuildInProgress ) { 
                 log() << "backgroundIndexBuildInProgress was " << backgroundIndexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
                 d->backgroundIndexBuildInProgress = 0;

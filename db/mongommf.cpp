@@ -67,17 +67,18 @@ namespace mongo {
                 return p;
             }
         }
-        log() << "switchToWritableView error " << p << endl;
+        log() << "switchToPrivateView error " << p << endl;
         assert( false ); // did you call writing() with a pointer that isn't into a datafile?
         return 0;
     }
 #endif
 
     /* switch to view_write.  normally, this is a bad idea since your changes will not 
-       show up in view_private if there have been changes there.  so this must be done 
-       with some care, such as during initialization it might be ok.
+       show up in view_private if there have been changes there; thus the leading underscore
+       as a tad of a "warning".  but useful when done with some care, such as during 
+       initialization.
     */
-    /*static*/ void* MongoMMF::switchTo_WritableView(void *p) { 
+    /*static*/ void* MongoMMF::_switchToWritableView(void *p) { 
         RARELY log() << "todo dur not done switchtowritable" << endl;
 #if defined(_DEBUG)
         return switchToPrivateView(p);
