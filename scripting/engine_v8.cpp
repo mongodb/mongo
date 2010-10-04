@@ -250,10 +250,17 @@ namespace mongo {
     
     // --- functions -----
 
+    bool hasFunctionIdentifier( const string& code ){
+        if ( code.size() < 9 || code.find( "function" ) != 0  )
+            return false;
+        
+        return code[8] == ' ' || code[8] == '(';
+    }
+        
     Local< v8::Function > V8Scope::__createFunction( const char * raw ){
         for(; isspace( *raw ); ++raw ); // skip whitespace
         string code = raw;
-        if ( code.find( "function" ) == string::npos ){
+        if ( !hasFunctionIdentifier( code ) ) {
             if ( code.find( "\n" ) == string::npos && 
                  ! hasJSReturn( code ) && 
                  ( code.find( ";" ) == string::npos || code.find( ";" ) == code.size() - 1 ) ){
