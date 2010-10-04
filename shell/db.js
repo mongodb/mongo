@@ -72,6 +72,11 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
     return hex_md5( nonce + username + hex_md5( username + ":mongo:" + pass ) );
 }
 
+DB.prototype.isAuth = function(){
+  var a = this.runCommand( "isauthorized" );
+  return a.authorized;
+}
+
 DB.prototype.auth = function( username , pass ){
     var n = this.runCommand( { getnonce : 1 } );
 
@@ -269,6 +274,7 @@ DB.prototype.help = function() {
     print("DB methods:");
     print("\tdb.addUser(username, password[, readOnly=false])");
     print("\tdb.auth(username, password)");
+    print("\tdb.isAuth() - check if the current user is authorized");
     print("\tdb.cloneDatabase(fromhost)");
     print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.copyDatabase(fromdb, todb, fromhost)");
