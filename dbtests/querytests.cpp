@@ -147,12 +147,8 @@ namespace QueryTests {
 
     class ClientBase {
     public:
-        // NOTE: Not bothering to backup the old error record.
         ClientBase() {
-            mongo::lastError.reset( new LastError() );
-        }
-        ~ClientBase() {
-            mongo::lastError.release();
+            mongo::lastError.get()->reset();
         }
     protected:
         static void insert( const char *ns, BSONObj o ) {
@@ -172,6 +168,9 @@ namespace QueryTests {
 
     class BoundedKey : public ClientBase {
     public:
+        ~BoundedKey() {
+            client().dropCollection( "unittests.querytests.BoundedKey" );
+        }
         void run() {
             const char *ns = "unittests.querytests.BoundedKey";
             insert( ns, BSON( "a" << 1 ) );
