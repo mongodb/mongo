@@ -362,16 +362,21 @@ namespace mongo {
             interruptJs( 0 );
         }
         void kill(AtomicUInt i) {
+            bool found = false;
             {
                 scoped_lock l( Client::clientsMutex );
-                for( set< Client* >::const_iterator j = Client::clients.begin(); j != Client::clients.end(); ++j ) {
-                    if ( ( *j )->curop()->opNum() == i ) {
-                        ( *j )->curop()->kill();
-                        break;
+                for( set< Client* >::const_iterator j = Client::clients.begin(); !found && j != Client::clients.end(); ++j ) {
+                    for( CurOp *k = ( *j )->curop(); !found && k; k = k->parent() ) {
+                        if ( k->opNum() == i ) {
+                            k->kill();
+                            found = true;
+                        }                        
                     }
                 }
             }
-            interruptJs( &i );
+            if ( found ) {
+                interruptJs( &i );
+            }
         }
         
         void checkForInterrupt( bool heedMutex = true ) {
