@@ -2,7 +2,7 @@ t = db.jstests_killop
 t.drop();
 
 function debug( x ) {
-    printjson( x );
+//    printjson( x );
 }
 
 t.save( {} );
