@@ -341,6 +341,8 @@ namespace mongo {
         string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
 
+        CurOp *parent() const { return _wrapped; }
+        
         void kill() { _killed = true; }
         bool killed() const { return _killed; }
 
@@ -372,7 +374,10 @@ namespace mongo {
             interruptJs( &i );
         }
         
-        void checkForInterrupt() {
+        void checkForInterrupt( bool heedMutex = true ) {
+            if ( heedMutex && dbMutex.isWriteLocked() ) {
+                return;
+            }
             if( _globalKill ) {
                 uasserted(11600,"interrupted at shutdown");
             }
@@ -381,7 +386,10 @@ namespace mongo {
             }
         }
         
-        const char *checkForInterruptNoAssert() {
+        const char *checkForInterruptNoAssert( bool heedMutex = true ) {
+            if ( heedMutex && dbMutex.isWriteLocked() ) {
+                return "";
+            }
             if( _globalKill ) {
                 return "interrupted at shutdown";
             }

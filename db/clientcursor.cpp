@@ -279,6 +279,7 @@ namespace mongo {
     }
 
     void ClientCursor::staticYield( int micros ) {
+        killCurrentOp.checkForInterrupt( false );
         {
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ){
