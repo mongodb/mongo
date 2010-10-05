@@ -340,7 +340,6 @@ namespace mongo {
         }
         currentOp.ensureStarted();
         currentOp.done();
-        killCurrentOp.finishOp();
         int ms = currentOp.totalTimeMillis();
         
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);

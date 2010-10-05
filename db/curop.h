@@ -150,6 +150,8 @@ namespace mongo {
         
         ThreadSafeString _message;
         ProgressMeter _progressMeter;
+        
+        volatile bool _killed;
 
         void _reset(){
             _command = false;
@@ -159,6 +161,7 @@ namespace mongo {
             _waitingForLock = false;
             _message = "";
             _progressMeter.finished();
+            _killed = false;
         }
 
         void setNS(const char *ns) {
@@ -338,53 +341,57 @@ namespace mongo {
         string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
 
+        void kill() { _killed = true; }
+        bool killed() const { return _killed; }
+
         friend class Client;
     };
 
-    /* 0 = ok
-       1 = kill current operation and reset this to 0
-       future: maybe use this as a "going away" thing on process termination with a higher flag value 
+    /* _globalKill: we are shutting down
+       otherwise kill attribute set on specified CurOp
+       this class does not handle races between interruptJs and the checkForInterrupt functions - those must be
+       handled by the client of this class
     */
     extern class KillCurrentOp { 
-        enum { Off, On, All } state;
-        AtomicUInt toKill;
+        volatile bool _globalKill;
     public:
-        // the kill functions are not called with a mutex
-        void killAll() { state = All; interruptJs( 0 ); }
-        void kill(AtomicUInt i) { toKill = i; state = On; interruptJs( &i ); }
-        
-        // this is called without a mutex also, which means we can miss some
-        // kill requests; it's no worse than what the code was doing before,
-        // though, so I don't feel too bad about adding this function.
-        // hopefully we will have time for SERVER-1816 to fix this
-        void finishOp() {
-            if( state == On && cc().curop()->opNum() == toKill ) { 
-                state = Off;
+        void killAll() {
+            _globalKill = true;
+            interruptJs( 0 );
+        }
+        void kill(AtomicUInt i) {
+            {
+                scoped_lock l( Client::clientsMutex );
+                for( set< Client* >::const_iterator j = Client::clients.begin(); j != Client::clients.end(); ++j ) {
+                    if ( ( *j )->curop()->opNum() == i ) {
+                        ( *j )->curop()->kill();
+                        break;
+                    }
+                }
             }
+            interruptJs( &i );
         }
         
-        void checkForInterrupt() { 
-            if( state != Off ) { 
-                if( state == All ) {
-                    uasserted(11600,"interrupted at shutdown");
-                }
-                if( cc().curop()->opNum() == toKill ) { 
-                    uasserted(11601,"interrupted");
-                }
+        void checkForInterrupt() {
+            if( _globalKill ) {
+                uasserted(11600,"interrupted at shutdown");
+            }
+            if( cc().curop()->killed() ) { 
+                uasserted(11601,"interrupted");
             }
         }
         
         const char *checkForInterruptNoAssert() {
-            if( state != Off ) { 
-                if( state == All ) 
-                    return "interrupted at shutdown";
-                if( cc().curop()->opNum() == toKill ) { 
-                    return "interrupted";
-                }
+            if( _globalKill ) {
+                return "interrupted at shutdown";
+            }
+            if( cc().curop()->killed() ) { 
+                return "interrupted";
             }
             return "";
         }
         
+    private:
         void interruptJs( AtomicUInt *op ) {
             if ( !globalScriptEngine ) {
                 return;
