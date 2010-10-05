@@ -55,6 +55,12 @@ namespace mongo {
         bool operator!=(const OID& r) {
             return a!=r.a||b!=r.b;
         }
+        bool operator==(const OID& r) const {
+            return a==r.a&&b==r.b;
+        }
+        bool operator!=(const OID& r) const {
+            return a!=r.a||b!=r.b;
+        }
 
         /** The object ID output as 24 hex digits. */
         string str() const {
