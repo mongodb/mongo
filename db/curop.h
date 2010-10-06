@@ -369,6 +369,9 @@ namespace mongo {
                     for( CurOp *k = ( *j )->curop(); !found && k; k = k->parent() ) {
                         if ( k->opNum() == i ) {
                             k->kill();
+                            for( CurOp *l = ( *j )->curop(); l != k; l = l->parent() ) {
+                                l->kill();
+                            }
                             found = true;
                         }                        
                     }
