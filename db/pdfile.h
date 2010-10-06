@@ -121,7 +121,6 @@ namespace mongo {
         void insertNoReturnVal(const char *ns, BSONObj o, bool god = false);
 
         DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, const BSONElement &writeId = BSONElement(), bool mayAddIndex = true);
-        void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false);
         static shared_ptr<Cursor> findAll(const char *ns, const DiskLoc &startLoc = DiskLoc());
 
         /* special version of insert for transaction logging -- streamlined a bit.
@@ -133,9 +132,10 @@ namespace mongo {
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
         static DeletedRecord* makeDeletedRecord(const DiskLoc& dl, int len);
-		//static void grow(const DiskLoc& dl, int len);
 
-        /* does not clean up indexes, etc. : just deletes the record in the pdfile. */
+        void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false);
+
+        /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
 
     private:
