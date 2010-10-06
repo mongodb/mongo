@@ -74,18 +74,27 @@ namespace mongo {
     };
 
 #pragma pack(1)
+    class BtreeData { 
+    protected:
+        DiskLoc parent;
+        DiskLoc nextChild; // child bucket off and to the right of the highest key.
+        unsigned short _wasSize; // can be reused, value is 8192 in current pdfile version Apr2010
+        unsigned short _reserved1; // zero
+        int flags;
+        int emptySize; // size of the empty region
+        int topSize; // size of the data at the top of the bucket (keys are at the beginning or 'bottom')
+        int n; // # of keys so far.
+        int reserved;
+        char data[4];
+    };
+
     /* this class is all about the storage management */
-    class BucketBasics {
+    class BucketBasics : public BtreeData {
         friend class BtreeBuilder;
         friend class KeyNode;
     public:
-        void dumpTree(DiskLoc thisLoc, const BSONObj &order);
-        bool isHead() { return parent.isNull(); }
         void assertValid(const Ordering &order, bool force = false);
-        void assertValid(const BSONObj &orderObj, bool force = false) { 
-            return assertValid(Ordering::make(orderObj),force); 
-        }
-        int fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount = 0); /* traverses everything */
+        void assertValid(const BSONObj &orderObj, bool force = false) { return assertValid(Ordering::make(orderObj),force); }
 
         KeyNode keyNode(int i) const {
             if ( i >= n ){
@@ -95,12 +104,7 @@ namespace mongo {
         }
 
     protected:
-
-        void modified(const DiskLoc& thisLoc);
-
-        char * dataAt(short ofs) {
-            return data + ofs;
-        }
+        char * dataAt(short ofs) { return data + ofs; }
 
         void init(); // initialize a new node
 
@@ -126,9 +130,7 @@ namespace mongo {
            */
         enum Flags { Packed=1 };
 
-        DiskLoc& childForPos(int p) {
-            return p == n ? nextChild : k(p).prevChildBucket;
-        }
+        DiskLoc& childForPos(int p) { return p == n ? nextChild : k(p).prevChildBucket; }
 
         int totalDataSize() const;
         void pack( const Ordering &order, int &refPos);
@@ -144,53 +146,21 @@ namespace mongo {
            */
         DiskLoc& tempNext() { return parent; }
 
-    public:
-        DiskLoc parent;
-
-        string bucketSummary() const {
-            stringstream ss;
-            ss << "  Bucket info:" << endl;
-            ss << "    n: " << n << endl;
-            ss << "    parent: " << parent.toString() << endl;
-            ss << "    nextChild: " << parent.toString() << endl;
-            ss << "    flags:" << flags << endl;
-            ss << "    emptySize: " << emptySize << " topSize: " << topSize << endl;
-            return ss.str();
-        }
-        
-        bool isUsed( int i ) const {
-            return k(i).isUsed();
-        }
-
-    protected:
         void _shape(int level, stringstream&);
-        DiskLoc nextChild; // child bucket off and to the right of the highest key.
-
-    private:
-        unsigned short _wasSize; // can be reused, value is 8192 in current pdfile version Apr2010
-        unsigned short _reserved1; // zero
-
-    protected:
         int Size() const;
-        int flags;
-        int emptySize; // size of the empty region
-        int topSize; // size of the data at the top of the bucket (keys are at the beginning or 'bottom')
-        int n; // # of keys so far.
-        int reserved;
-        const _KeyNode& k(int i) const {
-            return ((_KeyNode*)data)[i];
-        }
-        _KeyNode& k(int i) {
-            return ((_KeyNode*)data)[i];
-        }
-        char data[4];
+        const _KeyNode& k(int i) const { return ((_KeyNode*)data)[i]; }
+        _KeyNode& k(int i) { return ((_KeyNode*)data)[i]; }
     };
-#pragma pack()
 
-#pragma pack(1)
     class BtreeBucket : public BucketBasics {
         friend class BtreeCursor;
     public:
+        bool isHead() const { return parent.isNull(); }
+        void dumpTree(DiskLoc thisLoc, const BSONObj &order);
+        int fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount = 0); /* traverses everything */
+
+        bool isUsed( int i ) const { return k(i).isUsed(); }
+        string bucketSummary() const;
         void dump();
 
         /* @return true if key exists in index 
@@ -269,6 +239,7 @@ namespace mongo {
         bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent );
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
         static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, bool rSup, const vector< const BSONElement * > &rEnd, const vector< bool > &rEndInclusive, const Ordering &o, int direction );
+        static void fix(const DiskLoc& thisLoc, const DiskLoc& child);
     public:
         // simply builds and returns a dup key error message string
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );
@@ -319,13 +290,10 @@ namespace mongo {
             assert( !bucket.isNull() );
             return bucket.btree()->keyNode(keyOfs);
         }
-        virtual BSONObj currKey() const {
-            return currKeyNode().key;
-        }
 
-        virtual BSONObj indexKeyPattern() {
-            return indexDetails.keyPattern();
-        }
+        virtual BSONObj currKey() const { return currKeyNode().key; }
+
+        virtual BSONObj indexKeyPattern() { return indexDetails.keyPattern(); }
 
         virtual void aboutToDeleteBucket(const DiskLoc& b) {
             if ( bucket == b )

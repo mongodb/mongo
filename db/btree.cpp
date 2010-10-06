@@ -59,11 +59,17 @@ namespace mongo {
 
     /* BucketBasics --------------------------------------------------- */
 
-    inline void BucketBasics::modified(const DiskLoc& thisLoc) {
-//        VERIFYTHISLOC
-//        btreeStore->modified(thisLoc);
+    string BtreeBucket::bucketSummary() const {
+        stringstream ss;
+        ss << "  Bucket info:" << endl;
+        ss << "    n: " << n << endl;
+        ss << "    parent: " << parent.toString() << endl;
+        ss << "    nextChild: " << parent.toString() << endl;
+        ss << "    flags:" << flags << endl;
+        ss << "    emptySize: " << emptySize << " topSize: " << topSize << endl;
+        return ss.str();
     }
-
+        
     int BucketBasics::Size() const {
         assert( _wasSize == BucketSize );
         return BucketSize;
@@ -88,13 +94,13 @@ namespace mongo {
     int bt_fv=0;
     int bt_dmp=0;
 
-    void BucketBasics::dumpTree(DiskLoc thisLoc, const BSONObj &order) {
+    void BtreeBucket::dumpTree(DiskLoc thisLoc, const BSONObj &order) {
         bt_dmp=1;
         fullValidate(thisLoc, order);
         bt_dmp=0;
     }
 
-    int BucketBasics::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount) {
+    int BtreeBucket::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount) {
         {
             bool f = false;
             assert( f = true );
@@ -357,6 +363,7 @@ namespace mongo {
         assert( emptySize >= 0 );
 
         setPacked();
+        
         assertValid( order );
     }
 
@@ -598,7 +605,6 @@ found:
            it (meaning it is ineligible for reuse).
            */
         memset(this, 0, Size());
-        modified(thisLoc);
 #else
         //defensive:
         n = -1;
@@ -610,7 +616,6 @@ found:
 
     /* note: may delete the entire bucket!  this invalid upon return sometimes. */
     void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p) {
-        modified(thisLoc);
         assert(n>0);
         DiskLoc left = childForPos(p);
 
@@ -657,7 +662,7 @@ found:
         return b;
     }
 
-    inline void fix(const DiskLoc& thisLoc, const DiskLoc& child) {
+    inline void BtreeBucket::fix(const DiskLoc& thisLoc, const DiskLoc& child) {
         if ( !child.isNull() ) {
             if ( insert_debug )
                 out() << "      " << child.toString() << ".parent=" << thisLoc.toString() << endl;
@@ -821,7 +826,6 @@ found:
                                  DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
                                  DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
     {
-        modified(thisLoc);
         BtreeBucket *b = dur::writing(this);
         b->_insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
     }
