@@ -168,8 +168,15 @@ doTest = function (signal) {
 
     // a should not have the new data as it was in blind state.
     B.runCommand({ replSetTest: 1, blind: true });
-    A.runCommand({ replSetTest: 1, blind: false });
-    wait(function () { return !B.isMaster().ismaster; });
+    try {
+      A.runCommand({ replSetTest: 1, blind: false });
+    }
+    catch(e) {
+      print(e);
+    }
+
+    
+    wait(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
     wait(function () { return A.isMaster().ismaster; });
 
     assert(a.bar.count() >= 1, "count check");
@@ -183,7 +190,7 @@ doTest = function (signal) {
     B.runCommand({ replSetTest: 1, blind: false });
 
     wait(function () { return B.isMaster().ismaster || B.isMaster().secondary; });
-
+    
     // everyone is up here...
     assert(A.isMaster().ismaster || A.isMaster().secondary, "A up");
     assert(B.isMaster().ismaster || B.isMaster().secondary, "B up");

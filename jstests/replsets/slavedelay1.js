@@ -95,8 +95,13 @@ doTest = function( signal ) {
   config.members.push({_id : 3, host : host+":31007",priority:0, slaveDelay:10});
 
   var admin = master.getSisterDB("admin");
-  var ok = admin.runCommand({replSetReconfig : config});
-  assert.eq(ok.ok,1);
+  try {
+    var ok = admin.runCommand({replSetReconfig : config});
+    assert.eq(ok.ok,1);
+  }
+  catch(e) {
+    print(e);
+  }
 
   master = replTest.getMaster().getDB(name);
 

@@ -33,8 +33,15 @@ doTest = function( signal ) {
     config.version = c.version + 1;
     config.members = [ { "_id" : 0, "host" : replTest.host + ":31000" },
                        { "_id" : 2, "host" : replTest.host + ":31002" } ]
-    replTest.initiate( config , 'replSetReconfig' );
 
+    try {
+        replTest.initiate( config , 'replSetReconfig' );
+    }
+    catch(e) {
+        print(e);
+    }
+
+    
     // Make sure that a new master comes up
     master = replTest.getMaster();
     slaves = replTest.liveNodes.slaves;
