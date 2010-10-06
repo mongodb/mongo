@@ -66,7 +66,3 @@ doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(
 // these two are SERVER-1841
 //doIt( "while( 1 ) { try { db.jstests_evald.count( {i:10} ); } catch ( e ) { } }", true );
 //doIt( "while( 1 ) { try { while( 1 ) { ; } } catch ( e ) { } }", true );
-
-// the following won't work in v8 currently, see SERVER-1840
-//doIt( "while( 1 ) { db.jstests_evald.count( {$where:function(){ while( 1 ) {;}} } ); }", false );
-//doIt( "while( 1 ) { db.jstests_evald.count( {$where:function(){ while( 1 ) {;}} } ); }", true );
