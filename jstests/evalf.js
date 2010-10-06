@@ -3,6 +3,8 @@
 t = db.jstests_evalf;
 t.drop();
 
+if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900
+
 db.eval( function() {
         opid = null;
         while( opid == null ) {
@@ -21,3 +23,4 @@ db.eval( function() {
                                } } );
         } );
 
+}
