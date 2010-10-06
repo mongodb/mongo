@@ -98,9 +98,10 @@ namespace mongo {
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
                     assert( c );
-                    if ( c == &me )
-                        continue;
                     CurOp* co = c->curop();
+                    if ( c == &me && !co ) {
+                        continue;
+                    }
                     assert( co );
                     if( all || co->active() )
                         vals.push_back( co->infoNoauth() );
