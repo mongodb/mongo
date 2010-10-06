@@ -651,6 +651,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/apitest_db.js",
                                    "jstests/evalb.js",
                                    "jstests/evald.js",
+                                   "jstests/evalf.js",
                                    "jstests/killop.js"] );
         
         // some tests can't be run in parallel with each other
