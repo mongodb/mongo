@@ -313,7 +313,7 @@ namespace mongo {
                         continue;
                     }
                 }
-                if( ! nsDollarCheck( from_name ) ){
+                if( ! isANormalNSName( from_name ) ){
                     log(2) << "\t\t not cloning because has $ " << endl;
                     continue;
                 }            

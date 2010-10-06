@@ -112,10 +112,8 @@ namespace mongo {
     */
     bool replHasDatabases();
 
-// --- local client ---
-    
-    class DBDirectClient : public DBClientBase {
-        
+    /** "embedded" calls to the local server directly. */
+    class DBDirectClient : public DBClientBase {        
     public:
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
