@@ -63,6 +63,5 @@ doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(
 doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", true );
 doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", false );
 
-// these two are SERVER-1841
-//doIt( "while( 1 ) { try { db.jstests_evald.count( {i:10} ); } catch ( e ) { } }", true );
-//doIt( "while( 1 ) { try { while( 1 ) { ; } } catch ( e ) { } }", true );
+doIt( "while( 1 ) { try { db.jstests_evald.count( {i:10} ); } catch ( e ) { } }", true );
+doIt( "while( 1 ) { try { while( 1 ) { ; } } catch ( e ) { } }", true );
