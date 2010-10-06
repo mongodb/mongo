@@ -116,8 +116,14 @@ doTest = function (signal) {
 
     // a should not have the new data as it was in blind state.
     B.runCommand({ replSetTest: 1, blind: true });
-    A.runCommand({ replSetTest: 1, blind: false });
-    wait(function () { return !B.isMaster().ismaster; });
+    try {
+      A.runCommand({ replSetTest: 1, blind: false });
+    }
+    catch(e) {
+      print(e);
+    }
+    
+    wait(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
     wait(function () { return A.isMaster().ismaster; });
 
     assert(a.bar.count() == 3, "t is 3");

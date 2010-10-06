@@ -26,8 +26,13 @@ doTest = function( signal ) {
     conf.members.push({_id : id, host : host});
     conf.version++;
 
-    var result = master.getDB("admin").runCommand({replSetReconfig : conf});
-
+    try {
+      var result = master.getDB("admin").runCommand({replSetReconfig : conf});
+    }
+    catch(e) {
+      print(e);
+    }
+    
     // now... stuff should blow up?
 
     sleep(10);
