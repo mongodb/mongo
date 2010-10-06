@@ -401,9 +401,9 @@ namespace BasicTests {
             ASSERT( ! Database::validDBName( "foo/bar" ) );
             ASSERT( ! Database::validDBName( "foo.bar" ) );
 
-            ASSERT( nsDollarCheck( "asdads" ) );
-            ASSERT( ! nsDollarCheck( "asda$ds" ) );
-            ASSERT( nsDollarCheck( "local.oplog.$main" ) );
+            ASSERT( isANormalNSName( "asdads" ) );
+            ASSERT( ! isANormalNSName( "asda$ds" ) );
+            ASSERT( isANormalNSName( "local.oplog.$main" ) );
         }
     };
 

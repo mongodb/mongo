@@ -469,6 +469,7 @@
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="commands\group.cpp" />
     <ClCompile Include="commands\mr.cpp" />
+    <ClCompile Include="compact.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
