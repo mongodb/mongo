@@ -117,13 +117,9 @@ doTest = function (signal) {
 
     // a should not have the new data as it was in blind state.
     B.runCommand({ replSetTest: 1, blind: true });
-    print("*************** blind ****************");
-    try {
-      A.runCommand({ replSetTest: 1, blind: false });
-    }
-    catch(e) {
-      print(e);
-    }
+    print("*************** wait for server to reconnect ****************");
+    wait(function() { try { a.bar.findOne(); return true; } catch(e) { print(e); return false; } });
+    A.runCommand({ replSetTest: 1, blind: false });
 
     print("*************** B ****************");
     wait(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
