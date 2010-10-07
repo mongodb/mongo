@@ -388,7 +388,8 @@ namespace mongo {
             for ( ; i!=_cloneLocs.end(); ++i ){
                 DiskLoc dl = *i;
                 BSONObj o = dl.obj();
-                if ( ( o.objsize() + bytesSoFar ) > ( 4 * 1024 * 1024 ) ){
+                bytesSoFar += o.objsize();
+                if ( bytesSoFar > ( 4 * 1024 * 1024 ) ){
                     i--;
                     break;
                 }
