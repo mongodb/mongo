@@ -67,6 +67,7 @@ namespace mongo {
                                false
 #endif
                                );
+            result.appendNumber("maxBsonObjectSize", MaxBSONObjectSize);
             return true;
         }
     } cmdBuildInfo;
