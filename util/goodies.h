@@ -218,8 +218,8 @@ namespace mongo {
         }
 
     private:
-        const T _default;
         boost::thread_specific_ptr<T> _val;
+        const T _default;
     };
 
     class ProgressMeter : boost::noncopyable {

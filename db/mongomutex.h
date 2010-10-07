@@ -22,7 +22,7 @@ namespace mongo {
 
     class MongoMutex {
     public:
-        MongoMutex(const char * name) : _m(name) { }
+        MongoMutex(const char * name);
 
         /** @return
          *    > 0  write lock
@@ -172,13 +172,14 @@ namespace mongo {
         MutexInfo& info() { return _minfo; }
 
     private:
-        MutexInfo _minfo;
         RWLock _m;
 
         /* > 0 write lock with recurse count
            < 0 read lock 
         */
         ThreadLocalValue<int> _state;
+
+        MutexInfo _minfo;
 
         /* See the releaseEarly() method.
            we use a separate TLS value for releasedEarly - that is ok as 

@@ -26,4 +26,15 @@ namespace mongo {
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
     MongoMutex &dbMutex( *(new MongoMutex("rw:dbMutex")) );
 
+    MongoMutex::MongoMutex(const char *name) : _m(name) {
+        static int n;
+        assert( ++n == 1 ); // singleton class
+
+        /*cout << sizeof(*this) << endl;
+        cout << sizeof(MutexInfo) << endl;
+        cout << sizeof(RWLock) << endl;
+        cout << sizeof(ThreadLocalValue<int>) << endl;
+        _state.get();*/
+    }
+
 }

@@ -43,8 +43,9 @@ namespace mongo {
 
     /* mutex time stats */
     class MutexInfo {
-        unsigned long long start, enter, timeLocked; // all in microseconds
+        unsigned long long enter, timeLocked; // microseconds
         int locked;
+        unsigned long long start; // last as we touch this least often
 
     public:
         MutexInfo() : timeLocked(0) , locked(0) {
@@ -62,16 +63,12 @@ namespace mongo {
             if ( locked == 0 )
                 timeLocked += curTimeMicros64() - enter;
         }
-        int isLocked() const {
-            return locked;
-        }
+        int isLocked() const { return locked; }
         void getTimingInfo(unsigned long long &s, unsigned long long &tl) const {
             s = start;
             tl = timeLocked;
         }
-        unsigned long long getTimeLocked() const {
-            return timeLocked;
-        }
+        unsigned long long getTimeLocked() const { return timeLocked; }
     };
 
 }
