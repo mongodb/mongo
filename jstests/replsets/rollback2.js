@@ -178,7 +178,7 @@ doTest = function (signal) {
 
     
     wait(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
-    wait(function () { return A.isMaster().ismaster; });
+    wait(function () { try { return A.isMaster().ismaster; } catch(e) { return false; } });
 
     assert(a.bar.count() >= 1, "count check");
     doWritesToKeep2(a);
