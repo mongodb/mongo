@@ -1,8 +1,3 @@
-# See the file LICENSE for redistribution information.
-#
-# Copyright (c) 2008 WiredTiger Software.
-#	All rights reserved.
-#
 # $Id$
 
 # Read the source files and output the statistics #defines and allocation code.

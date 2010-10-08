@@ -1,8 +1,3 @@
-# See the file LICENSE for redistribution information.
-#
-# Copyright (c) 2009 WiredTiger Software.
-#	All rights reserved.
-#
 # $Id$
 
 # Read a memory.out file and output a list of memory errors.

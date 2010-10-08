@@ -1,8 +1,3 @@
-# See the file LICENSE for redistribution information.
-#
-# Copyright (c) 2008 WiredTiger Software.
-#	All rights reserved.
-#
 # $Id$
 
 # A simple python script to build a file that can be bulk-loaded into a

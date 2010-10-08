@@ -1,0 +1,38 @@
+#! /bin/sh
+
+# It was a pain updating all the copyrights in the Berkeley DB tree: I'm not
+# doing that again: the only files carrying copyrights in the WiredTiger tree
+# are the source files, that is, *.[ch] and *.in.  Check automatically to be
+# sure the copyright is up-to-date.
+
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+cat > $t <<ENDOFTEXT
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2010 WiredTiger, Inc.
+ *	All rights reserved.
+ENDOFTEXT
+
+check()
+{
+	# Skip auto-generated files, files we didn't author.
+	if `egrep $1 s_copyright.skip > /dev/null`; then
+		return;
+	fi
+
+	# Check the copyright header.
+	if `sed -e 5q ../$1 | diff - $t > /dev/null`; then
+		return;
+	fi
+
+	# Complain.
+	echo "$1: copyright information is incorrect"
+}
+
+l=`cd .. && echo inc_posix/*.h inc_posix/*.in`
+for i in $l `sed -e '/^[a-z]/! d' filelist`; do
+	check $i
+done

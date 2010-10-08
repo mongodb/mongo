@@ -1,8 +1,3 @@
-# See the file LICENSE for redistribution information.
-#
-# Copyright (c) 2008 WiredTiger Software.
-#	All rights reserved.
-#
 # $Id$
 #
 # Auto-generate statistics #defines, with allocation, clear and print functions.

@@ -1,7 +1,7 @@
 /*-
  * See the file LICENSE for redistribution information.
  *
- * Copyright (c) 2008 WiredTiger Software.
+ * Copyright (c) 2008-2010 WiredTiger, Inc.
  *	All rights reserved.
  *
  * $Id$
@@ -114,7 +114,7 @@ __wt_mb_add(WT_MBUF *mbp, const char *fmt, ...)
 		 * Format the user's information.  If it doesn't fit into the
 		 * buffer we have, re-allocate enough memory and try again.
 		 */
-		len = vsnprintf(mbp->next, remain, fmt, ap);
+		len = (size_t)vsnprintf(mbp->next, remain, fmt, ap);
 		if (len < remain) {
 			mbp->next += len;
 			break;

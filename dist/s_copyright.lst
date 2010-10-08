@@ -1,0 +1,7 @@
+inc_posix/bitstring.h
+inc_posix/extern.h
+inc_posix/queue.h
+inc_posix/serial.h
+support/api.c
+support/stat.c
+support/strerror.c

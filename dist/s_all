@@ -17,4 +17,5 @@ sh ./s_readme				# Build README file
 sh ./s_tags				# Build tags files
 sh ./s_whitespace			# Strip trailing whitespace from source
 
-sh ./s_define				# Complain about unused #defines.
+sh ./s_define				# Complain about unused #defines
+sh ./s_copyright			# Complain about copyright notices
