@@ -54,6 +54,12 @@ public:
     virtual int doRun(){
         auth();
         path root = getParam("dir");
+
+        // check if we're actually talking to a machine that can write
+        if (!isMaster()) {
+            return -1;
+        }
+        
         _drop = hasParam( "drop" );
         _indexesLast = hasParam("indexesLast");
 
