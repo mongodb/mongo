@@ -108,6 +108,7 @@ doTest = function (signal) {
     wait(function () { return b.bar.count() == 3; });
 
     A.runCommand({ replSetTest: 1, blind: true });
+    reconnect(a,b);
     wait(function () { return B.isMaster().ismaster; });
 
     b.bar.insert({ q: 4 });
@@ -117,15 +118,22 @@ doTest = function (signal) {
 
     // a should not have the new data as it was in blind state.
     B.runCommand({ replSetTest: 1, blind: true });
-    try {
-      A.runCommand({ replSetTest: 1, blind: false });
-    }
-    catch(e) {
-      print(e);
-    }
-    
+    print("*************** wait for server to reconnect ****************");
+    reconnect(a,b);
+    A.runCommand({ replSetTest: 1, blind: false });
+    reconnect(a,b);
+
+    print("*************** B ****************");
     wait(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
-    wait(function () { return A.isMaster().ismaster; });
+    print("*************** A ****************");
+    reconnect(a,b); 
+    wait(function () {
+        try {
+          return A.isMaster().ismaster;
+        } catch(e) {
+          return false;
+        }
+      });
 
     assert(a.bar.count() == 3, "t is 3");
     a.bar.insert({ q: 7 });
@@ -145,6 +153,7 @@ doTest = function (signal) {
 
     // bring B back online  
     B.runCommand({ replSetTest: 1, blind: false });
+    reconnect(a,b);
 
     wait(function () { return B.isMaster().ismaster || B.isMaster().secondary; });
 
@@ -156,7 +165,21 @@ doTest = function (signal) {
 
     pause("rollback.js SUCCESS");
     replTest.stopSet(signal);
-}
+};
+
+
+var reconnect = function(a,b) {
+  wait(function() { 
+      try {
+        a.bar.stats();
+        b.bar.stats();
+        return true;
+      } catch(e) {
+        print(e);
+        return false;
+      }
+    });
+};
 
 print("rollback.js");
 doTest( 15 );

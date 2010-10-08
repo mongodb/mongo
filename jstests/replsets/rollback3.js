@@ -188,21 +188,20 @@ doTest = function (signal) {
     wait(function () { return b.bar.count() == a.bar.count(); });
 
     A.runCommand({ replSetTest: 1, blind: true });
-    wait(function () { return B.isMaster().ismaster; });
+    reconnect(a,b);
+    wait(function () { try { return B.isMaster().ismaster; } catch(e) { return false; } });
 
     doItemsToRollBack(b);
 
     // a should not have the new data as it was in blind state.
     B.runCommand({ replSetTest: 1, blind: true });
-    try {
-      A.runCommand({ replSetTest: 1, blind: false });
-    }
-    catch(e) {
-      print(e);
-    }
+    reconnect(a,b);
+
+    A.runCommand({ replSetTest: 1, blind: false });
+    reconnect(a,b);
     
     wait(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
-    wait(function () { return A.isMaster().ismaster; });
+    wait(function () { try { return A.isMaster().ismaster; } catch(e) { return false; } });
 
     assert(a.bar.count() >= 1, "count check");
     doWritesToKeep2(a);
@@ -213,6 +212,7 @@ doTest = function (signal) {
     // bring B back online
     // as A is primary, B will roll back and then catch up
     B.runCommand({ replSetTest: 1, blind: false });
+    reconnect(a,b);
 
     wait(function () { return B.isMaster().ismaster || B.isMaster().secondary; });
 
@@ -224,7 +224,21 @@ doTest = function (signal) {
 
     pause("rollback3.js SUCCESS");
     replTest.stopSet(signal);
-}
+};
+
+
+var reconnect = function(a,b) {
+  wait(function() { 
+      try {
+        a.bar.stats();
+        b.bar.stats();
+        return true;
+      } catch(e) {
+        print(e);
+        return false;
+      }
+    });
+};
 
 print("rollback3.js");
 doTest( 15 );
