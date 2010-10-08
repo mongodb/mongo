@@ -778,7 +778,7 @@ namespace mongo {
         }
         virtual LockType locktype() const { return READ; } 
         virtual void help( stringstream& help ) const { help << "list databases on this server"; }
-        CmdListDatabases() : Command("listDatabases") {}
+        CmdListDatabases() : Command("listDatabases" , true ) {}
         bool run(const string& dbname , BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             vector< string > dbNames;
             getDatabaseNames( dbNames );

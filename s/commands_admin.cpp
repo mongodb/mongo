@@ -1011,7 +1011,7 @@ namespace mongo {
     
     class CmdListDatabases : public Command {
     public:
-        CmdListDatabases() : Command("listDatabases", false , "listdatabases" ) {}
+        CmdListDatabases() : Command("listDatabases", true , "listdatabases" ) {}
 
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
