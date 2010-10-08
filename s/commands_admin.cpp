@@ -786,6 +786,7 @@ namespace mongo {
             virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("ismaster", 1.0 );
                 result.append("msg", "isdbgrid");
+                result.appendNumber("maxBsonObjectSize", MaxBSONObjectSize);
                 return true;
             }
         } ismaster;
