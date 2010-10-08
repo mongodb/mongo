@@ -1352,13 +1352,15 @@ namespace mongo {
             int count;
         };
 
+        // should not generate exceptions, as those can be caught in 
+        // javascript code; returning false without an exception exits
+        // immediately
         static JSBool _interrupt( JSContext *cx ){
             TimeoutSpec &spec = *(TimeoutSpec *)( JS_GetContextPrivate( cx ) );
             if ( ++spec.count % 1000 != 0 )
                 return JS_TRUE;
             const char * interrupt = ScriptEngine::checkInterrupt();
             if ( interrupt && interrupt[ 0 ] ) {
-                JS_ReportError( cx, interrupt );
                 return JS_FALSE;
             }
             if ( spec.timeout.ticks() == 0 ) {
@@ -1368,7 +1370,6 @@ namespace mongo {
             if ( elapsed < spec.timeout ) {
                 return JS_TRUE;
             }
-            JS_ReportError( cx, "Timeout exceeded" );
             return JS_FALSE;
 
         }

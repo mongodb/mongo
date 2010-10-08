@@ -346,11 +346,6 @@ namespace mongo {
  
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
 
-            // Debugging code for SERVER-1633. Commands have already a coarser timer for
-            // normal operation.
-            Timer timer;
-            vector<int> laps;
-
             lastError.disableForCommand();
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
 
@@ -380,9 +375,6 @@ namespace mongo {
                 }
             }
 
-            // SERVER-1633
-            laps.push_back( timer.millis() );
-            
             if ( cmdObj["shard"].type() == String ){
                 shardingState.gotShardName( cmdObj["shard"].String() );
                 shardingState.gotShardHost( cmdObj["shardHost"].String() );
@@ -406,9 +398,6 @@ namespace mongo {
                 }
             }
 
-            // SERVER-1633
-            laps.push_back( timer.millis() );
-            
             unsigned long long version = extractVersion( cmdObj["version"] , errmsg );
 
             if ( errmsg.size() ){
@@ -435,9 +424,6 @@ namespace mongo {
                 return 1;
             }
 
-            // SERVER-1633
-            laps.push_back( timer.millis() );
-
             if ( version == 0 && globalVersion > 0 ){
                 if ( ! authoritative ){
                     result.appendBool( "need_authoritative" , true );
@@ -463,9 +449,6 @@ namespace mongo {
                 return false;
             }
             
-            // SERVER-1633
-            laps.push_back( timer.millis() );
-
             if ( version < globalVersion ){
                 while ( shardingState.inCriticalMigrateSection() ){
                     dbtemprelease r;
@@ -486,9 +469,6 @@ namespace mongo {
                 return false;
             }
 
-            // SERVER-1633
-            laps.push_back( timer.millis() );
-
             {
                 dbtemprelease unlock;
                 shardingState.getChunkMatcher( ns );
@@ -497,15 +477,6 @@ namespace mongo {
             result.appendTimestamp( "oldVersion" , oldVersion );
             oldVersion = version;
             globalVersion = version;
-
-            // SERVER-1633
-            ostringstream lapString;
-            lapString << name /* command name */ << " partials: " ;
-            for (size_t i = 1; i<laps.size(); ++i){ 
-                lapString << (laps[i] - laps[i-1]) / 1000 << " ";
-            }
-            lapString << endl;
-            logIfSlow( timer, lapString.str() );
 
             result.append( "ok" , 1 );
             return 1;

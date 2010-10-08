@@ -62,6 +62,8 @@ namespace mongo {
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
+    const bool closeOnRelinquish = true;
+
     void ReplSetImpl::relinquish() { 
         if( box.getState().primary() ) {
             log() << "replSet relinquishing primary state" << rsLog;
@@ -69,13 +71,13 @@ namespace mongo {
             // SERVER-1681:
             //changeState(MemberState::RS_SECONDARY);
             
-            /* close sockets that were talking to us */
-            // [dm] do we want to do this?  not sure.
-            //log() << "replSet closing sockets after reqlinquishing primary" << rsLog;
-            //MessagingPort::closeAllSockets(1);*/
-
-            // todo: >
-            //changeState(MemberState::RS_SECONDARY);
+            if( closeOnRelinquish ) {
+                /* close sockets that were talking to us so they don't blithly send many writes that will fail
+                   with "not master" (of course client could check result code, but in case they are not)
+                */
+                log() << "replSet closing client sockets after reqlinquishing primary" << rsLog;
+                MessagingPort::closeAllSockets(1);
+            }
         }
         else if( box.getState().startup2() ) {
             // ? add comment
@@ -95,12 +97,10 @@ namespace mongo {
     // for the replSetStepDown command
     bool ReplSetImpl::_stepDown() { 
         lock lk(this);
-        // **TODO** should this just set elect.steppedDown and call relinquish()???  seems that would be better
         if( box.getState().primary() ) { 
-            changeState(MemberState::RS_RECOVERING);
-            //changeState(MemberState::RS_SECONDARY);
             elect.steppedDown = time(0) + 60;
-            log() << "replSet info stepped down as primary" << rsLog;
+            log() << "replSet info stepping down as primary" << rsLog;
+            relinquish();
             return true;
         }
         return false;

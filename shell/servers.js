@@ -990,8 +990,13 @@ SyncCCTest.prototype.tempStart = function( num ){
 }
 
 
-function startParallelShell( jsCode ){
-    var x = startMongoProgramNoConnect( "mongo" , "--eval" , jsCode , db ? db.getMongo().host : null );
+function startParallelShell( jsCode, port ){
+    var x;
+    if ( port ) {
+        x = startMongoProgramNoConnect( "mongo" , "--port" , port , "--eval" , jsCode );
+    } else {
+        x = startMongoProgramNoConnect( "mongo" , "--eval" , jsCode , db ? db.getMongo().host : null );        
+    }
     return function(){
         waitProgram( x );
     };

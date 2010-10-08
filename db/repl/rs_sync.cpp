@@ -289,7 +289,9 @@ namespace mongo {
                     BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
 
                     int sd = myConfig().slaveDelay;
-                    if( sd ) { 
+                    // ignore slaveDelay if the box is still initializing. once
+                    // it becomes secondary we can worry about it.
+                    if( sd && box.getState().secondary() ) { 
                         const OpTime ts = o["ts"]._opTime();
                         long long a = ts.getSecs();
                         long long b = time(0);
@@ -389,6 +391,12 @@ namespace mongo {
                 sleepsecs(60);
             }
             sleepsecs(1);
+
+            /* normally msgCheckNewState gets called periodically, but in a single node repl set there 
+               are no heartbeat threads, so we do it here to be sure.  this is relevant if the singleton 
+               member has done a stepDown() and needs to come back up. 
+               */
+            OCCASIONALLY mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
         }
     }
 

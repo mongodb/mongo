@@ -503,7 +503,8 @@ sendmore:
     } dataFileSync;
 
     const char * jsInterruptCallback() {
-        return killCurrentOp.checkForInterruptNoAssert();
+        // should be safe to interrupt in js code, even if we have a write lock
+        return killCurrentOp.checkForInterruptNoAssert( false );
     }
     
     unsigned jsGetInterruptSpecCallback() {

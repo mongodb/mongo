@@ -63,27 +63,32 @@ namespace mongo {
     */
     void IndexDetails::kill_idx() {
         string ns = indexNamespace(); // e.g. foo.coll.$ts_1
+        try {
 
-        string pns = parentNS(); // note we need a copy, as parentNS() won't work after the drop() below 
+            string pns = parentNS(); // note we need a copy, as parentNS() won't work after the drop() below 
         
-        // clean up parent namespace index cache
-        NamespaceDetailsTransient::get_w( pns.c_str() ).deletedIndex();
+            // clean up parent namespace index cache
+            NamespaceDetailsTransient::get_w( pns.c_str() ).deletedIndex();
 
-        string name = indexName();
+            string name = indexName();
 
-        /* important to catch exception here so we can finish cleanup below. */
-        try { 
-            dropNS(ns.c_str());
+            /* important to catch exception here so we can finish cleanup below. */
+            try { 
+                dropNS(ns.c_str());
+            }
+            catch(DBException& ) { 
+                log(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
+            }
+            head.setInvalid();
+            info.setInvalid();
+
+            // clean up in system.indexes.  we do this last on purpose.
+            int n = removeFromSysIndexes(pns.c_str(), name.c_str());
+            wassert( n == 1 );
+            
+        } catch ( DBException &e ) {
+            log() << "exception in kill_idx: " << e << ", ns: " << ns << endl;
         }
-        catch(DBException& ) { 
-            log(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
-        }
-        head.setInvalid();
-        info.setInvalid();
-
-        // clean up in system.indexes.  we do this last on purpose.
-        int n = removeFromSysIndexes(pns.c_str(), name.c_str());
-        wassert( n == 1 );
     }
     
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {

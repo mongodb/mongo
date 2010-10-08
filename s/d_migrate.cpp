@@ -388,7 +388,8 @@ namespace mongo {
             for ( ; i!=_cloneLocs.end(); ++i ){
                 DiskLoc dl = *i;
                 BSONObj o = dl.obj();
-                if ( ( o.objsize() + bytesSoFar ) > ( 4 * 1024 * 1024 ) ){
+                bytesSoFar += o.objsize();
+                if ( bytesSoFar > ( 4 * 1024 * 1024 ) ){
                     i--;
                     break;
                 }
@@ -431,8 +432,8 @@ namespace mongo {
         // updates applied by 1 thread in a write lock
         set<DiskLoc> _cloneLocs;
 
-        list<BSONObj> _reload;
-        list<BSONObj> _deleted;
+        list<BSONObj> _reload; // objects that were modified that must be recloned 
+        list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
         long long _memoryUsed; // bytes in _reload + _deleted
 
     } migrateFromStatus;

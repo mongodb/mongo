@@ -55,7 +55,12 @@ namespace mongo {
 #endif
 #endif
 
-    void printSysInfo() { log() << "sys info: " << sysInfo() << endl; }
+    void printSysInfo() { 
+        log() << "sys info: " << sysInfo() << endl; 
+#if defined(_DURABLE)
+        log() << "_DURABLE defined, but durable is not finished" << endl;
+#endif
+    }
 
     //
     // 32 bit systems warning

@@ -149,7 +149,7 @@ namespace mongo {
 
         int best = 0;
         shared_ptr< MultiCursor::CursorOp > opPtr( new DeleteOp( justOneOrig, best ) );
-        shared_ptr< MultiCursor > creal( new MultiCursor( ns, pattern, BSONObj(), opPtr, true ) );
+        shared_ptr< MultiCursor > creal( new MultiCursor( ns, pattern, BSONObj(), opPtr, !god ) );
         
         if( !creal->ok() )
             return nDeleted;

@@ -24,6 +24,7 @@
 
 namespace mongo {
     
+    class NamespaceDetails;
     class Record;
     class CoveredIndexMatcher;
 
@@ -164,29 +165,18 @@ namespace mongo {
         BasicCursor(const AdvanceStrategy *_s = forward()) : s( _s ), _nscanned() {
             init();
         }
-        virtual string toString() {
-            return "BasicCursor";
-        }
+        virtual string toString() { return "BasicCursor"; }
         virtual void setTailable() {
             if ( !curr.isNull() || !last.isNull() )
                 tailable_ = true;
         }
-        virtual bool tailable() {
-            return tailable_;
-        }
+        virtual bool tailable() { return tailable_; }
         virtual bool getsetdup(DiskLoc loc) { return false; }
-
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return true; }
-
-        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
-        
-        virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
-            _matcher = matcher;
-        }
-        
-        virtual long long nscanned() { return _nscanned; }
-        
+        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }        
+        virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher; }
+        virtual long long nscanned() { return _nscanned; }        
     };
 
     /* used for order { $natural: -1 } */
@@ -194,12 +184,8 @@ namespace mongo {
     public:
         ReverseCursor(DiskLoc dl) : BasicCursor( dl, reverse() ) { }
         ReverseCursor() : BasicCursor( reverse() ) { }
-        virtual string toString() {
-            return "ReverseCursor";
-        }
+        virtual string toString() { return "ReverseCursor"; }
     };
-
-    class NamespaceDetails;
 
     class ForwardCappedCursor : public BasicCursor, public AdvanceStrategy {
     public:

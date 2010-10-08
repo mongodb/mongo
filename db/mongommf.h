@@ -28,7 +28,8 @@ namespace mongo {
     class MongoMMF : private MemoryMappedFile { 
     public:
         MongoMMF();
-        ~MongoMMF();
+        virtual ~MongoMMF();
+        virtual void close();
         unsigned long long length() const { return MemoryMappedFile::length(); }
         bool open(string fname);
         bool create(string fname, unsigned long long& len);
@@ -36,8 +37,10 @@ namespace mongo {
         // we will re-map the private few frequently, thus the use of MoveableBuffer
         MoveableBuffer getView();
 
+        static void* _switchToWritableView(void *private_ptr);
+
         // for _DEBUG build
-        static void* switchToWritableView(void *);
+        static void* switchToPrivateView(void *debug_readonly_ptr);
 
     private:
         void *view_write;

@@ -448,6 +448,11 @@ namespace mongo {
         
         time = min( time , 1000000 );
 
+        // there has been a kill request for this op - we should yield to allow the op to stop
+        if ( killCurrentOp.checkForInterruptNoAssert( false ) ) {
+            return 100;
+        }
+        
         return time;
     }
 }

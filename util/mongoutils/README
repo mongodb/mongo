@@ -5,3 +5,4 @@
     (3) may require boost headers, but not libs
     (4) are clean and easy to use in any c++ project without pulling in lots of other stuff
     (5) apache license
+    (6) must be documented!  if you aren't going to bother (but don't do that), stick it in util.

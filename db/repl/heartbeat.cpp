@@ -171,7 +171,9 @@ namespace mongo {
                         mem.skew = (int) (t - before); // negative
                 }
                 else {
-                    warning() << "heatbeat.time isn't a number: " << info << endl;
+                    // it won't be there if remote hasn't initialized yet
+                    if( info.hasElement("time") )
+                        warning() << "heatbeat.time isn't a number: " << info << endl;
                     mem.skew = INT_MIN;
                 }
 

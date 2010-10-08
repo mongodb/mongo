@@ -91,7 +91,7 @@ namespace mongo {
             close();
         }
 
-        void close();
+        virtual void close();
 
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
         void* map(const char *filename);

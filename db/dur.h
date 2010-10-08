@@ -3,17 +3,11 @@
 #pragma once
 
 #include "diskloc.h"
+#include "mongommf.h"
 
 namespace mongo { 
 
     namespace dur { 
-
-        /** call writing...() to declare "i'm about to write to x and it should be logged for redo." 
-            
-            failure to call writing...() is checked in _DEBUG mode by using a read only mapped view
-            (i.e., you'll segfault if you don't...)
-        */
-
 
 #if !defined(_DURABLE)
 
@@ -22,40 +16,32 @@ namespace mongo {
         inline int& writingInt(int& d) { return d; }
         template <typename T> inline T* writing(T *x) { return x; }
         inline void assertReading(void *p) { }
-
         template <typename T> inline T* writingNoLog(T *x) { return x; }
-
 #else
+
+        /** Declarations of write intent.
+            
+            Use these methods to declare "i'm about to write to x and it should be logged for redo." 
+            
+            Failure to call writing...() is checked in _DEBUG mode by using a read only mapped view
+            (i.e., you'll segfault if the code is covered in that situation)
+        */
 
         void* writingPtr(void *x, size_t len);
 
         inline DiskLoc& writingDiskLoc(DiskLoc& d) {
-#if defined(_DEBUG)
             return *((DiskLoc*) writingPtr(&d, sizeof(d)));
-#else
-            return d;
-#endif
         }
 
         inline int& writingInt(int& d) {
-#if defined(_DEBUG)
             return *((int*) writingPtr(&d, sizeof(d)));
-#else
-            return d;
-#endif
         }
 
         template <typename T> 
         inline 
         T* writing(T *x) { 
-#if defined(_DEBUG)
             return (T*) writingPtr(x, sizeof(T));
-#else
-            return x;
-#endif
         }
-
-        void assertReading(void *p);
 
         /** declare our intent to write, but it doesn't have to be journaled, as this write is 
             something 'unimportant'.
@@ -63,19 +49,17 @@ namespace mongo {
         template <typename T> 
         inline 
         T* writingNoLog(T *x) { 
-#if defined(_DEBUG)
+            log() << "todo dur" << endl;
             return (T*) writingPtr(x, sizeof(T));
-#else
-            return x;
-#endif
         }
 
+        /* assert that we have not (at least so far) declared write intent for p */
+        inline void assertReading(void *p) { dassert( MongoMMF::switchToPrivateView(p) != p ); }
+
 #endif
 
-    }
+    } // namespace dur
 
-    inline DiskLoc& DiskLoc::writing() { 
-        return dur::writingDiskLoc(*this);
-    }
+    inline DiskLoc& DiskLoc::writing() { return dur::writingDiskLoc(*this); }
 
 }

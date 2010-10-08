@@ -104,8 +104,8 @@ namespace mongo {
             bob settings;
             if( !ho.isDefault() )
                 settings << "heartbeatConnRetries " << ho.heartbeatConnRetries  << 
-                             "heartbeatSleep" << ho.heartbeatSleepMillis / 1000 << 
-                             "heartbeatTimeout" << ho.heartbeatTimeoutMillis / 1000;
+                             "heartbeatSleep" << ho.heartbeatSleepMillis / 1000.0 << 
+                             "heartbeatTimeout" << ho.heartbeatTimeoutMillis / 1000.0;
             if( !getLastErrorDefaults.isEmpty() )
                 settings << "getLastErrorDefaults" << getLastErrorDefaults;
             b << "settings" << settings.obj();
