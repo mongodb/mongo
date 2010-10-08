@@ -17,40 +17,51 @@ int
 __wt_bt_build_verify(void)
 {
 	static const struct {
-		u_int s, c, align;
 		char *name;
-	} list[] = {
-		{ sizeof(WT_COL), WT_COL_SIZE, 0, "WT_COL" },
-		{ sizeof(WT_ITEM), WT_ITEM_SIZE, 0, "WT_ITEM" },
-		{ sizeof(WT_OFF), WT_OFF_SIZE, sizeof(u_int32_t), "WT_OFF" },
-		{ sizeof(WT_OVFL), WT_OVFL_SIZE, sizeof(u_int32_t), "WT_OVFL" },
-		{ sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE, 0, "WT_PAGE_DESC" },
-		{ sizeof(WT_PAGE_HDR),
-		    WT_PAGE_HDR_SIZE, sizeof(u_int32_t), "WT_PAGE_HDR" },
-		{ sizeof(WT_ROW), WT_ROW_SIZE, 0, "WT_ROW" }
-	}, *lp;
+		u_int size, expected;
+	} size_check[] = {
+		{ "WT_COL", sizeof(WT_COL), WT_COL_SIZE },
+		{ "WT_ITEM", sizeof(WT_ITEM), WT_ITEM_SIZE },
+		{ "WT_OFF", sizeof(WT_OFF), WT_OFF_SIZE },
+		{ "WT_OVFL", sizeof(WT_OVFL), WT_OVFL_SIZE },
+		{ "WT_PAGE_DESC", sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE },
+		{ "WT_PAGE_HDR", sizeof(WT_PAGE_HDR), WT_PAGE_HDR_SIZE },
+		{ "WT_ROW", sizeof(WT_ROW), WT_ROW_SIZE }
+	};
+	static const struct {
+		char *name;
+		u_int size, align;
+	} align_check[] = {
+		{ "WT_OFF", sizeof(WT_OFF), sizeof(u_int32_t) },
+		{ "WT_OVFL", sizeof(WT_OVFL), sizeof(u_int32_t) },
+		{ "WT_PAGE_HDR", sizeof(WT_PAGE_HDR), sizeof(u_int32_t) },
+		{ "WT_TOC_UPDATE", sizeof(WT_TOC_UPDATE), sizeof(u_int32_t) }
+	};
+	u_int i;
 
 	/*
 	 * The compiler had better not have padded our structures -- make
 	 * sure the page header structure is exactly what we expect.
 	 */
-	for (lp = list; lp < list + WT_ELEMENTS(list); ++lp) {
-		if (lp->s == lp->c)
+	for (i = 0; i < WT_ELEMENTS(size_check); ++i) {
+		if (size_check[i].size == size_check[i].expected)
 			continue;
 		__wt_api_env_errx(NULL,
 		    "WiredTiger build failed, the %s header structure is not "
 		    "the correct size (expected %u, got %u)",
-		    lp->name, lp->c, lp->s);
+		    size_check[i].name,
+		    size_check[i].expected, size_check[i].size);
 		return (WT_ERROR);
 	}
 
 	/* There are also structures that must be aligned correctly. */
-	for (lp = list; lp < list + WT_ELEMENTS(list); ++lp) {
-		if (lp->align == 0 || WT_ALIGN(lp->s, lp->align) == lp->s)
+	for (i = 0; i < WT_ELEMENTS(align_check); ++i) {
+		if (WT_ALIGN(align_check[i].size,
+		    align_check[i].align) == align_check[i].size)
 			continue;
 		__wt_api_env_errx(NULL,
 		    "Build verification failed, the %s structure is not"
-		    " correctly aligned", lp->name);
+		    " correctly aligned", align_check[i].name);
 		return (WT_ERROR);
 	}
 
