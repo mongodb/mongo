@@ -17,7 +17,6 @@ for i in -d -t -w; do
 	fi
 done
 
-echo "Building tags..."
 rm -f tags
 ctags $flags ../inc_*/*.in ../*/*.[ch] 2>/dev/null
 chmod 444 tags

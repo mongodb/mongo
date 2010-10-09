@@ -19,7 +19,7 @@ ENDOFTEXT
 check()
 {
 	# Skip auto-generated files, files we didn't author.
-	if `egrep $1 s_copyright.skip > /dev/null`; then
+	if `egrep $1 s_copyright.skp > /dev/null`; then
 		return;
 	fi
 

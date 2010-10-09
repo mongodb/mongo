@@ -59,9 +59,6 @@ done
 
 ) | sort | uniq -u > $t
 
-test -s $t && {
-	echo 'Unused #defines:'
-	sed 's/^/	/' < $t
-}
+test -s $t && cat $t
 
 exit 0
