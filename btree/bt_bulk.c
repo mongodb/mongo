@@ -4,6 +4,7 @@
  * Copyright (c) 2008-2010 WiredTiger, Inc.
  *	All rights reserved.
  *
+ * $Id$
  */
 
 #include "wt_internal.h"
