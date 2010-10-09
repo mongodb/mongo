@@ -51,10 +51,12 @@ namespace mongo {
 
     class MoveTimingHelper {
     public:
-        MoveTimingHelper( const string& where , const string& ns )
+        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max )
             : _where( where ) , _ns( ns ){
             _next = 1;
             _nextNote = 0;
+            _b.append( "min" , min );
+            _b.append( "max" , max );
         }
 
         ~MoveTimingHelper(){
@@ -558,7 +560,7 @@ namespace mongo {
                 configServer.init( configdb );
             }
 
-            MoveTimingHelper timing( "from" , ns );
+            MoveTimingHelper timing( "from" , ns , min , max );
 
             Shard fromShard( from );
             Shard toShard( to );
@@ -835,12 +837,12 @@ namespace mongo {
         }
         
         void _go(){
-            MoveTimingHelper timing( "to" , ns );
-            
             assert( active );
             assert( state == READY );
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
+            
+            MoveTimingHelper timing( "to" , ns , min , max );
             
             ScopedDbConnection conn( from );
             conn->getLastError(); // just test connection
