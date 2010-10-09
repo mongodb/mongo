@@ -14,17 +14,20 @@ cat > $t <<ENDOFTEXT
  *
  * Copyright (c) 2008-2010 WiredTiger, Inc.
  *	All rights reserved.
+ *
 ENDOFTEXT
 
 check()
 {
-	# Skip auto-generated files, files we didn't author.
+	# Skip auto-generated files and files we didn't author.
 	if `egrep $1 s_copyright.skp > /dev/null`; then
 		return;
 	fi
 
-	# Check the copyright header.
-	if `sed -e 5q ../$1 | diff - $t > /dev/null`; then
+	# Check for a correct copyright header.
+	if `sed -e 6q ../$1 | diff - $t > /dev/null` &&
+	    `sed -e 7q -e d ../$1 | \
+	    egrep '^ \* \\$Id$$' > /dev/null`; then
 		return;
 	fi
 
