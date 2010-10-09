@@ -1,11 +1,21 @@
-/*
- * Copyright (c) 2008 WiredTiger Software.
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2010 WiredTiger, Inc.
  *	All rights reserved.
  *
  * $Id$
  */
-This copy of the WiredTiger software is distributed under the terms of
-the GNU GENERAL PUBLIC LICENSE, version 2, June 1991.  For a license to
-use the WiredTiger software under conditions other than those described
-by that license, or to purchase technical support for this software,
-contact WiredTiger Software at info@wiredtiger.com.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of version 3 of the GNU Affero General Public License as published
+by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
+details.
+
+For a license to use the WiredTiger software under conditions other than those
+described by the GNU Affero General Public License, or for technical support
+for this software, contact WiredTiger, Inc. at info@wiredtiger.com.
