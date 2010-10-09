@@ -20,6 +20,8 @@ $WIREDTIGER_VERSION_STRING
 
 This is version $WIREDTIGER_VERSION_MAJOR.$WIREDTIGER_VERSION_MINOR.$WIREDTIGER_VERSION_PATCH of WiredTiger.
 
+See the file LICENSE for redistribution information.
+
 To view release and installation documentation, load the distribution
 file docs/index.html into your web browser.
 
