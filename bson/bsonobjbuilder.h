@@ -646,7 +646,7 @@ namespace mongo {
 
         template <typename T>
         BSONArrayBuilder& append(const T& x){
-            _b.append(num().c_str(), x);
+            _b.append(num(), x);
             return *this;
         }
 
@@ -661,7 +661,7 @@ namespace mongo {
         }
         
         void appendNull() {
-            _b.appendNull(num().c_str());
+            _b.appendNull(num());
         }
 
         BSONArray arr(){ return BSONArray(_b.obj()); }
