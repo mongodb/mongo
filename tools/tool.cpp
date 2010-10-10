@@ -242,6 +242,24 @@ namespace mongo {
         return *_conn;
     }
 
+    bool Tool::isMaster() {
+        if ( hasParam("dbpath") ) {
+            return true;
+        }
+        
+        BSONObj info;
+        bool isMaster;
+        bool ok = conn().isMaster(isMaster, &info);
+        
+        if (ok && !isMaster) {
+            cerr << "ERROR: trying to write to non-master " << conn().toString() << endl;
+            cerr << "isMaster info: " << info << endl;
+            return false;
+        }
+        
+        return true;
+    }
+
     void Tool::addFieldOptions(){
         add_options()
             ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )

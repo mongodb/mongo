@@ -603,8 +603,10 @@ namespace mongo {
     }
 
     void renameNamespace( const char *from, const char *to ) {
-		NamespaceIndex *ni = nsindex( from );
-		assert( ni && ni->details( from ) && !ni->details( to ) );
+        NamespaceIndex *ni = nsindex( from );
+		assert( ni );
+        assert( ni->details( from ) );
+        assert( ! ni->details( to ) );
 		
 		// Our namespace and index details will move to a different 
 		// memory location.  The only references to namespace and 

@@ -32,6 +32,7 @@ function wait(f) {
         if (++n == 4) {
             print("" + f);
         }
+        assert(n < 200, 'tried 200 times, giving up');
         sleep(1000);
     }
 }

@@ -786,6 +786,7 @@ namespace mongo {
             virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("ismaster", 1.0 );
                 result.append("msg", "isdbgrid");
+                result.appendNumber("maxBsonObjectSize", MaxBSONObjectSize);
                 return true;
             }
         } ismaster;
@@ -1010,7 +1011,7 @@ namespace mongo {
     
     class CmdListDatabases : public Command {
     public:
-        CmdListDatabases() : Command("listDatabases", false , "listdatabases" ) {}
+        CmdListDatabases() : Command("listDatabases", true , "listdatabases" ) {}
 
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }

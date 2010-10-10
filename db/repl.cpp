@@ -368,14 +368,16 @@ namespace mongo {
                     result.append("secondary", false);
                     errmsg = "replSet still trying to initialize";
                     result.append("info", ReplSet::startupStatusMsg);
-                    return true;
                 }
-                theReplSet->fillIsMaster(result);
-                return true;
+                else {
+                    theReplSet->fillIsMaster(result);
+                }
             }
-            
-			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
-            appendReplicationInfo( result , authed );
+            else {
+                bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
+                appendReplicationInfo( result , authed );
+            }
+            result.appendNumber("maxBsonObjectSize", MaxBSONObjectSize);
             return true;
         }
     } cmdismaster;

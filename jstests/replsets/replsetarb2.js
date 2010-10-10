@@ -29,6 +29,8 @@ doTest = function( signal ) {
     master.getDB("foo").foo.insert({a: "foo"});
     replTest.awaitReplication();
 
+    assert( ! conns[1].getDB( "admin" ).runCommand( "ismaster" ).secondary , "arbiter shouldn't be secondary" )
+
     // Now kill the original master
     mId = replTest.getNodeId( master );
     replTest.stop( mId );
