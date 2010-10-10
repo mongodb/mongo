@@ -31,6 +31,7 @@
 #include "../dbhelpers.h"
 
 namespace mongo {
+
     /* decls for connections.h */
     ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());    
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
@@ -43,6 +44,7 @@ namespace mongo {
 
     static RamLog _rsLog;
     Tee *rsLog = &_rsLog;
+    extern bool replSetBlind;
 
     string ago(time_t t) { 
         if( t == 0 ) return "";
@@ -384,6 +386,8 @@ namespace mongo {
         b.appendTimeT("date", time(0));
         b.append("myState", box.getState().s);
         b.append("members", v);
+        if( replSetBlind )
+            b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
 
     static struct Test : public UnitTest { 
