@@ -316,7 +316,7 @@ namespace mongo {
         }
 
         case RENAME_TO: {
-            b.appendAs( ms.newVal , shortFieldName, &ms.newVal );
+            ms.handleRename( b, shortFieldName );
             break;
         }
                 
@@ -527,6 +527,16 @@ namespace mongo {
             ss << " fixed: " << fixed;
         return ss.str();
     }
+    
+    template< class Builder >
+    void ModState::handleRename( Builder &newObjBuilder, const char *shortFieldName ) {
+        newObjBuilder.appendAs( newVal , shortFieldName );
+        BSONObjBuilder b;
+        b.appendAs( newVal, shortFieldName );
+        assert( _objData.isEmpty() );
+        _objData = b.obj();
+        newVal = _objData.firstElement();            
+    }    
     
     void ModSetState::ApplyModsInPlace() {
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
