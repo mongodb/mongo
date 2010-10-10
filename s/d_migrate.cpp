@@ -39,6 +39,7 @@
 
 #include "../util/queue.h"
 #include "../util/unittest.h"
+#include "../util/processinfo.h"
 
 #include "shard.h"
 #include "d_logic.h"
@@ -78,6 +79,14 @@ namespace mongo {
             
             _b.appendNumber( s , _t.millis() );
             _t.reset();
+
+#if 0
+            // debugging for memory leak?
+            ProcessInfo pi;
+            ss << " v:" << pi.getVirtualMemorySize() 
+               << " r:" << pi.getResidentSize();
+            log() << ss.str() << endl;
+#endif
         }
         
         
@@ -382,7 +391,11 @@ namespace mongo {
             readlock l( _ns ); 
             Client::Context ctx( _ns );
             
-            BSONArrayBuilder a( result.subarrayStart( "objects" ) );
+            // doing it this way means lots of small allocations
+            // ideally should have a hint method on the command
+            // this is temporary
+            //BSONArrayBuilder a( result.subarrayStart( "objects" ) );
+            BSONArrayBuilder a( BSONObjMaxSize );
             
             int bytesSoFar = 0;
             
@@ -391,14 +404,14 @@ namespace mongo {
                 DiskLoc dl = *i;
                 BSONObj o = dl.obj();
                 bytesSoFar += o.objsize();
-                if ( bytesSoFar > ( 4 * 1024 * 1024 ) ){
+                if ( bytesSoFar > BSONObjMaxSize ){
                     i--;
                     break;
                 }
                 a.append( o );
             }
-            a.done();
-
+            //a.done();
+            result.appendArray( "objects" , a.arr() );
             _cloneLocs.erase( _cloneLocs.begin() , i );
             return true;
         }
