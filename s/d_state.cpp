@@ -76,7 +76,12 @@ namespace mongo {
         uasserted( 13298 , ss.str() );
     }
     
-    void ShardingState::gotShardHost( const string& host ){
+    void ShardingState::gotShardHost( string host ){
+        
+        size_t slash = host.find( '/' );
+        if ( slash != string::npos )
+            host = host.substr( 0 , slash );
+
         if ( _shardHost.size() == 0 ){
             _shardHost = host;
             return;

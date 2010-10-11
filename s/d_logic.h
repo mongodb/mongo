@@ -64,7 +64,7 @@ namespace mongo {
         void enable( const string& server );
 
         void gotShardName( const string& name );
-        void gotShardHost( const string& host );
+        void gotShardHost( string host );
         
         bool hasVersion( const string& ns );
         bool hasVersion( const string& ns , ConfigVersion& version );
