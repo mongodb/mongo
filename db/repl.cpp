@@ -377,7 +377,7 @@ namespace mongo {
                 bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
                 appendReplicationInfo( result , authed );
             }
-            result.appendNumber("maxBsonObjectSize", BSONObjMaxSize);
+            result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             return true;
         }
     } cmdismaster;

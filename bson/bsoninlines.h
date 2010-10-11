@@ -103,7 +103,7 @@ namespace mongo {
 
     inline bool BSONObj::isValid(){
         int x = objsize();
-        return x > 0 && x <= BSONObjMaxSize;
+        return x > 0 && x <= BSONObjMaxInternalSize;
     }
 
     inline bool BSONObj::getObjectID(BSONElement& e) const { 
@@ -265,7 +265,7 @@ namespace mongo {
         case Symbol:
         case mongo::String: {
             int x = valuestrsize();
-            if ( x > 0 && x < BSONObjMaxSize && valuestr()[x-1] == 0 )
+            if ( x > 0 && x < BSONObjMaxInternalSize && valuestr()[x-1] == 0 )
                 return;
             StringBuilder buf;
             buf <<  "Invalid dbref/code/string/symbol size: " << x << " strnlen:" << mongo::strnlen( valuestr() , x );

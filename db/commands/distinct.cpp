@@ -64,7 +64,7 @@ namespace mongo {
             }
             BSONObj arr = b.done();
 
-            uassert(10044,  "distinct too big, 4mb cap", (arr.objsize() + 1024) < BSONObjMaxSize );
+            uassert(10044,  "distinct too big, 4mb cap", arr.objsize() < BSONObjMaxUserSize );
 
             return true;
         }

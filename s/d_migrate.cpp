@@ -395,7 +395,7 @@ namespace mongo {
             NamespaceDetails *d = nsdetails( _ns.c_str() );
             assert( d );
 
-            BSONArrayBuilder a( std::min( BSONObjMaxSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
+            BSONArrayBuilder a( std::min( BSONObjMaxUserSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
             
             int bytesSoFar = 0;
             
@@ -404,7 +404,7 @@ namespace mongo {
                 DiskLoc dl = *i;
                 BSONObj o = dl.obj();
                 bytesSoFar += o.objsize();
-                if ( bytesSoFar > BSONObjMaxSize ){
+                if ( bytesSoFar > BSONObjMaxUserSize ){
                     i--;
                     break;
                 }
