@@ -39,7 +39,9 @@ namespace mongo {
        could be slightly larger.
     */
     const int BSONObjMaxSize = 4 * 1024 * 1024;
-
+    
+    const int BufferMaxSize = 64 * 1024 * 1024;
+    
     class StringBuilder;
 
     void msgasserted(int msgid, const char *msg);
@@ -151,7 +153,7 @@ namespace mongo {
                 a = 512;
             if ( l > a )
                 a = l + 16 * 1024;
-            if ( a > 2 * BSONObjMaxSize )
+            if ( a > BufferMaxSize )
                 msgasserted(10000, "BufBuilder grow() > 64MB");
             data = (char *) realloc(data, a);
             size= a;
