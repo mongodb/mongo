@@ -51,13 +51,11 @@ key_gen_setup()
 		free(g.key_gen_buf);
 		g.key_gen_buf = NULL;
 	}
-	for (i = 0;
-	    i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
+	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
 		g.key_rand_len[i] = MMRAND(g.c_key_min, g.c_key_max);
 		
 	if ((g.key_gen_buf = malloc(g.c_key_max)) == NULL) {
-		fprintf(stderr,
-		    "%s: %s\n", g.progname, strerror(errno));
+		fprintf(stderr, "%s: %s\n", g.progname, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	for (i = 0; i < g.c_key_max; ++i)
