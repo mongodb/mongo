@@ -243,7 +243,7 @@ struct OP_GETMORE : public MSGHEADER {
         }
         
         bool valid(){
-            if ( len <= 0 || len > ( 1024 * 1024 * 10 ) )
+            if ( len <= 0 || len > ( 4 * BSONObjMaxSize ) )
                 return false;
             if ( _operation < 0 || _operation > 30000 )
                 return false;

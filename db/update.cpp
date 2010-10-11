@@ -947,7 +947,7 @@ namespace mongo {
     };
 
     static void checkTooLarge(const BSONObj& newObj) {
-        uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= ( 4 * 1024 * 1024 ) );
+        uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= BSONObjMaxSize );
     }
 
     /* note: this is only (as-is) called for 

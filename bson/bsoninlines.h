@@ -99,7 +99,7 @@ namespace mongo {
 
     inline bool BSONObj::isValid(){
         int x = objsize();
-        return x > 0 && x <= 1024 * 1024 * 8;
+        return x > 0 && x <= BSONObjMaxSize;
     }
 
     inline bool BSONObj::getObjectID(BSONElement& e) const { 

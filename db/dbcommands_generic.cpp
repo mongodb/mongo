@@ -61,7 +61,7 @@ namespace mongo {
             result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
             result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
             result.appendBool( "debug" , debug );
-            result.appendNumber("maxBsonObjectSize", MaxBSONObjectSize);
+            result.appendNumber("maxBsonObjectSize", BSONObjMaxSize);
             return true;
         }
     } cmdBuildInfo;

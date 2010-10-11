@@ -27,8 +27,6 @@ namespace mongo {
 
     typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
 
-    const int BSONObjMaxSize = 32 * 1024 * 1024;
-
     /**
 	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
        object in a binary representation.
