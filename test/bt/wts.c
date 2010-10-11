@@ -44,7 +44,8 @@ wts_setup(int reopen, int logfile)
 	fprintf(g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
 
 	config_setup();
-	key_gen_setup();
+	if (!reopen)
+		key_gen_setup();
 
 	if ((ret = wiredtiger_simple_setup(
 	    g.progname, &db, g.c_cache, WT_MEMORY_CHECK)) != 0) {
