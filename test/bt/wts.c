@@ -25,12 +25,26 @@ int
 wts_setup(int reopen, int logfile)
 {
 	time_t now;
-	ENV *env;
 	DB *db;
+	ENV *env;
 	WT_TOC *toc;
 	u_int32_t intl_node_max, intl_node_min, leaf_node_max, leaf_node_min;
 	int ret;
 	char *p;
+
+	p = fname(WT_PREFIX, "log");
+	if ((g.wts_log = fopen(p, reopen ? "a" : "w")) == NULL) {
+		fprintf(stderr,
+		    "%s: %s: %s\n", g.progname, p, strerror(errno));
+		exit (EXIT_FAILURE);
+	}
+	fprintf(g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
+	(void)time(&now);
+	fprintf(g.wts_log, "%s", ctime(&now));
+	fprintf(g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
+
+	config_setup();
+	key_gen_setup();
 
 	if ((ret = wiredtiger_simple_setup(
 	    g.progname, &db, g.c_cache, WT_MEMORY_CHECK)) != 0) {
@@ -45,24 +59,11 @@ wts_setup(int reopen, int logfile)
 
 	/* Open the log file. */
 	if (logfile) {
-		p = fname(WT_PREFIX, "log");
-		if ((g.wts_log = fopen(p, reopen ? "a" : "w")) == NULL) {
-			fprintf(stderr,
-			    "%s: %s: %s\n", g.progname, p, strerror(errno));
-			exit (EXIT_FAILURE);
-		}
-		(void)time(&now);
-		fprintf(g.wts_log,
-		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
-		fprintf(g.wts_log, "%s", ctime(&now));
-		fprintf(g.wts_log,
-		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
-
 		(void)env->verbose_set(env,
 		    WT_VERB_CACHE |
 		    // WT_VERB_HAZARD |
 		    // WT_VERB_MUTEX |
-		    // WT_VERB_SERVERS |
+		    WT_VERB_SERVERS |
 		    // WT_VERB_FILEOPS |
 		    0);
 		(void)env->msgfile_set(env, g.wts_log);
@@ -113,7 +114,6 @@ wts_setup(int reopen, int logfile)
 	}
 
 	p = fname(WT_PREFIX, "db");
-
 	if (!reopen)
 		(void)remove(p);
 	if ((ret = db->open(db, p, 0660, reopen ? 0 : WT_CREATE)) != 0) {
@@ -292,12 +292,13 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 		break;
 	case ROW:
 		*keyp = &key;
-		fprintf(g.op_log,
-		    "%.*s\n", (int)key.size, (char *)key.data);
+		fprintf(g.wts_log,
+		    "load key {%.*s}\n", (int)key.size, (char *)key.data);
 		break;
 	}
 	*datap = &data;
-	fprintf(g.op_log, "%.*s\n", (int)data.size, (char *)data.data);
+	fprintf(g.wts_log,
+	    "load data {%.*s}\n", (int)data.size, (char *)data.data);
 
 	/* Insert the item into BDB. */
 	bdb_insert(key.data, key.size, data.data, data.size);
@@ -317,42 +318,38 @@ wts_ops()
 	int op;
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
+		keyno = MMRAND(1, g.c_rows);
+
 		/*
-		 * Perform some number of read/write operations.
-		 *
-		 * Deletes are not separately configured, they're a fixed
-		 * percent (20%) of write operations.
-		 *
-		 * A read operation always follows a write operation to confirm
-		 * it worked.
+		 * Perform some number of read/write/delete operations; the
+		 * number of deletes and writes are specified, reads are the
+		 * rest.  A read operation always follows a delete or write
+		 * operation to confirm it worked.
 		 */
 		op = wts_rand() % 100;
-		keyno = MMRAND(1, g.c_rows);
-		if ((u_int32_t)op > g.c_read_pct) {
-			if (MMRAND(1, 5) == 1) {	/* 20% deletes */
-				switch (g.c_database_type) {
-				case ROW:
-					if (wts_del_row(keyno))
-						return (1);
-					break;
-				case FIX:
-				case VAR:
-					if (wts_del_col(keyno))
-						return (1);
-					break;
-				}
-			} else {
-				switch (g.c_database_type) {
-				case ROW:
-					if (wts_put_row(keyno))
-						return (1);
-					break;
-				case FIX:
-				case VAR:
-					if (wts_put_col(keyno))
-						return (1);
-					break;
-				}
+		if ((u_int32_t)op < g.c_delete_pct) {
+			switch (g.c_database_type) {
+			case ROW:
+				if (wts_del_row(keyno))
+					return (1);
+				break;
+			case FIX:
+			case VAR:
+				if (wts_del_col(keyno))
+					return (1);
+				break;
+			}
+		} else if ((u_int32_t)op < g.c_delete_pct + g.c_write_pct) {
+			switch (g.c_database_type) {
+			case ROW:
+				if (wts_put_row(keyno))
+					return (1);
+				break;
+			case FIX:
+			case VAR:
+				if (wts_put_col(keyno))
+					return (1);
+				break;
 			}
 		}
 
@@ -428,7 +425,7 @@ wts_read_row(u_int64_t keyno)
 	env = db->env;
 
 	/* Log the operation */
-	fprintf(g.op_log, "R %llu\n", keyno);
+	fprintf(g.wts_log, "read {%llu}\n", keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
@@ -501,7 +498,7 @@ wts_read_col(u_int64_t keyno)
 	env = db->env;
 
 	/* Log the operation */
-	fprintf(g.op_log, "R %llu\n", keyno);
+	fprintf(g.wts_log, "read {%llu}\n", keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
@@ -552,7 +549,7 @@ wts_put_row(u_int64_t keyno)
 	data_gen(&data, 0);
 
 	/* Log the operation */
-	fprintf(g.op_log, "P %llu\n", keyno);
+	fprintf(g.wts_log, "put {%llu}\n", keyno);
 
 	if (bdb_put(keyno, data.data, data.size, &notfound))
 		return (1);
@@ -585,7 +582,7 @@ wts_put_col(u_int64_t keyno)
 	data_gen(&data, 0);
 
 	/* Log the operation */
-	fprintf(g.op_log, "P %llu\n", keyno);
+	fprintf(g.wts_log, "put {%llu}\n", keyno);
 
 	if (bdb_put(keyno, data.data, data.size, &notfound))
 		return (1);
@@ -618,7 +615,7 @@ wts_del_row(u_int64_t keyno)
 	key_gen(&key, keyno);
 
 	/* Log the operation */
-	fprintf(g.op_log, "D %llu\n", keyno);
+	fprintf(g.wts_log, "delete {%llu}\n", keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
@@ -649,7 +646,7 @@ wts_del_col(u_int64_t keyno)
 	env = db->env;
 
 	/* Log the operation */
-	fprintf(g.op_log, "D %llu\n", keyno);
+	fprintf(g.wts_log, "delete {%llu}\n", keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);

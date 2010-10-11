@@ -24,7 +24,7 @@ bdb_setup(int reopen)
 	assert(dbenv->set_cachesize(dbenv, 0, 50 * 1024 * 1024, 1) == 0);
 	assert(dbenv->open(dbenv, NULL,
 	    DB_CREATE |
-	    (g.c_read_pct == 100 ? 0 : DB_INIT_LOCK) |
+	    (g.c_delete_pct == 100 && g.c_write_pct == 100 ? 0 : DB_INIT_LOCK) |
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
 	if (g.c_duplicates_pct)

@@ -49,15 +49,7 @@ typedef struct {
 	void *wts_toc;				/* WT WT_TOC handle */
 	FILE *wts_log;				/* WT log file stream */
 
-	FILE *op_log;				/* Operations log */
 	FILE *rand_log;				/* Random number log */
-
-	u_int8_t *b1;				/* Scratch buffers for replay */
-	size_t	  b1_size;
-	size_t	  b1_len;
-	u_int8_t *b2;
-	size_t	  b2_size;
-	size_t	  b2_len;
 
 	enum                                    /* Dumps */
 	    { DUMP_DEBUG=1, DUMP_PRINT=2 } dump;
@@ -65,15 +57,16 @@ typedef struct {
 	u_int32_t run_cnt;			/* Run counter */
 
 	int replay;				/* Replaying a run. */
-
 	int stats;				/* Statistics */
-
 	int verbose;				/* Verbosity */
+
+	char *key_gen_buf;
 
 	u_int32_t c_cache;			/* Config values */
 	u_int32_t c_data_max;
 	u_int32_t c_data_min;
 	u_int32_t c_database_type;
+	u_int32_t c_delete_pct;
 	u_int32_t c_duplicates_pct;
 	u_int32_t c_huffman_data;
 	u_int32_t c_huffman_key;
@@ -85,11 +78,11 @@ typedef struct {
 	u_int32_t c_leaf_node_max;
 	u_int32_t c_leaf_node_min;
 	u_int32_t c_ops;
-	u_int32_t c_read_pct;
 	u_int32_t c_repeat_comp;
 	u_int32_t c_repeat_comp_pct;
 	u_int32_t c_rows;
 	u_int32_t c_runs;
+	u_int32_t c_write_pct;
 
 	u_int32_t key_cnt;			/* Keys loaded so far */
 	u_int16_t key_rand_len[1031];		/* Key lengths */
@@ -102,7 +95,7 @@ int	 bdb_put(u_int64_t, void *, u_int32_t, int *);
 int	 bdb_read(u_int64_t, void *, u_int32_t *, int *);
 void	 bdb_setup(int);
 void	 bdb_teardown(void);
-void	 config(void);
+void	 config_setup(void);
 void	 config_dump(int);
 void	 config_file(char *);
 void	 config_names(void);
@@ -110,6 +103,7 @@ void	 config_single(char *);
 void	 data_gen(DBT *, int);
 char	*fname(const char *, const char *);
 void	 key_gen(DBT *, u_int64_t);
+void	 key_gen_setup(void);
 void	 track(const char *, u_int64_t);
 int	 wts_bulk_load(void);
 int	 wts_del(u_int64_t);

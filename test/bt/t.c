@@ -12,6 +12,7 @@
 GLOBAL g;
 
 static void	usage(void);
+static void	restart(void);
 
 int
 main(int argc, char *argv[])
@@ -81,13 +82,13 @@ main(int argc, char *argv[])
 
 	printf("%s: process %lu\n", g.progname, (u_long)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
-		config();
+		restart();			/* Clean up previous runs */
 
 		bdb_setup(0);			/* Open the databases */
 		if (wts_setup(0, log))
 			goto err;
 
-		config_dump(1);
+		config_dump(0);
 
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
@@ -114,6 +115,7 @@ main(int argc, char *argv[])
 					goto err;
 				break;
 			}
+
 						/* Close/re-open database */
 			track("flushing & re-opening WT", (u_int64_t)0);
 			wts_teardown();
@@ -138,8 +140,18 @@ skip_ops:	if (g.stats && wts_stats())	/* Optional statistics */
 
 	return (EXIT_SUCCESS);
 
-err:	config_dump(0);
+err:	config_dump(1);
 	return (EXIT_FAILURE);
+}
+
+/*
+ * restart --
+ *	Clean up from previous runs.
+ */
+static void
+restart()
+{
+	system("rm -f __bdb* __wt*");
 }
 
 /*

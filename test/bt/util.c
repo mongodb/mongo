@@ -24,8 +24,18 @@ fname(const char *prefix, const char *name)
 void
 key_gen(DBT *key, u_int64_t keyno)
 {
-	static size_t blen;
-	static char *buf;
+	/* The key always starts with a 10-digit string (the specified cnt). */
+	sprintf(g.key_gen_buf, "%010llu", keyno);
+	g.key_gen_buf[10] = '/';
+
+	key->data = g.key_gen_buf;
+	key->size = g.key_rand_len[keyno %
+	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
+}
+
+void
+key_gen_setup()
+{
 	size_t i;
 
 	/*
@@ -37,31 +47,21 @@ key_gen(DBT *key, u_int64_t keyno)
 	 *
 	 * Fill in the random key lengths.
 	 */
-	if (blen < g.c_key_max) {
-		if (buf != NULL) {
-			free(buf);
-			buf = NULL;
-		}
-		for (i = 0;
-		    i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
-			g.key_rand_len[i] = MMRAND(g.c_key_min, g.c_key_max);
-		blen = g.c_key_max;
-		if ((buf = malloc(blen)) == NULL) {
-			fprintf(stderr,
-			    "%s: %s\n", g.progname, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		for (i = 0; i < blen; ++i)
-			buf[i] = 'a' + i % 26;
+	if (g.key_gen_buf != NULL) {
+		free(g.key_gen_buf);
+		g.key_gen_buf = NULL;
 	}
-
-	/* The key always starts with a 10-digit string (the specified cnt). */
-	sprintf(buf, "%010llu", keyno);
-	buf[10] = '/';
-
-	key->data = buf;
-	key->size = g.key_rand_len[keyno %
-	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
+	for (i = 0;
+	    i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
+		g.key_rand_len[i] = MMRAND(g.c_key_min, g.c_key_max);
+		
+	if ((g.key_gen_buf = malloc(g.c_key_max)) == NULL) {
+		fprintf(stderr,
+		    "%s: %s\n", g.progname, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	for (i = 0; i < g.c_key_max; ++i)
+		g.key_gen_buf[i] = 'a' + i % 26;
 }
 
 void

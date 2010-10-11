@@ -14,42 +14,13 @@ static const char *config_dtype(void);
 static CONFIG *config_find(const char *);
 
 /*
- * config_names --
- *	Display configuration names.
+ * config_setup --
+ *	Initialize configuration for a run.
  */
 void
-config_names(void)
+config_setup(void)
 {
 	CONFIG *cp;
-
-	/* Display configuration names. */
-	for (cp = c; cp->name != NULL; ++cp)
-		printf("%s\n", cp->name);
-}
-
-/*
- * config --
- *	Initialize the system.
- */
-void
-config(void)
-{
-	CONFIG *cp;
-	char *p;
-
-	/* Clean up from any previous runs. */
-	(void)system("rm -f __bdb* __wt*");
-
-	/* Open an operations log file. */
-	if (g.op_log != NULL) {
-		(void)fclose(g.op_log);
-		g.op_log = NULL;
-	}
-	p = fname(NULL, "ops");
-	if ((g.op_log = fopen(p, "w")) == NULL) {
-		fprintf(stderr, "%s: %s\n", p, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
 
 	/* Seed the random number generator. */
 	if (!g.replay)
@@ -99,24 +70,39 @@ config(void)
 }
 
 /*
+ * config_names --
+ *	Display configuration names.
+ */
+void
+config_names(void)
+{
+	CONFIG *cp;
+
+	/* Display configuration names. */
+	for (cp = c; cp->name != NULL; ++cp)
+		printf("%s\n", cp->name);
+}
+
+/*
  * config_dump --
  *	Dump configuration structure.
  */
 void
-config_dump(int logfile)
+config_dump(int error_display)
 {
 	CONFIG *cp;
 	FILE *fp;
 	char *p;
 
-	if (logfile) {
+	if (error_display)
+		fp = stdout;
+	else {
 		p = fname(WT_PREFIX, "run");
 		if ((fp = fopen(p, "w")) == NULL) {
 			fprintf(stderr, "%s: %s\n", p, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
-	} else
-		fp = stdout;
+	}
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");
@@ -138,7 +124,7 @@ config_dump(int logfile)
 		}
 
 	fprintf(fp, "############################################\n");
-	if (logfile)
+	if (fp != stdout)
 		(void)fclose(fp);
 }
 

@@ -28,6 +28,7 @@ static CONFIG c[] = {
 	{ "data_max",		0,		0,		32,	4096,		&g.c_data_max },
 	{ "data_min",		0,		0,		10,	32,		&g.c_data_min },
 	{ "database_type",	0,		C_IGNORE,	1,	3,		&g.c_database_type },
+	{ "delete_pct",		0,		0,		0,	45,		&g.c_delete_pct },
 	{ "duplicates_pct",	C_ROW,		C_IGNORE,	0,	80,		&g.c_duplicates_pct },
 	{ "huffman_data",	C_ROW|C_VAR,	C_BOOL,		0,	10,		&g.c_huffman_data },
 	{ "huffman_key",	C_ROW,		C_BOOL,		0,	10,		&g.c_huffman_key },
@@ -38,10 +39,10 @@ static CONFIG c[] = {
 	{ "leaf_node_max",	0,		0,		9,	17,		&g.c_leaf_node_max },
 	{ "leaf_node_min",	0,		0,		9,	17,		&g.c_leaf_node_min },
 	{ "ops",		0,		0,		0,	M(2),		&g.c_ops },
-	{ "read_pct",		0,		0,		0,	100,		&g.c_read_pct },
 	{ "repeat_comp",	C_FIX,		0,		0,	1,		&g.c_repeat_comp },
 	{ "repeat_comp_pct",	C_FIX,		0,		10,	90,		&g.c_repeat_comp_pct },
 	{ "rows",		0,		0,		100,	M(1),		&g.c_rows },
 	{ "runs",		0,		C_IGNORE,	0,	UINT_MAX,	&g.c_runs },
+	{ "write_pct",		0,		0,		0,	45,		&g.c_write_pct },
 	{ NULL, 0, 0, 0, 0, NULL }
 };
