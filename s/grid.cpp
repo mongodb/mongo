@@ -188,9 +188,11 @@ namespace mongo {
                 while ( iter.more() ){
                     hostSet.insert( iter.next().String() ); // host:port
                 }
-                BSONObjIterator piter( resIsMaster["passives"].Obj() );
-                while ( piter.more() ){
-                    hostSet.insert( piter.next().String() ); // host:port
+                if ( resIsMaster["passives"].isABSONObj() ){
+                    BSONObjIterator piter( resIsMaster["passives"].Obj() );
+                    while ( piter.more() ){
+                        hostSet.insert( piter.next().String() ); // host:port
+                    }
                 }
 
                 vector<HostAndPort> hosts = servers.getServers();
