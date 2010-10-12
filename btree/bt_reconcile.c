@@ -41,7 +41,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	hdr = page->hdr;
 
 	WT_VERBOSE(env, WT_VERB_CACHE,
-	    (env, "reconcile page/addr %p/%lu", page, (u_long)page->addr));
+	    (env, "reconcile addr %lu (page %p)", (u_long)page->addr, page));
 
 	/* If the page isn't dirty, we're done. */
 	WT_ASSERT(toc->env, WT_PAGE_MODIFY_ISSET(page));
@@ -210,10 +210,10 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * it's been deleted.
 		 */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl->data))
+			if (WT_REPL_DELETED_ISSET(repl))
 				data = toc->tmp2.data;	/* Replaced deleted */
-			else
-				data = repl->data;	/* Replaced data */
+			else				/* Replaced data */
+				data = WT_REPL_DATA(repl);
 		} else if (WT_FIX_DELETE_ISSET(cip->data))
 			data = toc->tmp2.data;		/* On-page deleted */
 		else
@@ -228,7 +228,6 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		new->first_free += len;
 		new->space_avail -= len;
 
-		++new->records;
 		++hdr->u.entries;
 	}
 
@@ -255,6 +254,7 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	u_int32_t i, len, n_expsort;
 	u_int16_t n, repeat_count, total;
 	u_int8_t *data, *last_data;
+	int rc_prefix;
 
 	db = toc->db;
 	env = toc->env;
@@ -293,14 +293,17 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 */
 		total = WT_FIX_REPEAT_COUNT(cip->data);
 		for (expp = expsort, n = 1; n <= total; n += repeat_count) {
+			rc_prefix = 0;
 			if ((exp = *expp) != NULL && n == exp->rcc_offset) {
 				++expp;
 
 				repl = exp->repl;
-				if (WT_REPL_DELETED_ISSET(repl->data))
+				if (WT_REPL_DELETED_ISSET(repl))
 					data = toc->tmp2.data;
-				else
-					data = repl->data;
+				else {
+					rc_prefix = 1;
+					data = WT_REPL_DATA(repl);
+				}
 				repeat_count = 1;
 			} else {
 				if (WT_FIX_DELETE_ISSET(cip->data))
@@ -338,8 +341,20 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				__wt_abort(toc->env);
 			}
 
+			/*
+			 * Most of the formats already include a repeat count:
+			 * specifically the deleted buffer, or any entry we're
+			 * copying from the original page.   However, entries
+			 * that were deleted or replaced are read from a WT_REPL
+			 * structure, which has no repeat count.
+			 */
 			last_data = new->first_free;
-			memcpy(new->first_free, data, len);
+			if (rc_prefix) {
+				WT_FIX_REPEAT_COUNT(last_data) = repeat_count;
+				memcpy(WT_FIX_REPEAT_DATA(
+				    last_data), data, db->fixed_len);
+			} else
+				memcpy(last_data, data, len);
 			new->first_free += len;
 			new->space_avail -= len;
 
@@ -455,13 +470,13 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 * Check for deletion, else build the data's WT_ITEM
 			 * chunk from the most recent replacement value.
 			 */
-			if (WT_REPL_DELETED_ISSET(repl->data)) {
+			if (WT_REPL_DELETED_ISSET(repl)) {
 				WT_CLEAR(data_item);
 				WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DEL);
 				WT_ITEM_LEN_SET(&data_item, 0);
 				len = WT_ITEM_SPACE_REQ(0);
 			} else {
-				data->data = repl->data;
+				data->data = WT_REPL_DATA(repl);
 				data->size = repl->size;
 				WT_RET(__wt_bt_build_data_item(
 				    toc, data, &data_item, &data_ovfl));
@@ -492,7 +507,6 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			new->first_free += len;
 			new->space_avail -= len;
 		}
-		++new->records;
 		++hdr->u.entries;
 	}
 
@@ -570,14 +584,14 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
 		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl->data))
+			if (WT_REPL_DELETED_ISSET(repl))
 				continue;
 
 			/*
 			 * Build the data's WT_ITEM chunk from the most recent
 			 * replacement value.
 			 */
-			data->data = repl->data;
+			data->data = WT_REPL_DATA(repl);
 			data->size = repl->size;
 			WT_RET(__wt_bt_build_data_item(
 			    toc, data, &data_item, &data_ovfl));
@@ -668,7 +682,6 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			++hdr->u.entries;
 			break;
 		}
-		++new->records;
 	}
 
 	__wt_bt_page_size_minimum(db, page, new);
@@ -690,6 +703,10 @@ __wt_bt_page_size_minimum(DB *db, WT_PAGE *old, WT_PAGE *new)
 	 * page size is larger or smaller than the original page, we allocate
 	 * a new page.  The difference is that if the page is smaller, we don't
 	 * extend the file to get a replacement page, we just waste the space.
+	 *
+	 * XXX
+	 * That's the plan -- none of it is implemented.  For the time being,
+	 * we simply reset the new size down to the old size.
 	 */
 	new->size = WT_MAX(old->size,
 	    (new->size + (db->allocsize - 1)) % db->allocsize);
