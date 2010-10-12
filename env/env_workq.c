@@ -77,10 +77,10 @@ __wt_workq_srvr(void *arg)
 
 		/* If a read is scheduled, check on the read server. */
 		if (chk_read)
-			__wt_workq_read_server(env, read_priority);
+			__wt_workq_read_server(env, read_priority ? 1 : 0);
 
 		/* Check on the cache drain server. */
-		__wt_workq_drain_server(env);
+		__wt_workq_drain_server(env, 0);
 
 		/*
 		 * If we didn't find work, yield the processor.  If we
