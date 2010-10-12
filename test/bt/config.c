@@ -97,7 +97,7 @@ config_dump(int error_display)
 	if (error_display)
 		fp = stdout;
 	else {
-		p = fname(WT_PREFIX, "run");
+		p = fname("run");
 		if ((fp = fopen(p, "w")) == NULL) {
 			fprintf(stderr, "%s: %s\n", p, strerror(errno));
 			exit(EXIT_FAILURE);

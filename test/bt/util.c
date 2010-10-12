@@ -10,14 +10,11 @@
 #include "wts.h"
 
 char *
-fname(const char *prefix, const char *name)
+fname(const char *name)
 {
 	static char buf[128];
 
-	if (prefix == NULL)
-		(void)snprintf(buf, sizeof(buf), "__%s", name);
-	else
-		(void)snprintf(buf, sizeof(buf), "__%s.%s", prefix, name);
+	(void)snprintf(buf, sizeof(buf), "__%s.%s", WT_PREFIX, name);
 	return (buf);
 }
 
@@ -170,7 +167,7 @@ wts_rand(void)
 	 * (and WT might call rand() in the future, who knows?)
 	 */
 	if (g.rand_log == NULL) {
-		p = fname(WT_PREFIX, "rand");
+		p = fname("rand");
 		if ((g.rand_log = fopen(p, g.replay ? "r" : "w")) == NULL) {
 			fprintf(stderr, p, strerror(errno));
 			exit(EXIT_FAILURE);

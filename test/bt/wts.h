@@ -101,7 +101,7 @@ void	 config_names(void);
 void	 config_setup(void);
 void	 config_single(char *);
 void	 data_gen(DBT *, int);
-char	*fname(const char *, const char *);
+char	*fname(const char *);
 void	 key_gen(DBT *, u_int64_t);
 void	 key_gen_setup(void);
 void	 track(const char *, u_int64_t);

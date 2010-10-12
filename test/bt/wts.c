@@ -32,7 +32,7 @@ wts_startup(int logfile)
 	int ret;
 	char *p;
 
-	p = fname(WT_PREFIX, "log");
+	p = fname("log");
 	if (g.wts_log != NULL)
 		(void)fclose(g.wts_log);
 	if ((g.wts_log = fopen(p, "w")) == NULL) {
@@ -112,7 +112,7 @@ wts_startup(int logfile)
 		break;
 	}
 
-	p = fname(WT_PREFIX, "db");
+	p = fname("wtdb");
 	if ((ret = db->open(db, p, 0660, WT_CREATE)) != 0) {
 		db->err(db, ret, "Db.open: %s", p);
 		return (1);
@@ -175,7 +175,7 @@ wts_dump()
 	db = g.wts_db;
 
 	track("dump", (u_int64_t)0);
-	p = fname(WT_PREFIX, "dump");
+	p = fname("dump");
 	if ((fp = fopen(p, "w")) == NULL) {
 		db->err(db, errno, "fopen: %s", p);
 		return (1);
@@ -235,7 +235,7 @@ wts_stats()
 	db = g.wts_db;
 
 	track("stat", (u_int64_t)0);
-	p = fname(NULL, "stats");
+	p = fname("stats");
 	if ((fp = fopen(p, "w")) == NULL) {
 		db->err(db, errno, "fopen: %s", p);
 		return (1);

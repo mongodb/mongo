@@ -30,7 +30,7 @@ bdb_startup()
 	if (g.c_duplicates_pct)
 		assert(db->set_flags(db, DB_DUP) == 0);
 
-	p = fname(BDB_PREFIX, "db");
+	p = fname("bdb");
 	assert(db->open(db, NULL, p, NULL, DB_BTREE, DB_CREATE, 0) == 0);
 
 	g.bdb_db = db;
