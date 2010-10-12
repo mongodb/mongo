@@ -65,13 +65,13 @@ extern "C" {
 	(toc)->gen = (toc)->env->ienv->api_gen
 
 /*
- * WT_DATA_UPDATE --
+ * WT_TOC_UPDATE --
  *	A structure to accumulate database changes on a per-thread basis.
  */
-struct __wt_data_update {
+struct __wt_toc_update {
 	u_int32_t len;				/* Buffer original size */
-	u_int8_t *first_free;			/* Buffer's first free byte */
 	u_int32_t space_avail;			/* Buffer's available memory */
+	u_int8_t *first_free;			/* Buffer's first free byte */
 
 	u_int16_t in;				/* Buffer chunks in use */
 	u_int16_t out;				/* Buffer chunks not in use */
