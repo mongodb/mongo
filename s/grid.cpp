@@ -201,7 +201,7 @@ namespace mongo {
             }
             if ( ! foundAll ){
                 ostringstream ss;
-                ss << "host " << offendingHost << " does not belong to replica set " << setName;;
+                ss << "host " << offendingHost << " does not belong to replica set as a non-passive member" << setName;;
                 errMsg = ss.str();
                 newShardConn.done();
                 return false;
