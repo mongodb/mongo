@@ -68,6 +68,7 @@ __wt_wt_toc_close(WT_TOC *toc)
 	ENV *env;
 	IENV *ienv;
 	WT_TOC **tp;
+	WT_TOC_UPDATE *update;
 	int ret;
 
 	env = toc->env;
@@ -76,6 +77,27 @@ __wt_wt_toc_close(WT_TOC *toc)
 
 	WT_ENV_FCHK_RET(
 	    env, "WT_TOC.close", toc->flags, WT_APIMASK_WT_TOC, ret);
+
+	/*
+	 * The "in" reference count is artificially incremented by 1 as
+	 * long as an update buffer is referenced by the WT_TOC thread;
+	 * we don't want them freed because a page was drained and their
+	 * count went to 0.  Decrement the reference count on the buffer
+	 * as part of releasing it.  There's a similar reference count
+	 * decrement when the WT_TOC structure is discarded.
+	 *
+	 * XXX
+	 * There's a race here: if this code, or the WT_TOC structure
+	 * close code, and the page discard code race, it's possible
+	 * neither will realize the buffer is no longer needed and free
+	 * it.  The fix is to involve the cache drain or workQ threads:
+	 * they may need a linked list of buffers they review to ensure
+	 * it never happens.  I'm living with this now: it's unlikely
+	 * and it's a memory leak if it ever happens.
+	 */
+	update = toc->update;
+	if (update != NULL && --update->in == update->out)
+		__wt_free(env, update, update->len);
 
 	/* Discard DBT memory. */
 	__wt_free(env, toc->key.data, toc->key.mem_size);
