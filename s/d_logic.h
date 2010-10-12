@@ -40,12 +40,12 @@ namespace mongo {
         friend class ShardingState;
         ChunkMatcher( ConfigVersion version );
         
-        void setRange( const BSONObj& min , const BSONObj& max );
+        void addRange( const BSONObj& min , const BSONObj& max );
         
         // highest ShardChunkVersion for which this ChunkMatcher's information is accurate
         const ConfigVersion _version;
 
-        // min key for this set of ranges of continguous chunks
+        // key pattern for chunks under this range
         BSONObj _key;
 
         // a map from a min key into a range or continguous chunks

@@ -226,12 +226,12 @@ namespace mongo {
             }
 
             // discontinuity; register range and reset min/max
-            p->setRange( min.getOwned() , max.getOwned() );
+            p->addRange( min.getOwned() , max.getOwned() );
             min = d["min"].Obj().getOwned();
             max = d["max"].Obj().getOwned();
         }
         assert( ! min.isEmpty() );
-        p->setRange( min.getOwned() , max.getOwned() );
+        p->addRange( min.getOwned() , max.getOwned() );
         
         if ( scoped.get() )
             scoped->done();
@@ -601,7 +601,8 @@ namespace mongo {
 
     ChunkMatcher::ChunkMatcher( ConfigVersion version ) : _version( version ) {}
 
-    void ChunkMatcher::setRange( const BSONObj& min , const BSONObj& max ){
+    void ChunkMatcher::addRange( const BSONObj& min , const BSONObj& max ){
+        // get the key pattern if it hasn't yet
         if (_key.isEmpty()){
             BSONObjBuilder b;
 
