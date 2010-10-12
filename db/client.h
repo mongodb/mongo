@@ -173,6 +173,9 @@ namespace mongo {
     public:
         MessagingPort * const _mp;
 
+        Client(const char *desc, MessagingPort *p = 0);
+        ~Client();
+
         string clientAddress() const;
         AuthenticationInfo * getAuthenticationInfo(){ return &_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
@@ -181,18 +184,13 @@ namespace mongo {
         Database* database() {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
         const char *desc() const { return _desc; }
-        
-        Client(const char *desc, MessagingPort *p = 0);
-        ~Client();
-
         void addTempCollection( const string& ns );
-        
         void _invalidateDB(const string& db);
-        static void invalidateDB(const string& db);
-        static void invalidateNS( const string& ns );
-
         void setLastOp( ReplTime op ) { _lastOp = op; }
         ReplTime getLastOp() const { return _lastOp; }
+
+        static void invalidateDB(const string& db);
+        static void invalidateNS( const string& ns );
 
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) {
@@ -216,16 +214,14 @@ namespace mongo {
            @return true if anything was done
          */
         bool shutdown();
-        
-        /* this is for map/reduce writes */
-        bool isGod() const { return _god; }
 
-        friend class CurOp;
-
+        bool isGod() const { return _god; } /* this is for map/reduce writes */
         string toString() const;
         void gotHandshake( const BSONObj& o );
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
+
+        friend class CurOp;
     };
     
     /** get the Client object for this thread. */
@@ -252,9 +248,7 @@ namespace mongo {
         cc()._god = true;
     }
 
-    inline Client::GodScope::~GodScope(){
-        cc()._god = _prev;
-    }
+    inline Client::GodScope::~GodScope() { cc()._god = _prev; }
 
 	/* this unlocks, does NOT upgrade. that works for our current usage */
     inline void mongolock::releaseAndWriteLock() { 
