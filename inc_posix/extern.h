@@ -93,9 +93,9 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 int
 __wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data);
 inline int
-__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data);
-inline int
 __wt_db_col_del(WT_TOC *toc, u_int64_t recno);
+inline int
+__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data);
 int
 __wt_bt_rcc_expand_serial_func(WT_TOC *toc);
 int
@@ -105,15 +105,19 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno, u_int32_t flags);
 int
 __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
 inline int
-__wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
-inline int
 __wt_db_row_del(WT_TOC *toc, DBT *key);
+inline int
+__wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
 int
 __wt_bt_update_serial_func(WT_TOC *toc);
 int
+__wt_db_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data);
+void
+__wt_db_repl_free(WT_TOC *toc, WT_REPL *repl);
+int
 __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags);
 void
-__wt_workq_drain_server(ENV *env);
+__wt_workq_drain_server(ENV *env, int force);
 void *
 __wt_cache_drain_server(void *arg);
 void
@@ -142,7 +146,7 @@ __wt_page_read(DB *db, WT_PAGE *page);
 int
 __wt_page_write(DB *db, WT_PAGE *page);
 void
-__wt_workq_read_server(ENV *env, int read_priority);
+__wt_workq_read_server(ENV *env, int force);
 void *
 __wt_cache_read_server(void *arg);
 int
@@ -198,6 +202,8 @@ int
 __wt_library_init(void);
 int
 __wt_breakpoint(void);
+void
+__wt_attach(ENV *env);
 int
 __wt_env_create(u_int32_t flags, ENV **envp);
 int
@@ -339,9 +345,13 @@ __wt_api_arg_max(ENV *env,
 int
 __wt_database_method_type(DB *db, const char *name, int column_err);
 int
+__wt_database_wrong_fixed_size(WT_TOC *toc, u_int32_t len);
+int
 __wt_database_readonly(DB *db, const char *name);
 int
 __wt_database_format(DB *db);
+int
+__wt_database_item_too_big(DB *db);
 int
 __wt_wt_toc_lockout(WT_TOC *toc);
 int
@@ -404,5 +414,3 @@ int
 __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp);
 void
 __wt_stat_clear_method_stats(WT_STATS *stats);
-int
-__wt_update_alloc(WT_TOC *toc, u_int32_t size, void *retp);
