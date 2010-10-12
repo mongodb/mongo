@@ -73,6 +73,14 @@ __wt_bt_desc_read(WT_TOC *toc)
 	db->idb->free_size = desc->free_size;
 	db->fixed_len = desc->fixed_len;
 
+	/*
+	 * XXX
+	 * This is the wrong place to do this -- need to think about how
+	 * to update open/configuration information in a reasonable way.
+	 */
+	if (db->fixed_len != 0)
+		F_SET(db->idb, WT_COLUMN);
+
 	__wt_bt_page_out(toc, &page, 0);
 	return (0);
 }
