@@ -3,45 +3,45 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_bulk.c (C)
                                                                           _
 			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  168  Warning 530: Symbol 'last_repeat' (line 96) not
-    initialized
-../btree/bt_bulk.c  96  Info 830: Location cited in prior message
-                                                                          _
-			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  168  Warning 530: Symbol 'last_data' (line 97) not
+../btree/bt_bulk.c  164  Warning 530: Symbol 'last_repeat' (line 97) not
     initialized
 ../btree/bt_bulk.c  97  Info 830: Location cited in prior message
+                                                                          _
+			    memcmp(last_data, data->data, data->size) == 0) {
+../btree/bt_bulk.c  164  Warning 530: Symbol 'last_data' (line 98) not
+    initialized
+../btree/bt_bulk.c  98  Info 830: Location cited in prior message
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/bt_bulk.c  386  Warning 530: Symbol 'dup_data' (line 256) not
+../btree/bt_bulk.c  382  Warning 530: Symbol 'dup_data' (line 252) not
     initialized
-../btree/bt_bulk.c  256  Info 830: Location cited in prior message
+../btree/bt_bulk.c  252  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/bt_bulk.c  457  Warning 530: Symbol 'dup_key' (line 256) not
+../btree/bt_bulk.c  453  Warning 530: Symbol 'dup_key' (line 252) not
     initialized
-../btree/bt_bulk.c  256  Info 830: Location cited in prior message
+../btree/bt_bulk.c  252  Info 830: Location cited in prior message
                        _
 	WT_RECORDS(&off) = dup_count;
-../btree/bt_bulk.c  780  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  776  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1035  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1031  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1068  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1064  Info 740: Unusual pointer cast (incompatible indirect
     types)
                               _
 #... S((WT_OFF *)((cip)->data))
 	WT_COL_OFF_RECORDS(cip) += incr;
-../btree/bt_bulk.c  1241  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1237  Info 740: Unusual pointer cast (incompatible indirect
     types)
                               _
 #... WT_ITEM_BYTE((rip)->data))
 	WT_ROW_OFF_RECORDS(rip) += incr;
-../btree/bt_bulk.c  1258  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1254  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_close.c (C)
@@ -51,11 +51,11 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_debug.c (C)
                                                                         _
 		    (u_long)off->addr, (u_long)off->size, WT_RECORDS(off));
-../btree/bt_debug.c  426  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  429  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                              _
 		    (u_long)off->size, (u_quad)WT_RECORDS(off));
-../btree/bt_debug.c  453  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  456  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
@@ -145,42 +145,42 @@ _
                                                        _
 #... ame = (vs->fragbits); register int _start = (addr), _stop = (addr + (frags
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1073  Info 713: Loss of precision (initialization)
+../btree/bt_vrfy.c  1079  Info 713: Loss of precision (initialization)
     (unsigned int to int)
                                                        _
 #...  int _start = (addr), _stop = (addr + (frags - 1)); register int _startbyt
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1073  Info 713: Loss of precision (initialization)
+../btree/bt_vrfy.c  1079  Info 713: Loss of precision (initialization)
     (unsigned int to int)
                                                        _
 #...  - 1)); register int _startbyte = _bit_byte(_start); register int _stopbyt
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1073  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  1079  Info 702: Shift right of signed quantity (int)
                                                        _
 #... (_start); register int _stopbyte = _bit_byte(_stop); if (_startbyte == _st
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1073  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  1079  Info 702: Shift right of signed quantity (int)
                                                        _
 #... else { _name[_startbyte] |= 0xff << ((_start)&0x7); while (++_startbyte < 
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1073  Info 734: Loss of precision (assignment) (15 bits to
+../btree/bt_vrfy.c  1079  Info 734: Loss of precision (assignment) (15 bits to
     8 bits)
                                                  _
 #... egister int _stopbyte = _bit_byte(_nbits - 1), _value = -1; if (_nbits > 0
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/bt_vrfy.c  1091  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  1097  Info 702: Shift right of signed quantity (int)
                                                  _
 #... != 0xff) { bitstr_t _lb; _value = _byte << 3; for (_lb = _name[_byte]; (_l
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/bt_vrfy.c  1091  Info 701: Shift left of signed quantity (int)
+../btree/bt_vrfy.c  1097  Info 701: Shift left of signed quantity (int)
                                                  _
 #... _name[_byte]; (_lb&0x1); ++_value, _lb >>= 1); break; } if (_value >= frag
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/bt_vrfy.c  1091  Info 722: Suspicious use of ;
+../btree/bt_vrfy.c  1097  Info 722: Suspicious use of ;
                                                  _
 #...                ((vs->fragbits)[_bit_byte(ffc)] |= _bit_mask(ffc))
 			bit_set(vs->fragbits, ffc);
-../btree/bt_vrfy.c  1093  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  1099  Info 702: Shift right of signed quantity (int)
 
 --- Module:   ../btree/col_get.c (C)
 
@@ -205,18 +205,18 @@ _
 --- Module:   ../btree/row_srch.c (C)
                                                                            _
 				cmp = db->btree_compare(db, key, (DBT *)rip);
-../btree/row_srch.c  75  Info 740: Unusual pointer cast (incompatible indirect
+../btree/row_srch.c  74  Info 740: Unusual pointer cast (incompatible indirect
     types)
                             _
 		if (cmp != 0)
-../btree/row_srch.c  98  Warning 644: Variable 'cmp' (line 27) may not have
+../btree/row_srch.c  97  Warning 644: Variable 'cmp' (line 26) may not have
     been initialized
-../btree/row_srch.c  27  Info 830: Location cited in prior message
+../btree/row_srch.c  26  Info 830: Location cited in prior message
                                           _
 		addr = WT_ROW_OFF_ADDR(rip);
-../btree/row_srch.c  106  Info 771: Symbol 'rip' (line 23) conceivably not
+../btree/row_srch.c  105  Info 771: Symbol 'rip' (line 22) conceivably not
     initialized
-../btree/row_srch.c  23  Info 830: Location cited in prior message
+../btree/row_srch.c  22  Info 830: Location cited in prior message
 
 --- Module:   ../db/db_err.c (C)
                                 _
@@ -339,6 +339,13 @@ _
 
 --- Module:   ../support/strerror.c (C)
 
---- Module:   ../support/update.c (C)
-
 --- Module:   ../support/version.c (C)
+
+--- Global Wrap-up
+
+Info 765: external '__wt_debugger_attach' (line 57, file ../env/env_global.c)
+    could be made static
+../env/env_global.c  57  Info 830: Location cited in prior message
+Info 729: Symbol '__wt_debugger_attach' (line 57, file ../env/env_global.c) not
+    explicitly initialized
+../env/env_global.c  57  Info 830: Location cited in prior message
