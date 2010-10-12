@@ -84,11 +84,14 @@ main(int argc, char *argv[])
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		restart();			/* Clean up previous runs */
 
-		bdb_setup(0);			/* Open the databases */
-		if (wts_setup(0, log))
-			goto err;
+		config_setup();
+		key_gen_setup();
 
-		config_dump(0);
+		bdb_startup();			/* Initial database config */
+		if (wts_startup(log))
+			return (EXIT_FAILURE);
+
+		config_dump(0);			/* Dump run configuration */
 
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
@@ -115,12 +118,6 @@ main(int argc, char *argv[])
 					goto err;
 				break;
 			}
-
-						/* Close/re-open database */
-			track("flushing & re-opening WT", (u_int64_t)0);
-			wts_teardown();
-			if (wts_setup(1, log))
-				goto err;
 
 			if (wts_ops())		/* Random operations */
 				goto err;
