@@ -6,6 +6,18 @@
 # Optional configuration.
 AC_DEFUN([AM_OPTIONS], [
 
+AH_TEMPLATE(HAVE_ATTACH, [Define to 1 to pause for debugger attach on failure.])
+AC_MSG_CHECKING(if --enable-attach option specified)
+AC_ARG_ENABLE(attach,
+	[AC_HELP_STRING([--enable-attach],
+	    [Configure for debugger attach on failure.])], r=$enableval, r=no)
+case "$r" in
+no)	db_cv_enable_attach=no;;
+*)	AC_DEFINE(HAVE_ATTACH)
+	db_cv_enable_attach=yes;;
+esac
+AC_MSG_RESULT($db_cv_enable_attach)
+
 AC_MSG_CHECKING(if --enable-debug option specified)
 AC_ARG_ENABLE(debug,
 	[AC_HELP_STRING([--enable-debug],

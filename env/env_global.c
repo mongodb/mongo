@@ -53,3 +53,20 @@ __wt_breakpoint(void)
 {
 	return (0);
 }
+
+int __wt_debugger_attach;
+
+/*
+ * __wt_attach --
+ *	A routine to wait for the debugging to attach.
+ */
+void
+__wt_attach(ENV *env)
+{
+#ifdef HAVE_ATTACH
+	__wt_api_env_errx(env,
+	    "process ID %lld: waiting for debugger...", (long long)getpid());
+	while (__wt_debugger_attach == 0)
+		__wt_sleep(10, 0);
+#endif
+}
