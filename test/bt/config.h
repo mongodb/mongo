@@ -25,7 +25,7 @@ typedef struct {
 
 static CONFIG c[] = {
 	{ "cache",		0,		0,		1,	30,		&g.c_cache },
-	{ "data_max",		0,		0,		32,	4096,		&g.c_data_max },
+	{ "data_max",		C_ROW|C_VAR,	0,		32,	4096,		&g.c_data_max },
 	{ "data_min",		0,		0,		10,	32,		&g.c_data_min },
 	{ "database_type",	0,		C_IGNORE,	1,	3,		&g.c_database_type },
 	{ "delete_pct",		0,		0,		0,	45,		&g.c_delete_pct },
@@ -34,8 +34,8 @@ static CONFIG c[] = {
 	{ "huffman_key",	C_ROW,		C_BOOL,		0,	10,		&g.c_huffman_key },
 	{ "intl_node_max",	0,		0,		9,	17,		&g.c_intl_node_max },
 	{ "intl_node_min",	0,		0,		9,	17,		&g.c_intl_node_min },
-	{ "key_max",		0,		0,		64,	128,		&g.c_key_max },
-	{ "key_min",		0,		0,		10,	32,		&g.c_key_min },
+	{ "key_max",		C_ROW,		0,		64,	128,		&g.c_key_max },
+	{ "key_min",		C_ROW,		0,		10,	32,		&g.c_key_min },
 	{ "leaf_node_max",	0,		0,		9,	17,		&g.c_leaf_node_max },
 	{ "leaf_node_min",	0,		0,		9,	17,		&g.c_leaf_node_min },
 	{ "ops",		0,		0,		0,	M(2),		&g.c_ops },
