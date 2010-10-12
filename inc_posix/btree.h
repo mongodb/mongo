@@ -251,7 +251,7 @@ struct __wt_page {
 	} u;
 
 	/*
-	 * Entry modifications or deletions are stored in the replacement array.
+	 * Data modifications or deletions are stored in the replacement array.
 	 * When the first element on a page is modified, the array is allocated,
 	 * with one slot for every existing element in the page.  A slot points
 	 * to a WT_REPL structure; if more than one modification is done to a
@@ -261,12 +261,13 @@ struct __wt_page {
 	WT_REPL **repl;			/* Modification index */
 
 	/*
-	 * Row store page insertions are stored in the rinsert array.  When the
+	 * Row store page insertions are stored in the insrow array.  When the
 	 * first insertion is done to a row store page, the array is allocated,
 	 * with one slot for every existing element in the page.  Each slot is
 	 * a forward-linked list of new entries sorting greater than or equal to
-	 * the entry with the same array offset in the original index.  Slots
-	 * point to WT_ROW_INSERT structures.
+	 * the entry with the same array offset in the original index.  Sorting
+	 * is key, if you'll pardon the phrase: it has to be sorted or we can't
+	 * search it efficiently.  Slots point to WT_ROW_INSERT structures.
 	 */
 	WT_ROW_INSERT **insrow;
 
@@ -279,7 +280,7 @@ struct __wt_page {
 	 * normally only possible to append to a column store as insert requires
 	 * re-numbering all subsequent records.  (Berkeley DB did support that
 	 * functionality, but it never performed well and it isn't useful enough
-	 * to  re-implement, IMNSHO.)
+	 * to re-implement, IMNSHO.)
 	 */
 	WT_COL_EXPAND **expcol;
 
