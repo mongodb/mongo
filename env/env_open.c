@@ -98,12 +98,13 @@ __wt_env_close(ENV *env)
 	WT_MEMORY_FLUSH;
 
 	/*
-	 * Wait for the cache server threads -- wait for the primary cache
-	 * server first, it schedules work for the other threads.
+	 * Force the cache server threads to run and wait for them to exit.
+	 * Wait for the cache drain server first, it potentially schedules work
+	 * for the read thread.
 	 */
-	__wt_unlock(env, ienv->cache->mtx_drain);
+	__wt_workq_drain_server(env, 1);
 	__wt_thread_join(ienv->cache_drain_tid);
-	__wt_unlock(env, ienv->cache->mtx_read);
+	__wt_workq_read_server(env, 1);
 	__wt_thread_join(ienv->cache_read_tid);
 
 	/*
