@@ -752,13 +752,14 @@ namespace mongo {
                         log() << "moveChunk updating self to: " << myVersion << " through " << chunkIDDoc << endl;
                     }
                     else {
-                        log() << "moveChunk: i have no chunks left" << endl;
+                        log() << "moveChunk: i have no chunks left for collection '" << ns << "'" << endl;
                         shardingState.setVersion( ns , 0 );
                     }
                 }
 
                 conn.done();
                 migrateFromStatus._inCriticalSection = false;
+
                 // 5.d
                 configServer.logChange( "moveChunk" , ns , BSON( "min" << min << "max" << max <<
                                                                  "from" << fromShard.getName() << 
