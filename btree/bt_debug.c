@@ -124,8 +124,11 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	else {
 		fprintf(fp, "level %lu, entries %lu, records %llu\n",
 		    (u_long)hdr->level, (u_long)hdr->u.entries, page->records);
-		fprintf(fp, "\tfirst-free %#lx, space avail %lu\n\n",
-		    (u_long)page->first_free, (u_long)page->space_avail);
+		fprintf(fp,
+		    "\tfirst-free %p (offset: %lu), space avail %lu\n\n",
+		    page->first_free,
+		    (u_long)(page->first_free - (u_int8_t *)page),
+		    (u_long)page->space_avail);
 	}
 
 	switch (hdr->type) {
@@ -341,7 +344,7 @@ __wt_bt_debug_repl(WT_REPL *repl, FILE *fp)
 		fp = stderr;
 
 	for (; repl != NULL; repl = repl->next)
-		if (WT_REPL_DELETED_ISSET(repl->data))
+		if (WT_REPL_DELETED_ISSET(repl))
 			fprintf(fp, "\trepl: {deleted}\n");
 		else
 			__wt_bt_debug_dbt("\trepl", repl, fp);
@@ -361,7 +364,7 @@ __wt_bt_debug_expcol(WT_COL_EXPAND *exp, FILE *fp)
 
 	for (; exp != NULL; exp = exp->next) {
 		repl = exp->repl;
-		if (WT_REPL_DELETED_ISSET(repl->data))
+		if (WT_REPL_DELETED_ISSET(repl))
 			fprintf(fp, "\texp: {deleted}\n");
 		else
 			__wt_bt_debug_dbt("\texp", repl, fp);
