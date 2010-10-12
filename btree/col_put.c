@@ -12,16 +12,6 @@
 static int __wt_db_col_update(WT_TOC *, u_int64_t, DBT *, int);
 
 /*
- * __wt_db_col_put --
- *	Db.put method.
- */
-inline int
-__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
-{
-	return (__wt_db_col_update(toc, recno, data, 1));
-}
-
-/*
  * __wt_db_col_del --
  *	Db.col_del method.
  */
@@ -29,6 +19,23 @@ inline int
 __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 {
 	return (__wt_db_col_update(toc, recno, NULL, 0));
+}
+
+/*
+ * __wt_db_col_put --
+ *	Db.put method.
+ */
+inline int
+__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
+{
+	DB *db;
+
+	db = toc->db;
+
+	if (db->fixed_len != 0 && data->size != db->fixed_len)
+		WT_RET(__wt_database_wrong_fixed_size(toc, data->size));
+
+	return (__wt_db_col_update(toc, recno, data, 1));
 }
 
 /*
@@ -86,15 +93,7 @@ __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 			    page->indx_count, sizeof(WT_REPL *), &new_repl));
 
 		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_update_alloc(toc,
-		    sizeof(WT_REPL) + (data == NULL ? 0 : data->size), &repl));
-		if (data == NULL)
-			repl->data = WT_REPL_DELETED_VALUE;
-		else {
-			repl->data = (u_int8_t *)repl + sizeof(WT_REPL);
-			repl->size = data->size;
-			memcpy(repl->data, data->data, data->size);
-		}
+		WT_ERR(__wt_db_repl_alloc(toc, &repl, data));
 
 		/* Schedule the workQ to insert the WT_REPL structure. */
 		__wt_bt_update_serial(toc, page, toc->srch_write_gen,
@@ -105,19 +104,13 @@ __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 			WT_ERR(__wt_calloc(env, page->indx_count,
 			    sizeof(WT_COL_EXPAND *), &new_expcol));
 
+		/* Allocate a WT_REPL structure and fill it in. */
+		WT_ERR(__wt_db_repl_alloc(toc, &repl, data));
+
 		/* Allocate a WT_COL_EXPAND structure and fill it in. */
 		WT_ERR(__wt_calloc(env, 1, sizeof(WT_COL_EXPAND), &exp));
 		exp->rcc_offset = toc->srch_rcc_offset;
-		WT_ERR(__wt_update_alloc(toc,
-		    sizeof(WT_REPL) + (data == NULL ? 0 : data->size), &repl));
 		exp->repl = repl;
-		if (data == NULL)
-			repl->data = WT_REPL_DELETED_VALUE;
-		else {
-			repl->data = (u_int8_t *)repl + sizeof(WT_REPL);
-			repl->size = data->size;
-			memcpy(repl->data, data->data, data->size);
-		}
 
 		/* Schedule the workQ to link in the WT_COL_EXPAND structure. */
 		__wt_bt_rcc_expand_serial(toc, page, toc->srch_write_gen,
@@ -125,24 +118,18 @@ __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 		goto done;
 	} else {					/* #3 */
 		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_update_alloc(toc,
-		    sizeof(WT_REPL) + (data == NULL ? 0 : data->size), &repl));
-		if (data == NULL)
-			repl->data = WT_REPL_DELETED_VALUE;
-		else {
-			repl->data = (u_int8_t *)repl + sizeof(WT_REPL);
-			repl->size = data->size;
-			memcpy(repl->data, data->data, data->size);
-		}
+		WT_ERR(__wt_db_repl_alloc(toc, &repl, data));
 
 		/* Schedule the workQ to insert the WT_REPL structure. */
 		__wt_bt_rcc_expand_repl_serial(
 		    toc, page, toc->srch_write_gen, toc->srch_exp, repl, ret);
 	}
 
-	if (0) {
+	if (ret != 0) {
 err:		if (exp != NULL)
 			__wt_free(env, exp, sizeof(WT_COL_EXPAND));
+		if (repl != NULL)
+			__wt_db_repl_free(toc, repl);
 	}
 
 done:	/* Free any allocated page expansion array unless the workQ used it. */
@@ -150,7 +137,7 @@ done:	/* Free any allocated page expansion array unless the workQ used it. */
 		__wt_free(env,
 		    new_expcol, page->indx_count * sizeof(WT_COL_EXPAND *));
 
-	/* Free any replacement array unless the workQ used it. */
+	/* Free any page replacement array unless the workQ used it. */
 	if (new_repl != NULL && new_repl != page->repl)
 		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 
