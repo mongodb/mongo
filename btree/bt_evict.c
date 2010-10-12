@@ -27,7 +27,7 @@ static void __wt_drain_hazard_validate(ENV *, WT_CACHE_ENTRY *);
  *	See if the drain server thread needs to be awakened.
  */
 void
-__wt_workq_drain_server(ENV *env)
+__wt_workq_drain_server(ENV *env, int force)
 {
 	WT_CACHE *cache;
 	u_int64_t bytes_inuse, bytes_max;
@@ -39,24 +39,23 @@ __wt_workq_drain_server(ENV *env)
 		return;
 
 	/*
-	 * If we're locking out reads, or we're over our cache limit, cycle
-	 * some of the cache content.
+	 * If we're locking out reads, or over our cache limit, or forcing the
+	 * issue (when closing the environment), run the cache drain server.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
-	if (!cache->read_lockout && bytes_inuse < bytes_max)
+	if (!force && !cache->read_lockout && bytes_inuse < bytes_max)
 		return;
 
 	WT_VERBOSE(env, WT_VERB_SERVERS, (env,
-	    "cache drain server running trickle: read lockout %sset, "
-	    "bytes inuse > max (%llu > %llu), ",
-	    cache->read_lockout ? "" : "not ",
-	    (u_quad)bytes_inuse, (u_quad)bytes_max));
+	    "waking cache drain server: force %sset, read lockout %sset, "
+	    "bytes inuse %s max (%lluMB %s %lluMB), ",
+	    force ? "" : "not ", cache->read_lockout ? "" : "not ",
+	    bytes_inuse <= bytes_max ? "<=" : ">",
+	    (u_quad)(bytes_inuse / WT_MEGABYTE),
+	    bytes_inuse <= bytes_max ? "<=" : ">",
+	    (u_quad)(bytes_max / WT_MEGABYTE)));
 
-	/*
-	 * Wake the cache drain thread; no memory flush needed, the
-	 * drain_sleeping field is declared volatile.
-	 */
 	cache->drain_sleeping = 0;
 	__wt_unlock(env, cache->mtx_drain);
 }
@@ -328,9 +327,9 @@ __wt_drain_hazard_check(ENV *env)
 		 */
 		if (*hazard == page) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache skip hazard referenced element/page/addr "
-			    "%p/%p/%lu",
-			    e, e->page, (u_long)e->addr));
+			    "cache skip hazard referenced addr %lu "
+			    "(element %p, page %p)",
+			    (u_long)e->addr, e, e->page));
 			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
 
 			e->state = WT_OK;
@@ -401,8 +400,8 @@ __wt_drain_evict(ENV *env)
 		__wt_drain_hazard_validate(env, e);
 #endif
 		WT_VERBOSE(env, WT_VERB_CACHE, (env,
-		    "cache evicting element/page/addr %p/%p/%lu",
-		    e, e->page, (u_long)e->addr));
+		    "cache evicting addr %lu (element %p, page %p)",
+		    (u_long)e->addr, e, e->page));
 
 		/*
 		 * Copy a page reference, then make the cache entry available

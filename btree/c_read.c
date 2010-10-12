@@ -17,7 +17,7 @@ static int __wt_cache_read(WT_READ_REQ *);
  *	See if the read server thread needs to be awakened.
  */
 void
-__wt_workq_read_server(ENV *env, int read_priority)
+__wt_workq_read_server(ENV *env, int force)
 {
 	WT_CACHE *cache;
 	u_int64_t bytes_inuse, bytes_max;
@@ -37,17 +37,22 @@ __wt_workq_read_server(ENV *env, int read_priority)
 		if (bytes_inuse <= bytes_max - (bytes_max / 20))
 			cache->read_lockout = 0;
 	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
-		WT_VERBOSE(env, WT_VERB_CACHE, (env,
-		    "bytes-inuse %llu of bytes-max %llu",
+		WT_VERBOSE(env, WT_VERB_SERVERS, (env,
+		    "workQ locks out reads: bytes-inuse %llu of bytes-max %llu",
 		    (u_quad)bytes_inuse, (u_quad)bytes_max));
 		cache->read_lockout = 1;
 	}
 
+	/* If the cache read server is running, there's nothing to do. */
+	if (!cache->read_sleeping)
+		return;
+
 	/*
-	 * If the read server is already running, or there's no read of a high
-	 * enough priority to over-ride any cache read lockout, we're done.
+	 * If reads are locked out and we're not forcing the issue (that's when
+	 * closing the environment, or if there's a priority read waiting to be
+	 * handled), we're done.
 	 */
-	if (!cache->read_sleeping || (cache->read_lockout && !read_priority))
+	if (!force && cache->read_lockout)
 		return;
 
 	cache->read_sleeping = 0;
@@ -224,9 +229,9 @@ __wt_cache_read(WT_READ_REQ *rr)
 	__wt_hazard_set(toc, NULL, page);
 	WT_CACHE_ENTRY_SET(empty, db, addr, page, WT_OK);
 
-	WT_VERBOSE(env, WT_VERB_CACHE, (env,
-	    "cache %s element/page/addr %p/%p/%lu",
-	    newpage ? "allocated" : "read", empty, empty->page, (u_long)addr));
+	WT_VERBOSE(env,
+	    WT_VERB_CACHE, (env, "cache %s addr %lu (element %p, page %p)",
+	    newpage ? "allocated" : "read", (u_long)addr, empty, empty->page));
 
 	WT_CACHE_PAGE_IN(cache, size);
 
