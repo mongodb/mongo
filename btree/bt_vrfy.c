@@ -391,6 +391,11 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	 * Check the LSN against the existing log files.
 	 */
 
+	/*
+	 * Don't verify the checksum -- it verified when we first read the
+	 * page.
+	 */
+
 	/* Check the page type. */
 	switch (hdr->type) {
 	case WT_PAGE_DESCRIPT:
@@ -453,11 +458,6 @@ err_level:		__wt_api_db_errx(db,
 		    (u_long)addr);
 		return (WT_ERROR);
 	}
-
-	/*
-	 * Don't verify the checksum -- it verified when we first read the
-	 * page.
-	 */
 
 	/* Verify the items on the page. */
 	switch (hdr->type) {
