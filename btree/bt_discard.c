@@ -138,21 +138,20 @@ __wt_bt_page_discard_expcol(ENV *env, WT_PAGE *page)
 static void
 __wt_bt_page_discard_repl_list(ENV *env, WT_REPL *repl)
 {
-	WT_DATA_UPDATE *upd;
 	WT_REPL *a;
+	WT_TOC_UPDATE *update;
 
 	do {
 		a = repl->next;
 
 		/*
 		 * The bytes immediately before the WT_REPL structure are a
-		 * pointer to the per-thread WT_DATA_UPDATE structure in
+		 * pointer to the per-thread WT_TOC_UPDATE structure in
 		 * which this WT_REPL and its associated data are stored.
 		 */
-		upd = *(WT_DATA_UPDATE **)
-		    ((u_int8_t *)repl - sizeof(WT_DATA_UPDATE *));
-		WT_ASSERT(env, upd->out < upd->in);
-		if (++upd->out == upd->in)
-			__wt_free(env, upd, upd->len);
+		update = repl->update;
+		WT_ASSERT(env, update->out < update->in);
+		if (++update->out == update->in)
+			__wt_free(env, update, update->len);
 	} while ((repl = a) != NULL);
 }
