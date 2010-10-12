@@ -69,5 +69,4 @@ support/progress.c
 support/serial.c
 support/stat.c
 support/strerror.c
-support/update.c
 support/version.c
