@@ -11,7 +11,7 @@
 #include "wts.h"
 
 void
-bdb_setup(int reopen)
+bdb_startup()
 {
 	DB *db;
 	DB_ENV *dbenv;
@@ -31,10 +31,7 @@ bdb_setup(int reopen)
 		assert(db->set_flags(db, DB_DUP) == 0);
 
 	p = fname(BDB_PREFIX, "db");
-	if (!reopen)
-		(void)remove(p);
-	assert(db->open(db, NULL,
-	    p, NULL, DB_BTREE, reopen ? 0 : DB_CREATE, 0) == 0);
+	assert(db->open(db, NULL, p, NULL, DB_BTREE, DB_CREATE, 0) == 0);
 
 	g.bdb_db = db;
 }
