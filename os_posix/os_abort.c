@@ -16,8 +16,10 @@
 void
 __wt_abort(ENV *env)
 {
-	if (env != NULL)
-		__wt_msg(env, "aborting WiredTiger library");
+	__wt_msg(env, "aborting WiredTiger library");
+
+	__wt_attach(env);
+
 	abort();
 	/* NOTREACHED */
 }
