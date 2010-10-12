@@ -147,14 +147,33 @@ int
 __wt_database_method_type(DB *db, const char *name, int column_err)
 {
 	__wt_api_db_errx(db,
-	    "%s: this method is not supported for a %s database type",
-	    name, column_err ? "column" : "err");
-	return (WT_READONLY);
+	    "%s: this method is not supported for a %s database",
+	    name, column_err ? "column store" : "row store");
+	return (WT_ERROR);
+}
+
+/*
+ * __wt_database_wrong_fixed_size --
+ *	Print a standard error message on attempts to put the wrong size element
+ *	into a fixed-size database.
+ */
+int
+__wt_database_wrong_fixed_size(WT_TOC *toc, u_int32_t len)
+{
+	DB *db;
+
+	db = toc->db;
+
+	__wt_api_db_errx(db,
+	    "%s: length of %lu does not match fixed-length database "
+	    "configuration of %lu",
+	     toc->name, (u_long)len, (u_long)db->fixed_len);
+	return (WT_ERROR);
 }
 
 /*
  * __wt_database_readonly --
- *	Print a standard error message on attempts to modify  a read-only
+ *	Print a standard error message on attempts to modify a read-only
  *	database.
  */
 int
@@ -176,6 +195,17 @@ __wt_database_format(DB *db)
 {
 	__wt_api_db_errx(db, "the database is corrupted; use the Db.salvage"
 	    " method or the db_salvage utility to repair the database");
+	return (WT_ERROR);
+}
+
+/*
+ * __wt_database_item_too_big --
+ *	Print a standard error message when an element is too large to store.
+ */
+int
+__wt_database_item_too_big(DB *db)
+{
+	__wt_api_db_errx(db, "the item is too large for the database to store");
 	return (WT_ERROR);
 }
 
