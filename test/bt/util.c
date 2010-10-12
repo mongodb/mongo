@@ -170,7 +170,7 @@ wts_rand(void)
 	 * (and WT might call rand() in the future, who knows?)
 	 */
 	if (g.rand_log == NULL) {
-		p = fname(NULL, "rand");
+		p = fname(WT_PREFIX, "rand");
 		if ((g.rand_log = fopen(p, g.replay ? "r" : "w")) == NULL) {
 			fprintf(stderr, p, strerror(errno));
 			exit(EXIT_FAILURE);
