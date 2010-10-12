@@ -22,7 +22,7 @@ static int wts_read_row(u_int64_t);
 static int wts_sync(void);
 
 int
-wts_setup(int reopen, int logfile)
+wts_startup(int logfile)
 {
 	time_t now;
 	DB *db;
@@ -33,7 +33,9 @@ wts_setup(int reopen, int logfile)
 	char *p;
 
 	p = fname(WT_PREFIX, "log");
-	if ((g.wts_log = fopen(p, reopen ? "a" : "w")) == NULL) {
+	if (g.wts_log != NULL)
+		(void)fclose(g.wts_log);
+	if ((g.wts_log = fopen(p, "w")) == NULL) {
 		fprintf(stderr,
 		    "%s: %s: %s\n", g.progname, p, strerror(errno));
 		exit (EXIT_FAILURE);
@@ -42,10 +44,6 @@ wts_setup(int reopen, int logfile)
 	(void)time(&now);
 	fprintf(g.wts_log, "%s", ctime(&now));
 	fprintf(g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
-
-	config_setup();
-	if (!reopen)
-		key_gen_setup();
 
 	if ((ret = wiredtiger_simple_setup(
 	    g.progname, &db, g.c_cache, WT_MEMORY_CHECK)) != 0) {
@@ -115,9 +113,7 @@ wts_setup(int reopen, int logfile)
 	}
 
 	p = fname(WT_PREFIX, "db");
-	if (!reopen)
-		(void)remove(p);
-	if ((ret = db->open(db, p, 0660, reopen ? 0 : WT_CREATE)) != 0) {
+	if ((ret = db->open(db, p, 0660, WT_CREATE)) != 0) {
 		db->err(db, ret, "Db.open: %s", p);
 		return (1);
 	}
@@ -142,9 +138,6 @@ wts_teardown()
 	assert(wts_sync() == 0);
 	assert(toc->close(toc, 0) == 0);
 	assert(wiredtiger_simple_teardown(g.progname, g.wts_db) == 0);
-
-	if (g.wts_log != NULL)
-		(void)fclose(g.wts_log);
 }
 
 int
