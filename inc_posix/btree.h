@@ -126,13 +126,21 @@ struct __wt_page_desc {
  *	Updates/deletes for a WT_{COL,ROW} entry.
  */
 struct __wt_repl {
-	/* In-memory deletes are flagged by an illegal data pointer value. */
-#define	WT_REPL_DELETED_VALUE		((void *)0x01)
-#define	WT_REPL_DELETED_ISSET(p)	((p) == WT_REPL_DELETED_VALUE)
-	void	 *data;			/* data */
+	WT_TOC_UPDATE *update;		/* update buffer holding this WT_REPL */
+	WT_REPL *next;			/* forward-linked list */
+
+	/*
+	 * We can't store 4GB items:  we're short by a few bytes because each
+	 * change/insert item requires a leading WT_REPL structure.  For that
+	 * reason, we use a max size as an is-deleted flag so we don't have to
+	 * increase the size of this structure.
+	 */
+#define	WT_REPL_DELETED_ISSET(repl)	((repl)->size == UINT32_MAX)
+#define	WT_REPL_DELETED_SET(repl)	((repl)->size = UINT32_MAX)
 	u_int32_t size;			/* data length */
 
-	struct __wt_repl *next;		/* forward-linked list */
+	/* The data immediately follows the repl structure. */
+#define	WT_REPL_DATA(repl)		((u_int8_t *)repl + sizeof(WT_REPL))
 };
 
 /*
