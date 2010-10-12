@@ -129,7 +129,7 @@ restart:
 		}
 						/* Deleted match. */
 		if ((repl = WT_ROW_REPL(page, rip)) != NULL)
-			if (WT_REPL_DELETED_ISSET(repl->data)) {
+			if (WT_REPL_DELETED_ISSET(repl)) {
 				ret = WT_NOTFOUND;
 				goto err;
 			}

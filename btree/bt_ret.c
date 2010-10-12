@@ -105,9 +105,9 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 		if (repl != NULL) {
-repl:			if (WT_REPL_DELETED_ISSET(repl->data))
+repl:			if (WT_REPL_DELETED_ISSET(repl))
 				return (WT_NOTFOUND);
-			data->data = repl->data;
+			data->data = WT_REPL_DATA(repl);
 			data->size = repl->size;
 			return (callback == NULL ? 0 : callback(db, key, data));
 		}

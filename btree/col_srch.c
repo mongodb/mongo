@@ -123,7 +123,7 @@ done:	/*
 				if (exp->rcc_offset == rcc_offset) {
 					repl = exp->repl;
 					if (!LF_ISSET(WT_INSERT) &&
-					    WT_REPL_DELETED_ISSET(repl->data))
+					    WT_REPL_DELETED_ISSET(repl))
 						goto notfound;
 					break;
 				}
@@ -139,8 +139,7 @@ done:	/*
 		 * not found, check for deletion in the original index.
 		 */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (!LF_ISSET(WT_INSERT) &&
-			    WT_REPL_DELETED_ISSET(repl->data))
+			if (!LF_ISSET(WT_INSERT) && WT_REPL_DELETED_ISSET(repl))
 				goto notfound;
 			break;
 		}
@@ -151,8 +150,7 @@ done:	/*
 	default:
 		/* Check for a replacement entry in the page's WT_REPL array. */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (!LF_ISSET(WT_INSERT) &&
-			    WT_REPL_DELETED_ISSET(repl->data))
+			if (!LF_ISSET(WT_INSERT) && WT_REPL_DELETED_ISSET(repl))
 				goto notfound;
 			break;
 		}
