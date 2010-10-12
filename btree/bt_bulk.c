@@ -127,14 +127,9 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			ret = WT_ERROR;
 			goto err;
 		}
-		if (data->size != db->fixed_len) {
-			__wt_api_db_errx(db,
-			    "length of %lu does not match the fixed-length "
-			    "configuration for this database of %lu",
-			    (u_long)data->size, (u_long)db->fixed_len);
-			ret = WT_ERROR;
-			goto err;
-		}
+		if (data->size != db->fixed_len)
+			WT_ERR(__wt_database_wrong_fixed_size(toc, data->size));
+
 		/*
 		 * We use the high bit of the data field as a "deleted" value,
 		 * make sure the user's data doesn't set it.
