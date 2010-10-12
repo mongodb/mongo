@@ -390,6 +390,12 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	 * FUTURE:
 	 * Check the LSN against the existing log files.
 	 */
+	if (hdr->lsn[0] != 0 || hdr->lsn[1] != 0) {
+		__wt_api_db_errx(db,
+		    "page at addr %lu has non-zero lsn header fields",
+		    (u_long)addr);
+		return (WT_ERROR);
+	}
 
 	/*
 	 * Don't verify the checksum -- it verified when we first read the
