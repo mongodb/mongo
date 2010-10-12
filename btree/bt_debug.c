@@ -19,6 +19,7 @@ static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_int(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *);
+static void __wt_bt_debug_pair(const char *, void *, u_int32_t, FILE *);
 static void __wt_bt_debug_repl(WT_REPL *, FILE *);
 static int  __wt_bt_debug_row_indx(WT_TOC *, WT_PAGE *, WT_ROW *, FILE *);
 static int  __wt_bt_debug_set_fp(const char *, FILE **, int *);
@@ -347,7 +348,8 @@ __wt_bt_debug_repl(WT_REPL *repl, FILE *fp)
 		if (WT_REPL_DELETED_ISSET(repl))
 			fprintf(fp, "\trepl: {deleted}\n");
 		else
-			__wt_bt_debug_dbt("\trepl", repl, fp);
+			__wt_bt_debug_pair(
+			    "\trepl", WT_REPL_DATA(repl), repl->size, fp);
 }
 
 /*
@@ -367,7 +369,8 @@ __wt_bt_debug_expcol(WT_COL_EXPAND *exp, FILE *fp)
 		if (WT_REPL_DELETED_ISSET(repl))
 			fprintf(fp, "\texp: {deleted}\n");
 		else
-			__wt_bt_debug_dbt("\texp", repl, fp);
+			__wt_bt_debug_pair(
+			    "\texp", WT_REPL_DATA(repl), repl->size, fp);
 	}
 }
 
@@ -583,11 +586,23 @@ __wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
 	 * fields of the argument are always a void *data/u_int32_t size pair.
 	 */
 	dbt = arg_dbt;
+	__wt_bt_debug_pair(tag, dbt->data, dbt->size, fp);
+}
+
+/*
+ * __wt_bt_debug_pair --
+ *	Dump a single data/size pair, with an optional tag.
+ */
+static void
+__wt_bt_debug_pair(const char *tag, void *data, u_int32_t size, FILE *fp)
+{
+	if (fp == NULL)				/* Default to stderr */
+		fp = stderr;
 
 	if (tag != NULL)
 		fprintf(fp, "%s: ", tag);
-	fprintf(fp, "%lu {",  (u_long)dbt->size);
-	__wt_bt_print(dbt->data, dbt->size, fp);
+	fprintf(fp, "%lu {",  (u_long)size);
+	__wt_bt_print(data, size, fp);
 	fprintf(fp, "}\n");
 }
 #endif
