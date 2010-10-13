@@ -25,6 +25,7 @@
 #include "pch.h"
 #include <map>
 #include <string>
+#include <algorithm>
 
 #include "../db/commands.h"
 #include "../db/jsobj.h"
@@ -39,6 +40,7 @@
 
 #include "../util/queue.h"
 #include "../util/unittest.h"
+#include "../util/processinfo.h"
 
 #include "shard.h"
 #include "d_logic.h"
@@ -51,10 +53,12 @@ namespace mongo {
 
     class MoveTimingHelper {
     public:
-        MoveTimingHelper( const string& where , const string& ns )
+        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max )
             : _where( where ) , _ns( ns ){
             _next = 1;
             _nextNote = 0;
+            _b.append( "min" , min );
+            _b.append( "max" , max );
         }
 
         ~MoveTimingHelper(){
@@ -76,6 +80,14 @@ namespace mongo {
             
             _b.appendNumber( s , _t.millis() );
             _t.reset();
+
+#if 0
+            // debugging for memory leak?
+            ProcessInfo pi;
+            ss << " v:" << pi.getVirtualMemorySize() 
+               << " r:" << pi.getResidentSize();
+            log() << ss.str() << endl;
+#endif
         }
         
         
@@ -380,7 +392,10 @@ namespace mongo {
             readlock l( _ns ); 
             Client::Context ctx( _ns );
             
-            BSONArrayBuilder a( result.subarrayStart( "objects" ) );
+            NamespaceDetails *d = nsdetails( _ns.c_str() );
+            assert( d );
+
+            BSONArrayBuilder a( std::min( BSONObjMaxUserSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
             
             int bytesSoFar = 0;
             
@@ -389,14 +404,14 @@ namespace mongo {
                 DiskLoc dl = *i;
                 BSONObj o = dl.obj();
                 bytesSoFar += o.objsize();
-                if ( bytesSoFar > ( 4 * 1024 * 1024 ) ){
+                if ( bytesSoFar > BSONObjMaxUserSize ){
                     i--;
                     break;
                 }
                 a.append( o );
             }
-            a.done();
 
+            result.appendArray( "objects" , a.arr() );
             _cloneLocs.erase( _cloneLocs.begin() , i );
             return true;
         }
@@ -558,7 +573,7 @@ namespace mongo {
                 configServer.init( configdb );
             }
 
-            MoveTimingHelper timing( "from" , ns );
+            MoveTimingHelper timing( "from" , ns , min , max );
 
             Shard fromShard( from );
             Shard toShard( to );
@@ -737,13 +752,14 @@ namespace mongo {
                         log() << "moveChunk updating self to: " << myVersion << " through " << chunkIDDoc << endl;
                     }
                     else {
-                        log() << "moveChunk: i have no chunks left" << endl;
+                        log() << "moveChunk: i have no chunks left for collection '" << ns << "'" << endl;
                         shardingState.setVersion( ns , 0 );
                     }
                 }
 
                 conn.done();
                 migrateFromStatus._inCriticalSection = false;
+
                 // 5.d
                 configServer.logChange( "moveChunk" , ns , BSON( "min" << min << "max" << max <<
                                                                  "from" << fromShard.getName() << 
@@ -835,12 +851,12 @@ namespace mongo {
         }
         
         void _go(){
-            MoveTimingHelper timing( "to" , ns );
-            
             assert( active );
             assert( state == READY );
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
+            
+            MoveTimingHelper timing( "to" , ns , min , max );
             
             ScopedDbConnection conn( from );
             conn->getLastError(); // just test connection

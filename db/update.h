@@ -422,6 +422,7 @@ namespace mongo {
         const Mod * m;
         BSONElement old;
         BSONElement newVal;
+        BSONObj _objData;
         
         const char * fixedOpName;
         BSONElement * fixed;
@@ -495,6 +496,9 @@ namespace mongo {
         }
 
         string toString() const;
+        
+        template< class Builder >
+        void handleRename( Builder &newObjBuilder, const char *shortFieldName );
     };
     
     /**
@@ -576,7 +580,7 @@ namespace mongo {
             }
             // shouldn't see RENAME_FROM here
             case Mod::RENAME_TO:
-                b.appendAs( ms.newVal, m.shortFieldName, &ms.newVal );
+                ms.handleRename( b, m.shortFieldName );
                 break;
             default: 
                 stringstream ss;

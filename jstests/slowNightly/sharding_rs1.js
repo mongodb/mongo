@@ -56,7 +56,7 @@ for ( i=0; i<s._rs.length; i++ ){
     x = r.test.getHashes( "test" );
     print( r.url + "\t" + tojson( x ) )
     for ( j=0; j<x.slaves.length; j++ )
-        assert.eq( x.master.md5 , x.slaves[j].md5 , "hashes same for: " + r.url + " slave: " + j );
+        assert.eq( x.master.md5 , x.slaves[j].md5 , "hashes not same for: " + r.url + " slave: " + j );
 }
 
 

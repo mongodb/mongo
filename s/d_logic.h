@@ -32,21 +32,25 @@ namespace mongo {
     // -----------
 
     class ChunkMatcher {
-        typedef map<BSONObj,pair<BSONObj,BSONObj>,BSONObjCmp> MyMap;
     public:
-        
         bool belongsToMe( const BSONObj& key , const DiskLoc& loc ) const;
 
     private:
+        // intantiated by ShardingState only
+        friend class ShardingState;
         ChunkMatcher( ConfigVersion version );
         
-        void gotRange( const BSONObj& min , const BSONObj& max );
+        void addRange( const BSONObj& min , const BSONObj& max );
         
-        ConfigVersion _version;
+        // highest ShardChunkVersion for which this ChunkMatcher's information is accurate
+        const ConfigVersion _version;
+
+        // key pattern for chunks under this range
         BSONObj _key;
-        MyMap _map;
-        
-        friend class ShardingState;
+
+        // a map from a min key into a range or continguous chunks
+        typedef map<BSONObj,pair<BSONObj,BSONObj>,BSONObjCmp> RangeMap;
+        RangeMap _map;
     };
 
     typedef shared_ptr<ChunkMatcher> ChunkMatcherPtr;
@@ -64,7 +68,7 @@ namespace mongo {
         void enable( const string& server );
 
         void gotShardName( const string& name );
-        void gotShardHost( const string& host );
+        void gotShardHost( string host );
         
         bool hasVersion( const string& ns );
         bool hasVersion( const string& ns , ConfigVersion& version );
@@ -85,8 +89,13 @@ namespace mongo {
         string _shardName;
         string _shardHost;
 
+        // protects state below
         mongo::mutex _mutex;
+
+        // map from a namespace into the highest ShardChunkVersion for that collection
         NSVersionMap _versions;
+
+        // map from a namespace into the ensemble of chunk ranges that are stores in this mongod
         map<string,ChunkMatcherPtr> _chunks;
     };
     

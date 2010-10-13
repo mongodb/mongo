@@ -280,7 +280,7 @@ namespace mongo {
         int bufSize = 512;
         if ( cc ){
             bufSize += sizeof( QueryResult );
-            bufSize += ( ntoreturn ? 4 : 1 ) * 1024 * 1024;
+            bufSize += ntoreturn ? MaxBytesToReturnToClientAtOnce : MaxBytesToReturnToClientAtOnce / 4;
         }
 
         BufBuilder b( bufSize );

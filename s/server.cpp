@@ -115,7 +115,7 @@ namespace mongo {
         dbexit(EXIT_CLEAN, (string("received signal ") + BSONObjBuilder::numStr(sig)).c_str());
     }
     
-    void setupSignals(){
+    void setupSignals( bool inFork ){
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
 
@@ -134,7 +134,7 @@ namespace mongo {
         serverID.init();
         setupSIGTRAPforGDB();
         setupCoreSignals();
-        setupSignals();
+        setupSignals( false );
     }
 
     void start( const MessageServer::Options& opts ){

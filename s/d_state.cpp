@@ -76,7 +76,12 @@ namespace mongo {
         uasserted( 13298 , ss.str() );
     }
     
-    void ShardingState::gotShardHost( const string& host ){
+    void ShardingState::gotShardHost( string host ){
+        
+        size_t slash = host.find( '/' );
+        if ( slash != string::npos )
+            host = host.substr( 0 , slash );
+
         if ( _shardHost.size() == 0 ){
             _shardHost = host;
             return;
@@ -164,16 +169,8 @@ namespace mongo {
             }
         }
 
-        BSONObj q;
-        {
-            BSONObjBuilder b;
-            b.append( "ns" , ns.c_str() );
-            b.append( "shard" , BSON( "$in" << BSON_ARRAY( _shardHost << _shardName ) ) );
-            q = b.obj();
-        }
-
         // have to get a connection to the config db
-        // special case if i'm the congigdb since i'm locked and if i connect to myself
+        // special case if i'm the configdb since i'm locked and if i connect to myself
         // its a deadlock
         auto_ptr<ScopedDbConnection> scoped;
         auto_ptr<DBDirectClient> direct;
@@ -189,9 +186,17 @@ namespace mongo {
             conn = scoped->get();
         }
 
-        // actually query all the chunks
+        // actually query all the chunks for 'ns' that live in this shard
         // sorting so we can efficiently bucket them
+        BSONObj q;
+        {
+            BSONObjBuilder b;
+            b.append( "ns" , ns.c_str() );
+            b.append( "shard" , BSON( "$in" << BSON_ARRAY( _shardHost << _shardName ) ) );
+            q = b.obj();
+        }
         auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
+
         assert( cursor.get() );
         if ( ! cursor->more() ){
             // TODO: should we update the local version or cache this result?
@@ -201,28 +206,32 @@ namespace mongo {
         }
         
         ChunkMatcherPtr p( new ChunkMatcher( version ) );
-        
+
+        // coallesce the chunk's bounds in ranges if there are adjacent chunks 
         BSONObj min,max;
         while ( cursor->more() ){
             BSONObj d = cursor->next();
             
+            // first chunk
             if ( min.isEmpty() ){
                 min = d["min"].Obj().getOwned();
                 max = d["max"].Obj().getOwned();
                 continue;
             }
 
+            // chunk is adjacent to last chunk
             if ( max == d["min"].Obj() ){
                 max = d["max"].Obj().getOwned();
                 continue;
             }
 
-            p->gotRange( min.getOwned() , max.getOwned() );
+            // discontinuity; register range and reset min/max
+            p->addRange( min.getOwned() , max.getOwned() );
             min = d["min"].Obj().getOwned();
             max = d["max"].Obj().getOwned();
         }
         assert( ! min.isEmpty() );
-        p->gotRange( min.getOwned() , max.getOwned() );
+        p->addRange( min.getOwned() , max.getOwned() );
         
         if ( scoped.get() )
             scoped->done();
@@ -590,12 +599,10 @@ namespace mongo {
 
     // --- ChunkMatcher ---
 
-    ChunkMatcher::ChunkMatcher( ConfigVersion version )
-        : _version( version ){
+    ChunkMatcher::ChunkMatcher( ConfigVersion version ) : _version( version ) {}
 
-    }
-
-    void ChunkMatcher::gotRange( const BSONObj& min , const BSONObj& max ){
+    void ChunkMatcher::addRange( const BSONObj& min , const BSONObj& max ){
+        // get the key pattern if it hasn't yet
         if (_key.isEmpty()){
             BSONObjBuilder b;
 
@@ -619,7 +626,7 @@ namespace mongo {
         
         BSONObj x = loc.obj().extractFields(_key);
         
-        MyMap::const_iterator a = _map.upper_bound( x );
+        RangeMap::const_iterator a = _map.upper_bound( x );
         if ( a != _map.begin() )
             a--;
         

@@ -111,15 +111,11 @@ namespace mongo {
         }
 
         /** append an element but with a new name */
-        BSONObjBuilder& appendAs(const BSONElement& e, const StringData& fieldName, BSONElement *newElt = 0) {
+        BSONObjBuilder& appendAs(const BSONElement& e, const StringData& fieldName) {
             assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
-            int len = _b.len();
             _b.appendNum((char) e.type());
             _b.appendStr(fieldName);
             _b.appendBuf((void *) e.value(), e.valuesize());
-            if ( newElt ) {
-                *newElt = BSONElement( _b.grow( 0 ) - ( _b.len() - len ) );
-            }
             return *this;
         }
 
@@ -643,10 +639,11 @@ namespace mongo {
     public:
         BSONArrayBuilder() : _i(0), _b() {}
         BSONArrayBuilder( BufBuilder &_b ) : _i(0), _b(_b) {}
+        BSONArrayBuilder( int initialSize ) : _i(0), _b(initialSize) {}
 
         template <typename T>
         BSONArrayBuilder& append(const T& x){
-            _b.append(num().c_str(), x);
+            _b.append(num(), x);
             return *this;
         }
 
@@ -661,7 +658,7 @@ namespace mongo {
         }
         
         void appendNull() {
-            _b.appendNull(num().c_str());
+            _b.appendNull(num());
         }
 
         BSONArray arr(){ return BSONArray(_b.obj()); }
@@ -692,9 +689,9 @@ namespace mongo {
             _b.appendArray( num(), subObj );
         }
         
-        void appendAs( const BSONElement &e, const char *name, BSONElement *newElt = 0 ) {
+        void appendAs( const BSONElement &e, const char *name) {
             fill( name );
-            _b.appendAs( e, num(), newElt );
+            append( e );
         }
         
     private:

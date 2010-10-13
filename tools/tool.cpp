@@ -432,5 +432,5 @@ namespace mongo {
             
 
 
-    void setupSignals(){}
+    void setupSignals( bool inFork ){}
 }

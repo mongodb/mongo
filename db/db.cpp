@@ -61,7 +61,7 @@ namespace mongo {
     extern bool checkNsFilesOnLoad;    
     extern string repairpath;
 
-    void setupSignals();
+    void setupSignals( bool inFork );
     void startReplSets(ReplSetCmdline*);
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
@@ -720,7 +720,8 @@ int main(int argc, char* argv[], char *envp[] )
         ("slave", "slave mode")
         ("source", po::value<string>(), "when slave: specify master as <server:port>")
         ("only", po::value<string>(), "when slave: specify a single database to replicate")
-        ("pairwith", po::value<string>(), "address of server to pair with")
+        ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
+        ("replSet", po::value<string>(), "specify repl set seed hostnames format <set id>/<host1>,<host2>,etc...")
         ("arbiter", po::value<string>(), "address of arbiter server")
         ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
         ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
@@ -737,7 +738,6 @@ int main(int argc, char* argv[], char *envp[] )
 
     hidden_options.add_options()
         ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
-        ("replSet", po::value<string>(), "specify repl set seed hostnames format <set id>/<host1>,<host2>,etc...")
         ("command", po::value< vector<string> >(), "command")
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
         ;
@@ -753,7 +753,7 @@ int main(int argc, char* argv[], char *envp[] )
     Module::addOptions( visible_options );
 
     setupCoreSignals();
-    setupSignals();
+    setupSignals( false );
 
     dbExecCommand = argv[0];
 
@@ -1119,7 +1119,9 @@ namespace mongo {
         abort();
     }
     
-    void setupSignals() {
+    void setupSignals_ignoreHelper( int signal ){}
+
+    void setupSignals( bool inFork ) {
         assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
         assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
         assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
@@ -1130,7 +1132,12 @@ namespace mongo {
         setupSIGTRAPforGDB();
 
         sigemptyset( &asyncSignals );
-        sigaddset( &asyncSignals, SIGHUP );
+
+        if ( inFork )
+            assert( signal( SIGHUP , setupSignals_ignoreHelper ) != SIG_ERR );
+        else
+            sigaddset( &asyncSignals, SIGHUP );
+
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
         assert( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
@@ -1178,7 +1185,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
         abort();        
     }
     
-    void setupSignals() {
+    void setupSignals( bool inFork ) {
         if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) )
             ;
         else
