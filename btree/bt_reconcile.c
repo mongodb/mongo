@@ -9,16 +9,17 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_rcc_expand_compare(const void *, const void *);
-static int __wt_bt_rcc_expand_sort(
+static int  __wt_bt_rcc_expand_compare(const void *, const void *);
+static int  __wt_bt_rcc_expand_sort(
 	ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, u_int32_t *);
-static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_page_write(DB *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static void __wt_bt_rec_page_size_reset(DB *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_page_write(DB *, WT_PAGE *);
+static int  __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int  __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 
 /*
  * __wt_bt_rec_page --
@@ -133,9 +134,16 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
+	/*
+	 * Reset the page's size; do it before verifying the page in debugging
+	 * mode, the verification code checks for entries that extend pas the
+	 * end of the page, and so expects the page->size field to be valid.
+	 */
+	__wt_bt_rec_page_size_reset(db, page, new);
+
 	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
-	WT_ERR(__wt_bt_rec_page_write(db, page, new));
+	WT_ERR(__wt_bt_rec_page_write(db, new));
 
 done:	/*
 	 * Clear the modification flag.  This doesn't sound safe, because the
@@ -684,7 +692,17 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
  *	Write a newly reconciled page.
  */
 static int
-__wt_bt_rec_page_write(DB *db, WT_PAGE *old, WT_PAGE *new)
+__wt_bt_rec_page_write(DB *db, WT_PAGE *new)
+{
+	return (__wt_page_write(db, new));
+}
+
+/*
+ * __wt_bt_rec_page_size_reset --
+ *	Reset a newly reconciled page's size.
+ */
+static void
+__wt_bt_rec_page_size_reset(DB *db, WT_PAGE *old, WT_PAGE *new)
 {
 	/*
 	 * Reset the page's size to the minimum required, and if the resulting
@@ -703,6 +721,4 @@ __wt_bt_rec_page_write(DB *db, WT_PAGE *old, WT_PAGE *new)
 		fprintf(stderr, "PAGE GREW: %lu\n", (u_long)new->addr);
 		__wt_abort(db->env);
 	}
-
-	return (__wt_page_write(db, new));
 }
