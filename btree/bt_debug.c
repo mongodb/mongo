@@ -408,7 +408,7 @@ __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 
 	db = toc->db;
 
-	fprintf(fp, "\ttype %s, len %lu",
+	fprintf(fp, "\t%s: len %lu",
 	    __wt_bt_item_type(item), (u_long)WT_ITEM_LEN(item));
 
 	switch (WT_ITEM_TYPE(item)) {
