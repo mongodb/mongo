@@ -12,6 +12,8 @@ run()
 	$1 | 2>&1 sed -e 's/^/	/'
 }
 
+echo 'Running dist/s_all...'
+
 run "python api_flags.py" "Building API flags include file"
 run "python api.py" "Building API methods"
 run "python api_err.py" "Building error return API"
@@ -25,3 +27,5 @@ run "sh ./s_whitespace" "Removing trailing whitespace from source files"
 
 run "sh ./s_define" "Checking for unused #defines"
 run "sh ./s_copyright" "Checking for incorrect copyright notices"
+
+echo 'Finished dist/s_all'
