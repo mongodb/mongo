@@ -465,7 +465,7 @@ sendmore:
      */
     class DataFileSync : public BackgroundJob {
     public:
-        string name() { return "DataFileSync"; }
+        string name() const { return "DataFileSync"; }
         void run(){
             if( _sleepsecs == 0 )
                 log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;

@@ -316,8 +316,7 @@ namespace mongo {
             }
         public:
             bool& _ready;
-            LockDBJob(bool& ready) : _ready(ready) {
-                deleteSelf = true;
+            LockDBJob(bool& ready) : BackgroundJob( true /* delete self */ ), _ready(ready){
                 _ready = false;
             }
         };

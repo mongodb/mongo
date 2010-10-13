@@ -35,7 +35,7 @@ namespace mongo {
 
     class SlaveTracking : public BackgroundJob {
     public:
-        string name() { return "SlaveTracking"; }
+        string name() const { return "SlaveTracking"; }
 
         static const char * NS;
 
