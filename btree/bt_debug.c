@@ -320,11 +320,11 @@ __wt_bt_debug_row_indx(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, FILE *fp)
 		fp = stderr;
 
 	if (WT_KEY_PROCESS(rip))
-		fprintf(fp, "\tkey {requires processing}\n");
+		fprintf(fp, "\tkey: {requires processing}\n");
 	else
 		__wt_bt_debug_dbt("\tkey", rip, fp);
 
-	fprintf(fp, "\tdata {");
+	fprintf(fp, "\tdata: {");
 	WT_RET(__wt_bt_debug_item_data(toc, rip->data, fp));
 	fprintf(fp, "}\n");
 
