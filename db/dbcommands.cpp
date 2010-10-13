@@ -1528,14 +1528,21 @@ namespace mongo {
         }
         CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            
+            
+            int secs = 100;
+            if ( cmdObj["secs"].isNumber() )
+                secs = cmdObj["secs"].numberInt();
+            
             if( cmdObj.getBoolField("w") ) { 
                 writelock lk("");
-                sleepsecs(100);
+                sleepsecs(secs);
             }
             else {
                 readlock lk("");
-                sleepsecs(100);
+                sleepsecs(secs);
             }
+
             return true;
         }
     } cmdSleep;
