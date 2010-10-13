@@ -51,11 +51,11 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_debug.c (C)
                                                                         _
 		    (u_long)off->addr, (u_long)off->size, WT_RECORDS(off));
-../btree/bt_debug.c  429  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  432  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                              _
 		    (u_long)off->size, (u_quad)WT_RECORDS(off));
-../btree/bt_debug.c  456  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  459  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
@@ -98,12 +98,30 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_reconcile.c (C)
 _
 }
-../btree/bt_reconcile.c  162  Warning 550: Symbol 'rp' (line 158) not accessed
-../btree/bt_reconcile.c  158  Info 830: Location cited in prior message
+../btree/bt_reconcile.c  169  Warning 550: Symbol 'toc' (line 162) not accessed
+../btree/bt_reconcile.c  162  Info 830: Location cited in prior message
 _
 }
-../btree/bt_reconcile.c  173  Warning 550: Symbol 'rp' (line 169) not accessed
-../btree/bt_reconcile.c  169  Info 830: Location cited in prior message
+../btree/bt_reconcile.c  169  Warning 550: Symbol 'new' (line 162) not accessed
+../btree/bt_reconcile.c  162  Info 830: Location cited in prior message
+_
+}
+../btree/bt_reconcile.c  169  Warning 550: Symbol 'page' (line 162) not
+    accessed
+../btree/bt_reconcile.c  162  Info 830: Location cited in prior message
+_
+}
+../btree/bt_reconcile.c  183  Warning 550: Symbol 'toc' (line 176) not accessed
+../btree/bt_reconcile.c  176  Info 830: Location cited in prior message
+_
+}
+../btree/bt_reconcile.c  183  Warning 550: Symbol 'new' (line 176) not accessed
+../btree/bt_reconcile.c  176  Info 830: Location cited in prior message
+_
+}
+../btree/bt_reconcile.c  183  Warning 550: Symbol 'page' (line 176) not
+    accessed
+../btree/bt_reconcile.c  176  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_ret.c (C)
                                              _

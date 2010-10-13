@@ -9,16 +9,16 @@
 
 #include "wt_internal.h"
 
-static void __wt_bt_page_size_minimum(DB *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rcc_expand_compare(const void *, const void *);
-static int  __wt_bt_rcc_expand_sort(
+static int __wt_bt_rcc_expand_compare(const void *, const void *);
+static int __wt_bt_rcc_expand_sort(
 	ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, u_int32_t *);
-static int  __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_page_write(DB *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 
 /*
  * __wt_bt_rec_page --
@@ -44,7 +44,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	    (env, "reconcile addr %lu (page %p)", (u_long)page->addr, page));
 
 	/* If the page isn't dirty, we're done. */
-	WT_ASSERT(toc->env, WT_PAGE_MODIFY_ISSET(page));
+	WT_ASSERT(env, WT_PAGE_MODIFY_ISSET(page));
 
 	/*
 	 * Multiple pages are marked for "draining" by the cache drain server,
@@ -102,7 +102,6 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	new = toc->tmp1.data;
 	new->hdr =
 	    (WT_PAGE_HDR *)((u_int8_t *)toc->tmp1.data + sizeof(WT_PAGE));
-	new->size = max;
 	new->addr = page->addr;
 	__wt_bt_set_ff_and_sa_from_offset(new, WT_PAGE_BYTE(new));
 	new->hdr->type = page->hdr->type;
@@ -120,10 +119,12 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		break;
 	case WT_PAGE_COL_INT:
 		WT_ERR(__wt_bt_rec_col_int(toc, page, new));
+		new = page;			
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_ERR(__wt_bt_rec_row_int(toc, page, new));
+		new = page;			
 		break;
 	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_DUP_LEAF:
@@ -132,7 +133,10 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
-err:
+	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
+
+	WT_ERR(__wt_bt_rec_page_write(db, page, new));
+
 done:	/*
 	 * Clear the modification flag.  This doesn't sound safe, because the
 	 * cache thread might decide to discard this page as "clean".  That's
@@ -146,7 +150,7 @@ done:	/*
 	WT_PAGE_MODIFY_CLR(page);
 	WT_MEMORY_FLUSH;
 
-	F_CLR(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
+err:	F_CLR(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
 	return (ret);
 }
 
@@ -155,10 +159,13 @@ done:	/*
  *	Reconcile a column store internal page.
  */
 static int
-__wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
+__wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	rp = NULL;
-	return (__wt_page_write(toc->db, page));
+	toc = NULL;
+	page = NULL;
+	new = NULL;
+	/* Don't forget to remove the "new = page" line in the caller. */
+	return (0);
 }
 
 /*
@@ -166,10 +173,13 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
  *	Reconcile a row store internal page.
  */
 static int
-__wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *rp)
+__wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	rp = NULL;
-	return (__wt_page_write(toc->db, page));
+	toc = NULL;
+	page = NULL;
+	new = NULL;
+	/* Don't forget to remove the "new = page" line in the caller. */
+	return (0);
 }
 
 /*
@@ -230,12 +240,7 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 		++hdr->u.entries;
 	}
-
-	__wt_bt_page_size_minimum(db, page, new);
-
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
-
-	return (__wt_page_write(db, new));
+	return (0);
 }
 
 /*
@@ -362,15 +367,10 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 	}
 
-	__wt_bt_page_size_minimum(db, page, new);
-
 	/* Free the sort array. */
 	if (expsort != NULL)
 		__wt_free(env, expsort, n_expsort * sizeof(WT_COL_EXPAND *));
-
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
-
-	return (__wt_page_write(db, new));
+	return (0);
 }
 
 /*
@@ -443,7 +443,6 @@ static int
 __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
-	DB *db;
 	DBT *data, data_dbt;
 	WT_COL *cip;
 	WT_ITEM data_item;
@@ -452,7 +451,6 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_REPL *repl;
 	u_int32_t i, len;
 
-	db = toc->db;
 	hdr = new->hdr;
 
 	WT_CLEAR(data_dbt);
@@ -509,12 +507,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 		++hdr->u.entries;
 	}
-
-	__wt_bt_page_size_minimum(db, page, new);
-
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
-
-	return (__wt_page_write(db, new));
+	return (0);
 }
 
 /*
@@ -683,20 +676,15 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			break;
 		}
 	}
-
-	__wt_bt_page_size_minimum(db, page, new);
-
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, new, NULL) == 0);
-
-	return (__wt_page_write(db, new));
+	return (0);
 }
 
 /*
- * __wt_bt_page_size_minimum --
- *	Reset a reconciled page's size.
+ * __wt_bt_rec_page_write --
+ *	Write a newly reconciled page.
  */
-static void
-__wt_bt_page_size_minimum(DB *db, WT_PAGE *old, WT_PAGE *new)
+static int
+__wt_bt_rec_page_write(DB *db, WT_PAGE *old, WT_PAGE *new)
 {
 	/*
 	 * Reset the page's size to the minimum required, and if the resulting
@@ -709,10 +697,12 @@ __wt_bt_page_size_minimum(DB *db, WT_PAGE *old, WT_PAGE *new)
 	 * we simply reset the new size down to the old size.
 	 */
 	new->size = WT_MAX(old->size,
-	    (new->size + (db->allocsize - 1)) % db->allocsize);
+	    WT_ALIGN(new->first_free - (u_int8_t *)new, db->allocsize));
 
 	if (new->size > old->size) {
 		fprintf(stderr, "PAGE GREW: %lu\n", (u_long)new->addr);
 		__wt_abort(db->env);
 	}
+
+	return (__wt_page_write(db, new));
 }
