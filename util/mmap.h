@@ -20,8 +20,7 @@
 namespace mongo {
     
     /* the administrative-ish stuff here */
-    class MongoFile : boost::noncopyable { 
-        
+    class MongoFile : boost::noncopyable {         
     public:
         /** Flushable has to fail nicely if the underlying object gets killed */
         class Flushable {
@@ -30,6 +29,22 @@ namespace mongo {
             virtual void flush() = 0;
         };
         
+        virtual ~MongoFile() {}
+
+        enum Options {
+            SEQUENTIAL = 1, // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
+            READONLY = 2    // not contractually guaranteed, but if specified the impl has option to fault writes
+        };
+
+        static int flushAll( bool sync ); // returns n flushed
+        static long long totalMappedLength();
+        static void closeAllFiles( stringstream &message );
+
+        // Locking allows writes. Reads are always allowed
+        static void lockAll();
+        static void unlockAll();
+        static bool exists(boost::filesystem::path p) { return boost::filesystem::exists(p); }
+
     protected:
         virtual void close() = 0;
         virtual void flush(bool sync) = 0;
@@ -47,24 +62,6 @@ namespace mongo {
         // only supporting on posix mmap
         virtual void _lock() {}
         virtual void _unlock() {}
-
-    public:
-        virtual ~MongoFile() {}
-
-        enum Options {
-            SEQUENTIAL = 1, // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
-            READONLY = 2    // not contractually guaranteed, but if specified the impl has option to fault writes
-        };
-
-        static int flushAll( bool sync ); // returns n flushed
-        static long long totalMappedLength();
-        static void closeAllFiles( stringstream &message );
-
-        // Locking allows writes. Reads are always allowed
-        static void lockAll();
-        static void unlockAll();
-
-        static bool exists(boost::filesystem::path p) { return boost::filesystem::exists(p); }
     };
 
 #ifndef _DEBUG
