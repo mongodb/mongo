@@ -120,12 +120,12 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		break;
 	case WT_PAGE_COL_INT:
 		WT_ERR(__wt_bt_rec_col_int(toc, page, new));
-		new = page;			
+		new = page;
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_ERR(__wt_bt_rec_row_int(toc, page, new));
-		new = page;			
+		new = page;
 		break;
 	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_DUP_LEAF:

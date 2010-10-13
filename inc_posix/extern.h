@@ -111,9 +111,9 @@ __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
 int
 __wt_bt_update_serial_func(WT_TOC *toc);
 int
-__wt_db_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data);
+__wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data);
 void
-__wt_db_repl_free(WT_TOC *toc, WT_REPL *repl);
+__wt_bt_repl_free(WT_TOC *toc, WT_REPL *repl);
 int
 __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags);
 void

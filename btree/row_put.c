@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_row_update(WT_TOC *, DBT *, DBT *, int);
+static int __wt_bt_row_update(WT_TOC *, DBT *, DBT *, int);
 
 /*
  * __wt_db_row_del --
@@ -18,7 +18,7 @@ static int __wt_db_row_update(WT_TOC *, DBT *, DBT *, int);
 inline int
 __wt_db_row_del(WT_TOC *toc, DBT *key)
 {
-	return (__wt_db_row_update(toc, key, NULL, 0));
+	return (__wt_bt_row_update(toc, key, NULL, 0));
 }
 
 /*
@@ -28,15 +28,15 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 inline int
 __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data)
 {
-	return (__wt_db_row_update(toc, key, data, 1));
+	return (__wt_bt_row_update(toc, key, data, 1));
 }
 
 /*
- * __wt_db_row_update --
+ * __wt_bt_row_update --
  *	Row store delete and update.
  */
 static int
-__wt_db_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
+__wt_bt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 {
 	ENV *env;
 	IDB *idb;
@@ -59,7 +59,7 @@ __wt_db_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 		    env, page->indx_count, sizeof(WT_REPL *), &new_repl));
 
 	/* Allocate room for the new data item from pre-thread memory. */
-	WT_ERR(__wt_db_repl_alloc(toc, &repl, data));
+	WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
 
 	/* Schedule the workQ to insert the WT_REPL structure. */
 	__wt_bt_update_serial(toc, page, toc->srch_write_gen,
@@ -67,7 +67,7 @@ __wt_db_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 
 	if (ret != 0) {
 err:		if (repl != NULL)
-			__wt_db_repl_free(toc, repl);
+			__wt_bt_repl_free(toc, repl);
 	}
 
 	/* Free any replacement array unless the workQ used it. */
@@ -120,12 +120,12 @@ __wt_bt_update_serial_func(WT_TOC *toc)
 }
 
 /*
- * __wt_db_repl_alloc --
+ * __wt_bt_repl_alloc --
  *	Allocate a WT_REPL structure and associated data from the TOC's update
  *	memory, and fill it in.
  */
 int
-__wt_db_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
+__wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 {
 	DB *db;
 	ENV *env;
@@ -261,12 +261,12 @@ no_allocation:
 }
 
 /*
- * __wt_db_repl_free --
+ * __wt_bt_repl_free --
  *	Free a WT_REPL structure and associated data from the TOC's update
  *	memory.
  */
 void
-__wt_db_repl_free(WT_TOC *toc, WT_REPL *repl)
+__wt_bt_repl_free(WT_TOC *toc, WT_REPL *repl)
 {
 	ENV *env;
 

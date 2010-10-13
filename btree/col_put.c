@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_col_update(WT_TOC *, u_int64_t, DBT *, int);
+static int __wt_bt_col_update(WT_TOC *, u_int64_t, DBT *, int);
 
 /*
  * __wt_db_col_del --
@@ -18,7 +18,7 @@ static int __wt_db_col_update(WT_TOC *, u_int64_t, DBT *, int);
 inline int
 __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 {
-	return (__wt_db_col_update(toc, recno, NULL, 0));
+	return (__wt_bt_col_update(toc, recno, NULL, 0));
 }
 
 /*
@@ -35,15 +35,15 @@ __wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
 	if (db->fixed_len != 0 && data->size != db->fixed_len)
 		WT_RET(__wt_database_wrong_fixed_size(toc, data->size));
 
-	return (__wt_db_col_update(toc, recno, data, 1));
+	return (__wt_bt_col_update(toc, recno, data, 1));
 }
 
 /*
- * __wt_db_col_update --
+ * __wt_bt_col_update --
  *	Column store delete and update.
  */
 static int
-__wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
+__wt_bt_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 {
 	ENV *env;
 	IDB *idb;
@@ -93,7 +93,7 @@ __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 			    page->indx_count, sizeof(WT_REPL *), &new_repl));
 
 		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_db_repl_alloc(toc, &repl, data));
+		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
 
 		/* Schedule the workQ to insert the WT_REPL structure. */
 		__wt_bt_update_serial(toc, page, toc->srch_write_gen,
@@ -105,7 +105,7 @@ __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 			    sizeof(WT_COL_EXPAND *), &new_expcol));
 
 		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_db_repl_alloc(toc, &repl, data));
+		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
 
 		/* Allocate a WT_COL_EXPAND structure and fill it in. */
 		WT_ERR(__wt_calloc(env, 1, sizeof(WT_COL_EXPAND), &exp));
@@ -118,7 +118,7 @@ __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 		goto done;
 	} else {					/* #3 */
 		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_db_repl_alloc(toc, &repl, data));
+		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
 
 		/* Schedule the workQ to insert the WT_REPL structure. */
 		__wt_bt_rcc_expand_repl_serial(
@@ -129,7 +129,7 @@ __wt_db_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 err:		if (exp != NULL)
 			__wt_free(env, exp, sizeof(WT_COL_EXPAND));
 		if (repl != NULL)
-			__wt_db_repl_free(toc, repl);
+			__wt_bt_repl_free(toc, repl);
 	}
 
 done:	/* Free any allocated page expansion array unless the workQ used it. */
