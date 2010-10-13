@@ -24,7 +24,6 @@
 namespace mongo {
 
     // both the BackgroundJob and the internal thread point to JobStatus
-    // Background object can be destroyed without hurting running thread. And vice-versa.
     struct BackgroundJob::JobStatus {
         JobStatus( const string& name , bool delFlag )  
             : threadName(name), deleteSelf(delFlag), m("backgroundJob"), state(NotStarted) { }
@@ -41,6 +40,7 @@ namespace mongo {
         _status.reset( new JobStatus( name() , selfDelete ) );
     }
 
+    // Background object can be only be destroyed after jobBody() ran
     void BackgroundJob::jobBody( boost::shared_ptr<JobStatus> status ){            
         {
             scoped_lock l( status->m );
