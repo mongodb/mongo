@@ -34,20 +34,43 @@ namespace mongo {
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
-
+            
             string key = cmdObj["key"].valuestrsafe();
             BSONObj keyPattern = BSON( key << 1 );
 
             BSONObj query = getQuery( cmdObj );
             
+            int bufSize = BSONObjMaxUserSize - 4096;
+            BufBuilder bb( bufSize );
+            char * start = bb.buf();
+                
+            BSONArrayBuilder arr( bb );
             BSONElementSet values;
+            
             shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
             scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
 
             while ( cursor->ok() ){
                 if ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() ) ){
                     BSONObj o = cursor->current();
-                    o.getFieldsDotted( key, values );
+
+                    BSONElementSet temp;
+                    o.getFieldsDotted( key, temp );
+                    
+                    for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ){
+                        BSONElement e = *i;
+                        if ( values.count( e ) )
+                            continue;
+                        
+                        int now = bb.len();
+
+                        uassert(10044,  "distinct too big, 4mb cap", ( now + e.size() + 1024 ) < bufSize );
+
+                        arr.append( e );
+                        BSONElement x( start + now );
+
+                        values.insert( x );
+                    }
                 }
 
                 cursor->advance();
@@ -58,13 +81,9 @@ namespace mongo {
                 RARELY killCurrentOp.checkForInterrupt();
             }
 
-            BSONArrayBuilder b( result.subarrayStart( "values" ) );
-            for ( BSONElementSet::iterator i = values.begin() ; i != values.end(); i++ ){
-                b.append( *i );
-            }
-            BSONObj arr = b.done();
-
-            uassert(10044,  "distinct too big, 4mb cap", arr.objsize() < BSONObjMaxUserSize );
+            assert( start == bb.buf() );
+            
+            result.appendArray( "values" , arr.done() );
 
             return true;
         }

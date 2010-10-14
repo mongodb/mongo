@@ -261,7 +261,7 @@ namespace mongo {
     
     class CursorTimeoutTask : public task::Task {
     public:
-        virtual string name() { return "cursorTimeout"; }
+        virtual string name() const { return "cursorTimeout"; }
         virtual void doWork(){
             cursorCache.doTimeouts();
         }

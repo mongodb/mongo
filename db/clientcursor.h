@@ -339,8 +339,8 @@ public:
 
     class ClientCursorMonitor : public BackgroundJob {
     public:
+        string name() const { return "ClientCursorMonitor"; }
         void run();
-        string name() { return "ClientCursorMonitor"; }
     };
 
     extern ClientCursorMonitor clientCursorMonitor;

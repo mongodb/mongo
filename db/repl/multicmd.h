@@ -21,7 +21,7 @@
 #include "../../util/background.h"
 #include "connections.h"
 
-namespace mongo { 
+namespace mongo {
 
     struct Target {
         Target(string hostport) : toHost(hostport), ok(false) { }
@@ -33,38 +33,37 @@ namespace mongo {
 
     /* -- implementation ------------- */
 
-    class _MultiCommandJob : public BackgroundJob { 
+    class _MultiCommandJob : public BackgroundJob {
     public:
         BSONObj& cmd;
         Target& d;
         _MultiCommandJob(BSONObj& _cmd, Target& _d) : cmd(_cmd), d(_d) { }
+
     private:
-        string name() { return "MultiCommandJob"; }
+        string name() const { return "MultiCommandJob"; }
         void run() {
-            try { 
+            try {
                 ScopedConn c(d.toHost);
                 d.ok = c->runCommand("admin", cmd, d.result);
             }
-            catch(DBException&) { 
+            catch(DBException&) {
                 DEV log() << "dev caught dbexception on multiCommand " << d.toHost << rsLog;
             }
         }
     };
 
-    inline void multiCommand(BSONObj cmd, list<Target>& L) { 
-        typedef shared_ptr<_MultiCommandJob> P;
-        list<P> jobs;
-        list<BackgroundJob *> _jobs;
+    inline void multiCommand(BSONObj cmd, list<Target>& L) {
+        list<BackgroundJob *> jobs;
 
-        for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) { 
+        for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
             Target& d = *i;
             _MultiCommandJob *j = new _MultiCommandJob(cmd, d);
-            jobs.push_back(P(j));
-            _jobs.push_back(j);
+            j->go();
+            jobs.push_back(j);
         }
 
-        BackgroundJob::go(_jobs);
-        BackgroundJob::wait(_jobs,5);
+        for( list<BackgroundJob*>::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
+            (*i)->wait();
+        }
     }
-
 }

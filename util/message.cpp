@@ -338,14 +338,16 @@ namespace mongo {
 
     class ConnectBG : public BackgroundJob {
     public:
-        int sock;
-        int res;
-        SockAddr farEnd;
-        ConnectBG() { nameThread = false; }
-        void run() {
-            res = ::connect(sock, farEnd.raw(), farEnd.addressSize);
-        }
-        string name() { return "ConnectBG"; }
+        ConnectBG(int sock, SockAddr farEnd) : _sock(sock), _farEnd(farEnd) { }
+
+        void run() { _res = ::connect(_sock, _farEnd.raw(), _farEnd.addressSize); }
+        string name() const { return ""; /* too short lived to need to name */ }
+        int inError() const { return _res; }
+        
+    private:
+        int _sock;
+        int _res;
+        SockAddr _farEnd;
     };
 
     bool MessagingPort::connect(SockAddr& _far)
@@ -362,13 +364,10 @@ namespace mongo {
             setSockTimeouts( sock, _timeout );
         }
                 
-        ConnectBG bg;
-        bg.sock = sock;
-        bg.farEnd = farEnd;
+        ConnectBG bg(sock, farEnd);
         bg.go();
-
         if ( bg.wait(5000) ) {
-            if ( bg.res ) {
+            if ( bg.inError() ) {
                 closesocket(sock);
                 sock = -1;
                 return false;

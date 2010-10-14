@@ -1165,7 +1165,7 @@ namespace mongo {
             result.appendNumber( "indexSize" , indexSize );
             result.appendNumber( "fileSize" , d->fileSize() );
 
-                return true;
+            return true;
         }
     } cmdDBStats;
 
