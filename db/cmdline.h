@@ -24,6 +24,11 @@ namespace mongo {
     */
     /* concurrency: OK/READ */
     struct CmdLine { 
+        CmdLine() : 
+            port(DefaultDBPort), rest(false), jsonp(false), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
+            quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true )
+        { } 
+        
         string binaryName;     // mongod or mongos
 
         int port;              // --port
@@ -67,12 +72,6 @@ namespace mongo {
         int pretouch;          // --pretouch for replication application (experimental)
         bool moveParanoia;     // for move chunk paranoia 
         
-        CmdLine() : 
-            port(DefaultDBPort), rest(false), jsonp(false), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
-            quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true )
-        { } 
-        
-
         static void addGlobalOptions( boost::program_options::options_description& general , 
                                       boost::program_options::options_description& hidden );
 
