@@ -67,9 +67,7 @@ namespace mongo {
     void ReplSetImpl::relinquish() { 
         if( box.getState().primary() ) {
             log() << "replSet relinquishing primary state" << rsLog;
-            changeState(MemberState::RS_RECOVERING);
-            // SERVER-1681:
-            //changeState(MemberState::RS_SECONDARY);
+            changeState(MemberState::RS_SECONDARY);
             
             if( closeOnRelinquish ) {
                 /* close sockets that were talking to us so they don't blithly send many writes that will fail

@@ -160,6 +160,7 @@ doTest = function (signal) {
     // everyone is up here...
     assert(A.isMaster().ismaster || A.isMaster().secondary, "A up");
     assert(B.isMaster().ismaster || B.isMaster().secondary, "B up");
+    replTest.awaitReplication();
 
     friendlyEqual(a.bar.find().sort({ _id: 1 }).toArray(), b.bar.find().sort({ _id: 1 }).toArray(), "server data sets do not match");
 
