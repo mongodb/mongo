@@ -70,8 +70,6 @@ namespace mongo {
         string getns() const;
         Shard getShard() const { return _shard; }
 
-        void setShard( const Shard& shard );
-
         bool contains( const BSONObj& obj ) const;
 
         string toString() const;

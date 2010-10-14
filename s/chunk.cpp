@@ -56,12 +56,6 @@ namespace mongo {
         return _manager->getns(); 
     }
 
-    void Chunk::setShard( const Shard& s ){
-        _shard = s;
-        _manager->_migrationNotification(this);
-        _modified = true;
-    }
-    
     bool Chunk::contains( const BSONObj& obj ) const{
         return
             _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
