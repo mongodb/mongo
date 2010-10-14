@@ -12,7 +12,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59
 		..\tools\restore.cpp = ..\tools\restore.cpp
 		..\tools\sniffer.cpp = ..\tools\sniffer.cpp
 		..\tools\stat.cpp = ..\tools\stat.cpp
-		..\tools\tool.cpp = ..\tools\tool.cpp
 		..\tools\tool.h = ..\tools\tool.h
 	EndProjectSection
 EndProject
