@@ -48,7 +48,13 @@ namespace mongo {
             }
         }
         uassert(13278, "bad config - dups?", me <= 1); // dups?
-        uassert(13279, "can't find self in the replset config", me == 1);
+        if( me != 1 ) {
+            stringstream ss;
+            ss << "can't find self in the replset config";
+            if( !cmdLine.isDefaultPort() ) ss << " my port: " << cmdLine.port;
+            if( me != 0 ) ss << " found: " << me;
+            uasserted(13279, ss.str());
+        }
 
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             BSONObj res;

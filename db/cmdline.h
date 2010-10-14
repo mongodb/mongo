@@ -27,6 +27,13 @@ namespace mongo {
         string binaryName;     // mongod or mongos
 
         int port;              // --port
+        enum { 
+            DefaultDBPort = 27017,
+            ConfigServerPort = 27019,
+            ShardServerPort = 27018
+        };
+        bool isDefaultPort() const { return port == DefaultDBPort; }
+
         string bind_ip;        // --bind_ip
         bool rest;             // --rest
         bool jsonp;             // --jsonp
@@ -60,12 +67,6 @@ namespace mongo {
         int pretouch;          // --pretouch for replication application (experimental)
         bool moveParanoia;     // for move chunk paranoia 
         
-        enum { 
-            DefaultDBPort = 27017,
-			ConfigServerPort = 27019,
-			ShardServerPort = 27018
-        };
-
         CmdLine() : 
             port(DefaultDBPort), rest(false), jsonp(false), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
             quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true )
