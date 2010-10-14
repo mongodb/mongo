@@ -37,8 +37,6 @@ namespace mongo {
 
         Stat() : Tool( "stat" , NO_LOCAL , "admin" ){
             _sleep = 1;
-            _rowNum = 0;
-            _showHeaders = true;
             _http = false;
 
             add_hidden_options()
@@ -135,33 +133,18 @@ namespace mongo {
             return p;
         }
 
-        void cellstart( stringstream& ss , string name , unsigned& width ){
-            if ( ! _showHeaders ) {
-                return;
-            }
+        template<typename T>
+        void _append( BSONObjBuilder& result , const string& name , unsigned width , const T& t ){
             if ( name.size() > width )
                 width = name.size();
-            if ( _rowNum % 20 == 0 )
-                cout << setw(width) << name << " ";            
+            result.append( name , BSON( "width" << (int)width << "data" << t ) );
         }
 
-        void cell( stringstream& ss , string name , unsigned width , double val ){
-            cellstart( ss , name , width );
-            ss << setw(width) << setprecision(3) << val << " ";
-        }
-
-        void cell( stringstream& ss , string name , unsigned width , int val ){
-            cellstart( ss , name , width );
-            ss << setw(width) << val << " ";
-        }
-
-        void cell( stringstream& ss , string name , unsigned width , const string& val ){
-            cellstart( ss , name , width );
-            ss << setw(width) << val << " ";
-        }
-
-        string doRow( const BSONObj& a , const BSONObj& b ){
-            stringstream ss;
+        /**
+         * BSON( <field> -> BSON( width : ### , data : XXX ) )
+         */
+        BSONObj doRow( const BSONObj& a , const BSONObj& b ){
+            BSONObjBuilder result;
 
             if ( b["opcounters"].type() == Object ){
                 BSONObj ax = a["opcounters"].embeddedObject();
@@ -169,43 +152,42 @@ namespace mongo {
                 BSONObjIterator i( bx );
                 while ( i.more() ){
                     BSONElement e = i.next();
-                    cell( ss , (string)(e.fieldName()) + "/s" , 6 , (int)diff( e.fieldName() , ax , bx ) );
+                    _append( result , (string)(e.fieldName()) + "/s" , 6 , (int)diff( e.fieldName() , ax , bx ) );
                 }
             }
-
-	    if ( b["backgroundFlushing"].type() == Object ){
+            
+            if ( b["backgroundFlushing"].type() == Object ){
                 BSONObj ax = a["backgroundFlushing"].embeddedObject();
                 BSONObj bx = b["backgroundFlushing"].embeddedObject();
-                BSONObjIterator i( bx );
-                cell( ss , "flushes/s" , 6 , (int)diff( "flushes" , ax , bx ) );
+                _append( result , "flushes/s" , 6 , (int)diff( "flushes" , ax , bx ) );
             }
 
             if ( b.getFieldDotted("mem.supported").trueValue() ){
                 BSONObj bx = b["mem"].embeddedObject();
                 BSONObjIterator i( bx );
-                cell( ss , "mapped" , 6 , bx["mapped"].numberInt() );
-                cell( ss , "vsize" , 6 , bx["virtual"].numberInt() );
-                cell( ss , "res" , 6 , bx["resident"].numberInt() );
+                _append( result , "mapped" , 6 , bx["mapped"].numberInt() );
+                _append( result , "vsize" , 6 , bx["virtual"].numberInt() );
+                _append( result , "res" , 6 , bx["resident"].numberInt() );
             }
 
             if ( b["extra_info"].type() == Object ){
                 BSONObj ax = a["extra_info"].embeddedObject();
                 BSONObj bx = b["extra_info"].embeddedObject();
                 if ( ax["page_faults"].type() || ax["page_faults"].type() )
-                    cell( ss , "faults/s" , 6 , (int)diff( "page_faults" , ax , bx ) );
+                    _append( result , "faults/s" , 6 , (int)diff( "page_faults" , ax , bx ) );
             }
             
-            cell( ss , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
-            cell( ss , "idx miss %" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
+            _append( result , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
+            _append( result , "idx miss %" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
 
             if ( b.getFieldDotted( "globalLock.currentQueue" ).type() == Object ){
                 int r = b.getFieldDotted( "globalLock.currentQueue.readers" ).numberInt();
                 int w = b.getFieldDotted( "globalLock.currentQueue.writers" ).numberInt();
                 stringstream temp;
                 temp << r+w << "|" << r << "|" << w;
-                cell( ss , "q t|r|w" , 10 , temp.str() );
+                _append( result , "q t|r|w" , 10 , temp.str() );
             }
-            cell( ss , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
+            _append( result , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
             {
                 struct tm t;
@@ -216,16 +198,9 @@ namespace mongo {
                      << setfill('0') << setw(2) << t.tm_min
                      << ":" 
                      << setfill('0') << setw(2) << t.tm_sec;
-                cell( ss , "time" , 10 , temp.str() );
+                _append( result , "time" , 10 , temp.str() );
             }
-
-            if ( _showHeaders && _rowNum % 20 == 0 ){
-                // this is the newline after the header line
-                cout << endl;
-            }
-            _rowNum++;
-
-            return ss.str();
+            return result.obj();
         }
         
         virtual void preSetup(){
@@ -237,16 +212,19 @@ namespace mongo {
 
         int run(){ 
             _sleep = getParam( "sleep" , _sleep );
-            if ( hasParam( "noheaders" ) ) {
-                _showHeaders = false;
-            }
-            _rowCount = getParam( "rowcount" , 0 );
+            return runNormal();
+        }
+
+        int runNormal(){
+            bool showHeaders = ! hasParam( "noheaders" );
+            int rowCount = getParam( "rowcount" , 0 );
+            int rowNum = 0;
 
             BSONObj prev = stats();
             if ( prev.isEmpty() )
                 return -1;
 
-            while ( _rowCount == 0 || _rowNum < _rowCount ){
+            while ( rowCount == 0 || rowNum < rowCount ){
                 sleepsecs(_sleep);
                 BSONObj now;
                 try {
@@ -261,7 +239,36 @@ namespace mongo {
                     return -2;
                 
                 try {
-                    cout << doRow( prev , now ) << endl;
+
+                    BSONObj out = doRow( prev , now );
+
+                    if ( showHeaders && rowNum % 10 == 0 ){
+                        BSONObjIterator i(out);
+                        while ( i.more() ){
+                            BSONElement e = i.next();
+                            BSONObj x = e.Obj();
+                            cout << setw( x["width"].numberInt() ) << e.fieldName() << ' ';
+                        }
+                        cout << endl;
+                    }
+                    
+                    BSONObjIterator i(out);
+                    while ( i.more() ){
+                        BSONObj x = i.next().Obj();
+                        int w = x["width"].numberInt();
+                        
+                        BSONElement data = x["data"];
+
+                        if ( data.type() == String )
+                            cout << setw(w) << data.String();
+                        else if ( data.type() == NumberDouble )
+                            cout << setw(w) << setprecision(3) << data.number();
+                        else if ( data.type() == NumberInt )
+                            cout << setw(w) << data.numberInt();
+
+                        cout << ' ';
+                    }
+                    cout << endl;
                 }
                 catch ( AssertionException& e ){
                     cout << "\nerror: " << e.what() << "\n"
@@ -270,15 +277,13 @@ namespace mongo {
                 }
                 
                 prev = now;
+                rowNum++;
             }
             return 0;
         }
         
 
         int _sleep;
-        int _rowNum;
-        int _rowCount;
-        bool _showHeaders;
         bool _http;
     };
 
