@@ -20,6 +20,7 @@
 #include "client/dbclient.h"
 #include "db/json.h"
 #include "../util/httpclient.h"
+#include "../util/text.h"
 
 #include "tool.h"
 
@@ -38,7 +39,8 @@ namespace mongo {
         Stat() : Tool( "stat" , NO_LOCAL , "admin" ){
             _sleep = 1;
             _http = false;
-
+            _many = false;
+            
             add_hidden_options()
                 ( "sleep" , po::value<int>() , "time to sleep between calls" )
                 ;
@@ -74,7 +76,7 @@ namespace mongo {
             out << "   faults/s  \t- # of pages faults/sec (linux only)\n";
             out << "   locked    \t- percent of time in global write lock\n";
             out << "   idx miss  \t- percent of btree page misses (sampled)\n";
-            out << "   q t|r|w   \t- ops waiting for lock from db.currentOp() (total|read|write)\n";
+            out << "   q r|w     \t- ops waiting for lock from db.currentOp() (read|write)\n";
             out << "   conn      \t- number of open connections\n";
         }
 
@@ -184,8 +186,8 @@ namespace mongo {
                 int r = b.getFieldDotted( "globalLock.currentQueue.readers" ).numberInt();
                 int w = b.getFieldDotted( "globalLock.currentQueue.writers" ).numberInt();
                 stringstream temp;
-                temp << r+w << "|" << r << "|" << w;
-                _append( result , "q t|r|w" , 10 , temp.str() );
+                temp << r << "|" << w;
+                _append( result , "qr|qw" , 9 , temp.str() );
             }
             _append( result , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
@@ -208,11 +210,49 @@ namespace mongo {
                 _http = true;
                 _noconnection = true;
             }
+
+            if ( hasParam( "host" ) && 
+                 getParam( "host" ).find( ',' ) != string::npos ){
+                _noconnection = true;
+                _many = true;
+            }
         }
 
         int run(){ 
             _sleep = getParam( "sleep" , _sleep );
+            if ( _many )
+                return runMany();
             return runNormal();
+        }
+
+        static void printHeaders( const BSONObj& o ){
+            BSONObjIterator i(o);
+            while ( i.more() ){
+                BSONElement e = i.next();
+                BSONObj x = e.Obj();
+                cout << setw( x["width"].numberInt() ) << e.fieldName() << ' ';
+            }
+            cout << endl;            
+        }
+
+        static void printData( const BSONObj& o ){
+            BSONObjIterator i(o);
+            while ( i.more() ){
+                BSONObj x = i.next().Obj();
+                int w = x["width"].numberInt();
+                
+                BSONElement data = x["data"];
+                
+                if ( data.type() == String )
+                    cout << setw(w) << data.String();
+                else if ( data.type() == NumberDouble )
+                    cout << setw(w) << setprecision(3) << data.number();
+                else if ( data.type() == NumberInt )
+                    cout << setw(w) << data.numberInt();
+                
+                cout << ' ';
+            }
+            cout << endl; 
         }
 
         int runNormal(){
@@ -243,32 +283,11 @@ namespace mongo {
                     BSONObj out = doRow( prev , now );
 
                     if ( showHeaders && rowNum % 10 == 0 ){
-                        BSONObjIterator i(out);
-                        while ( i.more() ){
-                            BSONElement e = i.next();
-                            BSONObj x = e.Obj();
-                            cout << setw( x["width"].numberInt() ) << e.fieldName() << ' ';
-                        }
-                        cout << endl;
+                        printHeaders( out );
                     }
                     
-                    BSONObjIterator i(out);
-                    while ( i.more() ){
-                        BSONObj x = i.next().Obj();
-                        int w = x["width"].numberInt();
-                        
-                        BSONElement data = x["data"];
+                    printData( out );
 
-                        if ( data.type() == String )
-                            cout << setw(w) << data.String();
-                        else if ( data.type() == NumberDouble )
-                            cout << setw(w) << setprecision(3) << data.number();
-                        else if ( data.type() == NumberInt )
-                            cout << setw(w) << data.numberInt();
-
-                        cout << ' ';
-                    }
-                    cout << endl;
                 }
                 catch ( AssertionException& e ){
                     cout << "\nerror: " << e.what() << "\n"
@@ -282,9 +301,121 @@ namespace mongo {
             return 0;
         }
         
+        struct ServerState {
+            ServerState() : lock( "Stat::ServerState" ){}
+            string host;
+            scoped_ptr<boost::thread> thr;
+            
+            mongo::mutex lock;
+
+            BSONObj prev;
+            BSONObj now;
+            time_t lastUpdate;
+
+            string error;
+        };
+            
+        static void serverThread( shared_ptr<ServerState> state ){
+            try {
+                DBClientConnection conn( true );
+                conn.connect( state->host );
+
+                while ( 1 ){
+                    try {
+                        BSONObj out;
+                        if ( conn.simpleCommand( "admin" , &out , "serverStatus" ) ){
+                            scoped_lock lk( state->lock );
+                            state->error = "";
+                            state->lastUpdate = time(0);
+                            state->prev = state->now;
+                            state->now = out.getOwned();
+                        }
+                        else {
+                            scoped_lock lk( state->lock );
+                            state->error = "serverStatus failed";
+                            state->lastUpdate = time(0);
+                        }
+                        
+                    }
+                    catch ( std::exception& e ){
+                        scoped_lock lk( state->lock );
+                        state->error = e.what();
+                    }
+                    
+                    sleepsecs( 1 );
+                }
+                
+                
+            }
+            catch ( std::exception& e ){
+                cout << "serverThread (" << state->host << ") fatal error : " << e.what() << endl;
+            }
+            catch ( ... ){
+                cout << "serverThread (" << state->host << ") fatal error" << endl;
+            }
+        }
+
+        int runMany(){
+            map<string,shared_ptr<ServerState> > threads;
+            
+            unsigned longestHost = 0;
+
+            {
+                string orig = getParam( "host" );
+                StringSplitter ss( orig.c_str() , "," );
+                while ( ss.more() ){
+                    string host = ss.next();
+                    if ( host.size() > longestHost )
+                        longestHost = host.size();
+
+                    shared_ptr<ServerState>& state = threads[host];
+                    if ( state )
+                        continue;
+
+                    state.reset( new ServerState() );
+                    state->host = host;
+                    state->thr.reset( new boost::thread( boost::bind( serverThread , state ) ) );
+                }
+            }
+            
+            int row = 0;
+
+            while ( 1 ){
+                sleepsecs( _sleep );
+                
+                cout << endl;
+                int x = 0;
+                for ( map<string,shared_ptr<ServerState> >::iterator i=threads.begin(); i!=threads.end(); ++i ){
+                    scoped_lock lk( i->second->lock );
+
+                    if ( i->second->error.size() ){
+                        cout << setw( longestHost ) << i->first << "\t";
+                        cout << i->second->error << endl;
+                    }
+                    else if ( i->second->prev.isEmpty() || i->second->now.isEmpty() ){
+                        cout << setw( longestHost ) << i->first << "\t";
+                        cout << "no data" << endl;
+                    }
+                    else {
+                        BSONObj out = doRow( i->second->prev , i->second->now );
+                        
+                        if ( x++ == 0 && row++ % 5 == 0 ){
+                            cout << setw( longestHost ) << "" << "\t";
+                            printHeaders( out );
+                        }
+
+                        cout << setw( longestHost ) << i->first << "\t";
+                        printData( out );
+                    }
+                }
+            }
+
+            return 0;
+        }
 
         int _sleep;
         bool _http;
+        bool _many;
     };
 
 }
