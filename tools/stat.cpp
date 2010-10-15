@@ -48,6 +48,7 @@ namespace mongo {
                 ("noheaders", "don't output column names")
                 ("rowcount,n", po::value<int>()->default_value(0), "number of stats lines to print (0 for indefinite)")
                 ("http", "use http instead of raw db connection")
+                ("discover" , "discover nodes and display stats for all" )
                 ;
 
             addPositionArg( "sleep" , 1 );
@@ -241,6 +242,11 @@ namespace mongo {
                 _noconnection = true;
                 _many = true;
             }
+
+            if ( hasParam( "discover" ) ){
+                _noconnection = true;
+                _many = true;
+            }
         }
 
         int run(){ 
@@ -382,32 +388,52 @@ namespace mongo {
             }
         }
 
+        typedef map<string,shared_ptr<ServerState> >  StateMap;
+
+        bool _add( StateMap& threads , string host ){
+            shared_ptr<ServerState>& state = threads[host];
+            if ( state )
+                return false;
+            
+            state.reset( new ServerState() );
+            state->host = host;
+            state->thr.reset( new boost::thread( boost::bind( serverThread , state ) ) );
+            return true;
+        }
+
+        bool _addAll( StateMap& threads , const BSONObj& hosts ){
+            BSONObjIterator i( hosts );
+            bool added = false;
+            while ( i.more() ){
+                bool me = _add( threads , i.next().String() );
+                added = added || me;
+            }
+            return added;
+        }
+
         int runMany(){
-            map<string,shared_ptr<ServerState> > threads;
+            StateMap threads;
             
             unsigned longestHost = 0;
 
             {
                 string orig = getParam( "host" );
+                if ( orig == "" )
+                    orig = "localhost:27017";
                 StringSplitter ss( orig.c_str() , "," );
                 while ( ss.more() ){
                     string host = ss.next();
                     if ( host.size() > longestHost )
                         longestHost = host.size();
 
-                    shared_ptr<ServerState>& state = threads[host];
-                    if ( state )
-                        continue;
-
-                    state.reset( new ServerState() );
-                    state->host = host;
-                    state->thr.reset( new boost::thread( boost::bind( serverThread , state ) ) );
+                    _add( threads , host );
                 }
             }
             
             sleepsecs(1);
 
             int row = 0;
+            bool discover = hasParam( "discover" );
 
             while ( 1 ){
                 sleepsecs( _sleep );
@@ -435,6 +461,18 @@ namespace mongo {
 
                         cout << setw( longestHost ) << i->first << "\t";
                         printData( out );
+                    }
+
+                    if ( discover && ! i->second->now.isEmpty() ){
+                        if ( i->second->now["repl"].isABSONObj() ){
+                            BSONObj x = i->second->now["repl"].Obj();
+                            if ( x["hosts"].isABSONObj() )
+                                if ( _addAll( threads , x["hosts"].Obj() ) )
+                                    break;
+                            if ( x["passives"].isABSONObj() )
+                                if ( _addAll( threads , x["passives"].Obj() ) )
+                                    break; 
+                        }
                     }
                 }
             }
