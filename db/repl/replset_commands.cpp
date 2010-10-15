@@ -186,6 +186,7 @@ namespace mongo {
             help << "'freeze' state of member to the extent we can do that.  What this really means is that\n";
             help << "this node will not attempt to become primary until the time period specified expires.\n";
             help << "You can call again with {replSetFreeze:0} to unfreeze sooner.\n";
+            help << "A process restart unfreezes the member also.\n";
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
 
