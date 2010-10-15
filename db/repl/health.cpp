@@ -90,6 +90,7 @@ namespace mongo {
             s << td(h);
         }
         s << td(config().votes);
+        s << td(config().priority);
         { 
             string stateText = state().toString();
             if( _config.hidden )
@@ -274,7 +275,7 @@ namespace mongo {
             "Up", 
             "<a title=\"length of time we have been continuously connected to the other member with no reconnects (for self, shows uptime)\">cctime</a>", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
-            "Votes", "State", "Status", 
+            "Votes", "Priority", "State", "Status", 
             "<a title=\"how up to date this server is.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">optime</a>", 
             "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">skew</a>", 
             0};
@@ -308,6 +309,7 @@ namespace mongo {
                 td(ago(started)) << 
 	        td("") << // last heartbeat
                 td(ToString(_self->config().votes)) << 
+                td(ToString(_self->config().priority)) <<
                 td( stateAsHtml(box.getState()) + (_self->config().hidden?" (hidden)":"") );
             s << td( _hbmsg );
             stringstream q;
