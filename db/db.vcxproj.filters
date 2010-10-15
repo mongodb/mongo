@@ -405,6 +405,9 @@
     <ClCompile Include="mongommf.cpp">
       <Filter>db\storage engine</Filter>
     </ClCompile>
+    <ClCompile Include="commands\isself.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

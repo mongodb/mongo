@@ -1,6 +1,6 @@
 // isself.cpp
 
-#include "../../pch.h"
+#include "pch.h"
 #include "../../util/message.h"
 #include "../commands.h"
 #include "../../client/dbclient.h"
