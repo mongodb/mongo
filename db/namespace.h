@@ -340,7 +340,7 @@ namespace mongo {
         int averageObjectSize(){
             if ( stats.nrecords == 0 )
                 return 5;
-            return stats.datasize / stats.nrecords;
+            return (int) (stats.datasize / stats.nrecords);
         }
         
     private:
