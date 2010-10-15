@@ -198,6 +198,8 @@ namespace mongo {
                 if( secs == 0 )
                     result.append("info","unfreezing");
             }
+            if( secs == 1 ) 
+                result.append("warning", "you really want to freeze for only 1 second?");
             return true;
         }
     } cmdReplSetFreeze;
