@@ -199,7 +199,8 @@ namespace mongo {
     class CmdReplSetStepDown: public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
-            help << "Step down as primary.  Will not try to reelect self or 1 minute.\n";
+            help << "{ replSetStepDown : <seconds> }\n";
+            help << "Step down as primary.  Will not try to reelect self for the specified time period (1 minute if no numeric secs value specified).\n";
             help << "(If another member with same priority takes over in the meantime, it will stay primary.)\n";
             help << "http://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
@@ -212,7 +213,10 @@ namespace mongo {
                 errmsg = "not primary so can't step down";
                 return false;
             }
-            return theReplSet->stepDown();
+            int secs = (int) cmdObj.firstElement().numberInt();
+            if( secs == 0 )
+                secs = 60;
+            return theReplSet->stepDown(secs);
         }
     } cmdReplSetStepDown;
 

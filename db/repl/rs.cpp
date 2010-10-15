@@ -93,10 +93,10 @@ namespace mongo {
     }
 
     // for the replSetStepDown command
-    bool ReplSetImpl::_stepDown() { 
+    bool ReplSetImpl::_stepDown(int secs) { 
         lock lk(this);
         if( box.getState().primary() ) { 
-            elect.steppedDown = time(0) + 60;
+            elect.steppedDown = time(0) + secs;
             log() << "replSet info stepping down as primary" << rsLog;
             relinquish();
             return true;
