@@ -191,6 +191,31 @@ namespace mongo {
             }
             _append( result , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
+            if ( b["repl"].type() == Object ){
+
+                BSONObj x = b["repl"].embeddedObject();
+                bool isReplSet = x["setName"].type() == String;
+
+                stringstream ss;
+
+                if ( isReplSet ){
+                    string setName = x["setName"].String();
+                    _append( result , "set" , setName.size() , setName );
+                }
+
+                if ( x["ismaster"].trueValue() )
+                    ss << "M";
+                else if ( x["secondary"].trueValue() )
+                    ss << "SEC";
+                else if ( isReplSet )
+                    ss << "UNK";
+                else
+                    ss << "SLV";
+                
+                _append( result , "repl" , 4 , ss.str() );
+                
+            }
+
             {
                 struct tm t;
                 time_t_to_Struct( time(0), &t , true );
@@ -318,7 +343,9 @@ namespace mongo {
         static void serverThread( shared_ptr<ServerState> state ){
             try {
                 DBClientConnection conn( true );
-                conn.connect( state->host );
+                string errmsg;
+                if ( ! conn.connect( state->host , errmsg ) )
+                    state->error = errmsg;
 
                 while ( 1 ){
                     try {
@@ -378,6 +405,8 @@ namespace mongo {
                 }
             }
             
+            sleepsecs(1);
+
             int row = 0;
 
             while ( 1 ){
