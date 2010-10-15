@@ -141,9 +141,13 @@ namespace mongo {
         bool getModified() { return _modified; }
         void setModified( bool modified ) { _modified = modified; }
 
-        ShardChunkVersion getVersionOnConfigServer() const;
-    private:
+        ShardChunkVersion getLastmod() const { return _lastmod; }
+        void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
 
+        ShardChunkVersion getVersionOnConfigServer() const;
+
+
+    private:
         bool _splitIfShould( long dataWritten );
         ChunkPtr multiSplit_inlock( const vector<BSONObj>& splitPoints );
 
@@ -174,7 +178,6 @@ namespace mongo {
         
         void _split( BSONObj& middle );
 
-        friend class ChunkManager;
         friend class ShardObjUnitTest;
     };
 

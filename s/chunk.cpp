@@ -1009,7 +1009,7 @@ namespace mongo {
 
         // instead of reloading, adjust ShardChunkVersion for the chunks that were updated in the configdb
         for ( unsigned i=0; i<toFix.size(); i++ ){
-            toFix[i]->_lastmod = newVersions[i];
+            toFix[i]->setLastmod( newVersions[i] );
             toFix[i]->setModified( false );
         }
 
@@ -1058,8 +1058,8 @@ namespace mongo {
             DEV assert( c );
             if ( c->getShard() != shard )
                 continue;
-            if ( c->_lastmod > max )
-                max = c->_lastmod;
+            if ( c->getLastmod() > max )
+                max = c->getLastmod();
         }        
         return max;
     }
@@ -1074,8 +1074,8 @@ namespace mongo {
         
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
             ChunkPtr c = i->second;
-            if ( c->_lastmod > max )
-                max = c->_lastmod;
+            if ( c->getLastmod() > max )
+                max = c->getLastmod();
         }        
 
         return max;
