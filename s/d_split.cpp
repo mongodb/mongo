@@ -273,4 +273,21 @@ namespace mongo {
         }
     } cmdSplitVector;
 
+    class SplitChunkCommand : public Command {
+    public:
+        SplitChunkCommand() : Command( "splitChunk" ){}
+        virtual void help( stringstream& help ) const {
+            help << "should not be calling this directly" << endl;
+        }
+
+        virtual bool slaveOk() const { return false; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+
+        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            errmsg = "Not yet implemented";
+            return false;            
+        }
+    } cmdSplitChunk;
+
 }  // namespace mongo
