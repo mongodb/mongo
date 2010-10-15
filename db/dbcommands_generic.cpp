@@ -77,9 +77,11 @@ namespace mongo {
             help << "{ get:1, notablescan:1 }\n";
             help << "supported so far:\n";
             help << "  notablescan\n";
+            help << "{ get:'*' } to get everything\n";
         }
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            if( cmdObj.hasElement("notablescan") ) {
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            bool all = cmdObj.firstElement().valuestrsafe();
+            if( all || cmdObj.hasElement("notablescan") ) {
                 result.append("notablescan", cmdLine.noTableScan);
             }
             else {
