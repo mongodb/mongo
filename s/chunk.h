@@ -268,6 +268,7 @@ namespace mongo {
         int numChunks() const { rwlock lk( _lock , false ); return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj );
 
+        void createFirstChunk();
         ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
         

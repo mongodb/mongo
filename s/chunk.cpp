@@ -610,21 +610,8 @@ namespace mongo {
         _lock("rw:ChunkManager"), _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
     {
         _reload_inlock();
-        
-        if ( _chunkMap.empty() ){
-            ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), config->getPrimary()) );
-            c->setModified( true );
-            
-            _chunkMap[c->getMax()] = c;
-            _chunkRanges.reloadAll(_chunkMap);
-
-            _shards.insert(c->getShard());
-
-            save_inlock( true );
-            log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
-        }
     }
-    
+
     ChunkManager::~ChunkManager(){
         _chunkMap.clear();
         _chunkRanges.clear();
@@ -721,6 +708,20 @@ namespace mongo {
 
     bool ChunkManager::hasShardKey( const BSONObj& obj ){
         return _key.hasShardKey( obj );
+    }
+
+    void ChunkManager::createFirstChunk(){
+        ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), _config->getPrimary()) );
+        c->setModified( true );
+        
+        _chunkMap[c->getMax()] = c;
+        _chunkRanges.reloadAll(_chunkMap);
+        
+        _shards.insert(c->getShard());
+
+        save_inlock( true );
+
+        log() << "no chunks for:" << _ns << " so creating first: " << c->toString() << endl;
     }
 
     ChunkPtr ChunkManager::findChunk( const BSONObj & obj , bool retry ){
