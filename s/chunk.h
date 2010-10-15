@@ -177,8 +177,6 @@ namespace mongo {
         // methods, etc..
         
         void _split( BSONObj& middle );
-
-        friend class ShardObjUnitTest;
     };
 
     class ChunkRange{
