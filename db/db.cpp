@@ -876,8 +876,8 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("upgrade")) {
             shouldRepairDatabases = 1;
         }
-        if (params.count("notablescan")) {
-            cmdLine.notablescan = true;
+        if (params.count("noTableScan")) {
+            cmdLine.noTableScan = true;
         }
         if (params.count("master")) {
             replSettings.master = true;

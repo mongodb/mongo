@@ -25,7 +25,7 @@ namespace mongo {
     /* concurrency: OK/READ */
     struct CmdLine { 
         CmdLine() : 
-            port(DefaultDBPort), rest(false), jsonp(false), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
+            port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(false),
             quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true )
         { } 
         
@@ -57,7 +57,7 @@ namespace mongo {
         string only;           // --only
         
         bool quiet;            // --quiet
-        bool notablescan;      // --notablescan
+        bool noTableScan;      // --notablescan
         bool prealloc;         // --noprealloc
         bool smallfiles;       // --smallfiles
         

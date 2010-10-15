@@ -32,7 +32,7 @@
 namespace mongo {
 
     void checkTableScanAllowed( const char * ns ){
-        if ( ! cmdLine.notablescan )
+        if ( ! cmdLine.noTableScan )
             return;
         
         if ( strstr( ns , ".system." ) ||
@@ -42,7 +42,7 @@ namespace mongo {
         if ( ! nsdetails( ns ) )
             return;
 
-        uassert( 10111 ,  (string)"table scans not allowed:" + ns , ! cmdLine.notablescan );
+        uassert( 10111 ,  (string)"table scans not allowed:" + ns , ! cmdLine.noTableScan );
     }
 
     double elementDirection( const BSONElement &e ) {
