@@ -97,11 +97,32 @@ namespace mongo {
         lock lk(this);
         if( box.getState().primary() ) { 
             elect.steppedDown = time(0) + secs;
-            log() << "replSet info stepping down as primary" << rsLog;
+            log() << "replSet info stepping down as primary secs=" << secs << rsLog;
             relinquish();
             return true;
         }
         return false;
+    }
+
+    bool ReplSetImpl::_freeze(int secs) { 
+        lock lk(this);
+        /* note if we are primary we remain primary but won't try to elect ourself again until 
+           this time period expires. 
+           */
+        if( secs == 0 ) { 
+            elect.steppedDown = 0;
+            log() << "replSet info 'unfreezing'" << rsLog;
+        }
+        else {
+            if( !box.getState().primary() ) { 
+                elect.steppedDown = time(0) + secs;
+                log() << "replSet info 'freezing' for " << secs << " seconds" << rsLog;
+            }
+            else {
+                log() << "replSet info received freeze command but we are primary" << rsLog;
+            }
+        }
+        return true;
     }
 
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) { 

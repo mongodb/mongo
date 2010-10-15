@@ -182,8 +182,10 @@ namespace mongo {
     class CmdReplSetFreeze : public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
-            help << "Enable / disable failover for the set - locks current primary as primary even if issues occur.\nFor use during system maintenance.\n";
-            help << "{ replSetFreeze : <bool> }";
+            help << "{ replSetFreeze : <seconds> }";
+            help << "'freeze' state of member to the extent we can do that.  What this really means is that\n";
+            help << "this node will not attempt to become primary until the time period specified expires.\n";
+            help << "You can call again with {replSetFreeze:0} to unfreeze sooner.\n";
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
 
@@ -191,8 +193,12 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            errmsg = "not yet implemented"; /*TODO*/
-            return false;
+            int secs = (int) cmdObj.firstElement().numberInt();
+            if( theReplSet->freeze(secs) ) {
+                if( secs == 0 )
+                    result.append("info","unfreezing");
+            }
+            return true;
         }
     } cmdReplSetFreeze;
 

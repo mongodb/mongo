@@ -261,6 +261,7 @@ namespace mongo {
         void forgetPrimary();
     protected:
         bool _stepDown(int secs);
+        bool _freeze(int secs);
     private:
         void assumePrimary();
         void loadLastOpTimeWritten();
@@ -352,6 +353,9 @@ namespace mongo {
 
         // for the replSetStepDown command
         bool stepDown(int secs) { return _stepDown(secs); }
+
+        // for the replSetFreeze command
+        bool freeze(int secs) { return _freeze(secs); }
 
         string selfFullName() { 
             lock lk(this);
