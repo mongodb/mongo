@@ -33,7 +33,7 @@ namespace mongo {
     public:
         CompactJob(string ns) : _ns(ns) { }
     private:
-        virtual string name() { return "compact"; }
+        virtual string name() const { return "compact"; }
         virtual void doWork();
         NamespaceDetails * beginBlock();
         void doBatch();
