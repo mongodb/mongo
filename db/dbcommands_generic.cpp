@@ -61,11 +61,61 @@ namespace mongo {
             result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
             result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
             result.appendBool( "debug" , debug );
-            result.appendNumber("maxBsonObjectSize", MaxBSONObjectSize);
+            result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             return true;
         }
     } cmdBuildInfo;
 
+    class CmdGet : public Command {
+    public:
+        CmdGet() : Command( "get" ) { }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; } 
+        virtual void help( stringstream &help ) const {
+            help << "get administrative option(s)\nexample:\n";
+            help << "{ get:1, notablescan:1 }\n";
+            help << "supported so far:\n";
+            help << "  notablescan\n";
+            help << "{ get:'*' } to get everything\n";
+        }
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            bool all = cmdObj.firstElement().valuestrsafe();
+            if( all || cmdObj.hasElement("notablescan") ) {
+                result.append("notablescan", cmdLine.noTableScan);
+            }
+            else {
+                errmsg = "no option found to get";
+                return false;
+            }
+            return true;
+        }
+    } cmdGet;
+
+    class CmdSet : public Command {
+    public:
+        CmdSet() : Command( "set" ) { }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; } 
+        virtual void help( stringstream &help ) const {
+            help << "set administrative option(s)\nexample:\n";
+            help << "{ set:1, notablescan:true }\n";
+            help << "supported so far:\n";
+            help << "  notablescan\n";
+        }
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            if( cmdObj.hasElement("notablescan") ) {
+                result.append("was", cmdLine.noTableScan);
+                cmdLine.noTableScan = cmdObj["notablescan"].Bool();
+            }
+            else {
+                errmsg = "no option found to set";
+                return false;
+            }
+            return true;
+        }
+    } cmdSet;
 
     /* just to check if the db has asserted */
     class CmdAssertInfo : public Command {
@@ -222,7 +272,5 @@ namespace mongo {
             return true;
         }
     } cmdForceError;
-
-    
 
 }

@@ -29,8 +29,12 @@ namespace mongo {
     }
 
     inline BSONObj BSONElement::embeddedObjectUserCheck() const {
-        uassert( 10065 ,  "invalid parameter: expected an object", isABSONObj() );
-        return BSONObj(value());
+        if ( isABSONObj() )
+            return BSONObj(value());
+        stringstream ss;
+        ss << "invalid parameter: expected an object (" << fieldName() << ")";
+        uasserted( 10065 , ss.str() );
+        return BSONObj(); // never reachable
     }
 
     inline BSONObj BSONElement::embeddedObject() const {
@@ -99,7 +103,7 @@ namespace mongo {
 
     inline bool BSONObj::isValid(){
         int x = objsize();
-        return x > 0 && x <= 1024 * 1024 * 8;
+        return x > 0 && x <= BSONObjMaxInternalSize;
     }
 
     inline bool BSONObj::getObjectID(BSONElement& e) const { 
@@ -261,7 +265,7 @@ namespace mongo {
         case Symbol:
         case mongo::String: {
             int x = valuestrsize();
-            if ( x > 0 && x < BSONObjMaxSize && valuestr()[x-1] == 0 )
+            if ( x > 0 && x < BSONObjMaxInternalSize && valuestr()[x-1] == 0 )
                 return;
             StringBuilder buf;
             buf <<  "Invalid dbref/code/string/symbol size: " << x << " strnlen:" << mongo::strnlen( valuestr() , x );

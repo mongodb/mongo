@@ -423,9 +423,19 @@ def main():
     print tests
 
     test_path = options.test_path
+
     mongod_executable = options.mongod_executable
+    if not os.path.exists(mongod_executable):
+        print "ERROR: no mongod found in this directory."
+        return
+
     mongod_port = options.mongod_port
+
     shell_executable = options.shell_executable
+    if not os.path.exists(shell_executable):
+        print "ERROR: no mongo shell found in this directory."
+        return
+
     continue_on_failure = options.continue_on_failure
     smoke_db_prefix = options.smoke_db_prefix
     small_oplog = options.small_oplog

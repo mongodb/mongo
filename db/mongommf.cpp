@@ -89,8 +89,8 @@ namespace mongo {
 #endif
     }
 
-    bool MongoMMF::open(string fname) {
-        view_write = map(fname.c_str());
+    bool MongoMMF::open(string fname, bool sequentialHint) {
+        view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         // temp : view_private pending more work!
         view_private = view_write;
         if( view_write ) { 
@@ -106,8 +106,8 @@ namespace mongo {
         return false;
     }
 
-    bool MongoMMF::create(string fname, unsigned long long& len) { 
-        view_write = map(fname.c_str(), len);
+    bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) { 
+        view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         // temp : view_private pending more work!
         view_private = view_write;
         if( view_write ) {

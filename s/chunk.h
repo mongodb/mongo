@@ -70,8 +70,6 @@ namespace mongo {
         string getns() const;
         Shard getShard() const { return _shard; }
 
-        void setShard( const Shard& shard );
-
         bool contains( const BSONObj& obj ) const;
 
         string toString() const;
@@ -143,9 +141,13 @@ namespace mongo {
         bool getModified() { return _modified; }
         void setModified( bool modified ) { _modified = modified; }
 
-        ShardChunkVersion getVersionOnConfigServer() const;
-    private:
+        ShardChunkVersion getLastmod() const { return _lastmod; }
+        void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
 
+        ShardChunkVersion getVersionOnConfigServer() const;
+
+
+    private:
         bool _splitIfShould( long dataWritten );
         ChunkPtr multiSplit_inlock( const vector<BSONObj>& splitPoints );
 
@@ -175,9 +177,6 @@ namespace mongo {
         // methods, etc..
         
         void _split( BSONObj& middle );
-
-        friend class ChunkManager;
-        friend class ShardObjUnitTest;
     };
 
     class ChunkRange{
@@ -269,6 +268,7 @@ namespace mongo {
         int numChunks() const { rwlock lk( _lock , false ); return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj );
 
+        void createFirstChunk();
         ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
         

@@ -68,9 +68,9 @@ namespace mongo {
                 
                 BSONElement ee = j.next();
                 
-                uassert( 13070 , "value to large to reduce" , ee.size() < ( 2 * 1024 * 1024 ) );
+                uassert( 13070 , "value to large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
 
-                if ( sizeSoFar + ee.size() > ( 4 * 1024 * 1024 ) ){
+                if ( sizeSoFar + ee.size() > BSONObjMaxUserSize ){
                     assert( n > 1 ); // if not, inf. loop
                     break;
                 }
@@ -395,7 +395,7 @@ namespace mongo {
 
         BSONObj fast_emit( const BSONObj& args ){
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
-            uassert( 13069 , "an emit can't be more than 2mb" , args.objsize() < ( 2 * 1024 * 1024 ) );
+            uassert( 13069 , "an emit can't be more than 2mb" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
             _tlmr->insert( args );
             _tlmr->numEmits++;
             return BSONObj();

@@ -173,9 +173,10 @@ namespace mongo {
                     cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
                     return -1;
                 }
+
+                (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
             }
-            
-            (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
+
         }
         else {
             if ( _params.count( "directoryperdb" ) ) {
@@ -432,5 +433,5 @@ namespace mongo {
             
 
 
-    void setupSignals(){}
+    void setupSignals( bool inFork ){}
 }

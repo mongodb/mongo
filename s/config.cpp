@@ -130,20 +130,24 @@ namespace mongo {
 
         log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
 
-        // mark the collection as sharded and save metadata before trying to chunk, which may throw
-        // TODO undo _collections state if ci.shard() or _save() fails
-        ci.shard( this , ns , fieldsAndOrder , unique );
-        _save();
-
+        // From this point on, 'ns' is going to be treated as a sharded collection. We assume this is the first 
+        // time it is seen by the sharded system and thus create the first chunk for the collection. All the remaining
+        // chunks will be created as a by-product of splitting.
+        ci.shard( this , ns , fieldsAndOrder , unique );        
+        ChunkManagerPtr cm = ci.getCM();
+        uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
+        cm->createFirstChunk();
+        _save(); 
+                
         try {
-            ci.getCM()->maybeChunkCollection();
+            cm->maybeChunkCollection();
         }
         catch ( UserException& e ){
             // failure to chunk is not critical enough to abort the command (and undo the _save()'d configDB state)
             log() << "couldn't chunk recently created collection: " << ns << " " << e << endl;
         }
 
-        return ci.getCM();
+        return cm;
     }
 
     bool DBConfig::removeSharding( const string& ns ){
@@ -272,7 +276,6 @@ namespace mongo {
 
         conn.done();
     }
-
     
     bool DBConfig::reload(){
         scoped_lock lk( _lock );

@@ -182,8 +182,11 @@ namespace mongo {
     class CmdReplSetFreeze : public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
-            help << "Enable / disable failover for the set - locks current primary as primary even if issues occur.\nFor use during system maintenance.\n";
-            help << "{ replSetFreeze : <bool> }";
+            help << "{ replSetFreeze : <seconds> }";
+            help << "'freeze' state of member to the extent we can do that.  What this really means is that\n";
+            help << "this node will not attempt to become primary until the time period specified expires.\n";
+            help << "You can call again with {replSetFreeze:0} to unfreeze sooner.\n";
+            help << "A process restart unfreezes the member also.\n";
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
 
@@ -191,15 +194,22 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            errmsg = "not yet implemented"; /*TODO*/
-            return false;
+            int secs = (int) cmdObj.firstElement().numberInt();
+            if( theReplSet->freeze(secs) ) {
+                if( secs == 0 )
+                    result.append("info","unfreezing");
+            }
+            if( secs == 1 ) 
+                result.append("warning", "you really want to freeze for only 1 second?");
+            return true;
         }
     } cmdReplSetFreeze;
 
     class CmdReplSetStepDown: public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
-            help << "Step down as primary.  Will not try to reelect self or 1 minute.\n";
+            help << "{ replSetStepDown : <seconds> }\n";
+            help << "Step down as primary.  Will not try to reelect self for the specified time period (1 minute if no numeric secs value specified).\n";
             help << "(If another member with same priority takes over in the meantime, it will stay primary.)\n";
             help << "http://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
@@ -212,7 +222,10 @@ namespace mongo {
                 errmsg = "not primary so can't step down";
                 return false;
             }
-            return theReplSet->stepDown();
+            int secs = (int) cmdObj.firstElement().numberInt();
+            if( secs == 0 )
+                secs = 60;
+            return theReplSet->stepDown(secs);
         }
     } cmdReplSetStepDown;
 

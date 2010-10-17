@@ -47,7 +47,7 @@ namespace mongo {
 
         private:
             virtual bool initClient() { return true; }
-            virtual string name() { return _name; }
+            virtual string name() const { return _name; }
             void doWork();
             deque<lam> d;
             boost::mutex m;

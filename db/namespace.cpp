@@ -140,7 +140,7 @@ namespace mongo {
         string pathString = nsPath.string();
         MoveableBuffer p;
         if( MMF::exists(nsPath) ) {
-            if( f.open(pathString) ) {
+            if( f.open(pathString, true) ) {
                 len = f.length();
                 if ( len % (1024*1024) != 0 ){
                     log() << "bad .ns file: " << pathString << endl;
@@ -154,7 +154,7 @@ namespace mongo {
 			massert( 10343, "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
             maybeMkdir();
 			unsigned long long l = lenForNewNsFiles;
-            if( f.create(pathString, l) ) {
+            if( f.create(pathString, l, true) ) {
                 len = l;
                 assert( len == lenForNewNsFiles );
                 p = f.getView();

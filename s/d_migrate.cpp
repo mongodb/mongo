@@ -25,6 +25,7 @@
 #include "pch.h"
 #include <map>
 #include <string>
+#include <algorithm>
 
 #include "../db/commands.h"
 #include "../db/jsobj.h"
@@ -391,11 +392,10 @@ namespace mongo {
             readlock l( _ns ); 
             Client::Context ctx( _ns );
             
-            // doing it this way means lots of small allocations
-            // ideally should have a hint method on the command
-            // this is temporary
-            //BSONArrayBuilder a( result.subarrayStart( "objects" ) );
-            BSONArrayBuilder a( BSONObjMaxSize );
+            NamespaceDetails *d = nsdetails( _ns.c_str() );
+            assert( d );
+
+            BSONArrayBuilder a( std::min( BSONObjMaxUserSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
             
             int bytesSoFar = 0;
             
@@ -404,13 +404,13 @@ namespace mongo {
                 DiskLoc dl = *i;
                 BSONObj o = dl.obj();
                 bytesSoFar += o.objsize();
-                if ( bytesSoFar > BSONObjMaxSize ){
+                if ( bytesSoFar > BSONObjMaxUserSize ){
                     i--;
                     break;
                 }
                 a.append( o );
             }
-            //a.done();
+
             result.appendArray( "objects" , a.arr() );
             _cloneLocs.erase( _cloneLocs.begin() , i );
             return true;
@@ -752,13 +752,14 @@ namespace mongo {
                         log() << "moveChunk updating self to: " << myVersion << " through " << chunkIDDoc << endl;
                     }
                     else {
-                        log() << "moveChunk: i have no chunks left" << endl;
+                        log() << "moveChunk: i have no chunks left for collection '" << ns << "'" << endl;
                         shardingState.setVersion( ns , 0 );
                     }
                 }
 
                 conn.done();
                 migrateFromStatus._inCriticalSection = false;
+
                 // 5.d
                 configServer.logChange( "moveChunk" , ns , BSON( "min" << min << "max" << max <<
                                                                  "from" << fromShard.getName() << 

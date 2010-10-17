@@ -1165,7 +1165,7 @@ namespace mongo {
             result.appendNumber( "indexSize" , indexSize );
             result.appendNumber( "fileSize" , d->fileSize() );
 
-                return true;
+            return true;
         }
     } cmdDBStats;
 
@@ -1528,14 +1528,21 @@ namespace mongo {
         }
         CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            
+            
+            int secs = 100;
+            if ( cmdObj["secs"].isNumber() )
+                secs = cmdObj["secs"].numberInt();
+            
             if( cmdObj.getBoolField("w") ) { 
                 writelock lk("");
-                sleepsecs(100);
+                sleepsecs(secs);
             }
             else {
                 readlock lk("");
-                sleepsecs(100);
+                sleepsecs(secs);
             }
+
             return true;
         }
     } cmdSleep;
@@ -1618,7 +1625,6 @@ namespace mongo {
             log() << "command denied: " << cmdObj.toString() << endl;
             return false;
         }
-        
 
         if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
             result.append( "errmsg" ,  "access denied; use admin db" );

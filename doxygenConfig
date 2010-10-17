@@ -101,7 +101,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = client db/jsobj.h db/json.h bson
+INPUT                  = client db/jsobj.h db/json.h bson util
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c \
                          *.cc \

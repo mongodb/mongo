@@ -338,6 +338,12 @@ namespace mongo {
         // Start from lastExtent by default.
         DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
         long long storageSize( int * numExtents = 0 );
+
+        int averageObjectSize(){
+            if ( stats.nrecords == 0 )
+                return 5;
+            return (int) (stats.datasize / stats.nrecords);
+        }
         
     private:
         DiskLoc _alloc(const char *ns, int len);

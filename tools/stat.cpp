@@ -20,6 +20,7 @@
 #include "client/dbclient.h"
 #include "db/json.h"
 #include "../util/httpclient.h"
+#include "../util/text.h"
 
 #include "tool.h"
 
@@ -37,10 +38,9 @@ namespace mongo {
 
         Stat() : Tool( "stat" , NO_LOCAL , "admin" ){
             _sleep = 1;
-            _rowNum = 0;
-            _showHeaders = true;
             _http = false;
-
+            _many = false;
+            
             add_hidden_options()
                 ( "sleep" , po::value<int>() , "time to sleep between calls" )
                 ;
@@ -48,6 +48,7 @@ namespace mongo {
                 ("noheaders", "don't output column names")
                 ("rowcount,n", po::value<int>()->default_value(0), "number of stats lines to print (0 for indefinite)")
                 ("http", "use http instead of raw db connection")
+                ("discover" , "discover nodes and display stats for all" )
                 ;
 
             addPositionArg( "sleep" , 1 );
@@ -76,7 +77,7 @@ namespace mongo {
             out << "   faults/s  \t- # of pages faults/sec (linux only)\n";
             out << "   locked    \t- percent of time in global write lock\n";
             out << "   idx miss  \t- percent of btree page misses (sampled)\n";
-            out << "   q t|r|w   \t- ops waiting for lock from db.currentOp() (total|read|write)\n";
+            out << "   q r|w     \t- ops waiting for lock from db.currentOp() (read|write)\n";
             out << "   conn      \t- number of open connections\n";
         }
 
@@ -135,33 +136,18 @@ namespace mongo {
             return p;
         }
 
-        void cellstart( stringstream& ss , string name , unsigned& width ){
-            if ( ! _showHeaders ) {
-                return;
-            }
+        template<typename T>
+        void _append( BSONObjBuilder& result , const string& name , unsigned width , const T& t ){
             if ( name.size() > width )
                 width = name.size();
-            if ( _rowNum % 20 == 0 )
-                cout << setw(width) << name << " ";            
+            result.append( name , BSON( "width" << (int)width << "data" << t ) );
         }
 
-        void cell( stringstream& ss , string name , unsigned width , double val ){
-            cellstart( ss , name , width );
-            ss << setw(width) << setprecision(3) << val << " ";
-        }
-
-        void cell( stringstream& ss , string name , unsigned width , int val ){
-            cellstart( ss , name , width );
-            ss << setw(width) << val << " ";
-        }
-
-        void cell( stringstream& ss , string name , unsigned width , const string& val ){
-            cellstart( ss , name , width );
-            ss << setw(width) << val << " ";
-        }
-
-        string doRow( const BSONObj& a , const BSONObj& b ){
-            stringstream ss;
+        /**
+         * BSON( <field> -> BSON( width : ### , data : XXX ) )
+         */
+        BSONObj doRow( const BSONObj& a , const BSONObj& b ){
+            BSONObjBuilder result;
 
             if ( b["opcounters"].type() == Object ){
                 BSONObj ax = a["opcounters"].embeddedObject();
@@ -169,43 +155,67 @@ namespace mongo {
                 BSONObjIterator i( bx );
                 while ( i.more() ){
                     BSONElement e = i.next();
-                    cell( ss , (string)(e.fieldName()) + "/s" , 6 , (int)diff( e.fieldName() , ax , bx ) );
+                    _append( result , (string)(e.fieldName()) + "/s" , 6 , (int)diff( e.fieldName() , ax , bx ) );
                 }
             }
-
-	    if ( b["backgroundFlushing"].type() == Object ){
+            
+            if ( b["backgroundFlushing"].type() == Object ){
                 BSONObj ax = a["backgroundFlushing"].embeddedObject();
                 BSONObj bx = b["backgroundFlushing"].embeddedObject();
-                BSONObjIterator i( bx );
-                cell( ss , "flushes/s" , 6 , (int)diff( "flushes" , ax , bx ) );
+                _append( result , "flushes/s" , 6 , (int)diff( "flushes" , ax , bx ) );
             }
 
             if ( b.getFieldDotted("mem.supported").trueValue() ){
                 BSONObj bx = b["mem"].embeddedObject();
                 BSONObjIterator i( bx );
-                cell( ss , "mapped" , 6 , bx["mapped"].numberInt() );
-                cell( ss , "vsize" , 6 , bx["virtual"].numberInt() );
-                cell( ss , "res" , 6 , bx["resident"].numberInt() );
+                _append( result , "mapped" , 6 , bx["mapped"].numberInt() );
+                _append( result , "vsize" , 6 , bx["virtual"].numberInt() );
+                _append( result , "res" , 6 , bx["resident"].numberInt() );
             }
 
             if ( b["extra_info"].type() == Object ){
                 BSONObj ax = a["extra_info"].embeddedObject();
                 BSONObj bx = b["extra_info"].embeddedObject();
                 if ( ax["page_faults"].type() || ax["page_faults"].type() )
-                    cell( ss , "faults/s" , 6 , (int)diff( "page_faults" , ax , bx ) );
+                    _append( result , "faults/s" , 6 , (int)diff( "page_faults" , ax , bx ) );
             }
             
-            cell( ss , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
-            cell( ss , "idx miss %" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
+            _append( result , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
+            _append( result , "idx miss %" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
 
             if ( b.getFieldDotted( "globalLock.currentQueue" ).type() == Object ){
                 int r = b.getFieldDotted( "globalLock.currentQueue.readers" ).numberInt();
                 int w = b.getFieldDotted( "globalLock.currentQueue.writers" ).numberInt();
                 stringstream temp;
-                temp << r+w << "|" << r << "|" << w;
-                cell( ss , "q t|r|w" , 10 , temp.str() );
+                temp << r << "|" << w;
+                _append( result , "qr|qw" , 9 , temp.str() );
             }
-            cell( ss , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
+            _append( result , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
+
+            if ( b["repl"].type() == Object ){
+
+                BSONObj x = b["repl"].embeddedObject();
+                bool isReplSet = x["setName"].type() == String;
+
+                stringstream ss;
+
+                if ( isReplSet ){
+                    string setName = x["setName"].String();
+                    _append( result , "set" , setName.size() , setName );
+                }
+
+                if ( x["ismaster"].trueValue() )
+                    ss << "M";
+                else if ( x["secondary"].trueValue() )
+                    ss << "SEC";
+                else if ( isReplSet )
+                    ss << "UNK";
+                else
+                    ss << "SLV";
+                
+                _append( result , "repl" , 4 , ss.str() );
+                
+            }
 
             {
                 struct tm t;
@@ -216,16 +226,9 @@ namespace mongo {
                      << setfill('0') << setw(2) << t.tm_min
                      << ":" 
                      << setfill('0') << setw(2) << t.tm_sec;
-                cell( ss , "time" , 10 , temp.str() );
+                _append( result , "time" , 10 , temp.str() );
             }
-
-            if ( _showHeaders && _rowNum % 20 == 0 ){
-                // this is the newline after the header line
-                cout << endl;
-            }
-            _rowNum++;
-
-            return ss.str();
+            return result.obj();
         }
         
         virtual void preSetup(){
@@ -233,20 +236,66 @@ namespace mongo {
                 _http = true;
                 _noconnection = true;
             }
+
+            if ( hasParam( "host" ) && 
+                 getParam( "host" ).find( ',' ) != string::npos ){
+                _noconnection = true;
+                _many = true;
+            }
+
+            if ( hasParam( "discover" ) ){
+                _noconnection = true;
+                _many = true;
+            }
         }
 
         int run(){ 
             _sleep = getParam( "sleep" , _sleep );
-            if ( hasParam( "noheaders" ) ) {
-                _showHeaders = false;
+            if ( _many )
+                return runMany();
+            return runNormal();
+        }
+
+        static void printHeaders( const BSONObj& o ){
+            BSONObjIterator i(o);
+            while ( i.more() ){
+                BSONElement e = i.next();
+                BSONObj x = e.Obj();
+                cout << setw( x["width"].numberInt() ) << e.fieldName() << ' ';
             }
-            _rowCount = getParam( "rowcount" , 0 );
+            cout << endl;            
+        }
+
+        static void printData( const BSONObj& o ){
+            BSONObjIterator i(o);
+            while ( i.more() ){
+                BSONObj x = i.next().Obj();
+                int w = x["width"].numberInt();
+                
+                BSONElement data = x["data"];
+                
+                if ( data.type() == String )
+                    cout << setw(w) << data.String();
+                else if ( data.type() == NumberDouble )
+                    cout << setw(w) << setprecision(3) << data.number();
+                else if ( data.type() == NumberInt )
+                    cout << setw(w) << data.numberInt();
+                
+                cout << ' ';
+            }
+            cout << endl; 
+        }
+
+        int runNormal(){
+            bool showHeaders = ! hasParam( "noheaders" );
+            int rowCount = getParam( "rowcount" , 0 );
+            int rowNum = 0;
 
             BSONObj prev = stats();
             if ( prev.isEmpty() )
                 return -1;
 
-            while ( _rowCount == 0 || _rowNum < _rowCount ){
+            while ( rowCount == 0 || rowNum < rowCount ){
                 sleepsecs(_sleep);
                 BSONObj now;
                 try {
@@ -261,7 +310,15 @@ namespace mongo {
                     return -2;
                 
                 try {
-                    cout << doRow( prev , now ) << endl;
+
+                    BSONObj out = doRow( prev , now );
+
+                    if ( showHeaders && rowNum % 10 == 0 ){
+                        printHeaders( out );
+                    }
+                    
+                    printData( out );
+
                 }
                 catch ( AssertionException& e ){
                     cout << "\nerror: " << e.what() << "\n"
@@ -270,16 +327,162 @@ namespace mongo {
                 }
                 
                 prev = now;
+                rowNum++;
             }
             return 0;
         }
         
+        struct ServerState {
+            ServerState() : lock( "Stat::ServerState" ){}
+            string host;
+            scoped_ptr<boost::thread> thr;
+            
+            mongo::mutex lock;
+
+            BSONObj prev;
+            BSONObj now;
+            time_t lastUpdate;
+
+            string error;
+        };
+            
+        static void serverThread( shared_ptr<ServerState> state ){
+            try {
+                DBClientConnection conn( true );
+                string errmsg;
+                if ( ! conn.connect( state->host , errmsg ) )
+                    state->error = errmsg;
+
+                while ( 1 ){
+                    try {
+                        BSONObj out;
+                        if ( conn.simpleCommand( "admin" , &out , "serverStatus" ) ){
+                            scoped_lock lk( state->lock );
+                            state->error = "";
+                            state->lastUpdate = time(0);
+                            state->prev = state->now;
+                            state->now = out.getOwned();
+                        }
+                        else {
+                            scoped_lock lk( state->lock );
+                            state->error = "serverStatus failed";
+                            state->lastUpdate = time(0);
+                        }
+                        
+                    }
+                    catch ( std::exception& e ){
+                        scoped_lock lk( state->lock );
+                        state->error = e.what();
+                    }
+                    
+                    sleepsecs( 1 );
+                }
+                
+                
+            }
+            catch ( std::exception& e ){
+                cout << "serverThread (" << state->host << ") fatal error : " << e.what() << endl;
+            }
+            catch ( ... ){
+                cout << "serverThread (" << state->host << ") fatal error" << endl;
+            }
+        }
+
+        typedef map<string,shared_ptr<ServerState> >  StateMap;
+
+        bool _add( StateMap& threads , string host ){
+            shared_ptr<ServerState>& state = threads[host];
+            if ( state )
+                return false;
+            
+            state.reset( new ServerState() );
+            state->host = host;
+            state->thr.reset( new boost::thread( boost::bind( serverThread , state ) ) );
+            return true;
+        }
+
+        bool _addAll( StateMap& threads , const BSONObj& hosts ){
+            BSONObjIterator i( hosts );
+            bool added = false;
+            while ( i.more() ){
+                bool me = _add( threads , i.next().String() );
+                added = added || me;
+            }
+            return added;
+        }
+
+        int runMany(){
+            StateMap threads;
+            
+            unsigned longestHost = 0;
+
+            {
+                string orig = getParam( "host" );
+                if ( orig == "" )
+                    orig = "localhost:27017";
+                StringSplitter ss( orig.c_str() , "," );
+                while ( ss.more() ){
+                    string host = ss.next();
+                    if ( host.size() > longestHost )
+                        longestHost = host.size();
+
+                    _add( threads , host );
+                }
+            }
+            
+            sleepsecs(1);
+
+            int row = 0;
+            bool discover = hasParam( "discover" );
+
+            while ( 1 ){
+                sleepsecs( _sleep );
+                
+                cout << endl;
+                int x = 0;
+                for ( map<string,shared_ptr<ServerState> >::iterator i=threads.begin(); i!=threads.end(); ++i ){
+                    scoped_lock lk( i->second->lock );
+
+                    if ( i->second->error.size() ){
+                        cout << setw( longestHost ) << i->first << "\t";
+                        cout << i->second->error << endl;
+                    }
+                    else if ( i->second->prev.isEmpty() || i->second->now.isEmpty() ){
+                        cout << setw( longestHost ) << i->first << "\t";
+                        cout << "no data" << endl;
+                    }
+                    else {
+                        BSONObj out = doRow( i->second->prev , i->second->now );
+                        
+                        if ( x++ == 0 && row++ % 5 == 0 ){
+                            cout << setw( longestHost ) << "" << "\t";
+                            printHeaders( out );
+                        }
+
+                        cout << setw( longestHost ) << i->first << "\t";
+                        printData( out );
+                    }
+
+                    if ( discover && ! i->second->now.isEmpty() ){
+                        if ( i->second->now["repl"].isABSONObj() ){
+                            BSONObj x = i->second->now["repl"].Obj();
+                            if ( x["hosts"].isABSONObj() )
+                                if ( _addAll( threads , x["hosts"].Obj() ) )
+                                    break;
+                            if ( x["passives"].isABSONObj() )
+                                if ( _addAll( threads , x["passives"].Obj() ) )
+                                    break; 
+                        }
+                    }
+                }
+            }
+
+            return 0;
+        }
 
         int _sleep;
-        int _rowNum;
-        int _rowCount;
-        bool _showHeaders;
         bool _http;
+        bool _many;
     };
 
 }
