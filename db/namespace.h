@@ -94,7 +94,9 @@ namespace mongo {
 namespace mongo {
 
     /** @return true if a client can modify this namespace
-        things like *.system.users */
+        things like *.system.users 
+        @param write used when .system.js
+    */
     bool legalClientSystemNS( const string& ns , bool write );
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
