@@ -1335,7 +1335,7 @@ ReplSetTest.prototype.awaitReplication = function() {
                var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
                printjson( entry );
                var ts = entry['ts'];
-               print("TS for " + slave + " is " + ts + " and latest is " + latest);
+               print("TS for " + slave + " is " + ts.t + " and latest is " + latest.t);
                print("Oplog size for " + slave + " is " + log.count());
                synced = (synced && friendlyEqual(latest,ts))
              }
