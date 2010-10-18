@@ -80,16 +80,32 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		ret = __wt_page_write(db, page);
 		goto done;
 	case WT_PAGE_COL_FIX:
+		/*
+		 * When reconciling a fixed-width page that doesn't support
+		 * repeat count compression, the on-page information cannot
+		 * change size -- there's no reason to ever split such a page.
+		 */
+		if (!F_ISSET(idb, WT_REPEAT_COMP)) {
+			max = page->size;
+			break;
+		}
+		/* FALLTHROUGH */
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
-		/* We'll potentially need a new leaf page. */
+		/*
+		 * Other leaf page types can grow, allocate the maximum leaf
+		 * page size.
+		 */
 		max = db->leafmax;
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		/* We'll potentially need a new internal page. */
+		/*
+		 * All internal page types can grow, allocate the maximum
+		 * internal page size.
+		 */
 		max = db->intlmax;
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
@@ -138,7 +154,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	/*
 	 * Reset the page's size; do it before verifying the page in debugging
-	 * mode, the verification code checks for entries that extend pas the
+	 * mode, the verification code checks for entries that extend past the
 	 * end of the page, and so expects the page->size field to be valid.
 	 */
 	__wt_bt_rec_page_size_reset(db, page, new);
@@ -239,10 +255,12 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		else
 			data = cip->data;		/* On-page data */
 
-		if (len > new->space_avail) {
-			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
-			__wt_abort(toc->env);
-		}
+		/*
+		 * When reconciling a fixed-width page that doesn't support
+		 * repeat count compression, the on-page information cannot
+		 * change size -- there's no reason to ever split such a page.
+		 */
+		WT_ASSERT(env, len <= new->space_avail);
 
 		memcpy(new->first_free, data, len);
 		new->first_free += len;
@@ -350,10 +368,16 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				continue;
 			}
 
+			/*
+			 * XXX
+			 * We don't yet handle splits -- we allocated the maximum
+			 * leaf page size, but it still wasn't enough.  We must
+			 * allocate another leaf page and split the parent.
+			 */
 			if (len > new->space_avail) {
 				fprintf(stderr,
 				    "PAGE %lu SPLIT\n", (u_long)page->addr);
-				__wt_abort(toc->env);
+				__wt_abort(env);
 			}
 
 			/*
@@ -498,10 +522,17 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			data_loc = DATA_ON_PAGE;
 		}
 
+		/*
+		 * XXX
+		 * We don't yet handle splits -- we allocated the maximum leaf
+		 * page size, but it still wasn't enough.  We must allocate
+		 * another leaf page and split the parent.
+		 */
 		if (len > new->space_avail) {
 			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
+
 		switch (data_loc) {
 		case DATA_ON_PAGE:
 			memcpy(new->first_free, data->data, data->size);
@@ -654,6 +685,13 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			len += data->size;
 			break;
 		}
+
+		/*
+		 * XXX
+		 * We don't yet handle splits -- we allocated the maximum leaf
+		 * page size, but it still wasn't enough.  We must allocate
+		 * another leaf page and split the parent.
+		 */
 		if (len > new->space_avail) {
 			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
 			__wt_abort(toc->env);
@@ -697,14 +735,8 @@ static inline void
 __wt_bt_rec_page_size_reset(DB *db, WT_PAGE *page, WT_PAGE *new)
 {
 	/*
-	 * Reset the page's size to the minimum required, and if the resulting
-	 * page size is larger or smaller than the original page, we allocate
-	 * a new page.  The difference is that if the page is smaller, we don't
-	 * extend the file to get a replacement page, we just waste the space.
-	 *
-	 * XXX
-	 * That's the plan -- none of it is implemented.  For the time being,
-	 * we simply reset the new size down to the old size.
+	 * Reset the page's size to the minimum number of allocation units
+	 * required.
 	 */
 	new->size = WT_MAX(page->size,
 	    WT_ALIGN(new->first_free - (u_int8_t *)new, db->allocsize));
