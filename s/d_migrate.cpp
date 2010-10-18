@@ -401,6 +401,9 @@ namespace mongo {
             for ( ; i!=_cloneLocs.end(); ++i ){
                 DiskLoc dl = *i;
                 BSONObj o = dl.obj();
+
+                // use the builder size instead of accumulating 'o's size so that we take into consideration
+                // the overhead of BSONArray indices
                 if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ){
                     i--;
                     break;
