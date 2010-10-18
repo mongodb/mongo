@@ -608,7 +608,7 @@ namespace mongo {
                 }
                 
                 if ( maxVersion < shardingState.getVersion( ns ) ){
-                    errmsg = "official version less than mine?";;
+                    errmsg = "official version less than mine?";
                     result.appendTimestamp( "officialVersion" , maxVersion );
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
                     return false;
