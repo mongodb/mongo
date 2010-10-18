@@ -33,6 +33,7 @@ static int __wt_bt_verify_page_col_fix(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_col_int(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_desc(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_bt_verify_page_ovfl(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_tree(
 		WT_TOC *, WT_ROW *, u_int32_t, WT_OFF *, WT_VSTUFF *);
 
@@ -410,16 +411,9 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		break;
-	case WT_PAGE_OVFL:
-		if (hdr->u.entries == 0) {
-			__wt_api_db_errx(db,
-			    "overflow page at addr %lu has no entries",
-			    (u_long)addr);
-			return (WT_ERROR);
-		}
 		break;
 	case WT_PAGE_INVALID:
 	default:
@@ -484,6 +478,7 @@ err_level:		__wt_api_db_errx(db,
 		WT_RET(__wt_bt_verify_page_col_fix(db, page));
 		break;
 	case WT_PAGE_OVFL:
+		WT_RET(__wt_bt_verify_page_ovfl(toc, page));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -1055,6 +1050,43 @@ __wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovfl, WT_VSTUFF *vs)
 	__wt_bt_page_out(toc, &page, 0);
 
 	return (ret);
+}
+
+/*
+ * __wt_bt_verify_page_ovfl --
+ *	Verify a WT_PAGE_OVFL page.
+ */
+static int
+__wt_bt_verify_page_ovfl(WT_TOC *toc, WT_PAGE *page)
+{
+	DB *db;
+	WT_PAGE_HDR *hdr;
+	u_int32_t addr, len;
+	u_int8_t *p;
+
+	db = toc->db;
+	hdr = page->hdr;
+	addr = page->addr;
+
+	if (hdr->u.datalen == 0) {
+		__wt_api_db_errx(db,
+		    "overflow page at addr %lu has no data", (u_long)addr);
+		return (WT_ERROR);
+	}
+
+	/* Any page data after the overflow record should be nul bytes. */
+	p = (u_int8_t *)hdr + (sizeof(WT_PAGE_HDR) + hdr->u.datalen);
+	len = page->size - (sizeof(WT_PAGE_HDR) + hdr->u.datalen);
+	for (; len > 0; ++p, --len)
+		if (*p != '\0') {
+			__wt_api_db_errx(db,
+			    "overflow page at addr %lu has non-zero trailing "
+			    "bytes",
+			    (u_long)addr);
+			return (WT_ERROR);
+		}
+
+	return (0);
 }
 
 /*
