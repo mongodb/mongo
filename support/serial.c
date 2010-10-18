@@ -76,7 +76,9 @@ __wt_toc_serialize_func(
 			case WT_WORKQ_NONE:
 				done = 1;
 				break;
-			default:
+			case WT_WORKQ_FUNC:
+			case WT_WORKQ_READ:
+			case WT_WORKQ_READ_SCHED:
 				__wt_yield();
 				break;
 			}
