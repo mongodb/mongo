@@ -74,8 +74,7 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 /*
  * __wt_bt_ovfl_copy --
  *	Copy an overflow item in the database, returning the starting
- *	addr.  This routine is used when an overflow item is promoted
- *	to an internal page.
+ *	addr; used when an overflow item is promoted to an internal page.
  */
 int
 __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy)
