@@ -1,4 +1,4 @@
-// d_split.cpp
+// @file  d_split.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -26,6 +26,13 @@
 #include "../db/jsobj.h"
 #include "../db/query.h"
 #include "../db/queryoptimizer.h"
+
+#include "../client/connpool.h"
+#include "../client/distlock.h"
+
+#include "chunk.h" // for static genID only
+#include "config.h"
+#include "d_logic.h"
 
 namespace mongo {
 
@@ -275,18 +282,178 @@ namespace mongo {
 
     class SplitChunkCommand : public Command {
     public:
-        SplitChunkCommand() : Command( "splitChunk" ){}
+        SplitChunkCommand() : Command( "splitChunk_ForDevOnly" ){}
         virtual void help( stringstream& help ) const {
-            help << "should not be calling this directly" << endl;
+            help << 
+                "internal command ** under development ** \n" 
+                "example:\n"
+                " { splitChunk:\"db.foo\" , keyPattern: {a:1} , min : {a:100} , max: {a:200} { splitKeys : [ {a:150} , ... ]}";
         }
 
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
 
-        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            errmsg = "Not yet implemented";
-            return false;            
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+
+            //
+            // 1. check whether parameters passed to splitChunk are sound
+            //
+
+            const string ns = cmdObj.firstElement().str();
+            if ( ns.empty() ){
+                errmsg  = "need to specify namespace in command";
+                return false;
+            }
+
+            BSONObj keyPattern = cmdObj["keyPattern"].Obj();
+            if ( keyPattern.isEmpty() ){
+                errmsg = "need to specify the key pattern the collection is sharded over";
+                return false;
+            }
+
+            BSONObj min = cmdObj["min"].Obj();
+            if ( min.isEmpty() ){
+                errmsg = "neet to specify the min key for the chunk";
+                return false;
+            }
+
+            BSONObj max = cmdObj["max"].Obj();
+            if ( max.isEmpty() ){
+                errmsg = "neet to specify the max key for the chunk";
+                return false;
+            }
+
+            BSONObj splitKeys = cmdObj["splitKeys"].Obj();
+            if ( splitKeys.isEmpty() ){
+                errmsg = "need to provide the split points to chunk over";
+                return false;
+            }
+
+            //
+            // 2. lock the collection's metadata and get highest version for the current shard
+            //
+
+            DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC) , ns );
+            dist_lock_try dlk( &lockSetup, string("split-") + min.toString() );
+            if ( ! dlk.got() ){
+                errmsg = "the collection's metadata lock is taken";
+                result.append( "who" , dlk.other() );
+                return false;
+            }
+
+            ShardChunkVersion maxVersion;
+            string shard;
+            {
+                ScopedDbConnection conn( shardingState.getConfigServer() );
+
+                BSONObj maxChunk = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
+                BSONObj currChunk = conn->findOne( ShardNS::chunk, Query( BSON( "ns" << ns << "min" << min ) ) );
+                conn.done();
+
+                maxVersion = maxChunk["lastmod"];
+                if ( maxVersion < shardingState.getVersion( ns ) ) {
+                    errmsg = "official version less than mine?";
+                    result.appendTimestamp( "officialVersion" , maxVersion );
+                    result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
+                    return false;
+                }
+
+                BSONObj currMin = currChunk["min"].Obj();
+                BSONObj currMax = currChunk["max"].Obj();
+                if ( ( currMin.woCompare( min ) != 0) || ( currMax.woCompare( max ) != 0) ){
+                    errmsg = "attempt to split old chunk (boundaries changed)";
+                    result.append( "currMin" , currMin );
+                    result.append( "expectedMin" , min );
+                    result.append( "currMax" , currMax );
+                    result.append( "expectedMax" , max ); 
+                    return false;
+                }
+                shard = currChunk["shard"].str();
+            }
+
+            // 
+            // 3. create the batch of updates to metadata ( the new chunks ) to be applied via 'applyOps' command
+            //
+
+            ShardChunkVersion myVersion = maxVersion;
+            BSONObj startKey = min;
+
+            BSONObjBuilder cmdBuilder;
+            BSONArrayBuilder updates( cmdBuilder.subarrayStart( "applyOps" ) );
+            BSONObjIterator keys( splitKeys );
+            while ( keys.more() ){                
+                BSONObj endKey = keys.next().Obj();
+
+                // splits only update the 'minor' portion of version
+                myVersion.incMinor();
+
+                // build an update operation against the chunks collection of the config database with 
+                // upsert true
+                BSONObjBuilder op;
+                op.append( "op" , "u" );
+                op.appendBool( "b" , true );
+                op.append( "ns" , ShardNS::chunk );
+
+                // add the modified (new) chunk infomation as the update object
+                BSONObjBuilder n( op.subobjStart( "o" ) );
+                n.append( "_id" , Chunk::genID( ns , startKey ) );
+                n.appendTimestamp( "lastmod" , myVersion );
+                n.append( "ns" , ns );
+                n.append( "min" , startKey );
+                n.append( "max" , endKey );
+                n.append( "shard" , shard );
+                n.done();
+
+                // add the chunk's _id as the query part of the update statement
+                BSONObjBuilder q( op.subobjStart( "o2" ) );
+                q.append( "_id" , Chunk::genID( ns , startKey ) );
+                q.done();
+
+                updates.append( op.obj() );
+            }        
+            updates.done();
+        
+            {
+                BSONArrayBuilder preCond( cmdBuilder.subarrayStart( "preCondition" ) );
+                BSONObjBuilder b;
+                b.append( "ns" , ShardNS::chunk );
+                b.append( "q" , BSON( "query" << BSON( "ns" << ns ) << "orderby" << BSON( "lastmod" << -1 ) ) );
+                {
+                    BSONObjBuilder bb( b.subobjStart( "res" ) );
+                    bb.appendTimestamp( "lastmod" , maxVersion );
+                    bb.done();
+                }
+                preCond.append( b.obj() );
+                preCond.done();
+            }
+
+            // 
+            // 4. apply the batch of updates to metadata
+            //
+
+            BSONObj cmd = cmdBuilder.obj();
+
+            log(7) << "splitChunk update: " << cmd << endl;
+
+            bool ok;
+            BSONObj cmdResult;
+            {
+                ScopedDbConnection conn( shardingState.getConfigServer() );
+                ok = conn->runCommand( "config" , cmd , cmdResult );
+                conn.done();
+            }
+
+            if ( ! ok ){
+                stringstream ss;
+                ss << "saving chunks failed.  cmd: " << cmd << " result: " << cmdResult;
+                log( LL_ERROR ) << ss.str() << endl;
+                msgasserted( 13327 , ss.str() );
+            }
+
+            // TODO logChanges
+
+            return true;
         }
     } cmdSplitChunk;
 
