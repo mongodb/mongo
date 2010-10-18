@@ -42,8 +42,10 @@ int
 __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
-void
+inline void
 __wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, u_int8_t *p);
+inline int
+__wt_page_write_gen_update(WT_PAGE *page, u_int32_t write_gen);
 const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *
@@ -116,6 +118,10 @@ void
 __wt_bt_repl_free(WT_TOC *toc, WT_REPL *repl);
 int
 __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags);
+int
+__wt_cache_alloc(WT_TOC *toc, u_int32_t *addrp, u_int32_t size);
+int
+__wt_cache_free(WT_TOC *toc, u_int32_t addr, u_int32_t size);
 void
 __wt_workq_drain_server(ENV *env, int force);
 void *
@@ -147,6 +153,9 @@ int
 __wt_page_write(DB *db, WT_PAGE *page);
 void
 __wt_workq_read_server(ENV *env, int force);
+int
+__wt_cache_read_queue(
+    WT_TOC *toc, u_int32_t *addrp, u_int32_t size, WT_PAGE **pagep);
 void *
 __wt_cache_read_server(void *arg);
 int
@@ -389,7 +398,9 @@ void
 __wt_progress(const char *s, u_int64_t v);
 int
 __wt_toc_serialize_func(
-    WT_TOC *toc, wq_state_t op, int (*func)(WT_TOC *), void *args);
+    WT_TOC *toc, wq_state_t op, int spin, int (*func)(WT_TOC *), void *args);
+void
+__wt_toc_serialize_wrapup(WT_TOC *toc, int ret);
 int
 __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp);
 void
