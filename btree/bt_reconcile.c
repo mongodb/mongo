@@ -16,8 +16,6 @@ static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static inline void
-	   __wt_bt_rec_page_size_reset(DB *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -44,9 +42,10 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	hdr = page->hdr;
 
 	WT_VERBOSE(env, WT_VERB_CACHE,
-	    (env, "reconcile addr %lu (page %p)", (u_long)page->addr, page));
+	    (env, "reconcile addr %lu (page %p, type %s)",
+	    (u_long)page->addr, page, __wt_bt_hdr_type(hdr)));
 
-	/* If the page isn't dirty, we're done. */
+	/* If the page isn't dirty, we should never have been called. */
 	WT_ASSERT(env, WT_PAGE_MODIFY_ISSET(page));
 
 	/*
@@ -76,7 +75,13 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	switch (hdr->type) {
 	case WT_PAGE_DESCRIPT:
-	case WT_PAGE_OVFL:
+		/*
+		 * The database description page doesn't move, simply write it
+		 * into place.  This assumes (1) the description page is only a
+		 * single disk sector, and writing a single disk sector is known
+		 * to be atomic, that is, it either succeeds or fails, there is
+		 * no possibility of a corrupted write.
+		 */
 		ret = __wt_page_write(db, page);
 		goto done;
 	case WT_PAGE_COL_FIX:
@@ -108,6 +113,20 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		 */
 		max = db->intlmax;
 		break;
+	case WT_PAGE_OVFL:
+		/*
+		 * Overflow pages are never modified, the only way we ever see
+		 * an overflow page in the reconciliation code is because it was
+		 * bulk loaded and we're discarding it.   That case was caught
+		 * above because the page->indx_count wasn't set, which means
+		 * this is an error.
+		 *
+		 * XXX
+		 * There's no reason to allocate WT_PAGE information for overflow
+		 * pages during bulk load, which means we should never be here
+		 * at all.  Once bulk load is fixed, fix this comment.
+		 */
+		 /* FALLTHROUGH */
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
@@ -151,15 +170,6 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
-
-	/*
-	 * Reset the page's size; do it before verifying the page in debugging
-	 * mode, the verification code checks for entries that extend past the
-	 * end of the page, and so expects the page->size field to be valid.
-	 */
-	__wt_bt_rec_page_size_reset(db, page, new);
-
-	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
 	WT_ERR(__wt_bt_rec_page_write(toc, page, new));
 
@@ -728,21 +738,6 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 }
 
 /*
- * __wt_bt_rec_page_size_reset --
- *	Reset a newly reconciled page's size.
- */
-static inline void
-__wt_bt_rec_page_size_reset(DB *db, WT_PAGE *page, WT_PAGE *new)
-{
-	/*
-	 * Reset the page's size to the minimum number of allocation units
-	 * required.
-	 */
-	new->size = WT_MAX(page->size,
-	    WT_ALIGN(new->first_free - (u_int8_t *)new, db->allocsize));
-}
-
-/*
  * __wt_bt_rec_page_write --
  *	Write a newly reconciled page.
  */
@@ -750,11 +745,23 @@ static int
 __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	DB *db;
-	WT_PAGE_HDR *hdr;
+	ENV *env;
 	int ret;
 
 	db = toc->db;
-	hdr = new->hdr;
+	env = toc->env;
+
+	/*
+	 * Set the page's size to the minimum number of allocation units needed
+	 * (note the page size can either grow or shrink).
+	 *
+	 * Do so before verifying the page in debugging mode, the verification
+	 * code checks for entries that extend past the end of the page, and so
+	 * expects the WT_PAGE->size field to be valid.
+	 */
+	new->size = WT_ALIGN(new->first_free - (u_int8_t *)new, db->allocsize);
+
+	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
 	/*
 	 * Don't overwrite pages on disk -- if the write only partially succeeds
@@ -770,6 +777,10 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		return (ret);
 
 	/* Reset the page's address and the parent page's reference. */
+	WT_VERBOSE(env, WT_VERB_CACHE,
+	    (env, "reconcile move %lu to %lu, resize %lu to %lu",
+	    (u_long)page->addr, (u_long)new->addr,
+	    (u_long)page->size, (u_long)new->size));
 	page->addr = new->addr;
 
 	return (__wt_page_write(db, new));
