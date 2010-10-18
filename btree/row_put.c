@@ -90,12 +90,14 @@ __wt_bt_update_serial_func(WT_TOC *toc)
 	WT_PAGE *page;
 	WT_REPL **new_repl, *repl;
 	u_int16_t write_gen;
-	int slot;
+	int ret, slot;
 
 	__wt_bt_update_unpack(toc, page, write_gen, slot, new_repl, repl);
 
+	ret = 0;
+
 	/* Check the page's write-generation, then update it. */
-	WT_PAGE_WRITE_GEN_CHECK(page);
+	WT_ERR(__wt_page_write_gen_update(page, write_gen));
 
 	/*
 	 * If the page does not yet have a replacement array, our caller passed
@@ -114,8 +116,12 @@ __wt_bt_update_serial_func(WT_TOC *toc)
 	WT_MEMORY_FLUSH;
 	page->repl[slot] = repl;
 	WT_PAGE_MODIFY_SET(page);
-	/* Depend on workQ's memory flush before scheduling thread proceeds. */
+	/*
+	 * Depend on the memory flush in __wt_toc_serialize_wrapup before the
+	 * calling thread proceeds.
+	 */
 
+err:	__wt_toc_serialize_wrapup(toc, ret);
 	return (0);
 }
 
