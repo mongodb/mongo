@@ -9,17 +9,19 @@
 
 #include "wt_internal.h"
 
-static int  __wt_bt_rcc_expand_compare(const void *, const void *);
-static int  __wt_bt_rcc_expand_sort(
-	ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, u_int32_t *);
-static int  __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static void __wt_bt_rec_page_size_reset(DB *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_page_write(DB *, WT_PAGE *);
-static int  __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int  __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rcc_expand_compare(const void *, const void *);
+static int __wt_bt_rcc_expand_sort(
+		ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, u_int32_t *);
+static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static inline void
+	   __wt_bt_rec_page_size_reset(DB *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_cache_alloc_serial_func(WT_TOC *);
 
 /*
  * __wt_bt_rec_page --
@@ -143,7 +145,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
-	WT_ERR(__wt_bt_rec_page_write(db, new));
+	WT_ERR(__wt_bt_rec_page_write(toc, page, new));
 
 done:	/*
 	 * Clear the modification flag.  This doesn't sound safe, because the
@@ -688,21 +690,11 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 }
 
 /*
- * __wt_bt_rec_page_write --
- *	Write a newly reconciled page.
- */
-static int
-__wt_bt_rec_page_write(DB *db, WT_PAGE *new)
-{
-	return (__wt_page_write(db, new));
-}
-
-/*
  * __wt_bt_rec_page_size_reset --
  *	Reset a newly reconciled page's size.
  */
-static void
-__wt_bt_rec_page_size_reset(DB *db, WT_PAGE *old, WT_PAGE *new)
+static inline void
+__wt_bt_rec_page_size_reset(DB *db, WT_PAGE *page, WT_PAGE *new)
 {
 	/*
 	 * Reset the page's size to the minimum required, and if the resulting
@@ -714,11 +706,53 @@ __wt_bt_rec_page_size_reset(DB *db, WT_PAGE *old, WT_PAGE *new)
 	 * That's the plan -- none of it is implemented.  For the time being,
 	 * we simply reset the new size down to the old size.
 	 */
-	new->size = WT_MAX(old->size,
+	new->size = WT_MAX(page->size,
 	    WT_ALIGN(new->first_free - (u_int8_t *)new, db->allocsize));
+}
 
-	if (new->size > old->size) {
-		fprintf(stderr, "PAGE GREW: %lu\n", (u_long)new->addr);
-		__wt_abort(db->env);
-	}
+/*
+ * __wt_bt_rec_page_write --
+ *	Write a newly reconciled page.
+ */
+static int
+__wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+{
+	DB *db;
+	WT_PAGE_HDR *hdr;
+	int ret;
+
+	db = toc->db;
+	hdr = new->hdr;
+
+	/*
+	 * Don't overwrite pages on disk -- if the write only partially succeeds
+	 * in Berkeley DB, you're forced into catastrophic recovery.  I never
+	 * saw Berkeley DB fail in the field with a torn write, but that may be
+	 * because Berkeley DB's maximum page size is only 64KB.  WiredTiger
+	 * supports much larger page sizes, and is much more likely to see torn
+	 * write failures.
+	 */
+	new->addr = WT_ADDR_INVALID;
+	__wt_cache_alloc_serial(toc, &new->addr, new->size, ret);
+	if (ret != 0)
+		return (ret);
+
+	/* Reset the page's address and the parent page's reference. */
+	page->addr = new->addr;
+
+	return (__wt_page_write(db, new));
+}
+
+/*
+ * __wt_cache_alloc_serial_func --
+ *	Allocation serialization function called when we need to allocate a
+ *	chunk of space from the underlying file.
+ */
+static int
+__wt_cache_alloc_serial_func(WT_TOC *toc)
+{
+	u_int32_t *addrp, size;
+
+	__wt_cache_alloc_unpack(toc, addrp, size);
+	return (__wt_cache_read_queue(toc, addrp, size, NULL));
 }
