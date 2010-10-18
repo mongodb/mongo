@@ -30,16 +30,17 @@ ienv_stats['WORKQ_YIELD'] = Stat([], 'workQ yields')
 # Cache handle statistics
 ##########################################
 cache_stats = {}
-cache_stats['CACHE_ALLOC'] = Stat([], 'pages allocated in the cache')
+cache_stats['CACHE_ALLOC'] = Stat([], 'cache allocations')
 cache_stats['CACHE_BYTES_INUSE'] = Stat(['perm'], 'bytes in the cache')
 cache_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'maximum bytes configured for the cache')
 cache_stats['CACHE_EVICT_HAZARD'] = Stat([], 'pages selected for eviction not evicted because of a hazard reference')
 cache_stats['CACHE_EVICT_MODIFIED'] = Stat([], 'modified pages selected for eviction')
 cache_stats['CACHE_EVICT_UNMODIFIED'] = Stat([], 'unmodified pages selected for eviction')
+cache_stats['CACHE_FREE'] = Stat([], 'cache frees')
 cache_stats['CACHE_HASH_BUCKETS'] = Stat([], 'hash buckets')
-cache_stats['CACHE_HIT'] = Stat([], 'reads found in the cache')
+cache_stats['CACHE_HIT'] = Stat([], 'cache read hits')
 cache_stats['CACHE_MAX_BUCKET_ENTRIES'] = Stat([], 'maximum entries allocated to a hash bucket')
-cache_stats['CACHE_MISS'] = Stat([], 'reads not found in the cache')
+cache_stats['CACHE_MISS'] = Stat([], 'cache read misses')
 cache_stats['CACHE_PAGES_INUSE'] = Stat(['perm'], 'pages in the cache')
 cache_stats['CACHE_READ_RESTARTS'] = Stat([], 'cache read restarts')
 
@@ -47,9 +48,10 @@ cache_stats['CACHE_READ_RESTARTS'] = Stat([], 'cache read restarts')
 # IDB handle statistics
 ##########################################
 idb_stats = {}
-idb_stats['DB_CACHE_ALLOC'] = Stat([], 'cache allocation: pages allocated in the cache')
-idb_stats['DB_CACHE_HIT'] = Stat([], 'cache hit: reads found in the cache')
-idb_stats['DB_CACHE_MISS'] = Stat([], 'cache miss: reads not found in the cache')
+idb_stats['DB_CACHE_ALLOC'] = Stat([], 'database cache allocations')
+idb_stats['DB_CACHE_FREE'] = Stat([], 'database cache frees')
+idb_stats['DB_CACHE_HIT'] = Stat([], 'database cache read hits')
+idb_stats['DB_CACHE_MISS'] = Stat([], 'database cache read misses')
 idb_stats['DUPLICATE_ITEMS_INSERTED'] = Stat([], 'duplicate key/data pairs inserted')
 idb_stats['HUFFMAN_DATA'] = Stat([], 'huffman data compression in bytes')
 idb_stats['HUFFMAN_KEY'] = Stat([], 'huffman key compression in bytes')
