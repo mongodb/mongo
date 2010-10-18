@@ -363,8 +363,10 @@ private:
         private:
             const char *_objdata;
         };
+
         const char *_objdata;
         boost::shared_ptr< Holder > _holder;
+
         void init(const char *data, bool ifree) {
             if ( ifree )
                 _holder.reset( new Holder( data ) );
