@@ -25,6 +25,7 @@ btree/col_srch.c
 btree/row_get.c
 btree/row_put.c
 btree/row_srch.c
+cache/c_alloc.c
 cache/c_drain.c
 cache/c_init.c
 cache/c_page.c
