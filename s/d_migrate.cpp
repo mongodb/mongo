@@ -397,14 +397,11 @@ namespace mongo {
 
             BSONArrayBuilder a( std::min( BSONObjMaxUserSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
             
-            int bytesSoFar = 0;
-            
             set<DiskLoc>::iterator i = _cloneLocs.begin();
             for ( ; i!=_cloneLocs.end(); ++i ){
                 DiskLoc dl = *i;
                 BSONObj o = dl.obj();
-                bytesSoFar += o.objsize();
-                if ( bytesSoFar > BSONObjMaxUserSize ){
+                if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ){
                     i--;
                     break;
                 }
