@@ -583,7 +583,7 @@ namespace mongo {
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
             dist_lock_try dlk( &lockSetup , (string)"migrate-" + min.toString() );
             if ( ! dlk.got() ){
-                errmsg = "someone else has the lock";
+                errmsg = "the collection's metadata lock is taken";
                 result.append( "who" , dlk.other() );
                 return false;
             }
