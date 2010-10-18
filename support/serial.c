@@ -35,7 +35,7 @@
  */
 int
 __wt_toc_serialize_func(
-    WT_TOC *toc, wq_state_t op, int (*func)(WT_TOC *), void *args)
+    WT_TOC *toc, wq_state_t op, int spin, int (*func)(WT_TOC *), void *args)
 {
 	int done;
 
@@ -56,6 +56,7 @@ __wt_toc_serialize_func(
 	 */
 	toc->wq_args = args;
 	toc->wq_func = func;
+	toc->wq_sleeping = spin ? 0 : 1;
 	WT_MEMORY_FLUSH;
 	toc->wq_state = op;
 
@@ -64,8 +65,7 @@ __wt_toc_serialize_func(
 	 * satisfied), or block until its mutex is unlocked by another thread
 	 * when the operation has completed.
 	 */
-	switch (op) {
-	case WT_WORKQ_SPIN:
+	if (spin) {
 		/*
 		 * !!!
 		 * Don't do arithmetic comparisons (even equality) on enum's,
@@ -73,25 +73,42 @@ __wt_toc_serialize_func(
 		 */
 		for (done = 0; !done;) {
 			switch (toc->wq_state) {
-			case WT_WORKQ_SPIN:
-				break;
-			default:
+			case WT_WORKQ_NONE:
 				done = 1;
 				break;
+			default:
+				__wt_yield();
+				break;
 			}
-			__wt_yield();
 		}
-		break;
-	case WT_WORKQ_READ:
+	} else
 		__wt_lock(toc->env, toc->mtx);
 
-		/* The workQ thread can quit worrying about us. */
-		toc->wq_state = WT_WORKQ_NONE;
-		break;
-	default:
-	case WT_WORKQ_NONE:
-	case WT_WORKQ_READ_SCHED:
-		return (WT_ERROR);
-	}
 	return (toc->wq_ret);
+}
+
+/*
+ * __wt_toc_serialize_wrapup --
+ *	Server function cleanup.
+ */
+void
+__wt_toc_serialize_wrapup(WT_TOC *toc, int ret)
+{
+	ENV *env;
+
+	env = toc->env;
+
+	/*
+	 * Set the return value and reset the state -- the workQ no longer needs
+	 * to worry about us.
+	 *
+	 * The return value isn't volatile, so requires an explicit flush.
+	 */
+	toc->wq_ret = ret;
+	toc->wq_state = WT_WORKQ_NONE;
+	WT_MEMORY_FLUSH;
+
+	/* If the calling thread is sleeping, wake it up. */
+	if (toc->wq_sleeping)
+		__wt_unlock(env, toc->mtx);
 }

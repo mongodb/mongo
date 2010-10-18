@@ -20,7 +20,7 @@ __wt_workq_srvr(void *arg)
 	IENV *ienv;
 	WT_TOC **tp, *toc;
 	u_int32_t low_gen;
-	int chk_read, nowork, read_priority;
+	int chk_read, nowork, read_force;
 
 	env = (ENV *)arg;
 	ienv = env->ienv;
@@ -32,52 +32,59 @@ __wt_workq_srvr(void *arg)
 		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
 
 		low_gen = UINT32_MAX;
-		chk_read = read_priority = 0;
+		chk_read = read_force = 0;
 		for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 			if (toc->gen < low_gen)
 				low_gen = toc->gen;
 			switch (toc->wq_state) {
 			case WT_WORKQ_NONE:
 				continue;
-			case WT_WORKQ_SPIN:
-				/*
-				 * Call the function, flush out the results,
-				 * then let the thread proceed.
-				 */
-				toc->wq_ret = toc->wq_func(toc);
-				WT_MEMORY_FLUSH;
-				toc->wq_state = WT_WORKQ_NONE;
-
+			case WT_WORKQ_FUNC:
 				nowork = 0;
+				(void)toc->wq_func(toc);
 				break;
 			case WT_WORKQ_READ:
-				/*
-				 * Call the function, flush out the results.
-				 * If the call failed, wake the waiting thread,
-				 * otherwise update the state so we'll check
-				 * the I/O thread as necessary.
-				 */
-				toc->wq_ret = toc->wq_func(toc);
-				WT_MEMORY_FLUSH;
-				if (toc->wq_ret != 0) {
-					toc->wq_state = WT_WORKQ_NONE;
-					__wt_unlock(env, toc->mtx);
-					break;
-				}
-				toc->wq_state = WT_WORKQ_READ_SCHED;
 				nowork = 0;
+
+				/*
+				 * Call a function which makes a request of the
+				 * read server.  There are two read states: READ
+				 * (the initial request), and READ_SCHED (the
+				 * function has been called and we're waiting on
+				 * the read to complete).  There are two states
+				 * because we can race with the server: if the
+				 * called function adds itself to the queue just
+				 * as the server is going to sleep, the server
+				 * might not see the request.   So, READ_SCHED
+				 * means we don't have to call the function, but
+				 * we do have check if the server is running.
+				 *
+				 * The read state is eventually reset by the
+				 * read server, so we set it before we call the
+				 * function that will contact the server, so we
+				 * can't race on that update.
+				 */
+				toc->wq_state = WT_WORKQ_READ_SCHED;
+
+				/*
+				 * Call the function (which contacts the server).
+				 * If that call fails, we're done.
+				 */
+				if (toc->wq_func(toc) != 0)
+					break;
+
 				/* FALLTHROUGH */
 			case WT_WORKQ_READ_SCHED:
 				chk_read = 1;
-				if (F_ISSET(toc, WT_READ_PRIORITY))
-					read_priority = 1;
+				read_force =
+				    F_ISSET(toc, WT_READ_PRIORITY) ? 1 : 0;
 				break;
 			}
 		}
 
 		/* If a read is scheduled, check on the read server. */
 		if (chk_read)
-			__wt_workq_read_server(env, read_priority ? 1 : 0);
+			__wt_workq_read_server(env, read_force);
 
 		/* Check on the cache drain server. */
 		__wt_workq_drain_server(env, 0);
