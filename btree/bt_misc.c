@@ -104,11 +104,26 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
  *	Set the page's first-free and space-available values from an
  *	address positioned one past the last used byte on the page.
  */
-void
+inline void
 __wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, u_int8_t *p)
 {
 	page->first_free = p;
 	page->space_avail = page->size - (u_int)(p - (u_int8_t *)page->hdr);
+}
+
+/*
+ * __wt_page_write_gen_update --
+ *	Handle the page's write generation number.
+ */
+inline int
+__wt_page_write_gen_update(WT_PAGE *page, u_int32_t write_gen)
+{
+	if (page->write_gen != write_gen)
+		return (WT_RESTART);
+
+	++page->write_gen;
+	WT_MEMORY_FLUSH;
+	return (0);
 }
 
 /*

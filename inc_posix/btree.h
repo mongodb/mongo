@@ -215,12 +215,6 @@ struct __wt_page {
 	u_int16_t write_gen;		/* Write generation */
 #define	WT_PAGE_WRITE_GEN(p)						\
 	((p)->write_gen)
-#define	WT_PAGE_WRITE_GEN_CHECK(p) do {					\
-	if (write_gen != (p)->write_gen)				\
-		return (WT_RESTART);					\
-	(++(p)->write_gen);						\
-	WT_MEMORY_FLUSH;						\
-} while (0)
 
 	/*
 	 * Each disk page entry is referenced by an array of WT_ROW/WT_COL
