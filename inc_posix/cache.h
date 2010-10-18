@@ -21,12 +21,14 @@ struct __wt_read_req;		typedef struct __wt_read_req WT_READ_REQ;
  */
 struct __wt_read_req {
 	WT_TOC	  *toc;			/* Requesting thread */
-	u_int32_t  addr;		/* Address */
+	u_int32_t *addrp;		/* Address */
 	u_int32_t  size;		/* Bytes */
 	WT_PAGE  **pagep;		/* Returned page */
 };
-#define	WT_READ_REQ_SET(r, _toc, _addr, _size, _pagep) do {		\
-	(r)->addr = _addr;						\
+#define	WT_READ_REQ_ISEMPTY(r)						\
+	((r)->toc == NULL)
+#define	WT_READ_REQ_SET(r, _toc, _addrp, _size, _pagep) do {		\
+	(r)->addrp = _addrp;						\
 	(r)->size = _size;						\
 	(r)->pagep = _pagep;						\
 	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\

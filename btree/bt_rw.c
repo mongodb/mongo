@@ -9,16 +9,17 @@
 
 #include "wt_internal.h"
 
-static int __wt_cache_in_serial_func(WT_TOC *);
+static int __wt_cache_read_serial_func(WT_TOC *);
 
 /*
  * __wt_page_alloc --
- *	Allocate bytes from a file.
+ *	Allocate bytes from a file and associate it with a WT_PAGE structure.
  */
 int
 __wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep)
 {
 	ENV *env;
+	u_int32_t addr;
 	int ret;
 
 	*pagep = NULL;
@@ -26,7 +27,8 @@ __wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep)
 
 	WT_ASSERT(env, size % WT_FRAGMENT == 0);
 
-	__wt_cache_in_serial(toc, WT_ADDR_INVALID, size, pagep, ret);
+	addr = WT_ADDR_INVALID;
+	__wt_cache_read_serial(toc, &addr, size, pagep, ret);
 	return (ret);
 }
 
@@ -91,41 +93,26 @@ __wt_page_in(WT_TOC *toc,
 	 * to get it for us and go to sleep.  The read server is expensive, but
 	 * serializes all the hard cases.
 	 */
-	__wt_cache_in_serial(toc, addr, size, pagep, ret);
+	__wt_cache_read_serial(toc, &addr, size, pagep, ret);
 	if (ret == WT_RESTART)
 		WT_STAT_INCR(cache->stats, CACHE_READ_RESTARTS);
 	return (ret);
 }
 
 /*
- * __wt_cache_in_serial_func --
+ * __wt_cache_read_serial_func --
  *	Read/allocation serialization function called when a page-in requires
  *	allocation or a read.
  */
 static int
-__wt_cache_in_serial_func(WT_TOC *toc)
+__wt_cache_read_serial_func(WT_TOC *toc)
 {
-	ENV *env;
-	WT_CACHE *cache;
 	WT_PAGE **pagep;
-	WT_READ_REQ *rr, *rr_end;
-	u_int32_t addr, size;
+	u_int32_t *addrp, size;
 
-	__wt_cache_in_unpack(toc, addr, size, pagep);
+	__wt_cache_read_unpack(toc, addrp, size, pagep);
 
-	env = toc->env;
-	cache = env->ienv->cache;
-
-	/* Find an empty slot and enter the read request. */
-	rr = cache->read_request;
-	rr_end = rr + WT_ELEMENTS(cache->read_request);
-	for (; rr < rr_end; ++rr)
-		if (rr->toc == NULL) {
-			WT_READ_REQ_SET(rr, toc, addr, size, pagep);
-			return (0);
-		}
-	__wt_api_env_errx(env, "read server request table full");
-	return (WT_RESTART);
+	return (__wt_cache_read_queue(toc, addrp, size, pagep));
 }
 
 /*
