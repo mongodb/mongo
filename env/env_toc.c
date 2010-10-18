@@ -233,8 +233,8 @@ __wt_toc_print_state(WT_TOC *toc)
 		return ("read");
 	case WT_WORKQ_READ_SCHED:
 		return ("read scheduled");
-	case WT_WORKQ_SPIN:
-		return ("spin");
+	case WT_WORKQ_FUNC:
+		return ("function");
 	case WT_WORKQ_NONE:
 		return ("none");
 	}

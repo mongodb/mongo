@@ -7,14 +7,15 @@ from dist import compare_srcfile
 
 serial = {}
 class Serial:
-	def __init__(self, key, op, args):
+	def __init__(self, key, op, spin, args):
 		self.key = key
 		self.op = op
+		self.spin = spin
 		self.args = args
 
 serial['bt_rcc_expand'] = Serial(
 	'bt_rcc_expand',
-	'WT_WORKQ_SPIN',
+	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'u_int16_t/write_gen',
 	 'int/slot',
@@ -23,7 +24,7 @@ serial['bt_rcc_expand'] = Serial(
 
 serial['bt_rcc_expand_repl'] = Serial(
 	'bt_rcc_expand_repl',
-	'WT_WORKQ_SPIN',
+	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'u_int16_t/write_gen',
 	 'WT_COL_EXPAND */exp',
@@ -31,17 +32,23 @@ serial['bt_rcc_expand_repl'] = Serial(
 
 serial['bt_update'] = Serial(
 	'bt_update',
-	'WT_WORKQ_SPIN',
+	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'u_int16_t/write_gen',
 	 'int/slot',
 	 'WT_REPL **/new_repl',
 	 'WT_REPL */repl'])
 
-serial['cache_in'] = Serial(
-	'cache_in',
-	'WT_WORKQ_READ',
-	['u_int32_t/addr',
+serial['cache_alloc'] = Serial(
+	'cache_alloc',
+	'WT_WORKQ_READ', '1',
+	['u_int32_t */addrp',
+	 'u_int32_t/size'])
+
+serial['cache_read'] = Serial(
+	'cache_read',
+	'WT_WORKQ_READ', '0',
+	['u_int32_t */addrp',
 	 'u_int32_t/size',
 	 'WT_PAGE **/pagep'])
 
@@ -67,8 +74,8 @@ def func_serial(f):
 			f.write('\t_args.' + l.split('/')[1] +
 			    ' = _' + l.split('/')[1] + ';\\\n')
 		f.write('\t(ret) = __wt_toc_serialize_func(\\\n')
-		f.write('\t    toc, ' + entry[1].op + ', __wt_' +
-		    entry[1].key + '_serial_func, &_args);\\\n')
+		f.write('\t    toc, ' + entry[1].op + ', ' + entry[1].spin +
+		    ', __wt_' + entry[1].key + '_serial_func, &_args);\\\n')
 		f.write('} while (0)\n')
 
 		# unpack function
@@ -84,7 +91,7 @@ def func_serial(f):
 		f.write('} while (0)\n')
 
 #####################################################################
-# Update serial.h, the serialization header file.
+# Update serial.h.
 #####################################################################
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')

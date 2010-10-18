@@ -106,9 +106,9 @@ struct __dbt {
  *******************************************/
 typedef	enum {
 	WT_WORKQ_NONE=0,		/* No request */
-	WT_WORKQ_READ=1,		/* Schedule read */
-	WT_WORKQ_READ_SCHED=2,		/* Read scheduled */
-	WT_WORKQ_SPIN=3,		/* Spin on simple function */
+	WT_WORKQ_FUNC=1,		/* Function, then return */
+	WT_WORKQ_READ=2,		/* Function, then schedule read */
+	WT_WORKQ_READ_SCHED=3		/* Waiting on read to complete */
 } wq_state_t;
 
 struct __wt_toc {
@@ -140,9 +140,10 @@ struct __wt_toc {
 
 					/* WT_TOC workQ request */
 	wq_state_t volatile wq_state;	/* Request state */
+	int	  wq_ret;		/* Return value */
 	int     (*wq_func)(WT_TOC *);	/* Function */
 	void	 *wq_args;		/* Function argument */
-	int	  wq_ret;		/* Return value */
+	int	  wq_sleeping;		/* Thread is blocked */
 
 	WT_PAGE	**hazard;		/* Hazard reference array */
 
