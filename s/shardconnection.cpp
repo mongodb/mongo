@@ -153,7 +153,7 @@ namespace mongo {
                 }
             }
             catch ( std::exception& e ){
-                log(LL_ERROR) << "couldn't unsert sharding : " << e.what() << endl;
+                log(LL_ERROR) << "couldn't unset sharding : " << e.what() << endl;
                 delete conn;
             }
         }
