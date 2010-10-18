@@ -1251,12 +1251,15 @@ namespace mongo {
                 return false;
             }
 
+            string shortTmpName = str::stream() << ".tmp.convertToCapped." << from;
+            string longTmpName = str::stream() << dbname << "." << shortTmpName;
+
             DBDirectClient client;
-            client.dropCollection( dbname + "." + from + ".$temp_convertToCapped" );
+            client.dropCollection( longTmpName );
 
             BSONObj info;
             if ( !client.runCommand( dbname ,
-                                    BSON( "cloneCollectionAsCapped" << from << "toCollection" << ( from + ".$temp_convertToCapped" ) << "size" << double( size ) ),
+                                    BSON( "cloneCollectionAsCapped" << from << "toCollection" << shortTmpName << "size" << double( size ) ),
                                     info ) ) {
                 errmsg = "cloneCollectionAsCapped failed: " + info.toString();
                 return false;
@@ -1268,8 +1271,8 @@ namespace mongo {
             }
 
             if ( !client.runCommand( "admin",
-                                    BSON( "renameCollection" << ( dbname + "." + from + ".$temp_convertToCapped" ) 
-                                          << "to" << ( dbname + "." + from ) ),
+                                     BSON( "renameCollection" << longTmpName <<
+                                           "to" << ( dbname + "." + from ) ),
                                     info ) ) {
                 errmsg = "renameCollection failed: " + info.toString();
                 return false;
