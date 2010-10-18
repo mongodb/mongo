@@ -608,6 +608,8 @@ namespace mongo {
         bool owned() const { return &_b == &_buf; }
 
         BSONObjIterator iterator() const ;
+
+        int len() const { return _b.len(); }
         
     private:
         char* _done() {
@@ -694,6 +696,8 @@ namespace mongo {
             append( e );
         }
         
+        int len() const { return _b.len(); }
+
     private:
         void fill( const StringData& name ) {
             char *r;
