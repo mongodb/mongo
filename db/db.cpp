@@ -969,6 +969,7 @@ int main(int argc, char* argv[], char *envp[] )
             }
         }
         if ( params.count("configsvr" ) ){
+            uassert( 13499, "replication should not be enabled on a config server", !cmdLine.usingReplSets() && !replSettings.master && !replSettings.slave);
             if ( params.count( "diaglog" ) == 0 )
                 _diaglog.level = 1;
             if ( params.count( "dbpath" ) == 0 )
