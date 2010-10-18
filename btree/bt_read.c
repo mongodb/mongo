@@ -60,6 +60,33 @@ __wt_workq_read_server(ENV *env, int force)
 }
 
 /*
+ * __wt_cache_read_queue --
+ *	Enter a new request into the cache read queue.
+ */
+int
+__wt_cache_read_queue(
+    WT_TOC *toc, u_int32_t *addrp, u_int32_t size, WT_PAGE **pagep)
+{
+	ENV *env;
+	WT_CACHE *cache;
+	WT_READ_REQ *rr, *rr_end;
+
+	env = toc->env;
+	cache = env->ienv->cache;
+
+	/* Find an empty slot and enter the read request. */
+	rr = cache->read_request;
+	rr_end = rr + WT_ELEMENTS(cache->read_request);
+	for (; rr < rr_end; ++rr)
+		if (WT_READ_REQ_ISEMPTY(rr)) {
+			WT_READ_REQ_SET(rr, toc, addrp, size, pagep);
+			return (0);
+		}
+	__wt_api_env_errx(env, "read server request table full");
+	return (WT_RESTART);
+}
+
+/*
  * __wt_cache_read_server --
  *	Thread to do database reads.
  */
@@ -71,7 +98,7 @@ __wt_cache_read_server(void *arg)
 	WT_CACHE *cache;
 	WT_READ_REQ *rr, *rr_end;
 	WT_TOC *toc;
-	int didwork;
+	int didwork, ret;
 
 	env = arg;
 	ienv = env->ienv;
@@ -106,9 +133,10 @@ __wt_cache_read_server(void *arg)
 				    !F_ISSET(toc, WT_READ_PRIORITY))
 					continue;
 
-				toc->wq_ret = __wt_cache_read(rr);
+				ret = __wt_cache_read(rr);
 				WT_READ_REQ_CLR(rr);
-				__wt_unlock(env, toc->mtx);
+				__wt_toc_serialize_wrapup(toc, ret);
+
 				didwork = 1;
 			}
 		} while (didwork);
@@ -134,6 +162,14 @@ __wt_cache_read(WT_READ_REQ *rr)
 	u_int32_t addr, addr_hash, size, i;
 	int newpage, ret;
 
+	/*
+	 * The read server thread does both general file allocation and cache
+	 * page instantiation.   If it's general file allocation, it's fast,
+	 * we just need to serialize it.
+	 */
+	if (rr->pagep == NULL)
+		return (__wt_cache_alloc(rr->toc, rr->addrp, rr->size));
+
 	toc = rr->toc;
 	db = toc->db;
 	env = toc->env;
@@ -142,7 +178,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	fh = idb->fh;
 	ret = 0;
 
-	addr = rr->addr;
+	addr = *rr->addrp;
 	size = rr->size;
 	newpage = addr == WT_ADDR_INVALID ? 1 : 0;
 
@@ -189,14 +225,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(u_int8_t), &page->hdr));
 
 	/* If it's an allocation, extend the file; otherwise read the page. */
-	if (newpage) {
-		/* Extend the file. */
-		addr = WT_OFF_TO_ADDR(db, fh->file_size);
-		fh->file_size += size;
-
-		WT_STAT_INCR(cache->stats, CACHE_ALLOC);
-		WT_STAT_INCR(idb->stats, DB_CACHE_ALLOC);
-	}
+	if (newpage)
+		WT_ERR(__wt_cache_alloc(toc, &addr, size));
 	page->addr = addr;
 	page->size = size;
 	page->lru = ++cache->lru;
