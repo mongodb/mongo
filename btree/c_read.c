@@ -133,7 +133,17 @@ __wt_cache_read_server(void *arg)
 				    !F_ISSET(toc, WT_READ_PRIORITY))
 					continue;
 
-				ret = __wt_cache_read(rr);
+				/*
+				 * The read server thread does both general file
+				 * allocation and cache page instantiation.   In
+				 * a file allocation, there's no pagep field in
+				 * in which to return a page.
+				 */
+				ret = rr->pagep == NULL ?
+				    __wt_cache_alloc(
+					rr->toc, rr->addrp, rr->size) :
+				    __wt_cache_read(rr);
+
 				WT_READ_REQ_CLR(rr);
 				__wt_toc_serialize_wrapup(toc, ret);
 
@@ -161,14 +171,6 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_TOC *toc;
 	u_int32_t addr, addr_hash, size, i;
 	int newpage, ret;
-
-	/*
-	 * The read server thread does both general file allocation and cache
-	 * page instantiation.   If it's general file allocation, it's fast,
-	 * we just need to serialize it.
-	 */
-	if (rr->pagep == NULL)
-		return (__wt_cache_alloc(rr->toc, rr->addrp, rr->size));
 
 	toc = rr->toc;
 	db = toc->db;
