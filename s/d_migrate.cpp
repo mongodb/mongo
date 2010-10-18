@@ -599,6 +599,7 @@ namespace mongo {
                 x = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
                 assert( x["shard"].type() );
                 myOldShard = x["shard"].String();
+                conn.done();
                 
                 if ( myOldShard != fromShard.getName() ){
                     errmsg = "i'm out of date";
@@ -613,8 +614,6 @@ namespace mongo {
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
                     return false;
                 }
-
-                conn.done();
             }
             
             timing.done(2);
