@@ -759,7 +759,8 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * code checks for entries that extend past the end of the page, and so
 	 * expects the WT_PAGE->size field to be valid.
 	 */
-	new->size = WT_ALIGN(new->first_free - (u_int8_t *)new, db->allocsize);
+	new->size = WT_ALIGN(
+	    new->first_free - (u_int8_t *)new->hdr, db->allocsize);
 
 	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
