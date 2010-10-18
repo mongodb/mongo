@@ -804,7 +804,19 @@ namespace mongo {
 
         //TODO look into FieldRangeSetOr
         FieldRangeOrSet fros(_ns.c_str(), query, false);
-        uassert(13088, "no support for special queries yet", fros.getSpecial().empty());
+
+        const string special = fros.getSpecial();
+        if (special == "2d") {
+            BSONForEach(field, query){
+                if (getGtLtOp(field) == BSONObj::opNEAR) {
+                    uassert(13501, "use geoNear command rather than $near query", false);
+                    // TODO: convert to geoNear rather than erroring out
+                }
+                // $within queries are fine
+            }
+        } else if (!special.empty()){
+            uassert(13502, "unrecognized special query type: " + special, false);
+        }
 
         do {
             boost::scoped_ptr<FieldRangeSet> frs (fros.topFrs());
