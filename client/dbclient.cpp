@@ -904,7 +904,7 @@ namespace mongo {
         return ss.str();
     }
 
-    /* find which server, the left or right, is currently master mode */
+    /* find which server currently primary */
     void DBClientReplicaSet::_checkMaster() {
         
         bool triedQuickCheck = false;
