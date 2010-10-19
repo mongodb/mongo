@@ -168,9 +168,9 @@ db.getLastError();
 res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 , min: 1} );
 
 assert.eq( true , res.ok , "8a" );
-assert.eq( 1 , res.splitKeys.length , "8b" );
+assert.eq( 2 , res.splitKeys.length , "8b" );
 assert.eq( 2 , res.splitKeys[0].x , "8c" );
-assert.eq( 3 , res.splitKeys[1].x , "8d");
+assert.eq( 3 , res.splitKeys[1].x , "8d" );
 
 print("PASSED");
 
