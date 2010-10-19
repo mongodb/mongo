@@ -744,7 +744,9 @@ found:
             out() << "    " << thisLoc.toString() << ".split" << endl;
 
         int split = n / 2;
-        if ( keypos == n ) { // see SERVER-983
+        // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split. 
+        // see SERVER-983
+        if ( keypos == n ) { 
             split = (int) (0.9 * n);
             if ( split > n - 2 )
                 split = n - 2;

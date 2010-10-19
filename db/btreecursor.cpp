@@ -43,7 +43,7 @@ namespace mongo {
     {
         audit();
         init();
-        DEV assert( dups.size() == 0 );
+        dassert( _dups.size() == 0 );
     }
 
     BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction )
@@ -71,7 +71,7 @@ namespace mongo {
         keyOfs = 0;
         indexDetails.head.btree()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, direction, noBestParent );
         skipAndCheck();
-        DEV assert( dups.size() == 0 );
+        dassert( _dups.size() == 0 );
     }
 
     void BtreeCursor::audit() {
