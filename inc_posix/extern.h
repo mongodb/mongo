@@ -3,9 +3,11 @@ int
 __wt_db_bulk_load(WT_TOC *toc, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **));
 int
-__wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl);
+__wt_bt_build_key_item(
+    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load);
 int
-__wt_bt_build_data_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl);
+__wt_bt_build_data_item(
+    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load);
 int
 __wt_bt_close(WT_TOC *toc);
 int
@@ -396,6 +398,12 @@ u_int32_t
 __wt_prime(u_int32_t n);
 void
 __wt_progress(const char *s, u_int64_t v);
+int
+__wt_toc_scratch_alloc(WT_TOC *toc, DBT **dbtp);
+void
+__wt_toc_scratch_discard(WT_TOC *toc, DBT *dbt);
+void
+__wt_toc_scratch_free(WT_TOC *toc);
 int
 __wt_toc_serialize_func(
     WT_TOC *toc, wq_state_t op, int spin, int (*func)(WT_TOC *), void *args);

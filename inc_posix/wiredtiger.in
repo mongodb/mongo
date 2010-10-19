@@ -128,7 +128,9 @@ struct __wt_toc {
 
 	DB	*db;			/* Current database */
 	DBT	 key, data;		/* Returned key/data pairs */
-	DBT	 tmp1, tmp2;		/* Temporary use by anybody */
+
+	DBT	 scratch[10];		/* Temporary memory for any function */
+	u_int8_t scratch_inuse[10];	/* Currently in-use */
 
 	/*
 	 * Each WT_TOC structure is assigned a generation number as it enters

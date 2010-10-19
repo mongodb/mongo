@@ -67,6 +67,7 @@ support/huffman.c
 support/pow.c
 support/prime.c
 support/progress.c
+support/scratch.c
 support/serial.c
 support/stat.c
 support/strerror.c

@@ -302,11 +302,13 @@ __wt_bt_verify_cmp(
     WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 {
 	DB *db;
-	DBT *cd_ref, *pd_ref;
+	DBT *cd_ref, *pd_ref, *tmp1, *tmp2;
 	WT_ROW *child_rip;
 	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
+	tmp1 = tmp2 = NULL;
+	ret = 0;
 
 	/* Set the comparison function. */
 	switch (child->hdr->type) {
@@ -329,12 +331,14 @@ __wt_bt_verify_cmp(
 	child_rip = first_entry ?
 	    child->u.irow : child->u.irow + (child->indx_count - 1);
 	if (WT_KEY_PROCESS(child_rip)) {
-		cd_ref = &toc->tmp1;
-		WT_RET(__wt_bt_key_process(toc, NULL, child_rip, cd_ref));
+		WT_ERR(__wt_toc_scratch_alloc(toc, &tmp1));
+		cd_ref = tmp1;
+		WT_ERR(__wt_bt_key_process(toc, NULL, child_rip, cd_ref));
 	} else
 		cd_ref = (DBT *)child_rip;
 	if (WT_KEY_PROCESS(parent_rip)) {
-		pd_ref = &toc->tmp2;
+		WT_ERR(__wt_toc_scratch_alloc(toc, &tmp2));
+		pd_ref = tmp2;
 		WT_RET(__wt_bt_key_process(toc, NULL, parent_rip, pd_ref));
 	} else
 		pd_ref = (DBT *)parent_rip;
@@ -342,7 +346,6 @@ __wt_bt_verify_cmp(
 	/* Compare the parent's key against the child's key. */
 	cmp = func(db, cd_ref, pd_ref);
 
-	ret = 0;
 	if (first_entry && cmp < 0) {
 		__wt_api_db_errx(db,
 		    "the first key on page at addr %lu sorts before its "
@@ -357,6 +360,11 @@ __wt_bt_verify_cmp(
 		    (u_long)child->addr);
 		ret = WT_ERROR;
 	}
+
+err:	if (tmp1 != NULL)
+		__wt_toc_scratch_discard(toc, tmp1);
+	if (tmp2 != NULL)
+		__wt_toc_scratch_discard(toc, tmp2);
 
 	return (ret);
 }

@@ -454,7 +454,7 @@ __wt_bt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 		fp = stderr;
 
 	WT_OFF_FOREACH(page, off, i)
-		fprintf(fp, "\toffpage,  addr %lu, size %lu, records %llu\n",
+		fprintf(fp, "\toffpage: addr %lu, size %lu, records %llu\n",
 		    (u_long)off->addr,
 		    (u_long)off->size, (u_quad)WT_RECORDS(off));
 }
@@ -505,6 +505,7 @@ static int
 __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
 	DB *db;
+	DBT *tmp;
 	IDB *idb;
 	WT_OVFL *ovfl;
 	WT_PAGE *page;
@@ -517,10 +518,13 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		fp = stderr;
 
 	db = toc->db;
+	tmp = NULL;
 	idb = db->idb;
 	page = NULL;
 	hp = NULL;
 	ret = 0;
+
+	WT_RET(__wt_toc_scratch_alloc(toc, &tmp));
 
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
@@ -551,21 +555,23 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		p = (u_int8_t *)"offpage";
 		size = 7;
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
 	/* Uncompress the item as necessary. */
 	if (hp != NULL) {
-		WT_ERR(__wt_huffman_decode(hp, p, size,
-		    &toc->tmp1.data, &toc->tmp1.mem_size, &toc->tmp1.size));
-		p = toc->tmp1.data;
-		size = toc->tmp1.size;
+		WT_ERR(__wt_huffman_decode(
+		    hp, p, size, &tmp->data, &tmp->mem_size, &tmp->size));
+		p = tmp->data;
+		size = tmp->size;
 	}
 
 	__wt_bt_print(p, size, fp);
 
 err:	if (page != NULL)
 		__wt_bt_page_out(toc, &page, 0);
+	if (tmp != NULL)
+		__wt_toc_scratch_discard(toc, tmp);
 	return (ret);
 }
 
