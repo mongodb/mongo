@@ -169,7 +169,7 @@ wts_rand(void)
 	if (g.rand_log == NULL) {
 		p = fname("rand");
 		if ((g.rand_log = fopen(p, g.replay ? "r" : "w")) == NULL) {
-			fprintf(stderr, p, strerror(errno));
+			fprintf(stderr, "%s: %s\n", p, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 	}
