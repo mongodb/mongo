@@ -53,13 +53,13 @@ namespace mongo {
             
             _state.set(1);
 
-            curopWaitingForLock( 1 ); // stats
+            Client *c = curopWaitingForLock( 1 ); // stats
             _m.lock(); 
-            curopGotLock();
+            curopGotLock(c);
 
             _minfo.entered();
 
-            MongoFile::lockAll();
+            MongoFile::lockAll(); // for _DEBUG validation -- a no op for release build
         }
 
         // try write lock
@@ -67,9 +67,9 @@ namespace mongo {
             if ( _writeLockedAlready() )
                 return true;
 
-            curopWaitingForLock( 1 );
+            Client *c = curopWaitingForLock( 1 );
             bool got = _m.lock_try( millis ); 
-            curopGotLock();
+            curopGotLock(c);
             
             if ( got ){
                 _minfo.entered();
@@ -128,9 +128,9 @@ namespace mongo {
                 }
             }
             _state.set(-1);
-            curopWaitingForLock( -1 );
+            Client *c = curopWaitingForLock( -1 );
             _m.lock_shared(); 
-            curopGotLock();
+            curopGotLock(c);
         }
         
         // try read lock
@@ -142,6 +142,10 @@ namespace mongo {
                 return true;
             }
 
+            /* [dm] should there be
+                             Client *c = curopWaitingForLock( 1 );
+               here?  i think so.  seems to be missing.
+               */
             bool got = _m.lock_shared_try( millis );
             if ( got )
                 _state.set(-1);

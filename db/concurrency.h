@@ -38,8 +38,9 @@ namespace mongo {
     string sayClientState();
     bool haveClient();
     
-    void curopWaitingForLock( int type );
-    void curopGotLock();
+    class Client;
+    Client* curopWaitingForLock( int type );
+    void curopGotLock(Client*);
 
     /* mutex time stats */
     class MutexInfo {
