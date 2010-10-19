@@ -340,9 +340,10 @@ struct __wt_page_hdr {
 	 * their level in the tree.
 	 *
 	 * We don't need the tree level on disk and we could move this field to
-	 * the WT_PAGE structure -- that said, it's only a byte, and it is quite
-	 * a bit more difficult to figure out a tree level whenever we bring a
-	 * page into memory versus setting it once when the page is created.
+	 * the WT_PAGE structure -- that said, it's only a byte, we are going to
+	 * have unused bytes in this structure anyway, and it's a lot harder to
+	 * figure out a tree level whenever we bring a page into memory than to
+	 * just set it once when the page is created.
 	 *
 	 * Leaf pages are level 1, each higher level of the tree increases by 1.
 	 * The maximum tree level is 255, larger than any practical fan-out.
