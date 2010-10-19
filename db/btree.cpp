@@ -848,7 +848,8 @@ found:
 
     /* start a new index off, empty */
     DiskLoc BtreeBucket::addBucket(IndexDetails& id) {
-        DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), 0, BucketSize, true);
+        string ns = id.indexNamespace();
+        DiskLoc loc = theDataFileMgr.insert(ns.c_str(), 0, BucketSize, true);
         BtreeBucket *b = loc.btreemod();
         b->init();
         return loc;
@@ -1100,7 +1101,7 @@ found:
 
             DEV { 
                 log() << "_insert(): key already exists in index (ok for background:true)\n";
-                log() << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
+                log() << "  " << idx.indexNamespace() << " thisLoc:" << thisLoc.toString() << '\n';
                 log() << "  " << key.toString() << '\n';
                 log() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
                 log() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
@@ -1142,7 +1143,7 @@ found:
     {
         if ( toplevel ) {
             if ( key.objsize() > KeyMax ) {
-                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.objsize() << ' ' << key.toString() << endl;
+                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.objsize() << ' ' << key.toString() << endl;
                 return 3;
             }
         }
@@ -1271,7 +1272,7 @@ namespace mongo {
         if ( ! b->_pushBack(loc, key, ordering, DiskLoc()) ){
             // no room
             if ( key.objsize() > KeyMax ) {
-                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.objsize() << ' ' << key.toString() << endl;
+                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.objsize() << ' ' << key.toString() << endl;
             }
             else { 
                 // bucket was full
@@ -1344,7 +1345,8 @@ namespace mongo {
             DiskLoc x = first;
             while( !x.isNull() ) { 
                 DiskLoc next = x.btree()->tempNext();
-                theDataFileMgr._deleteRecord(nsdetails(idx.indexNamespace().c_str()), idx.indexNamespace().c_str(), x.rec(), x);
+                string ns = idx.indexNamespace();
+                theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), x.rec(), x);
                 x = next;
             }
             assert( idx.head.isNull() );
