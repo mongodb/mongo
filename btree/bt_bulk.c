@@ -39,7 +39,7 @@ static int  __wt_bt_bulk_fix(WT_TOC *,
 static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, u_int32_t *);
 static int  __wt_bt_bulk_var(WT_TOC *, u_int32_t,
 	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
-static int __wt_bt_bulk_write(WT_TOC *, void *, u_int32_t, u_int32_t);
+static inline int __wt_bt_bulk_write(WT_TOC *, WT_PAGE *);
 static int  __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
 	DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
@@ -89,10 +89,11 @@ __wt_bt_bulk_fix(WT_TOC *toc,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
-	DBT *key, *data;
+	DBT *key, *data, *tmp;
 	ENV *env;
 	IDB *idb;
-	WT_PAGE *page;
+	WT_PAGE _page, *page;
+	WT_PAGE_HDR *hdr;
 	WT_STACK stack;
 	u_int64_t insert_cnt;
 	u_int32_t len;
@@ -111,13 +112,32 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	    (F_ISSET(idb, WT_REPEAT_COMP) ? sizeof(u_int16_t) : 0);
 
 	/*
-	 * Allocate our first page and set our handle to reference it, then
-	 * update the database descriptor record.
+	 * We don't run the leaf pages through the cache -- that means passing
+	 * a lot of messages we don't want to bother with.  We're the only user
+	 * of the database, which means we can grab file space whenever we want.
+	 *
+	 * Make sure the TOC's scratch buffer is big enough to hold a leaf page,
+	 * and clear the memory so it's never random bytes.
 	 */
-	WT_ERR(__wt_bt_page_alloc(
-	    toc, WT_PAGE_COL_FIX, WT_LLEAF, db->leafmin, &page));
+	tmp = &toc->tmp1;
+	if (tmp->mem_size < db->leafmin)
+		WT_RET(__wt_realloc(
+		    env, &tmp->mem_size, db->leafmin, &tmp->data));
+	memset(tmp->data, 0, db->leafmin);
+
+	/* Initialize the WT_PAGE and WT_PAGE_HDR information. */
+	WT_CLEAR(_page);
+	page = &_page;
+	page->hdr = hdr = tmp->data;
+	WT_ERR(__wt_cache_alloc(toc, &page->addr, db->leafmin));
+	page->size = db->leafmin;
+	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
+	hdr->type = WT_PAGE_COL_FIX;
+	hdr->level = WT_LLEAF;
+
+	/* Update the descriptor record. */
 	idb->root_addr = page->addr;
-	idb->root_size = db->leafmin;
+	idb->root_size = page->size;
 	WT_ERR(__wt_bt_desc_write(toc));
 
 	while ((ret = cb(db, &key, &data)) == 0) {
@@ -161,16 +181,14 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		 * and increment that item's repeat count instead of entering
 		 * new data.
 		 */
-		if (F_ISSET(idb, WT_REPEAT_COMP) && page->hdr->u.entries != 0) {
+		if (F_ISSET(idb, WT_REPEAT_COMP) && hdr->u.entries != 0)
 			if (*last_repeat < UINT16_MAX &&
 			    memcmp(last_data, data->data, data->size) == 0) {
 				++*last_repeat;
-				++page->records;
-				++page->hdr->u.entries;
+				++hdr->u.entries;
 				WT_STAT_INCR(idb->stats, REPEAT_COUNT);
 				continue;
 			}
-		}
 
 		/*
 		 * We now have the data item to store on the page.  If there
@@ -183,15 +201,17 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			 * to its parent and discard it, then switch to the new
 			 * page.
 			 */
+			page->records = hdr->u.entries;
 			WT_ERR(__wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL));
-			WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
-			WT_ERR(__wt_bt_page_alloc(toc,
-			    WT_PAGE_COL_FIX, WT_LLEAF, db->leafmin, &page));
+			WT_ERR(__wt_bt_bulk_write(toc, page));
+			hdr->u.entries = 0;
+			WT_ERR(__wt_cache_alloc(toc, &page->addr, db->leafmin));
+			__wt_bt_set_ff_and_sa_from_offset(
+			    page, WT_PAGE_BYTE(page));
 		}
 
-		++page->records;
-		++page->hdr->u.entries;
+		++hdr->u.entries;
 
 		/*
 		 * Copy the data item onto the page -- if we're doing repeat
@@ -210,15 +230,16 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	}
 
 	/* A ret of 1 just means we've reached the end of the input. */
-	if (ret == 1) {
-		ret = 0;
+	if (ret != 1)
+		goto err;
+	ret = 0;
 
-		/* Promote a key from any partially-filled page and write it. */
-		if (page != NULL) {
-			ret = __wt_bt_promote(
-			    toc, page, page->records, &stack, 0, NULL);
-			WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
-		}
+	/* Promote a key from any partially-filled page and write it. */
+	if (hdr->u.entries != 0) {
+		page->records = hdr->u.entries;
+		ret = __wt_bt_promote(
+		    toc, page, page->records, &stack, 0, NULL);
+		WT_ERR(__wt_bt_bulk_write(toc, page));
 	}
 
 	/* Wrap up reporting. */
@@ -231,8 +252,6 @@ err:	if (stack.page != NULL) {
 			WT_BULK_PAGE_OUT(toc, &stack.page[i], WT_MODIFIED);
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
-	if (page != NULL)
-		WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
 
 	return (ret);
 }
@@ -1387,7 +1406,8 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	DB *db;
 	DBT *tmp;
 	ENV *env;
-	WT_PAGE_HDR hdr;
+	WT_PAGE page;
+	WT_PAGE_HDR *hdr;
 	u_int32_t remain, size;
 	u_int8_t *p;
 
@@ -1412,11 +1432,10 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	    __wt_cache_alloc(toc, addrp, WT_HDR_BYTES_TO_ALLOC(db, dbt->size)));
 
 	/* Initialize the page header and copy the overflow item in. */
-	WT_CLEAR(hdr);
-	hdr.type = WT_PAGE_OVFL;
-	hdr.level = WT_LLEAF;
-	hdr.u.datalen = dbt->size;
-	memcpy(p, &hdr, sizeof(WT_PAGE_HDR));
+	hdr = tmp->data;
+	hdr->type = WT_PAGE_OVFL;
+	hdr->level = WT_LLEAF;
+	hdr->u.datalen = dbt->size;
 	p += sizeof(WT_PAGE_HDR);
 	remain -= sizeof(WT_PAGE_HDR);
 
@@ -1429,32 +1448,31 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	if (remain > 0)
 		memset(p, 0, remain);
 
-	return (__wt_bt_bulk_write(toc, tmp->data, *addrp, size));
+	/* Build a page structure. */
+	WT_CLEAR(page);
+	page.hdr = tmp->data;
+	page.addr = *addrp;
+	page.size = size;
+
+	return (__wt_bt_bulk_write(toc, &page));
 }
 
 /*
  * __wt_bt_bulk_write --
  *	Write a bulk-loaded page into the database.
  */
-static int
-__wt_bt_bulk_write(WT_TOC *toc, void *p, u_int32_t addr, u_int32_t size)
+static inline int
+__wt_bt_bulk_write(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	ENV *env;
-	WT_PAGE page;
 
 	db = toc->db;
 	env = toc->env;
 
-	WT_CLEAR(page);
+	WT_ASSERT(env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
-	page.hdr = p;
-	page.addr = addr;
-	page.size = size;
-
-	WT_ASSERT(env, __wt_bt_verify_page(toc, &page, NULL) == 0);
-
-	return (__wt_page_write(db, &page));
+	return (__wt_page_write(db, page));
 }
 
 /*
