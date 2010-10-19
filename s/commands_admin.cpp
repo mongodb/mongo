@@ -440,18 +440,18 @@ namespace mongo {
             }
         } getShardVersionCmd;
 
-        class SplitCollectionHelper : public GridAdminCmd {
+        class SplitCollectionCmd : public GridAdminCmd {
         public:
-            SplitCollectionHelper( const char * name ) : GridAdminCmd( name ) , _name( name ){}
+            SplitCollectionCmd() : GridAdminCmd( "split" ) {}
             virtual void help( stringstream& help ) const {
                 help
-                    << " example: { split : 'alleyinsider.blog.posts' , find : { ts : 1 } } - split the shard that contains give key \n"
-                    << " example: { split : 'alleyinsider.blog.posts' , middle : { ts : 1 } } - split the shard that contains the key with this as the middle \n"
+                    << " example: - split the shard that contains give key \n" 
+                    << " { split : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n" 
+                    << " example: - split the shard that contains the key with this as the middle \n"
+                    << " { split : 'alleyinsider.blog.posts' , middle : { ts : 1 } }\n"
                     << " NOTE: this does not move move the chunks, it merely creates a logical seperation \n"
                     ;
             }
-
-            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ChunkManagerPtr manager , ChunkPtr old , BSONObj middle ) = 0;
 
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ShardConnection::sync();
@@ -481,37 +481,8 @@ namespace mongo {
                 ChunkManagerPtr info = config->getChunkManager( ns );
                 ChunkPtr old = info->findChunk( find );
 
-                return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
-            }
+                BSONObj middle = cmdObj.getObjectField( "middle" );
 
-        protected:
-            string _name;
-        };
-
-        class SplitValueCommand : public SplitCollectionHelper {
-        public:
-            SplitValueCommand() : SplitCollectionHelper( "splitValue" ){}
-            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManagerPtr manager , ChunkPtr old , BSONObj middle ){
-
-                result << "shardinfo" << old->toString();
-
-                result.appendBool( "auto" , middle.isEmpty() );
-
-                if ( middle.isEmpty() )
-                    middle = old->pickSplitPoint();
-
-                result.append( "middle" , middle );
-
-                return true;
-            }
-
-        } splitValueCmd;
-
-
-        class SplitCollection : public SplitCollectionHelper {
-        public:
-            SplitCollection() : SplitCollectionHelper( "split" ){}
-            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManagerPtr manager , ChunkPtr old , BSONObj middle ){
                 assert( old.get() );
                 log() << "splitting: " << ns << "  shard: " << old << endl;
 
@@ -525,8 +496,6 @@ namespace mongo {
 
                 return true;
             }
-
-
         } splitCollectionCmd;
 
         class MoveChunkCmd : public GridAdminCmd {

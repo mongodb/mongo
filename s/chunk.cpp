@@ -109,7 +109,8 @@ namespace mongo {
         
         return _manager->getShardKey().extractKey( end );
     }
-    
+
+    /* to be deprecated */
     BSONObj Chunk::pickSplitPoint( const vector<BSONObj> * possibleSplitPoints ) const {
         
         // check to see if we're at the edge of the key range
@@ -197,10 +198,31 @@ namespace mongo {
         conn.done();
     }
 
+    /* to be deprecated */
     ChunkPtr Chunk::split(){
         vector<BSONObj> splitPoints;
         splitPoints.push_back( pickSplitPoint() );
         return multiSplit( splitPoints );
+    }
+
+    ChunkPtr Chunk::simpleSplit( bool force ){
+        // if forcing a split, maxChunkSize does not really matter
+        // if not forcing a split, we want to have at least 2 split points, meaning there is enough data to reach
+        // the maximum split size
+        // TODO Handle 'not enough data to warrant chunking' in pickSplitVector
+        vector<BSONObj> candidates;
+        pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , force ? 0 : 2, force ? 0 : 100000);
+
+        vector<BSONObj> splitPoint;
+        if ( minIsInf() ){
+            splitPoint.push_back( _getExtremeKey( 1 ) );
+        } else if ( maxIsInf() ){
+            splitPoint.push_back( _getExtremeKey( -1 ) );
+        } else if ( candidates.size() ){
+            splitPoint.push_back( candidates[0] );
+        }
+
+        return multiSplit( splitPoint );
     }
     
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
