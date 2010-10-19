@@ -256,21 +256,20 @@ namespace mongo {
         return c->toString();
     }
     
-    void curopWaitingForLock( int type ){
+    Client* curopWaitingForLock( int type ){
         Client * c = currentClient.get();
         assert( c );
         CurOp * co = c->curop();
         if ( co ){
             co->waitingForLock( type );
         }
+        return c;
     }
-    void curopGotLock(){
-        Client * c = currentClient.get();
+    void curopGotLock(Client *c){
         assert(c);
         CurOp * co = c->curop();
-        if ( co ){
+        if ( co ) 
             co->gotLock();
-        }
     }
 
     CurOp::~CurOp(){
@@ -278,7 +277,6 @@ namespace mongo {
             scoped_lock bl(Client::clientsMutex);
             _client->_curOp = _wrapped;
         }
-        
         _client = 0;
     }
 
