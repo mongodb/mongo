@@ -3,13 +3,14 @@
 # $Id$
 
 # Run standard scripts.
-
-trap 'rm -f *.pyc __tmp __wt.*; exit 0' 0 1 2 3 13 15
+t=__wt.$$
+trap 'rm -f $t *.pyc __tmp __wt.*; exit 0' 0 1 2 3 13 15
 
 run()
 {
-	echo "$2 ..."
-	$1 | 2>&1 sed -e 's/^/	/'
+	echo -n "$2 ..."
+	$1 | 2>&1 sed -e 's/^/	/' > $t
+	test -s $t && (echo && cat $t) || echo ' OK'
 }
 
 echo 'dist/s_all run started...'
