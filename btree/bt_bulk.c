@@ -36,8 +36,10 @@ typedef struct {
 
 static int  __wt_bt_bulk_fix(WT_TOC *,
 	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, u_int32_t *);
 static int  __wt_bt_bulk_var(WT_TOC *, u_int32_t,
 	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bt_bulk_write(WT_TOC *, void *, u_int32_t, u_int32_t);
 static int  __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
 	DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
@@ -45,8 +47,8 @@ static int  __wt_bt_promote(
 	WT_TOC *, WT_PAGE *, u_int64_t, WT_STACK *, u_int, u_int32_t *);
 static int  __wt_bt_promote_col_indx(WT_TOC *, WT_PAGE *, void *);
 static int  __wt_bt_promote_row_indx(WT_TOC *, WT_PAGE *, WT_ITEM *, WT_ITEM *);
-static void __wt_bt_promote_col_rec(WT_PAGE *, u_int64_t);
-static void __wt_bt_promote_row_rec(WT_PAGE *, u_int64_t);
+static inline void __wt_bt_promote_col_rec(WT_PAGE *, u_int64_t);
+static inline void __wt_bt_promote_row_rec(WT_PAGE *, u_int64_t);
 
 /*
  * __wt_db_bulk_load --
@@ -353,9 +355,9 @@ skip_read:	/*
 		 */
 		if (key != NULL)
 			WT_ERR(__wt_bt_build_key_item(
-			    toc, key, &key_item, &key_ovfl));
+			    toc, key, &key_item, &key_ovfl, 1));
 		WT_ERR(__wt_bt_build_data_item(
-		    toc, data, &data_item, &data_ovfl));
+		    toc, data, &data_item, &data_ovfl, 1));
 
 		/*
 		 * Check for duplicate data; we don't store the key on the page
@@ -1224,7 +1226,7 @@ __wt_bt_promote_row_indx(
  * __wt_bt_promote_col_rec --
  *	Promote the record count to a column-store parent.
  */
-static void
+static inline void
 __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
 {
 	WT_COL *cip;
@@ -1241,7 +1243,7 @@ __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
  * __wt_bt_promote_row_rec --
  *	Promote the record count to a row-store parent.
  */
-static void
+static inline void
 __wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t incr)
 {
 	WT_ROW *rip;
@@ -1260,7 +1262,8 @@ __wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t incr)
  *	string to be stored on the page.
  */
 int
-__wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
+__wt_bt_build_key_item(
+    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load)
 {
 	DB *db;
 	IDB *idb;
@@ -1292,7 +1295,10 @@ __wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	if (dbt->size > db->leafitemsize) {
 		WT_CLEAR(*ovfl);
 		ovfl->size = dbt->size;
-		WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
+		if (bulk_load)
+			WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
+		else
+			WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
@@ -1311,7 +1317,8 @@ __wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
  *	string to be stored on the page.
  */
 int
-__wt_bt_build_data_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
+__wt_bt_build_data_item(
+    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load)
 {
 	DB *db;
 	IDB *idb;
@@ -1354,7 +1361,10 @@ __wt_bt_build_data_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	if (dbt->size > db->leafitemsize) {
 		WT_CLEAR(*ovfl);
 		ovfl->size = dbt->size;
-		WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
+		if (bulk_load)
+			WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
+		else
+			WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
@@ -1367,8 +1377,89 @@ __wt_bt_build_data_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 }
 
 /*
+ * __wt_bt_bulk_ovfl_write --
+ *	Store bulk-loaded overflow item in the database, returning the starting
+ *	addr.
+ */
+static int
+__wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
+{
+	DB *db;
+	DBT *tmp;
+	ENV *env;
+	WT_PAGE_HDR hdr;
+	u_int32_t remain, size;
+	u_int8_t *p;
+
+	db = toc->db;
+	tmp = &toc->tmp2;
+	env = toc->env;
+
+	/* Make sure the TOC's scratch buffer is big enough. */
+	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + dbt->size, db->allocsize);
+	if (tmp->mem_size < size)
+		WT_RET(__wt_realloc(env, &tmp->mem_size, size, &tmp->data));
+	p = tmp->data;
+	remain = size;
+
+	/*
+	 * Allocate a chunk of file space -- we don't go through the cache
+	 * to do that, it's going to take additional time because we'd have
+	 * to pass messages around, and during a bulk load there shouldn't
+	 * be any other threads of control accessing this file.
+	 */
+	WT_RET(
+	    __wt_cache_alloc(toc, addrp, WT_HDR_BYTES_TO_ALLOC(db, dbt->size)));
+
+	/* Initialize the page header and copy the overflow item in. */
+	WT_CLEAR(hdr);
+	hdr.type = WT_PAGE_OVFL;
+	hdr.level = WT_LLEAF;
+	hdr.u.datalen = dbt->size;
+	memcpy(p, &hdr, sizeof(WT_PAGE_HDR));
+	p += sizeof(WT_PAGE_HDR);
+	remain -= sizeof(WT_PAGE_HDR);
+
+	/* Copy the record into place. */
+	memcpy(p, dbt->data, dbt->size);
+	p += dbt->size;
+	remain -= dbt->size;
+
+	/* Clear any remaining bytes. */
+	if (remain > 0)
+		memset(p, 0, remain);
+
+	return (__wt_bt_bulk_write(toc, tmp->data, *addrp, size));
+}
+
+/*
+ * __wt_bt_bulk_write --
+ *	Write a bulk-loaded page into the database.
+ */
+static int
+__wt_bt_bulk_write(WT_TOC *toc, void *p, u_int32_t addr, u_int32_t size)
+{
+	DB *db;
+	ENV *env;
+	WT_PAGE page;
+
+	db = toc->db;
+	env = toc->env;
+
+	WT_CLEAR(page);
+
+	page.hdr = p;
+	page.addr = addr;
+	page.size = size;
+
+	WT_ASSERT(env, __wt_bt_verify_page(toc, &page, NULL) == 0);
+
+	return (__wt_page_write(db, &page));
+}
+
+/*
  * __wt_bt_dbt_copy --
- *	Get a local copy of an overflow key.
+ *	Get a copy of DBT referenced object.
  */
 static int
 __wt_bt_dbt_copy(ENV *env, DBT *orig, DBT *copy)
