@@ -230,23 +230,38 @@ namespace mongo {
             Timer timer;
             long long currCount = 0;
             long long numChunks = 0;
-            vector<BSONObj> splitKeys;
-            BSONObj currKey;
             
             BtreeCursor * bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
             shared_ptr<Cursor> c( bc );
             scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+            if ( ! cc->ok() ){
+                errmsg = "can't open a cursor for splitting";
+                return false;
+            }
 
+            // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel, to be removed
+            // at the end. If a key appears more times than entries allowed on a chunk, we issue a warning and 
+            // split on the following key.
+            vector<BSONObj> splitKeys;
+            set<BSONObj> tooFrequentKeys;
+            splitKeys.push_back( c->currKey() );
             while ( cc->ok() ){ 
                 currCount++;
                 if ( currCount > keyCount ){
-                    if ( currKey.isEmpty() || currKey.woCompare( c->currKey() ) ){ 
-                        currKey = c->currKey();
-                        splitKeys.push_back( bc->prettyKey( currKey ) );
+                    BSONObj currKey = c->currKey();
+
+                    // Do not use this split key if it is the same used in the previous split point.
+                    if ( currKey.woCompare( splitKeys.back() ) == 0 ){
+                        tooFrequentKeys.insert( currKey );
+
+                    } else {
+                        splitKeys.push_back( currKey );
                         currCount = 0;
                         numChunks++;
-                        log(4) << "picked a split key: " << currKey << endl;
+
+                        log(4) << "picked a split key: " << bc->prettyKey( currKey ) << endl;
                     }
+
                 }
                 cc->advance();
 
@@ -264,6 +279,18 @@ namespace mongo {
                     bc = NULL; // defensive
                     break;
                 }
+            }
+
+            // Warn for keys that are more numerous than maxChunkSize allows.
+            for ( set<BSONObj>::const_iterator it = tooFrequentKeys.begin(); it != tooFrequentKeys.end(); ++it ){
+                log( LL_WARNING ) << "chunk is larger than " << maxChunkSize 
+                                  << " bytes because of key " << bc->prettyKey( *it ) << endl;
+            }
+
+            // Remove the sentinel at the beginning before returning and add fieldnames.
+            splitKeys.erase( splitKeys.begin() );
+            for ( vector<BSONObj>::iterator it = splitKeys.begin(); it != splitKeys.end() ; ++it ){
+                *it = bc->prettyKey( *it );
             }
 
             ostringstream os;
