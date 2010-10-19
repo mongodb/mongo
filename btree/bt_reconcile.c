@@ -29,6 +29,7 @@ int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
+	DBT *tmp;
 	IDB *idb;
 	ENV *env;
 	WT_PAGE *new;
@@ -37,6 +38,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	int ret;
 
 	db = toc->db;
+	tmp = NULL;
 	idb = db->idb;
 	env = toc->env;
 	hdr = page->hdr;
@@ -114,32 +116,20 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		max = db->intlmax;
 		break;
 	case WT_PAGE_OVFL:
-		/*
-		 * Overflow pages are never modified, the only way we ever see
-		 * an overflow page in the reconciliation code is because it was
-		 * bulk loaded and we're discarding it.   That case was caught
-		 * above because the page->indx_count wasn't set, which means
-		 * this is an error.
-		 *
-		 * XXX
-		 * There's no reason to allocate WT_PAGE information for overflow
-		 * pages during bulk load, which means we should never be here
-		 * at all.  Once bulk load is fixed, fix this comment.
-		 */
 		 /* FALLTHROUGH */
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
 	/* Make sure the TOC's scratch buffer is big enough. */
-	if (toc->tmp1.mem_size < sizeof(WT_PAGE) + max)
-		WT_ERR(__wt_realloc(env, &toc->tmp1.mem_size,
-		    sizeof(WT_PAGE) + max, &toc->tmp1.data));
-	memset(toc->tmp1.data, 0, sizeof(WT_PAGE) + max);
+	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	if (tmp->mem_size < sizeof(WT_PAGE) + max)
+		WT_ERR(__wt_realloc(env, &tmp->mem_size,
+		    sizeof(WT_PAGE) + max, &tmp->data));
+	memset(tmp->data, 0, sizeof(WT_PAGE) + max);
 
 	/* Initialize the reconciliation buffer as a replacement page. */
-	new = toc->tmp1.data;
-	new->hdr =
-	    (WT_PAGE_HDR *)((u_int8_t *)toc->tmp1.data + sizeof(WT_PAGE));
+	new = tmp->data;
+	new->hdr = (WT_PAGE_HDR *)((u_int8_t *)tmp->data + sizeof(WT_PAGE));
 	new->addr = page->addr;
 	__wt_bt_set_ff_and_sa_from_offset(new, WT_PAGE_BYTE(new));
 	new->hdr->type = page->hdr->type;
@@ -187,6 +177,10 @@ done:	/*
 	WT_MEMORY_FLUSH;
 
 err:	F_CLR(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
+
+	if (tmp != NULL)
+		__wt_toc_scratch_discard(toc, tmp);
+
 	return (ret);
 }
 
@@ -227,28 +221,32 @@ static int
 __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	DB *db;
+	DBT *tmp;
 	ENV *env;
 	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
 	u_int32_t i, len;
 	u_int8_t *data;
+	int ret;
 
 	db = toc->db;
+	tmp = NULL;
 	env = toc->env;
 	hdr = new->hdr;
+	ret = 0;
 
 	/*
 	 * We need a "deleted" data item to store on the page.  Make sure the
-	 * WT_TOC's scratch buffer is big enough (our caller is using tmp1 so
-	 * we use tmp2).   Clear the buffer's contents and set the delete flag.
+	 * WT_TOC's scratch buffer is big enough.  Clear the buffer's contents
+	 * and set the delete flag.
 	 */
 	len = db->fixed_len;
-	if (toc->tmp2.mem_size < len)
-		WT_RET(__wt_realloc(
-		    env, &toc->tmp2.mem_size, len, &toc->tmp2.data));
-	memset(toc->tmp2.data, 0, len);
-	WT_FIX_DELETE_SET(toc->tmp2.data);
+	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	if (tmp->mem_size < len)
+		WT_ERR(__wt_realloc(env, &tmp->mem_size, len, &tmp->data));
+	memset(tmp->data, 0, len);
+	WT_FIX_DELETE_SET(tmp->data);
 
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
@@ -257,11 +255,11 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
 			if (WT_REPL_DELETED_ISSET(repl))
-				data = toc->tmp2.data;	/* Replaced deleted */
+				data = tmp->data;	/* Replaced deleted */
 			else				/* Replaced data */
 				data = WT_REPL_DATA(repl);
 		} else if (WT_FIX_DELETE_ISSET(cip->data))
-			data = toc->tmp2.data;		/* On-page deleted */
+			data = tmp->data;		/* On-page deleted */
 		else
 			data = cip->data;		/* On-page data */
 
@@ -278,7 +276,10 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 		++hdr->u.entries;
 	}
-	return (0);
+
+err:	if (tmp != NULL)
+		__wt_toc_scratch_discard(toc, tmp);
+	return (ret);
 }
 
 /*
@@ -289,6 +290,7 @@ static int
 __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	DB *db;
+	DBT *tmp;
 	ENV *env;
 	WT_COL *cip;
 	WT_COL_EXPAND *exp, **expsort, **expp;
@@ -297,27 +299,29 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	u_int32_t i, len, n_expsort;
 	u_int16_t n, repeat_count, total;
 	u_int8_t *data, *last_data;
-	int rc_prefix;
+	int rc_prefix, ret;
 
 	db = toc->db;
+	tmp = NULL;
 	env = toc->env;
 	expsort = NULL;
 	hdr = new->hdr;
 	n_expsort = 0;			/* Necessary for the sort function */
 	last_data = NULL;
+	ret = 0;
 
 	/*
 	 * We need a "deleted" data item to store on the page.  Make sure the
-	 * WT_TOC's scratch buffer is big enough (our caller is using tmp1 so
-	 * we use tmp2).   Clear the buffer's contents and set the delete flag.
+	 * WT_TOC's scratch buffer is big enough.  Clear the buffer's contents
+	 * and set the delete flag.
 	 */
 	len = db->fixed_len + sizeof(u_int16_t);
-	if (toc->tmp2.mem_size < len)
-		WT_RET(__wt_realloc(
-		    env, &toc->tmp2.mem_size, len, &toc->tmp2.data));
-	memset(toc->tmp2.data, 0, len);
-	WT_FIX_REPEAT_COUNT(toc->tmp2.data) = 1;
-	WT_FIX_DELETE_SET(WT_FIX_REPEAT_DATA(toc->tmp2.data));
+	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	if (tmp->mem_size < len)
+		WT_ERR(__wt_realloc(env, &tmp->mem_size, len, &tmp->data));
+	memset(tmp->data, 0, len);
+	WT_FIX_REPEAT_COUNT(tmp->data) = 1;
+	WT_FIX_DELETE_SET(WT_FIX_REPEAT_DATA(tmp->data));
 
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
@@ -326,7 +330,7 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * terminated array of references to WT_COL_EXPAND structures,
 		 * sorted by record offset.
 		 */
-		WT_RET(__wt_bt_rcc_expand_sort(
+		WT_ERR(__wt_bt_rcc_expand_sort(
 		    env, page, cip, &expsort, &n_expsort));
 
 		/*
@@ -342,7 +346,7 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 				repl = exp->repl;
 				if (WT_REPL_DELETED_ISSET(repl))
-					data = toc->tmp2.data;
+					data = tmp->data;
 				else {
 					rc_prefix = 1;
 					data = WT_REPL_DATA(repl);
@@ -350,7 +354,7 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				repeat_count = 1;
 			} else {
 				if (WT_FIX_DELETE_ISSET(cip->data))
-					data = toc->tmp2.data;
+					data = tmp->data;
 				else
 					data = cip->data;
 				/*
@@ -380,7 +384,7 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 			/*
 			 * XXX
-			 * We don't yet handle splits -- we allocated the maximum
+			 * We don't yet handle splits:  we allocated the maximum
 			 * leaf page size, but it still wasn't enough.  We must
 			 * allocate another leaf page and split the parent.
 			 */
@@ -412,9 +416,13 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	}
 
 	/* Free the sort array. */
-	if (expsort != NULL)
+err:	if (expsort != NULL)
 		__wt_free(env, expsort, n_expsort * sizeof(WT_COL_EXPAND *));
-	return (0);
+
+	if (tmp != NULL)
+		__wt_toc_scratch_discard(toc, tmp);
+
+	return (ret);
 }
 
 /*
@@ -521,7 +529,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				data->data = WT_REPL_DATA(repl);
 				data->size = repl->size;
 				WT_RET(__wt_bt_build_data_item(
-				    toc, data, &data_item, &data_ovfl));
+				    toc, data, &data_item, &data_ovfl, 0));
 				len = WT_ITEM_SPACE_REQ(data->size);
 			}
 			data_loc = DATA_OFF_PAGE;
@@ -638,7 +646,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			data->data = WT_REPL_DATA(repl);
 			data->size = repl->size;
 			WT_RET(__wt_bt_build_data_item(
-			    toc, data, &data_item, &data_ovfl));
+			    toc, data, &data_item, &data_ovfl, 0));
 			data_loc = DATA_OFF_PAGE;
 		} else {
 			/* Copy the item off the page. */
