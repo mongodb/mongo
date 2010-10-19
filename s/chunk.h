@@ -90,9 +90,17 @@ namespace mongo {
          * @param a vector of possible split points
          *        used as a hint only
          */
-        BSONObj pickSplitPoint( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
-        ChunkPtr split();
+        /* to be deprecated */ BSONObj pickSplitPoint( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
+        /* to be deprecated */ ChunkPtr split();        
 
+        /**
+         * Splits a chunk at a non specificed split key.
+         *
+         * @param force if set to true, will split the chunk regardless if the split is really necessary size wise
+         *              if set to false, will only split if the chunk has reached the currently desired maximum size
+         */
+        ChunkPtr simpleSplit( bool force );
+        
         /**
          * @param splitPoints vector to be filled in
          * @param chunkSize chunk size to target in bytes
