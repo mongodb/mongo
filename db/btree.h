@@ -297,7 +297,7 @@ namespace mongo {
         virtual string toString() {
             string s = string("BtreeCursor ") + indexDetails.indexName();
             if ( direction < 0 ) s += " reverse";
-            if ( bounds_.get() && bounds_->size() > 1 ) s += " multi";
+            if ( _bounds.get() && _bounds->size() > 1 ) s += " multi";
             return s;
         }
 
@@ -309,7 +309,7 @@ namespace mongo {
             if ( !_independentFieldRanges ) {
                 return BSON( "start" << prettyKey( startKey ) << "end" << prettyKey( endKey ) );
             } else {
-                return bounds_->obj();
+                return _bounds->obj();
             }
         }
         
@@ -349,17 +349,17 @@ namespace mongo {
         const int idxNo;        
         BSONObj startKey;
         BSONObj endKey;
-        bool endKeyInclusive_;        
+        bool _endKeyInclusive;        
         bool multikey; // note this must be updated every getmore batch in case someone added a multikey...
         const IndexDetails& indexDetails;
-        BSONObj order;
-        Ordering _ordering;
+        const BSONObj _order;
+        const Ordering _ordering;
         DiskLoc bucket;
         int keyOfs;
         const int direction; // 1=fwd,-1=reverse
         BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
         DiskLoc locAtKeyOfs;
-        shared_ptr< FieldRangeVector > bounds_;
+        const shared_ptr< FieldRangeVector > _bounds;
         auto_ptr< FieldRangeVector::Iterator > _boundsIterator;
         const IndexSpec& _spec;
         shared_ptr< CoveredIndexMatcher > _matcher;

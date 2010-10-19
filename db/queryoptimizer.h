@@ -81,7 +81,7 @@ namespace mongo {
         shared_ptr< FieldRangeVector > _originalFrv;
         BSONObj _startKey;
         BSONObj _endKey;
-        bool endKeyInclusive_;
+        bool _endKeyInclusive;
         bool unhelpful_;
         string _special;
         IndexType * _type;

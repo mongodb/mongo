@@ -63,7 +63,7 @@ namespace mongo {
     scanAndOrderRequired_( true ),
     exactKeyMatch_( false ),
     direction_( 0 ),
-    endKeyInclusive_( endKey.isEmpty() ),
+    _endKeyInclusive( endKey.isEmpty() ),
     unhelpful_( false ),
     _special( special ),
     _type(0),
@@ -202,8 +202,8 @@ namespace mongo {
         massert( 10363 ,  "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
         
         if ( _startOrEndSpec ) {
-            // we are sure to spec endKeyInclusive_
-            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, _startKey, _endKey, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
+            // we are sure to spec _endKeyInclusive
+            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, _startKey, _endKey, _endKeyInclusive, direction_ >= 0 ? 1 : -1 ) );
         } else if ( index_->getSpec().getType() ) {
             return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, _frv->startKey(), _frv->endKey(), true, direction_ >= 0 ? 1 : -1 ) );            
         } else {
