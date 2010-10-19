@@ -1,4 +1,4 @@
-// rwlock.h
+// @file rwlock.h generic reader-writer lock (cross platform support)
 
 /*
  *    Copyright (C) 2010 10gen Inc.
