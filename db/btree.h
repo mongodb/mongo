@@ -253,18 +253,9 @@ namespace mongo {
     class BtreeCursor : public Cursor {
     public:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
-        ~BtreeCursor(){
-        }
-        virtual bool ok() {
-            return !bucket.isNull();
-        }
-        bool eof() {
-            return !ok();
-        }
+        virtual bool ok() { return !bucket.isNull(); }
         virtual bool advance();
-
         virtual void noteLocation(); // updates keyAtKeyOfs...
         virtual void checkLocation();
         virtual bool supportGetMore() { return true; }
@@ -278,7 +269,7 @@ namespace mongo {
         */
         virtual bool getsetdup(DiskLoc loc) {
             if( multikey ) { 
-                pair<set<DiskLoc>::iterator, bool> p = dups.insert(loc);
+                pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
                 return !p.second;
             }
             return false;
@@ -296,7 +287,6 @@ namespace mongo {
         }
 
         virtual BSONObj currKey() const { return currKeyNode().key; }
-
         virtual BSONObj indexKeyPattern() { return indexDetails.keyPattern(); }
 
         virtual void aboutToDeleteBucket(const DiskLoc& b) {
@@ -304,22 +294,14 @@ namespace mongo {
                 keyOfs = -1;
         }
 
-        virtual DiskLoc currLoc() {
-            return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc();
-        }
-        virtual DiskLoc refLoc() {
-            return currLoc();
-        }
-        virtual Record* _current() {
-            return currLoc().rec();
-        }
-        virtual BSONObj current() {
-            return BSONObj(_current());
-        }
+        virtual DiskLoc currLoc()  { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc();  }
+        virtual DiskLoc refLoc()   { return currLoc(); }
+        virtual Record* _current() { return currLoc().rec(); }
+        virtual BSONObj current()  { return BSONObj(_current()); }
         virtual string toString() {
             string s = string("BtreeCursor ") + indexDetails.indexName();
             if ( direction < 0 ) s += " reverse";
-            if ( bounds_.get() && bounds_->size() > 1 ) s += " multi";
+            if ( _bounds.get() && _bounds->size() > 1 ) s += " multi";
             return s;
         }
 
@@ -331,7 +313,7 @@ namespace mongo {
             if ( !_independentFieldRanges ) {
                 return BSON( "start" << prettyKey( startKey ) << "end" << prettyKey( endKey ) );
             } else {
-                return bounds_->obj();
+                return _bounds->obj();
             }
         }
         
@@ -339,9 +321,7 @@ namespace mongo {
 
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         
-        virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
-            _matcher = matcher;
-        }
+        virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher;  }
 
         virtual long long nscanned() { return _nscanned; }
         
@@ -367,25 +347,23 @@ namespace mongo {
         void advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive );
         
         friend class BtreeBucket;
-        set<DiskLoc> dups;
-        NamespaceDetails *d;
-        int idxNo;
-        
+
+        set<DiskLoc> _dups;
+        NamespaceDetails * const d;
+        const int idxNo;        
         BSONObj startKey;
         BSONObj endKey;
-        bool endKeyInclusive_;
-        
+        bool _endKeyInclusive;        
         bool multikey; // note this must be updated every getmore batch in case someone added a multikey...
-
         const IndexDetails& indexDetails;
-        BSONObj order;
-        Ordering _ordering;
+        const BSONObj _order;
+        const Ordering _ordering;
         DiskLoc bucket;
         int keyOfs;
-        int direction; // 1=fwd,-1=reverse
+        const int direction; // 1=fwd,-1=reverse
         BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
         DiskLoc locAtKeyOfs;
-        shared_ptr< FieldRangeVector > bounds_;
+        const shared_ptr< FieldRangeVector > _bounds;
         auto_ptr< FieldRangeVector::Iterator > _boundsIterator;
         const IndexSpec& _spec;
         shared_ptr< CoveredIndexMatcher > _matcher;

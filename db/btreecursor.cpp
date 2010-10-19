@@ -31,11 +31,11 @@ namespace mongo {
             d(_d), idxNo(_idxNo), 
             startKey( _startKey ),
             endKey( _endKey ),
-            endKeyInclusive_( endKeyInclusive ),
+            _endKeyInclusive( endKeyInclusive ),
             multikey( d->isMultikey( idxNo ) ),
             indexDetails( _id ),
-            order( _id.keyPattern() ),
-            _ordering( Ordering::make( order ) ),
+            _order( _id.keyPattern() ),
+            _ordering( Ordering::make( _order ) ),
             direction( _direction ),
             _spec( _id.getSpec() ),
             _independentFieldRanges( false ),
@@ -43,27 +43,27 @@ namespace mongo {
     {
         audit();
         init();
-        DEV assert( dups.size() == 0 );
+        dassert( _dups.size() == 0 );
     }
 
     BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction )
         :
             d(_d), idxNo(_idxNo), 
-            endKeyInclusive_( true ),
+            _endKeyInclusive( true ),
             multikey( d->isMultikey( idxNo ) ),
             indexDetails( _id ),
-            order( _id.keyPattern() ),
-            _ordering( Ordering::make( order ) ),
+            _order( _id.keyPattern() ),
+            _ordering( Ordering::make( _order ) ),
             direction( _direction ),
-            bounds_( ( assert( _bounds.get() ), _bounds ) ),
-            _boundsIterator( new FieldRangeVector::Iterator( *bounds_  ) ),
+            _bounds( ( assert( _bounds.get() ), _bounds ) ),
+            _boundsIterator( new FieldRangeVector::Iterator( *_bounds  ) ),
             _spec( _id.getSpec() ),
             _independentFieldRanges( true ),
             _nscanned( 0 )
     {
         massert( 13384, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
         audit();
-        startKey = bounds_->startKey();
+        startKey = _bounds->startKey();
         _boundsIterator->advance( startKey ); // handles initialization
         _boundsIterator->prepDive();
         pair< DiskLoc, int > noBestParent;
@@ -71,7 +71,7 @@ namespace mongo {
         keyOfs = 0;
         indexDetails.head.btree()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, direction, noBestParent );
         skipAndCheck();
-        DEV assert( dups.size() == 0 );
+        dassert( _dups.size() == 0 );
     }
 
     void BtreeCursor::audit() {
@@ -80,7 +80,7 @@ namespace mongo {
         if ( otherTraceLevel >= 12 ) {
             if ( otherTraceLevel >= 200 ) {
                 out() << "::BtreeCursor() qtl>200.  validating entire index." << endl;
-                indexDetails.head.btree()->fullValidate(indexDetails.head, order);
+                indexDetails.head.btree()->fullValidate(indexDetails.head, _order);
             }
             else {
                 out() << "BTreeCursor(). dumping head bucket" << endl;
@@ -169,9 +169,9 @@ namespace mongo {
         if ( bucket.isNull() )
             return;
         if ( !endKey.isEmpty() ) {
-            int cmp = sgn( endKey.woCompare( currKey(), order ) );
+            int cmp = sgn( endKey.woCompare( currKey(), _order ) );
             if ( ( cmp != 0 && cmp != direction ) ||
-                ( cmp == 0 && !endKeyInclusive_ ) )
+                ( cmp == 0 && !_endKeyInclusive ) )
                 bucket = DiskLoc();
         }
     }

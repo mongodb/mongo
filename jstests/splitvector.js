@@ -120,4 +120,57 @@ res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:
 assert.eq( true , res.ok , "6a" );
 assert.eq( 19 , res.splitKeys.length , "6b" );
 
+
+// -------------------------
+// Case 7: enough occurances of min key documents to pass the chunk limit
+// [1111111111111111,2,3)
+
+f.drop();
+f.ensureIndex( { x: 1 } );
+
+// Fill collection and get split vector for 1MB maxChunkSize
+numDocs = 2100;
+for( i=1; i<numDocs; i++ ){
+    f.save( { x: 1, y: filler } );
+}
+
+for( i=1; i<10; i++ ){
+    f.save( { x: 2, y: filler } );
+}
+db.getLastError();
+res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 , min: 1} );
+
+assert.eq( true , res.ok , "7a" );
+assert.eq( 2 , res.splitKeys[0].x, "7b");
+
+
+// -------------------------
+// Case 8: few occurrances of min key, and enough of some other that we cannot split it
+// [1, 22222222222222, 3)
+
+f.drop();
+f.ensureIndex( { x: 1 } );
+
+for( i=1; i<10; i++ ){
+    f.save( { x: 1, y: filler } );
+}
+
+numDocs = 2100;
+for( i=1; i<numDocs; i++ ){
+    f.save( { x: 2, y: filler } );
+}
+
+for( i=1; i<10; i++ ){
+    f.save( { x: 3, y: filler } );
+}
+
+db.getLastError();
+res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 , min: 1} );
+
+assert.eq( true , res.ok , "8a" );
+assert.eq( 1 , res.splitKeys.length , "8b" );
+assert.eq( 2 , res.splitKeys[0].x , "8c" );
+assert.eq( 3 , res.splitKeys[1].x , "8d");
+
 print("PASSED");
+

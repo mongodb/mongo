@@ -1419,7 +1419,7 @@ namespace mongo {
 
             _want._min = Point( _g , _bl );
             _want._max = Point( _g , _tr );
-            
+
             uassert( 13064 , "need an area > 0 " , _want.area() > 0 );
 
             _state = START;
@@ -1430,12 +1430,14 @@ namespace mongo {
             
             GEODEBUG( "center : " << center.toString() << "\t" << _prefix );
 
-	    {
-	      GeoHash a(0LL,32);
-	      GeoHash b(0LL,32);
-	      b.move(1,1);
-	      _fudge = _g->distance(a,b);
-	    }
+            {
+                GeoHash a(0LL,32);
+                GeoHash b(0LL,32);
+                b.move(1,1);
+                _fudge = _g->distance(a,b);
+            }
+
+            _wantLen = _fudge + std::max((_want._max._x - _want._min._x), (_want._max._y - _want._min._y));
 
             ok();
         }
@@ -1470,31 +1472,46 @@ namespace mongo {
                         _state = DONE;
                         return;
                     }
-                    
-                    Box cur( _g , _prefix );
-                    if ( cur._min._x + _fudge < _want._min._x &&
-                         cur._min._y + _fudge < _want._min._y &&
-                         cur._max._x - _fudge > _want._max._x &&
-                         cur._max._y - _fudge > _want._max._y ){
-                        
-                        _state = DONE;
-                        GeoHash temp = _prefix.commonPrefix( cur._max.hash( _g ) );
 
-                        GEODEBUG( "box done : " << cur.toString() << " prefix:" << _prefix << " common:" << temp );
-                        
-                        if ( temp == _prefix )
-                            return;
-                        _prefix = temp;
-                        GEODEBUG( "\t one more loop" );
-                        continue;
-                    }
-                    else {
+                    if (_g->sizeEdge(_prefix) < _wantLen){
                         _prefix = _prefix.up();
+                    } else {
+                        for (int i=-1; i<=1; i++){
+                            for (int j=-1; j<=1; j++){
+
+                                if (i == 0 && j == 0)
+                                    continue; // main box
+
+                                GeoHash newBox = _prefix;
+                                newBox.move(i, j);
+
+                                PREFIXDEBUG(newBox, _g);
+
+                                Box cur( _g , newBox );
+                                if (_want.intersects(cur)){
+                                    // TODO consider splitting into quadrants
+                                    getPointsForPrefix(newBox);
+                                } else  {
+                                    GEODEBUG("skipping box");
+                                }
+                            }
+                        }
+                        _state = DONE;
                     }
+                    
                 }
                 return;
             }
 
+        }
+
+        void getPointsForPrefix(const GeoHash& prefix){
+            if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , prefix , _found , this ) ){
+                return;
+            }
+
+            while ( _min.hasPrefix( prefix ) && _min.advance( -1 , _found , this ) );
+            while ( _max.hasPrefix( prefix ) && _max.advance( 1 , _found , this ) );
         }
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
@@ -1508,6 +1525,7 @@ namespace mongo {
         GeoHash _bl;
         GeoHash _tr;
         Box _want;
+        double _wantLen;
 
         int _found;
         

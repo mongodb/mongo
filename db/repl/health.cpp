@@ -370,9 +370,15 @@ namespace mongo {
             BSONObjBuilder bb;
             bb.append("_id", (int) m->id());
             bb.append("name", m->fullName());
-            bb.append("health", m->hbinfo().health);
+            double h = m->hbinfo().health;
+            bb.append("health", h);
             bb.append("state", (int) m->state().s);
-            bb.append("stateStr", m->state().toString());
+            if( h == 0 ) {
+                // if we can't connect the state info is from the past and could be confusing to show
+                bb.append("stateStr", "(not reachable/healthy)"); 
+            } else {
+                bb.append("stateStr", m->state().toString());
+            }
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
             bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
             bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);

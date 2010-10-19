@@ -20,6 +20,13 @@
 
 namespace mongo { 
 
+    /* the 'big lock' we use for most operations. a read/write lock.
+       there is one of these, dbMutex.  
+       generally if you need to declare a mutex use the right primitive class no this.
+
+       use readlock and writelock classes for scoped locks on this rather than direct 
+       manipulation.
+       */
     class MongoMutex {
     public:
         MongoMutex(const char * name);
@@ -30,50 +37,39 @@ namespace mongo {
          *    < 0  read lock
          */
         int getState() const { return _state.get(); }
+
+        bool atLeastReadLocked() const { return _state.get() != 0; }
+        void assertAtLeastReadLocked() const { assert(atLeastReadLocked()); }
         bool isWriteLocked() const { return getState() > 0; }
         void assertWriteLocked() const { 
             assert( getState() > 0 ); 
             DEV assert( !_releasedEarly.get() );
         }
-        bool atLeastReadLocked() const { return _state.get() != 0; }
-        void assertAtLeastReadLocked() const { assert(atLeastReadLocked()); }
 
-        bool _checkWriteLockAlready(){
-            DEV assert( haveClient() );
-                
-            int s = _state.get();
-            if( s > 0 ) {
-                _state.set(s+1);
-                return true;
-            }
-
-            massert( 10293 , (string)"internal error: locks are not upgradeable: " + sayClientState() , s == 0 );
-
-            return false;
-        }
-
+        // write lock
         void lock() { 
-            if ( _checkWriteLockAlready() )
+            if ( _writeLockedAlready() )
                 return;
             
             _state.set(1);
 
-            curopWaitingForLock( 1 ); // stats
+            Client *c = curopWaitingForLock( 1 ); // stats
             _m.lock(); 
-            curopGotLock();
+            curopGotLock(c);
 
             _minfo.entered();
 
-            MongoFile::lockAll();
+            MongoFile::lockAll(); // for _DEBUG validation -- a no op for release build
         }
 
+        // try write lock
         bool lock_try( int millis ) { 
-            if ( _checkWriteLockAlready() )
+            if ( _writeLockedAlready() )
                 return true;
 
-            curopWaitingForLock( 1 );
+            Client *c = curopWaitingForLock( 1 );
             bool got = _m.lock_try( millis ); 
-            curopGotLock();
+            curopGotLock(c);
             
             if ( got ){
                 _minfo.entered();
@@ -84,9 +80,8 @@ namespace mongo {
             return got;
         }
 
-
+        // un write lock 
         void unlock() { 
-            //DEV cout << "UNLOCK" << endl;
             int s = _state.get();
             if( s > 1 ) { 
                 _state.set(s-1);
@@ -117,8 +112,8 @@ namespace mongo {
             unlock();
         }
 
+        // read lock
         void lock_shared() { 
-            //DEV cout << " LOCKSHARED" << endl;
             int s = _state.get();
             if( s ) {
                 if( s > 0 ) { 
@@ -133,11 +128,12 @@ namespace mongo {
                 }
             }
             _state.set(-1);
-            curopWaitingForLock( -1 );
+            Client *c = curopWaitingForLock( -1 );
             _m.lock_shared(); 
-            curopGotLock();
+            curopGotLock(c);
         }
         
+        // try read lock
         bool lock_shared_try( int millis ) {
             int s = _state.get();
             if ( s ){
@@ -146,6 +142,10 @@ namespace mongo {
                 return true;
             }
 
+            /* [dm] should there be
+                             Client *c = curopWaitingForLock( 1 );
+               here?  i think so.  seems to be missing.
+               */
             bool got = _m.lock_shared_try( millis );
             if ( got )
                 _state.set(-1);
@@ -153,7 +153,6 @@ namespace mongo {
         }
         
         void unlock_shared() { 
-            //DEV cout << " UNLOCKSHARED" << endl;
             int s = _state.get();
             if( s > 0 ) { 
                 assert( s > 1 ); /* we must have done a lock write first to have s > 1 */
@@ -172,6 +171,18 @@ namespace mongo {
         MutexInfo& info() { return _minfo; }
 
     private:
+        /* @return true if was already write locked.  increments recursive lock count. */
+        bool _writeLockedAlready() {
+            dassert( haveClient() );                
+            int s = _state.get();
+            if( s > 0 ) {
+                _state.set(s+1);
+                return true;
+            }
+            massert( 10293 , (string)"internal error: locks are not upgradeable: " + sayClientState() , s == 0 );
+            return false;
+        }
+
         RWLock _m;
 
         /* > 0 write lock with recurse count
@@ -185,6 +196,11 @@ namespace mongo {
            we use a separate TLS value for releasedEarly - that is ok as 
            our normal/common code path, we never even touch it */
         ThreadLocalValue<bool> _releasedEarly;
+
+        /* this is for fsyncAndLock command.  otherwise write lock's greediness will
+           make us block on any attempted write lock the the fsync's lock.
+           */
+        //volatile bool _blockWrites;
     };
 
     extern MongoMutex &dbMutex;

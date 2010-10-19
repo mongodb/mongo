@@ -731,8 +731,8 @@ int main(int argc, char* argv[], char *envp[] )
         ;
 
 	sharding_options.add_options()
-		("configsvr", "declare this is a config db of a cluster")
-		("shardsvr", "declare this is a shard db of a cluster")
+		("configsvr", "declare this is a config db of a cluster; default port 27019; default dir /data/configdb")
+		("shardsvr", "declare this is a shard db of a cluster; default port 27018")
         ("noMoveParanoia" , "turn off paranoid saving of data for moveChunk.  this is on by default for now, but default will switch" )
 		;
 
@@ -969,6 +969,7 @@ int main(int argc, char* argv[], char *envp[] )
             }
         }
         if ( params.count("configsvr" ) ){
+            uassert( 13499, "replication should not be enabled on a config server", !cmdLine.usingReplSets() && !replSettings.master && !replSettings.slave);
             if ( params.count( "diaglog" ) == 0 )
                 _diaglog.level = 1;
             if ( params.count( "dbpath" ) == 0 )

@@ -240,15 +240,16 @@ namespace mongo {
         }
 
         class IndexIterator { 
-            friend class NamespaceDetails;
-            int i, n;
-            NamespaceDetails *d;
-            IndexIterator(NamespaceDetails *_d);
         public:
             int pos() { return i; } // note this is the next one to come
             bool more() { return i < n; }
             IndexDetails& next() { return d->idx(i++); }
-        }; // IndexIterator
+        private:
+            friend class NamespaceDetails;
+            int i, n;
+            NamespaceDetails *d;
+            IndexIterator(NamespaceDetails *_d);
+        };
 
         IndexIterator ii() { return IndexIterator(this); }
 
@@ -259,7 +260,7 @@ namespace mongo {
              for a single document. see multikey in wiki.
            for these, we have to do some dedup work on queries.
         */
-        bool isMultikey(int i) { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
+        bool isMultikey(int i) const { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
         void setIndexIsMultikey(int i) { 
             dassert( i < NIndexesMax );
             unsigned long long x = ((unsigned long long) 1) << i;

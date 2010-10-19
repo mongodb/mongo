@@ -924,9 +924,7 @@ namespace mongo {
         string _name;
         DBClientConnection * _currentMaster;
         vector<HostAndPort> _servers;
-        vector<DBClientConnection*> _conns;
-
-        
+        vector<DBClientConnection*> _conns;        
         void _checkMaster();
         DBClientConnection * checkMaster();
 
@@ -992,7 +990,6 @@ namespace mongo {
         
         DBClientConnection& masterConn();
         DBClientConnection& slaveConn();
-
 
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { return checkMaster()->call( toSend , response , assertOk ); }
         virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
