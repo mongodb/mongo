@@ -731,8 +731,8 @@ int main(int argc, char* argv[], char *envp[] )
         ;
 
 	sharding_options.add_options()
-		("configsvr", "declare this is a config db of a cluster")
-		("shardsvr", "declare this is a shard db of a cluster")
+		("configsvr", "declare this is a config db of a cluster; default port 27019; default dir /data/configdb")
+		("shardsvr", "declare this is a shard db of a cluster; default port 27018")
         ("noMoveParanoia" , "turn off paranoid saving of data for moveChunk.  this is on by default for now, but default will switch" )
 		;
 
