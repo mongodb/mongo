@@ -103,6 +103,17 @@ namespace BtreeTests {
         BSONObj order() {
             return id().keyPattern();
         }
+        BtreeBucket *child( BtreeBucket *b, int i ) {
+            assert( i <= b->nKeys() );
+            DiskLoc d;
+            if ( i == b->nKeys() ) {
+                d = b->getNextChild();
+            } else {
+                d = const_cast< DiskLoc& >( b->keyNode( i ).prevChildBucket );
+            }
+            assert( !d.isNull() );
+            return d.btree();
+        }
     private:
         dblock lk_;
         Client::Context _context;
@@ -142,6 +153,8 @@ namespace BtreeTests {
                 insert( longKey );
             }
             checkValid( 20 );
+            ASSERT_EQUALS( 1, bt()->nKeys() );
+            checkSplit();
         }
     protected:
         virtual char shortToken( int i ) const = 0;
@@ -152,6 +165,7 @@ namespace BtreeTests {
         static char rightToken( int i ) {
             return 'z' - i;
         }
+        virtual void checkSplit() = 0;
     };
 
     class SplitRightHeavyBucket : public SplitUnevenBucketBase {
@@ -162,6 +176,10 @@ namespace BtreeTests {
         virtual char longToken( int i ) const {
             return rightToken( i );
         }
+        virtual void checkSplit() {
+            ASSERT_EQUALS( 15, child( bt(), 0 )->nKeys() );
+            ASSERT_EQUALS( 4, child( bt(), 1 )->nKeys() );            
+        }
     };
 
     class SplitLeftHeavyBucket : public SplitUnevenBucketBase {
@@ -171,6 +189,10 @@ namespace BtreeTests {
         }
         virtual char longToken( int i ) const {
             return leftToken( i );
+        }
+        virtual void checkSplit() {
+            ASSERT_EQUALS( 4, child( bt(), 0 )->nKeys() );
+            ASSERT_EQUALS( 15, child( bt(), 1 )->nKeys() );            
         }
     };
 
@@ -259,6 +281,7 @@ namespace BtreeTests {
             for ( int i = 0; i < 10; ++i ) {
                 insert( i );
             }
+//            dump();
             BSONObj root = key( 'p' );
             unindex( root );
             Base::insert( root );

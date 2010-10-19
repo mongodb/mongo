@@ -102,6 +102,10 @@ namespace mongo {
             }
             return KeyNode(*this, k(i));
         }
+        
+        // for testing
+        int nKeys() const { return n; }
+        DiskLoc getNextChild() const { return nextChild; }
 
     protected:
         char * dataAt(short ofs) { return data + ofs; }
@@ -116,8 +120,8 @@ namespace mongo {
         /**
          * @return true if works, false if not enough space
          */
-        bool _pushBack(const DiskLoc& recordLoc, BSONObj& key, const Ordering &order, DiskLoc prevChild);
-        void pushBack(const DiskLoc& recordLoc, BSONObj& key, const Ordering &order, DiskLoc prevChild){
+        bool _pushBack(const DiskLoc& recordLoc, const BSONObj& key, const Ordering &order, DiskLoc prevChild);
+        void pushBack(const DiskLoc& recordLoc, const BSONObj& key, const Ordering &order, DiskLoc prevChild){
             bool ok = _pushBack( recordLoc , key , order , prevChild );
             assert(ok);
         }
