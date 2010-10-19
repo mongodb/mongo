@@ -189,7 +189,22 @@ namespace mongo {
                 break;
         }
 
-        wassert( toAdvance.size() < 5000 );
+        if( toAdvance.size() >= 3000 ) { 
+            log() << "perf warning MPW101: " << toAdvance.size() << " cursors for one diskloc " 
+                << dl.toString()
+                << ' ' << toAdvance[1000]->ns
+                << ' ' << toAdvance[2000]->ns
+                << ' ' << toAdvance[1000]->_pinValue 
+                << ' ' << toAdvance[2000]->_pinValue
+                << ' ' << toAdvance[1000]->pos
+                << ' ' << toAdvance[2000]->pos
+                << ' ' << toAdvance[1000]->_idleAgeMillis
+                << ' ' << toAdvance[2000]->_idleAgeMillis
+                << ' ' << toAdvance[1000]->_doingDeletes 
+                << ' ' << toAdvance[2000]->_doingDeletes 
+                << endl;
+            //wassert( toAdvance.size() < 5000 );
+        }
         
         for ( vector<ClientCursor*>::iterator i = toAdvance.begin(); i != toAdvance.end(); ++i ){
             ClientCursor* cc = *i;
