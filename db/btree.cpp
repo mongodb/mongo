@@ -752,7 +752,7 @@ found:
         int rightSize = 0;
         // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split. 
         // see SERVER-983
-        int rightSizeLimit = topSize * ( keypos == n ? 0.1 : 0.5 );
+        int rightSizeLimit = topSize / ( keypos == n ? 10 : 2 );
         for( int i = n - 1; i > -1; --i ) {
             rightSize += keyNode( i ).key.objsize();
             if ( rightSize > rightSizeLimit ) {
