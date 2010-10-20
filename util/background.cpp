@@ -85,7 +85,8 @@ namespace mongo {
                 boost::xtime xt;
                 boost::xtime_get( &xt, boost::TIME_UTC );
 
-                unsigned long long ns = msTimeOut * 1000000; // milli to nano
+                unsigned long long ns = msTimeOut * 1000000ULL; // milli to nano
+                cout << msTimeOut << "\t" << ns << "\t" << ( ns / 1000000 ) << endl;
                 if ( xt.nsec + ns < 1000000000 ) {
                     xt.nsec = (xtime::xtime_nsec_t) (xt.nsec + ns);
                 } else {
