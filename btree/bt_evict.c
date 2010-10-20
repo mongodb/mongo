@@ -92,13 +92,21 @@ __wt_cache_drain_server(void *arg)
 	    env, cache->hazard_elem, sizeof(WT_PAGE *), &cache->hazard));
 	cache->hazard_len = cache->hazard_elem * sizeof(WT_PAGE *);
 
-	while (F_ISSET(ienv, WT_SERVER_RUN)) {
+	for (;;) {
 		WT_VERBOSE(env,
 		    WT_VERB_SERVERS, (env, "cache drain server sleeping"));
 		cache->drain_sleeping = 1;
 		__wt_lock(env, cache->mtx_drain);
 		WT_VERBOSE(env,
 		    WT_VERB_SERVERS, (env, "cache drain server waking"));
+
+		/*
+		 * Check for environment exit; do it here, instead of the top of
+		 * the loop because doing it here keeps us from doing a bunch of
+		 * worked when simply awakened to quit.
+		 */
+		if (!F_ISSET(ienv, WT_SERVER_RUN))
+			break;
 
 		for (;;) {
 			/*
@@ -131,15 +139,18 @@ __wt_cache_drain_server(void *arg)
 				break;
 		}
 	}
-err:	if (ret != 0)
-		__wt_api_env_err(env, ret, "cache drain server failure");
 
-	if (cache->drain != NULL)
+err:	if (cache->drain != NULL)
 		__wt_free(env, cache->drain, cache->drain_len);
 	if (cache->hazard != NULL)
 		__wt_free(env, cache->hazard, cache->hazard_len);
 	if (toc != NULL)
 		WT_TRET(toc->close(toc, 0));
+
+	if (ret != 0)
+		__wt_api_env_err(env, ret, "cache drain server error");
+
+	WT_VERBOSE(env, WT_VERB_SERVERS, (env, "cache drain server exiting"));
 
 	return (NULL);
 }

@@ -107,13 +107,21 @@ __wt_cache_read_server(void *arg)
 	rr = cache->read_request;
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
 
-	while (F_ISSET(ienv, WT_SERVER_RUN)) {
+	for (;;) {
 		WT_VERBOSE(env,
 		    WT_VERB_SERVERS, (env, "cache read server sleeping"));
 		cache->read_sleeping = 1;
 		__wt_lock(env, cache->mtx_read);
 		WT_VERBOSE(
 		    env, WT_VERB_SERVERS, (env, "cache read server waking"));
+
+		/*
+		 * Check for environment exit; do it here, instead of the top of
+		 * the loop because doing it here keeps us from doing a bunch of
+		 * worked when simply awakened to quit.
+		 */
+		if (!F_ISSET(ienv, WT_SERVER_RUN))
+			break;
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
@@ -143,6 +151,8 @@ __wt_cache_read_server(void *arg)
 				    __wt_cache_alloc(
 					rr->toc, rr->addrp, rr->size) :
 				    __wt_cache_read(rr);
+				if (ret != 0)
+					break;
 
 				WT_READ_REQ_CLR(rr);
 				__wt_toc_serialize_wrapup(toc, ret);
@@ -151,6 +161,11 @@ __wt_cache_read_server(void *arg)
 			}
 		} while (didwork);
 	}
+
+	if (ret != 0)
+		__wt_api_env_err(env, ret, "cache read server error");
+
+	WT_VERBOSE(env, WT_VERB_SERVERS, (env, "cache read server exiting"));
 	return (NULL);
 }
 
