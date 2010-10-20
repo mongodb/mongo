@@ -295,8 +295,8 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 			 * next slot and copy the previous key.
 			 */
 			if (rip->data != NULL) {
+				WT_KEY_SET(rip + 1, rip->key, rip->size);
 				++rip;
-				WT_KEY_SET(rip, rip[-1].key, rip[-1].size);
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA:
