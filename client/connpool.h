@@ -147,13 +147,15 @@ namespace mongo {
     public:
         ScopedDbConnection() : _host( "" ) , _conn(0) {}
 
+        ScopedDbConnection(const string& host, DBClientBase* conn ) : _host( host ) , _conn( conn ) {}
+        
         /** throws UserException if can't connect */
         explicit ScopedDbConnection(const string& host) : _host(host), _conn( pool.get(host) ) {}
         
-        ScopedDbConnection(const string& host, DBClientBase* conn ) : _host( host ) , _conn( conn ) {}
-        
+        /** throws UserException if can't connect */
         explicit ScopedDbConnection(const ConnectionString& url ) : _host(url.toString()), _conn( pool.get(url) ) {}
 
+        /** throws UserException if can't connect */
         explicit ScopedDbConnection(const Shard& shard );
         explicit ScopedDbConnection(const Shard* shard );
 
