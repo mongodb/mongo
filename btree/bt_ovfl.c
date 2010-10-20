@@ -39,8 +39,7 @@ __wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep)
 
 /*
  * __wt_bt_ovfl_write --
- *	Store an overflow item in the database, returning the starting
- *	addr.
+ *	Store overflow items in the database, returning the page addr.
  */
 int
 __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
@@ -97,28 +96,5 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy)
 	copy->size = from->size;
 
 	__wt_bt_page_out(toc, &ovfl_page, 0);
-	return (ret);
-}
-
-/*
- * __wt_bt_ovfl_to_dbt --
- *	Copy an overflow item into allocated memory in a DBT.
- */
-int
-__wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_OVFL *ovfl, DBT *copy)
-{
-	DB *db;
-	WT_PAGE *ovfl_page;
-	int ret;
-
-	db = toc->db;
-
-	WT_RET(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
-
-	ret = __wt_bt_data_copy_to_dbt(
-	    db, WT_PAGE_BYTE(ovfl_page), ovfl->size, copy);
-
-	__wt_bt_page_out(toc, &ovfl_page, 0);
-
 	return (ret);
 }
