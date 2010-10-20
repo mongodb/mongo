@@ -723,6 +723,98 @@ namespace mongo {
             }
         } fileMD5Cmd;
 
+        class Geo2dFindNearCmd : public PublicGridCommand {
+        public:
+            Geo2dFindNearCmd() : PublicGridCommand( "geoNear" ){}
+            void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Geospatial+Indexing#GeospatialIndexing-geoNearCommand"; }
+
+            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string collection = cmdObj.firstElement().valuestrsafe();
+                string fullns = dbName + "." + collection;
+
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
+                massert( 13500 ,  "how could chunk manager be null!" , cm );
+
+                BSONObj query = getQuery(cmdObj);
+                set<Shard> shards;
+                cm->getShardsForQuery(shards, query);
+                
+                int limit = 100;
+                if (cmdObj["num"].isNumber())
+                    limit = cmdObj["num"].numberInt();
+
+                list< shared_ptr<Future::CommandResult> > futures;
+                BSONArrayBuilder shardArray;
+                for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ){
+                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj ) );
+                    shardArray.append(i->getName());
+                }
+                
+                multimap<double, BSONObj> results; // TODO: maybe use merge-sort instead
+                string nearStr;
+                double time = 0;
+                double btreelocs = 0;
+                double nscanned = 0;
+                double objectsLoaded = 0;
+                for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ){
+                    shared_ptr<Future::CommandResult> res = *i;
+                    if ( ! res->join() ){
+                        errmsg = res->result()["errmsg"].String();
+                        return false;
+                    }
+
+                    nearStr = res->result()["near"].String();
+                    time += res->result()["stats"]["time"].Number(); 
+                    btreelocs += res->result()["stats"]["btreelocs"].Number(); 
+                    nscanned += res->result()["stats"]["nscanned"].Number(); 
+                    objectsLoaded += res->result()["stats"]["objectsLoaded"].Number(); 
+
+                    BSONForEach(obj, res->result()["results"].embeddedObject()){
+                        results.insert(make_pair(obj["dis"].Number(), obj.embeddedObject().getOwned()));
+                    }
+
+                    // TODO: maybe shrink results if size() > limit
+                }
+
+                result.append("ns" , fullns);
+                result.append("near", nearStr);
+                
+                int outCount = 0;
+                double totalDistance = 0;
+                double maxDistance = 0;
+                {
+                    BSONArrayBuilder sub (result.subarrayStart("results"));
+                    for (multimap<double, BSONObj>::const_iterator it(results.begin()), end(results.end()); it!= end && outCount < limit; ++it, ++outCount){
+                        totalDistance += it->first;
+                        maxDistance = it->first; // guaranteed to be highest so far
+
+                        sub.append(it->second);
+                    }
+                    sub.done();
+                }
+
+                {
+                    BSONObjBuilder sub (result.subobjStart("stats"));
+                    sub.append("time", time);
+                    sub.append("btreelocs", btreelocs);
+                    sub.append("nscanned", nscanned);
+                    sub.append("objectsLoaded", objectsLoaded);
+                    sub.append("avgDistance", totalDistance / outCount);
+                    sub.append("maxDistance", maxDistance);
+                    sub.append("shards", shardArray.arr());
+                    sub.done();
+                }
+
+                return true;
+            }
+        } geo2dFindNearCmd;
+
         class MRCmd : public PublicGridCommand {
         public:
             MRCmd() : PublicGridCommand( "mapreduce" ){}
