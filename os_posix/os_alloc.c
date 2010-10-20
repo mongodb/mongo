@@ -164,15 +164,17 @@ __wt_free_func(ENV *env, void *p_arg
 	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
 		WT_STAT_INCR(env->ienv->stats, MEMFREE);
 
-	p = *(void **)p_arg;
-	if (p == NULL)			/* ANSI C free semantics */
-		return;
-
 	/*
 	 * If there's a serialization bug we might race with another thread.
-	 * Avoid the race by clearing the location atomically.
+	 * We can't avoid the race (and we aren't willing to flush memory),
+	 * but we minimize the window by clearing the free address atomically,
+	 * hoping a racing thread will see, and won't free, a NULL pointer.
 	 */
+	p = *(void **)p_arg;
 	*(void **)p_arg = NULL;
+
+	if (p == NULL)			/* ANSI C free semantics */
+		return;
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
