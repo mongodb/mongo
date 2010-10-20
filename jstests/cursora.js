@@ -25,10 +25,10 @@ function run( n , atomic ){
         print( "warning: shouldn't have counted all  n: " + n + " num: " + num );
 }
 
-// run( 1500 )
-// run( 5000 )
+run( 1500 )
+run( 5000 )
 
-// run( 1500 , true )
-// run( 5000 , true )
+run( 1500 , true )
+run( 5000 , true )
     
 
