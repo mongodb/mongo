@@ -70,8 +70,6 @@ namespace mongo {
         string getns() const;
         Shard getShard() const { return _shard; }
 
-        void setShard( const Shard& shard );
-
         bool contains( const BSONObj& obj ) const;
 
         string toString() const;
@@ -92,9 +90,17 @@ namespace mongo {
          * @param a vector of possible split points
          *        used as a hint only
          */
-        BSONObj pickSplitPoint( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
-        ChunkPtr split();
+        /* to be deprecated */ BSONObj pickSplitPoint( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
+        /* to be deprecated */ ChunkPtr split();        
 
+        /**
+         * Splits a chunk at a non specificed split key.
+         *
+         * @param force if set to true, will split the chunk regardless if the split is really necessary size wise
+         *              if set to false, will only split if the chunk has reached the currently desired maximum size
+         */
+        ChunkPtr simpleSplit( bool force );
+        
         /**
          * @param splitPoints vector to be filled in
          * @param chunkSize chunk size to target in bytes
@@ -143,9 +149,13 @@ namespace mongo {
         bool getModified() { return _modified; }
         void setModified( bool modified ) { _modified = modified; }
 
-        ShardChunkVersion getVersionOnConfigServer() const;
-    private:
+        ShardChunkVersion getLastmod() const { return _lastmod; }
+        void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
 
+        ShardChunkVersion getVersionOnConfigServer() const;
+
+
+    private:
         bool _splitIfShould( long dataWritten );
         ChunkPtr multiSplit_inlock( const vector<BSONObj>& splitPoints );
 
@@ -175,9 +185,6 @@ namespace mongo {
         // methods, etc..
         
         void _split( BSONObj& middle );
-
-        friend class ChunkManager;
-        friend class ShardObjUnitTest;
     };
 
     class ChunkRange{
@@ -269,6 +276,7 @@ namespace mongo {
         int numChunks() const { rwlock lk( _lock , false ); return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj );
 
+        void createFirstChunk();
         ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
         

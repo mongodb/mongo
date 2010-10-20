@@ -178,6 +178,11 @@ public:
             fileSize = file_size( filename );
         }
 
+        // check if we're actually talking to a machine that can write
+        if (!isMaster()) {
+            return -1;
+        }
+        
         string ns;
 
         try {

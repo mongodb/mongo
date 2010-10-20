@@ -338,14 +338,16 @@ namespace mongo {
 
     class ConnectBG : public BackgroundJob {
     public:
-        int sock;
-        int res;
-        SockAddr farEnd;
-        ConnectBG() { nameThread = false; }
-        void run() {
-            res = ::connect(sock, farEnd.raw(), farEnd.addressSize);
-        }
-        string name() { return "ConnectBG"; }
+        ConnectBG(int sock, SockAddr farEnd) : _sock(sock), _farEnd(farEnd) { }
+
+        void run() { _res = ::connect(_sock, _farEnd.raw(), _farEnd.addressSize); }
+        string name() const { return ""; /* too short lived to need to name */ }
+        int inError() const { return _res; }
+        
+    private:
+        int _sock;
+        int _res;
+        SockAddr _farEnd;
     };
 
     bool MessagingPort::connect(SockAddr& _far)
@@ -362,13 +364,10 @@ namespace mongo {
             setSockTimeouts( sock, _timeout );
         }
                 
-        ConnectBG bg;
-        bg.sock = sock;
-        bg.farEnd = farEnd;
+        ConnectBG bg(sock, farEnd);
         bg.go();
-
         if ( bg.wait(5000) ) {
-            if ( bg.res ) {
+            if ( bg.inError() ) {
                 closesocket(sock);
                 sock = -1;
                 return false;
@@ -714,141 +713,5 @@ namespace mongo {
     }
 
     TicketHolder connTicketHolder(20000);
-
-    namespace {
-        map<string, bool> isSelfCache; // host, isSelf
-
-#if !defined(_WIN32) && !defined(__sunos__)
-
-        vector<string> getMyAddrs(){
-            ifaddrs * addrs;
-
-            int status = getifaddrs(&addrs);
-            massert(13469, "getifaddrs failure: " + errnoWithDescription(errno), status == 0);
-
-            vector<string> out;
-
-            // based on example code from linux getifaddrs manpage
-            for (ifaddrs * addr = addrs; addr != NULL; addr = addr->ifa_next){
-                if ( addr->ifa_addr == NULL ) continue;
-                int family = addr->ifa_addr->sa_family;
-                char host[NI_MAXHOST];
-
-                if (family == AF_INET || family == AF_INET6) {
-                   status = getnameinfo(addr->ifa_addr,
-                                        (family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)),
-                                        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-                   if ( status != 0 ){
-                       freeifaddrs( addrs );
-                       addrs = NULL;
-                       msgasserted( 13470, string("getnameinfo() failed: ") + gai_strerror(status) );
-                   }
-
-                   out.push_back(host);
-               }
-
-            }
-
-            freeifaddrs( addrs );
-            addrs = NULL;
-
-            if (logLevel >= 1){ 
-                log(1) << "getMyAddrs():";
-                for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it){
-                    log(1) << " [" << *it << ']';
-                }
-                log(1) << endl;
-            }
-
-            return out;
-        }
-
-        vector<string> getAllIPs(StringData iporhost){
-            addrinfo* addrs = NULL;
-            addrinfo hints;
-            memset(&hints, 0, sizeof(addrinfo));
-            hints.ai_socktype = SOCK_STREAM;
-            hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
-
-            static string portNum = BSONObjBuilder::numStr(cmdLine.port);
-
-            int ret = getaddrinfo(iporhost.data(), portNum.c_str(), &hints, &addrs);
-            massert(13471, string("getaddrinfo(\"") + iporhost.data() + "\") failed: " + gai_strerror(ret), ret == 0);
-
-            vector<string> out;
-            for (addrinfo* addr = addrs; addr != NULL; addr = addr->ai_next){
-                int family = addr->ai_family;
-                char host[NI_MAXHOST];
-
-                if (family == AF_INET || family == AF_INET6) {
-                    int status = getnameinfo(addr->ai_addr, addr->ai_addrlen, host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-
-                    massert(13472, string("getnameinfo() failed: ") + gai_strerror(status), status == 0);
-
-                    out.push_back(host);
-                }
-
-            }
-
-            freeaddrinfo(addrs);
-
-            if (logLevel >= 1){ 
-                log(1) << "getallIPs(\"" << iporhost << "\"):";
-                for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it){
-                    log(1) << " [" << *it << ']';
-                }
-                log(1) << endl;
-            }
-
-            return out;
-        }
-#endif
-    }
-    
-    bool HostAndPort::isSelf() const { 
-        int p = _port == -1 ? CmdLine::DefaultDBPort : _port;
-
-        if( p != cmdLine.port ){
-            return false;
-        } else {
-            map<string, bool>::const_iterator it = isSelfCache.find(_host);
-            if (it != isSelfCache.end()){
-                return it->second;
-            }
-
-#if !defined(_WIN32) && !defined(__sunos__)
-            
-            static const vector<string> myaddrs = getMyAddrs();
-            const vector<string> addrs = getAllIPs(_host);
-
-            bool ret=false;
-            for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end(); i!=iend; ++i){
-                for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end(); j!=jend; ++j){
-                    string a = *i;
-                    string b = *j;
-
-                    if ( a == b ||
-                         ( a.find( "127." ) == 0 && b.find( "127." ) == 0 )  // 127. is all loopback
-                         ){
-                        ret = true;
-                        break;
-                    }
-                }
-            }
-
-#else
-            SockAddr addr (_host.c_str(), 0); // port 0 is dynamically assigned
-            SOCKET sock = ::socket(addr.getType(), SOCK_STREAM, 0);
-            assert(sock != INVALID_SOCKET);
-
-            bool ret = (::bind(sock, addr.raw(), addr.addressSize) == 0);
-            closesocket(sock);
-#endif
-
-            isSelfCache[_host] = ret;
-
-            return ret;
-        }
-    }
 
 } // namespace mongo

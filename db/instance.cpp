@@ -437,7 +437,7 @@ namespace mongo {
         assert( d.moreJSObjs() );
         assert( query.objsize() < m.header()->dataLen() );
         BSONObj toupdate = d.nextJsObj();
-        uassert( 10055 , "update object too large", toupdate.objsize() <= MaxBSONObjectSize);
+        uassert( 10055 , "update object too large", toupdate.objsize() <= BSONObjMaxUserSize);
         assert( toupdate.objsize() < m.header()->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.header()->dataLen() );
         bool upsert = flags & UpdateOption_Upsert;
@@ -577,7 +577,7 @@ namespace mongo {
         Client::Context ctx(ns);		
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
-            uassert( 10059 , "object to insert too large", js.objsize() <= MaxBSONObjectSize);
+            uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
             theDataFileMgr.insertWithObjMod(ns, js, false);
             logOp("i", ns, js);
             globalOpCounters.gotInsert();

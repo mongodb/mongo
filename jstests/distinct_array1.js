@@ -21,4 +21,5 @@ t.save( { a : [] , c : 12 } );
 t.save( { a : { b : "z"} , c : 12 } );
 
 res = t.distinct( "a.b" );
+res.sort()
 assert.eq( "a,b,c,d,e,f,z" , res.toString() , "B1" );

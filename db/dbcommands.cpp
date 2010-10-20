@@ -778,7 +778,7 @@ namespace mongo {
         }
         virtual LockType locktype() const { return READ; } 
         virtual void help( stringstream& help ) const { help << "list databases on this server"; }
-        CmdListDatabases() : Command("listDatabases") {}
+        CmdListDatabases() : Command("listDatabases" , true ) {}
         bool run(const string& dbname , BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             vector< string > dbNames;
             getDatabaseNames( dbNames );
@@ -1089,7 +1089,8 @@ namespace mongo {
             long long size = nsd->stats.datasize / scale;
             result.appendNumber( "count" , nsd->stats.nrecords );
             result.appendNumber( "size" , size );
-            result.append      ( "avgObjSize" , double(size) / double(nsd->stats.nrecords) );
+            if( nsd->stats.nrecords )
+                result.append      ( "avgObjSize" , double(size) / double(nsd->stats.nrecords) );
             int numExtents;
             result.appendNumber( "storageSize" , nsd->storageSize( &numExtents ) / scale );
             result.append( "numExtents" , numExtents );
@@ -1165,7 +1166,7 @@ namespace mongo {
             result.appendNumber( "indexSize" , indexSize );
             result.appendNumber( "fileSize" , d->fileSize() );
 
-                return true;
+            return true;
         }
     } cmdDBStats;
 
@@ -1250,12 +1251,15 @@ namespace mongo {
                 return false;
             }
 
+            string shortTmpName = str::stream() << ".tmp.convertToCapped." << from;
+            string longTmpName = str::stream() << dbname << "." << shortTmpName;
+
             DBDirectClient client;
-            client.dropCollection( dbname + "." + from + ".$temp_convertToCapped" );
+            client.dropCollection( longTmpName );
 
             BSONObj info;
             if ( !client.runCommand( dbname ,
-                                    BSON( "cloneCollectionAsCapped" << from << "toCollection" << ( from + ".$temp_convertToCapped" ) << "size" << double( size ) ),
+                                    BSON( "cloneCollectionAsCapped" << from << "toCollection" << shortTmpName << "size" << double( size ) ),
                                     info ) ) {
                 errmsg = "cloneCollectionAsCapped failed: " + info.toString();
                 return false;
@@ -1267,8 +1271,8 @@ namespace mongo {
             }
 
             if ( !client.runCommand( "admin",
-                                    BSON( "renameCollection" << ( dbname + "." + from + ".$temp_convertToCapped" ) 
-                                          << "to" << ( dbname + "." + from ) ),
+                                     BSON( "renameCollection" << longTmpName <<
+                                           "to" << ( dbname + "." + from ) ),
                                     info ) ) {
                 errmsg = "renameCollection failed: " + info.toString();
                 return false;
@@ -1528,14 +1532,21 @@ namespace mongo {
         }
         CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            
+            
+            int secs = 100;
+            if ( cmdObj["secs"].isNumber() )
+                secs = cmdObj["secs"].numberInt();
+            
             if( cmdObj.getBoolField("w") ) { 
                 writelock lk("");
-                sleepsecs(100);
+                sleepsecs(secs);
             }
             else {
                 readlock lk("");
-                sleepsecs(100);
+                sleepsecs(secs);
             }
+
             return true;
         }
     } cmdSleep;
@@ -1618,7 +1629,6 @@ namespace mongo {
             log() << "command denied: " << cmdObj.toString() << endl;
             return false;
         }
-        
 
         if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
             result.append( "errmsg" ,  "access denied; use admin db" );

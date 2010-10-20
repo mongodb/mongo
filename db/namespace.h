@@ -94,7 +94,9 @@ namespace mongo {
 namespace mongo {
 
     /** @return true if a client can modify this namespace
-        things like *.system.users */
+        things like *.system.users 
+        @param write used when .system.js
+    */
     bool legalClientSystemNS( const string& ns , bool write );
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
@@ -238,15 +240,16 @@ namespace mongo {
         }
 
         class IndexIterator { 
-            friend class NamespaceDetails;
-            int i, n;
-            NamespaceDetails *d;
-            IndexIterator(NamespaceDetails *_d);
         public:
             int pos() { return i; } // note this is the next one to come
             bool more() { return i < n; }
             IndexDetails& next() { return d->idx(i++); }
-        }; // IndexIterator
+        private:
+            friend class NamespaceDetails;
+            int i, n;
+            NamespaceDetails *d;
+            IndexIterator(NamespaceDetails *_d);
+        };
 
         IndexIterator ii() { return IndexIterator(this); }
 
@@ -257,7 +260,7 @@ namespace mongo {
              for a single document. see multikey in wiki.
            for these, we have to do some dedup work on queries.
         */
-        bool isMultikey(int i) { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
+        bool isMultikey(int i) const { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
         void setIndexIsMultikey(int i) { 
             dassert( i < NIndexesMax );
             unsigned long long x = ((unsigned long long) 1) << i;
@@ -336,6 +339,12 @@ namespace mongo {
         // Start from lastExtent by default.
         DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
         long long storageSize( int * numExtents = 0 );
+
+        int averageObjectSize(){
+            if ( stats.nrecords == 0 )
+                return 5;
+            return (int) (stats.datasize / stats.nrecords);
+        }
         
     private:
         DiskLoc _alloc(const char *ns, int len);

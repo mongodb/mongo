@@ -103,7 +103,7 @@ namespace mongo {
 
     class SnapshotThread : public BackgroundJob {
     public:
-        string name() { return "snapshot"; }
+        string name() const { return "snapshot"; }
         void run();
     };
     

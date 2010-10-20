@@ -31,8 +31,8 @@ namespace mongo {
         virtual ~MongoMMF();
         virtual void close();
         unsigned long long length() const { return MemoryMappedFile::length(); }
-        bool open(string fname);
-        bool create(string fname, unsigned long long& len);
+        bool open(string fname, bool sequentialHint);
+        bool create(string fname, unsigned long long& len, bool sequentialHint);
 
         // we will re-map the private few frequently, thus the use of MoveableBuffer
         MoveableBuffer getView();

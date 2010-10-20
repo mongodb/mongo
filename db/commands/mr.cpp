@@ -68,9 +68,9 @@ namespace mongo {
                 
                 BSONElement ee = j.next();
                 
-                uassert( 13070 , "value to large to reduce" , ee.size() < ( 2 * 1024 * 1024 ) );
+                uassert( 13070 , "value to large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
 
-                if ( sizeSoFar + ee.size() > ( 4 * 1024 * 1024 ) ){
+                if ( sizeSoFar + ee.size() > BSONObjMaxUserSize ){
                     assert( n > 1 ); // if not, inf. loop
                     break;
                 }
@@ -154,22 +154,24 @@ namespace mongo {
                     
                 }
              
-                { // code
-                    mapCode = cmdObj["map"]._asCode();
-                    reduceCode = cmdObj["reduce"]._asCode();
-                    if ( cmdObj["finalize"].type() ){
-                        finalizeCode = cmdObj["finalize"]._asCode();
-                    }
-                    checkCodeWScope( "map" , cmdObj );
-                    checkCodeWScope( "reduce" , cmdObj );
-                    checkCodeWScope( "finalize" , cmdObj );
-                    
-                    if ( cmdObj["mapparams"].type() == Array ){
-                        mapparams = cmdObj["mapparams"].embeddedObjectUserCheck();
-                    }
+                { // scope and code
+                    // NOTE: function scopes are merged with m/r scope, not nested like they should be
+                    BSONObjBuilder scopeBuilder;
 
                     if ( cmdObj["scope"].type() == Object ){
-                        scopeSetup = cmdObj["scope"].embeddedObjectUserCheck();
+                        scopeBuilder.appendElements( cmdObj["scope"].embeddedObjectUserCheck() );
+                    }
+
+                    mapCode = scopeAndCode( scopeBuilder, cmdObj["map"] );
+                    reduceCode = scopeAndCode( scopeBuilder, cmdObj["reduce"] );
+                    if ( cmdObj["finalize"].type() ){
+                        finalizeCode = scopeAndCode( scopeBuilder, cmdObj["finalize"] );
+                    }
+                    
+                    scopeSetup = scopeBuilder.obj();
+
+                    if ( cmdObj["mapparams"].type() == Array ){
+                        mapparams = cmdObj["mapparams"].embeddedObjectUserCheck();
                     }
                     
                 }
@@ -189,13 +191,14 @@ namespace mongo {
                         limit = 0;
                 }
             }
-            
-            void checkCodeWScope( const char * field , const BSONObj& o ){
-                BSONElement e = o[field];
-                if ( e.type() != CodeWScope )
-                    return;
-                BSONObj x = e.codeWScopeObject();
-                uassert( 13035 , (string)"can't use CodeWScope with map/reduce function: " + field , x.isEmpty() );
+
+            /** Field expected to be a Code or CodeWScope.
+             * Add its scope, if any, to scopeBuilder, and return its code.
+             * Scopes added later will shadow those added earlier. */
+            static string scopeAndCode (BSONObjBuilder& scopeBuilder, const BSONElement& field) {
+                if ( field.type() == CodeWScope )
+                    scopeBuilder.appendElements( field.codeWScopeObject() );
+                return field._asCode();
             }
 
             /**
@@ -392,7 +395,7 @@ namespace mongo {
 
         BSONObj fast_emit( const BSONObj& args ){
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
-            uassert( 13069 , "an emit can't be more than 2mb" , args.objsize() < ( 2 * 1024 * 1024 ) );
+            uassert( 13069 , "an emit can't be more than 2mb" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
             _tlmr->insert( args );
             _tlmr->numEmits++;
             return BSONObj();

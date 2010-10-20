@@ -278,7 +278,7 @@ namespace mongo {
     }
 
     /* add a key.  must be > all existing.  be careful to set next ptr right. */
-    bool BucketBasics::_pushBack(const DiskLoc& recordLoc, BSONObj& key, const Ordering &order, DiskLoc prevChild) {
+    bool BucketBasics::_pushBack(const DiskLoc& recordLoc, const BSONObj& key, const Ordering &order, DiskLoc prevChild) {
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
         if ( bytesNeeded > emptySize )
             return false;
@@ -743,11 +743,27 @@ found:
         if ( split_debug )
             out() << "    " << thisLoc.toString() << ".split" << endl;
 
-        int split = n / 2;
-        if ( keypos == n ) { // see SERVER-983
-            split = (int) (0.9 * n);
-            if ( split > n - 2 )
-                split = n - 2;
+        // In the standard btree algorithm, we would split based on the
+        // existing keys _and_ the new key.  But that's more work to
+        // implement, so we split the existing keys and then add the new key.
+        
+        assert( n > 2 );
+        int split = 0;
+        int rightSize = 0;
+        // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split. 
+        // see SERVER-983
+        int rightSizeLimit = topSize / ( keypos == n ? 10 : 2 );
+        for( int i = n - 1; i > -1; --i ) {
+            rightSize += keyNode( i ).key.objsize();
+            if ( rightSize > rightSizeLimit ) {
+                split = i;
+                break;
+            }
+        }
+        if ( split < 1 ) {
+            split = 1;
+        } else if ( split > n - 2 ) {
+            split = n - 2;
         }
 
         DiskLoc rLoc = addBucket(idx);
@@ -772,7 +788,7 @@ found:
             if ( split_debug ) {
                 out() << "    splitkey key:" << splitkey.key.toString() << endl;
             }
-
+            
             // promote splitkey to a parent node
             if ( parent.isNull() ) {
                 // make a new parent if we were the root
@@ -797,11 +813,11 @@ found:
         }
 
         int newpos = keypos;
+        // note this may trash splitkey.key.  thus we had to promote it before finishing up here.
         truncateTo(split, order, newpos);  // note this may trash splitkey.key.  thus we had to promote it before finishing up here.
 
         // add our new key, there is room now
         {
-
             if ( keypos <= split ) {
                 if ( split_debug )
                     out() << "  keypos<split, insertHere() the new key" << endl;

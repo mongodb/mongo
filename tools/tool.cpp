@@ -173,9 +173,10 @@ namespace mongo {
                     cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
                     return -1;
                 }
+
+                (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
             }
-            
-            (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
+
         }
         else {
             if ( _params.count( "directoryperdb" ) ) {
@@ -240,6 +241,24 @@ namespace mongo {
         if ( slaveIfPaired && _conn->type() == ConnectionString::SET )
             return ((DBClientReplicaSet*)_conn)->slaveConn();
         return *_conn;
+    }
+
+    bool Tool::isMaster() {
+        if ( hasParam("dbpath") ) {
+            return true;
+        }
+        
+        BSONObj info;
+        bool isMaster;
+        bool ok = conn().isMaster(isMaster, &info);
+        
+        if (ok && !isMaster) {
+            cerr << "ERROR: trying to write to non-master " << conn().toString() << endl;
+            cerr << "isMaster info: " << info << endl;
+            return false;
+        }
+        
+        return true;
     }
 
     void Tool::addFieldOptions(){
@@ -414,5 +433,5 @@ namespace mongo {
             
 
 
-    void setupSignals(){}
+    void setupSignals( bool inFork ){}
 }

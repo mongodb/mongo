@@ -56,12 +56,6 @@ namespace mongo {
         return _manager->getns(); 
     }
 
-    void Chunk::setShard( const Shard& s ){
-        _shard = s;
-        _manager->_migrationNotification(this);
-        _modified = true;
-    }
-    
     bool Chunk::contains( const BSONObj& obj ) const{
         return
             _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
@@ -115,7 +109,8 @@ namespace mongo {
         
         return _manager->getShardKey().extractKey( end );
     }
-    
+
+    /* to be deprecated */
     BSONObj Chunk::pickSplitPoint( const vector<BSONObj> * possibleSplitPoints ) const {
         
         // check to see if we're at the edge of the key range
@@ -203,10 +198,31 @@ namespace mongo {
         conn.done();
     }
 
+    /* to be deprecated */
     ChunkPtr Chunk::split(){
         vector<BSONObj> splitPoints;
         splitPoints.push_back( pickSplitPoint() );
         return multiSplit( splitPoints );
+    }
+
+    ChunkPtr Chunk::simpleSplit( bool force ){
+        // if forcing a split, maxChunkSize does not really matter
+        // if not forcing a split, we want to have at least 2 split points, meaning there is enough data to reach
+        // the maximum split size
+        // TODO Handle 'not enough data to warrant chunking' in pickSplitVector
+        vector<BSONObj> candidates;
+        pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , force ? 0 : 2, force ? 0 : 100000);
+
+        vector<BSONObj> splitPoint;
+        if ( minIsInf() ){
+            splitPoint.push_back( _getExtremeKey( 1 ) );
+        } else if ( maxIsInf() ){
+            splitPoint.push_back( _getExtremeKey( -1 ) );
+        } else if ( candidates.size() ){
+            splitPoint.push_back( candidates[0] );
+        }
+
+        return multiSplit( splitPoint );
     }
     
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
@@ -616,21 +632,8 @@ namespace mongo {
         _lock("rw:ChunkManager"), _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
     {
         _reload_inlock();
-        
-        if ( _chunkMap.empty() ){
-            ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), config->getPrimary()) );
-            c->setModified( true );
-            
-            _chunkMap[c->getMax()] = c;
-            _chunkRanges.reloadAll(_chunkMap);
-
-            _shards.insert(c->getShard());
-
-            save_inlock( true );
-            log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
-        }
     }
-    
+
     ChunkManager::~ChunkManager(){
         _chunkMap.clear();
         _chunkRanges.clear();
@@ -727,6 +730,20 @@ namespace mongo {
 
     bool ChunkManager::hasShardKey( const BSONObj& obj ){
         return _key.hasShardKey( obj );
+    }
+
+    void ChunkManager::createFirstChunk(){
+        ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), _config->getPrimary()) );
+        c->setModified( true );
+        
+        _chunkMap[c->getMax()] = c;
+        _chunkRanges.reloadAll(_chunkMap);
+        
+        _shards.insert(c->getShard());
+
+        save_inlock( true );
+
+        log() << "no chunks for:" << _ns << " so creating first: " << c->toString() << endl;
     }
 
     ChunkPtr ChunkManager::findChunk( const BSONObj & obj , bool retry ){
@@ -1015,7 +1032,7 @@ namespace mongo {
 
         // instead of reloading, adjust ShardChunkVersion for the chunks that were updated in the configdb
         for ( unsigned i=0; i<toFix.size(); i++ ){
-            toFix[i]->_lastmod = newVersions[i];
+            toFix[i]->setLastmod( newVersions[i] );
             toFix[i]->setModified( false );
         }
 
@@ -1064,8 +1081,8 @@ namespace mongo {
             DEV assert( c );
             if ( c->getShard() != shard )
                 continue;
-            if ( c->_lastmod > max )
-                max = c->_lastmod;
+            if ( c->getLastmod() > max )
+                max = c->getLastmod();
         }        
         return max;
     }
@@ -1080,8 +1097,8 @@ namespace mongo {
         
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
             ChunkPtr c = i->second;
-            if ( c->_lastmod > max )
-                max = c->_lastmod;
+            if ( c->getLastmod() > max )
+                max = c->getLastmod();
         }        
 
         return max;

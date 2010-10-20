@@ -31,6 +31,7 @@
 #include "../dbhelpers.h"
 
 namespace mongo {
+
     /* decls for connections.h */
     ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());    
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
@@ -43,6 +44,7 @@ namespace mongo {
 
     static RamLog _rsLog;
     Tee *rsLog = &_rsLog;
+    extern bool replSetBlind;
 
     string ago(time_t t) { 
         if( t == 0 ) return "";
@@ -88,6 +90,7 @@ namespace mongo {
             s << td(h);
         }
         s << td(config().votes);
+        s << td(config().priority);
         { 
             string stateText = state().toString();
             if( _config.hidden )
@@ -272,7 +275,7 @@ namespace mongo {
             "Up", 
             "<a title=\"length of time we have been continuously connected to the other member with no reconnects (for self, shows uptime)\">cctime</a>", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
-            "Votes", "State", "Status", 
+            "Votes", "Priority", "State", "Messages", 
             "<a title=\"how up to date this server is.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">optime</a>", 
             "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">skew</a>", 
             0};
@@ -306,6 +309,7 @@ namespace mongo {
                 td(ago(started)) << 
 	        td("") << // last heartbeat
                 td(ToString(_self->config().votes)) << 
+                td(ToString(_self->config().priority)) <<
                 td( stateAsHtml(box.getState()) + (_self->config().hidden?" (hidden)":"") );
             s << td( _hbmsg );
             stringstream q;
@@ -366,9 +370,15 @@ namespace mongo {
             BSONObjBuilder bb;
             bb.append("_id", (int) m->id());
             bb.append("name", m->fullName());
-            bb.append("health", m->hbinfo().health);
+            double h = m->hbinfo().health;
+            bb.append("health", h);
             bb.append("state", (int) m->state().s);
-            bb.append("stateStr", m->state().toString());
+            if( h == 0 ) {
+                // if we can't connect the state info is from the past and could be confusing to show
+                bb.append("stateStr", "(not reachable/healthy)"); 
+            } else {
+                bb.append("stateStr", m->state().toString());
+            }
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
             bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
             bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
@@ -384,6 +394,8 @@ namespace mongo {
         b.appendTimeT("date", time(0));
         b.append("myState", box.getState().s);
         b.append("members", v);
+        if( replSetBlind )
+            b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
 
     static struct Test : public UnitTest { 

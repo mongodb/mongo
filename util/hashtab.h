@@ -92,7 +92,7 @@ namespace mongo {
                 if( chain >= maxChain ) { 
                     if ( firstNonUsed >= 0 )
                         return firstNonUsed;
-                    out() << "error: hashtable " << name << " max chain n:" << n << endl;
+                    out() << "error: hashtable " << name << " max chain reached:" << maxChain << endl;
                     return -1;
                 }
             }

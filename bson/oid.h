@@ -49,10 +49,10 @@ namespace mongo {
 
         const unsigned char *getData() const { return data; }
 
-        bool operator==(const OID& r) {
+        bool operator==(const OID& r) const {
             return a==r.a&&b==r.b;
         }
-        bool operator!=(const OID& r) {
+        bool operator!=(const OID& r) const {
             return a!=r.a||b!=r.b;
         }
 

@@ -27,8 +27,6 @@ namespace mongo {
 
     typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
 
-    const int BSONObjMaxSize = 32 * 1024 * 1024;
-
     /**
 	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
        object in a binary representation.
@@ -365,8 +363,10 @@ private:
         private:
             const char *_objdata;
         };
+
         const char *_objdata;
         boost::shared_ptr< Holder > _holder;
+
         void init(const char *data, bool ifree) {
             if ( ifree )
                 _holder.reset( new Holder( data ) );

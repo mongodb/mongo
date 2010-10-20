@@ -271,6 +271,18 @@ namespace mongo {
     bool replAuthenticate(DBClientBase *conn);
     
     void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ){
+
+        if ( replSet ) {
+            if( theReplSet == 0 ) { 
+                result.append("ismaster", false);
+                result.append("secondary", false);
+                result.append("info", ReplSet::startupStatusMsg);
+                return;
+            }
+            
+            theReplSet->fillIsMaster(result);
+            return;
+        }
         
         if ( replAllDead ) {
             result.append("ismaster", 0);
@@ -361,21 +373,10 @@ namespace mongo {
 			   we allow unauthenticated ismaster but we aren't as verbose informationally if 
 			   one is not authenticated for admin db to be safe.
 			*/
-
-            if( replSet ) {
-                if( theReplSet == 0 ) { 
-                    result.append("ismaster", false);
-                    result.append("secondary", false);
-                    errmsg = "replSet still trying to initialize";
-                    result.append("info", ReplSet::startupStatusMsg);
-                    return true;
-                }
-                theReplSet->fillIsMaster(result);
-                return true;
-            }
-            
-			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
+            bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
             appendReplicationInfo( result , authed );
+
+            result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             return true;
         }
     } cmdismaster;

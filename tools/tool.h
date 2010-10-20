@@ -78,6 +78,8 @@ namespace mongo {
             }
             return _db + "." + _coll;
         }
+
+        bool isMaster();
         
         virtual void preSetup(){}
 

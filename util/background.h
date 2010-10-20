@@ -1,4 +1,4 @@
-// background.h
+// @file background.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -19,82 +19,83 @@
 
 namespace mongo {
 
-    /** object-orienty background thread dispatching.
+    /**
+     *  Background thread dispatching.
+     *  subclass and define run()
+     *
+     *  It is ok to call go(), that is, run the job, more than once -- if the 
+     *  previous invocation has finished. Thus one pattern of use is to embed 
+     *  a backgroundjob in your object and reuse it (or same thing with 
+     *  inheritance).  Each go() call spawns a new thread.
+     *
+     *  Thread safety:
+     *    note when job destructs, the thread is not terminated if still running.
+     *    generally if the thread could still be running, allocate the job dynamically 
+     *    and set deleteSelf to true.
+     *
+     *    go() and wait() are not thread safe
+     *    run() will be executed on the background thread
+     *    BackgroundJob object must exist for as long the background thread is running
+     */
 
-       subclass and define run()
-
-       It is ok to call go(), that is, run the job, more than once -- if the 
-       previous invocation has finished. Thus one pattern of use is to embed 
-       a backgroundjob in your object and reuse it (or same thing with 
-       inheritance).  Each go() call spawns a new thread.
-
-       note when job destructs, the thread is not terminated if still running.
-       generally if the thread could still be running, allocate the job dynamically 
-       and set deleteSelf to true.
-    */
-    /* example
-    class ConnectBG : public BackgroundJob {
-    public:
-        int sock;
-        int res;
-        SockAddr farEnd;
-        void run() {
-            res = ::connect(sock, farEnd.raw(), farEnd.addressSize);
-        }
-    };
-    */
     class BackgroundJob : boost::noncopyable {
     protected:
-        /** define this to do your work.
-            after this returns, state is set to done.
-            after this returns, deleted if deleteSelf true.
-        */
+        /**
+         * sub-class must intantiate the BackgrounJob
+         *
+         * @param selfDelete if set to true, object will destruct itself after the run() finished
+         * @note selfDelete instantes cannot be wait()-ed upon
+         */
+        explicit BackgroundJob(bool selfDelete = false);
+
+        virtual string name() const { return ""; }
+
+        /**
+         * define this to do your work.
+         * after this returns, state is set to done.
+         * after this returns, deleted if deleteSelf true.
+         */
         virtual void run() = 0;
-        virtual string name() = 0;
-        //virtual void ending() { } // hook for post processing if desired after everything else done. not called when deleteSelf=true
+
     public:
         enum State {
             NotStarted,
             Running,
             Done
         };
-        State getState() const { return state; }
-        bool running() const   { return state == Running; }
 
-        bool deleteSelf; // delete self when Done?
-
-        bool nameThread; // thread should name itself to the OS / debugger. set to false if very short lived to avoid that call
-
-        BackgroundJob() {
-            deleteSelf = false;
-            state = NotStarted;
-            nameThread = true;
-        }
         virtual ~BackgroundJob() { }
 
-        // starts job.  returns once it is "dispatched"
+        /** 
+         * starts job. 
+         * returns immediatelly after dispatching. 
+         *
+         * @note the BackgroundJob object must live for as long the thread is still running, ie
+         * until getState() returns Done.
+         */
         BackgroundJob& go();
 
-        // wait for completion.  this spins with sleep() so not terribly efficient.
-        // returns true if did not time out.
-        //
-        // note you can call wait() more than once if the first call times out.
-        bool wait(int msMax = 0, unsigned maxSleepInterval=1000);
+        /** 
+         * wait for completion.
+         *
+         * @param msTimeOut maximum amount of time to wait in millisecons
+         * @return true if did not time out. false otherwise.
+         *
+         * @note you can call wait() more than once if the first call times out.
+         * but you cannot call wait on a self-deleting job.
+         */
+        bool wait( unsigned msTimeOut = 0 );
 
-        /* start several */
-        static void go(list<BackgroundJob*>&);
-
-        /* wait for several jobs to finish. */
-        static void wait(list<BackgroundJob*>&, unsigned maxSleepInterval=1000);
+        // accessors
+        State getState() const;
+        bool running() const;
 
     private:
-        //static BackgroundJob *grab;
-        //static mongo::mutex mutex;
-        void thr();
-        volatile State state;
-        //boost::mutex _m;
-        //boost::condition _c;
-    };
+        struct JobStatus;
+        boost::shared_ptr<JobStatus> _status;  // shared between 'this' and body() thread
 
+        void jobBody( boost::shared_ptr<JobStatus> status );
+
+    };
 
 } // namespace mongo

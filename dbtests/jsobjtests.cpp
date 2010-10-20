@@ -445,29 +445,27 @@ namespace JsobjTests {
         class AppendAs {
         public:
             void run() {
-                BSONElement bar;
                 BSONObjBuilder b;
                 {
                     BSONObj foo = BSON( "foo" << 1 );
-                    b.appendAs( foo.firstElement(), "bar", &bar );
+                    b.appendAs( foo.firstElement(), "bar" );
                 }
-                BSONObj expected = BSON( "bar" << 1 );
-                ASSERT_EQUALS( expected.firstElement(), bar );
+                ASSERT_EQUALS( BSON( "bar" << 1 ), b.done() );
             }
         };
 
         class ArrayAppendAs {
         public:
             void run() {
-                BSONElement three;
                 BSONArrayBuilder b;
                 {
                     BSONObj foo = BSON( "foo" << 1 );
-                    b.appendAs( foo.firstElement(), "3", &three );
+                    b.appendAs( foo.firstElement(), "3" );
                 }
+                BSONArray a = b.arr();
                 BSONObj expected = BSON( "3" << 1 );
-                ASSERT_EQUALS( expected.firstElement(), three );
-                ASSERT_EQUALS( 4, b.done().nFields() );
+                ASSERT_EQUALS( expected.firstElement(), a[ 3 ] );
+                ASSERT_EQUALS( 4, a.nFields() );
             }
         };
         

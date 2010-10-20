@@ -195,6 +195,7 @@ namespace mongo {
                 log() << "replSet oldest at " << hn << " : " << ts.toStringLong() << rsLog;
                 log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
                 sethbmsg("error RS102 too stale to catch up");
+                changeState(MemberState::RS_RECOVERING);
                 sleepsecs(120);
                 return;
             }

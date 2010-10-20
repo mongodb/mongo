@@ -25,7 +25,7 @@ namespace po = boost::program_options;
 
 namespace mongo {
 
-    void setupSignals();
+    void setupSignals( bool inFork );
     BSONArray argvArray;
 
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general , 
@@ -207,7 +207,7 @@ namespace mongo {
             }
 
             setupCoreSignals();
-            setupSignals();
+            setupSignals( true );
         }
 #endif
         if (params.count("logpath")) {
@@ -230,10 +230,9 @@ namespace mongo {
 
         return true;
     }
-    
-    void ignoreSignal( int signal ){
-    }
 
+    void ignoreSignal( int sig ){}
+    
     void setupCoreSignals(){
 #if !defined(_WIN32)
         assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
