@@ -376,9 +376,10 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncThread() {
-        if( myConfig().arbiterOnly )
-            return;
-        while( 1 ) { 
+        while( 1 ) {
+            if( myConfig().arbiterOnly )
+                return;
+            
             try {
                 _syncThread();
             }

@@ -266,6 +266,7 @@ namespace mongo {
         void assumePrimary();
         void loadLastOpTimeWritten();
         void changeState(MemberState s);
+        void _changeArbiterState();
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm" 

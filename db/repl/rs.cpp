@@ -409,6 +409,8 @@ namespace mongo {
                 oldPrimaryId = p->id();
         }
         forgetPrimary();
+        
+        bool iWasArbiterOnly = _self ? iAmArbiterOnly() : false;
         setSelfTo(0);
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
@@ -417,6 +419,12 @@ namespace mongo {
                 assert( _self == 0 );
                 mi = new Member(m.h, m._id, &m, true);
                 setSelfTo(mi);
+
+                // if the arbiter status changed
+                if (iWasArbiterOnly ^ iAmArbiterOnly()) {
+                    _changeArbiterState();
+                }
+                
                 if( (int)mi->id() == oldPrimaryId )
                     box.setSelfPrimary(mi);
             } else {
@@ -428,6 +436,22 @@ namespace mongo {
             }
         }
         return true;
+    }
+
+    void startSyncThread();
+
+    void ReplSetImpl::_changeArbiterState() {
+        if (iAmArbiterOnly()) {
+            changeState(MemberState::RS_ARBITER);
+            
+            // TODO: free oplog (after terminating sync)
+        }
+        else {
+            // TODO: allocate oplog (before starting sync)
+            
+            changeState(MemberState::RS_RECOVERING);
+            boost::thread t(startSyncThread);
+        }
     }
 
     // Our own config must be the first one.

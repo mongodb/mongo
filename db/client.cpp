@@ -126,6 +126,9 @@ namespace mongo {
         {
             scoped_lock bl(clientsMutex);
             clients.erase(this);
+            if ( isSyncThread() ) {
+                syncThread = 0;
+            }
         }
 
         bool didAnything = false;
