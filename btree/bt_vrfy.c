@@ -28,7 +28,6 @@ typedef struct {
 static int __wt_bt_verify_addfrag(DB *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_checkfrag(DB *, WT_VSTUFF *);
 static int __wt_bt_verify_cmp(WT_TOC *, WT_ROW *, WT_PAGE *, int);
-static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, WT_VSTUFF *);
 static int __wt_bt_verify_page_col_fix(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_col_int(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_desc(DB *, WT_PAGE *);
@@ -509,16 +508,17 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	struct {
 		u_int32_t indx;			/* Item number */
 
-		DBT *item;			/* Item to compare */
-		DBT item_std;			/* On-page reference */
-		DBT item_ovfl;			/* Overflow holder */
-		DBT item_comp;			/* Uncompressed holder */
+		DBT	*item;			/* Item to compare */
+		DBT	 item_std;		/* On-page reference */
+		DBT	 item_ovfl;		/* Overflow holder */
+		WT_PAGE	*ovfl;			/* Overflow page */
+		DBT	 item_comp;		/* Uncompressed holder */
 	} *current, *last_data, *last_key, *swap_tmp, _a, _b, _c;
 	DB *db;
 	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
-	WT_OVFL *ovflp;
+	WT_OVFL *ovfl;
 	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
@@ -659,13 +659,20 @@ eop:			__wt_api_db_errx(db,
 			    (u_long)item_num, (u_long)addr);
 			goto err_set;
 		}
+
+		/*
+		 * We set ovfl to any overflow reference, and then use it
+		 * below, knowing this code initialized it.  Guarantee it
+		 * is set, it makes lint happier.
+		 */
+		ovfl = NULL;
 		switch (item_type) {
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
-			ovflp = WT_ITEM_BYTE_OVFL(item);
-			if (WT_ADDR_TO_OFF(db, ovflp->addr) +
-			    WT_HDR_BYTES_TO_ALLOC(db, ovflp->size) >
+			ovfl = WT_ITEM_BYTE_OVFL(item);
+			if (WT_ADDR_TO_OFF(db, ovfl->addr) +
+			    WT_HDR_BYTES_TO_ALLOC(db, ovfl->size) >
 			    idb->fh->file_size)
 				goto eof;
 			break;
@@ -690,28 +697,35 @@ eof:				__wt_api_db_errx(db,
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
-			ovflp = WT_ITEM_BYTE_OVFL(item);
-			WT_ERR(__wt_bt_verify_ovfl(toc, ovflp, vs));
+			/*
+			 * Discard any previous overflow page -- if we're here,
+			 * reading in a new overflow page, we must be done with
+			 * the previous one.
+			 */
+			if (current->ovfl != NULL) {
+				__wt_bt_page_out(toc, &current->ovfl, 0);
+				current->ovfl = NULL;
+			}
+
+			WT_ERR(__wt_bt_ovfl_in(toc, ovfl, &current->ovfl));
+			WT_ERR(__wt_bt_verify_page(toc, current->ovfl, vs));
+
+			/*
+			 * Check that the underlying overflow page's size
+			 * is correct.
+			 */
+			if (ovfl->size != current->ovfl->hdr->u.datalen) {
+				__wt_api_db_errx(db,
+				    "overflow page reference in item %lu on "
+				    "page at addr %lu does not match the data "
+				    "size on the overflow page",
+				    (u_long)item_num, (u_long)addr);
+				goto err_set;
+			}
 			break;
 		default:
 			break;
 		}
-
-		/*
-		 * If we're verifying the entire tree, verify any off-page
-		 * duplicate trees (that's any off-page references found on
-		 * a row-store leaf page).
-		 */
-		if (vs != NULL && hdr->type == WT_PAGE_ROW_LEAF)
-			switch (item_type) {
-			case WT_ITEM_OFF:
-				off = WT_ITEM_BYTE_OFF(item);
-				WT_ERR(__wt_bt_verify_tree(
-				    toc, NULL, WT_LDESC, off, vs));
-				break;
-			default:
-				break;
-			}
 
 		/*
 		 * Check the page item sort order.  If the page doesn't contain
@@ -728,7 +742,7 @@ eof:				__wt_api_db_errx(db,
 			/*
 			 * These items aren't sorted on the page-- we're done.
 			 */
-			continue;
+			goto offpagedups;
 		case WT_ITEM_KEY:
 		case WT_ITEM_DUP:
 			current->indx = item_num;
@@ -738,16 +752,22 @@ eof:				__wt_api_db_errx(db,
 			break;
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DUP_OVFL:
+			/*
+			 * We already have a copy of the overflow page, read in
+			 * when the overflow page was verified.  Set our DBT
+			 * to reference it.
+			 */
 			current->indx = item_num;
 			current->item = &current->item_ovfl;
-			WT_ERR(__wt_bt_ovfl_to_dbt(toc, (WT_OVFL *)
-			    WT_ITEM_BYTE(item), current->item));
+			ovfl = WT_ITEM_BYTE_OVFL(item);
+			current->item_ovfl.data = WT_PAGE_BYTE(current->ovfl);
+			current->item_ovfl.size = ovfl->size;
 			break;
 		default:
 			break;
 		}
 
-		/* If the key is compressed, get an uncompressed version. */
+		/* If key is compressed, get an uncompressed copy. */
 		if (idb->huffman_key != NULL) {
 			WT_ERR(__wt_huffman_decode(idb->huffman_key,
 			    current->item->data, current->item->size,
@@ -776,6 +796,15 @@ eof:				__wt_api_db_errx(db,
 			break;
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
+			/* If data is compressed, get an uncompressed copy. */
+			if (idb->huffman_data != NULL) {
+				WT_ERR(__wt_huffman_decode(idb->huffman_data,
+				    current->item->data, current->item->size,
+				    &current->item_comp.data,
+				    &current->item_comp.mem_size,
+				    &current->item_comp.size));
+				current->item = &current->item_comp;
+			}
 			if (last_data->item != NULL &&
 			    func(db, last_data->item, current->item) >= 0) {
 				__wt_api_db_errx(db,
@@ -792,13 +821,38 @@ eof:				__wt_api_db_errx(db,
 		default:	/* No other values are possible. */
 			break;
 		}
+
+offpagedups:	/*
+		 * If we're verifying the entire tree, verify any off-page
+		 * duplicate trees (that's any off-page references found on
+		 * a row-store leaf page).
+		 */
+		if (vs != NULL && hdr->type == WT_PAGE_ROW_LEAF)
+			switch (item_type) {
+			case WT_ITEM_OFF:
+				off = WT_ITEM_BYTE_OFF(item);
+				WT_ERR(__wt_bt_verify_tree(
+				    toc, NULL, WT_LDESC, off, vs));
+				break;
+			default:
+				break;
+			}
 	}
 
 	if (0) {
 err_set:	ret = WT_ERROR;
 	}
 
-err:	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.mem_size);
+err:	/* Discard any overflow pages we're still holding. */
+	if (_a.ovfl != NULL)
+		__wt_bt_page_out(toc, &_a.ovfl, 0);
+	if (_b.ovfl != NULL)
+		__wt_bt_page_out(toc, &_b.ovfl, 0);
+	if (_c.ovfl != NULL)
+		__wt_bt_page_out(toc, &_c.ovfl, 0);
+
+	/* Free any memory we allocated. */
+	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.mem_size);
 	__wt_free(env, _b.item_ovfl.data, _b.item_ovfl.mem_size);
 	__wt_free(env, _c.item_ovfl.data, _c.item_ovfl.mem_size);
 	__wt_free(env, _a.item_comp.data, _a.item_comp.mem_size);
@@ -1037,25 +1091,6 @@ unused_not_clear:	__wt_api_db_errx(db,
 			    "unused fields");
 			ret = WT_ERROR;
 		}
-
-	return (ret);
-}
-
-/*
- * __wt_bt_verify_ovfl --
- *	Verify an overflow item.
- */
-static int
-__wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovfl, WT_VSTUFF *vs)
-{
-	WT_PAGE *page;
-	int ret;
-
-	WT_RET(__wt_bt_ovfl_in(toc, ovfl, &page));
-
-	ret = __wt_bt_verify_page(toc, page, vs);
-
-	__wt_bt_page_out(toc, &page, 0);
 
 	return (ret);
 }
