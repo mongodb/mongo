@@ -1449,7 +1449,7 @@ __wt_bt_build_data_item(
 
 /*
  * __wt_bt_bulk_ovfl_write --
- *	Store bulk-loaded overflow item in the database, returning the starting
+ *	Store bulk-loaded overflow items in the database, returning the page
  *	addr.
  */
 static int
