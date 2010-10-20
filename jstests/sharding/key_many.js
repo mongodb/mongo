@@ -20,7 +20,7 @@ s = new ShardingTest( "key_many" , 2 );
 s.adminCommand( { enablesharding : "test" } )
 db = s.getDB( "test" );
 primary = s.getServer( "test" ).getDB( "test" );
-seconday = s.getOther( primary ).getDB( "test" );
+secondary = s.getOther( primary ).getDB( "test" );
 
 function makeObjectDotted( v ){
     var o = {};
@@ -97,12 +97,12 @@ for ( var i=0; i<types.length; i++ ){
     s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
     s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
 
-    s.adminCommand( { movechunk : longName , find : makeObjectDotted( curT.values[3] ) , to : seconday.getMongo().name } );
+    s.adminCommand( { movechunk : longName , find : makeObjectDotted( curT.values[3] ) , to : secondary.getMongo().name } );
     
     s.printChunks();
     
     assert.eq( 3 , primary[shortName].find().toArray().length , curT.name + " primary count" );
-    assert.eq( 3 , seconday[shortName].find().toArray().length , curT.name + " secondary count" );
+    assert.eq( 3 , secondary[shortName].find().toArray().length , curT.name + " secondary count" );
     
     assert.eq( 6 , c.find().toArray().length , curT.name + " total count" );
     assert.eq( 6 , c.find().sort( makeObjectDotted( 1 ) ).toArray().length , curT.name + " total count sorted" );
