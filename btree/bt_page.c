@@ -290,8 +290,14 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 			break;
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
-			/* Duplicate the previous key. */
-			WT_KEY_SET(rip, rip[-1].key, rip[-1].size);
+			/*
+			 * If the second or subsequent duplicate, move to the
+			 * next slot and copy the previous key.
+			 */
+			if (rip->data != NULL) {
+				++rip;
+				WT_KEY_SET(rip, rip[-1].key, rip[-1].size);
+			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
