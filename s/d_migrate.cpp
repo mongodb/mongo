@@ -599,11 +599,24 @@ namespace mongo {
                 BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
                 maxVersion = x["lastmod"];
 
-                x = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
-                assert( x["shard"].type() );
-                myOldShard = x["shard"].String();
+                BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
+                assert( currChunk["shard"].type() );
+                assert( currChunk["min"].type() );
+                assert( currChunk["max"].type() );
+                myOldShard = currChunk["shard"].String();
                 conn.done();
                 
+                BSONObj currMin = currChunk["min"].Obj();
+                BSONObj currMax = currChunk["max"].Obj();
+                if ( currMin.woCompare( min ) || currMax.woCompare( max ) ) {
+                    errmsg = "chunk boundaries are outdated (likely a split occurred)";
+                    result.append( "currMin" , currMin );
+                    result.append( "currMax" , currMax );
+                    result.append( "requestedMin" , min );
+                    result.append( "requestedMax" , max );
+                    return false;
+                }
+
                 if ( myOldShard != fromShard.getName() ){
                     errmsg = "i'm out of date";
                     result.append( "from" , fromShard.getName() );
