@@ -54,13 +54,13 @@ namespace mongo {
         
             const BSONObj& chunkToMove = chunkInfo.chunk;
             ChunkPtr c = cm->findChunk( chunkToMove["min"].Obj() );
-            if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
+            if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) || c->getMax().woCompare( chunkToMove["max"].Obj() ) ) {
                 // likely a split happened somewhere
-                cm = cfg->getChunkManager( chunkInfo.ns , true );
+                cm = cfg->getChunkManager( chunkInfo.ns , true /* reload */);
                 assert( cm );
 
                 c = cm->findChunk( chunkToMove["min"].Obj() );
-                if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
+                if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) || c->getMax().woCompare( chunkToMove["max"].Obj() ) ) {
                     log() << "chunk mismatch after reload, ignoring will retry issue cm: " 
                           << c->getMin() << " min: " << chunkToMove["min"].Obj() << endl;
                     continue;
