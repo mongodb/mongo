@@ -235,42 +235,51 @@ namespace mongo {
     ChunkPtr Chunk::simpleSplit( bool force ){
         vector<BSONObj> splitPoint;
 
-        // We assume that if the chunk being split is the first (or last) one on the collection, this chunk is
-        // likely to see more insertions. Instead of splitting mid-chunk, we use the very first (or last) key
-        // as a split point.
-        if ( minIsInf() ){
-            BSONObj key = _getExtremeKey( 1 );
-            if ( ! key.isEmpty() )
-                splitPoint.push_back( key );
+        // If splitting is not obligatory, we may return early if there are not enough data. 
+        if ( ! force ) {
+            vector<BSONObj> candidates;
+            const int maxPoints = 2;
+            const int maxObjs = 100000;
+            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
+            if ( candidates.size() <= 1 )
+                // no split points means there isn't enough data to split on
+                // 1 split point means we have between half the chunk size to full chunk size
+                // so we shouldn't split
+                return ChunkPtr();
 
-        } else if ( maxIsInf() ){
-            BSONObj key = _getExtremeKey( -1 );
-            if ( ! key.isEmpty() )
-                splitPoint.push_back( key );
+            splitPoint.push_back( candidates.front() );
 
-        } else if ( force ) {
+        } else {
             // if forcing a split, use the chunk's median key
             BSONObj medianKey;
             pickMedianKey( medianKey );
             if ( ! medianKey.isEmpty() )
                 splitPoint.push_back( medianKey );
-
-        } else {
-            // If not forcing a split, we want to have at least 2 split points, meaning there is enough data to reach
-            // the maximum split size. We limit the amount of objects we're willing to split away and don't bother
-            // getting all the split points. If we're in a jumbo chunk, that would prevent traversing the whole chunk.
-            vector<BSONObj> candidates;
-            const int maxPoints = 2;
-            const int maxObjs = 100000;
-            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
-            if ( ! candidates.empty() ) 
-                splitPoint.push_back( candidates.front() );
         }
 
-        // Normally, we'll have a sound split point here but we check this anyway.
+        // We assume that if the chunk being split is the first (or last) one on the collection, this chunk is
+        // likely to see more insertions. Instead of splitting mid-chunk, we use the very first (or last) key
+        // as a split point.
+        if ( minIsInf() ) {
+            splitPoint.clear();
+            BSONObj key = _getExtremeKey( 1 );
+            if ( ! key.isEmpty() ) {
+                splitPoint.push_back( key );
+            }
+
+        } else if ( maxIsInf() ) {
+            splitPoint.clear();
+            BSONObj key = _getExtremeKey( -1 );
+            if ( ! key.isEmpty() ) {
+                splitPoint.push_back( key );
+            }
+        } 
+
+        // Normally, we'd have a sound split point here if the chunk is not empty. It's also a good place to
+        // sanity check.
         if ( splitPoint.empty() || _min == splitPoint.front() || _max == splitPoint.front() ) {
-            error() << "want to split chunk, but can't find split point " 
-                    << " chunk: " << toString() << " got: " << splitPoint.front() << endl;
+            log() << "want to split chunk, but can't find split point " 
+                  << " chunk: " << toString() << " got: " << splitPoint.front() << endl;
             return ChunkPtr();
         }
 
