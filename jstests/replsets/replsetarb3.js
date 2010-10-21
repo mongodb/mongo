@@ -9,8 +9,9 @@
  * 6: check m3.state == 7
  * 7: reconfig
  * 8: check m3.state == 2
- * 9: reconfig
- * 10: check m1.state == 7
+ * 9: insert 10000
+ * 10: reconfig
+ * 11: check m3.state == 7
  */
 
 var statusSoon = function(s) {
@@ -57,6 +58,7 @@ var reconfig = function() {
     print(e);
   }
   reconnect(master);
+  reconnect(replTest.liveNodes.slaves[1]);
   sleep(20000);
 };
 
@@ -85,6 +87,7 @@ replTest.awaitReplication();
 
 print("2");
 statusSoon(7);
+assert.eq(replTest.liveNodes.slaves[1].getDB("local").oplog.rs.count(), 0);
 
 
 print("3");
@@ -94,6 +97,7 @@ reconfig();
 
 print("4");
 statusSoon(2);
+assert(replTest.liveNodes.slaves[1].getDB("local").oplog.rs.count() > 0);
 
 
 print("5");
@@ -103,6 +107,7 @@ reconfig();
 
 print("6");
 statusSoon(7);
+assert.eq(replTest.liveNodes.slaves[1].getDB("local").oplog.rs.count(), 0);
 
 
 print("7");
@@ -112,6 +117,24 @@ reconfig();
 
 print("8");
 statusSoon(2);
-  
+assert(replTest.liveNodes.slaves[1].getDB("local").oplog.rs.count() > 0);
+
+
+print("9");
+for (var i = 0; i < 10000; i++) {
+  master.getDB("foo").bar.insert({increment : i, c : 0, foo : "kasdlfjaklsdfalksdfakldfmalksdfmaklmfalkfmkafmdsaklfma", date : new Date(), d : Date()});
+}
+
+
+print("10");
+config.members[2].arbiterOnly = true;
+reconfig();
+
+
+print("11");
+statusSoon(7);
+assert.eq(replTest.liveNodes.slaves[1].getDB("local").oplog.rs.count(), 0);
+
+
 replTest.stopSet( 15 );
 

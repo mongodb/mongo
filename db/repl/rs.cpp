@@ -443,13 +443,27 @@ namespace mongo {
     void ReplSetImpl::_changeArbiterState() {
         if (iAmArbiterOnly()) {
             changeState(MemberState::RS_ARBITER);
-            
-            // TODO: free oplog (after terminating sync)
+
+            // if there is an oplog, free it
+            // not sure if this is necessary, maybe just leave the oplog and let
+            // the user delete it if they want the space?
+            writelock lk(rsoplog);
+            Client::Context c(rsoplog, dbpath, 0, false);
+            NamespaceDetails *d = nsdetails(rsoplog);
+            if (d) {
+                string errmsg;
+                bob res;
+                dropCollection(rsoplog, errmsg, res);
+
+                // clear last op time to force initial sync (if the arbiter
+                // becomes a "normal" server again)
+                lastOpTimeWritten = OpTime();
+            }
         }
         else {
-            // TODO: allocate oplog (before starting sync)
-            
             changeState(MemberState::RS_RECOVERING);
+
+            // oplog will be allocated when sync begins            
             boost::thread t(startSyncThread);
         }
     }

@@ -26,6 +26,7 @@
 #include "rs.h"
 #include "rs_config.h"
 #include "../dbhelpers.h"
+#include "../oplog.h"
 
 using namespace bson;
 using namespace mongoutils;
@@ -220,6 +221,8 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
+                createOplog();
+                
                 writelock lk("");
                 bo comment = BSON( "msg" << "initiating set");
                 newConfig.saveConfigLocally(comment);
