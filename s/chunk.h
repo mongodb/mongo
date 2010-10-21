@@ -98,9 +98,17 @@ namespace mongo {
          *
          * @param force if set to true, will split the chunk regardless if the split is really necessary size wise
          *              if set to false, will only split if the chunk has reached the currently desired maximum size
+         * @return if found a key, return a pointer to the first chunk, otherwise return a null pointer
          */
         ChunkPtr simpleSplit( bool force );
         
+        /**
+         * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
+         * 
+         * @param medianKey the key that divides this chunk, if there is one, or empty
+         */
+        void pickMedianKey( BSONObj& medianKey ) const;
+
         /**
          * @param splitPoints vector to be filled in
          * @param chunkSize chunk size to target in bytes

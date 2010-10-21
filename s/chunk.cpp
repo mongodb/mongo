@@ -170,6 +170,33 @@ namespace mongo {
         return median;
     }
 
+    void Chunk::pickMedianKey( BSONObj& medianKey ) const {
+        // Ask the mongod holding this chunk to figure out the split points.
+        ScopedDbConnection conn( getShard().getConnString() );
+        BSONObj result;
+        BSONObjBuilder cmd;
+        cmd.append( "splitVector" , _manager->getns() );
+        cmd.append( "keyPattern" , _manager->getShardKey().key() );
+        cmd.append( "min" , getMin() );
+        cmd.append( "max" , getMax() );
+        cmd.appendBool( "force" , true );
+        BSONObj cmdObj = cmd.obj();
+
+        if ( ! conn->runCommand( "admin" , cmdObj , result )){
+            conn.done();
+            ostringstream os;
+            os << "splitVector command (median key) failed: " << result;
+            uassert( 13503 , os.str() , 0 );
+        }       
+
+        BSONObjIterator it( result.getObjectField( "splitKeys" ) );
+        if ( it.more() ){
+            medianKey = it.next().Obj().getOwned();
+        }
+
+        conn.done();
+    }
+
     void Chunk::pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize /* bytes */, int maxPoints, int maxObjs ) const { 
         // Ask the mongod holding this chunk to figure out the split points.
         ScopedDbConnection conn( getShard().getConnString() );
@@ -206,20 +233,45 @@ namespace mongo {
     }
 
     ChunkPtr Chunk::simpleSplit( bool force ){
-        // if forcing a split, maxChunkSize does not really matter
-        // if not forcing a split, we want to have at least 2 split points, meaning there is enough data to reach
-        // the maximum split size
-        // TODO Handle 'not enough data to warrant chunking' in pickSplitVector
-        vector<BSONObj> candidates;
-        pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , force ? 0 : 2, force ? 0 : 100000);
-
         vector<BSONObj> splitPoint;
+
+        // We assume that if the chunk being split is the first (or last) one on the collection, this chunk is
+        // likely to see more insertions. Instead of splitting mid-chunk, we use the very first (or last) key
+        // as a split point.
         if ( minIsInf() ){
-            splitPoint.push_back( _getExtremeKey( 1 ) );
+            BSONObj key = _getExtremeKey( 1 );
+            if ( ! key.isEmpty() )
+                splitPoint.push_back( key );
+
         } else if ( maxIsInf() ){
-            splitPoint.push_back( _getExtremeKey( -1 ) );
-        } else if ( candidates.size() ){
-            splitPoint.push_back( candidates[0] );
+            BSONObj key = _getExtremeKey( -1 );
+            if ( ! key.isEmpty() )
+                splitPoint.push_back( key );
+
+        } else if ( force ) {
+            // if forcing a split, use the chunk's median key
+            BSONObj medianKey;
+            pickMedianKey( medianKey );
+            if ( ! medianKey.isEmpty() )
+                splitPoint.push_back( medianKey );
+
+        } else {
+            // If not forcing a split, we want to have at least 2 split points, meaning there is enough data to reach
+            // the maximum split size. We limit the amount of objects we're willing to split away and don't bother
+            // getting all the split points. If we're in a jumbo chunk, that would prevent traversing the whole chunk.
+            vector<BSONObj> candidates;
+            const int maxPoints = 2;
+            const int maxObjs = 100000;
+            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
+            if ( ! candidates.empty() ) 
+                splitPoint.push_back( candidates.front() );
+        }
+
+        // Normally, we'll have a sound split point here but we check this anyway.
+        if ( splitPoint.empty() || _min == splitPoint.front() || _max == splitPoint.front() ) {
+            error() << "want to split chunk, but can't find split point " 
+                    << " chunk: " << toString() << " got: " << splitPoint.front() << endl;
+            return ChunkPtr();
         }
 
         return multiSplit( splitPoint );
