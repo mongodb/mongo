@@ -94,7 +94,7 @@ namespace mongo {
         /* to be deprecated */ ChunkPtr split();        
 
         /**
-         * Splits a chunk at a non specificed split key.
+         * Splits this chunk at a non-specificed split key to be chosen by the mongod holding this chunk.
          *
          * @param force if set to true, will split the chunk regardless if the split is really necessary size wise
          *              if set to false, will only split if the chunk has reached the currently desired maximum size
@@ -110,13 +110,20 @@ namespace mongo {
         void pickMedianKey( BSONObj& medianKey ) const;
 
         /**
+         * Splits this chunk at at the given keys
+         *
+         * @param splitPoints the vector of keys that should be used to divide this chunk
+         * @return shared pointer to the first new Chunk
+         */
+        ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
+
+        /**
          * @param splitPoints vector to be filled in
          * @param chunkSize chunk size to target in bytes
          * @param maxPoints limits the number of split points that are needed, zero is max (optional)
          * @param maxObjs limits the number of objects in each chunk, zero is as max (optional)
          */
         void pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize , int maxPoints = 0, int maxObjs = 0) const;
-        ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
 
         /**
          * @return size of shard in bytes
