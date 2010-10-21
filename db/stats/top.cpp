@@ -24,9 +24,10 @@
 namespace mongo {
     
     Top::UsageData::UsageData( const UsageData& older , const UsageData& newer )
-        : time(newer.time-older.time) , 
-          count(newer.count-older.count) 
     {
+        // this won't be 100% accurate on rollovers and drop(), but at least it won't be negative
+        time  = (newer.time  > older.time)  ? (newer.time  - older.time)  : newer.time;
+        count = (newer.count > older.count) ? (newer.count - older.count) : newer.count;
         
     }
 
