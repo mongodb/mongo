@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # Download mongodb stuff (at present builds, sources, docs, but not
 # drivers).
