@@ -5,18 +5,12 @@ doTest = function( signal ) {
 
     var orig = new ReplSetTest( {name: 'testSet', nodes: 3} );
     orig.startSet();
+    orig.initiate();
+    var master = orig.getMaster();
 
     var interloper = new ReplSetTest( {name: 'testSet', nodes: 3, startPort : 31003} );
     interloper.startSet();
-
-    sleep(5000);
-
-    orig.initiate();
     interloper.initiate();
-
-    sleep(5000);
-
-    var master = orig.getMaster();
 
     var conf = master.getDB("local").system.replset.findOne();
  
