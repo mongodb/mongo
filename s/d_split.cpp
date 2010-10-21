@@ -132,12 +132,23 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help <<
                 "Internal command.\n"
-                "example: { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, maxChunkSize:200 }\n"
-                "maxChunkSize unit in MBs\n"
-                "May optionally specify 'maxSplitPoints' and 'maxChunkObjects' to avoid traversing the whole chunk\n"
+                "examples:\n"
+                "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, maxChunkSize:200 }\n"
+                "  maxChunkSize unit in MBs\n"
+                "  May optionally specify 'maxSplitPoints' and 'maxChunkObjects' to avoid traversing the whole chunk\n"
+                "  \n"
+                "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, force: true }\n"
+                "  'force' will produce one split point even if data is small; defaults to false\n"
                 "NOTE: This command may take a while to run";
         }
+
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+
+            //
+            // 1.a We'll parse the parameters in two steps. First, make sure the we can use the split index to get
+            //     a good approximation of the size of the chunk -- without needing to access the actual data.
+            //
+
             const char* ns = jsobj.getStringField( "splitVector" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
@@ -157,14 +168,45 @@ namespace mongo {
                 errmsg = "either provide both min and max or leave both empty";
                 return false;
             }
+
+            // Get the size estimate for this namespace
+            Client::Context ctx( ns );
+            NamespaceDetails *d = nsdetails( ns );
+            if ( ! d ){
+                errmsg = "ns not found";
+                return false;
+            }
             
+            IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
+            if ( idx == NULL ){
+                errmsg = "couldn't find index over splitting key";
+                return false;
+            }
+
+            const long long recCount = d->stats.nrecords;
+            const long long dataSize = d->stats.datasize;
+
+            //
+            // 1.b Now that we have the size estimate, go over the remaining parameters and apply any maximum size
+            //     restrictions specified there.
+            //
+            
+            // 'force'-ing a split is equivalent to having maxChunkSize be the size of the current chunk, i.e., the 
+            // logic below will split that chunk in half
             long long maxChunkSize = 0;
+            bool force = false;
             {
                 BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
-                if ( maxSizeElem.isNumber() ){
+                BSONElement forceElem = jsobj[ "force" ];
+
+                if ( forceElem.isBoolean() && forceElem.Bool() ) {
+                    force = true;
+                    maxChunkSize = dataSize;
+
+                } else if ( maxSizeElem.isNumber() ){
                     maxChunkSize = maxSizeElem.numberLong() * 1<<20; 
-                }
-                else {
+
+                } else {
                     maxSizeElem = jsobj["maxChunkSizeBytes"];
                     if ( maxSizeElem.isNumber() ){
                         maxChunkSize = maxSizeElem.numberLong();
@@ -189,23 +231,6 @@ namespace mongo {
                 maxChunkObjects = MaxChunkObjectsElem.numberLong();
             }
 
-            // Get the size estimate for this namespace
-            Client::Context ctx( ns );
-            NamespaceDetails *d = nsdetails( ns );
-            if ( ! d ){
-                errmsg = "ns not found";
-                return false;
-            }
-            
-            IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
-            if ( idx == NULL ){
-                errmsg = "couldn't find index over splitting key";
-                return false;
-            }
-
-            const long long recCount = d->stats.nrecords;
-            const long long dataSize = d->stats.datasize;
-            
             // If there's not enough data for more than one chunk, no point continuing.
             if ( dataSize < maxChunkSize || recCount == 0 ) {
                 vector<BSONObj> emptyVector;
@@ -224,9 +249,12 @@ namespace mongo {
                 keyCount = maxChunkObjects;
             }
 
-            // We traverse the index and add the keyCount-th key to the result vector. If that key
-            // appeared in the vector before, we omit it. The assumption here is that all the 
-            // instances of a key value live in the same chunk.
+            //
+            // 2. Traverse the index and add the keyCount-th key to the result vector. If that key
+            //    appeared in the vector before, we omit it. The invariant here is that all the 
+            //    instances of a given key value live in the same chunk.
+            //
+
             Timer timer;
             long long currCount = 0;
             long long numChunks = 0;
@@ -280,6 +308,11 @@ namespace mongo {
                     break;
                 }
             }
+
+            //
+            // 3. Format the result and issue any warnings about the data we gathered while traversing the
+            //    index
+            //
 
             // Warn for keys that are more numerous than maxChunkSize allows.
             for ( set<BSONObj>::const_iterator it = tooFrequentKeys.begin(); it != tooFrequentKeys.end(); ++it ){
