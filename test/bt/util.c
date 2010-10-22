@@ -172,6 +172,8 @@ wts_rand(void)
 			fprintf(stderr, "%s: %s\n", p, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
+		if (!g.replay)
+			setvbuf(g.rand_log, NULL, _IOLBF, 0);
 	}
 	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
