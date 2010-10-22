@@ -13,7 +13,7 @@ static int  __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_col_int(WT_PAGE *);
 static int  __wt_bt_page_inmem_col_var(WT_PAGE *);
 static int  __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
-static int  __wt_bt_page_inmem_item_int(DB *, WT_PAGE *);
+static int  __wt_bt_page_inmem_row_int(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
 
 /*
@@ -130,8 +130,17 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
 		nindx = hdr->u.entries / 2;
+		break;
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * Row store leaf pages support duplicates, so the real worst
+		 * case is one key plus some number of duplicate data items.
+		 * The number is configurable, that is, you can configure when
+		 * a duplicate set is big enough to be pushed off the page;
+		 * we're conservative here.
+		 */
+		nindx = hdr->u.entries - 1;
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -174,7 +183,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		ret = __wt_bt_page_inmem_item_int(db, page);
+		ret = __wt_bt_page_inmem_row_int(db, page);
 		break;
 	case WT_PAGE_DUP_LEAF:
 		ret = __wt_bt_page_inmem_dup_leaf(db, page);
@@ -188,12 +197,12 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_item_int --
+ * __wt_bt_page_inmem_row_int --
  *	Build in-memory index for row-store and off-page duplicate tree
  *	internal pages.
  */
 static int
-__wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_ITEM *item;
@@ -297,6 +306,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 			if (rip->data != NULL) {
 				WT_KEY_SET(rip + 1, rip->key, rip->size);
 				++rip;
+				++indx_count;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA:
