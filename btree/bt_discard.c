@@ -35,20 +35,25 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		/*
-		 * For each entry, see if the key was an allocation, that is,
-		 * if it points somewhere other than the original page.  If it
-		 * is an allocation, free it.
+		 * For each entry, see if the key was an allocation (that is,
+		 * if it points somewhere other than the original page), and
+		 * if so, free the memory.  This test is a superset of the
+		 * WT_KEY_PROCESS test, that is, any key requiring processing
+		 * but not yet processed, must reference on-page information.
 		 *
 		 * Only handle the first key entry for duplicate key/data pairs,
-		 * the others reference the same memory.
+		 * the others reference the same memory.  (This test only makes
+		 * sense for WT_PAGE_ROW_LEAF pages, but there is no cost in
+		 * doing the test for all page types.
 		 */
 		last_key = NULL;
 		WT_INDX_FOREACH(page, rip, i) {
+			if (WT_ROW_KEY_ON_PAGE(page, rip))
+				continue;
 			if (rip->key == last_key)
 				continue;
 			last_key = rip->key;
-			if (!WT_ROW_KEY_ON_PAGE(page, rip))
-				__wt_free(env, rip->key, rip->size);
+			__wt_free(env, rip->key, rip->size);
 		}
 		break;
 	case WT_PAGE_COL_FIX:
