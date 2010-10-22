@@ -274,7 +274,6 @@ __wt_bt_verify_tree(WT_TOC *toc,
 				    __wt_bt_verify_cmp(toc, rip, vs->leaf, 0));
 				__wt_bt_page_out(toc, &vs->leaf, 0);
 			}
-
 			WT_ERR(__wt_bt_verify_tree(toc, rip,
 			    level - 1, WT_ITEM_BYTE_OFF(rip->data), vs));
 		}
@@ -512,7 +511,7 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		DBT	 item_std;		/* On-page reference */
 		DBT	 item_ovfl;		/* Overflow holder */
 		WT_PAGE	*ovfl;			/* Overflow page */
-		DBT	 item_comp;		/* Uncompressed holder */
+		DBT	 *item_comp;		/* Uncompressed holder */
 	} *current, *last_data, *last_key, *swap_tmp, _a, _b, _c;
 	DB *db;
 	ENV *env;
@@ -539,13 +538,22 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	 * last data item, and the current item.   They're stored in the _a,
 	 * _b, and _c structures (it doesn't matter which) -- what matters is
 	 * which item is referenced by current, last_data or last_key.
+	 *
+	 * If we're doing Huffman compression, allocate scratch buffers for the
+	 * decompressed versions.
 	 */
 	WT_CLEAR(_a);
 	current = &_a;
+	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
+		WT_ERR(__wt_toc_scratch_alloc(toc, &_a.item_comp));
 	WT_CLEAR(_b);
 	last_data = &_b;
+	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
+		WT_ERR(__wt_toc_scratch_alloc(toc, &_b.item_comp));
 	WT_CLEAR(_c);
 	last_key = &_c;
+	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
+		WT_ERR(__wt_toc_scratch_alloc(toc, &_c.item_comp));
 
 	/* Set the comparison function. */
 	switch (hdr->type) {
@@ -759,7 +767,6 @@ eof:				__wt_api_db_errx(db,
 			 */
 			current->indx = item_num;
 			current->item = &current->item_ovfl;
-			ovfl = WT_ITEM_BYTE_OVFL(item);
 			current->item_ovfl.data = WT_PAGE_BYTE(current->ovfl);
 			current->item_ovfl.size = ovfl->size;
 			break;
@@ -771,10 +778,10 @@ eof:				__wt_api_db_errx(db,
 		if (idb->huffman_key != NULL) {
 			WT_ERR(__wt_huffman_decode(idb->huffman_key,
 			    current->item->data, current->item->size,
-			    &current->item_comp.data,
-			    &current->item_comp.mem_size,
-			    &current->item_comp.size));
-			current->item = &current->item_comp;
+			    &current->item_comp->data,
+			    &current->item_comp->mem_size,
+			    &current->item_comp->size));
+			current->item = current->item_comp;
 		}
 
 		/* Check the sort order. */
@@ -800,10 +807,10 @@ eof:				__wt_api_db_errx(db,
 			if (idb->huffman_data != NULL) {
 				WT_ERR(__wt_huffman_decode(idb->huffman_data,
 				    current->item->data, current->item->size,
-				    &current->item_comp.data,
-				    &current->item_comp.mem_size,
-				    &current->item_comp.size));
-				current->item = &current->item_comp;
+				    &current->item_comp->data,
+				    &current->item_comp->mem_size,
+				    &current->item_comp->size));
+				current->item = current->item_comp;
 			}
 			if (last_data->item != NULL &&
 			    func(db, last_data->item, current->item) >= 0) {
@@ -851,13 +858,13 @@ err:	/* Discard any overflow pages we're still holding. */
 	if (_c.ovfl != NULL)
 		__wt_bt_page_out(toc, &_c.ovfl, 0);
 
-	/* Free any memory we allocated. */
-	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.mem_size);
-	__wt_free(env, _b.item_ovfl.data, _b.item_ovfl.mem_size);
-	__wt_free(env, _c.item_ovfl.data, _c.item_ovfl.mem_size);
-	__wt_free(env, _a.item_comp.data, _a.item_comp.mem_size);
-	__wt_free(env, _b.item_comp.data, _b.item_comp.mem_size);
-	__wt_free(env, _c.item_comp.data, _c.item_comp.mem_size);
+	/* Discard any scratch buffers we allocated. */
+	if (_a.item_comp != NULL)
+		__wt_toc_scratch_discard(toc, _a.item_comp);
+	if (_b.item_comp != NULL)
+		__wt_toc_scratch_discard(toc, _b.item_comp);
+	if (_c.item_comp != NULL)
+		__wt_toc_scratch_discard(toc, _c.item_comp);
 
 	return (ret);
 }
