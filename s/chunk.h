@@ -52,47 +52,63 @@ namespace mongo {
      */    
     class Chunk : boost::noncopyable, public boost::enable_shared_from_this<Chunk>  {
     public:
-
         Chunk( ChunkManager * info );
         Chunk( ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
         
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
-        
-        void setMin(const BSONObj& o){
-            _min = o;
-        }
-        void setMax(const BSONObj& o){
-            _max = o;
-        }
+        void setMin(const BSONObj& o) { _min = o; }
+        void setMax(const BSONObj& o) { _max = o; }
 
-
-        string getns() const;
-        Shard getShard() const { return _shard; }
+        // if min/max key is pos/neg infinity
+        bool minIsInf() const;
+        bool maxIsInf() const;
 
         bool contains( const BSONObj& obj ) const;
 
         string toString() const;
-
         friend ostream& operator << (ostream& out, const Chunk& c){ return (out << c.toString()); }
-
         bool operator==(const Chunk& s) const;
+        bool operator!=(const Chunk& s) const { return ! ( *this == s ); }
         
-        bool operator!=(const Chunk& s) const{
-            return ! ( *this == s );
-        }
+        string getns() const;
+        const char * getNS() { return "config.chunks"; }
+        Shard getShard() const { return _shard; }
+        const ChunkManager* getManager() const { return _manager; }
+
+        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
+        void unserialize(const BSONObj& from);
+        string modelServer() const;
         
-        // if min/max key is pos/neg infinity
-        bool minIsInf() const;
-        bool maxIsInf() const;
+        void appendShortVersion( const char * name , BSONObjBuilder& b );
+        ShardChunkVersion getVersionOnConfigServer() const;
+
+        string genID() const;
+        static string genID( const string& ns , const BSONObj& min );
+
+        bool getModified() { return _modified; }
+        void setModified( bool modified ) { _modified = modified; }
+
+        ShardChunkVersion getLastmod() const { return _lastmod; }
+        void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
+
+        //
+        // split support
+        //
 
         /**
          * @param a vector of possible split points
          *        used as a hint only
          */
-        /* to be deprecated */ BSONObj pickSplitPoint( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
-        /* to be deprecated */ ChunkPtr split();        
+        BSONObj pickSplitPoint_DEPRECATED( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
+        ChunkPtr split_DEPRECATED();
 
+        /**
+         * if the amount of data written nears the max size of a shard
+         * then we check the real size, and if its too big, we split
+         */
+        bool splitIfShould( long dataWritten );
+        
         /**
          * Splits this chunk at a non-specificed split key to be chosen by the mongod holding this chunk.
          *
@@ -101,13 +117,6 @@ namespace mongo {
          * @return if found a key, return a pointer to the first chunk, otherwise return a null pointer
          */
         ChunkPtr simpleSplit( bool force );
-        
-        /**
-         * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
-         * 
-         * @param medianKey the key that divides this chunk, if there is one, or empty
-         */
-        void pickMedianKey( BSONObj& medianKey ) const;
 
         /**
          * Splits this chunk at at the given keys
@@ -116,6 +125,13 @@ namespace mongo {
          * @return shared pointer to the first new Chunk
          */
         ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
+
+        /**
+         * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
+         * 
+         * @param medianKey the key that divides this chunk, if there is one, or empty
+         */
+        void pickMedianKey( BSONObj& medianKey ) const;
 
         /**
          * @param splitPoints vector to be filled in
@@ -134,57 +150,20 @@ namespace mongo {
         int countObjects(int maxcount=0) const;
         
         /**
-         * if the amount of data written nears the max size of a shard
-         * then we check the real size, and if its too big, we split
-         */
-        bool splitIfShould( long dataWritten );
-        
-        /*
          * moves either this shard or newShard if it makes sense too
+         *
          * @return whether or not a shard was moved
          */
         bool moveIfShould( ChunkPtr newShard = ChunkPtr() );
 
         bool moveAndCommit( const Shard& to , BSONObj& res );
 
-        const char * getNS(){ return "config.chunks"; }
-        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
-        void unserialize(const BSONObj& from);
-        string modelServer() const;
-        
-        void appendShortVersion( const char * name , BSONObjBuilder& b );
-
         static int MaxChunkSize;
 
-        string genID() const;
-        static string genID( const string& ns , const BSONObj& min );
-
-        const ChunkManager* getManager() const { return _manager; }
-        
-        bool getModified() { return _modified; }
-        void setModified( bool modified ) { _modified = modified; }
-
-        ShardChunkVersion getLastmod() const { return _lastmod; }
-        void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
-
-        ShardChunkVersion getVersionOnConfigServer() const;
-
-
     private:
-        bool _splitIfShould( long dataWritten );
-        ChunkPtr multiSplit_inlock( const vector<BSONObj>& splitPoints );
-
-        /**
-         * if sort 1, return lowest key
-         * if sort -1, return highest key
-         * will return empty object if have none
-         */
-        BSONObj _getExtremeKey( int sort ) const;
-
         // main shard info
         
         ChunkManager * _manager;
-        ShardKeyPattern skey() const;
 
         BSONObj _min;
         BSONObj _max;
@@ -199,7 +178,14 @@ namespace mongo {
         
         // methods, etc..
         
-        void _split( BSONObj& middle );
+        /**
+         * if sort 1, return lowest key
+         * if sort -1, return highest key
+         * will return empty object if have none
+         */
+        BSONObj _getExtremeKey( int sort ) const;
+
+        ShardKeyPattern skey() const;
     };
 
     class ChunkRange{

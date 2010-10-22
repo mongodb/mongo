@@ -110,8 +110,7 @@ namespace mongo {
         return _manager->getShardKey().extractKey( end );
     }
 
-    /* to be deprecated */
-    BSONObj Chunk::pickSplitPoint( const vector<BSONObj> * possibleSplitPoints ) const {
+    BSONObj Chunk::pickSplitPoint_DEPRECATED( const vector<BSONObj> * possibleSplitPoints ) const {
         
         // check to see if we're at the edge of the key range
         // if so, split on the edge for sequential insertion efficienc
@@ -225,10 +224,9 @@ namespace mongo {
         conn.done();
     }
 
-    /* to be deprecated */
-    ChunkPtr Chunk::split(){
+    ChunkPtr Chunk::split_DEPRECATED(){
         vector<BSONObj> splitPoints;
-        splitPoints.push_back( pickSplitPoint() );
+        splitPoints.push_back( pickSplitPoint_DEPRECATED() );
         return multiSplit( splitPoints );
     }
 
@@ -245,6 +243,7 @@ namespace mongo {
                 // no split points means there isn't enough data to split on
                 // 1 split point means we have between half the chunk size to full chunk size
                 // so we shouldn't split
+                log(1) << "chunk not full enough to trigger auto-split" << endl;
                 return ChunkPtr();
 
             splitPoint.push_back( candidates.front() );
@@ -289,10 +288,7 @@ namespace mongo {
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
         dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
         uassert( 10166 , "locking namespace failed" , dlk.got() );
-        return multiSplit_inlock( m );
-    }
-    
-    ChunkPtr Chunk::multiSplit_inlock( const vector<BSONObj>& m ){
+
         const size_t maxSplitPoints = 256;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -444,76 +440,42 @@ namespace mongo {
     
     bool Chunk::splitIfShould( long dataWritten ){
         LastError::Disabled d( lastError.get() );
+
         try {
-            return _splitIfShould( dataWritten );
-        }
-        catch ( std::exception& e ){
-            error() << "splitIfShould failed: " << e.what() << endl;
-            return false;
-        }
-    }
+            _dataWritten += dataWritten;        
+            int splitThreshold = getManager()->getCurrentDesiredChunkSize();
+            if ( minIsInf() || maxIsInf() ){
+                splitThreshold = (int) ((double)splitThreshold * .9);
+            }
 
-    bool Chunk::_splitIfShould( long dataWritten ){
-        _dataWritten += dataWritten;
-        
-        int splitThreshold = getManager()->getCurrentDesiredChunkSize();
-        if ( minIsInf() || maxIsInf() ){
-            splitThreshold = (int) ((double)splitThreshold * .9);
-        }
-
-        if ( _dataWritten < splitThreshold / 5 )
-            return false;
-        
-        ChunkPtr newShard;
-        {
-            // putting this in its own scope so moveIfShould is done outside
-
-            dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
-            if ( ! dlk.got() )
+            if ( _dataWritten < splitThreshold / 5 )
                 return false;
-            
-            log(3) << "\t splitIfShould entering decision area : " << *this << endl;
+        
+            log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << endl;
             
             _dataWritten = 0; // reset so we check often enough
             
-            // We limit the amount of objects we're willing to split away and don't bother
-            // getting all the split points. If we're in a jumbo chunk, that would prevent
-            // traversing the whole chunk.
-            const int maxPoints = 2; 
-            const int maxObjs = 100000;
-            vector<BSONObj> possibleSplitPoints;
-            pickSplitVector( possibleSplitPoints , splitThreshold , maxPoints , maxObjs );            
-            if ( possibleSplitPoints.size() <= 1 ) {
-                // no split points means there isn't enough data to split on
-                // 1 split point means we have between half the chunk size to full chunk size
-                // so we shouldn't split
+            ChunkPtr newShard = simpleSplit( false /* does not force a split if not enough data */ );
+            if ( newShard.get() == NULL ){
+                // simpleSplit would have issued a message if we got here
                 return false;
             }
 
-            BSONObj splitPoint = pickSplitPoint( &possibleSplitPoints );
-            if ( splitPoint.isEmpty() || _min == splitPoint || _max == splitPoint) {
-                // TODO: this check might be redundany, but probably not that bad
-                error() << "want to split chunk, but can't find split point " 
-                        << " chunk: " << toString() << " got: " << splitPoint << endl;
-                return false;
-            }
-            
-            log() << "autosplitting " << _manager->getns() << " shard: " << toString() 
-                  << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")" 
+            log() << "autosplitted " << _manager->getns() << " shard: " << toString() 
+                  << " on: " << newShard->getMax() << "(splitThreshold " << splitThreshold << ")" 
 #ifdef _DEBUG
                   << " size: " << getPhysicalSize() // slow - but can be usefule when debugging
 #endif
                   << endl;
-            
-            vector<BSONObj> splitPoints;
-            splitPoints.push_back( splitPoint );
-            newShard = multiSplit_inlock( splitPoints );
+        
+            moveIfShould( newShard );
+        
+            return true;
+
+        } catch ( std::exception& e ){
+            error() << "splitIfShould failed: " << e.what() << endl;
+            return false;
         }
-        
-        // since a chunk move is done by the donor shard, it should be responsible for locking the ns 
-        moveIfShould( newShard );
-        
-        return true;
     }
 
     bool Chunk::moveIfShould( ChunkPtr newChunk ){
@@ -676,7 +638,6 @@ namespace mongo {
         ss << "ns:" << _manager->getns() << " at: " << _shard.toString() << " lastmod: " << _lastmod.toString() << " min: " << _min << " max: " << _max;
         return ss.str();
     }
-    
     
     ShardKeyPattern Chunk::skey() const{
         return _manager->getShardKey();

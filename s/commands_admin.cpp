@@ -487,7 +487,7 @@ namespace mongo {
                 log() << "splitting: " << ns << "  shard: " << old << endl;
 
                 if ( middle.isEmpty() )
-                    old->split();
+                    old->simpleSplit( true /* force a split even if not enough data */ );
                 else {
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );

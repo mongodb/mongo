@@ -30,11 +30,13 @@ assert.eq( 6 , db.foo.find().count() , "basic count" );
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
+s.printChunks()
 
 assert.eq( 6 , db.foo.find().count() , "basic count after split " );
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "basic count after split sorted " );
 
 s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : secondary.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "sara" } , to : secondary.getMongo().name } );
 
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 3 , secondary.foo.find().toArray().length , "secondary count" );

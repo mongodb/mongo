@@ -25,6 +25,7 @@ s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 
 s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "sara" } , to : seconday.getMongo().name } );
 
 s.printChunks();
 

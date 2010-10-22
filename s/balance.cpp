@@ -78,7 +78,7 @@ namespace mongo {
 
             if ( res["split"].trueValue() ) {
                 log() << "move asked for a split of " << c << endl;
-                c->split();
+                c->simpleSplit( true /* force a split even if not enough data */ );
             }
         }
 

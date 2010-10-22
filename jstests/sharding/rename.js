@@ -24,3 +24,4 @@ assert.eq(db.bar.findOne(), {_id:3}, '3.1');
 assert.eq(db.bar.count(), 1, '3.2');
 assert.eq(db.foo.count(), 0, '3.3');
 
+s.stop()
