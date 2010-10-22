@@ -414,9 +414,20 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj splitKeys = cmdObj["splitKeys"].Obj();
-            if ( splitKeys.isEmpty() ){
+            BSONObj splitKeysElem = cmdObj["splitKeys"].Obj();
+            if ( splitKeysElem.isEmpty() ){
                 errmsg = "need to provide the split points to chunk over";
+                return false;
+            }
+            vector<BSONObj> splitKeys;
+            BSONObjIterator it( splitKeysElem );
+            while ( it.more() ) {
+                splitKeys.push_back( it.next().Obj().getOwned() );
+            }
+
+            BSONElement shardId = cmdObj["shardId"];
+            if ( shardId.eoo() ) {
+                errmsg = "need to provide shardId";
                 return false;
             }
 
@@ -432,34 +443,47 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj maxChunk;
-            BSONObj currChunk;
+            // TODO This is a check migrate does to the letter. Factor it out and share. 2010-10-22
+
+            ShardChunkVersion maxVersion;
+            string shard;
+            ChunkInfo origChunk;
             {
                 ScopedDbConnection conn( shardingState.getConfigServer() );
-                BSONObj maxChunk = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
-                BSONObj currChunk = conn->findOne( ShardNS::chunk, Query( BSON( "ns" << ns << "min" << min ) ) );
+                
+                BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
+                maxVersion = x["lastmod"];
+
+                BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
+                assert( currChunk["shard"].type() );
+                assert( currChunk["min"].type() );
+                assert( currChunk["max"].type() );
+                shard = currChunk["shard"].String();
                 conn.done();
-            }
+                
+                BSONObj currMin = currChunk["min"].Obj();
+                BSONObj currMax = currChunk["max"].Obj();
+                if ( currMin.woCompare( min ) || currMax.woCompare( max ) ) {
+                    errmsg = "chunk boundaries are outdated (likely a split occurred)";
+                    result.append( "currMin" , currMin );
+                    result.append( "currMax" , currMax );
+                    result.append( "requestedMin" , min );
+                    result.append( "requestedMax" , max );
+                    return false;
+                }
 
-            ShardChunkVersion maxVersion = maxChunk["lastmod"];
-            if ( maxVersion < shardingState.getVersion( ns ) ) {
-                errmsg = "official version less than mine?";
-                result.appendTimestamp( "officialVersion" , maxVersion );
-                result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
-                return false;
-            }
+                if ( maxVersion < shardingState.getVersion( ns ) ){
+                    errmsg = "official version less than mine?";
+                    result.appendTimestamp( "officialVersion" , maxVersion );
+                    result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
+                    return false;
+                }
 
-            ChunkInfo origChunk( currChunk["min"].Obj() , currChunk["max"].Obj() , currChunk["lastmod"] );
+                origChunk.min = currMin;
+                origChunk.max = currMax;
+                origChunk.lastmod = currChunk["lastmod"];
 
-            if ( ( origChunk.min.woCompare( min ) != 0) || ( origChunk.max.woCompare( max ) != 0) ){
-                errmsg = "attempt to split old chunk (boundaries changed)";
-                result.append( "currMin" , origChunk.min );
-                result.append( "expectedMin" , min );
-                result.append( "currMax" , origChunk.max );
-                result.append( "expectedMax" , max ); 
-                return false;
             }
-            const string shard = currChunk["shard"].str();
 
             // 
             // 3. create the batch of updates to metadata ( the new chunks ) to be applied via 'applyOps' command
@@ -472,12 +496,13 @@ namespace mongo {
 
             ShardChunkVersion myVersion = maxVersion;
             BSONObj startKey = min;
+            splitKeys.push_back( max ); // we need to update that chunk, too
 
             BSONObjBuilder cmdBuilder;
             BSONArrayBuilder updates( cmdBuilder.subarrayStart( "applyOps" ) );
-            BSONObjIterator keys( splitKeys );
-            while ( keys.more() ){                
-                BSONObj endKey = keys.next().Obj();
+
+            for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end(); ++it ){
+                BSONObj endKey = *it;
 
                 // splits only update the 'minor' portion of version
                 myVersion.incMinor();
@@ -508,6 +533,8 @@ namespace mongo {
 
                 // remember this chunk info for logging later
                 newChunks.push_back( ChunkInfo( startKey , endKey, myVersion ) );
+
+                startKey = endKey;
             }        
 
             updates.done();

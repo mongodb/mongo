@@ -284,6 +284,7 @@ namespace mongo {
         }
 
         return multiSplit( splitPoint );
+        //return multiSplit_ForDevOnly( splitPoint );
     }
     
     ChunkPtr Chunk::multiSplit_ForDevOnly( const vector<BSONObj>& m ) {
@@ -295,6 +296,7 @@ namespace mongo {
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
         cmd.append( "splitKeys" , m );
+        cmd.append( "shardId", genID() );
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , result )) {
@@ -309,8 +311,10 @@ namespace mongo {
         conn.done();
         _manager->_reload();
 
-        return ChunkPtr(); // TODO can it return the post-split chunk? should it?
-    }
+        // TODO the moveIfShould path is still expecting the first new chunk of the split. So produce that now
+        // but the move code path can obtain this the same way.
+        return _manager->findChunk( getMin() );
+     }
 
     /* to be deprecated */
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
