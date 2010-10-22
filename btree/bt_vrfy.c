@@ -514,7 +514,6 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		DBT	 *item_comp;		/* Uncompressed holder */
 	} *current, *last_data, *last_key, *swap_tmp, _a, _b, _c;
 	DB *db;
-	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
@@ -525,7 +524,6 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	int (*func)(DB *, const DBT *, const DBT *), ret;
 
 	db = toc->db;
-	env = toc->env;
 	idb = db->idb;
 	ret = 0;
 
@@ -543,14 +541,14 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	 * decompressed versions.
 	 */
 	WT_CLEAR(_a);
+	WT_CLEAR(_b);
+	WT_CLEAR(_c);
 	current = &_a;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
 		WT_ERR(__wt_toc_scratch_alloc(toc, &_a.item_comp));
-	WT_CLEAR(_b);
 	last_data = &_b;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
 		WT_ERR(__wt_toc_scratch_alloc(toc, &_b.item_comp));
-	WT_CLEAR(_c);
 	last_key = &_c;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
 		WT_ERR(__wt_toc_scratch_alloc(toc, &_c.item_comp));
