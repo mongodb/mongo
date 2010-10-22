@@ -670,6 +670,8 @@ namespace mongo {
                 ReplSource tmp(c->current());
                 if ( tmp.hostName != cmdLine.source ) {
                     log() << "repl: --source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
+                    log() << "repl: for instructions on changing this slave's source, see:" << endl;
+                    log() << "http://dochub.mongodb.org/core/masterslave" << endl;
                     log() << "repl: terminating mongod after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
