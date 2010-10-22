@@ -668,6 +668,8 @@ int main(int argc, char* argv[], char *envp[] )
 	po::options_description windows_scm_options("Windows Service Control Manager options");
 	#endif
     po::options_description replication_options("Replication options");
+    po::options_description ms_options("Master/slave options");
+    po::options_description rs_options("Replica set options");
     po::options_description sharding_options("Sharding options");
     po::options_description visible_options("Allowed options");
     po::options_description hidden_options("Hidden options");
@@ -716,20 +718,26 @@ int main(int argc, char* argv[], char *envp[] )
 #endif
 
 	replication_options.add_options()
-        ("master", "master mode")
-        ("slave", "slave mode")
-        ("source", po::value<string>(), "when slave: specify master as <server:port>")
-        ("only", po::value<string>(), "when slave: specify a single database to replicate")
-        ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
-        ("replSet", po::value<string>(), "specify repl set seed hostnames format <set id>/<host1>,<host2>,etc...")
-        ("arbiter", po::value<string>(), "address of arbiter server")
-        ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
         ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
+        ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
+        ("arbiter", po::value<string>(), "address of arbiter server DEPRECATED")
         ;
 
+        ms_options.add_options()
+        ("master", "master mode")
+        ("slave", "slave mode")
+        ("source", po::value<string>(), "when slave: specify master as <server:port>")
+        ("only", po::value<string>(), "when slave: specify a single database to replicate")
+        ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
+        ;
+            
+        rs_options.add_options()
+        ("replSet", po::value<string>(), "specify repl set seed hostnames format <set id>/<host1>,<host2>,etc...")
+        ;
+        
 	sharding_options.add_options()
 		("configsvr", "declare this is a config db of a cluster; default port 27019; default dir /data/configdb")
 		("shardsvr", "declare this is a shard db of a cluster; default port 27018")
@@ -749,6 +757,8 @@ int main(int argc, char* argv[], char *envp[] )
 	visible_options.add(windows_scm_options);
 	#endif
     visible_options.add(replication_options);
+    visible_options.add(ms_options);
+    visible_options.add(rs_options);
     visible_options.add(sharding_options);
     Module::addOptions( visible_options );
 
