@@ -239,12 +239,13 @@ namespace mongo {
             const int maxPoints = 2;
             const int maxObjs = 100000;
             pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
-            if ( candidates.size() <= 1 )
+            if ( candidates.size() <= 1 ) {
                 // no split points means there isn't enough data to split on
                 // 1 split point means we have between half the chunk size to full chunk size
                 // so we shouldn't split
                 log(1) << "chunk not full enough to trigger auto-split" << endl;
                 return ChunkPtr();
+            }
 
             splitPoint.push_back( candidates.front() );
 
