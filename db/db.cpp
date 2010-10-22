@@ -839,7 +839,10 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
-            uassert( 12589, "repairpath has to be non-zero", repairpath.size() );
+            if (!repairpath.size()) {
+                out() << "repairpath has to be non-zero" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
         } else {
             repairpath = dbpath;
         }
@@ -913,11 +916,11 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("replSet")) {
             if (params.count("slavedelay")) {
-                cout << "--slavedelay cannot be used with --replSet" << endl;
-                ::exit(-1);
+                out() << "--slavedelay cannot be used with --replSet" << endl;
+                dbexit( EXIT_BADOPTIONS );
             } else if (params.count("only")) {
-                cout << "--only cannot be used with --replSet" << endl;
-                ::exit(-1);
+                out() << "--only cannot be used with --replSet" << endl;
+                dbexit( EXIT_BADOPTIONS );
             }
             /* seed list of hosts for the repl set */
             cmdLine._replSet = params["replSet"].as<string>().c_str();
@@ -939,39 +942,52 @@ int main(int argc, char* argv[], char *envp[] )
                 pairWith(paired.c_str(), "-");
             }
         } else if (params.count("arbiter")) {
-            uasserted(10999,"specifying --arbiter without --pairwith");
+            out() << "specifying --arbiter without --pairwith" << endl;
+            dbexit( EXIT_BADOPTIONS );
         }
         if( params.count("nssize") ) {
             int x = params["nssize"].as<int>();
-            uassert( 10034 , "bad --nssize arg", x > 0 && x <= (0x7fffffff/1024/1024));
+            if (x <= 0 || x > (0x7fffffff/1024/1024)) {
+                out() << "bad --nssize arg" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
             lenForNewNsFiles = x * 1024 * 1024;
             assert(lenForNewNsFiles > 0);
         }
         if (params.count("oplogSize")) {
             long x = params["oplogSize"].as<int>();
-            uassert( 10035 , "bad --oplogSize arg", x > 0);
+            if (x <= 0) {
+                out() << "bad --oplogSize arg" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
             cmdLine.oplogSize = x * 1024 * 1024;
             assert(cmdLine.oplogSize > 0);
         }
         if (params.count("opIdMem")) {
             long x = params["opIdMem"].as<long>();
-            uassert( 10036 , "bad --opIdMem arg", x > 0);
+            if (x <= 0) {
+                out() << "bad --opIdMem arg" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
             replSettings.opIdMem = x;
             assert(replSettings.opIdMem > 0);
         }
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
-            uassert( 10037 , "bad --cacheSize arg", x > 0);
+            if (x <= 0) {
+                out() << "bad --cacheSize arg" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
             log() << "--cacheSize option not currently supported" << endl;
             //setRecCacheSize(x);
         }
-		if (params.count("port") == 0 ) { 
-			if( params.count("configsvr") ) {
-				cmdLine.port = CmdLine::ConfigServerPort;
-			}
-			if( params.count("shardsvr") )
-				cmdLine.port = CmdLine::ShardServerPort;
-		}
+        if (params.count("port") == 0 ) { 
+            if( params.count("configsvr") ) {
+                cmdLine.port = CmdLine::ConfigServerPort;
+            }
+            if( params.count("shardsvr") )
+                cmdLine.port = CmdLine::ShardServerPort;
+        }
         else { 
             if ( cmdLine.port <= 0 || cmdLine.port > 65535 ){
                 out() << "bad --port number" << endl;
@@ -979,7 +995,10 @@ int main(int argc, char* argv[], char *envp[] )
             }
         }
         if ( params.count("configsvr" ) ){
-            uassert( 13499, "replication should not be enabled on a config server", !cmdLine.usingReplSets() && !replSettings.master && !replSettings.slave);
+            if (cmdLine.usingReplSets() || replSettings.master || replSettings.slave) {
+                log() << "replication should not be enabled on a config server" << endl;
+                ::exit(-1);
+            }
             if ( params.count( "diaglog" ) == 0 )
                 _diaglog.level = 1;
             if ( params.count( "dbpath" ) == 0 )
@@ -990,8 +1009,14 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if ( params.count( "maxConns" ) ){
             int newSize = params["maxConns"].as<int>();
-            uassert( 12507 , "maxConns has to be at least 5" , newSize >= 5 );
-            uassert( 12508 , "maxConns can't be greater than 10000000" , newSize < 10000000 );
+            if ( newSize < 5 ) {
+                out() << "maxConns has to be at least 5" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
+            else if ( newSize >= 10000000 ) {
+                out() << "maxConns can't be greater than 10000000" << endl;
+                dbexit( EXIT_BADOPTIONS );                
+            }
             connTicketHolder.resize( newSize );
         }
         if (params.count("nounixsocket")){
