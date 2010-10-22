@@ -340,6 +340,36 @@ namespace mongo {
         }
     } cmdSplitVector;
 
+    // ** temporary ** 2010-10-22
+    // chunkInfo is a helper to collect and log information about the chunks generated in splitChunk.
+    // It should hold the chunk state for this module only, while we don't have min/max key info per chunk on the
+    // mongod side. Do not build on this; it will go away. 
+    struct ChunkInfo { 
+        BSONObj min;
+        BSONObj max;
+        ShardChunkVersion lastmod;
+
+        ChunkInfo() { } 
+        ChunkInfo( BSONObj aMin , BSONObj aMax , ShardChunkVersion aVersion ) : min(aMin) , max(aMax) , lastmod(aVersion) {}
+        void appendShortVersion( const char* name, BSONObjBuilder& b ) const;
+        string toString() const;
+    };
+
+    void ChunkInfo::appendShortVersion( const char * name , BSONObjBuilder& b ) const { 
+        BSONObjBuilder bb( b.subobjStart( name ) ); 
+        bb.append( "min" , min ); 
+        bb.append( "max" , max );
+        bb.appendTimestamp( "lastmod" , lastmod );
+        bb.done(); 
+    } 
+
+    string ChunkInfo::toString() const {
+        ostringstream os;
+        os << "lastmod: " << lastmod.toString() << " min: " << min << " max: " << endl;
+        return os.str();
+    }
+    // ** end temporary **
+
     class SplitChunkCommand : public Command {
     public:
         SplitChunkCommand() : Command( "splitChunk_ForDevOnly" ){}
@@ -402,39 +432,43 @@ namespace mongo {
                 return false;
             }
 
-            ShardChunkVersion maxVersion;
-            string shard;
+            BSONObj maxChunk;
+            BSONObj currChunk;
             {
                 ScopedDbConnection conn( shardingState.getConfigServer() );
-
                 BSONObj maxChunk = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
                 BSONObj currChunk = conn->findOne( ShardNS::chunk, Query( BSON( "ns" << ns << "min" << min ) ) );
                 conn.done();
-
-                maxVersion = maxChunk["lastmod"];
-                if ( maxVersion < shardingState.getVersion( ns ) ) {
-                    errmsg = "official version less than mine?";
-                    result.appendTimestamp( "officialVersion" , maxVersion );
-                    result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
-                    return false;
-                }
-
-                BSONObj currMin = currChunk["min"].Obj();
-                BSONObj currMax = currChunk["max"].Obj();
-                if ( ( currMin.woCompare( min ) != 0) || ( currMax.woCompare( max ) != 0) ){
-                    errmsg = "attempt to split old chunk (boundaries changed)";
-                    result.append( "currMin" , currMin );
-                    result.append( "expectedMin" , min );
-                    result.append( "currMax" , currMax );
-                    result.append( "expectedMax" , max ); 
-                    return false;
-                }
-                shard = currChunk["shard"].str();
             }
+
+            ShardChunkVersion maxVersion = maxChunk["lastmod"];
+            if ( maxVersion < shardingState.getVersion( ns ) ) {
+                errmsg = "official version less than mine?";
+                result.appendTimestamp( "officialVersion" , maxVersion );
+                result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
+                return false;
+            }
+
+            ChunkInfo origChunk( currChunk["min"].Obj() , currChunk["max"].Obj() , currChunk["lastmod"] );
+
+            if ( ( origChunk.min.woCompare( min ) != 0) || ( origChunk.max.woCompare( max ) != 0) ){
+                errmsg = "attempt to split old chunk (boundaries changed)";
+                result.append( "currMin" , origChunk.min );
+                result.append( "expectedMin" , min );
+                result.append( "currMax" , origChunk.max );
+                result.append( "expectedMax" , max ); 
+                return false;
+            }
+            const string shard = currChunk["shard"].str();
 
             // 
             // 3. create the batch of updates to metadata ( the new chunks ) to be applied via 'applyOps' command
             //
+
+            BSONObjBuilder logDetail;
+            origChunk.appendShortVersion( "before" , logDetail );
+            log(1) << "before split on " << origChunk << endl;
+            vector<ChunkInfo> newChunks;
 
             ShardChunkVersion myVersion = maxVersion;
             BSONObj startKey = min;
@@ -471,7 +505,11 @@ namespace mongo {
                 q.done();
 
                 updates.append( op.obj() );
+
+                // remember this chunk info for logging later
+                newChunks.push_back( ChunkInfo( startKey , endKey, myVersion ) );
             }        
+
             updates.done();
         
             {
@@ -507,11 +545,34 @@ namespace mongo {
             if ( ! ok ){
                 stringstream ss;
                 ss << "saving chunks failed.  cmd: " << cmd << " result: " << cmdResult;
-                log( LL_ERROR ) << ss.str() << endl;
+                error() << ss.str() << endl;
                 msgasserted( 13327 , ss.str() );
             }
 
-            // TODO logChanges
+            //
+            // 5. logChanges
+            //
+
+            // single splits are logged different than multisplits
+            if ( newChunks.size() == 2 ) {
+                newChunks[0].appendShortVersion( "left" , logDetail );
+                newChunks[1].appendShortVersion( "right" , logDetail );
+                configServer.logChange( "split" , ns , logDetail.obj() );
+
+            } else {
+                BSONObj beforeDetailObj = logDetail.obj();
+                BSONObj firstDetailObj = beforeDetailObj.getOwned();
+                const int newChunksSize = newChunks.size();
+
+                for ( int i=0; i < newChunksSize; i++ ){
+                    BSONObjBuilder chunkDetail;
+                    chunkDetail.appendElements( beforeDetailObj );
+                    chunkDetail.append( "number", i );
+                    chunkDetail.append( "of" , newChunksSize );
+                    newChunks[i].appendShortVersion( "chunk" , chunkDetail );
+                    configServer.logChange( "multi-split" , ns , chunkDetail.obj() );
+                }
+            }
 
             return true;
         }
