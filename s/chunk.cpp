@@ -285,6 +285,33 @@ namespace mongo {
         return multiSplit( splitPoint );
     }
     
+    ChunkPtr Chunk::multiSplit_ForDevOnly( const vector<BSONObj>& m ) {
+        ScopedDbConnection conn( getShard().getConnString() );
+        BSONObj result;
+        BSONObjBuilder cmd;
+        cmd.append( "splitChunk_ForDevOnly" , _manager->getns() );
+        cmd.append( "keyPattern" , _manager->getShardKey().key() );
+        cmd.append( "min" , getMin() );
+        cmd.append( "max" , getMax() );
+        cmd.append( "splitKeys" , m );
+        BSONObj cmdObj = cmd.obj();
+
+        if ( ! conn->runCommand( "admin" , cmdObj , result )) {
+            conn.done();
+
+            // TODO decide if push up the error instead of asserting
+            ostringstream os;
+            os << "split chunk command failed: " << result;
+            uassert( 13504 , os.str() , 0 );
+        }
+
+        conn.done();
+        _manager->_reload();
+
+        return ChunkPtr(); // TODO can it return the post-split chunk? should it?
+    }
+
+    /* to be deprecated */
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
         dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
         uassert( 10166 , "locking namespace failed" , dlk.got() );
