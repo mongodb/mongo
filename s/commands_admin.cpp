@@ -479,19 +479,25 @@ namespace mongo {
                 }
                 
                 ChunkManagerPtr info = config->getChunkManager( ns );
-                ChunkPtr old = info->findChunk( find );
-
+                ChunkPtr chunk = info->findChunk( find );
                 BSONObj middle = cmdObj.getObjectField( "middle" );
 
-                assert( old.get() );
-                log() << "splitting: " << ns << "  shard: " << old << endl;
+                assert( chunk.get() );
+                log() << "splitting: " << ns << "  shard: " << chunk << endl;
 
                 if ( middle.isEmpty() )
-                    old->simpleSplit( true /* force a split even if not enough data */ );
+                    chunk->simpleSplit( true /* force a split even if not enough data */ );
+
                 else {
+                    // sanity check if the key provided is a valid split point
+                    if ( ( middle == chunk->getMin() ) || ( middle == chunk->getMax() ) ) {
+                        errmsg = "cannot split on initial or final chunk's key";
+                        return false;
+                    }
+
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
-                    old->multiSplit( splitPoints );
+                    chunk->multiSplit( splitPoints );
                 }
 
                 return true;

@@ -39,6 +39,11 @@ assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "total count with co
 assert.eq( "allan,bob,eliot,joe,mark,sara" ,  db.foo.find().sort( { name : 1 } ).toArray().map( function(z){ return z.name; } ) , "sort 1" );
 assert.eq( "sara,mark,joe,eliot,bob,allan" ,  db.foo.find().sort( { name : -1 } ).toArray().map( function(z){ return z.name; } ) , "sort 2" );
 
+// make sure we can't foce a split on an extreme key
+// [allan->joe) 
+assert.throws( function(){ s.adminCommand( { split : "test.foo" , middle : { name : "allan" } } ) } );
+assert.throws( function(){ s.adminCommand( { split : "test.foo" , middle : { name : "joe" } } ) } );
+
 s.stop();
 
 
