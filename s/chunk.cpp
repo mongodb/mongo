@@ -279,7 +279,7 @@ namespace mongo {
         // sanity check.
         if ( splitPoint.empty() || _min == splitPoint.front() || _max == splitPoint.front() ) {
             log() << "want to split chunk, but can't find split point chunk " << toString()
-                  << " got: " << ( true ? "<empty>" : splitPoint.front().toString() ) << endl;
+                  << " got: " << ( splitPoint.empty() ? "<empty>" : splitPoint.front().toString() ) << endl;
             return ChunkPtr();
         }
 
