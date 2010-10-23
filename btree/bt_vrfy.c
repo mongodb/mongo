@@ -266,13 +266,16 @@ __wt_bt_verify_tree(WT_TOC *toc,
 			 * immediate left of the current item; this key must
 			 * compare less than or equal to the current item.  The
 			 * trick here is we need the last leaf key, not the last
-			 * internal node key.  Discard the leaf node as soon as
-			 * we've used it in a comparison.
+			 * internal node key.  It's returned to us in the leaf
+			 * field of the vs structure, whenever we verify a leaf
+			 * page.  Discard the leaf node as soon as we've used it
+			 * in a comparison.
 			 */
 			if (vs->leaf != NULL) {
 				WT_ERR(
 				    __wt_bt_verify_cmp(toc, rip, vs->leaf, 0));
 				__wt_bt_page_out(toc, &vs->leaf, 0);
+				vs->leaf = NULL;
 			}
 			WT_ERR(__wt_bt_verify_tree(toc, rip,
 			    level - 1, WT_ITEM_BYTE_OFF(rip->data), vs));
@@ -281,10 +284,13 @@ __wt_bt_verify_tree(WT_TOC *toc,
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
-	if (0) {
-err:		if (vs->leaf != NULL)
-			__wt_bt_page_out(toc, &vs->leaf, 0);
-	}
+	/*
+	 * The largest key on the last leaf page in the tree is never needed,
+	 * there aren't any internal pages after it.  So, we get here with
+	 * vs->leaf needing to be released.
+	 */
+err:	if (vs->leaf != NULL)
+		__wt_bt_page_out(toc, &vs->leaf, 0);
 	if (page != NULL)
 		__wt_bt_page_out(toc, &page, 0);
 
