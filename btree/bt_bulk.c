@@ -273,7 +273,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 {
 	DB *db;
 	DBT *key, *data, key_copy, data_copy;
-	DBT *lastkey, lastkey_std, lastkey_ovfl;
+	DBT *lastkey, lastkey_std, *lastkey_ovfl;
 	DBT *tmp1, *tmp2;
 	ENV *env;
 	IDB *idb;
@@ -301,8 +301,8 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	WT_CLEAR(data_copy);
 	WT_CLEAR(key_copy);
 	WT_CLEAR(key_item);
-	WT_CLEAR(lastkey_ovfl);
 	WT_CLEAR(lastkey_std);
+	WT_ERR(__wt_toc_scratch_alloc(toc, &lastkey_ovfl));
 
 	/*
 	 * We don't run the leaf pages through the cache -- that means passing
@@ -459,7 +459,7 @@ skip_read:	/*
 			 */
 			if (LF_ISSET(WT_DUPLICATES) &&
 			    key->size > db->leafitemsize) {
-				lastkey = &lastkey_ovfl;
+				lastkey = lastkey_ovfl;
 				WT_ERR(__wt_bt_dbt_copy(env, key, lastkey));
 			}
 		}
@@ -668,9 +668,8 @@ err:	if (stack.page != NULL) {
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
 
-	if (lastkey_ovfl.data != NULL)
-		__wt_free(env, lastkey_ovfl.data, lastkey_ovfl.mem_size);
-
+	if (lastkey_ovfl != NULL)
+		__wt_toc_scratch_discard(toc, lastkey_ovfl);
 	if (tmp1 != NULL)
 		__wt_toc_scratch_discard(toc, tmp1);
 	if (tmp2 != NULL)
