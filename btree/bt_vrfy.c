@@ -778,20 +778,19 @@ eof:				__wt_api_db_errx(db,
 			break;
 		}
 
-		/* If key is compressed, get an uncompressed copy. */
-		if (idb->huffman_key != NULL) {
-			WT_ERR(__wt_huffman_decode(idb->huffman_key,
-			    current->item->data, current->item->size,
-			    &current->item_comp->data,
-			    &current->item_comp->mem_size,
-			    &current->item_comp->size));
-			current->item = current->item_comp;
-		}
-
 		/* Check the sort order. */
 		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
+			/* If key is compressed, get an uncompressed copy. */
+			if (idb->huffman_key != NULL) {
+				WT_ERR(__wt_huffman_decode(idb->huffman_key,
+				    current->item->data, current->item->size,
+				    &current->item_comp->data,
+				    &current->item_comp->mem_size,
+				    &current->item_comp->size));
+				current->item = current->item_comp;
+			}
 			if (last_key->item != NULL &&
 			    func(db, last_key->item, current->item) >= 0) {
 				__wt_api_db_errx(db,
