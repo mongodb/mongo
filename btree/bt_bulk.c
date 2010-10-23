@@ -273,7 +273,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 {
 	DB *db;
 	DBT *key, *data, key_copy, data_copy;
-	DBT *lastkey, lastkey_std, *lastkey_ovfl;
+	DBT *lastkey, *lastkey_copy, lastkey_std;
 	DBT *tmp1, *tmp2;
 	ENV *env;
 	IDB *idb;
@@ -302,7 +302,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	WT_CLEAR(key_copy);
 	WT_CLEAR(key_item);
 	WT_CLEAR(lastkey_std);
-	WT_ERR(__wt_toc_scratch_alloc(toc, &lastkey_ovfl));
+	WT_ERR(__wt_toc_scratch_alloc(toc, &lastkey_copy));
 
 	/*
 	 * We don't run the leaf pages through the cache -- that means passing
@@ -449,19 +449,23 @@ skip_read:	/*
 
 			key = NULL;
 		} else {
-			dup_count = 0;
-
 			/*
 			 * It's a new key, but if duplicates are possible we'll
 			 * need a copy of the key for comparison with the next
-			 * key.  If the key is an overflow object, we can't use
-			 * the on-page version, we have to save a copy.
+			 * key.  If the key is Huffman encoded or an overflow
+			 * object, we can't use the on-page version, we have to
+			 * save a copy.
 			 */
 			if (LF_ISSET(WT_DUPLICATES) &&
-			    key->size > db->leafitemsize) {
-				lastkey = lastkey_ovfl;
-				WT_ERR(__wt_bt_dbt_copy(env, key, lastkey));
-			}
+			    (key->size > db->leafitemsize ||
+			    idb->huffman_key != NULL)) {
+				WT_ERR(
+				    __wt_bt_dbt_copy(env, key, lastkey_copy));
+				lastkey = lastkey_copy;
+			} else
+				lastkey = NULL;
+
+			dup_count = 0;
 		}
 
 		/* Build the key item we're going to store on the page. */
@@ -574,9 +578,11 @@ skip_read:	/*
 			page->space_avail -= WT_ITEM_SPACE_REQ(key->size);
 
 			/*
-			 * If duplicates: we'll need a copy of the key for
-			 * comparison with the next key.  Not an overflow
-			 * object, so we can just use the on-page memory.
+			 * If processing duplicates we'll need a copy of the key
+			 * for comparison with the next key.  If the key was an
+			 * overflow or Huffman encoded item, we already have a
+			 * copy -- otherwise, use the copy we just put on the
+			 * page.
 			 *
 			 * We also save the location for the key of any current
 			 * duplicate set in case we have to move the set to a
@@ -585,8 +591,7 @@ skip_read:	/*
 			 * fit on this page).
 			 */
 			if (LF_ISSET(WT_DUPLICATES)) {
-				if (WT_ITEM_TYPE(
-				    &key_item) != WT_ITEM_KEY_OVFL) {
+				if (lastkey == NULL) {
 					lastkey = &lastkey_std;
 					lastkey_std.data =
 					    WT_ITEM_BYTE(page->first_free);
@@ -668,8 +673,8 @@ err:	if (stack.page != NULL) {
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
 
-	if (lastkey_ovfl != NULL)
-		__wt_toc_scratch_discard(toc, lastkey_ovfl);
+	if (lastkey_copy != NULL)
+		__wt_toc_scratch_discard(toc, lastkey_copy);
 	if (tmp1 != NULL)
 		__wt_toc_scratch_discard(toc, tmp1);
 	if (tmp2 != NULL)
@@ -1371,6 +1376,10 @@ __wt_bt_build_key_item(
 	 * We're called with a DBT that references a data/size pair.  We can
 	 * re-point that DBT's data and size fields to other memory, but we
 	 * cannot allocate memory in that DBT -- all we can do is re-point it.
+	 *
+	 * For Huffman-encoded key/data items, we need a chunk of new space;
+	 * use the WT_TOC key/data return memory: this routine is called during
+	 * bulk insert and reconciliation, we aren't returning key/data pairs.
 	 */
 
 	/* Optionally compress the data using the Huffman engine. */
@@ -1429,6 +1438,10 @@ __wt_bt_build_data_item(
 	 * We're called with a DBT that references a data/size pair.  We can
 	 * re-point that DBT's data and size fields to other memory, but we
 	 * cannot allocate memory in that DBT -- all we can do is re-point it.
+	 *
+	 * For Huffman-encoded key/data items, we need a chunk of new space;
+	 * use the WT_TOC key/data return memory: this routine is called during
+	 * bulk insert and reconciliation, we aren't returning key/data pairs.
 	 */
 	WT_CLEAR(*item);
 	WT_ITEM_TYPE_SET(
@@ -1515,6 +1528,7 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 
 	/* Initialize the page header and copy the overflow item in. */
 	hdr = tmp->data;
+	memset(hdr, 0, sizeof(WT_PAGE_HDR));
 	hdr->type = WT_PAGE_OVFL;
 	hdr->level = WT_LLEAF;
 	hdr->u.datalen = dbt->size;
