@@ -393,6 +393,11 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 		 * key to store.
 		 */
 
+skip_read:	/*
+		 * We pushed a set of duplicates off-page, and that routine
+		 * returned an ending key/data pair to us.
+		 */
+
 		/*
 		 * Copy the caller's DBTs, we don't want to modify them.  But,
 		 * copy them carefully, all we want is a pointer and a length.
@@ -405,11 +410,6 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 		data_copy.data = data->data;
 		data_copy.size = data->size;
 		data = &data_copy;
-
-skip_read:	/*
-		 * We pushed a set of duplicates off-page, and that routine
-		 * returned an ending key/data pair to us.
-		 */
 
 		/* Build the data item we're going to store on the page. */
 		WT_ERR(__wt_bt_build_data_item(
