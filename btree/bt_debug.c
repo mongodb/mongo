@@ -128,7 +128,7 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		fprintf(fp,
 		    "\tfirst-free %p (offset: %lu), space avail %lu\n\n",
 		    page->first_free,
-		    (u_long)(page->first_free - (u_int8_t *)page),
+		    (u_long)(page->first_free - (u_int8_t *)page->hdr),
 		    (u_long)page->space_avail);
 	}
 
