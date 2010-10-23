@@ -161,7 +161,8 @@ __wt_hazard_empty(WT_TOC *toc, const char *name)
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
 		if (*hp != NULL) {
 			__wt_api_env_errx(env,
-			    "%s: returned with a hazard reference set", name);
+			    "%s: returned with a hazard reference set (%p)",
+			    name, *hp);
 			*hp = NULL;
 			WT_MEMORY_FLUSH;
 		}
