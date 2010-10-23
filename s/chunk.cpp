@@ -278,8 +278,8 @@ namespace mongo {
         // Normally, we'd have a sound split point here if the chunk is not empty. It's also a good place to
         // sanity check.
         if ( splitPoint.empty() || _min == splitPoint.front() || _max == splitPoint.front() ) {
-            log() << "want to split chunk, but can't find split point " 
-                  << " chunk: " << toString() << " got: " << splitPoint.front() << endl;
+            log() << "want to split chunk, but can't find split point chunk " << toString()
+                  << " got: " << ( true ? "<empty>" : splitPoint.front().toString() ) << endl;
             return ChunkPtr();
         }
 
