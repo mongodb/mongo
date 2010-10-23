@@ -488,7 +488,8 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt)
+__wt_bt_key_process(
+    WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt, int iskey)
 {
 	DBT local_dbt;
 	ENV *env;
@@ -498,7 +499,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt)
 	WT_PAGE *ovfl_page;
 	u_int32_t i, size;
 	int ret;
-	void *orig;
+	void *huffman, *orig;
 
 	env = toc->env;
 	idb = toc->db->idb;
@@ -546,14 +547,14 @@ __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt)
 	}
 
 	/* Copy the item into place; if the item is compressed, decode it. */
-	if (idb->huffman_key == NULL) {
+	if ((huffman = iskey ? idb->huffman_key : idb->huffman_data) == NULL) {
 		if (size > dbt->mem_size)
 			WT_ERR(__wt_realloc(
 			    env, &dbt->mem_size, size, &dbt->data));
 		dbt->size = size;
 		memcpy(dbt->data, orig, size);
 	} else
-		WT_ERR(__wt_huffman_decode(idb->huffman_key,
+		WT_ERR(__wt_huffman_decode(huffman,
 		    orig, size, &dbt->data, &dbt->mem_size, &dbt->size));
 
 	/*
