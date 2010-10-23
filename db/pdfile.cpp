@@ -42,6 +42,9 @@ _ disallow system* manipulations from the database.
 #include "curop.h"
 #include "background.h"
 
+#include <boost/thread/thread.hpp>
+
+
 namespace mongo {
 
     bool inDBRepair = false;
@@ -1076,6 +1079,214 @@ namespace mongo {
             cout<<"SORTER next:" << d.first.toString() << endl;*/
         }
     }
+
+    void indexBuildThread( IndexChunkBuilder* chunkBuilder )
+    {
+
+       BtreeBuilder* btBuilder = chunkBuilder->getBtreeBuilder();
+       BSONObj keyLast;
+       while( chunkBuilder->more() ) { 
+           RARELY killCurrentOp.checkForInterrupt();
+           BSONObjExternalSorter::Data d = i->next();
+ 
+           try { 
+               btBuilder.addKey(d.first, d.second);
+           }
+           catch( AssertionException& e ) { 
+               if ( dupsAllowed ){
+                   // unknow exception??
+                   throw;
+               }
+               
+               if( e.interrupted() )
+                   throw;
+ 
+               if ( ! dropDups )
+                   throw;
+ 
+              /* we could queue these on disk, but normally there are very few dups, so instead we 
+                  keep in ram and have a limit.
+               */
+               dupsToDrop.push_back(d.second);
+               uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
+           }
+           pm.hit();
+       }
+       pm.finished();
+       op->setMessage( "index: (3/3) btree-middle" );
+       log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
+       wassert( btBuilder.getn() == nkeys || dropDups ); 
+
+    }
+
+    // throws DBException
+    unsigned long long fastParallelBuildIndex( const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+        assert( d->backgroundIndexBuildInProgress == 0 );
+        CurOp * op = cc().curop();
+
+        Timer t;
+
+        tlog(1) << "fastParallelBuildIndex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
+
+        bool dupsAllowed = !idx.unique();
+        bool dropDups = idx.dropDups() || inDBRepair;
+        BSONObj order = idx.keyPattern();
+
+        dur::writingDiskLoc(idx.head).Null();
+        
+        if ( logLevel > 1 ) printMemInfo( "before index start" );
+
+        /* get and sort all the keys ----- */
+        unsigned long long n = 0;
+        shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+        BSONObjExternalSorter sorter(order);
+        sorter.hintNumObjects( d->stats.nrecords );
+        unsigned long long nkeys = 0;
+        ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->stats.nrecords , 10 ) );
+        while ( c->ok() ) {
+            BSONObj o = c->current();
+            DiskLoc loc = c->currLoc();
+
+            BSONObjSetDefaultOrder keys;
+            idx.getKeysFromObject(o, keys);
+            int k = 0;
+            for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                if( ++k == 2 ) {
+                    d->setIndexIsMultikey(idxNo);
+                }
+                sorter.add(*i, loc);
+                nkeys++;
+            }
+            
+            c->advance();
+            n++;
+            pm.hit();
+            if ( logLevel > 1 && n % 10000 == 0 ){
+                printMemInfo( "\t iterating objects" );
+            }
+        };
+        pm.finished();
+
+        if ( logLevel > 1 ) printMemInfo( "before final sort" );
+        sorter.sort();
+        if ( logLevel > 1 ) printMemInfo( "after final sort" );
+        
+        log(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
+
+        list<DiskLoc> dupsToDrop;
+
+        /* Build the index in parrallel */
+        {
+          boost::thread_group builderThreads();
+
+          vector<IndexChunkBuilder*> chunkBuilders;
+
+          int threadOffset = 0;
+
+          int nChunks = d->stats.nrecords/numThreads;
+
+          /* NOTE: Break this out into a user configurable paramater */  
+          int numThreads = 2;
+          for ( int i = 0; i < numThreads; i++ ) {
+              try {
+                  /** TODO: extender sorter, to allow parallel iterator access or something similar */ 
+                  IndexChunkBuilder* builderThreadArg = new IndexChunkBuilder( threadOffset,
+                      threadOffset + numChunks, sorter );
+
+                  builderThreadArg-> 
+
+                  chunkBuilders.push_back( builderThreadArg );
+
+                  builderThreads.add_thread( boost::bind( &indexBuildThread, builderThreadArg ) )
+              }
+              catch ( boost::thread_resource_error& ){
+                  log() << "can't create new thread, closing connection" << endl;
+              }
+              catch ( ... ){
+                  log() << "unknown exception starting connThread" << endl;
+              }
+          }
+
+          builderThreads.join_all();
+
+          BtreeBuilder* master = chunkBuilders.back()->getBtreeBuilder();
+          /** Merge btree's into one BtreeBuilder */
+
+
+          master.addKey()
+
+          for ( int i = 0; i < chunkBuilders.size(); i++ ) {
+              delete chunkBuidlers[i];
+          }
+
+        }
+        
+        log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
+
+        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ )
+            theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
+
+        return n;
+    }
+
+    class BackgroundIndexBuildJob : public BackgroundOperation { 
+
+        unsigned long long addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+            bool dupsAllowed = !idx.unique();
+            bool dropDups = idx.dropDups();
+
+            ProgressMeter& progress = cc().curop()->setMessage( "bg index build" , d->stats.nrecords );
+
+            unsigned long long n = 0;
+            auto_ptr<ClientCursor> cc;
+            {
+                shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+                cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
+            }
+            CursorId id = cc->cursorid;
+
+            while ( cc->c->ok() ) {
+                BSONObj js = cc->c->current();
+                try { 
+                    _indexRecord(d, idxNo, js, cc->c->currLoc(), dupsAllowed);
+                    cc->c->advance();
+                } catch( AssertionException& e ) { 
+                    if( e.interrupted() )
+                        throw;
+
+                    if ( dropDups ) {
+                        DiskLoc toDelete = cc->c->currLoc();
+                        bool ok = cc->c->advance();
+                        cc->updateLocation();
+                        theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
+                        if( ClientCursor::find(id, false) == 0 ) {
+                            cc.release();
+                            if( !ok ) { 
+                                /* we were already at the end. normal. */
+                            }
+                            else {
+                                uasserted(12585, "cursor gone during bg index; dropDups");
+                            }
+                            break;
+                        }
+                    } else {
+                        log() << "background addExistingToIndex exception " << e.what() << endl;
+                        throw;
+                    }
+                }
+                n++;
+                progress.hit();
+
+                if ( n % 128 == 0 && !cc->yield() ) {
+                    cc.release();
+                    uasserted(12584, "cursor gone during bg index");
+                    break;
+                }
+            }
+            progress.finished();
+            return n;
+        }
+
 
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
