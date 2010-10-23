@@ -411,18 +411,12 @@ skip_read:	/*
 		 * returned an ending key/data pair to us.
 		 */
 
-		/*
-		 * Process the key/data pairs and build the items we're going
-		 * to store on the page.
-		 */
-		if (key != NULL)
-			WT_ERR(__wt_bt_build_key_item(
-			    toc, key, &key_item, &key_ovfl, 1));
+		/* Build the data item we're going to store on the page. */
 		WT_ERR(__wt_bt_build_data_item(
-		    toc, data, &data_item, &data_ovfl, 1));
+		    toc, data, &data_item, &data_ovfl, WT_IS_BULK));
 
 		/*
-		 * Check for duplicate data; we don't store the key on the page
+		 * Check for duplicate keys; we don't store the key on the page
 		 * in the case of a duplicate.
 		 *
 		 * !!!
@@ -454,20 +448,26 @@ skip_read:	/*
 			WT_STAT_INCR(idb->stats, DUPLICATE_ITEMS_INSERTED);
 
 			key = NULL;
-		} else
+		} else {
 			dup_count = 0;
 
-		/*
-		 * If duplicates: we'll need a copy of the key for comparison
-		 * with the next key.  If the key is an overflow object, we
-		 * can't just use the on-page version, we have to save a copy.
-		 */
-		if (key != NULL &&
-		    LF_ISSET(WT_DUPLICATES) &&
-		    WT_ITEM_TYPE(&key_item) == WT_ITEM_KEY_OVFL) {
-			lastkey = &lastkey_ovfl;
-			WT_ERR(__wt_bt_dbt_copy(env, key, lastkey));
+			/*
+			 * It's a new key, but if duplicates are possible we'll
+			 * need a copy of the key for comparison with the next
+			 * key.  If the key is an overflow object, we can't use
+			 * the on-page version, we have to save a copy.
+			 */
+			if (LF_ISSET(WT_DUPLICATES) &&
+			    key->size > db->leafitemsize) {
+				lastkey = &lastkey_ovfl;
+				WT_ERR(__wt_bt_dbt_copy(env, key, lastkey));
+			}
 		}
+
+		/* Build the key item we're going to store on the page. */
+		if (key != NULL)
+			WT_ERR(__wt_bt_build_key_item(
+			    toc, key, &key_item, &key_ovfl, 1));
 
 		/*
 		 * We now have the key/data items to store on the page.  If
@@ -690,21 +690,22 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
     u_int32_t dup_count, int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
-	DBT *key, *data;
+	DBT *key, *data, *tmp;
 	ENV *env;
 	IDB *idb;
 	WT_ITEM data_item;
 	WT_OFF off;
-	WT_OVFL data_local;
-	WT_PAGE *page;
+	WT_OVFL data_ovfl;
+	WT_PAGE *page, _page;
 	WT_STACK stack;
 	u_int32_t len, root_addr;
 	u_int8_t *p;
-	int ret, tret;
+	int ret, success_return;
 
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
+	success_return = 0;
 
 	/*
 	 * This routine is the same as the bulk load routine, except it loads
@@ -741,16 +742,39 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	ret = 0;
 
 	/*
-	 * Allocate and initialize a new page, and copy the duplicate set into
-	 * place.
+	 * We don't run the leaf pages through the cache -- that means passing
+	 * a lot of messages we don't want to bother with.  We're the only user
+	 * of the database, which means we can grab file space whenever we want.
+	 *
+	 * Make sure the TOC's scratch buffer is big enough to hold a leaf page,
+	 * and clear the memory so it's never random bytes.
 	 */
-	WT_RET(__wt_bt_page_alloc(
-	    toc, WT_PAGE_DUP_LEAF, WT_LLEAF, db->leafmin, &page));
-	page->hdr->u.entries = dup_count;
+	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	if (tmp->mem_size < db->leafmin)
+		WT_ERR(__wt_realloc(
+		    env, &tmp->mem_size, db->leafmin, &tmp->data));
+	memset(tmp->data, 0, db->leafmin);
+
+	/*
+	 * Initialize the WT_PAGE and WT_PAGE_HDR information and allocate
+	 * the first page.
+	 */
+	WT_CLEAR(_page);
+	page = &_page;
+	page->hdr = tmp->data;
+	page->size = db->leafmin;
+	page->hdr->type = WT_PAGE_DUP_LEAF;
+	page->hdr->level = WT_LLEAF;
+	WT_ERR(__wt_cache_alloc(toc, &page->addr, db->leafmin));
+	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
+
+	/* Move the duplicates onto the page. */
 	page->records = dup_count;
+	page->hdr->u.entries = dup_count;
 	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
 	memcpy(page->first_free, dup_data, (size_t)len);
-	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page) + len);
+	page->first_free += len;
+	page->space_avail -= len;
 
 	/*
 	 * Unless we have enough duplicates to split this page, it will be the
@@ -761,8 +785,8 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	/*
 	 * Reset the caller's page entry count.   Once we know the final root
 	 * page and record count we'll replace the duplicate set with a single
-	 * WT_OFF structure, that is, we've replaced dup_count entries
-	 * with a single entry.
+	 * WT_OFF structure, that is, we've replaced dup_count entries with a
+	 * single entry.
 	 */
 	leaf_page->hdr->u.entries -= (dup_count - 1);
 
@@ -784,16 +808,9 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			break;
 		}
 
-		/* Create overflow objects if the data won't fit. */
-		if (data->size > db->leafitemsize) {
-			data_local.size = data->size;
-			WT_RET(__wt_bt_ovfl_write(toc, data, &data_local.addr));
-			data->data = &data_local;
-			data->size = sizeof(data_local);
-			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DUP_OVFL);
-			WT_STAT_INCR(idb->stats, OVERFLOW_DATA);
-		} else
-			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DUP);
+		/* Build the data item we're going to store on the page. */
+		WT_ERR(__wt_bt_build_data_item(
+		    toc, data, &data_item, &data_ovfl, WT_IS_BULK | WT_IS_DUP));
 
 		/*
 		 * If there's insufficient space available, allocate a new
@@ -810,9 +827,11 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			 */
 			WT_RET(__wt_bt_promote(toc,
 			    page, page->records, &stack, 0, &root_addr));
-			WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
-			WT_RET(__wt_bt_page_alloc(toc,
-			    WT_PAGE_DUP_LEAF, WT_LLEAF, db->leafmin, &page));
+			WT_ERR(__wt_bt_bulk_write(toc, page));
+			page->records = 0;
+			page->hdr->u.entries = 0;
+			__wt_bt_set_ff_and_sa_from_offset(
+			    page, WT_PAGE_BYTE(page));
 		}
 
 		++dup_count;			/* Total duplicate count */
@@ -831,14 +850,17 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 
 	/*
 	 * Ret values of 1 and 0 are both "OK", the ret value of 1 means we
-	 * reached the end of the bulk input.
-	 *
-	 * Promote a key from any partially-filled page and write it.
+	 * reached the end of the bulk input.   Save the successful return
+	 * for our final return value.
 	 */
-	if ((tret = __wt_bt_promote(toc, page, page->records,
-	    &stack, 0, &root_addr)) != 0 && (ret == 0 || ret == 1))
-		ret = tret;
-	WT_BULK_PAGE_OUT(toc, &page, WT_DISCARD | WT_MODIFIED);
+	if (ret != 0 && ret != 1)
+		goto err;
+	success_return = ret;
+
+	/* Promote a key from the partially-filled page and write it. */
+	WT_ERR(
+	    __wt_bt_promote(toc, page, page->records, &stack, 0, &root_addr));
+	WT_ERR(__wt_bt_bulk_write(toc, page));
 
 	/*
 	 * Replace the caller's duplicate set with a WT_OFF structure, and
@@ -849,21 +871,22 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	WT_RECORDS(&off) = dup_count;
 	off.addr = root_addr;
 	off.size = db->intlmin;
-
 	p = (u_int8_t *)dup_data;
 	memcpy(p, &data_item, sizeof(data_item));
 	memcpy(p + sizeof(data_item), &off, sizeof(WT_OFF));
 	__wt_bt_set_ff_and_sa_from_offset(leaf_page,
 	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)));
 
-	if (stack.page != NULL) {
+err:	if (stack.page != NULL) {
 		u_int i;
 		for (i = 0; stack.page[i] != NULL; ++i)
 			WT_BULK_PAGE_OUT(toc, &stack.page[i], WT_MODIFIED);
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
+	if (tmp != NULL)
+		__wt_toc_scratch_discard(toc, tmp);
 
-	return (ret);
+	return (ret == 0 ? success_return : ret);
 }
 
 /*
@@ -1155,6 +1178,7 @@ split:		switch (page->hdr->type) {
 	}
 
 	parent->records += page->records;
+	WT_ASSERT(env, __wt_bt_verify_page(toc, parent, NULL) == 0);
 
 	/*
 	 * The promotion for case #2 and the second part of case #3 -- promote
@@ -1389,11 +1413,14 @@ __wt_bt_build_key_item(
  */
 int
 __wt_bt_build_data_item(
-    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load)
+    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, u_int flags)
 {
 	DB *db;
 	IDB *idb;
 	WT_STATS *stats;
+
+	 WT_ENV_FCHK_ASSERT(toc->env,
+	    "__wt_bt_build_data_item", flags, WT_APIMASK_BT_BUILD_DATA_ITEM);
 
 	db = toc->db;
 	idb = db->idb;
@@ -1405,7 +1432,8 @@ __wt_bt_build_data_item(
 	 * cannot allocate memory in that DBT -- all we can do is re-point it.
 	 */
 	WT_CLEAR(*item);
-	WT_ITEM_TYPE_SET(item, WT_ITEM_DATA);
+	WT_ITEM_TYPE_SET(
+	    item, LF_ISSET(WT_IS_DUP) ? WT_ITEM_DUP : WT_ITEM_DATA);
 
 	/*
 	 * Handle zero-length items quickly -- this is a common value, it's
@@ -1432,14 +1460,15 @@ __wt_bt_build_data_item(
 	if (dbt->size > db->leafitemsize) {
 		WT_CLEAR(*ovfl);
 		ovfl->size = dbt->size;
-		if (bulk_load)
+		if (LF_ISSET(WT_IS_BULK))
 			WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
 		else
 			WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
-		WT_ITEM_TYPE_SET(item, WT_ITEM_DATA_OVFL);
+		WT_ITEM_TYPE_SET(item,
+		    LF_ISSET(WT_IS_DUP) ? WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL);
 		WT_STAT_INCR(stats, OVERFLOW_DATA);
 	}
 
