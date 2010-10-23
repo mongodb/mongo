@@ -895,8 +895,8 @@ namespace mongo {
                 ChunkRangeMap::const_iterator min, max;
                 min = _chunkRanges.upper_bound(minObj);
                 max = _chunkRanges.upper_bound(maxObj);
-
-                assert(min != _chunkRanges.ranges().end());
+                
+                massert( 13507 , (string)"invalid chunk config minObj: " + minObj.toString() , min != _chunkRanges.ranges().end());
 
                 // make max non-inclusive like end iterators
                 if(max != _chunkRanges.ranges().end())
