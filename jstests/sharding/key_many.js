@@ -97,8 +97,7 @@ for ( var i=0; i<types.length; i++ ){
     s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
     s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
 
-    s.adminCommand( { movechunk : longName , find : makeObjectDotted( curT.values[3] ) , to : secondary.getMongo().name } );
-    s.adminCommand( { movechunk : longName , find : makeObjectDotted( curT.values[5] ) , to : secondary.getMongo().name } );
+    s.adminCommand( { movechunk : longName , find : makeObjectDotted( curT.values[0] ) , to : secondary.getMongo().name } );
     
     s.printChunks();
     

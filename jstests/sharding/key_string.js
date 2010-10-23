@@ -20,12 +20,11 @@ db.foo.save( { name : "allan" } )
 
 assert.eq( 6 , db.foo.find().count() , "basic count" );
 
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
+s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [Minkey -> allan) , * [allan -> ..)
+s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // * [allan -> sara) , [sara -> Maxkey)
+s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [alan -> joe) , [joe -> sara]
 
-s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
-s.adminCommand( { movechunk : "test.foo" , find : { name : "sara" } , to : seconday.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : seconday.getMongo().name } );
 
 s.printChunks();
 
