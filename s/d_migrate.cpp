@@ -375,14 +375,21 @@ namespace mongo {
                 return false;
             }
             
-            BtreeCursor c( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
-            while ( c.ok() ){
-                DiskLoc dl = c.currLoc();
+            scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , 
+                                                           shared_ptr<Cursor>( new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
+                                                           _ns ) );
+            while ( cc->ok() ){
+                DiskLoc dl = cc->currLoc();
                 _cloneLocs.insert( dl );
-                c.advance();
-                // TODO: should we yield? 
+                cc->advance();
+                
+                if ( ! cc->yieldSometimes() )
+                    break;
+
             }
             
+            log() << "\t moveChunk number of documents: " << _cloneLocs.size() << endl;
+
             return true;
         }
 
