@@ -208,9 +208,11 @@ namespace mongo {
                     ss << "M";
                 else if ( x["secondary"].trueValue() )
                     ss << "SEC";
+                else if ( x["isreplicaset"].trueValue() )
+                    ss << "REC";
                 else if ( isReplSet )
                     ss << "UNK";
-                else
+                else 
                     ss << "SLV";
                 
                 _append( result , "repl" , 4 , ss.str() );
