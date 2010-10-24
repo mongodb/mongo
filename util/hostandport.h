@@ -84,12 +84,20 @@ namespace mongo {
     };
 
     /** returns true if strings seem to be the same hostname.
-        "nyc1" and "nyc1.acme.com" are treated as the same.
-        in fact "nyc1.foo.com" and "nyc1.acme.com" are treated the same - 
-        we oly look up to the first period.
+        "nyc1", "nyc1.acme", and "nyc1.acme.com" are treated as the same.
     */
     inline bool sameHostname(const string& a, const string& b) {
-        return str::before(a, '.') == str::before(b, '.');
+        size_t prefixLen = str::shareCommonPrefix(a.c_str(), b.c_str());
+
+        if (prefixLen == a.size()) { // (a == b) or (a isPrefixOf b)
+            if ( b[prefixLen] == '.' || b[prefixLen] == '\0')
+                return true;
+        } else if(prefixLen == b.size()) { // (b isPrefixOf a)
+            if ( a[prefixLen] == '.') // can't be '\0'
+                return true;
+        }
+
+        return false;
     }
 
     inline HostAndPort HostAndPort::Me() { 

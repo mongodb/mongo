@@ -110,8 +110,7 @@ namespace mongo {
         return _manager->getShardKey().extractKey( end );
     }
 
-    /* to be deprecated */
-    BSONObj Chunk::pickSplitPoint( const vector<BSONObj> * possibleSplitPoints ) const {
+    BSONObj Chunk::pickSplitPoint_DEPRECATED( const vector<BSONObj> * possibleSplitPoints ) const {
         
         // check to see if we're at the edge of the key range
         // if so, split on the edge for sequential insertion efficienc
@@ -170,6 +169,33 @@ namespace mongo {
         return median;
     }
 
+    void Chunk::pickMedianKey( BSONObj& medianKey ) const {
+        // Ask the mongod holding this chunk to figure out the split points.
+        ScopedDbConnection conn( getShard().getConnString() );
+        BSONObj result;
+        BSONObjBuilder cmd;
+        cmd.append( "splitVector" , _manager->getns() );
+        cmd.append( "keyPattern" , _manager->getShardKey().key() );
+        cmd.append( "min" , getMin() );
+        cmd.append( "max" , getMax() );
+        cmd.appendBool( "force" , true );
+        BSONObj cmdObj = cmd.obj();
+
+        if ( ! conn->runCommand( "admin" , cmdObj , result )){
+            conn.done();
+            ostringstream os;
+            os << "splitVector command (median key) failed: " << result;
+            uassert( 13503 , os.str() , 0 );
+        }       
+
+        BSONObjIterator it( result.getObjectField( "splitKeys" ) );
+        if ( it.more() ){
+            medianKey = it.next().Obj().getOwned();
+        }
+
+        conn.done();
+    }
+
     void Chunk::pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize /* bytes */, int maxPoints, int maxObjs ) const { 
         // Ask the mongod holding this chunk to figure out the split points.
         ScopedDbConnection conn( getShard().getConnString() );
@@ -198,40 +224,103 @@ namespace mongo {
         conn.done();
     }
 
-    /* to be deprecated */
-    ChunkPtr Chunk::split(){
+    ChunkPtr Chunk::split_DEPRECATED(){
         vector<BSONObj> splitPoints;
-        splitPoints.push_back( pickSplitPoint() );
+        splitPoints.push_back( pickSplitPoint_DEPRECATED() );
         return multiSplit( splitPoints );
     }
 
     ChunkPtr Chunk::simpleSplit( bool force ){
-        // if forcing a split, maxChunkSize does not really matter
-        // if not forcing a split, we want to have at least 2 split points, meaning there is enough data to reach
-        // the maximum split size
-        // TODO Handle 'not enough data to warrant chunking' in pickSplitVector
-        vector<BSONObj> candidates;
-        pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , force ? 0 : 2, force ? 0 : 100000);
-
         vector<BSONObj> splitPoint;
-        if ( minIsInf() ){
-            splitPoint.push_back( _getExtremeKey( 1 ) );
-        } else if ( maxIsInf() ){
-            splitPoint.push_back( _getExtremeKey( -1 ) );
-        } else if ( candidates.size() ){
-            splitPoint.push_back( candidates[0] );
+
+        // If splitting is not obligatory, we may return early if there are not enough data. 
+        if ( ! force ) {
+            vector<BSONObj> candidates;
+            const int maxPoints = 2;
+            const int maxObjs = 100000;
+            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
+            if ( candidates.size() <= 1 ) {
+                // no split points means there isn't enough data to split on
+                // 1 split point means we have between half the chunk size to full chunk size
+                // so we shouldn't split
+                log(1) << "chunk not full enough to trigger auto-split" << endl;
+                return ChunkPtr();
+            }
+
+            splitPoint.push_back( candidates.front() );
+
+        } else {
+            // if forcing a split, use the chunk's median key
+            BSONObj medianKey;
+            pickMedianKey( medianKey );
+            if ( ! medianKey.isEmpty() )
+                splitPoint.push_back( medianKey );
+        }
+
+        // We assume that if the chunk being split is the first (or last) one on the collection, this chunk is
+        // likely to see more insertions. Instead of splitting mid-chunk, we use the very first (or last) key
+        // as a split point.
+        if ( minIsInf() ) {
+            splitPoint.clear();
+            BSONObj key = _getExtremeKey( 1 );
+            if ( ! key.isEmpty() ) {
+                splitPoint.push_back( key );
+            }
+
+        } else if ( maxIsInf() ) {
+            splitPoint.clear();
+            BSONObj key = _getExtremeKey( -1 );
+            if ( ! key.isEmpty() ) {
+                splitPoint.push_back( key );
+            }
+        } 
+
+        // Normally, we'd have a sound split point here if the chunk is not empty. It's also a good place to
+        // sanity check.
+        if ( splitPoint.empty() || _min == splitPoint.front() || _max == splitPoint.front() ) {
+            log() << "want to split chunk, but can't find split point chunk " << toString()
+                  << " got: " << ( splitPoint.empty() ? "<empty>" : splitPoint.front().toString() ) << endl;
+            return ChunkPtr();
         }
 
         return multiSplit( splitPoint );
+        //return multiSplit_ForDevOnly( splitPoint );
     }
     
+    ChunkPtr Chunk::multiSplit_ForDevOnly( const vector<BSONObj>& m ) {
+        ScopedDbConnection conn( getShard().getConnString() );
+        BSONObj result;
+        BSONObjBuilder cmd;
+        cmd.append( "splitChunk_ForDevOnly" , _manager->getns() );
+        cmd.append( "keyPattern" , _manager->getShardKey().key() );
+        cmd.append( "min" , getMin() );
+        cmd.append( "max" , getMax() );
+        cmd.append( "splitKeys" , m );
+        cmd.append( "shardId", genID() );
+        BSONObj cmdObj = cmd.obj();
+
+        if ( ! conn->runCommand( "admin" , cmdObj , result )) {
+            conn.done();
+
+            // TODO decide if push up the error instead of asserting
+            ostringstream os;
+            os << "split chunk command failed: " << result;
+            uassert( 13504 , os.str() , 0 );
+        }
+
+        conn.done();
+        _manager->_reload();
+
+        // TODO the moveIfShould path is still expecting the first new chunk of the split. So produce that now
+        // but the move code path can obtain this the same way.
+        return _manager->findChunk( getMin() );
+     }
+
+    /* to be deprecated */
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
         dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
         uassert( 10166 , "locking namespace failed" , dlk.got() );
-        return multiSplit_inlock( m );
-    }
-    
-    ChunkPtr Chunk::multiSplit_inlock( const vector<BSONObj>& m ){
+
         const size_t maxSplitPoints = 256;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -383,76 +472,42 @@ namespace mongo {
     
     bool Chunk::splitIfShould( long dataWritten ){
         LastError::Disabled d( lastError.get() );
+
         try {
-            return _splitIfShould( dataWritten );
-        }
-        catch ( std::exception& e ){
-            error() << "splitIfShould failed: " << e.what() << endl;
-            return false;
-        }
-    }
+            _dataWritten += dataWritten;        
+            int splitThreshold = getManager()->getCurrentDesiredChunkSize();
+            if ( minIsInf() || maxIsInf() ){
+                splitThreshold = (int) ((double)splitThreshold * .9);
+            }
 
-    bool Chunk::_splitIfShould( long dataWritten ){
-        _dataWritten += dataWritten;
-        
-        int splitThreshold = getManager()->getCurrentDesiredChunkSize();
-        if ( minIsInf() || maxIsInf() ){
-            splitThreshold = (int) ((double)splitThreshold * .9);
-        }
-
-        if ( _dataWritten < splitThreshold / 5 )
-            return false;
-        
-        ChunkPtr newShard;
-        {
-            // putting this in its own scope so moveIfShould is done outside
-
-            dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
-            if ( ! dlk.got() )
+            if ( _dataWritten < splitThreshold / 5 )
                 return false;
-            
-            log(3) << "\t splitIfShould entering decision area : " << *this << endl;
+        
+            log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << endl;
             
             _dataWritten = 0; // reset so we check often enough
             
-            // We limit the amount of objects we're willing to split away and don't bother
-            // getting all the split points. If we're in a jumbo chunk, that would prevent
-            // traversing the whole chunk.
-            const int maxPoints = 2; 
-            const int maxObjs = 100000;
-            vector<BSONObj> possibleSplitPoints;
-            pickSplitVector( possibleSplitPoints , splitThreshold , maxPoints , maxObjs );            
-            if ( possibleSplitPoints.size() <= 1 ) {
-                // no split points means there isn't enough data to split on
-                // 1 split point means we have between half the chunk size to full chunk size
-                // so we shouldn't split
+            ChunkPtr newShard = simpleSplit( false /* does not force a split if not enough data */ );
+            if ( newShard.get() == NULL ){
+                // simpleSplit would have issued a message if we got here
                 return false;
             }
 
-            BSONObj splitPoint = pickSplitPoint( &possibleSplitPoints );
-            if ( splitPoint.isEmpty() || _min == splitPoint || _max == splitPoint) {
-                // TODO: this check might be redundany, but probably not that bad
-                error() << "want to split chunk, but can't find split point " 
-                        << " chunk: " << toString() << " got: " << splitPoint << endl;
-                return false;
-            }
-            
-            log() << "autosplitting " << _manager->getns() << " shard: " << toString() 
-                  << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")" 
+            log() << "autosplitted " << _manager->getns() << " shard: " << toString() 
+                  << " on: " << newShard->getMax() << "(splitThreshold " << splitThreshold << ")" 
 #ifdef _DEBUG
                   << " size: " << getPhysicalSize() // slow - but can be usefule when debugging
 #endif
                   << endl;
-            
-            vector<BSONObj> splitPoints;
-            splitPoints.push_back( splitPoint );
-            newShard = multiSplit_inlock( splitPoints );
+        
+            moveIfShould( newShard );
+        
+            return true;
+
+        } catch ( std::exception& e ){
+            error() << "splitIfShould failed: " << e.what() << endl;
+            return false;
         }
-        
-        // since a chunk move is done by the donor shard, it should be responsible for locking the ns 
-        moveIfShould( newShard );
-        
-        return true;
     }
 
     bool Chunk::moveIfShould( ChunkPtr newChunk ){
@@ -615,7 +670,6 @@ namespace mongo {
         ss << "ns:" << _manager->getns() << " at: " << _shard.toString() << " lastmod: " << _lastmod.toString() << " min: " << _min << " max: " << _max;
         return ss.str();
     }
-    
     
     ShardKeyPattern Chunk::skey() const{
         return _manager->getShardKey();
@@ -804,7 +858,19 @@ namespace mongo {
 
         //TODO look into FieldRangeSetOr
         FieldRangeOrSet fros(_ns.c_str(), query, false);
-        uassert(13088, "no support for special queries yet", fros.getSpecial().empty());
+
+        const string special = fros.getSpecial();
+        if (special == "2d") {
+            BSONForEach(field, query){
+                if (getGtLtOp(field) == BSONObj::opNEAR) {
+                    uassert(13501, "use geoNear command rather than $near query", false);
+                    // TODO: convert to geoNear rather than erroring out
+                }
+                // $within queries are fine
+            }
+        } else if (!special.empty()){
+            uassert(13502, "unrecognized special query type: " + special, false);
+        }
 
         do {
             boost::scoped_ptr<FieldRangeSet> frs (fros.topFrs());
@@ -829,8 +895,8 @@ namespace mongo {
                 ChunkRangeMap::const_iterator min, max;
                 min = _chunkRanges.upper_bound(minObj);
                 max = _chunkRanges.upper_bound(maxObj);
-
-                assert(min != _chunkRanges.ranges().end());
+                
+                massert( 13507 , (string)"invalid chunk config minObj: " + minObj.toString() , min != _chunkRanges.ranges().end());
 
                 // make max non-inclusive like end iterators
                 if(max != _chunkRanges.ranges().end())

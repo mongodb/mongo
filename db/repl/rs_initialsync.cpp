@@ -42,6 +42,8 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncDoInitialSync() { 
+        createOplog();
+        
         while( 1 ) {
             try {
                 _syncDoInitialSync();

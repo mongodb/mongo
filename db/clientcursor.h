@@ -161,7 +161,7 @@ namespace mongo {
         OpTime _slaveReadTill;
         Database * const _db;
 
-        ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const string& _ns, BSONObj _query = BSONObj()) :
+        ClientCursor(int queryOptions, const shared_ptr<Cursor>& _c, const string& _ns, BSONObj _query = BSONObj()) :
             _idleAgeMillis(0), _pinValue(0), 
             _doingDeletes(false), _yieldSometimesTracker(128,10),
             ns(_ns), c(_c), 
@@ -250,7 +250,8 @@ namespace mongo {
         BSONObj indexKeyPattern() { return c->indexKeyPattern();  }
         bool ok() { return c->ok(); }
         bool advance(){ return c->advance(); }
-        BSONObj current() {  return c->current(); }
+        BSONObj current() { return c->current(); }
+        DiskLoc currLoc() { return c->currLoc(); }
 
         bool currentMatches(){
             if ( ! c->matcher() )

@@ -150,6 +150,8 @@ namespace mongo {
                 if (chmod(me.getAddr().c_str(), 0777) == -1){
                     log() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
                 }
+
+                ListeningSockets::get()->addPath( me.getAddr() );
             }
 #endif
 

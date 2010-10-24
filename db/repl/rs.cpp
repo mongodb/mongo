@@ -409,6 +409,8 @@ namespace mongo {
                 oldPrimaryId = p->id();
         }
         forgetPrimary();
+        
+        bool iWasArbiterOnly = _self ? iAmArbiterOnly() : false;
         setSelfTo(0);
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
@@ -417,6 +419,12 @@ namespace mongo {
                 assert( _self == 0 );
                 mi = new Member(m.h, m._id, &m, true);
                 setSelfTo(mi);
+
+                // if the arbiter status changed
+                if (iWasArbiterOnly ^ iAmArbiterOnly()) {
+                    _changeArbiterState();
+                }
+                
                 if( (int)mi->id() == oldPrimaryId )
                     box.setSelfPrimary(mi);
             } else {
@@ -428,6 +436,36 @@ namespace mongo {
             }
         }
         return true;
+    }
+
+    void startSyncThread();
+
+    void ReplSetImpl::_changeArbiterState() {
+        if (iAmArbiterOnly()) {
+            changeState(MemberState::RS_ARBITER);
+
+            // if there is an oplog, free it
+            // not sure if this is necessary, maybe just leave the oplog and let
+            // the user delete it if they want the space?
+            writelock lk(rsoplog);
+            Client::Context c(rsoplog, dbpath, 0, false);
+            NamespaceDetails *d = nsdetails(rsoplog);
+            if (d) {
+                string errmsg;
+                bob res;
+                dropCollection(rsoplog, errmsg, res);
+
+                // clear last op time to force initial sync (if the arbiter
+                // becomes a "normal" server again)
+                lastOpTimeWritten = OpTime();
+            }
+        }
+        else {
+            changeState(MemberState::RS_RECOVERING);
+
+            // oplog will be allocated when sync begins            
+            boost::thread t(startSyncThread);
+        }
     }
 
     // Our own config must be the first one.

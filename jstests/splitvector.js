@@ -138,7 +138,7 @@ for( i=1; i<10; i++ ){
     f.save( { x: 2, y: filler } );
 }
 db.getLastError();
-res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 , min: 1} );
+res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 } );
 
 assert.eq( true , res.ok , "7a" );
 assert.eq( 2 , res.splitKeys[0].x, "7b");
@@ -165,12 +165,31 @@ for( i=1; i<10; i++ ){
 }
 
 db.getLastError();
-res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 , min: 1} );
+res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , maxChunkSize: 1 } );
 
 assert.eq( true , res.ok , "8a" );
 assert.eq( 2 , res.splitKeys.length , "8b" );
 assert.eq( 2 , res.splitKeys[0].x , "8c" );
 assert.eq( 3 , res.splitKeys[1].x , "8d" );
 
-print("PASSED");
 
+// -------------------------
+// Case 9: splitVector "force" mode, where we split (possible small) chunks in the middle
+//
+
+f.drop();
+f.ensureIndex( { x: 1 } );
+
+f.save( { x: 1 } );
+f.save( { x: 2 } );
+f.save( { x: 3 } );
+db.getLastError();
+
+res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , force : true } );
+
+assert.eq( true , res.ok , "9a" );
+assert.eq( 1 , res.splitKeys.length , "9b" );
+assert.eq( 2 , res.splitKeys[0].x , "9c" );
+
+
+print("PASSED");

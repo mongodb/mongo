@@ -178,6 +178,7 @@ namespace mongo {
             int flags = d.pullInt();
             
             BSONObj query = d.nextJsObj();
+            uassert( 13506 ,  "$atomic not supported sharded" , query["$atomic"].eoo() );
             uassert( 10201 ,  "invalid update" , d.moreJSObjs() );
             BSONObj toupdate = d.nextJsObj();
 
@@ -272,6 +273,7 @@ namespace mongo {
             
             uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
             BSONObj pattern = d.nextJsObj();
+            uassert( 13505 ,  "$atomic not supported sharded" , pattern["$atomic"].eoo() );
 
             set<Shard> shards;
             int left = 5;

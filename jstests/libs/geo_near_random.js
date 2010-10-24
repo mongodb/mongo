@@ -63,14 +63,16 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
     }
 
     
-    last = last.map(function(x){return x.obj});
+    if (!opts.sharded){
+        last = last.map(function(x){return x.obj});
 
-    var query = {loc:{}};
-    query.loc[ opts.sphere ? '$nearSphere' : '$near' ] = pt;
-    var near = this.t.find(query).limit(opts.nToTest).toArray();
+        var query = {loc:{}};
+        query.loc[ opts.sphere ? '$nearSphere' : '$near' ] = pt;
+        var near = this.t.find(query).limit(opts.nToTest).toArray();
 
-    this.assertIsPrefix(last, near);
-    assert.eq(last, near);
+        this.assertIsPrefix(last, near);
+        assert.eq(last, near);
+    }
 }
 
 

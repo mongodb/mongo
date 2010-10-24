@@ -642,40 +642,48 @@ namespace mongo {
         return name;
     }
 
+    /* must never throw */
     void ConfigServer::logChange( const string& what , const string& ns , const BSONObj& detail ){
-        assert( _primary.ok() );
-
-        static bool createdCapped = false;
-        static AtomicUInt num;
-        
-        ScopedDbConnection conn( _primary );
-        
-        if ( ! createdCapped ){
-            try {
-                conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
-            }
-            catch ( UserException& e ){
-                log(1) << "couldn't create changelog (like race condition): " << e << endl;
-                // don't care
-            }
-            createdCapped = true;
-        }
-     
-        stringstream id;
-        id << getHostNameCached() << "-" << terseCurrentTime() << "-" << num++;
-
-        BSONObj msg = BSON( "_id" << id.str() << "server" << getHostNameCached() << "time" << DATENOW <<
-                            "what" << what << "ns" << ns << "details" << detail );
-        log() << "config change: " << msg << endl;
+        string changeID;
 
         try {
-            conn->insert( "config.changelog" , msg );
-        }
-        catch ( std::exception& e ){
-            log() << "not logging config change: " << e.what() << endl;                
-        }
+            // get this entry's ID so we can use on the exception code path too
+            stringstream id;
+            static AtomicUInt num;
+            id << getHostNameCached() << "-" << terseCurrentTime() << "-" << num++;
+            changeID = id.str();
+
+            // send a copy of the message to the log in case it doesn't manage to reach config.changelog
+            BSONObj msg = BSON( "_id" << changeID << "server" << getHostNameCached() << "time" << DATENOW <<
+                                "what" << what << "ns" << ns << "details" << detail );
+            log() << "about to issue config change: " << msg << endl;
+
+            assert( _primary.ok() );
+
+            ScopedDbConnection conn( _primary );
         
-        conn.done();
+            static bool createdCapped = false;
+            if ( ! createdCapped ){
+                try {
+                    conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
+                }
+                catch ( UserException& e ){
+                    log(1) << "couldn't create changelog (like race condition): " << e << endl;
+                    // don't care
+                }
+                createdCapped = true;
+            }
+     
+            conn->insert( "config.changelog" , msg );
+
+            conn.done();
+
+        }
+
+        catch ( std::exception& e ) {
+            // if we got here, it means the config change is only in the log; it didn't make it to config.changelog
+            log() << "not logging config change: " << changeID << " " << e.what() << endl;
+        }
     }
 
     DBConfigPtr configServerPtr (new ConfigServer());    

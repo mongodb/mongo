@@ -20,11 +20,11 @@ db.foo.save( { name : "allan" } )
 
 assert.eq( 6 , db.foo.find().count() , "basic count" );
 
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
+s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [Minkey -> allan) , * [allan -> ..)
+s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // * [allan -> sara) , [sara -> Maxkey)
+s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [alan -> joe) , [joe -> sara]
 
-s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : seconday.getMongo().name } );
 
 s.printChunks();
 
@@ -38,6 +38,11 @@ assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "total count with co
 
 assert.eq( "allan,bob,eliot,joe,mark,sara" ,  db.foo.find().sort( { name : 1 } ).toArray().map( function(z){ return z.name; } ) , "sort 1" );
 assert.eq( "sara,mark,joe,eliot,bob,allan" ,  db.foo.find().sort( { name : -1 } ).toArray().map( function(z){ return z.name; } ) , "sort 2" );
+
+// make sure we can't foce a split on an extreme key
+// [allan->joe) 
+assert.throws( function(){ s.adminCommand( { split : "test.foo" , middle : { name : "allan" } } ) } );
+assert.throws( function(){ s.adminCommand( { split : "test.foo" , middle : { name : "joe" } } ) } );
 
 s.stop();
 
