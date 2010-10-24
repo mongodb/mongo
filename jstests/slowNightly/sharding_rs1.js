@@ -46,7 +46,7 @@ print( diff() )
 assert.soon( function(){
     var d = diff();
     return d < 5;
-} , "balance didn't happen" , 1000 * 60 * 3 , 5000 );
+} , "balance didn't happen" , 1000 * 60 * 6 , 5000 );
 
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
 
