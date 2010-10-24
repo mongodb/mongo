@@ -351,6 +351,7 @@ namespace mongo {
         static void serverThread( shared_ptr<ServerState> state ){
             try {
                 DBClientConnection conn( true );
+                conn._logLevel = 1;
                 string errmsg;
                 if ( ! conn.connect( state->host , errmsg ) )
                     state->error = errmsg;
