@@ -538,7 +538,7 @@ namespace mongo {
 
         BSONObj res;
         massert( 10412 , 
-                 (string)"moveAndCommit failed: " + res.toString() , 
+                 str::stream() << "moveAndCommit failed: " << res , 
                  toMove->moveAndCommit( newLocation , res ) );
         
         return true;
@@ -896,7 +896,7 @@ namespace mongo {
                 min = _chunkRanges.upper_bound(minObj);
                 max = _chunkRanges.upper_bound(maxObj);
                 
-                massert( 13507 , (string)"invalid chunk config minObj: " + minObj.toString() , min != _chunkRanges.ranges().end());
+                massert( 13507 , str::stream() << "invalid chunk config minObj: " << minObj , min != _chunkRanges.ranges().end());
 
                 // make max non-inclusive like end iterators
                 if(max != _chunkRanges.ranges().end())
@@ -997,7 +997,7 @@ namespace mongo {
             ScopedDbConnection conn( *i );
             BSONObj res;
             if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
-                throw UserException( 8071 , (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
+                throw UserException( 8071 , str::stream() << "cleaning up after drop failed: " << res );
             conn.done();
         }
 
