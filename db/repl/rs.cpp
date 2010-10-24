@@ -143,6 +143,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMasterHost(const Member *m, vector<string>& hosts, vector<string>& passives, vector<string>& arbiters) {
+        assert( m );
         if( m->config().hidden )
             return;
 
@@ -172,6 +173,7 @@ namespace mongo {
             _fillIsMasterHost(_self, hosts, passives, arbiters);
 
             for( Member *m = _members.head(); m; m = m->next() ) {
+                assert( m );
                 _fillIsMasterHost(m, hosts, passives, arbiters);
             }
 
