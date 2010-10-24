@@ -32,6 +32,7 @@
 #include "namespace.h"
 #include "client.h"
 
+
 namespace mongo {
 
     class DataFileHeader;
@@ -144,75 +145,6 @@ namespace mongo {
 
     extern DataFileMgr theDataFileMgr;
 
-    class IndexChunkBuilder {
-
-    public:
-
-      IndexChunkBuilder( int start, int end, BSONObjExternalSorter &sorter ) 
-         : chunkStart( start ),
-           chunkCurr( 0 ),
-           chunkEnd( end ),
-           chunkIteratorInitialzed( false ) { 
-
-         chunkIterator = sorter.iterator();
-         setup();
-      }
-
-      ~IndexChunkBuilder( void ) {
-        delete btBuilder;
-      }
-      
-      int getStart( void ) { 
-        return chunkStart;
-      }
-
-      int getEnd( void ) {
-        return chunkEnd;
-      }
-
-      void makeBtBuilder( bool dups, IndexDetails idx ) {
-        btBuilder = new BtreeBuilder( dups, idx );
-      }
-
-      BtreeBuilder* getBtreeBuilder( void ) {
-        return btBuilder;
-      }
-
-      BSONObjExternalSorter::Data next( void ) {
-        currChunk++;
-        return chunkIterator.next()
-      }
-
-      bool more( void ) {
-        return chunkIteratorInitialized && currChunk < chunkEnd;
-      }
-      
-
-    protected:
-
-      void setup( void ) { 
-        while ( currChunk < chunkStart ) {
-          chunkIterator.next();
-          currChunk++;
-        }
-        chunkIteratorInitialized = true;
-      }
-      
-      BSONObjExternalSorter &sorter;
-     
-      int currChunk;
-
-      int chunkStart; 
-
-      int chunkEnd;
-
-      bool chunkIteratorInitialized;
-
-      auto_ptr<BSONObjExternalSorter::Iterator> chunkIterator;
-
-      BtreeBuilder* btBuilder;
-
-    };
 #pragma pack(1)
 
     class DeletedRecord {
@@ -531,5 +463,4 @@ namespace mongo {
     inline BSONObj::BSONObj(const Record *r) {
         init(r->data, false);
     }
-
 } // namespace mongo
