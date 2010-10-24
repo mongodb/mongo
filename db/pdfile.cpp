@@ -1635,7 +1635,7 @@ namespace mongo {
                     string s = e.toString();
                     s += " : on addIndex/capped - collection and its index will not match";
                     uassert_nothrow(s.c_str());
-                    log() << s << '\n';
+                    error() << s << endl;
                 }
                 else { 
                     // normal case -- we can roll back
