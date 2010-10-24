@@ -277,6 +277,7 @@ namespace mongo {
                 result.append("ismaster", false);
                 result.append("secondary", false);
                 result.append("info", ReplSet::startupStatusMsg);
+                result.append( "isreplicaset" , true );
                 return;
             }
             

@@ -18,14 +18,17 @@
 #include "../pch.h"
 #include <fcntl.h>
 #include <errno.h>
+
 #if defined(__freebsd__) || defined(__openbsd__)
 #include <sys/stat.h>
 #endif
 
 #include "timer.h"
+#include "mongoutils/str.h"
+using namespace mongoutils;
 
 #ifndef O_NOATIME
-#define O_NOATIME 0
+#define O_NOATIME (0)
 #endif
 
 namespace mongo {
@@ -120,7 +123,7 @@ namespace mongo {
             if ( ret == 0 )
                 return;
             
-            log() << "posix_fallocate failed: " << errnoWithDescription( ret ) << " falling back" << endl;
+            log() << "FileAllocator: posix_fallocate failed: " << errnoWithDescription( ret ) << " falling back" << endl;
 #endif
             
             off_t filelen = lseek(fd, 0, SEEK_END);
@@ -128,12 +131,13 @@ namespace mongo {
                 if (filelen != 0) {
                     stringstream ss;
                     ss << "failure creating new datafile; lseek failed for fd " << fd << " with errno: " << errnoWithDescription();
-                    massert( 10440 ,  ss.str(), filelen == 0 );
+                    uassert( 10440 ,  ss.str(), filelen == 0 );
                 }
                 // Check for end of disk.
-                massert( 10441 ,  "Unable to allocate file of desired size",
+				
+                uassert( 10441 ,  str::stream() << "Unable to allocate new file of size " << size << ' ' << errnoWithDescription(),
                          size - 1 == lseek(fd, size - 1, SEEK_SET) );
-                massert( 10442 ,  "Unable to allocate file of desired size",
+                uassert( 10442 ,  str::stream() << "Unable to allocate new file of size " << size << ' ' << errnoWithDescription(),
                          1 == write(fd, "", 1) );
                 lseek(fd, 0, SEEK_SET);
                 
@@ -148,7 +152,7 @@ namespace mongo {
                         towrite = z;
                     
                     int written = write( fd , buf , towrite );
-                    massert( 10443 , errnoWithPrefix("write failed" ), written > 0 );
+                    uassert( 10443 , errnoWithPrefix("FileAllocator: file write failed" ), written > 0 );
                     left -= written;
                 }
             }
@@ -158,7 +162,7 @@ namespace mongo {
     private:
 #if !defined(_WIN32)
         void checkFailure() {
-            massert( 12520, "file allocation failure", !failed_ );            
+            uassert( 12520, "new file allocation failure", !failed_ );            
         }
         
         // caller must hold pendingMutex_ lock.  Returns size if allocated or 
@@ -210,8 +214,8 @@ namespace mongo {
                             long fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                             if ( fd <= 0 ) {
                                 stringstream ss;
-                                ss << "couldn't open " << name << ' ' << errnoWithDescription();
-                                massert( 10439 ,  ss.str(), fd <= 0 );
+                                ss << "FileAllocator: couldn't open " << name << ' ' << errnoWithDescription();
+                                uassert( 10439 ,  ss.str(), fd <= 0 );
                             }
 
 #if defined(POSIX_FADV_DONTNEED)
@@ -233,8 +237,8 @@ namespace mongo {
                             close( fd );
                             
                         } catch ( ... ) {
-                            problem() << "Failed to allocate new file: " << name
-                                      << ", size: " << size << ", aborting." << endl;
+                            log() << "error failed to allocate new file: " << name
+								  << " size: " << size << ' ' << errnoWithDescription() << endl;
                             try {
                                 BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
                             } catch ( ... ) {

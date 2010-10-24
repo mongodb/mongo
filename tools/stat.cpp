@@ -208,9 +208,11 @@ namespace mongo {
                     ss << "M";
                 else if ( x["secondary"].trueValue() )
                     ss << "SEC";
+                else if ( x["isreplicaset"].trueValue() )
+                    ss << "REC";
                 else if ( isReplSet )
                     ss << "UNK";
-                else
+                else 
                     ss << "SLV";
                 
                 _append( result , "repl" , 4 , ss.str() );
@@ -349,6 +351,7 @@ namespace mongo {
         static void serverThread( shared_ptr<ServerState> state ){
             try {
                 DBClientConnection conn( true );
+                conn._logLevel = 1;
                 string errmsg;
                 if ( ! conn.connect( state->host , errmsg ) )
                     state->error = errmsg;

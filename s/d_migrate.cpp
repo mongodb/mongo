@@ -934,12 +934,13 @@ namespace mongo {
                     BSONObj arr = res["objects"].Obj();
                     int thisTime = 0;
 
-                    writelock lk( ns );
-
                     BSONObjIterator i( arr );
                     while( i.more() ){
                         BSONObj o = i.next().Obj();
-                        Helpers::upsert( ns , o );
+                        {
+                            writelock lk( ns );
+                            Helpers::upsert( ns , o );
+                        }
                         thisTime++;
                         numCloned++;
                         clonedBytes += o.objsize();
