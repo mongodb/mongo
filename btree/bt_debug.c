@@ -413,6 +413,7 @@ __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
+	case WT_ITEM_DUPKEY:
 	case WT_ITEM_DATA:
 	case WT_ITEM_DUP:
 		break;
@@ -420,6 +421,7 @@ __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		fprintf(fp, "\n");
 		return (0);
 	case WT_ITEM_KEY_OVFL:
+	case WT_ITEM_DUPKEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
 		ovfl = WT_ITEM_BYTE_OVFL(item);
@@ -529,27 +531,29 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
 		hp = idb->huffman_key;
-		p = WT_ITEM_BYTE(item);
-		size = WT_ITEM_LEN(item);
-		break;
+		goto onpage;
+	case WT_ITEM_DUPKEY:
 	case WT_ITEM_DATA:
 	case WT_ITEM_DUP:
 		hp = idb->huffman_data;
-		p = WT_ITEM_BYTE(item);
+onpage:		p = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
+		break;
+	case WT_ITEM_KEY_OVFL:
+		hp = idb->huffman_key;
+		goto offpage;
+	case WT_ITEM_DUPKEY_OVFL:
+	case WT_ITEM_DATA_OVFL:
+	case WT_ITEM_DUP_OVFL:
+		hp = idb->huffman_data;
+offpage:	ovfl = WT_ITEM_BYTE_OVFL(item);
+		WT_ERR(__wt_bt_ovfl_in(toc, ovfl, &page));
+		p = WT_PAGE_BYTE(page);
+		size = ovfl->size;
 		break;
 	case WT_ITEM_DEL:
 		p = (u_int8_t *)"deleted";
 		size = 7;
-		break;
-	case WT_ITEM_KEY_OVFL:
-	case WT_ITEM_DATA_OVFL:
-	case WT_ITEM_DUP_OVFL:
-		ovfl = WT_ITEM_BYTE_OVFL(item);
-		WT_ERR(__wt_bt_ovfl_in(toc, ovfl, &page));
-		hp = idb->huffman_data;
-		p = WT_PAGE_BYTE(page);
-		size = ovfl->size;
 		break;
 	case WT_ITEM_OFF:
 		p = (u_int8_t *)"offpage";

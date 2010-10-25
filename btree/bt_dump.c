@@ -155,6 +155,7 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		item_len = WT_ITEM_LEN(item);
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
+		case WT_ITEM_DUPKEY:
 			last_key_std.data = WT_ITEM_BYTE(item);
 			last_key_std.size = item_len;
 			last_key = &last_key_std;
@@ -177,6 +178,7 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);
 			break;
 		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DUPKEY_OVFL:
 			/*
 			 * If the overflow key has duplicate records, we'll need
 			 * a copy of the key to write for each of those records.

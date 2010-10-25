@@ -558,41 +558,45 @@ struct __wt_item {
 #define	WT_ITEM_SIZE	4
 
 /*
- * There are 3 basic types: keys, data items and duplicate data items, each of
- * which has an overflow form.  The item is followed by additional data, which
- * varies by type: a key, data or duplicate item is followed by a set of bytes;
- * a WT_OVFL structure follows an overflow form.
- *
- * We could compress the item types (for example, use a bit to mean overflow),
- * but it's simpler this way because we don't need the page type to know what
- * "WT_ITEM_KEY" really means.  We express the item types as bit masks because
- * it makes the macro for assignment faster, but they are integer values, not
- * unique bits.
+ * There are 4 basic types: keys, duplicate keys, data items and duplicate data
+ * items, each of which has an overflow form.  Items are followed by additional
+ * data, which varies by type: a key, duplicate key, data or duplicate item is
+ * followed by a set of bytes; a WT_OVFL structure follows an overflow form.
+ * There are two additional types: First, a deleted type (a place-holder for
+ * deleted items where the item cannot be removed, for example, an column store
+ * item that must remain to preserve the record count).   Second, a subtree
+ * reference for keys that reference subtrees of information (for example, an
+ * internal Btree page has a key and a reference to the tree that contains all
+ * key/data pairs greater than the internal page's key, or, a leaf Btree page
+ * where a key references all of the duplicate data items for the key when the
+ * duplicate data items can no longer fit onto the Btree leaf page).
  *
  * Here's the usage by page type:
  *
  * WT_PAGE_ROW_INT (row-store internal pages):
- * Variable-length key and offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
- * followed by a WT_ITEM_OFF item).
+ * -- Variable-length key and offpage-reference pairs (a WT_ITEM_KEY or
+ *    WT_ITEM_KEY_OVFL item, followed by a WT_ITEM_OFF item).
  *
- * WT_PAGE_ROW_LEAF (row-store primary leaf pages):
- * -- Variable-length key followed by a single variable-length/data item (a
- *    WT_ITEM_KEY/KEY_OVFL item followed by a WT_ITEM_DATA/DATA_OVFL item);
- * -- Variable-length key/offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
- *    followed by a WT_ITEM_OFF item);
- * -- Variable-length key followed a sets of duplicates that have not yet been
- *    moved into their own tree (a WT_ITEM_KEY/KEY_OVFL item followed by two
- *    or more WT_ITEM_DUP/DUP_OVFL items).
+ * WT_PAGE_ROW_LEAF (row-store leaf pages):
+ * -- Variable-length key and variable-length/data pairs (a WT_ITEM_KEY or
+ *    WT_ITEM_KEY_OVFL item followed by a WT_ITEM_DATA or WT_ITEM_DATA_OVFL
+ *    item);
+ * -- Variable-length key and set of duplicates moved into a separate tree
+ *    (a WT_ITEM_KEY or WT_ITEM_KEY_OVFL item followed by a WT_ITEM_OFF item);
+ * -- Variable-length key and set of duplicates not yet moved into a separate
+ *    tree (a WT_ITEM_KEY/KEY_OVFL item followed by two or more WT_ITEM_DUP or
+ *    WT_ITEM_DUP_OVFL items).
  *
  * WT_PAGE_DUP_INT (row-store offpage duplicates internal pages):
- * Variable-length key and offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
- * followed by a WT_ITEM_OFF item).
+ * -- Variable-length duplicate key and offpage-reference pairs (a
+ *    WT_ITEM_DUPKEY or WT_ITEM_DUPKEY_OVFL item followed by a WT_ITEM_OFF
+ *    item).
  *
  * WT_PAGE_DUP_LEAF (row-store offpage duplicates leaf pages):
- * Variable-length data items (WT_ITEM_DUP/DUP_OVFL).
+ * -- Variable-length data items (WT_ITEM_DUP/DUP_OVFL_ITEM).
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length items):
- * Variable-length data items (WT_ITEM_DATA/DATA_OVFL/DEL).
+ * -- Variable-length data items (WT_ITEM_DATA/DATA_OVFL/DEL).
  *
  * WT_PAGE_COL_INT (Column-store internal page):
  * WT_PAGE_COL_FIX (Column-store leaf page storing fixed-length items):
@@ -600,15 +604,28 @@ struct __wt_item {
  *	These pages contain fixed-sized structures (WT_PAGE_COL_INT and
  *	WT_PAGE_COL_FIX), or a string of bytes (WT_PAGE_OVFL), and so do
  *	not contain WT_ITEM structures.
+ *
+ * There are currently 10 item types, requiring 4 bits, with 6 values unused.
+ *
+ * We could compress the item types in a couple of ways.  We could merge the
+ * WT_ITEM_KEY and WT_ITEM_DUPKEY types, but that would require we know the
+ * underlying page type in order to know how an item might be encoded (that
+ * is, if it's an off-page duplicate key, encoded using the Huffman data coder,
+ * or a Btree row store key, encoded using the Huffman key encoder). We could
+ * also use a bit to mean overflow, merging all overflow types into a single
+ * bit plus the ""primary" item type, but that would require more bit shuffling
+ * than the current scheme.
  */
-#define	WT_ITEM_KEY		0x01000000 /* Key */
-#define	WT_ITEM_KEY_OVFL	0x02000000 /* Overflow key */
-#define	WT_ITEM_DATA		0x03000000 /* Data */
-#define	WT_ITEM_DATA_OVFL	0x04000000 /* Overflow data */
-#define	WT_ITEM_DEL		0x05000000 /* Deleted */
+#define	WT_ITEM_KEY		0x00000000 /* Key */
+#define	WT_ITEM_KEY_OVFL	0x01000000 /* Overflow key */
+#define	WT_ITEM_DUPKEY		0x02000000 /* Duplicate key */
+#define	WT_ITEM_DUPKEY_OVFL	0x03000000 /* Duplicate overflow key */
+#define	WT_ITEM_DATA		0x04000000 /* Data */
+#define	WT_ITEM_DATA_OVFL	0x05000000 /* Overflow data */
 #define	WT_ITEM_DUP		0x06000000 /* Duplicate data */
 #define	WT_ITEM_DUP_OVFL	0x07000000 /* Overflow duplicate data */
-#define	WT_ITEM_OFF		0x08000000 /* Offpage-tree reference */
+#define	WT_ITEM_DEL		0x08000000 /* Deleted */
+#define	WT_ITEM_OFF		0x09000000 /* Offpage-tree reference */
 
 #define	WT_ITEM_LEN(addr)						\
 	(((WT_ITEM *)(addr))->__item_chunk & 0x00ffffff)

@@ -609,6 +609,9 @@ flags['wiredtiger_env_init'] = [
 ###################################################
 # Internal routine flag declarations
 ###################################################
+flags['bt_build_data_item'] = [
+	'IS_BULK',
+	'IS_DUP']
 flags['bt_page_out'] = [
 	'DISCARD',
 	'MODIFIED' ]

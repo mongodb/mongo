@@ -7,7 +7,7 @@ __wt_bt_build_key_item(
     WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load);
 int
 __wt_bt_build_data_item(
-    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load);
+    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, u_int flags);
 int
 __wt_bt_close(WT_TOC *toc);
 int

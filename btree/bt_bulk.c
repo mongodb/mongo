@@ -908,12 +908,14 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	WT_OFF off;
 	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
+	WT_PAGE_HDR *hdr;
 	u_int type;
 	int need_promotion, ret;
 	void *parent_data;
 
 	db = toc->db;
 	env = toc->env;
+	hdr = page->hdr;
 
 	WT_CLEAR(item);
 	next = parent = NULL;
@@ -927,7 +929,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	 *
 	 * If it's a column-store page, we don't promote a key at all.
 	 */
-	switch (page->hdr->type) {
+	switch (hdr->type) {
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
@@ -941,7 +943,18 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 		case WT_ITEM_KEY:
 			key->data = WT_ITEM_BYTE(key_item);
 			key->size = WT_ITEM_LEN(key_item);
-			WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY);
+			switch (hdr->type) {
+			case WT_PAGE_DUP_INT:
+			case WT_PAGE_DUP_LEAF:
+				WT_ITEM_TYPE_SET(&item, WT_ITEM_DUPKEY);
+				break;
+			case WT_PAGE_ROW_INT:
+			case WT_PAGE_ROW_LEAF:
+				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY);
+				break;
+			default:		/* Not possible */
+				break;
+			}
 			WT_ITEM_LEN_SET(&item, key->size);
 			break;
 		case WT_ITEM_DUP_OVFL:
@@ -956,7 +969,18 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 			    WT_ITEM_BYTE_OVFL(key_item), &tmp_ovfl));
 			key->data = &tmp_ovfl;
 			key->size = sizeof(tmp_ovfl);
-			WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
+			switch (hdr->type) {
+			case WT_PAGE_DUP_INT:
+			case WT_PAGE_DUP_LEAF:
+				WT_ITEM_TYPE_SET(&item, WT_ITEM_DUPKEY_OVFL);
+				break;
+			case WT_PAGE_ROW_INT:
+			case WT_PAGE_ROW_LEAF:
+				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
+				break;
+			default:		/* Not possible */
+				break;
+			}
 			WT_ITEM_LEN_SET(&item, sizeof(tmp_ovfl));
 			break;
 		WT_ILLEGAL_FORMAT(db);
@@ -1051,7 +1075,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	if ((parent = stack->page[level]) != NULL)
 		need_promotion = 0;
 	else {
-split:		switch (page->hdr->type) {
+split:		switch (hdr->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_COL_VAR:
@@ -1068,7 +1092,7 @@ split:		switch (page->hdr->type) {
 		WT_ILLEGAL_FORMAT(db);
 		}
 		WT_ERR(__wt_bt_page_alloc(
-		    toc, type, page->hdr->level + 1, db->intlmin, &next));
+		    toc, type, hdr->level + 1, db->intlmin, &next));
 
 		/*
 		 * Case #1 -- there's no parent, it's a root split.  If in a
@@ -1130,8 +1154,7 @@ split:		switch (page->hdr->type) {
 		/* Create the WT_OFF reference. */
 		WT_RECORDS(&off) = page->records;
 		off.addr = page->addr;
-		off.size =
-		    page->hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
+		off.size = hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
 		/* Store the data item. */
 		++parent->hdr->u.entries;
@@ -1163,8 +1186,7 @@ split:		switch (page->hdr->type) {
 		WT_ITEM_TYPE_SET(&item, WT_ITEM_OFF);
 		WT_RECORDS(&off) = page->records;
 		off.addr = page->addr;
-		off.size =
-		    page->hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
+		off.size = hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
 		/* Store the data item. */
 		++parent->hdr->u.entries;
@@ -1259,8 +1281,8 @@ __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
 
 /*
  * __wt_bt_promote_row_indx --
- *	Append a new WT_ITEM_KEY/WT_OFF pair to an internal page's in-memory
- *	information.
+ *	Append a new WT_ITEM_{DUPKEY,KEY}/WT_OFF pair to an internal page's
+ *	in-memory information.
  */
 static int
 __wt_bt_promote_row_indx(
@@ -1308,9 +1330,17 @@ __wt_bt_promote_row_indx(
 				    WT_ITEM_BYTE(key), WT_ITEM_LEN(key));
 				break;
 			}
+			goto process;
+		case WT_ITEM_DUPKEY:
+			if (idb->huffman_data == NULL) {
+				WT_KEY_SET(rip,
+				    WT_ITEM_BYTE(key), WT_ITEM_LEN(key));
+				break;
+			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-			WT_KEY_SET_PROCESS(rip, key);
+		case WT_ITEM_DUPKEY_OVFL:
+process:		WT_KEY_SET_PROCESS(rip, key);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
