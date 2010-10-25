@@ -136,7 +136,7 @@ static int
 __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
-	DBT last_key_ovfl, last_key_std, *last_key;
+	DBT *last_key_ovfl, last_key_std, *last_key;
 	ENV *env;
 	WT_ITEM *item;
 	WT_OFF *off;
@@ -148,8 +148,11 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	db = toc->db;
 	env = toc->env;
 	WT_CLEAR(last_key_std);
-	WT_CLEAR(last_key_ovfl);
 	ret = 0;
+
+	/* We may need a scratch buffer to hold copies of overflow keys. */
+	last_key_ovfl = NULL;
+	WT_ERR(__wt_toc_scratch_alloc(toc, &last_key_ovfl));
 
 	/*
 	 * If we're passed a key, then we're dumping an off-page duplicate tree,
@@ -208,9 +211,9 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			 */
 			if (dup_ahead) {
 				WT_ERR(__wt_bt_data_copy_to_dbt(db,
-				    WT_PAGE_BYTE(ovfl_page), ovfl->size,
-				    &last_key_ovfl));
-				last_key = &last_key_ovfl;
+				    WT_PAGE_BYTE(
+					ovfl_page), ovfl->size, last_key_ovfl));
+				last_key = last_key_ovfl;
 				dup_ahead = 0;
 			} else
 				dp->p(WT_PAGE_BYTE(
@@ -236,7 +239,8 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	}
 
 err:	/* Discard any space allocated to hold an overflow key. */
-	__wt_free(env, last_key_ovfl.data, last_key_ovfl.mem_size);
+	if (last_key_ovfl != NULL)
+		__wt_toc_scratch_discard(toc, last_key_ovfl);
 
 	return (ret);
 }
