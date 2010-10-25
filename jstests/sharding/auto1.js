@@ -34,6 +34,7 @@ for ( ; i<200; i++ ){
 }
 
 s.printChunks()
+s.printChangeLog()
 counts.push( s.config.chunks.count() );
 
 for ( ; i<400; i++ ){
@@ -41,6 +42,7 @@ for ( ; i<400; i++ ){
 }
 
 s.printChunks();
+s.printChangeLog()
 counts.push( s.config.chunks.count() );
 
 for ( ; i<700; i++ ){
@@ -49,6 +51,7 @@ for ( ; i<700; i++ ){
 db.getLastError();
 
 s.printChunks();
+s.printChangeLog()
 counts.push( s.config.chunks.count() );
 
 assert( counts[counts.length-1] > counts[0] , "counts 1 : " + tojson( counts ) )
