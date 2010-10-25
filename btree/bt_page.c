@@ -211,29 +211,37 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 	WT_ROW *rip;
 	u_int64_t records;
 	u_int32_t i;
+	void *huffman;
 
 	idb = db->idb;
 	hdr = page->hdr;
 	rip = page->u.irow;
 	records = 0;
 
+	huffman =
+	    hdr->type == WT_PAGE_DUP_INT ? idb->huffman_data : idb->huffman_key;
+
 	/*
 	 * Walk the page, building indices and finding the end of the page.
 	 *
-	 * The page contains sorted key/offpage-reference pairs.  Keys are
-	 * on-page (WT_ITEM_KEY) or overflow (WT_ITEM_KEY_OVFL) items.
-	 * Offpage references are WT_ITEM_OFF items.
+	 * The page contains sorted key/offpage-reference pairs.  Keys are row
+	 * store internal pages with on-page/overflow (WT_ITEM_KEY/KEY_OVFL)
+	 * items, or row store duplicate internal pages with on-page/overflow
+	 * (WT_ITEM_DUPKEY/WT_ITEM_DUPKEY_OVFL) items.  In both cases, offpage
+	 * references are WT_ITEM_OFF items.
 	 */
 	WT_ITEM_FOREACH(page, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
-			if (idb->huffman_key == NULL) {
+		case WT_ITEM_DUPKEY:
+			if (huffman == NULL) {
 				WT_KEY_SET(rip,
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DUPKEY_OVFL:
 			WT_KEY_SET_PROCESS(rip, item);
 			break;
 		case WT_ITEM_OFF:
@@ -424,7 +432,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 			    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			break;
 		case WT_ITEM_DUP_OVFL:
-			WT_KEY_SET_PROCESS(rip, WT_ITEM_BYTE(item));
+			WT_KEY_SET_PROCESS(rip, item);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -484,13 +492,13 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 
 /*
  * __wt_bt_key_process --
- *	Overflow and/or compressed on-page items need processing before
+ *	Overflow and/or compressed on-page keys need processing before
  *	we look at them.
  */
 int
-__wt_bt_key_process(
-    WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt, int iskey)
+__wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt)
 {
+	DB *db;
 	DBT local_dbt;
 	ENV *env;
 	IDB *idb;
@@ -501,8 +509,9 @@ __wt_bt_key_process(
 	int ret;
 	void *huffman, *orig;
 
+	db = toc->db;
 	env = toc->env;
-	idb = toc->db->idb;
+	idb = db->idb;
 	ovfl_page = NULL;
 	ret = 0;
 
@@ -514,26 +523,37 @@ __wt_bt_key_process(
 	    (page == NULL && dbt != NULL) || (page != NULL && dbt == NULL));
 
 	/*
-	 * 3 cases:
-	 * (1) Uncompressed overflow item
-	 * (2) Compressed overflow item
-	 * (3) Compressed on-page item
+	 * We're really processing any sort item, not just "keys".  As an
+	 * example, off-page duplicate trees are sorted, but they're data
+	 * items, not keys.   We end up here anyway, to expand overflow items.
 	 *
-	 * In these cases, the WT_ROW data field points to the on-page
-	 * item.   We're going to process that item to create an in-memory
-	 * key.
-	 *
-	 * If the item is an overflow item, bring it into memory.
+	 * 3 cases: compressed on-page item, or compressed or uncompressed
+	 * overflow item.  In these cases, the WT_ROW data field points to
+	 * the on-page item and we process it to create an in-memory key.
 	 */
 	item = rip->key;
-	if (WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL) {
-		ovfl = WT_ITEM_BYTE_OVFL(item);
+	switch (WT_ITEM_TYPE(item)) {
+	case WT_ITEM_KEY:
+		huffman = idb->huffman_key;
+		goto onpage;
+	case WT_ITEM_DUPKEY:
+	case WT_ITEM_DUP:
+		huffman = idb->huffman_data;
+onpage:		orig = WT_ITEM_BYTE(item);
+		size = WT_ITEM_LEN(item);
+		break;
+	case WT_ITEM_KEY_OVFL:
+		huffman = idb->huffman_key;
+		goto offpage;
+	case WT_ITEM_DUPKEY_OVFL:
+	case WT_ITEM_DUP_OVFL:
+		huffman = idb->huffman_data;
+offpage:	ovfl = WT_ITEM_BYTE_OVFL(item);
 		WT_RET(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
 		orig = WT_PAGE_BYTE(ovfl_page);
 		size = ovfl->size;
-	} else {
-		orig = WT_ITEM_BYTE(item);
-		size = WT_ITEM_LEN(item);
+		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*
@@ -547,7 +567,7 @@ __wt_bt_key_process(
 	}
 
 	/* Copy the item into place; if the item is compressed, decode it. */
-	if ((huffman = iskey ? idb->huffman_key : idb->huffman_data) == NULL) {
+	if (huffman == NULL) {
 		if (size > dbt->mem_size)
 			WT_ERR(__wt_realloc(
 			    env, &dbt->mem_size, size, &dbt->data));
