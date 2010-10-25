@@ -511,7 +511,11 @@ namespace mongo {
         template < class T >
         BSONObjBuilder& append( const StringData& fieldName, const list< T >& vals );
 
-        /** The returned BSONObj will free the buffer when it is finished. */
+        /** 
+         * destructive
+         * The returned BSONObj will free the buffer when it is finished. 
+         * @return owned BSONObj
+        */
         BSONObj obj() {
             bool own = owned();
             massert( 10335 , "builder does not own memory", own );
@@ -662,7 +666,11 @@ namespace mongo {
         void appendNull() {
             _b.appendNull(num());
         }
-
+        
+        /**
+         * destructive - ownership moves to returned BSONArray
+         * @return owned BSONArray
+         */
         BSONArray arr(){ return BSONArray(_b.obj()); }
         
         BSONObj done() { return _b.done(); }
