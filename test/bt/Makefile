@@ -14,8 +14,10 @@ t: ${OBJS} ${LIB}
 
 clean:
 	rm -f t ${OBJS}
-	rm -f __* *.core
 	rm -f DUMP LOG flexlint.out memory.out
+
+realclean: clean
+	rm -f __* *.core
 
 tags: ${SRCS}
 	ctags -w *.h *.c ../*/*.c ../*/*.h
