@@ -230,7 +230,7 @@ namespace mongo {
         return multiSplit( splitPoints );
     }
 
-    ChunkPtr Chunk::simpleSplit( bool force ){
+    ChunkPtr Chunk::singleSplit( bool force ){
         vector<BSONObj> splitPoint;
 
         // If splitting is not obligatory, we may return early if there are not enough data. 
@@ -324,7 +324,7 @@ namespace mongo {
             _manager->_chunkMap[_max] = shared_from_this();
         }
 
-        // return the second half, if a simple split, or the first new chunk, if a multisplit.
+        // return the second half, if a single split, or the first new chunk, if a multisplit.
         return _manager->findChunk( m[0] );
      }
 
@@ -420,7 +420,7 @@ namespace mongo {
         // Save the new key boundaries in the configDB.
         _manager->save( false /* does not inc 'major', ie no moves, in ShardChunkVersion control */);
 
-        // Log all these changes in the configDB's log. We log a simple split differently than a multi-split.
+        // Log all these changes in the configDB's log. We log a single split differently than a multi-split.
         if ( newChunks.size() == 1) {
             appendShortVersion( "left" , detail );
             newChunks[0]->appendShortVersion( "right" , detail );
@@ -499,9 +499,9 @@ namespace mongo {
             
             _dataWritten = 0; // reset so we check often enough
             
-            ChunkPtr newShard = simpleSplit( false /* does not force a split if not enough data */ );
+            ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ );
             if ( newShard.get() == NULL ){
-                // simpleSplit would have issued a message if we got here
+                // singleSplit would have issued a message if we got here
                 return false;
             }
 
