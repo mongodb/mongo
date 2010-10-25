@@ -298,7 +298,8 @@ namespace mongo {
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
         cmd.append( "splitKeys" , m );
-        cmd.append( "shardId", genID() );
+        cmd.append( "shardId" , genID() );
+        cmd.append( "configdb" , configServer.modelServer() ); 
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , result )) {

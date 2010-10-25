@@ -431,6 +431,18 @@ namespace mongo {
                 return false;
             }
 
+            // It is possible that this is the first sharded command this mongod is asked to perform. If so,
+            // start sharding apparatus.
+            if ( ! shardingState.enabled() ){
+                if ( cmdObj["configdb"].type() != String ){
+                    errmsg = "sharding not enabled";
+                    return false;
+                }
+                string configdb = cmdObj["configdb"].String();
+                shardingState.enable( configdb );
+                configServer.init( configdb );
+            }
+
             //
             // 2. lock the collection's metadata and get highest version for the current shard
             //
