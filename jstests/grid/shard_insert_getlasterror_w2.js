@@ -14,7 +14,7 @@ for (var i = 0; i < 40; i++)
     Text += 'abcdefghijklmnopqrstuvwxyz'
 
 // Create replica set with 3 servers
-var repset1 = new ReplicaSet('repset1', 3) .start()
+var repset1 = new ReplicaSet('repset1', 3) .begin()
 
 // Add data to it
 var conn1a = repset1.getMaster()
@@ -26,10 +26,11 @@ for (var i = 0; i < N; i++) {
 
 // Create 3 sharding config servers
 var configsetSpec = new ConfigSet(3)
-var configsetConns = configsetSpec.start()
+var configsetConns = configsetSpec.begin()
 
 // Create sharding router (mongos)
-var routerConn = new Router(configsetSpec) .start()
+var routerSpec = new Router(configsetSpec)
+var routerConn = routerSpec.begin()
 var dba = routerConn.getDB('admin')
 var db = routerConn.getDB('test')
 
@@ -55,8 +56,12 @@ for (var i = N; i < 2*N; i++) {
 }
 // BUG: above getLastError fails on about every 170 inserts
 
-print('shard_insert_getlasterror_w2.js SUCCESS')
+// Done
+routerSpec.end()
+configsetSpec.end()
+repset1.stopSet()
 
+print('shard_insert_getlasterror_w2.js SUCCESS')
 }
 
 //Uncomment below to execute
