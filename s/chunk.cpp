@@ -288,6 +288,8 @@ namespace mongo {
     }
     
     ChunkPtr Chunk::multiSplit_ForDevOnly( const vector<BSONObj>& m ) {
+        // TODO use current multiSplit asserts here
+
         ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
         BSONObjBuilder cmd;
@@ -311,9 +313,19 @@ namespace mongo {
         conn.done();
         _manager->_reload();
 
-        // TODO the moveIfShould path is still expecting the first new chunk of the split. So produce that now
-        // but the move code path can obtain this the same way.
-        return _manager->findChunk( getMin() );
+        // The previous multisplit logic adjusted the boundaries of 'this' chunk. Any call to 'this' object hereafter
+        // will see a different _max for the chunk.
+        // TODO Untie this dependency since, for metadata purposes, the reload() above already fixed boundaries
+        {
+            rwlock lk( _manager->_lock , true );
+
+            setMax(m[0].getOwned());
+            DEV assert( shared_from_this() );
+            _manager->_chunkMap[_max] = shared_from_this();
+        }
+
+        // return the second half, if a simple split, or the first new chunk, if a multisplit.
+        return _manager->findChunk( m[0] );
      }
 
     /* to be deprecated */
