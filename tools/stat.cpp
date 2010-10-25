@@ -64,20 +64,21 @@ namespace mongo {
         virtual void printExtraHelpAfter( ostream & out ){
             out << "\n";
             out << " Fields\n";
-            out << "   inserts/s \t- # of inserts per second\n";
-            out << "   query/s   \t- # of queries per second\n";
-            out << "   update/s  \t- # of updates per second\n";
-            out << "   delete/s  \t- # of deletes per second\n";
-            out << "   getmore/s \t- # of get mores (cursor batch) per second\n";
-            out << "   command/s \t- # of commands per second\n";
-            out << "   flushes/s \t- # of fsync flushes per second\n";
+            out << "   inserts \t- # of inserts per second\n";
+            out << "   query   \t- # of queries per second\n";
+            out << "   update  \t- # of updates per second\n";
+            out << "   delete  \t- # of deletes per second\n";
+            out << "   getmore \t- # of get mores (cursor batch) per second\n";
+            out << "   command \t- # of commands per second\n";
+            out << "   flushes \t- # of fsync flushes per second\n";
             out << "   mapped    \t- amount of data mmaped (total data size) megabytes\n";
             out << "   visze     \t- virtual size of process in megabytes\n";
             out << "   res       \t- resident size of process in megabytes\n";
-            out << "   faults/s  \t- # of pages faults/sec (linux only)\n";
+            out << "   faults  \t- # of pages faults per sec (linux only)\n";
             out << "   locked    \t- percent of time in global write lock\n";
             out << "   idx miss  \t- percent of btree page misses (sampled)\n";
-            out << "   q r|w     \t- ops waiting for lock from db.currentOp() (read|write)\n";
+            out << "   qr|qw     \t- queue lengths for clients waiting (read|write)\n";
+            out << "   ar|aw     \t- active clients (read|write)\n";
             out << "   conn      \t- number of open connections\n";
         }
 
@@ -155,14 +156,14 @@ namespace mongo {
                 BSONObjIterator i( bx );
                 while ( i.more() ){
                     BSONElement e = i.next();
-                    _append( result , (string)(e.fieldName()) + "/s" , 6 , (int)diff( e.fieldName() , ax , bx ) );
+                    _append( result , e.fieldName() , 6 , (int)diff( e.fieldName() , ax , bx ) );
                 }
             }
             
             if ( b["backgroundFlushing"].type() == Object ){
                 BSONObj ax = a["backgroundFlushing"].embeddedObject();
                 BSONObj bx = b["backgroundFlushing"].embeddedObject();
-                _append( result , "flushes/s" , 6 , (int)diff( "flushes" , ax , bx ) );
+                _append( result , "flushes" , 6 , (int)diff( "flushes" , ax , bx ) );
             }
 
             if ( b.getFieldDotted("mem.supported").trueValue() ){
@@ -177,7 +178,7 @@ namespace mongo {
                 BSONObj ax = a["extra_info"].embeddedObject();
                 BSONObj bx = b["extra_info"].embeddedObject();
                 if ( ax["page_faults"].type() || ax["page_faults"].type() )
-                    _append( result , "faults/s" , 6 , (int)diff( "page_faults" , ax , bx ) );
+                    _append( result , "faults" , 6 , (int)diff( "page_faults" , ax , bx ) );
             }
             
             _append( result , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
@@ -190,6 +191,16 @@ namespace mongo {
                 temp << r << "|" << w;
                 _append( result , "qr|qw" , 9 , temp.str() );
             }
+
+            if ( b.getFieldDotted( "globalLock.activeClients" ).type() == Object ){
+                int r = b.getFieldDotted( "globalLock.activeClients.readers" ).numberInt();
+                int w = b.getFieldDotted( "globalLock.activeClients.writers" ).numberInt();
+                stringstream temp;
+                temp << r << "|" << w;
+                _append( result , "ar|aw" , 7 , temp.str() );
+            }
+
+
             _append( result , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
             if ( b["repl"].type() == Object ){
