@@ -10,3 +10,6 @@ b __wt_database_format
 define dp
 print __wt_bt_debug_page(toc, $arg0, 0, 0)
 end
+define fp
+print __wt_bt_debug_page(toc, $arg0, "/tmp/o", 0)
+end
