@@ -46,7 +46,7 @@ namespace mongo {
     }
 
 #ifndef O_NOATIME
-#define O_NOATIME 0
+#define O_NOATIME (0)
 #endif
 
     void* MemoryMappedFile::map(const char *filename, unsigned long long &length, int options) {
@@ -55,28 +55,26 @@ namespace mongo {
         theFileAllocator().allocateAsap( filename, length );
         len = length;
 
-        massert( 10446 ,  (string)"mmap() can't map area of size 0 [" + filename + "]" , length > 0 );
-
+        massert( 10446 , str::stream() << "mmap: can't map area of size 0 file: " << filename, length > 0 );
         
         fd = open(filename, O_RDWR | O_NOATIME);
         if ( fd <= 0 ) {
-            out() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
+            log() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
             return 0;
         }
 
         unsigned long long filelen = lseek(fd, 0, SEEK_END);
-        if ( filelen != length ){
-            cout << "wanted length: " << length << " filelen: " << filelen << endl;
-            cout << sizeof(size_t) << endl;
-            massert( 10447 ,  "file size allocation failed", filelen == length );
-        }
+		uassert(10447,  str::stream() << "map file alloc failed, wanted: " << length << " filelen: " << filelen << ' ' << sizeof(size_t), filelen == length );
         lseek( fd, 0, SEEK_SET );
         
         void * view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if ( view == MAP_FAILED ) {
-            out() << "  mmap() failed for " << filename << " len:" << length << " " << errnoWithDescription() << endl;
-            if ( errno == ENOMEM ){
-                out() << "mmap failed with out of memory, if you're using 32-bits, then you probably need to upgrade to 64" << endl;
+            error() << "  mmap() failed for " << filename << " len:" << length << " " << errnoWithDescription() << endl;
+            if ( errno == ENOMEM ) {
+			  if( sizeof(void*) == 4 )
+                error() << "mmap failed with out of memory. You are using a 32-bit build and probably need to upgrade to 64" << endl;
+			  else
+                error() << "mmap failed with out of memory. (64 bit build)" << endl;
             }
             return 0;
         }
@@ -87,7 +85,7 @@ namespace mongo {
 #else
         if ( options & SEQUENTIAL ){
             if ( madvise( view , length , MADV_SEQUENTIAL ) ){
-                out() << " madvise failed for " << filename << " " << errnoWithDescription() << endl;
+                warning() << "map: madvise failed for " << filename << ' ' << errnoWithDescription() << endl;
             }
         }
 #endif

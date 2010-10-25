@@ -273,7 +273,7 @@ namespace mongo {
         ss << opToString( op ) << " ";
 
         int logThreshold = cmdLine.slowMS;
-        bool log = logLevel >= 1;
+        bool log = logLevel >= 1 || ++ctr % 512 == 0;
         
         if ( op == dbQuery ) {
             if ( handlePossibleShardedMessage( m , &dbresponse ) )
@@ -331,19 +331,21 @@ namespace mongo {
                         log = true;
                     }
                 }
+                catch ( UserException& ue ) {
+                    tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing " << ue.toString() << endl;
+                    ss << " exception " << ue.toString();
+                }
                 catch ( AssertionException& e ) {
-                    static int n;
-                    tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing" << endl;
-                    ss << " exception " + e.toString();
-                    log = ++n < 10;
+                    tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing " << e.toString() << endl;
+                    ss << " exception " << e.toString();
+                    log = true;
                 }
             }
         }
         currentOp.ensureStarted();
         currentOp.done();
         int ms = currentOp.totalTimeMillis();
-        
-        log = log || (logLevel >= 2 && ++ctr % 512 == 0);
+
         //DEV log = true; 
         if ( log || ms > logThreshold ) {
             if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 3000 && !log ) {

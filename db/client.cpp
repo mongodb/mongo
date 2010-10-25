@@ -456,4 +456,25 @@ namespace mongo {
         
         return time;
     }
+
+    int Client::getActiveClientCount( int& writers, int& readers ){
+        writers = 0;
+        readers = 0;
+        
+        scoped_lock bl(clientsMutex);
+        for ( set<Client*>::iterator i=clients.begin(); i!=clients.end(); ++i ){
+            Client* c = *i;
+            if ( ! c->curop()->active() )
+                continue;
+            
+            int l = c->curop()->getLockType();
+            if ( l > 0 )
+                writers++;
+            else if ( l < 0 )
+                readers++;
+            
+        }
+
+        return writers + readers;
+    }
 }

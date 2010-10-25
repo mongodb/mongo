@@ -37,7 +37,7 @@ namespace mongo {
 
     const int edebug=0;
 
-    bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg) {
+    bool dbEval(const string& dbName, BSONObj& cmd, BSONObjBuilder& result, string& errmsg) {
         BSONElement e = cmd.firstElement();
         uassert( 10046 ,  "eval needs Code" , e.type() == Code || e.type() == CodeWScope || e.type() == String );
 
@@ -60,7 +60,7 @@ namespace mongo {
             return false;
         }
 
-        auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
+        auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbName );
         ScriptingFunction f = s->createFunction(code);
         if ( f == 0 ) {
             errmsg = (string)"compile failed: " + s->getError();
@@ -69,7 +69,7 @@ namespace mongo {
         
         if ( e.type() == CodeWScope )
             s->init( e.codeWScopeScopeData() );
-        s->localConnect( cc().database()->name.c_str() );
+        s->localConnect( dbName.c_str() );
 
         BSONObj args;
         {
@@ -89,7 +89,7 @@ namespace mongo {
             res = s->invoke(f,args, cmdLine.quota ? 10 * 60 * 1000 : 0 );
             int m = t.millis();
             if ( m > cmdLine.slowMS ) {
-                out() << "dbeval slow, time: " << dec << m << "ms " << ns << endl;
+                out() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
                 if ( m >= 1000 ) log() << code << endl;
                 else OCCASIONALLY log() << code << endl;
             }
@@ -126,12 +126,15 @@ namespace mongo {
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
             uassert( 12598 , "$eval reads unauthorized", ai->isAuthorizedReads(dbname.c_str()) );
             
+            if ( cmdObj["nolock"].trueValue() ){
+                return dbEval(dbname, cmdObj, result, errmsg);
+            }
+            
             // write security will be enforced in DBDirectClient
             mongolock lk( ai->isAuthorized( dbname.c_str() ) );
             Client::Context ctx( dbname );
             
-
-            return dbEval(dbname.c_str(), cmdObj, result, errmsg);
+            return dbEval(dbname, cmdObj, result, errmsg);
         }
     } cmdeval;
 
