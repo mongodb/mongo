@@ -666,12 +666,12 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			    WT_ITEM_TYPE(rip->data) : WT_ITEM_TYPE(&data_item);
 			switch (type) {
 				case WT_ITEM_DATA:
-				case WT_ITEM_DUP:
-					type = WT_ITEM_DUP;
+				case WT_ITEM_DATA_DUP:
+					type = WT_ITEM_DATA_DUP;
 					break;
 				case WT_ITEM_DATA_OVFL:
-				case WT_ITEM_DUP_OVFL:
-					type = WT_ITEM_DUP_OVFL;
+				case WT_ITEM_DATA_DUP_OVFL:
+					type = WT_ITEM_DATA_DUP_OVFL;
 					break;
 				WT_ILLEGAL_FORMAT(db);
 				}

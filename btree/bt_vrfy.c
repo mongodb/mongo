@@ -594,8 +594,8 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 			    hdr->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_DUPKEY:
-		case WT_ITEM_DUPKEY_OVFL:
+		case WT_ITEM_KEY_DUP:
+		case WT_ITEM_KEY_DUP_OVFL:
 			if (hdr->type != WT_PAGE_DUP_INT)
 				goto item_vs_page;
 			break;
@@ -605,8 +605,8 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 			    hdr->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_DUP:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP:
+		case WT_ITEM_DATA_DUP_OVFL:
 			if (hdr->type != WT_PAGE_DUP_LEAF &&
 			    hdr->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
@@ -645,15 +645,15 @@ item_vs_page:			__wt_api_db_errx(db,
 		/* Check the item's length. */
 		switch (item_type) {
 		case WT_ITEM_KEY:
-		case WT_ITEM_DUPKEY:
+		case WT_ITEM_KEY_DUP:
 		case WT_ITEM_DATA:
-		case WT_ITEM_DUP:
+		case WT_ITEM_DATA_DUP:
 			/* The length is variable, we can't check it. */
 			break;
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DUPKEY_OVFL:
+		case WT_ITEM_KEY_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
 			if (item_len != sizeof(WT_OVFL))
 				goto item_len;
 			break;
@@ -691,9 +691,9 @@ eop:			__wt_api_db_errx(db,
 		ovfl = NULL;
 		switch (item_type) {
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DUPKEY_OVFL:
+		case WT_ITEM_KEY_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
 			ovfl = WT_ITEM_BYTE_OVFL(item);
 			if (WT_ADDR_TO_OFF(db, ovfl->addr) +
 			    WT_HDR_BYTES_TO_ALLOC(db, ovfl->size) >
@@ -719,9 +719,9 @@ eof:				__wt_api_db_errx(db,
 		/* Verify overflow references. */
 		switch (item_type) {
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DUPKEY_OVFL:
+		case WT_ITEM_KEY_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
 			/*
 			 * Discard any previous overflow page -- if we're here,
 			 * reading in a new overflow page, we must be done with
@@ -760,25 +760,25 @@ eof:				__wt_api_db_errx(db,
 		 * compare it with the last item.
 		 */
 		switch (item_type) {
-		case WT_ITEM_DEL:
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
+		case WT_ITEM_DEL:
 		case WT_ITEM_OFF:
 			/*
 			 * These items aren't sorted on the page-- we're done.
 			 */
 			goto offpagedups;
 		case WT_ITEM_KEY:
-		case WT_ITEM_DUPKEY:
-		case WT_ITEM_DUP:
+		case WT_ITEM_KEY_DUP:
+		case WT_ITEM_DATA_DUP:
 			current->indx = item_num;
 			current->item = &current->item_std;
 			current->item->data = WT_ITEM_BYTE(item);
 			current->item->size = item_len;
 			break;
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DUPKEY_OVFL:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_KEY_DUP_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
 			/*
 			 * We already have a copy of the overflow page, read in
 			 * when the overflow page was verified.  Set our DBT
@@ -807,9 +807,9 @@ eof:				__wt_api_db_errx(db,
 				current->item = current->item_comp;
 			}
 			break;
-		case WT_ITEM_DUPKEY:
-		case WT_ITEM_DUP:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_KEY_DUP:
+		case WT_ITEM_DATA_DUP:
+		case WT_ITEM_DATA_DUP_OVFL:
 			/* If data is compressed, get an uncompressed copy. */
 			if (idb->huffman_data != NULL) {
 				WT_ERR(__wt_huffman_decode(idb->huffman_data,
@@ -827,7 +827,7 @@ eof:				__wt_api_db_errx(db,
 		/* Check the sort order. */
 		switch (item_type) {
 		case WT_ITEM_KEY:
-		case WT_ITEM_DUPKEY:
+		case WT_ITEM_KEY_DUP:
 		case WT_ITEM_KEY_OVFL:
 			if (last_key->item != NULL &&
 			    func(db, last_key->item, current->item) >= 0) {
@@ -842,8 +842,8 @@ eof:				__wt_api_db_errx(db,
 			last_key = current;
 			current = swap_tmp;
 			break;
-		case WT_ITEM_DUP:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP:
+		case WT_ITEM_DATA_DUP_OVFL:
 			if (last_data->item != NULL &&
 			    func(db, last_data->item, current->item) >= 0) {
 				__wt_api_db_errx(db,

@@ -584,16 +584,16 @@ struct __wt_item {
  * -- Variable-length key and set of duplicates moved into a separate tree
  *    (a WT_ITEM_KEY or WT_ITEM_KEY_OVFL item followed by a WT_ITEM_OFF item);
  * -- Variable-length key and set of duplicates not yet moved into a separate
- *    tree (a WT_ITEM_KEY/KEY_OVFL item followed by two or more WT_ITEM_DUP or
- *    WT_ITEM_DUP_OVFL items).
+ *    tree (a WT_ITEM_KEY/KEY_OVFL item followed by two or more
+ *    WT_ITEM_DATA_DUP or WT_ITEM_DATA_DUP_OVFL items).
  *
  * WT_PAGE_DUP_INT (row-store offpage duplicates internal pages):
  * -- Variable-length duplicate key and offpage-reference pairs (a
- *    WT_ITEM_DUPKEY or WT_ITEM_DUPKEY_OVFL item followed by a WT_ITEM_OFF
- *    item).
+ *    WT_ITEM_KEY_DUP or WT_ITEM_DATA_DUPKEY_OVFL item followed by a
+ *    WT_ITEM_OFF item).
  *
  * WT_PAGE_DUP_LEAF (row-store offpage duplicates leaf pages):
- * -- Variable-length data items (WT_ITEM_DUP/DUP_OVFL_ITEM).
+ * -- Variable-length data items (WT_ITEM_DATA_DUP/DUP_OVFL_ITEM).
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length items):
  * -- Variable-length data items (WT_ITEM_DATA/DATA_OVFL/DEL).
@@ -608,7 +608,7 @@ struct __wt_item {
  * There are currently 10 item types, requiring 4 bits, with 6 values unused.
  *
  * We could compress the item types in a couple of ways.  We could merge the
- * WT_ITEM_KEY and WT_ITEM_DUPKEY types, but that would require we know the
+ * WT_ITEM_KEY and WT_ITEM_KEY_DUP types, but that would require we know the
  * underlying page type in order to know how an item might be encoded (that
  * is, if it's an off-page duplicate key, encoded using the Huffman data coder,
  * or a Btree row store key, encoded using the Huffman key encoder). We could
@@ -617,15 +617,15 @@ struct __wt_item {
  * than the current scheme.
  */
 #define	WT_ITEM_KEY		0x00000000 /* Key */
-#define	WT_ITEM_KEY_OVFL	0x01000000 /* Overflow key */
-#define	WT_ITEM_DUPKEY		0x02000000 /* Duplicate key */
-#define	WT_ITEM_DUPKEY_OVFL	0x03000000 /* Duplicate overflow key */
+#define	WT_ITEM_KEY_OVFL	0x01000000 /* Key: overflow */
+#define	WT_ITEM_KEY_DUP		0x02000000 /* Key: dup internal tree */
+#define	WT_ITEM_KEY_DUP_OVFL	0x03000000 /* Key: dup internal tree overflow */
 #define	WT_ITEM_DATA		0x04000000 /* Data */
-#define	WT_ITEM_DATA_OVFL	0x05000000 /* Overflow data */
-#define	WT_ITEM_DUP		0x06000000 /* Duplicate data */
-#define	WT_ITEM_DUP_OVFL	0x07000000 /* Overflow duplicate data */
+#define	WT_ITEM_DATA_OVFL	0x05000000 /* Data: overflow */
+#define	WT_ITEM_DATA_DUP	0x06000000 /* Data: duplicate */
+#define	WT_ITEM_DATA_DUP_OVFL	0x07000000 /* Data: duplicate overflow */
 #define	WT_ITEM_DEL		0x08000000 /* Deleted */
-#define	WT_ITEM_OFF		0x09000000 /* Offpage-tree reference */
+#define	WT_ITEM_OFF		0x09000000 /* Off-page reference */
 
 #define	WT_ITEM_LEN(addr)						\
 	(((WT_ITEM *)(addr))->__item_chunk & 0x00ffffff)

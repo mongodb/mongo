@@ -227,13 +227,13 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 	 * The page contains sorted key/offpage-reference pairs.  Keys are row
 	 * store internal pages with on-page/overflow (WT_ITEM_KEY/KEY_OVFL)
 	 * items, or row store duplicate internal pages with on-page/overflow
-	 * (WT_ITEM_DUPKEY/WT_ITEM_DUPKEY_OVFL) items.  In both cases, offpage
-	 * references are WT_ITEM_OFF items.
+	 * (WT_ITEM_KEY_DUP/WT_ITEM_DATA_KEY_DUP_OVFL) items.  In both cases,
+	 * offpage references are WT_ITEM_OFF items.
 	 */
 	WT_ITEM_FOREACH(page, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
-		case WT_ITEM_DUPKEY:
+		case WT_ITEM_KEY_DUP:
 			if (huffman == NULL) {
 				WT_KEY_SET(rip,
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
@@ -241,7 +241,7 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DUPKEY_OVFL:
+		case WT_ITEM_KEY_DUP_OVFL:
 			WT_KEY_SET_PROCESS(rip, item);
 			break;
 		case WT_ITEM_OFF:
@@ -284,7 +284,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	 * overflow (WT_ITEM_KEY_OVFL) items.  The data sets are either: a
 	 * single on-page (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) item;
 	 * a group of duplicate data items where each duplicate is an on-page
-	 * (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL) item; or an offpage
+	 * (WT_ITEM_DATA_DUP) or overflow (WT_ITEM_DUP_OVFL) item; or an offpage
 	 * reference (WT_ITEM_OFF).
 	 */
 	rip = NULL;
@@ -305,8 +305,8 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			++indx_count;
 			break;
-		case WT_ITEM_DUP:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP:
+		case WT_ITEM_DATA_DUP_OVFL:
 			/*
 			 * If the second or subsequent duplicate, move to the
 			 * next slot and copy the previous key.
@@ -422,16 +422,16 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	/*
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains sorted data items.  The data items are on-page
-	 * (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL) items.
+	 * (WT_ITEM_DATA_DUP) or overflow (WT_ITEM_DUP_OVFL) items.
 	 */
 	rip = page->u.irow;
 	WT_ITEM_FOREACH(page, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_DUP:
+		case WT_ITEM_DATA_DUP:
 			WT_KEY_SET(rip,
 			    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			break;
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
 			WT_KEY_SET_PROCESS(rip, item);
 			break;
 		WT_ILLEGAL_FORMAT(db);
@@ -536,8 +536,8 @@ __wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt)
 	case WT_ITEM_KEY:
 		huffman = idb->huffman_key;
 		goto onpage;
-	case WT_ITEM_DUPKEY:
-	case WT_ITEM_DUP:
+	case WT_ITEM_KEY_DUP:
+	case WT_ITEM_DATA_DUP:
 		huffman = idb->huffman_data;
 onpage:		orig = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
@@ -545,8 +545,8 @@ onpage:		orig = WT_ITEM_BYTE(item);
 	case WT_ITEM_KEY_OVFL:
 		huffman = idb->huffman_key;
 		goto offpage;
-	case WT_ITEM_DUPKEY_OVFL:
-	case WT_ITEM_DUP_OVFL:
+	case WT_ITEM_KEY_DUP_OVFL:
+	case WT_ITEM_DATA_DUP_OVFL:
 		huffman = idb->huffman_data;
 offpage:	ovfl = WT_ITEM_BYTE_OVFL(item);
 		WT_RET(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
@@ -586,8 +586,8 @@ offpage:	ovfl = WT_ITEM_BYTE_OVFL(item);
 	 */
 	if (dbt == &local_dbt) {
 		WT_KEY_SET(rip, dbt->data, dbt->size);
-		if (WT_ITEM_TYPE(rip->data) == WT_ITEM_DUP ||
-		    WT_ITEM_TYPE(rip->data) == WT_ITEM_DUP_OVFL) {
+		if (WT_ITEM_TYPE(rip->data) == WT_ITEM_DATA_DUP ||
+		    WT_ITEM_TYPE(rip->data) == WT_ITEM_DATA_DUP_OVFL) {
 			WT_INDX_FOREACH(page, rip, i)
 				if (rip->key == item)
 					WT_KEY_SET(rip, dbt->data, dbt->size);

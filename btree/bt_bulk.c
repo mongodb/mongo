@@ -437,13 +437,13 @@ skip_read:	/*
 				dup_count = 2;
 				WT_ITEM_TYPE_SET(dup_data,
 				    WT_ITEM_TYPE(dup_data) == WT_ITEM_DATA ?
-				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
+				    WT_ITEM_DATA_DUP : WT_ITEM_DATA_DUP_OVFL);
 			}
 
 			/* Reset the type of the current item to a duplicate. */
 			WT_ITEM_TYPE_SET(&data_item,
 			    WT_ITEM_TYPE(&data_item) == WT_ITEM_DATA ?
-			    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
+			    WT_ITEM_DATA_DUP : WT_ITEM_DATA_DUP_OVFL);
 
 			WT_STAT_INCR(idb->stats, DUPLICATE_ITEMS_INSERTED);
 
@@ -939,26 +939,26 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 
 		key_item = (WT_ITEM *)WT_PAGE_BYTE(page);
 		switch (WT_ITEM_TYPE(key_item)) {
-		case WT_ITEM_DUP:
 		case WT_ITEM_KEY:
+		case WT_ITEM_DATA_DUP:
 			key->data = WT_ITEM_BYTE(key_item);
 			key->size = WT_ITEM_LEN(key_item);
 			switch (hdr->type) {
-			case WT_PAGE_DUP_INT:
-			case WT_PAGE_DUP_LEAF:
-				WT_ITEM_TYPE_SET(&item, WT_ITEM_DUPKEY);
-				break;
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_ROW_LEAF:
 				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY);
+				break;
+			case WT_PAGE_DUP_INT:
+			case WT_PAGE_DUP_LEAF:
+				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_DUP);
 				break;
 			default:		/* Not possible */
 				break;
 			}
 			WT_ITEM_LEN_SET(&item, key->size);
 			break;
-		case WT_ITEM_DUP_OVFL:
 		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
 			/*
 			 * Assume overflow keys remain overflow keys when they
 			 * are promoted; not necessarily true if internal nodes
@@ -970,13 +970,13 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 			key->data = &tmp_ovfl;
 			key->size = sizeof(tmp_ovfl);
 			switch (hdr->type) {
-			case WT_PAGE_DUP_INT:
-			case WT_PAGE_DUP_LEAF:
-				WT_ITEM_TYPE_SET(&item, WT_ITEM_DUPKEY_OVFL);
-				break;
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_ROW_LEAF:
 				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
+				break;
+			case WT_PAGE_DUP_INT:
+			case WT_PAGE_DUP_LEAF:
+				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_DUP_OVFL);
 				break;
 			default:		/* Not possible */
 				break;
@@ -1166,8 +1166,8 @@ split:		switch (hdr->type) {
 		/* Append new parent index to the in-memory page structures. */
 		WT_ERR(__wt_bt_promote_col_indx(toc, parent, parent_data));
 		break;
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
+	case WT_PAGE_DUP_INT:
 		if (parent->space_avail <
 		    WT_ITEM_SPACE_REQ(sizeof(WT_OFF)) +
 		    WT_ITEM_SPACE_REQ(key->size))
@@ -1281,7 +1281,7 @@ __wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
 
 /*
  * __wt_bt_promote_row_indx --
- *	Append a new WT_ITEM_{DUPKEY,KEY}/WT_OFF pair to an internal page's
+ *	Append a new WT_ITEM_{KEY,KEY_DUP}/WT_OFF pair to an internal page's
  *	in-memory information.
  */
 static int
@@ -1331,7 +1331,7 @@ __wt_bt_promote_row_indx(
 				break;
 			}
 			goto process;
-		case WT_ITEM_DUPKEY:
+		case WT_ITEM_KEY_DUP:
 			if (idb->huffman_data == NULL) {
 				WT_KEY_SET(rip,
 				    WT_ITEM_BYTE(key), WT_ITEM_LEN(key));
@@ -1339,7 +1339,7 @@ __wt_bt_promote_row_indx(
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DUPKEY_OVFL:
+		case WT_ITEM_KEY_DUP_OVFL:
 process:		WT_KEY_SET_PROCESS(rip, key);
 			break;
 		WT_ILLEGAL_FORMAT(db);
@@ -1475,7 +1475,7 @@ __wt_bt_build_data_item(
 	 */
 	WT_CLEAR(*item);
 	WT_ITEM_TYPE_SET(
-	    item, LF_ISSET(WT_IS_DUP) ? WT_ITEM_DUP : WT_ITEM_DATA);
+	    item, LF_ISSET(WT_IS_DUP) ? WT_ITEM_DATA_DUP : WT_ITEM_DATA);
 
 	/*
 	 * Handle zero-length items quickly -- this is a common value, it's
@@ -1509,8 +1509,8 @@ __wt_bt_build_data_item(
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
-		WT_ITEM_TYPE_SET(item,
-		    LF_ISSET(WT_IS_DUP) ? WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL);
+		WT_ITEM_TYPE_SET(item, LF_ISSET(WT_IS_DUP) ?
+		    WT_ITEM_DATA_DUP_OVFL : WT_ITEM_DATA_OVFL);
 		WT_STAT_INCR(stats, OVERFLOW_DATA);
 	}
 

@@ -25,6 +25,7 @@ static int  __wt_bt_dump_page_fixed(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_bt_dump_page_item(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
 static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
+static inline int __wt_bt_dup_ahead(WT_ITEM *);
 
 /*
  * __wt_db_dump --
@@ -113,12 +114,18 @@ __wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	return (0);
 }
 
-/* Check if the next page entry is part of a duplicate data set. */
-#define	WT_DUP_AHEAD(item, yesno) {					\
-	u_int32_t __type = WT_ITEM_TYPE(WT_ITEM_NEXT(item));		\
-	(yesno) = __type == WT_ITEM_DUP ||				\
-	    __type == WT_ITEM_DUP_OVFL ||				\
-	    __type == WT_ITEM_OFF ? 1 : 0;				\
+/*
+ * __wt_bt_dup_ahead --
+ *	Check if the next page entry is part of a duplicate data set.
+ */
+static inline int
+__wt_bt_dup_ahead(WT_ITEM *item)
+{
+	u_int32_t type;
+
+	type = WT_ITEM_TYPE(WT_ITEM_NEXT(item));
+	return (type == WT_ITEM_DATA_DUP ||
+	    type == WT_ITEM_DATA_DUP_OVFL || type == WT_ITEM_OFF ? 1 : 0);
 }
 
 /*
@@ -155,7 +162,7 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		item_len = WT_ITEM_LEN(item);
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
-		case WT_ITEM_DUPKEY:
+		case WT_ITEM_KEY_DUP:
 			last_key_std.data = WT_ITEM_BYTE(item);
 			last_key_std.size = item_len;
 			last_key = &last_key_std;
@@ -164,35 +171,33 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			 * write the key here, we'll write it when writing the
 			 * off-page duplicates.
 			 */
-			WT_DUP_AHEAD(item, dup_ahead);
+			dup_ahead = __wt_bt_dup_ahead(item);
 			if (!dup_ahead)
 				dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);
 			break;
 		case WT_ITEM_DATA:
 			dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);
 			break;
-		case WT_ITEM_DEL:
-			break;
-		case WT_ITEM_DUP:
+		case WT_ITEM_DATA_DUP:
 			dp->p(last_key->data, last_key->size, dp->stream);
 			dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);
 			break;
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DUPKEY_OVFL:
+		case WT_ITEM_KEY_DUP_OVFL:
 			/*
 			 * If the overflow key has duplicate records, we'll need
 			 * a copy of the key to write for each of those records.
 			 * Look ahead and see if it's a set of duplicates.
 			 */
-			WT_DUP_AHEAD(item, dup_ahead);
+			dup_ahead = __wt_bt_dup_ahead(item);
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
 			ovfl = WT_ITEM_BYTE_OVFL(item);
 			WT_ERR(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
 
 			/* If we're already in a duplicate set, dump the key. */
-			if (WT_ITEM_TYPE(item) == WT_ITEM_DUP_OVFL)
+			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_DUP_OVFL)
 				dp->p(
 				    last_key->data, last_key->size, dp->stream);
 
@@ -212,6 +217,8 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 				   ovfl_page), ovfl->size, dp->stream);
 
 			__wt_bt_page_out(toc, &ovfl_page, 0);
+			break;
+		case WT_ITEM_DEL:
 			break;
 		case WT_ITEM_OFF:
 			/*

@@ -172,18 +172,18 @@ __wt_bt_item_type(WT_ITEM *item)
 		return ("key");
 	case WT_ITEM_KEY_OVFL:
 		return ("key-overflow");
-	case WT_ITEM_DUPKEY:
-		return ("duplicate-key");
-	case WT_ITEM_DUPKEY_OVFL:
-		return ("duplicate-key-overflow");
+	case WT_ITEM_KEY_DUP:
+		return ("key-duplicate");
+	case WT_ITEM_KEY_DUP_OVFL:
+		return ("key-duplicate-overflow");
 	case WT_ITEM_DATA:
 		return ("data");
 	case WT_ITEM_DATA_OVFL:
 		return ("data-overflow");
-	case WT_ITEM_DUP:
-		return ("duplicate");
-	case WT_ITEM_DUP_OVFL:
-		return ("duplicate-overflow");
+	case WT_ITEM_DATA_DUP:
+		return ("data-duplicate");
+	case WT_ITEM_DATA_DUP_OVFL:
+		return ("data-duplicate-overflow");
 	case WT_ITEM_DEL:
 		return ("deleted");
 	case WT_ITEM_OFF:

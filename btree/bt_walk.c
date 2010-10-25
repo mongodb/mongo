@@ -140,7 +140,7 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 		case WT_ITEM_KEY_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_KEY_OVFL);
 			break;
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_DATA_OVFL);
 			break;
@@ -152,16 +152,16 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 		case WT_ITEM_KEY_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_TOTAL_KEY);
 			break;
-		case WT_ITEM_DEL:
-			WT_STAT_INCR(idb->dstats, ITEM_TOTAL_DELETED);
-			break;
-		case WT_ITEM_DUP:
-		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_DATA_DUP:
+		case WT_ITEM_DATA_DUP_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_DUP_DATA);
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_TOTAL_DATA);
+			break;
+		case WT_ITEM_DEL:
+			WT_STAT_INCR(idb->dstats, ITEM_TOTAL_DELETED);
 			break;
 		case WT_ITEM_OFF:
 			WT_ASSERT(toc->env, hdr->type == WT_PAGE_ROW_LEAF);

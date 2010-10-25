@@ -153,7 +153,7 @@ item_set:	if (callback != NULL &&
 	case WT_PAGE_DUP_LEAF:
 		item = rip->data;
 		if (callback != NULL &&
-		    WT_ITEM_TYPE(item) == WT_ITEM_DUP &&
+		    WT_ITEM_TYPE(item) == WT_ITEM_DATA_DUP &&
 		    idb->huffman_data == NULL) {
 			WT_CLEAR(local_data);
 			data = &local_data;
@@ -162,7 +162,7 @@ item_set:	if (callback != NULL &&
 			return (callback(db, key, data));
 		}
 
-		if (WT_ITEM_TYPE(item) == WT_ITEM_DUP) {
+		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_DUP) {
 			orig = rip->key;
 			size = rip->size;
 		} else
