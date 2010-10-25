@@ -1,4 +1,4 @@
-s = new ShardingTest( "cursors1" , 2 , 0 , 1 , { chunksize : 1 } )
+s = new ShardingTest( "sharding_cursors1" , 2 , 0 , 1 , { chunksize : 1 } )
 
 s.adminCommand( { enablesharding : "test" } );
 
