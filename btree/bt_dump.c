@@ -147,11 +147,11 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 	db = toc->db;
 	env = toc->env;
-	WT_CLEAR(last_key_std);
+	last_key_ovfl = NULL;
 	ret = 0;
+	WT_CLEAR(last_key_std);
 
 	/* We may need a scratch buffer to hold copies of overflow keys. */
-	last_key_ovfl = NULL;
 	WT_ERR(__wt_toc_scratch_alloc(toc, &last_key_ovfl));
 
 	/*
