@@ -1080,7 +1080,7 @@ namespace mongo {
         }
     }
 
-    class IndexChunkBuilder {
+    class IndexChunkBuilder : public BucketBasics {
     public:
       IndexChunkBuilder( int start, int end, BSONObjExternalSorter &sorter )
          : currChunk( 0 ),
@@ -1125,6 +1125,57 @@ namespace mongo {
       list<DiskLoc>::iterator getDupIterator( void ) {
         return dupsToDrop.begin();
       }
+
+    	/*
+	 * See BtreeBuilder::buildNextLevel
+	 */
+	static void mergeIndexSubTrees(vector<IndexChunkBuilder *> &chunkBuilders, IndexDetails &idx) {
+		int currentChunkBuilderIndex = 0;
+		BtreeBuilder *currentBtreeBuilder = chunkBuilders.front()->getBtreeBuilder();
+		DiskLoc loc = currentBtreeBuilder->getIndexDetails()->head;		
+		while(true) {
+			if(loc.btree()->tempNext().isNull()) {
+				dur::writingDiskLoc(idx.head) = loc;	
+				break;
+			}	
+			DiskLoc upLoc = BtreeBucket::addBucket(idx);
+			DiskLoc upStart = upLoc;
+			BtreeBucket *up = upLoc.btreemod(); //i.e. cast to BtreeBucket
+			DiskLoc xloc = loc;
+			while( ! xloc.isNull() ) {
+				BtreeBucket *x = xloc.btreemod();
+				BSONObj k;
+				DiskLoc r;
+				x->popBack(r,k);
+				bool keepX = x->n != 0;
+				DiskLoc keepLoc;
+				if(keepX) {
+					keepLoc = xloc;				
+				} else {
+					keepLoc = x->nextChild;
+				}
+				/**
+ 				 * Prob is, whose ordering should it be?
+				 */
+				if( ! up->_pushBack(r, k, currentBtreeBuilder->getOrdering(), 
+							keepLoc) ) {
+					// current bucket full
+					DiskLoc n = BtreeBucket::addBucket(idx);
+					up->tempNext() = n;
+					upLoc = n;
+					up = upLoc.btreemod();
+					up->pushBack(r, k, currentBtreeBuilder->getOrdering(), keepLoc);
+				}
+				currentBtreeBuilder = chunkBuilders[++currentChunkBuilderIndex]->getBtreeBuilder();
+				DiskLoc nextLoc = currentBtreeBuilder->getIndexDetails()->head;
+
+				xloc = nextLoc; 	
+
+			}
+			loc = upStart;							
+		}
+	}
+
 
     protected:
 
@@ -1176,6 +1227,7 @@ namespace mongo {
            }
        }
     }
+
 
     // throws DBException
     unsigned long long fastParallelBuildIndex( const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
@@ -1272,12 +1324,14 @@ namespace mongo {
           master->addKey()
           */
 
+
           for( unsigned int b = 0; b < chunkBuilders.size(); b++ ) {
               list<DiskLoc>::iterator it = chunkBuilders[b]->getDupIterator();
               for( ; it != dupsToDrop.end(); it++ ) {
                   theDataFileMgr.deleteRecord( ns, it->rec(), *it, false, true );
               }
           }
+	      IndexChunkBuilder::mergeIndexSubTrees(chunkBuilders, idx);					
 
           for ( unsigned int i = 0; i < chunkBuilders.size(); i++ ) {
               delete chunkBuilders[i];
@@ -1286,9 +1340,14 @@ namespace mongo {
         }
         return n;
     }
+				
+	
 
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+        //Call our function
+        return fastParallelBuildIndex(ns, d, idx, idxNo);
+                
         assert( d->backgroundIndexBuildInProgress == 0 );
         CurOp * op = cc().curop();
 

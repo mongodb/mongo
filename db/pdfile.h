@@ -448,7 +448,8 @@ namespace mongo {
     void ensureHaveIdIndex(const char *ns);
     
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
-
+    
+ 
 
     /**
      * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.

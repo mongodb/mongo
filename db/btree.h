@@ -90,9 +90,11 @@ namespace mongo {
 
     /* this class is all about the storage management */
     class BucketBasics : public BtreeData {
-        friend class BtreeBuilder;
+	friend class BtreeBuilder;
         friend class KeyNode;
     public:
+	friend class IndexChunkBuilder;        
+
         void assertValid(const Ordering &order, bool force = false);
         void assertValid(const BSONObj &orderObj, bool force = false) { return assertValid(Ordering::make(orderObj),force); }
 
@@ -382,6 +384,9 @@ namespace mongo {
     /* build btree from the bottom up */
     /* _ TODO dropDups */
     class BtreeBuilder {
+
+        class IndexChunkBuilder;
+        friend void mergeIndexSubTrees(  vector<IndexChunkBuilder *> &chunkBuilders, IndexDetails &idx);  
         bool dupsAllowed; 
         IndexDetails& idx;
         unsigned long long n;
@@ -410,6 +415,18 @@ namespace mongo {
         void commit();
 
         unsigned long long getn() { return n; }
+
+		DiskLoc getFirst() {
+			return first;
+		}
+
+		Ordering getOrdering() {
+			return ordering;		
+		}
+
+        IndexDetails *getIndexDetails() {
+            return &idx;            
+        }
     };
 
 } // namespace mongo;

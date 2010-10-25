@@ -1294,7 +1294,7 @@ namespace mongo {
 
             DiskLoc upLoc = BtreeBucket::addBucket(idx);
             DiskLoc upStart = upLoc;
-            BtreeBucket *up = upLoc.btreemod();
+            BtreeBucket *up = upLoc.btreemod();	//i.e., cast DiskLoc to BtreeBucket
 
             DiskLoc xloc = loc;
             while( !xloc.isNull() ) { 
