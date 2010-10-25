@@ -49,6 +49,7 @@ namespace mongo {
                 ("rowcount,n", po::value<int>()->default_value(0), "number of stats lines to print (0 for indefinite)")
                 ("http", "use http instead of raw db connection")
                 ("discover" , "discover nodes and display stats for all" )
+                ("all" , "all optional fields" )
                 ;
 
             addPositionArg( "sleep" , 1 );
@@ -143,6 +144,17 @@ namespace mongo {
                 width = name.size();
             result.append( name , BSON( "width" << (int)width << "data" << t ) );
         }
+        
+        void _appendMem( BSONObjBuilder& result , const string& name , unsigned width , double sz ){
+            string unit = "m";
+            if ( sz > 1024 ){
+                unit = "g";
+                sz /= 1024;
+            }
+            stringstream ss;
+            ss << setprecision(3) << sz << unit;
+            _append( result , name , width , ss.str() );
+        }
 
         /**
          * BSON( <field> -> BSON( width : ### , data : XXX ) )
@@ -169,9 +181,12 @@ namespace mongo {
             if ( b.getFieldDotted("mem.supported").trueValue() ){
                 BSONObj bx = b["mem"].embeddedObject();
                 BSONObjIterator i( bx );
-                _append( result , "mapped" , 6 , bx["mapped"].numberInt() );
-                _append( result , "vsize" , 6 , bx["virtual"].numberInt() );
-                _append( result , "res" , 6 , bx["resident"].numberInt() );
+                _appendMem( result , "mapped" , 6 , bx["mapped"].numberInt() );
+                _appendMem( result , "vsize" , 6 , bx["virtual"].numberInt() );
+                _appendMem( result , "res" , 6 , bx["resident"].numberInt() );
+
+                if ( _all )
+                    _appendMem( result , "non-mapped" , 6 , bx["virtual"].numberInt() - bx["mapped"].numberInt() );
             }
 
             if ( b["extra_info"].type() == Object ){
@@ -264,6 +279,7 @@ namespace mongo {
 
         int run(){ 
             _sleep = getParam( "sleep" , _sleep );
+            _all = hasParam( "all" );
             if ( _many )
                 return runMany();
             return runNormal();
@@ -497,6 +513,7 @@ namespace mongo {
         int _sleep;
         bool _http;
         bool _many;
+        bool _all;
     };
 
 }
