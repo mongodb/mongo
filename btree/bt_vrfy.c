@@ -590,13 +590,13 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
-			if (hdr->type != WT_PAGE_DUP_INT &&
-			    hdr->type != WT_PAGE_ROW_INT &&
+			if (hdr->type != WT_PAGE_ROW_INT &&
 			    hdr->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_DEL:
-			if (hdr->type != WT_PAGE_COL_VAR)
+		case WT_ITEM_DUPKEY:
+		case WT_ITEM_DUPKEY_OVFL:
+			if (hdr->type != WT_PAGE_DUP_INT)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_DATA:
@@ -609,6 +609,15 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		case WT_ITEM_DUP_OVFL:
 			if (hdr->type != WT_PAGE_DUP_LEAF &&
 			    hdr->type != WT_PAGE_ROW_LEAF)
+				goto item_vs_page;
+			break;
+		case WT_ITEM_DEL:
+			/*
+			 * XXX
+			 * You can delete items from fixed-length pages, why
+			 * aren't we checking against WT_PAGE_COL_FIX here?
+			 */
+			if (hdr->type != WT_PAGE_COL_VAR)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_OFF:
@@ -636,18 +645,20 @@ item_vs_page:			__wt_api_db_errx(db,
 		/* Check the item's length. */
 		switch (item_type) {
 		case WT_ITEM_KEY:
+		case WT_ITEM_DUPKEY:
 		case WT_ITEM_DATA:
 		case WT_ITEM_DUP:
 			/* The length is variable, we can't check it. */
 			break;
-		case WT_ITEM_DEL:
-			if (item_len != 0)
-				goto item_len;
-			break;
 		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DUPKEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
 			if (item_len != sizeof(WT_OVFL))
+				goto item_len;
+			break;
+		case WT_ITEM_DEL:
+			if (item_len != 0)
 				goto item_len;
 			break;
 		case WT_ITEM_OFF:
@@ -680,6 +691,7 @@ eop:			__wt_api_db_errx(db,
 		ovfl = NULL;
 		switch (item_type) {
 		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DUPKEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
 			ovfl = WT_ITEM_BYTE_OVFL(item);
@@ -707,6 +719,7 @@ eof:				__wt_api_db_errx(db,
 		/* Verify overflow references. */
 		switch (item_type) {
 		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DUPKEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
 			/*
@@ -756,6 +769,7 @@ eof:				__wt_api_db_errx(db,
 			 */
 			goto offpagedups;
 		case WT_ITEM_KEY:
+		case WT_ITEM_DUPKEY:
 		case WT_ITEM_DUP:
 			current->indx = item_num;
 			current->item = &current->item_std;
@@ -763,6 +777,7 @@ eof:				__wt_api_db_errx(db,
 			current->item->size = item_len;
 			break;
 		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DUPKEY_OVFL:
 		case WT_ITEM_DUP_OVFL:
 			/*
 			 * We already have a copy of the overflow page, read in
@@ -778,7 +793,7 @@ eof:				__wt_api_db_errx(db,
 			break;
 		}
 
-		/* Check the sort order. */
+		/* Get a decompressed version if necessary. */
 		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
@@ -791,6 +806,29 @@ eof:				__wt_api_db_errx(db,
 				    &current->item_comp->size));
 				current->item = current->item_comp;
 			}
+			break;
+		case WT_ITEM_DUPKEY:
+		case WT_ITEM_DUP:
+		case WT_ITEM_DUP_OVFL:
+			/* If data is compressed, get an uncompressed copy. */
+			if (idb->huffman_data != NULL) {
+				WT_ERR(__wt_huffman_decode(idb->huffman_data,
+				    current->item->data, current->item->size,
+				    &current->item_comp->data,
+				    &current->item_comp->mem_size,
+				    &current->item_comp->size));
+				current->item = current->item_comp;
+			}
+			break;
+		default:	/* No other values are possible. */
+			break;
+		}
+
+		/* Check the sort order. */
+		switch (item_type) {
+		case WT_ITEM_KEY:
+		case WT_ITEM_DUPKEY:
+		case WT_ITEM_KEY_OVFL:
 			if (last_key->item != NULL &&
 			    func(db, last_key->item, current->item) >= 0) {
 				__wt_api_db_errx(db,
@@ -806,15 +844,6 @@ eof:				__wt_api_db_errx(db,
 			break;
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
-			/* If data is compressed, get an uncompressed copy. */
-			if (idb->huffman_data != NULL) {
-				WT_ERR(__wt_huffman_decode(idb->huffman_data,
-				    current->item->data, current->item->size,
-				    &current->item_comp->data,
-				    &current->item_comp->mem_size,
-				    &current->item_comp->size));
-				current->item = current->item_comp;
-			}
 			if (last_data->item != NULL &&
 			    func(db, last_data->item, current->item) >= 0) {
 				__wt_api_db_errx(db,
