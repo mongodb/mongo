@@ -1,3 +1,11 @@
+mongodb (1.6.4) unstable; urgency=low
+
+  * replica_sets shell helpers
+  * sharding chunk safety, yielding during migrate cleanup
+  * full change log http://jira.mongodb.org/browse/SERVER/fixforversion/10191
+
+  -- Richard Kreuter <richard@10gen.com>  Tue, 26 Oct 2010 16:56:28 -0500
+
 mongodb (1.6.3) unstable; urgency=low
 
   * replica_sets slavedelay, rollback
