@@ -602,10 +602,22 @@ namespace UpdateTests {
 
     namespace basic {
         class Base : public ClientBase {
+        protected:
+            
             virtual const char * ns() = 0;
             virtual void dotest() = 0;
             
-        protected:
+            void insert( const BSONObj& o ){
+                client().insert( ns() , o );
+            }
+            
+            void update( const BSONObj& m ){
+                client().update( ns() , BSONObj() , m );
+            }
+
+            BSONObj findOne(){
+                return client().findOne( ns() , BSONObj() );
+            }
 
             void test( const char* initial , const char* mod , const char* after ){
                 test( fromjson( initial ) , fromjson( mod ) , fromjson( after ) );
@@ -614,9 +626,9 @@ namespace UpdateTests {
 
             void test( const BSONObj& initial , const BSONObj& mod , const BSONObj& after ){
                 client().dropCollection( ns() );
-                client().insert( ns() , initial );
-                client().update( ns() , BSONObj() , mod );
-                ASSERT_EQUALS( after , client().findOne( ns(), BSONObj() ));
+                insert( initial );
+                update( mod );
+                ASSERT_EQUALS( after , findOne() );
                 client().dropCollection( ns() );
             }
 
@@ -726,7 +738,33 @@ namespace UpdateTests {
 
         };
 
+        class inc6 : public Base {
 
+            virtual const char * ns(){
+                return "unittests.inc6";
+            }
+
+
+            virtual BSONObj initial(){ return BSONObj(); }
+            virtual BSONObj mod(){ return BSONObj(); }
+            virtual BSONObj after(){ return BSONObj(); }
+
+            void dotest(){
+                client().insert( ns() , BSON( "x" << 5 ) );
+                ASSERT( findOne()["x"].type() == NumberInt );
+                long start = 5;
+                long max = 1024L * 1024L * 1024L * 16;
+                ASSERT( max > numeric_limits<int>::max() );
+                cout << "E:  " << max << endl;
+                while ( start < max ){
+                    update( BSON( "$inc" << BSON( "x" << 500000 ) ) );
+                    start += 500000;
+                    //ASSERT_EQUALS( start , findOne()["x"].numberLong() ); // SERVER-2005
+                }
+
+            }
+        };
+        
         class bit1 : public Base {
             const char * ns(){
                 return "unittests.bit1";
@@ -827,6 +865,7 @@ namespace UpdateTests {
             add< basic::inc3 >();
             add< basic::inc4 >();
             add< basic::inc5 >();
+            add< basic::inc6 >();
             add< basic::bit1 >();
             add< basic::unset >();
             add< basic::setswitchint >();
