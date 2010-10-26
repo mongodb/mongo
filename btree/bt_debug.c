@@ -509,47 +509,46 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	DB *db;
 	DBT *tmp;
 	IDB *idb;
-	WT_OVFL *ovfl;
-	WT_PAGE *page;
+	WT_PAGE *ovfl;
 	u_int32_t size;
 	u_int8_t *p;
-	void *hp;
 	int ret;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	db = toc->db;
+	ovfl = NULL;
 	tmp = NULL;
 	idb = db->idb;
-	page = NULL;
-	hp = NULL;
 	ret = 0;
-
-	WT_RET(__wt_toc_scratch_alloc(toc, &tmp));
 
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
-		hp = idb->huffman_key;
+		if (idb->huffman_key != NULL)
+			goto process;
 		goto onpage;
 	case WT_ITEM_KEY_DUP:
 	case WT_ITEM_DATA:
 	case WT_ITEM_DATA_DUP:
-		hp = idb->huffman_data;
+		if (idb->huffman_data != NULL)
+			goto process;
 onpage:		p = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
 		break;
 	case WT_ITEM_KEY_OVFL:
-		hp = idb->huffman_key;
-		goto offpage;
 	case WT_ITEM_KEY_DUP_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DATA_DUP_OVFL:
-		hp = idb->huffman_data;
-offpage:	ovfl = WT_ITEM_BYTE_OVFL(item);
-		WT_ERR(__wt_bt_ovfl_in(toc, ovfl, &page));
-		p = WT_PAGE_BYTE(page);
-		size = ovfl->size;
+process:	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+		WT_ERR(__wt_bt_item_process(toc, item, &ovfl, tmp));
+		if (ovfl == NULL) {
+			p = tmp->data;
+			size = tmp->size;
+		} else {
+			p = WT_PAGE_BYTE(ovfl);
+			size = ovfl->hdr->u.datalen;
+		}
 		break;
 	case WT_ITEM_DEL:
 		p = (u_int8_t *)"deleted";
@@ -562,18 +561,10 @@ offpage:	ovfl = WT_ITEM_BYTE_OVFL(item);
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
-	/* Uncompress the item as necessary. */
-	if (hp != NULL) {
-		WT_ERR(__wt_huffman_decode(
-		    hp, p, size, &tmp->data, &tmp->mem_size, &tmp->size));
-		p = tmp->data;
-		size = tmp->size;
-	}
-
 	__wt_bt_print(p, size, fp);
 
-err:	if (page != NULL)
-		__wt_bt_page_out(toc, &page, 0);
+err:	if (ovfl != NULL)
+		__wt_bt_page_out(toc, &ovfl, 0);
 	if (tmp != NULL)
 		__wt_toc_scratch_discard(toc, tmp);
 	return (ret);

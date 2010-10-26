@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static int __wt_bt_key_build(WT_TOC *, WT_PAGE *, WT_ROW *);
+
 /*
  * __wt_bt_search_row --
  *	Search a row-store tree for a specific key.
@@ -55,8 +57,7 @@ restart:
 			 */
 			rip = page->u.irow + indx;
 			if (WT_KEY_PROCESS(rip))
-				WT_ERR(
-				    __wt_bt_key_process(toc, page, rip, NULL));
+				WT_ERR(__wt_bt_key_build(toc, page, rip));
 
 			/*
 			 * If we're about to compare an application key with the
@@ -143,4 +144,37 @@ restart:
 err:	if (page != idb->root_page)
 		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
+}
+
+/*
+ * __wt_bt_key_build --
+ *	Instantiate an overflow or compressed key into a WT_ROW structure.
+ */
+static int
+__wt_bt_key_build(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip_arg)
+{
+	DBT *dbt, local_dbt;
+	WT_ROW *rip;
+	WT_ITEM *item;
+	u_int32_t i;
+
+	WT_CLEAR(local_dbt);
+	dbt = &local_dbt;
+
+	item = rip_arg->key;
+	WT_RET(__wt_bt_item_process(toc, item, NULL, dbt));
+
+	/*
+	 * Update the WT_ROW reference with the processed key.  If there are
+	 * any duplicates of this item, update them as well.
+	 */
+	WT_KEY_SET(rip_arg, dbt->data, dbt->size);
+	if (WT_ITEM_TYPE(rip_arg->data) == WT_ITEM_DATA_DUP ||
+	    WT_ITEM_TYPE(rip_arg->data) == WT_ITEM_DATA_DUP_OVFL) {
+		WT_INDX_FOREACH(page, rip, i)
+			if (rip->key == item)
+				WT_KEY_SET(rip, dbt->data, dbt->size);
+	}
+
+	return (0);
 }

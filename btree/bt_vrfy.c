@@ -306,12 +306,14 @@ __wt_bt_verify_cmp(
     WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 {
 	DB *db;
-	DBT *cd_ref, *pd_ref, *tmp1, *tmp2;
+	DBT *cd_ref, *pd_ref, *scratch1, *scratch2, tmp1, tmp2;
+	WT_PAGE *child_ovfl_page, *parent_ovfl_page;
 	WT_ROW *child_rip;
 	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
-	tmp1 = tmp2 = NULL;
+	scratch1 = scratch2 = NULL;
+	child_ovfl_page = parent_ovfl_page = NULL;
 	ret = 0;
 
 	/* Set the comparison function. */
@@ -335,15 +337,29 @@ __wt_bt_verify_cmp(
 	child_rip = first_entry ?
 	    child->u.irow : child->u.irow + (child->indx_count - 1);
 	if (WT_KEY_PROCESS(child_rip)) {
-		WT_ERR(__wt_toc_scratch_alloc(toc, &tmp1));
-		cd_ref = tmp1;
-		WT_ERR(__wt_bt_key_process(toc, NULL, child_rip, cd_ref));
+		WT_ERR(__wt_toc_scratch_alloc(toc, &scratch1));
+		WT_ERR(__wt_bt_item_process(
+		    toc, child_rip->key, &child_ovfl_page, scratch1));
+		if (child_ovfl_page != NULL) {
+			WT_CLEAR(tmp1);
+			tmp1.data = WT_PAGE_BYTE(child_ovfl_page);
+			tmp1.size = child_ovfl_page->hdr->u.datalen;
+			cd_ref = &tmp1;
+		} else
+			cd_ref = scratch1;
 	} else
 		cd_ref = (DBT *)child_rip;
 	if (WT_KEY_PROCESS(parent_rip)) {
-		WT_ERR(__wt_toc_scratch_alloc(toc, &tmp2));
-		pd_ref = tmp2;
-		WT_RET(__wt_bt_key_process(toc, NULL, parent_rip, pd_ref));
+		WT_ERR(__wt_toc_scratch_alloc(toc, &scratch2));
+		WT_RET(__wt_bt_item_process(
+		    toc, parent_rip->key, &parent_ovfl_page, scratch2));
+		if (parent_ovfl_page != NULL) {
+			WT_CLEAR(tmp2);
+			tmp2.data = WT_PAGE_BYTE(parent_ovfl_page);
+			tmp2.size = parent_ovfl_page->hdr->u.datalen;
+			pd_ref = &tmp2;
+		} else
+			pd_ref = scratch2;
 	} else
 		pd_ref = (DBT *)parent_rip;
 
@@ -365,10 +381,14 @@ __wt_bt_verify_cmp(
 		ret = WT_ERROR;
 	}
 
-err:	if (tmp1 != NULL)
-		__wt_toc_scratch_discard(toc, tmp1);
-	if (tmp2 != NULL)
-		__wt_toc_scratch_discard(toc, tmp2);
+err:	if (scratch1 != NULL)
+		__wt_toc_scratch_discard(toc, scratch1);
+	if (scratch2 != NULL)
+		__wt_toc_scratch_discard(toc, scratch2);
+	if (child_ovfl_page != NULL)
+		__wt_bt_page_out(toc, &child_ovfl_page, 0);
+	if (parent_ovfl_page != NULL)
+		__wt_bt_page_out(toc, &parent_ovfl_page, 0);
 
 	return (ret);
 }

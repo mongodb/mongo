@@ -73,7 +73,8 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
-__wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt);
+__wt_bt_item_process(
+    WT_TOC *toc, WT_ITEM *item, WT_PAGE **ovfl_ret, DBT *dbt_ret);
 int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page);
 int

@@ -423,13 +423,16 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains sorted data items.  The data items are on-page
 	 * (WT_ITEM_DATA_DUP) or overflow (WT_ITEM_DUP_OVFL) items.
+	 *
+	 * These data values are sorted, so we want to treat them as keys, and
+	 * we return them as on-page WT_ITEM values, so we want to tream them
+	 * as data.  Set both the WT_ROW key and data fields.
 	 */
 	rip = page->u.irow;
 	WT_ITEM_FOREACH(page, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA_DUP:
-			WT_KEY_SET(rip,
-			    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
+			WT_KEY_SET(rip, WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			break;
 		case WT_ITEM_DATA_DUP_OVFL:
 			WT_KEY_SET_PROCESS(rip, item);
@@ -491,111 +494,93 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_key_process --
- *	Overflow and/or compressed on-page keys need processing before
+ * __wt_bt_item_process --
+ *	Overflow and/or compressed on-page items need processing before
  *	we look at them.
  */
 int
-__wt_bt_key_process(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, DBT *dbt)
+__wt_bt_item_process(
+    WT_TOC *toc, WT_ITEM *item, WT_PAGE **ovfl_ret, DBT *dbt_ret)
 {
 	DB *db;
-	DBT local_dbt;
 	ENV *env;
 	IDB *idb;
-	WT_ITEM *item;
-	WT_OVFL *ovfl;
-	WT_PAGE *ovfl_page;
-	u_int32_t i, size;
+	WT_PAGE *ovfl;
+	void *huffman, *p;
+	u_int32_t size;
 	int ret;
-	void *huffman, *orig;
 
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
-	ovfl_page = NULL;
+	ovfl = NULL;
 	ret = 0;
 
-	/* We only get called when there's a key to process. */
-	WT_ASSERT(env, WT_KEY_PROCESS(rip));
-
-	/* We only need a WT_PAGE when instantiating a key in the tree. */
-	WT_ASSERT(env,
-	    (page == NULL && dbt != NULL) || (page != NULL && dbt == NULL));
-
 	/*
-	 * We're really processing any sort item, not just "keys".  As an
-	 * example, off-page duplicate trees are sorted, but they're data
-	 * items, not keys.   We end up here anyway, to expand overflow items.
-	 *
 	 * 3 cases: compressed on-page item, or compressed or uncompressed
-	 * overflow item.  In these cases, the WT_ROW data field points to
-	 * the on-page item and we process it to create an in-memory key.
+	 * overflow item.
+	 *
+	 * The return cases are confusing.   If the item is compressed (either
+	 * on-page or overflow, it doesn't matter), then always uncompress it
+	 * and return a copy in the return DBT, and ignore the return WT_PAGE.
+	 * If the item isn't compressed, we're here because it's an overflow
+	 * item.  If the caller passed in a return WT_PAGE, return the page to
+	 * the caller and ignore the return DBT.  If the caller didn't pass in
+	 * a return WT_PAGE, copy the page into the return DBT.
+	 *
+	 * The reason for this is that this function gets called in a couple
+	 * of ways, and the additional complexity is worth it because avoiding
+	 * a copy of an overflow chunk is a pretty good thing.
 	 */
-	item = rip->key;
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
 		huffman = idb->huffman_key;
 		goto onpage;
 	case WT_ITEM_KEY_DUP:
+	case WT_ITEM_DATA:
 	case WT_ITEM_DATA_DUP:
 		huffman = idb->huffman_data;
-onpage:		orig = WT_ITEM_BYTE(item);
+onpage:		p = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
 		break;
 	case WT_ITEM_KEY_OVFL:
 		huffman = idb->huffman_key;
 		goto offpage;
 	case WT_ITEM_KEY_DUP_OVFL:
+	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DATA_DUP_OVFL:
 		huffman = idb->huffman_data;
-offpage:	ovfl = WT_ITEM_BYTE_OVFL(item);
-		WT_RET(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
-		orig = WT_PAGE_BYTE(ovfl_page);
+offpage:	WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), &ovfl));
+		p = WT_PAGE_BYTE(ovfl);
 		size = ovfl->size;
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*
-	 * When returning keys to the application, this function is called with
-	 * a DBT into which to copy the key; if that isn't given, copy the key
-	 * into allocated memory in the WT_ROW structure.
+	 * If the item is compressed (on-page or overflow), decode it and copy
+	 * it into the caller's DBT.   If the item is not compressed, it's an
+	 * overflow item (else we wouldn't be here) and return a pointer to the
+	 * page itself, if the user passed in a WT_PAGE reference, otherwise
+	 * copy it into the caller's DBT.
 	 */
-	if (dbt == NULL) {
-		WT_CLEAR(local_dbt);
-		dbt = &local_dbt;
-	}
-
-	/* Copy the item into place; if the item is compressed, decode it. */
 	if (huffman == NULL) {
-		if (size > dbt->mem_size)
-			WT_ERR(__wt_realloc(
-			    env, &dbt->mem_size, size, &dbt->data));
-		dbt->size = size;
-		memcpy(dbt->data, orig, size);
-	} else
-		WT_ERR(__wt_huffman_decode(huffman,
-		    orig, size, &dbt->data, &dbt->mem_size, &dbt->size));
-
-	/*
-	 * If no target DBT specified (that is, we're intending to persist this
-	 * conversion in our in-memory tree), update the WT_ROW reference with
-	 * the processed key.
-	 *
-	 * If there are any duplicates of this item, update them as well.
-	 */
-	if (dbt == &local_dbt) {
-		WT_KEY_SET(rip, dbt->data, dbt->size);
-		if (WT_ITEM_TYPE(rip->data) == WT_ITEM_DATA_DUP ||
-		    WT_ITEM_TYPE(rip->data) == WT_ITEM_DATA_DUP_OVFL) {
-			WT_INDX_FOREACH(page, rip, i)
-				if (rip->key == item)
-					WT_KEY_SET(rip, dbt->data, dbt->size);
+		if (ovfl_ret == NULL) {
+			if (size > dbt_ret->mem_size)
+				WT_ERR(__wt_realloc(env,
+				    &dbt_ret->mem_size, size, &dbt_ret->data));
+			memcpy(dbt_ret->data, p, size);
+			dbt_ret->size = size;
+		} else {
+			*ovfl_ret = ovfl;
+			ovfl = NULL;
 		}
-	}
+	} else
+		WT_ERR(__wt_huffman_decode(huffman, p, size,
+		    &dbt_ret->data, &dbt_ret->mem_size, &dbt_ret->size));
 
-err:	if (ovfl_page != NULL)
-		__wt_bt_page_out(toc, &ovfl_page, 0);
+err:	if (ovfl != NULL)
+		__wt_bt_page_out(toc, &ovfl, 0);
 
 	return (ret);
 }
