@@ -48,5 +48,5 @@ doTest = function( signal ) {
     stopMongod (solo.port, signal)
 }
 
-doTest( 15 );
+//doTest( 15 );
 print("replsets/cloneDb.js SUCCESS");
