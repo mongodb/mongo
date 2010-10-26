@@ -215,7 +215,9 @@ namespace mongo {
         default: {
             string errmsg;
             if ( ! shardVersionOk( _ns , lockState > 0 , errmsg ) ){
-                msgasserted( StaleConfigInContextCode , (string)"[" + _ns + "] shard version not ok in Client::Context: " + errmsg );
+                ostringstream os;
+                os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
+                msgassertedNoTrace( StaleConfigInContextCode , os.str().c_str() );
             }
         }
         }
