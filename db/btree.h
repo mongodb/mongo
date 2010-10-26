@@ -386,7 +386,6 @@ namespace mongo {
     class BtreeBuilder {
 
         class IndexChunkBuilder;
-        friend void mergeIndexSubTrees(  vector<IndexChunkBuilder *> &chunkBuilders, IndexDetails &idx);  
         bool dupsAllowed; 
         IndexDetails& idx;
         unsigned long long n;
@@ -413,6 +412,10 @@ namespace mongo {
            (in case exception has happened).
         */
         void commit();
+
+        void setCommitted( bool status ) {
+          committed = status;
+        }
 
         unsigned long long getn() { return n; }
 

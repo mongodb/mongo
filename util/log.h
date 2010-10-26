@@ -154,12 +154,12 @@ namespace mongo {
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
         static int doneSetup;
-        stringstream ss;
         LogLevel logLevel;
         static FILE* logfile;
         static boost::scoped_ptr<ostream> stream;
         static vector<Tee*> * globalTees;
     public:
+        stringstream ss;
         inline static void logLockless( const StringData& s );
         
         static void setLogFile(FILE* f){
