@@ -17,6 +17,10 @@ toInsert = ( 1 * 1000 * 1000 );
 for (var i=0; i < toInsert; i++ ){
     db.foo.insert( { i: i, r: Math.random(), s: bigString } );
     assert.eq(db.getLastError(), null, 'no error'); //SERVER-1541
+
+    if ( i % 1000 == 999 ) {
+        print( "already inserted " + i );
+    }
 }
 
 inserted = toInsert;
