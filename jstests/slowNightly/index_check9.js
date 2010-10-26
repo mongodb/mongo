@@ -33,6 +33,11 @@ function r() {
 }
 
 function check() {
+    var v = t.validate();
+    if ( !t.valid ) {
+        printjson( t );
+        assert( t.valid );
+    }
     var spec = {};
     for( var i = 0; i < n; ++i ) {
         if ( Random.rand() > 0.5 ) {
@@ -59,7 +64,7 @@ function check() {
         }
     }
     s = sort();
-    c1 = t.find( spec, { _id:null } ).sort( s ).toArray();
+    c1 = t.find( spec, { _id:null } ).sort( s ).hint( idx ).toArray();
     c2 = t.find( spec ).sort( s ).explain().nscanned;
     c3 = t.find( spec, { _id:null } ).sort( s ).hint( {$natural:1} ).toArray();
     //    assert.eq( c1, c3, "spec: " + tojson( spec ) + ", sort: " + tojson( s ) );
