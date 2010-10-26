@@ -1052,12 +1052,13 @@ rs.help = function () {
     print("\trs.status()                     { replSetGetStatus : 1 } checks repl set status");
     print("\trs.initiate()                   { replSetInitiate : null } initiates set with default settings");
     print("\trs.initiate(cfg)                { replSetInitiate : cfg } initiates set with configuration cfg");
+    print("\trs.conf()                       get the current configuration object from local.system.replset");
+    print("\trs.reconfig(cfg)                updates the configuration of a running replica set with cfg");
     print("\trs.add(hostportstr)             add a new member to the set with default attributes");
     print("\trs.add(membercfgobj)            add a new member to the set with extra attributes");
     print("\trs.addArb(hostportstr)          add a new member which is arbiterOnly:true");
     print("\trs.stepDown()                   step down as primary (momentarily)");
     print("\trs.remove(hostportstr)          remove a host from the replica set");
-    print("\trs.conf()                       return configuration from local.system.replset");
     print("\trs.slaveOk()                    shorthand for db.getMongo().setSlaveOk()");
     print();
     print("\tdb.isMaster()                   check who is primary");
@@ -1068,6 +1069,11 @@ rs.slaveOk = function () { return db.getMongo().setSlaveOk(); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
+rs.reconfig = function(cfg) {
+  cfg.version = rs.conf().version + 1;
+
+  return db._adminCommand({ replSetReconfig: cfg });
+}
 rs.add = function (hostport, arb) {
     var cfg = hostport;
 
@@ -1075,7 +1081,9 @@ rs.add = function (hostport, arb) {
     assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
     var c = local.system.replset.findOne();
     assert(c, "no config object retrievable from local.system.replset");
+
     c.version++;
+
     var max = 0;
     for (var i in c.members)
         if (c.members[i]._id > max) max = c.members[i]._id;
@@ -1091,7 +1099,7 @@ rs.stepDown = function () { return db._adminCommand({ replSetStepDown:true}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
 
-rs.remove = function (hn) { 
+rs.remove = function (hn) {
     var local = db.getSisterDB("local");
     assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
     var c = local.system.replset.findOne();
