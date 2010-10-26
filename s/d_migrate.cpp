@@ -721,8 +721,10 @@ namespace mongo {
             // 5.
             { 
                 // 5.a
+                // we're under the collection lock here, so no other migrate can change maxVersion
                 migrateFromStatus.setInCriticalSection( true );
-                ShardChunkVersion myVersion = maxVersion;
+                ShardChunkVersion currVersion = maxVersion;
+                ShardChunkVersion myVersion = currVersion;
                 myVersion.incMajor();
                 
                 {
@@ -730,9 +732,9 @@ namespace mongo {
                     assert( myVersion > shardingState.getVersion( ns ) );
                     shardingState.setVersion( ns , myVersion );
                     assert( myVersion == shardingState.getVersion( ns ) );
-                    log() << "moveChunk locking myself to: " << myVersion << endl;
                 }
-
+                log() << "moveChunk locking myself to: " << myVersion << endl;
+                    
                 
                 // 5.b
                 {
@@ -744,7 +746,13 @@ namespace mongo {
                     connTo.done();
                     log() << "moveChunk commit result: " << res << endl;
                     if ( ! ok ){
-                        log() << "_recvChunkCommit failed: " << res << endl;
+                        {
+                            dblock lk;
+                            shardingState.setVersion( ns , currVersion );
+                            assert( currVersion == shardingState.getVersion( ns ) );
+                        }
+                        log() << "_recvChunkCommit failed: " << res << " resetting shard version to: " << currVersion << endl;
+
                         errmsg = "_recvChunkCommit failed!";
                         result.append( "cause" , res );
                         return false;
