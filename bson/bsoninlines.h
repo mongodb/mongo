@@ -48,10 +48,19 @@ namespace mongo {
         return BSONObj( value() + 4 + 4 + strSizeWNull );
     }
     
-    inline BSONObj BSONObj::copy() const {
+    /* the idea with NOINLINE_DECL here is to keep this from inlining in the 
+       getOwned() method.  the presumption being that is better.
+    */
+    inline NOINLINE_DECL BSONObj BSONObj::copy() const {
         char *p = (char*) malloc(objsize());
         memcpy(p, objdata(), objsize());
         return BSONObj(p, true);
+    }
+
+    inline BSONObj BSONObj::getOwned() const {
+        if ( isOwned() )
+            return *this;
+        return copy();
     }
 
     // wrap this element up as a singleton object.

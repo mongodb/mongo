@@ -251,9 +251,7 @@ namespace mongo {
         }
 
 		/** @return first field of the object */
-        BSONElement firstElement() const {
-            return BSONElement(objdata() + 4);
-        }
+        BSONElement firstElement() const { return BSONElement(objdata() + 4); }
 
 		/** @return true if field exists in the object */
         bool hasElement(const char *name) const;
@@ -265,15 +263,12 @@ namespace mongo {
 		*/
 		bool getObjectID(BSONElement& e) const;
 
-        /** makes a copy of the object. */
+        /** @return a new full copy of the object. */
         BSONObj copy() const;
 
         /* make sure the data buffer is under the control of this BSONObj and not a remote buffer */
-        BSONObj getOwned() const{
-            if ( !isOwned() )
-                return copy();
-            return *this;
-        }
+        BSONObj getOwned() const;
+
         bool isOwned() const { return _holder.get() != 0; }
 
         /** @return A hash code for the object */
