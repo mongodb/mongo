@@ -245,14 +245,14 @@ namespace mongo {
         return ofs;
     }
 
-    void BucketBasics::_delKeyAtPos(int keypos) {
+    void BucketBasics::_delKeyAtPos(int keypos, bool mayEmpty) {
         assert( keypos >= 0 && keypos <= n );
         assert( childForPos(keypos).isNull() );
+        assert( ( mayEmpty && n > 0 ) || n > 1 || nextChild.isNull() );
+        emptySize += sizeof(_KeyNode);
         n--;
-        assert( n > 0 || nextChild.isNull() );
         for ( int j = keypos; j < n; j++ )
             k(j) = k(j+1);
-        emptySize += sizeof(_KeyNode);
         setNotPacked();
     }
 
@@ -323,6 +323,25 @@ namespace mongo {
         return true;
     }
 
+    // with this implementation, refPos == 0 disregards effect of refPos
+    bool BucketBasics::mayDropKey( int index, int refPos ) const {
+        return index > 0 && ( index != refPos ) && k( index ).isUnused() && k( index ).prevChildBucket.isNull();
+    }
+    
+    int BucketBasics::packedDataSize( int refPos ) const {
+        if ( flags & Packed ) {
+            return BucketSize - emptySize - headerSize();
+        }
+        int size = 0;
+        for( int j = 0; j < n; ++j ) {
+            if ( mayDropKey( j, refPos ) ) {
+                continue;
+            }
+            size += keyNode( j ).key.objsize() + sizeof( _KeyNode );
+        }
+        return size;
+    }
+    
     /* when we delete things we just leave empty space until the node is
        full and then we repack it.
     */
@@ -336,7 +355,7 @@ namespace mongo {
         topSize = 0;
         int i = 0;
         for ( int j = 0; j < n; j++ ) {
-            if( j > 0 && ( j != refPos ) && k( j ).isUnused() && k( j ).prevChildBucket.isNull() ) {
+            if( mayDropKey( j, refPos ) ) {
                 continue; // key is unused and has no children - drop it
             }
             if( i != j ) {
@@ -615,30 +634,127 @@ found:
     }
 
     /* note: may delete the entire bucket!  this invalid upon return sometimes. */
-    void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p) {
+    void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p, const Ordering &order) {
         assert(n>0);
         DiskLoc left = childForPos(p);
 
         if ( n == 1 ) {
             if ( left.isNull() && nextChild.isNull() ) {
-                if ( isHead() )
+                if ( isHead() ) {
                     _delKeyAtPos(p); // we don't delete the top bucket ever
-                else
+                } else {
                     delBucket(thisLoc, id);
+                }
                 return;
             }
             markUnused(p);
             return;
         }
 
-        if ( left.isNull() )
+        if ( left.isNull() ) {
             _delKeyAtPos(p);
-        else
+            balanceWithNeighbors( thisLoc, id, order );
+        } else {
             markUnused(p);
+        }
     }
 
-    int qqq = 0;
-
+    void BtreeBucket::replaceWithNextChild( DiskLoc thisLoc, IndexDetails &id ) {
+        assert( n == 0 && !nextChild.isNull() );
+        if ( parent.isNull() ) {
+            assert( id.head == thisLoc );
+            id.head.writing() = nextChild;
+        } else {
+            parent.btree()->child( indexInParent( thisLoc ) ).writing() = nextChild;
+        }
+        nextChild.btree()->parent.writing() = parent;
+        ClientCursor::informAboutToDeleteBucket( thisLoc );
+        // is it necessary to indicate writing for this?
+        deallocBucket( thisLoc, id );
+    }
+    
+    bool BtreeBucket::tryMergeNeighbors( DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) {
+        assert( leftIndex >= 0 && leftIndex < n );
+        DiskLoc leftNodeLoc = child( leftIndex );
+        DiskLoc rightNodeLoc = child( leftIndex + 1 );
+        if ( leftNodeLoc.isNull() || rightNodeLoc.isNull() ) {
+            // TODO if this situation is possible in long term implementation, maybe we should compact somehow anyway
+            return false;
+        }
+        int pos = 0;
+        {
+            BtreeBucket *l = leftNodeLoc.btree();
+            BtreeBucket *r = rightNodeLoc.btree();
+            if ( ( headerSize() + l->packedDataSize( pos ) + r->packedDataSize( pos ) + keyNode( leftIndex ).key.objsize() + sizeof(_KeyNode) > unsigned( BucketSize ) ) ) {
+                return false;
+            }
+        }
+        BtreeBucket *l = leftNodeLoc.btreemod();
+        BtreeBucket *r = rightNodeLoc.btreemod();
+        l->pack( order, pos );
+        r->pack( order, pos ); // pack r in case there are droppable keys
+        thisLoc.btreemod(); // indicate writing 'this'
+        
+        int oldLNum = l->n;
+        KeyNode kn = keyNode( leftIndex );
+        l->pushBack( kn.recordLoc, kn.key, order, l->nextChild ); // left child's right child becomes old parent key's left child
+        for( int i = 0; i < r->n; ++i ) {
+            KeyNode kn = r->keyNode( i );
+            l->pushBack( kn.recordLoc, kn.key, order, kn.prevChildBucket );
+        }
+        l->nextChild.writing() = r->nextChild;
+        l->fixParentPtrs( leftNodeLoc, oldLNum );
+        r->delBucket( rightNodeLoc, id );
+        child( leftIndex + 1 ).writing() = leftNodeLoc;
+        child( leftIndex ).writing() = DiskLoc();
+        _delKeyAtPos( leftIndex, true );
+        if ( n == 0 ) {
+            // will trash this and thisLoc
+            replaceWithNextChild( thisLoc, id );
+        } else {
+            // balance recursively - maybe we should do this even when n == 0?
+            balanceWithNeighbors( thisLoc, id, order );
+        }
+        return true;
+    }
+    
+    int BtreeBucket::indexInParent( const DiskLoc &thisLoc ) {
+        assert( !parent.isNull() );
+        BtreeBucket *p = parent.btree();
+        if ( p->nextChild == thisLoc ) {
+            return p->n;
+        } else {
+            for( int i = 0; i < p->n; ++i ) {
+                if ( p->k( i ).prevChildBucket == thisLoc ) {
+                    return i;
+                }
+            }
+        }
+        out() << "ERROR: can't find ref to child bucket.\n";
+        out() << "child: " << thisLoc << "\n";
+        dump();
+        out() << "Parent: " << parent << "\n";
+        p->dump();
+        assert(false);
+        return -1; // just to compile
+    }
+    
+    void BtreeBucket::balanceWithNeighbors( const DiskLoc &thisLoc, IndexDetails &id, const Ordering &order ) {
+        if ( parent.isNull() ) { // we are root, there are no neighbors
+            return;
+        }
+        BtreeBucket *p = parent.btree();
+        int parentIdx = indexInParent( thisLoc );
+        if ( parentIdx < p->n ) {
+            if ( p->tryMergeNeighbors( parent, parentIdx, id, order ) ) {
+                return;
+            }
+        }
+        if ( parentIdx > 0 ) {
+            p->tryMergeNeighbors( parent, parentIdx - 1, id, order );
+        }
+    }
+    
     /* remove a key from the index */
     bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc ) {
         if ( key.objsize() > KeyMax ) {
@@ -650,7 +766,7 @@ found:
         bool found;
         DiskLoc loc = locate(id, thisLoc, key, Ordering::make(id.keyPattern()), pos, found, recordLoc, 1);
         if ( found ) {
-            loc.btreemod()->delKeyAtPos(loc, id, pos);
+            loc.btreemod()->delKeyAtPos(loc, id, pos, Ordering::make(id.keyPattern()));
             return true;
         }
         return false;
@@ -671,10 +787,10 @@ found:
     }
 
     /* this sucks.  maybe get rid of parent ptrs. */
-    void BtreeBucket::fixParentPtrs(const DiskLoc& thisLoc) {
+    void BtreeBucket::fixParentPtrs(const DiskLoc& thisLoc, int startIndex) {
         VERIFYTHISLOC
         fix(thisLoc, nextChild);
-        for ( int i = 0; i < n; i++ )
+        for ( int i = startIndex; i < n; i++ )
             fix(thisLoc, k(i).prevChildBucket);
     }
 
@@ -848,7 +964,8 @@ found:
 
     /* start a new index off, empty */
     DiskLoc BtreeBucket::addBucket(IndexDetails& id) {
-        DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), 0, BucketSize, true);
+        string ns = id.indexNamespace();
+        DiskLoc loc = theDataFileMgr.insert(ns.c_str(), 0, BucketSize, true);
         BtreeBucket *b = loc.btreemod();
         b->init();
         return loc;
@@ -1100,7 +1217,7 @@ found:
 
             DEV { 
                 log() << "_insert(): key already exists in index (ok for background:true)\n";
-                log() << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
+                log() << "  " << idx.indexNamespace() << " thisLoc:" << thisLoc.toString() << '\n';
                 log() << "  " << key.toString() << '\n';
                 log() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
                 log() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
@@ -1142,7 +1259,7 @@ found:
     {
         if ( toplevel ) {
             if ( key.objsize() > KeyMax ) {
-                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.objsize() << ' ' << key.toString() << endl;
+                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.objsize() << ' ' << key.toString() << endl;
                 return 3;
             }
         }
@@ -1271,7 +1388,7 @@ namespace mongo {
         if ( ! b->_pushBack(loc, key, ordering, DiskLoc()) ){
             // no room
             if ( key.objsize() > KeyMax ) {
-                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.objsize() << ' ' << key.toString() << endl;
+                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.objsize() << ' ' << key.toString() << endl;
             }
             else { 
                 // bucket was full
@@ -1344,7 +1461,8 @@ namespace mongo {
             DiskLoc x = first;
             while( !x.isNull() ) { 
                 DiskLoc next = x.btree()->tempNext();
-                theDataFileMgr._deleteRecord(nsdetails(idx.indexNamespace().c_str()), idx.indexNamespace().c_str(), x.rec(), x);
+                string ns = idx.indexNamespace();
+                theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), x.rec(), x);
                 x = next;
             }
             assert( idx.head.isNull() );
