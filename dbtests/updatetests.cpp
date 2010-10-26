@@ -701,7 +701,7 @@ namespace UpdateTests {
                 return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
             virtual const char * ns(){
-                return "unittests.inc2";
+                return "unittests.inc3";
             }
 
         };
@@ -717,7 +717,7 @@ namespace UpdateTests {
                 return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
             virtual const char * ns(){
-                return "unittests.inc2";
+                return "unittests.inc4";
             }
 
         };
@@ -733,7 +733,7 @@ namespace UpdateTests {
                 return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
             virtual const char * ns(){
-                return "unittests.inc2";
+                return "unittests.inc5";
             }
 
         };
