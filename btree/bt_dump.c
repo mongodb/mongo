@@ -137,7 +137,6 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	DBT *last_key_ovfl, last_key_std, *last_key;
-	ENV *env;
 	WT_ITEM *item;
 	WT_OFF *off;
 	WT_OVFL *ovfl;
@@ -146,7 +145,6 @@ __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	int dup_ahead, ret;
 
 	db = toc->db;
-	env = toc->env;
 	last_key_ovfl = NULL;
 	ret = 0;
 	WT_CLEAR(last_key_std);
