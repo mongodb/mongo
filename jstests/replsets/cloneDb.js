@@ -1,4 +1,4 @@
-// Test for cloning a db from a replica set [SERVER-1643]
+// Test for cloning a db from a replica set [SERVER-1643] -Tony
 
 load('jstests/libs/grid.js')
 
@@ -12,7 +12,7 @@ doTest = function( signal ) {
         Text += 'abcdefghijklmnopqrstuvwxyz'
 
     // Create replica set
-    var repset = new ReplicaSet ('testSet', 3) .start()
+    var repset = new ReplicaSet ('testSet', 3) .begin()
     var master = repset.getMaster()
     var db1 = master.getDB('test')
     
@@ -24,7 +24,7 @@ doTest = function( signal ) {
     
     // Create single server
     var solo = new Server ('singleTarget')
-    var soloConn = solo.start()
+    var soloConn = solo.begin()
     var db2 = soloConn.getDB('test')
     
     // Clone db from replica set to single server
@@ -44,9 +44,9 @@ doTest = function( signal ) {
     assert.eq (Text, db2['foo'] .findOne({x: N-1}) ['text'], 'cloneDatabase failed (test2)')
 
     // Shut down replica set and single server
+    solo.end()
     repset.stopSet( signal )
-    stopMongod (solo.port, signal)
 }
 
-//doTest( 15 );
+doTest( 15 );
 print("replsets/cloneDb.js SUCCESS");
