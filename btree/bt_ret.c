@@ -22,22 +22,23 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	IDB *idb;
 	WT_COL *cip;
 	WT_ITEM *item;
-	WT_OVFL *ovfl;
 	WT_PAGE *page, *ovfl_page;
+	WT_PAGE_HDR *hdr;
 	WT_ROW *rip;
 	WT_REPL *repl;
-	void *orig;
-	u_int32_t size;
+	void *data_ret;
+	u_int32_t size_ret;
 	int (*callback)(DB *, DBT *, DBT *), ret;
 
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
-	ovfl = NULL;
+	ovfl_page = NULL;
 	callback = data->callback;
 	ret = 0;
 
 	page = toc->srch_page;
+	hdr = page->hdr;
 	cip = toc->srch_ip;
 	rip = toc->srch_ip;
 	repl = toc->srch_repl;
@@ -68,7 +69,8 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	 */
 	if (key_return) {
 		if (WT_KEY_PROCESS(rip)) {
-			WT_RET(__wt_bt_key_process(toc, NULL, rip, &toc->key));
+			WT_RET(__wt_bt_item_process(
+			    toc, rip->key, NULL, &toc->key));
 
 			key->data = toc->key.data;
 			key->size = toc->key.size;
@@ -96,103 +98,97 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	 * If the item was ever replaced, it's easy, take the last replacement
 	 * data item, it's just a byte string.
 	 */
-	switch (page->hdr->type) {
-	case WT_PAGE_DUP_LEAF:
-	case WT_PAGE_ROW_LEAF:
-		if (repl != NULL)
-			goto repl;
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-		if (repl != NULL) {
-repl:			if (WT_REPL_DELETED_ISSET(repl))
-				return (WT_NOTFOUND);
-			data->data = WT_REPL_DATA(repl);
-			data->size = repl->size;
-			return (callback == NULL ? 0 : callback(db, key, data));
-		}
-		break;
-	WT_ILLEGAL_FORMAT(db);
+	if (repl != NULL) {
+		if (WT_REPL_DELETED_ISSET(repl))
+			return (WT_NOTFOUND);
+		data->data = WT_REPL_DATA(repl);
+		data->size = repl->size;
+		return (callback == NULL ? 0 : callback(db, key, data));
 	}
 
-	switch (page->hdr->type) {
+	/* Otherwise, take the item from the original page. */
+	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		if (callback != NULL) {
-			WT_CLEAR(local_data);
-			data = &local_data;
-			data->data = F_ISSET(idb, WT_REPEAT_COMP) ?
-			    WT_FIX_REPEAT_DATA(cip->data) : cip->data;
-			data->size = db->fixed_len;
-			return (callback(db, key, data));
-		}
-		orig = F_ISSET(idb, WT_REPEAT_COMP) ?
+		data_ret = F_ISSET(idb, WT_REPEAT_COMP) ?
 		    WT_FIX_REPEAT_DATA(cip->data) : cip->data;
-		size = db->fixed_len;
+		size_ret = db->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:
 		item = cip->data;
 		goto item_set;
 	case WT_PAGE_ROW_LEAF:
-		item = rip->data;
-item_set:	if (callback != NULL &&
-		    WT_ITEM_TYPE(item) == WT_ITEM_DATA &&
-		    idb->huffman_data == NULL) {
-			WT_CLEAR(local_data);
-			data = &local_data;
-			data->data = WT_ITEM_BYTE(item);
-			data->size = WT_ITEM_LEN(item);
-			return (callback(db, key, data));
-		}
-
-		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA) {
-			orig = WT_ITEM_BYTE(item);
-			size = WT_ITEM_LEN(item);
-		} else
-			ovfl = WT_ITEM_BYTE_OVFL(item);
-		break;
 	case WT_PAGE_DUP_LEAF:
 		item = rip->data;
-		if (callback != NULL &&
-		    WT_ITEM_TYPE(item) == WT_ITEM_DATA_DUP &&
-		    idb->huffman_data == NULL) {
-			WT_CLEAR(local_data);
-			data = &local_data;
-			data->data = rip->key;
-			data->size = rip->size;
-			return (callback(db, key, data));
+item_set:	switch (WT_ITEM_TYPE(item)) {
+		case WT_ITEM_DATA:
+		case WT_ITEM_DATA_DUP:
+			if (idb->huffman_data == NULL) {
+				data_ret = WT_ITEM_BYTE(item);
+				size_ret = WT_ITEM_LEN(item);
+			}
+			/* FALLTHROUGH */
+		case WT_ITEM_DATA_OVFL:
+		case WT_ITEM_DATA_DUP_OVFL:
+			/*
+			 * If there's a callback function, pass the item_process
+			 * function a WT_PAGE reference, that way we never copy
+			 * the data, we pass a pointer into the cache page to
+			 * the callback function.  If there's no callback, then
+			 * don't pass a WT_PAGE reference, might as well let it
+			 * do the copy for us.
+			 */
+			WT_ERR(__wt_bt_item_process(toc, item,
+			    callback == NULL ? NULL : &ovfl_page, &toc->data));
+			data_ret = toc->data.data;
+			size_ret = toc->data.size;
+			break;
+		WT_ILLEGAL_FORMAT(db);
 		}
-
-		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_DUP) {
-			orig = rip->key;
-			size = rip->size;
-		} else
-			ovfl = WT_ITEM_BYTE_OVFL(item);
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
-	if (ovfl != NULL) {
-		WT_RET(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
-		orig = WT_PAGE_BYTE(ovfl_page);
-		size = ovfl->size;
+	/*
+	 * When we get here, data_ret and size_ret are set to the byte string
+	 * and the length we're going to return.   That byte string has been
+	 * decoded, we called __wt_bt_item_process above in all cases where the
+	 * item could be encoded.
+	 */
+	if (callback == NULL) {
+		/*
+		 * We're copying the key/data pair out to the caller.  If we
+		 * haven't yet copied the data_ret/size_ret pair into the return
+		 * DBT (potentially done by __wt_bt_item_process), do so now.
+		 */
+		if (data_ret != toc->data.data) {
+			if (toc->data.mem_size < size_ret)
+				WT_ERR(__wt_realloc(env,
+				    &toc->data.mem_size,
+				    size_ret, &toc->data.data));
+			memcpy(toc->data.data, data_ret, size_ret);
+			toc->data.size = size_ret;
+		}
+
+		data->data = toc->data.data;
+		data->size = toc->data.size;
+	} else {
+		/*
+		 * If we're given a callback function, use the data_ret/size_ret
+		 * fields as set.
+		 */
+		WT_CLEAR(local_data);
+		data = &local_data;
+		data->data = data_ret;
+		data->size = size_ret;
+		ret = callback(db, key, data);
 	}
 
-	if (idb->huffman_data == NULL) {
-		if (toc->data.mem_size < size)
-			WT_ERR(__wt_realloc(
-			    env, &toc->data.mem_size, size, &toc->data.data));
-		memcpy(toc->data.data, orig, size);
-		toc->data.size = size;
-	} else
-		 WT_ERR(__wt_huffman_decode(idb->huffman_data, orig, size,
-		     &toc->data.data, &toc->data.mem_size, &toc->data.size));
-
-	data->data = toc->data.data;
-	data->size = toc->data.size;
-
-err:	if (ovfl != NULL)
+	/*
+	 * Release any overflow page the __wt_bt_item_process function returned
+	 * us.
+	 */
+err:	if (ovfl_page != NULL)
 		__wt_bt_page_out(toc, &ovfl_page, 0);
 
-	return (ret != 0 ? ret :
-	    (callback == NULL ? 0 : callback(db, key, data)));
+	return (ret);
 }
