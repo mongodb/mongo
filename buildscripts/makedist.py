@@ -123,7 +123,9 @@ class EC2InstanceConfigurator(BaseConfigurator):
     def __init__(self, **kwargs):
         super(EC2InstanceConfigurator, self).__init__(**kwargs)
         self.configuration += [("ec2_ami",
-                                ((("ubuntu", "10.4", "x86_64"), "ami-bf07ead6"),
+                                ((("ubuntu", "10.10", "x86_64"), "ami-548c783d"),
+                                 (("ubuntu", "10.10", "x86"), "ami-508c7839"),
+                                 (("ubuntu", "10.4", "x86_64"), "ami-bf07ead6"),
                                  (("ubuntu", "10.4", "x86"), "ami-f707ea9e"),
                                  (("ubuntu", "9.10", "x86_64"), "ami-55739e3c"),
                                  (("ubuntu", "9.10", "x86"), "ami-bb709dd2"),
@@ -266,6 +268,7 @@ class SshConnectionConfigurator (BaseConfigurator):
                                 # FLAW: this actually depends more on the AMI
                                 # than the triple.
                                 ((("debian", "*", "*"), "root"),
+                                 (("ubuntu", "10.10", "*"), "ubuntu"),
                                  (("ubuntu", "10.4", "*"), "ubuntu"),
                                  (("ubuntu", "9.10", "*"), "ubuntu"),
                                  (("ubuntu", "9.4", "*"), "root"),
@@ -420,8 +423,12 @@ cp {pkg_name}{pkg_name_suffix}*.tar.gz "{pkg_product_dir}/{distro_version}/10gen
 dpkg-scanpackages "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}" /dev/null | gzip -9c > "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}/Packages.gz"
 dpkg-scansources "{pkg_product_dir}/{distro_version}/10gen/source" /dev/null | gzip -9c > "{pkg_product_dir}/{distro_version}/10gen/source/Sources.gz"
 """
-    rpm_prereq_commands = """
-rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/{distro_arch}/epel-release-5-3.noarch.rpm
+    centos_prereq_commands = """
+rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/{distro_arch}/epel-release-5-4.noarch.rpm
+yum -y install {pkg_prereq_str}
+"""
+    fedora_prereq_commands = """
+#rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/{distro_arch}/epel-release-5-4.noarch.rpm
 yum -y install {pkg_prereq_str}
 """
     rpm_build_commands="""
@@ -462,6 +469,7 @@ rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-devel-1.38.0-1.{distro_arch}.r
     # 1.34, but 1.35 packages are available, so we want those.
     versioned_deb_boost_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev"]
 
+    new_versioned_deb_boost_prereqs =  ["libboost-thread1.42-dev", "libboost-filesystem1.42-dev", "libboost-program-options1.42-dev", "libboost-date-time1.42-dev", "libboost1.42-dev"]
     unversioned_deb_xulrunner_prereqs = ["xulrunner-dev"]
 
     old_versioned_deb_xulrunner_prereqs = ["xulrunner-1.9-dev"]
@@ -511,6 +519,8 @@ git clone git://github.com/mongodb/mongo.git
                                   self.versioned_deb_boost_prereqs + self.unversioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "9.10", "*"),
                                   self.unversioned_deb_boost_prereqs + self.unversioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
+                                 (("ubuntu", "10.10", "*"),
+                                  self.new_versioned_deb_boost_prereqs + self.new_versioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "10.4", "*"),
                                   self.unversioned_deb_boost_prereqs + self.new_versioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "8.10", "*"),
@@ -532,22 +542,24 @@ git clone git://github.com/mongodb/mongo.git
                                   (("ubuntu", "*", "*"),
                                   self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
                                  (("centos", "*", "*"),
-                                  self.preamble_commands + self.old_rpm_precommands + self.rpm_prereq_commands + self.get_mongo_commands + self.mangle_files_commands  + self.mangle_files_for_ancient_redhat_commands + self.rpm_build_commands),
+                                  self.preamble_commands + self.old_rpm_precommands + self.centos_prereq_commands + self.get_mongo_commands + self.mangle_files_commands  + self.mangle_files_for_ancient_redhat_commands + self.rpm_build_commands),
                                  (("fedora", "*", "*"),
-                                  self.preamble_commands + self.old_rpm_precommands + self.rpm_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.rpm_build_commands))),
+                                  self.preamble_commands + self.old_rpm_precommands + self.fedora_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.rpm_build_commands))),
                                ("preamble_commands",
                                 ((("*", "*", "*"), self.preamble_commands),
                                  )),
                                ("install_prereqs",
                                 ((("debian", "*", "*"), self.deb_prereq_commands),
                                  (("ubuntu", "*", "*"), self.deb_prereq_commands),
-                                 (("centos", "*", "*"), self.rpm_prereq_commands),
-                                 (("fedora", "*", "*"), self.rpm_prereq_commands))),
+                                 (("centos", "*", "*"), self.centos_prereq_commands),
+                                 (("fedora", "*", "*"), self.fedora_prereq_commands))),
                                ("get_mongo",
                                 ((("*", "*", "*"), self.get_mongo_commands),
                                  )),
                                ("mangle_mongo",
                                 ((("debian", "*", "*"), self.mangle_files_commands),
+                                 (("ubuntu", "10.10", "*"),
+                                  self.mangle_files_commands  + self.mangle_files_for_new_deb_xulrunner_commands),
                                  (("ubuntu", "10.4", "*"),
                                   self.mangle_files_commands  + self.mangle_files_for_new_deb_xulrunner_commands),
                                  (("ubuntu", "*", "*"), self.mangle_files_commands),
