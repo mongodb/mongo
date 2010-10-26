@@ -101,7 +101,7 @@ namespace mongo {
     const char * (*getcurns)() = default_getcurns;
 
     int logLevel = 0;
-    int tlogLevel = 0;
+    int tlogLevel = 1;
     mongo::mutex Logstream::mutex("Logstream");
     int Logstream::doneSetup = Logstream::magicNumber();
     

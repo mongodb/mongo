@@ -38,6 +38,7 @@ namespace mongo {
 		(such as adding a virtual function)
 	 */
     class DiskLoc {
+        friend class BtreeBuilder;
         int _a;     // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
         int ofs;
 

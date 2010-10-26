@@ -1130,7 +1130,8 @@ namespace mongo {
 	 * See BtreeBuilder::buildNextLevel
 	 */
 	static void mergeIndexSubTrees(vector<IndexChunkBuilder *> &chunkBuilders, IndexDetails &idx) {
-		int currentChunkBuilderIndex = 0;
+        		
+        int currentChunkBuilderIndex = 0;
 		BtreeBuilder *currentBtreeBuilder = chunkBuilders.front()->getBtreeBuilder();
 		DiskLoc loc = currentBtreeBuilder->getIndexDetails()->head;		
 		while(true) {
@@ -1166,9 +1167,17 @@ namespace mongo {
 					up = upLoc.btreemod();
 					up->pushBack(r, k, currentBtreeBuilder->getOrdering(), keepLoc);
 				}
+                
 				currentBtreeBuilder = chunkBuilders[++currentChunkBuilderIndex]->getBtreeBuilder();
 				DiskLoc nextLoc = currentBtreeBuilder->getIndexDetails()->head;
-
+                if( keepX ) {
+                    x->parent = upLoc;                
+                } else {
+                    if( !x->nextChild.isNull() ) {
+                        x->nextChild.btreemod()->parent = upLoc;                    
+                    }
+                    x->deallocBucket(xloc, idx);                
+                }
 				xloc = nextLoc; 	
 
 			}
@@ -1205,7 +1214,8 @@ namespace mongo {
 
     void indexBuildThread( IndexChunkBuilder* chunkBuilder )
     {
-
+       
+       Client::initThread("Parallel index build"); 
        BtreeBuilder* btBuilder = chunkBuilder->getBtreeBuilder();
        BSONObj keyLast;
        while ( chunkBuilder->more() ) {
@@ -1346,7 +1356,7 @@ namespace mongo {
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         //Call our function
-        return fastParallelBuildIndex(ns, d, idx, idxNo);
+        //return fastParallelBuildIndex(ns, d, idx, idxNo);
                 
         assert( d->backgroundIndexBuildInProgress == 0 );
         CurOp * op = cc().curop();

@@ -1304,7 +1304,7 @@ namespace mongo {
                 x->popBack(r,k);
                 bool keepX = ( x->n != 0 );
                 DiskLoc keepLoc = keepX ? xloc : x->nextChild;
-
+		        log(1) << "Trying to add BSONObj: " << k.toString() << ", at DiskLoc " << r._a << ", " << r.ofs << "to node at "<< upLoc._a << ", " << upLoc.ofs << endl;
                 if ( ! up->_pushBack(r, k, ordering, keepLoc) ){
                     // current bucket full
                     DiskLoc n = BtreeBucket::addBucket(idx);
@@ -1312,7 +1312,8 @@ namespace mongo {
                     upLoc = n; 
                     up = upLoc.btreemod();
                     up->pushBack(r, k, ordering, keepLoc);
-                }
+		            log(1) << "Needed new node: " << upLoc._a << ", " << upLoc.ofs << endl;
+                } 
 
                 DiskLoc nextLoc = x->tempNext(); /* get next in chain at current level */
                 if ( keepX ) {
