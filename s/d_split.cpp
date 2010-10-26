@@ -491,8 +491,8 @@ namespace mongo {
                     return false;
                 }
 
-                origChunk.min = currMin;
-                origChunk.max = currMax;
+                origChunk.min = currMin.getOwned();
+                origChunk.max = currMax.getOwned();
                 origChunk.lastmod = currChunk["lastmod"];
 
             }
