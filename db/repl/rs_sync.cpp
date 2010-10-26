@@ -84,7 +84,7 @@ namespace mongo {
                 bo op = r.next();
                 OpTime t = op["ts"]._opTime();
                 r.putBack(op);
-                assert( !t.isNull() );
+                massert( 13508 , str::stream() << "no 'ts' in oplog: " << op , !t.isNull() );
                 if( t > applyGTE ) {
                     sethbmsg(str::stream() << "error " << hn << " oplog wrapped during initial sync");
                     return false;
