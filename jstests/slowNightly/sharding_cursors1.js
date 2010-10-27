@@ -19,7 +19,7 @@ for (var i=0; i < toInsert; i++ ){
     assert.eq(db.getLastError(), null, 'no error'); //SERVER-1541
 
     if ( i % 1000 == 999 ) {
-        print( "already inserted " + i );
+        print( "already inserted " + ( i + 1 ) );
     }
 }
 
