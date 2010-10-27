@@ -695,10 +695,9 @@ namespace mongo {
     ChunkManager::ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique ) : 
         _config( config ) , _ns( ns ) , 
         _key( pattern ) , _unique( unique ) , 
-        _sequenceNumber(  ++NextSequenceNumber ), 
         _lock("rw:ChunkManager"), _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
     {
-        _reload_inlock();
+        _reload_inlock();  // will set _sequenceNumber
     }
 
     ChunkManager::~ChunkManager(){
@@ -722,15 +721,20 @@ namespace mongo {
 
             if (_isValid()){
                 _chunkRanges.reloadAll(_chunkMap);
+
+                // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
+                // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
+                // the most up to date value.
+                _sequenceNumber = ++NextSequenceNumber; 
+
                 return;
             }
 
             if (_chunkMap.size() < 10){ 
                 _printChunks();
             }
-            // TODO which one is it? millis or secs?
+
             sleepmillis(10 * (3-tries));
-            sleepsecs(10);
         }
 
         msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.");
