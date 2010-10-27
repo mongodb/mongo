@@ -1031,17 +1031,17 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	 * P3 -> P1
 	 *    -> P2 -> L
 	 */
-#ifdef HAVE_DIAGNOSTIC
-#define	WT_STACK_ALLOC_INCR	2
-#else
-#define	WT_STACK_ALLOC_INCR	20
-#endif
 	/*
 	 * To simplify the rest of the code, check to see if there's room for
 	 * another entry in our stack structure.  Allocate the stack in groups
 	 * of 20, which is probably big enough for any tree we'll ever see in
 	 * the field, we'll never test the realloc code unless we work at it.
 	 */
+#ifdef HAVE_DIAGNOSTIC
+#define	WT_STACK_ALLOC_INCR	2
+#else
+#define	WT_STACK_ALLOC_INCR	20
+#endif
 	if (stack->size == 0 || level == stack->size - 1) {
 		u_int32_t bytes_allocated = stack->size * sizeof(WT_PAGE *);
 		WT_RET(__wt_realloc(env, &bytes_allocated,
@@ -1060,9 +1060,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	 * If we don't have a parent page, it's case #1 -- allocate the parent
 	 * page immediately.
 	 */
-	if ((parent = stack->page[level]) != NULL)
-		need_promotion = 0;
-	else {
+	if ((parent = stack->page[level]) == NULL) {
 split:		switch (hdr->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:
@@ -1123,7 +1121,8 @@ split:		switch (hdr->type) {
 		/* There's a new parent page, reset the stack. */
 		stack->page[level] = parent = next;
 		next = NULL;
-	}
+	} else
+		need_promotion = 0;
 
 	/*
 	 * See if the promoted data will fit (if they don't, we have to split).
