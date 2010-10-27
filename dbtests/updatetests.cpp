@@ -753,9 +753,9 @@ namespace UpdateTests {
                 client().insert( ns() , BSON( "x" << 5 ) );
                 ASSERT( findOne()["x"].type() == NumberInt );
                 long long start = 5;
-                long long max = 1024L * 1024L * 1024L * 16;
+                long long max = 1024LL * 1024LL * 1024LL * 16LL;
                 ASSERT( max > numeric_limits<int>::max() );
-                cout << "E:  " << max << endl;
+
                 while ( start < max ){
                     update( BSON( "$inc" << BSON( "x" << 500000 ) ) );
                     start += 500000;
