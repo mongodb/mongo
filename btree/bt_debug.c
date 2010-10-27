@@ -540,7 +540,7 @@ onpage:		p = WT_ITEM_BYTE(item);
 	case WT_ITEM_KEY_DUP_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DATA_DUP_OVFL:
-process:	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+process:	WT_ERR(__wt_scr_alloc(toc, &tmp));
 		WT_ERR(__wt_bt_item_process(toc, item, &ovfl, tmp));
 		if (ovfl == NULL) {
 			p = tmp->data;
@@ -566,7 +566,7 @@ process:	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
 err:	if (ovfl != NULL)
 		__wt_bt_page_out(toc, &ovfl, 0);
 	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, &tmp);
+		__wt_scr_release(&tmp);
 	return (ret);
 }
 

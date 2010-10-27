@@ -121,7 +121,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	}
 
 	/* Make sure the TOC's scratch buffer is big enough. */
-	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	WT_ERR(__wt_scr_alloc(toc, &tmp));
 	if (tmp->mem_size < sizeof(WT_PAGE) + max)
 		WT_ERR(__wt_realloc(env, &tmp->mem_size,
 		    sizeof(WT_PAGE) + max, &tmp->data));
@@ -179,7 +179,7 @@ done:	/*
 err:	F_CLR(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
 
 	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, &tmp);
+		__wt_scr_release(&tmp);
 
 	return (ret);
 }
@@ -242,7 +242,7 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * and set the delete flag.
 	 */
 	len = db->fixed_len;
-	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	WT_ERR(__wt_scr_alloc(toc, &tmp));
 	if (tmp->mem_size < len)
 		WT_ERR(__wt_realloc(env, &tmp->mem_size, len, &tmp->data));
 	memset(tmp->data, 0, len);
@@ -278,7 +278,7 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	}
 
 err:	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, &tmp);
+		__wt_scr_release(&tmp);
 	return (ret);
 }
 
@@ -316,7 +316,7 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * and set the delete flag.
 	 */
 	len = db->fixed_len + sizeof(u_int16_t);
-	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	WT_ERR(__wt_scr_alloc(toc, &tmp));
 	if (tmp->mem_size < len)
 		WT_ERR(__wt_realloc(env, &tmp->mem_size, len, &tmp->data));
 	memset(tmp->data, 0, len);
@@ -420,7 +420,7 @@ err:	if (expsort != NULL)
 		__wt_free(env, expsort, n_expsort * sizeof(WT_COL_EXPAND *));
 
 	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, &tmp);
+		__wt_scr_release(&tmp);
 
 	return (ret);
 }

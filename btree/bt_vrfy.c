@@ -337,7 +337,7 @@ __wt_bt_verify_cmp(
 	child_rip = first_entry ?
 	    child->u.irow : child->u.irow + (child->indx_count - 1);
 	if (WT_KEY_PROCESS(child_rip)) {
-		WT_ERR(__wt_toc_scratch_alloc(toc, &scratch1));
+		WT_ERR(__wt_scr_alloc(toc, &scratch1));
 		WT_ERR(__wt_bt_item_process(
 		    toc, child_rip->key, &child_ovfl_page, scratch1));
 		if (child_ovfl_page != NULL) {
@@ -350,7 +350,7 @@ __wt_bt_verify_cmp(
 	} else
 		cd_ref = (DBT *)child_rip;
 	if (WT_KEY_PROCESS(parent_rip)) {
-		WT_ERR(__wt_toc_scratch_alloc(toc, &scratch2));
+		WT_ERR(__wt_scr_alloc(toc, &scratch2));
 		WT_RET(__wt_bt_item_process(
 		    toc, parent_rip->key, &parent_ovfl_page, scratch2));
 		if (parent_ovfl_page != NULL) {
@@ -382,9 +382,9 @@ __wt_bt_verify_cmp(
 	}
 
 err:	if (scratch1 != NULL)
-		__wt_toc_scratch_discard(toc, &scratch1);
+		__wt_scr_release(&scratch1);
 	if (scratch2 != NULL)
-		__wt_toc_scratch_discard(toc, &scratch2);
+		__wt_scr_release(&scratch2);
 	if (child_ovfl_page != NULL)
 		__wt_bt_page_out(toc, &child_ovfl_page, 0);
 	if (parent_ovfl_page != NULL)
@@ -571,13 +571,13 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_CLEAR(_c);
 	current = &_a;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
-		WT_ERR(__wt_toc_scratch_alloc(toc, &_a.item_comp));
+		WT_ERR(__wt_scr_alloc(toc, &_a.item_comp));
 	last_data = &_b;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
-		WT_ERR(__wt_toc_scratch_alloc(toc, &_b.item_comp));
+		WT_ERR(__wt_scr_alloc(toc, &_b.item_comp));
 	last_key = &_c;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
-		WT_ERR(__wt_toc_scratch_alloc(toc, &_c.item_comp));
+		WT_ERR(__wt_scr_alloc(toc, &_c.item_comp));
 
 	/* Set the comparison function. */
 	switch (hdr->type) {
@@ -912,11 +912,11 @@ err:	/* Discard any overflow pages we're still holding. */
 
 	/* Discard any scratch buffers we allocated. */
 	if (_a.item_comp != NULL)
-		__wt_toc_scratch_discard(toc, &_a.item_comp);
+		__wt_scr_release(&_a.item_comp);
 	if (_b.item_comp != NULL)
-		__wt_toc_scratch_discard(toc, &_b.item_comp);
+		__wt_scr_release(&_b.item_comp);
 	if (_c.item_comp != NULL)
-		__wt_toc_scratch_discard(toc, &_c.item_comp);
+		__wt_scr_release(&_c.item_comp);
 
 	return (ret);
 }
