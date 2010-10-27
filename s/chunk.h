@@ -116,16 +116,16 @@ namespace mongo {
          *              if set to false, will only split if the chunk has reached the currently desired maximum size
          * @return if found a key, return a pointer to the first chunk, otherwise return a null pointer
          */
-        ChunkPtr simpleSplit( bool force );
+        ChunkPtr singleSplit( bool force );
 
         /**
-         * Splits this chunk at at the given keys
+         * Splits this chunk at the given key (or keys)
          *
          * @param splitPoints the vector of keys that should be used to divide this chunk
          * @return shared pointer to the first new Chunk
          */
-        /* to be deprecated */ ChunkPtr multiSplit( const vector<BSONObj>& splitPoints );
-        ChunkPtr multiSplit_ForDevOnly( const  vector<BSONObj>& splitPoints );
+        ChunkPtr multiSplit_DEPRECATED( const vector<BSONObj>& splitPoints );
+        ChunkPtr multiSplit( const  vector<BSONObj>& splitPoints );
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two

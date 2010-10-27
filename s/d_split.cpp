@@ -372,10 +372,10 @@ namespace mongo {
 
     class SplitChunkCommand : public Command {
     public:
-        SplitChunkCommand() : Command( "splitChunk_ForDevOnly" ){}
+        SplitChunkCommand() : Command( "splitChunk" ){}
         virtual void help( stringstream& help ) const {
             help << 
-                "internal command ** under development ** \n" 
+                "internal command usage only\n" 
                 "example:\n"
                 " { splitChunk:\"db.foo\" , keyPattern: {a:1} , min : {a:100} , max: {a:200} { splitKeys : [ {a:150} , ... ]}";
         }
@@ -431,6 +431,18 @@ namespace mongo {
                 return false;
             }
 
+            // It is possible that this is the first sharded command this mongod is asked to perform. If so,
+            // start sharding apparatus.
+            if ( ! shardingState.enabled() ){
+                if ( cmdObj["configdb"].type() != String ){
+                    errmsg = "sharding not enabled";
+                    return false;
+                }
+                string configdb = cmdObj["configdb"].String();
+                shardingState.enable( configdb );
+                configServer.init( configdb );
+            }
+
             //
             // 2. lock the collection's metadata and get highest version for the current shard
             //
@@ -479,8 +491,8 @@ namespace mongo {
                     return false;
                 }
 
-                origChunk.min = currMin;
-                origChunk.max = currMax;
+                origChunk.min = currMin.getOwned();
+                origChunk.max = currMax.getOwned();
                 origChunk.lastmod = currChunk["lastmod"];
 
             }

@@ -134,6 +134,9 @@ namespace mongo {
         OID round = cmd["round"].OID();
         int myver = rs.config().version;
 
+        const Member* primary = rs.box.getPrimary();
+        const Member* hopeful = rs.findById(whoid);
+
         int vote = 0;
         if( set != rs.name() ) { 
             log() << "replSet error received an elect request for '" << set << "' but our set name is '" << rs.name() << "'" << rsLog;
@@ -145,6 +148,16 @@ namespace mongo {
         else if( myver > cfgver ) { 
             // they are stale!
             log() << "replSet info got stale version # during election" << rsLog;
+            vote = -10000;
+        }
+        else if( !hopeful ) {
+            log() << "couldn't find member with id " << whoid << rsLog;
+            vote = -10000;
+        }
+        else if( primary && primary->hbinfo().opTime > hopeful->hbinfo().opTime ) {
+            // other members might be aware of more up-to-date nodes
+            log() << hopeful->fullName() << " is trying to elect itself but " <<
+                primary->fullName() << " is already primary and more up-to-date" << rsLog;
             vote = -10000;
         }
         else {

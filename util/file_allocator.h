@@ -162,7 +162,10 @@ namespace mongo {
     private:
 #if !defined(_WIN32)
         void checkFailure() {
-            uassert( 12520, "new file allocation failure", !failed_ );            
+            if (failed_) {
+                // we want to log the problem (diskfull.js expects it) but we do not want to dump a stack tracke
+                msgassertedNoTrace( 12520, "new file allocation failure" );
+            }
         }
         
         // caller must hold pendingMutex_ lock.  Returns size if allocated or 

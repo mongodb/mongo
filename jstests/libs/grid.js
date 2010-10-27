@@ -1,4 +1,4 @@
-// Grid infrastructure: Servers, ReplicaSets, ConfigSets, Shards, Routers (mongos). Convenient objects and functions on top of those in shell/servers.js
+// Grid infrastructure: Servers, ReplicaSets, ConfigSets, Shards, Routers (mongos). Convenient objects and functions on top of those in shell/servers.js -Tony
 
 load('jstests/libs/fun.js')
 load('jstests/libs/network.js')
@@ -8,7 +8,7 @@ load('jstests/libs/network.js')
 var nextPort = 31000
 
 /*** Server is the spec of a mongod, ie. all its command line options.
- To start a server call start ***/
+ To start a server call 'begin' ***/
 // new Server :: String -> FreshPorts Server
 function Server (name) {
     this.dbpath = '/data/db/' + name + nextPort
@@ -26,10 +26,18 @@ Server.prototype.host = function() {
     return this.addr + ':' + this.port
 }
 
-// Start a server with this spec and return connection to it
+// Start a new server with this spec and return connection to it
 // Server -> IO Connection
-Server.prototype.start = function() {
+Server.prototype.begin = function() {
     return startMongodEmpty(this)
+}
+
+// Stop server and remove db directory
+// Server -> IO ()
+Server.prototype.end = function() {
+    print('Stopping mongod on port ' + this.port)
+    stopMongod (this.port)
+    resetDbpath (this.dbpath)
 }
 
 // Cut server from network so it is unreachable (but still alive)
@@ -46,7 +54,7 @@ function uncutServer (conn) {
     restoreNetwork (iport.port)
 }
 
-// Terminate server process at other end of this connection
+// Kill server process at other end of this connection
 function killServer (conn, _signal) {
     var signal = _signal || 15
     var iport = parseHost (conn.host)
@@ -54,7 +62,7 @@ function killServer (conn, _signal) {
 }
 
 /*** ReplicaSet is the spec of a replica set, ie. options given to ReplicaSetTest.
- To start a replica set call start ***/
+ To start a replica set call 'begin' ***/
 // new ReplicaSet :: String -> Int -> FreshPorts ReplicaSet
 function ReplicaSet (name, numServers) {
     this.name = name
@@ -65,9 +73,9 @@ function ReplicaSet (name, numServers) {
     nextPort += numServers
 }
 
-// Start a replica set with this spec and return ReplSetTest, which hold connections to the servers including the master server
+// Start a replica set with this spec and return ReplSetTest, which hold connections to the servers including the master server. Call ReplicaSetTest.stopSet() to end all servers
 // ReplicaSet -> IO ReplicaSetTest
-ReplicaSet.prototype.start = function() {
+ReplicaSet.prototype.begin = function() {
     var rs = new ReplSetTest(this)
     rs.startSet()
     rs.initiate()
@@ -91,7 +99,7 @@ ReplSetTest.prototype.addServer = function() {
 
 /*** ConfigSet is a set of specs (Servers) for sharding config servers.
  Supply either the servers or the number of servers desired.
- To start the config servers call start ***/
+ To start the config servers call 'begin' ***/
 // new ConfigSet :: [Server] or Int -> FreshPorts ConfigSet
 function ConfigSet (configSvrsOrNumSvrs) {
     if (typeof configSvrsOrNumSvrs == 'number') {
@@ -104,12 +112,18 @@ function ConfigSet (configSvrsOrNumSvrs) {
 
 // Start config servers, return list of connections to them
 // ConfigSet -> IO [Connection]
-ConfigSet.prototype.start = function() {
-    return map (function(s) {return s.start()}, this.configSvrs)
+ConfigSet.prototype.begin = function() {
+    return map (function(s) {return s.begin()}, this.configSvrs)
+}
+
+// Stop config servers
+// ConfigSet -> IO ()
+ConfigSet.prototype.end = function() {
+    return map (function(s) {return s.end()}, this.configSvrs)
 }
 
 /*** Router is the spec for a mongos, ie, its command line options.
- To start a router (mongos) call start ***/
+ To start a router (mongos) call 'begin' ***/
 // new Router :: ConfigSet -> FreshPorts Router
 function Router (configSet) {
     this.port = nextPort++
@@ -120,8 +134,14 @@ function Router (configSet) {
 
 // Start router (mongos) with this spec and return connection to it
 // Router -> IO Connection
-Router.prototype.start = function() {
+Router.prototype.begin = function() {
     return startMongos (this)
+}
+
+// Stop router
+// Router -> IO ()
+Router.prototype.end = function() {
+    return stopMongoProgram (this.port)
 }
 
 // Add shard to config via router (mongos) connection. Shard is either a replSet name (replSet.getURL()) or single server (server.host)

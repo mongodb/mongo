@@ -486,7 +486,7 @@ namespace mongo {
                 log() << "splitting: " << ns << "  shard: " << chunk << endl;
 
                 if ( middle.isEmpty() )
-                    chunk->simpleSplit( true /* force a split even if not enough data */ );
+                    chunk->singleSplit( true /* force a split even if not enough data */ );
 
                 else {
                     // sanity check if the key provided is a valid split point

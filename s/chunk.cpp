@@ -230,7 +230,7 @@ namespace mongo {
         return multiSplit( splitPoints );
     }
 
-    ChunkPtr Chunk::simpleSplit( bool force ){
+    ChunkPtr Chunk::singleSplit( bool force ){
         vector<BSONObj> splitPoint;
 
         // If splitting is not obligatory, we may return early if there are not enough data. 
@@ -283,20 +283,23 @@ namespace mongo {
             return ChunkPtr();
         }
 
+        //return multiSplit_DEPRECATED( splitPoint );
         return multiSplit( splitPoint );
-        //return multiSplit_ForDevOnly( splitPoint );
     }
     
-    ChunkPtr Chunk::multiSplit_ForDevOnly( const vector<BSONObj>& m ) {
+    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ) {
+        // TODO use current multiSplit asserts here
+
         ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
         BSONObjBuilder cmd;
-        cmd.append( "splitChunk_ForDevOnly" , _manager->getns() );
+        cmd.append( "splitChunk" , _manager->getns() );
         cmd.append( "keyPattern" , _manager->getShardKey().key() );
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
         cmd.append( "splitKeys" , m );
-        cmd.append( "shardId", genID() );
+        cmd.append( "shardId" , genID() );
+        cmd.append( "configdb" , configServer.modelServer() ); 
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , result )) {
@@ -311,13 +314,22 @@ namespace mongo {
         conn.done();
         _manager->_reload();
 
-        // TODO the moveIfShould path is still expecting the first new chunk of the split. So produce that now
-        // but the move code path can obtain this the same way.
-        return _manager->findChunk( getMin() );
+        // The previous multisplit logic adjusted the boundaries of 'this' chunk. Any call to 'this' object hereafter
+        // will see a different _max for the chunk.
+        // TODO Untie this dependency since, for metadata purposes, the reload() above already fixed boundaries
+        {
+            rwlock lk( _manager->_lock , true );
+
+            setMax(m[0].getOwned());
+            DEV assert( shared_from_this() );
+            _manager->_chunkMap[_max] = shared_from_this();
+        }
+
+        // return the second half, if a single split, or the first new chunk, if a multisplit.
+        return _manager->findChunk( m[0] );
      }
 
-    /* to be deprecated */
-    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
+    ChunkPtr Chunk::multiSplit_DEPRECATED( const vector<BSONObj>& m ){
         dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
         uassert( 10166 , "locking namespace failed" , dlk.got() );
 
@@ -408,7 +420,7 @@ namespace mongo {
         // Save the new key boundaries in the configDB.
         _manager->save( false /* does not inc 'major', ie no moves, in ShardChunkVersion control */);
 
-        // Log all these changes in the configDB's log. We log a simple split differently than a multi-split.
+        // Log all these changes in the configDB's log. We log a single split differently than a multi-split.
         if ( newChunks.size() == 1) {
             appendShortVersion( "left" , detail );
             newChunks[0]->appendShortVersion( "right" , detail );
@@ -487,9 +499,9 @@ namespace mongo {
             
             _dataWritten = 0; // reset so we check often enough
             
-            ChunkPtr newShard = simpleSplit( false /* does not force a split if not enough data */ );
+            ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ );
             if ( newShard.get() == NULL ){
-                // simpleSplit would have issued a message if we got here
+                // singleSplit would have issued a message if we got here
                 return false;
             }
 
@@ -505,7 +517,9 @@ namespace mongo {
             return true;
 
         } catch ( std::exception& e ){
-            error() << "splitIfShould failed: " << e.what() << endl;
+            // if the collection lock is taken (e.g. we're migrating), it is fine for the split to fail.
+            log() << "autosplit failed: " << e.what() << endl;
+
             return false;
         }
     }
@@ -682,10 +696,9 @@ namespace mongo {
     ChunkManager::ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique ) : 
         _config( config ) , _ns( ns ) , 
         _key( pattern ) , _unique( unique ) , 
-        _sequenceNumber(  ++NextSequenceNumber ), 
         _lock("rw:ChunkManager"), _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
     {
-        _reload_inlock();
+        _reload_inlock();  // will set _sequenceNumber
     }
 
     ChunkManager::~ChunkManager(){
@@ -709,15 +722,20 @@ namespace mongo {
 
             if (_isValid()){
                 _chunkRanges.reloadAll(_chunkMap);
+
+                // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
+                // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
+                // the most up to date value.
+                _sequenceNumber = ++NextSequenceNumber; 
+
                 return;
             }
 
             if (_chunkMap.size() < 10){ 
                 _printChunks();
             }
-            // TODO which one is it? millis or secs?
+
             sleepmillis(10 * (3-tries));
-            sleepsecs(10);
         }
 
         msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.");
@@ -1011,7 +1029,10 @@ namespace mongo {
     }
     
     void ChunkManager::save_inlock( bool major ){
-        
+        // we do not update update the chunk manager on the mongos side any more
+        // the only exception case should be first chunk creation
+        assert( _chunkMap.size() == 1 );
+
         ShardChunkVersion version = getVersion_inlock();
         assert( version > 0 || _chunkMap.size() <= 1 );
         ShardChunkVersion nextChunkVersion = version;

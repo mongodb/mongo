@@ -108,8 +108,10 @@ namespace mongo {
         // for testing
         int nKeys() const { return n; }
         DiskLoc getNextChild() const { return nextChild; }
-
+        
     protected:
+        DiskLoc &child( int i ) { return i == n ? nextChild : k( i ).prevChildBucket; }
+
         char * dataAt(short ofs) { return data + ofs; }
 
         void init(); // initialize a new node
@@ -128,7 +130,7 @@ namespace mongo {
             assert(ok);
         }
         void popBack(DiskLoc& recLoc, BSONObj& key);
-        void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs.
+        void _delKeyAtPos(int keypos, bool mayEmpty = false); // low level version that doesn't deal with child ptrs.
 
         /* !Packed means there is deleted fragment space within the bucket.
            We "repack" when we run out of space before considering the node
@@ -139,7 +141,12 @@ namespace mongo {
         DiskLoc& childForPos(int p) { return p == n ? nextChild : k(p).prevChildBucket; }
 
         int totalDataSize() const;
+        int headerSize() const {
+            return (char*)&data - (char*)&parent;
+        }
+        bool mayDropKey( int index, int refPos ) const;
         void pack( const Ordering &order, int &refPos);
+        int packedDataSize( int refPos ) const;
         void setNotPacked();
         void setPacked();
         int _alloc(int bytes);
@@ -222,10 +229,16 @@ namespace mongo {
 
         static void a_test(IndexDetails&);
 
-    private:
-        void fixParentPtrs(const DiskLoc& thisLoc);
+    protected:
+        void fixParentPtrs(const DiskLoc& thisLoc, int startIndex = 0);
         void delBucket(const DiskLoc& thisLoc, IndexDetails&);
-        void delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p);
+        void delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p, const Ordering &order);
+        void balanceWithNeighbors(const DiskLoc &thisLoc, IndexDetails &id, const Ordering &order);
+        // returns true if merge succeeded, may invalidate 'this'
+        bool tryMergeNeighbors( DiskLoc parent, int leftIndex, IndexDetails &id, const Ordering &order);
+        // will invalidate 'this'
+        void replaceWithNextChild( DiskLoc thisLoc, IndexDetails &id );
+        int indexInParent( const DiskLoc &thisLoc );
         BSONObj keyAt(int keyOfs) {
             return keyOfs >= n ? BSONObj() : keyNode(keyOfs).key;
         }

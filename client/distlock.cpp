@@ -147,6 +147,11 @@ namespace mongo {
 
        
     bool DistributedLock::lock_try( string why , BSONObj * other ){
+        // write to dummy if 'other' is null
+        BSONObj dummyOther; 
+        if ( other == NULL )
+            other = &dummyOther;
+
         ScopedDbConnection conn( _conn );
             
         BSONObjBuilder queryBuilder;
@@ -179,6 +184,8 @@ namespace mongo {
 
                 if ( elapsed <= _takeoverMinutes ){
                     log(1) << "dist_lock lock failed because taken by: " << o << " elapsed minutes: " << elapsed << endl;
+                    *other = o;
+                    other->getOwned();
                     conn.done();
                     return false;
                 }
@@ -209,10 +216,8 @@ namespace mongo {
             now = conn->findOne( _ns , _id );
                 
             if ( o["n"].numberInt() == 0 ){
-                if ( other ){
-                    *other = now;
-                    other->getOwned();
-                }
+                *other = now;
+                other->getOwned();
                 log() << "dist_lock error trying to aquire lock: " << lockDetails << " error: " << o << endl;
                 gotLock = false;
             }

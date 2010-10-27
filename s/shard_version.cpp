@@ -97,6 +97,8 @@ namespace mongo {
             officialSequenceNumber = manager->getSequenceNumber();
         }
 
+        // has the ChunkManager been reloaded since the last time we updated the connection-level version?
+        // (ie, last time we issued the setShardVersions below)
         unsigned long long sequenceNumber = connectionShardStatus.getSequence(&conn,ns);
         if ( sequenceNumber == officialSequenceNumber ){
             return false;

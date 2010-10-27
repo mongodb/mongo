@@ -162,6 +162,7 @@ namespace mongo {
             
         bool justOne = justOneOrig;
         bool canYield = !god && !creal->matcher()->docMatcher().atomic();
+
         do {
             if ( canYield && ! cc->yieldSometimes() ){
                 cc.release(); // has already been deleted elsewhere
@@ -655,17 +656,17 @@ namespace mongo {
         }
         
         virtual void recoverFromYield() {
-            ++_nYields;
+            _nYields++;
+            
             if ( _findingStartCursor.get() ) {
                 _findingStartCursor->recoverFromYield();
-            } else {
-                if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
-                    _c.reset();
-                    _cc.reset();
-                    _so.reset();
-                    massert( 13338, "cursor dropped during query", false );
-                    // TODO maybe we want to prevent recording the winning plan as well?
-                } 
+            } 
+            else if ( ! ClientCursor::recoverFromYield( _yieldData ) ) {
+                _c.reset();
+                _cc.reset();
+                _so.reset();
+                massert( 13338, "cursor dropped during query", false );
+                // TODO maybe we want to prevent recording the winning plan as well?
             }
         }
         
