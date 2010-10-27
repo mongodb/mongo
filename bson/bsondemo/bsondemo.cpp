@@ -39,7 +39,7 @@ void iter(bo o) {
 
 int main()
 {
-	cout << "build bits: " << 8 * sizeof(char *) << '\n' <<  endl;
+    cout << "build bits: " << 8 * sizeof(char *) << '\n' <<  endl;
 
     /* a bson object defaults on construction to { } */
     bo empty;
@@ -103,5 +103,6 @@ int main()
     cout << strs.size() << " strings, first one: " << strs[0] << endl;
 
     iter(y);
-	return 0;
+    return 0;
 }
+
