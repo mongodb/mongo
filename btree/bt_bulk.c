@@ -15,24 +15,14 @@
  *	in this structure.
  */
 typedef struct {
-	WT_PAGE **page;				/* page stack */
+	WT_PAGE *page;				/* page header */
+	DBT	*tmp;				/* page-in-a-buffer */
+	void	*data;				/* last on-page WT_COL/WT_ROW */
+} WT_STACK_ELEM;
+typedef struct {
+	WT_STACK_ELEM *elem;			/* stack */
 	u_int size;				/* stack size */
 } WT_STACK;
-
-/*
- * Bulk-load builds physical pages, and we want to verify them as soon as they
- * are created (when running in diagnostic mode).
- */
-#ifdef HAVE_DIAGNOSTIC
-#define	WT_BULK_PAGE_OUT(toc, pagep, flags) do {			\
-	WT_ASSERT(							\
-	    (toc)->env, __wt_bt_verify_page(toc, *(pagep), NULL) == 0);	\
-	__wt_bt_page_out(toc, pagep, flags);				\
-} while (0)
-#else
-#define	WT_BULK_PAGE_OUT(toc, pagep, flags)				\
-	__wt_bt_page_out(toc, pagep, flags)
-#endif
 
 static int  __wt_bt_bulk_fix(WT_TOC *,
 	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
@@ -46,10 +36,6 @@ static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
 	DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
 static int  __wt_bt_promote(
 	WT_TOC *, WT_PAGE *, u_int64_t, WT_STACK *, u_int, u_int32_t *);
-static int  __wt_bt_promote_col_indx(WT_TOC *, WT_PAGE *, void *);
-static int  __wt_bt_promote_row_indx(WT_TOC *, WT_PAGE *, WT_ITEM *, WT_ITEM *);
-static inline void __wt_bt_promote_col_rec(WT_PAGE *, u_int64_t);
-static inline void __wt_bt_promote_row_rec(WT_PAGE *, u_int64_t);
 static int __wt_bt_scratch_page(
 	WT_TOC *, u_int32_t, u_int32_t, u_int32_t, WT_PAGE **, DBT **);
 
@@ -229,10 +215,9 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	if (f != NULL)
 		f(toc->name, insert_cnt);
 
-err:	if (stack.page != NULL)
-		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
+err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, &tmp);
+		__wt_scr_release(&tmp);
 
 	return (ret);
 }
@@ -277,14 +262,14 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	WT_CLEAR(key_copy);
 	WT_CLEAR(key_item);
 	WT_CLEAR(lastkey_std);
-	WT_ERR(__wt_toc_scratch_alloc(toc, &lastkey_copy));
+	WT_ERR(__wt_scr_alloc(toc, &lastkey_copy));
 
 	/*
 	 * Get a pair of scratch buffers and make them look like our two work
 	 * pages.
 	 */
-	WT_ERR(__wt_bt_scratch_page(toc,
-	    db->leafmin, type, WT_LLEAF, &page, &tmp1));
+	WT_ERR(__wt_bt_scratch_page(
+	    toc, db->leafmin, type, WT_LLEAF, &page, &tmp1));
 
 	/* Update the descriptor record. */
 	idb->root_addr = page->addr;
@@ -500,6 +485,7 @@ skip_read:	/*
 			WT_ERR(__wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL));
 			WT_ERR(__wt_bt_bulk_write(toc, page));
+			__wt_scr_release(&tmp1);
 
 			/*
 			 * Discard the last page, and switch to the next page.
@@ -512,7 +498,6 @@ skip_read:	/*
 			 * asynchronous I/O in bulk load, which means the page
 			 * won't be reusable until the I/O completes.
 			 */
-			__wt_toc_scratch_discard(toc, &tmp1);
 			page = next;
 			next = NULL;
 			tmp1 = tmp2;
@@ -619,14 +604,13 @@ skip_read:	/*
 	if (f != NULL)
 		f(toc->name, insert_cnt);
 
-err:	if (stack.page != NULL)
-		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
+err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (lastkey_copy != NULL)
-		__wt_toc_scratch_discard(toc, &lastkey_copy);
+		__wt_scr_release(&lastkey_copy);
 	if (tmp1 != NULL)
-		__wt_toc_scratch_discard(toc, &tmp1);
+		__wt_scr_release(&tmp1);
 	if (tmp2 != NULL)
-		__wt_toc_scratch_discard(toc, &tmp2);
+		__wt_scr_release(&tmp2);
 
 	return (ret);
 }
@@ -804,10 +788,9 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	__wt_bt_set_ff_and_sa_from_offset(leaf_page,
 	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)));
 
-err:	if (stack.page != NULL)
-		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
+err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, &tmp);
+		__wt_scr_release(&tmp);
 
 	return (ret == 0 ? success_return : ret);
 }
@@ -821,13 +804,14 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
     WT_STACK *stack, u_int level, u_int32_t *dup_root_addrp)
 {
 	DB *db;
-	DBT *key, key_build;
+	DBT *key, key_build, *next_tmp;
 	ENV *env;
-	WT_ITEM *key_item, item, *parent_key;
+	WT_ITEM *key_item, item;
 	WT_OFF off;
 	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
 	WT_PAGE_HDR *hdr;
+	WT_STACK_ELEM *elem;
 	u_int type;
 	int need_promotion, ret;
 	void *parent_data;
@@ -835,9 +819,10 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	db = toc->db;
 	env = toc->env;
 	hdr = page->hdr;
-
 	WT_CLEAR(item);
+	next_tmp = NULL;
 	next = parent = NULL;
+	ret = 0;
 
 	/*
 	 * If it's a row-store, get a copy of the first item on the page -- it
@@ -974,10 +959,11 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 #define	WT_STACK_ALLOC_INCR	20
 #endif
 	if (stack->size == 0 || level == stack->size - 1) {
-		u_int32_t bytes_allocated = stack->size * sizeof(WT_PAGE *);
+		u_int32_t
+		    bytes_allocated = stack->size * sizeof(WT_STACK_ELEM);
 		WT_RET(__wt_realloc(env, &bytes_allocated,
-		    (stack->size + WT_STACK_ALLOC_INCR) * sizeof(WT_PAGE *),
-		    &stack->page));
+		    (stack->size + WT_STACK_ALLOC_INCR) * sizeof(WT_STACK_ELEM),
+		    &stack->elem));
 		stack->size += WT_STACK_ALLOC_INCR;
 		/*
 		 * Note, the stack structure may be entirely uninitialized here,
@@ -991,7 +977,8 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	 * If we don't have a parent page, it's case #1 -- allocate the parent
 	 * page immediately.
 	 */
-	if ((parent = stack->page[level]) == NULL) {
+	parent = stack->elem[level].page;
+	if (parent == NULL) {
 split:		switch (hdr->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:
@@ -1008,8 +995,8 @@ split:		switch (hdr->type) {
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
-		WT_ERR(__wt_bt_page_alloc(
-		    toc, type, hdr->level + 1, db->intlmin, &next));
+		WT_ERR(__wt_bt_scratch_page(
+		    toc, db->intlmin, type, hdr->level + 1, &next, &next_tmp));
 
 		/*
 		 * Case #1 -- there's no parent, it's a root split.  If in a
@@ -1040,18 +1027,21 @@ split:		switch (hdr->type) {
 			 * a key from both of the parent pages: promote the key
 			 * from the existing parent page.
 			 */
-			if (stack->page[level + 1] == NULL)
+			if (stack->elem[level + 1].page == NULL)
 				WT_ERR(__wt_bt_promote(toc, parent,
 				    incr, stack, level + 1, dup_root_addrp));
 
-			/* Discard the old parent page, we have a new one. */
-			WT_BULK_PAGE_OUT(toc, &parent, WT_MODIFIED);
+			/* Write the last parent page, we have a new one. */
+			WT_ERR(__wt_bt_bulk_write(toc, parent));
+			__wt_scr_release(&stack->elem[level].tmp);
 			need_promotion = 1;
 		}
 
 		/* There's a new parent page, reset the stack. */
-		stack->page[level] = parent = next;
+		stack->elem[level].page = parent = next;
 		next = NULL;
+		stack->elem[level].tmp = next_tmp;
+		next_tmp = NULL;
 	} else
 		need_promotion = 0;
 
@@ -1067,8 +1057,6 @@ split:		switch (hdr->type) {
 		if (parent->space_avail < sizeof(WT_OFF))
 			goto split;
 
-		parent_key = NULL;
-
 		/* Create the WT_OFF reference. */
 		WT_RECORDS(&off) = page->records;
 		off.addr = page->addr;
@@ -1081,8 +1069,8 @@ split:		switch (hdr->type) {
 		parent->first_free += sizeof(WT_OFF);
 		parent->space_avail -= sizeof(WT_OFF);
 
-		/* Append new parent index to the in-memory page structures. */
-		WT_ERR(__wt_bt_promote_col_indx(toc, parent, parent_data));
+		/* Track the last entry on the page for record count updates. */
+		stack->elem[level].data = parent_data;
 		break;
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_DUP_INT:
@@ -1093,7 +1081,6 @@ split:		switch (hdr->type) {
 
 		/* Store the key. */
 		++parent->hdr->u.entries;
-		parent_key = (WT_ITEM *)parent->first_free;
 		memcpy(parent->first_free, &item, sizeof(item));
 		memcpy(parent->first_free + sizeof(item), key->data, key->size);
 		parent->first_free += WT_ITEM_SPACE_REQ(key->size);
@@ -1114,15 +1101,13 @@ split:		switch (hdr->type) {
 		parent->first_free += WT_ITEM_SPACE_REQ(sizeof(WT_OFF));
 		parent->space_avail -= WT_ITEM_SPACE_REQ(sizeof(WT_OFF));
 
-		/* Append new parent index to the in-memory page structures. */
-		WT_ERR(__wt_bt_promote_row_indx(
-		    toc, parent, parent_key, parent_data));
+		/* Track the last entry on the page for record count updates. */
+		stack->elem[level].data = parent_data;
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
 	parent->records += page->records;
-	WT_ASSERT(env, __wt_bt_verify_page(toc, parent, NULL) == 0);
 
 	/*
 	 * The promotion for case #2 and the second part of case #3 -- promote
@@ -1138,169 +1123,27 @@ split:		switch (hdr->type) {
 		 * to the root.  We've already corrected our current "parent"
 		 * page, so proceed from there to the root.
 		 */
-		u_int i;
-		for (i = level + 1; (parent = stack->page[i]) != NULL; ++i) {
-			switch (parent->hdr->type) {
+		for (elem =
+		    &stack->elem[level + 1]; elem->page != NULL; ++elem) {
+			switch (elem->page->hdr->type) {
 			case WT_PAGE_COL_INT:
-				__wt_bt_promote_col_rec(parent, incr);
+				WT_RECORDS((WT_OFF *)elem->data) += incr;
 				break;
 			case WT_PAGE_ROW_INT:
-				__wt_bt_promote_row_rec(parent, incr);
+			case WT_PAGE_DUP_INT:
+				WT_RECORDS(
+				    (WT_OFF *)WT_ITEM_BYTE(elem->data)) += incr;
 				break;
 			WT_ILLEGAL_FORMAT(db);
 			}
-			parent->records += incr;
+			elem->page->records += incr;
 		}
 	}
 
-err:	if (next != NULL)
-		WT_BULK_PAGE_OUT(toc, &next, WT_MODIFIED);
+err:	if (next_tmp != NULL)
+		__wt_scr_release(&next_tmp);
 
 	return (ret);
-}
-
-/*
- * __wt_bt_promote_col_indx --
- *	Append a new WT_OFF to an internal page's in-memory information.
- */
-static int
-__wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *data)
-{
-	ENV *env;
-	WT_COL *cip;
-	u_int32_t allocated;
-
-	env = toc->env;
-
-	/*
-	 * Make sure there's enough room in the in-memory index.  We don't grow
-	 * the page's index anywhere else, so we don't have any "size" value
-	 * separate from the number of entries the index array holds.  In this
-	 * one case, to avoid re-allocating the array on every promotion, we
-	 * allocate in chunks of 100, which we can detect as the count hits a
-	 * new boundary.
-	 */
-	if (page->indx_count % 100 == 0) {
-		allocated = page->indx_count * sizeof(WT_COL);
-		WT_RET(__wt_realloc(env, &allocated,
-		    (page->indx_count + 100) * sizeof(WT_COL),
-		    &page->u.icol));
-	}
-
-	/* Add in the new index entry. */
-	cip = page->u.icol + page->indx_count;
-	++page->indx_count;
-
-	/* Fill in the on-page data. */
-	cip->data = data;
-
-	return (0);
-}
-
-/*
- * __wt_bt_promote_row_indx --
- *	Append a new WT_ITEM_{KEY,KEY_DUP}/WT_OFF pair to an internal page's
- *	in-memory information.
- */
-static int
-__wt_bt_promote_row_indx(
-    WT_TOC *toc, WT_PAGE *page, WT_ITEM *key, WT_ITEM *data)
-{
-	DB *db;
-	ENV *env;
-	IDB *idb;
-	WT_ROW *rip;
-	u_int32_t allocated;
-
-	env = toc->env;
-	db = toc->db;
-	idb = db->idb;
-
-	/*
-	 * Make sure there's enough room in the in-memory index.  We don't grow
-	 * the page's index anywhere else, so we don't have any "size" value
-	 * separate from the number of entries the index array holds.  In this
-	 * one case, to avoid re-allocating the array on every promotion, we
-	 * allocate in chunks of 100, which we can detect as the count hits a
-	 * new boundary.
-	 */
-	if (page->indx_count % 100 == 0) {
-		allocated = page->indx_count * sizeof(WT_ROW);
-		WT_RET(__wt_realloc(env, &allocated,
-		    (page->indx_count + 100) * sizeof(WT_ROW),
-		    &page->u.irow));
-	}
-
-	/* Add in the new index entry. */
-	rip = page->u.irow + page->indx_count;
-	++page->indx_count;
-
-	/*
-	 * If there's a key, fill it in.  On-page uncompressed keys are directly
-	 * referenced, but compressed or overflow keys reference the on-page
-	 * item, with a size of 0 to indicate they need further processing.
-	 */
-	if (key != NULL)
-		switch (WT_ITEM_TYPE(key)) {
-		case WT_ITEM_KEY:
-			if (idb->huffman_key == NULL) {
-				WT_KEY_SET(rip,
-				    WT_ITEM_BYTE(key), WT_ITEM_LEN(key));
-				break;
-			}
-			goto process;
-		case WT_ITEM_KEY_DUP:
-			if (idb->huffman_data == NULL) {
-				WT_KEY_SET(rip,
-				    WT_ITEM_BYTE(key), WT_ITEM_LEN(key));
-				break;
-			}
-			/* FALLTHROUGH */
-		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_KEY_DUP_OVFL:
-process:		WT_KEY_SET_PROCESS(rip, key);
-			break;
-		WT_ILLEGAL_FORMAT(db);
-		}
-
-	/* Fill in the on-page data. */
-	rip->data = data;
-
-	return (0);
-}
-
-/*
- * __wt_bt_promote_col_rec --
- *	Promote the record count to a column-store parent.
- */
-static inline void
-__wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
-{
-	WT_COL *cip;
-
-	/*
-	 * Because of the bulk load pattern, we're always adding records to
-	 * the subtree referenced by the last entry in each parent page.
-	 */
-	cip = parent->u.icol + (parent->indx_count - 1);
-	WT_COL_OFF_RECORDS(cip) += incr;
-}
-
-/*
- * __wt_bt_promote_row_rec --
- *	Promote the record count to a row-store parent.
- */
-static inline void
-__wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t incr)
-{
-	WT_ROW *rip;
-
-	/*
-	 * Because of the bulk load pattern, we're always adding records to
-	 * the subtree referenced by the last entry in each parent page.
-	 */
-	rip = parent->u.irow + (parent->indx_count - 1);
-	WT_ROW_OFF_RECORDS(rip) += incr;
 }
 
 /*
@@ -1470,7 +1313,7 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	ret = __wt_bt_bulk_write(toc, page);
 
 err:	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, &tmp);
+		__wt_scr_release(&tmp);
 
 	return (ret);
 }
@@ -1499,7 +1342,7 @@ __wt_bt_scratch_page(WT_TOC *toc,
 	 * WT_PAGE structure plus the page itself, and clear the memory so
 	 * it's never random bytes.
 	 */
-	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	WT_ERR(__wt_scr_alloc(toc, &tmp));
 	size = page_size + sizeof(WT_PAGE);
 	if (tmp->mem_size < size)
 		WT_ERR(__wt_realloc(env, &tmp->mem_size, size, &tmp->data));
@@ -1526,7 +1369,7 @@ __wt_bt_scratch_page(WT_TOC *toc,
 	return (0);
 
 err:	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, &tmp);
+		__wt_scr_release(&tmp);
 	return (ret);
 }
 
@@ -1538,13 +1381,20 @@ static int
 __wt_bt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 {
 	ENV *env;
-	u_int i;
+	WT_STACK_ELEM *elem;
+	int ret;
 
 	env = toc->env;
+	ret = 0;
 
-	for (i = 0; stack->page[i] != NULL; ++i)
-		WT_BULK_PAGE_OUT(toc, &stack->page[i], WT_MODIFIED);
-	__wt_free(env, stack->page, stack->size * sizeof(WT_PAGE *));
+	if (stack->elem == NULL)
+		return (0);
+
+	for (elem = stack->elem; elem->page != NULL; ++elem) {
+		WT_TRET(__wt_bt_bulk_write(toc, elem->page));
+		__wt_scr_release(&elem->tmp);
+	}
+	__wt_free(env, stack->elem, stack->size * sizeof(WT_STACK_ELEM));
 
 	return (0);
 }
@@ -1574,10 +1424,11 @@ __wt_bt_bulk_write(WT_TOC *toc, WT_PAGE *page)
 static int
 __wt_bt_dbt_copy(ENV *env, DBT *orig, DBT *copy)
 {
-	if (copy->data == NULL || copy->mem_size < orig->size)
+	if (copy->mem_size < orig->size)
 		WT_RET(__wt_realloc(
 		    env, &copy->mem_size, orig->size, &copy->data));
-	memcpy(copy->data, orig->data, copy->size = orig->size);
+	memcpy(copy->data, orig->data, orig->size);
+	copy->size = orig->size;
 
 	return (0);
 }
