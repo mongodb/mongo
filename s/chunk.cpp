@@ -518,7 +518,9 @@ namespace mongo {
             return true;
 
         } catch ( std::exception& e ){
-            error() << "splitIfShould failed: " << e.what() << endl;
+            // if the collection lock is taken (e.g. we're migrating), it is fine for the split to fail.
+            log() << "splitIfShould failed: " << e.what() << endl;
+
             return false;
         }
     }
