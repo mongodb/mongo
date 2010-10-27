@@ -37,6 +37,7 @@ typedef struct {
 static int  __wt_bt_bulk_fix(WT_TOC *,
 	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, u_int32_t *);
+static int __wt_bt_bulk_stack_put(WT_TOC *, WT_STACK *);
 static int  __wt_bt_bulk_var(WT_TOC *, u_int32_t,
 	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
 static inline int __wt_bt_bulk_write(WT_TOC *, WT_PAGE *);
@@ -250,12 +251,8 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	if (f != NULL)
 		f(toc->name, insert_cnt);
 
-err:	if (stack.page != NULL) {
-		u_int i;
-		for (i = 0; stack.page[i] != NULL; ++i)
-			WT_BULK_PAGE_OUT(toc, &stack.page[i], WT_MODIFIED);
-		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
-	}
+err:	if (stack.page != NULL)
+		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
 		__wt_toc_scratch_discard(toc, tmp);
 
@@ -666,13 +663,8 @@ skip_read:	/*
 	if (f != NULL)
 		f(toc->name, insert_cnt);
 
-err:	if (stack.page != NULL) {
-		u_int i;
-		for (i = 0; stack.page[i] != NULL; ++i)
-			WT_BULK_PAGE_OUT(toc, &stack.page[i], WT_MODIFIED);
-		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
-	}
-
+err:	if (stack.page != NULL)
+		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (lastkey_copy != NULL)
 		__wt_toc_scratch_discard(toc, lastkey_copy);
 	if (tmp1 != NULL)
@@ -881,12 +873,8 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	__wt_bt_set_ff_and_sa_from_offset(leaf_page,
 	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)));
 
-err:	if (stack.page != NULL) {
-		u_int i;
-		for (i = 0; stack.page[i] != NULL; ++i)
-			WT_BULK_PAGE_OUT(toc, &stack.page[i], WT_MODIFIED);
-		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
-	}
+err:	if (stack.page != NULL)
+		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
 		__wt_toc_scratch_discard(toc, tmp);
 
@@ -1586,6 +1574,25 @@ err:	if (tmp != NULL)
 		__wt_toc_scratch_discard(toc, tmp);
 
 	return (ret);
+}
+
+/*
+ * __wt_bt_bulk_stack_put --
+ *	Push out the tree's stack of pages.
+ */
+static int
+__wt_bt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
+{
+	ENV *env;
+	u_int i;
+
+	env = toc->env;
+
+	for (i = 0; stack->page[i] != NULL; ++i)
+		WT_BULK_PAGE_OUT(toc, &stack->page[i], WT_MODIFIED);
+	__wt_free(env, stack->page, stack->size * sizeof(WT_PAGE *));
+
+	return (0);
 }
 
 /*
