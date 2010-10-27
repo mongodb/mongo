@@ -283,17 +283,17 @@ namespace mongo {
             return ChunkPtr();
         }
 
+        //return multiSplit_DEPRECATED( splitPoint );
         return multiSplit( splitPoint );
-        //return multiSplit_ForDevOnly( splitPoint );
     }
     
-    ChunkPtr Chunk::multiSplit_ForDevOnly( const vector<BSONObj>& m ) {
+    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ) {
         // TODO use current multiSplit asserts here
 
         ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
         BSONObjBuilder cmd;
-        cmd.append( "splitChunk_ForDevOnly" , _manager->getns() );
+        cmd.append( "splitChunk" , _manager->getns() );
         cmd.append( "keyPattern" , _manager->getShardKey().key() );
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
@@ -329,8 +329,7 @@ namespace mongo {
         return _manager->findChunk( m[0] );
      }
 
-    /* to be deprecated */
-    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ){
+    ChunkPtr Chunk::multiSplit_DEPRECATED( const vector<BSONObj>& m ){
         dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
         uassert( 10166 , "locking namespace failed" , dlk.got() );
 
@@ -519,7 +518,7 @@ namespace mongo {
 
         } catch ( std::exception& e ){
             // if the collection lock is taken (e.g. we're migrating), it is fine for the split to fail.
-            log() << "splitIfShould failed: " << e.what() << endl;
+            log() << "autosplit failed: " << e.what() << endl;
 
             return false;
         }
@@ -1030,7 +1029,10 @@ namespace mongo {
     }
     
     void ChunkManager::save_inlock( bool major ){
-        
+        // we do not update update the chunk manager on the mongos side any more
+        // the only exception case should be first chunk creation
+        assert( _chunkMap.size() == 1 );
+
         ShardChunkVersion version = getVersion_inlock();
         assert( version > 0 || _chunkMap.size() <= 1 );
         ShardChunkVersion nextChunkVersion = version;

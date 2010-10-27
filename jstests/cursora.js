@@ -21,8 +21,8 @@ function run( n , atomic ){
     join()
 
     print( "num: " + num + " time:" + ( end.getTime() - start.getTime() ) )
-    assert.eq( 0 , t.count() , "after remove" )
-    assert.lt( 0 , ex.nYields , "not enough yields" )
+    assert.eq( 0 , t.count() , "after remove: " + tojson( ex ) )
+    assert.lt( 0 , ex.nYields , "not enough yields : " + tojson( ex ) )
     if ( n == num )
         print( "warning: shouldn't have counted all  n: " + n + " num: " + num );
 }

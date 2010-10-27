@@ -95,7 +95,7 @@ namespace mongo {
         // map from a namespace into the highest ShardChunkVersion for that collection
         NSVersionMap _versions;
 
-        // map from a namespace into the ensemble of chunk ranges that are stores in this mongod
+        // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
         map<string,ChunkMatcherPtr> _chunks;
     };
     

@@ -73,13 +73,9 @@ namespace mongo {
                 continue;
             }
 
-            log() << "MOVE FAILED **** " << res << "\n"
-                  << "           from: " << chunkInfo.from << " to: " << chunkInfo.to << " chunk: " << chunkToMove << endl;
-
-            if ( res["split"].trueValue() ) {
-                log() << "move asked for a split of " << c << endl;
-                c->singleSplit( true /* force a split even if not enough data */ );
-            }
+            // the move requires acquiring the collection metadata's lock, which can fail
+            log() << "balacer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to 
+                  << " chunk: " << chunkToMove << endl;
         }
 
         return movedCount;
