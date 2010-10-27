@@ -566,7 +566,7 @@ process:	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
 err:	if (ovfl != NULL)
 		__wt_bt_page_out(toc, &ovfl, 0);
 	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, tmp);
+		__wt_toc_scratch_discard(toc, &tmp);
 	return (ret);
 }
 

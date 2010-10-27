@@ -382,9 +382,9 @@ __wt_bt_verify_cmp(
 	}
 
 err:	if (scratch1 != NULL)
-		__wt_toc_scratch_discard(toc, scratch1);
+		__wt_toc_scratch_discard(toc, &scratch1);
 	if (scratch2 != NULL)
-		__wt_toc_scratch_discard(toc, scratch2);
+		__wt_toc_scratch_discard(toc, &scratch2);
 	if (child_ovfl_page != NULL)
 		__wt_bt_page_out(toc, &child_ovfl_page, 0);
 	if (parent_ovfl_page != NULL)
@@ -912,11 +912,11 @@ err:	/* Discard any overflow pages we're still holding. */
 
 	/* Discard any scratch buffers we allocated. */
 	if (_a.item_comp != NULL)
-		__wt_toc_scratch_discard(toc, _a.item_comp);
+		__wt_toc_scratch_discard(toc, &_a.item_comp);
 	if (_b.item_comp != NULL)
-		__wt_toc_scratch_discard(toc, _b.item_comp);
+		__wt_toc_scratch_discard(toc, &_b.item_comp);
 	if (_c.item_comp != NULL)
-		__wt_toc_scratch_discard(toc, _c.item_comp);
+		__wt_toc_scratch_discard(toc, &_c.item_comp);
 
 	return (ret);
 }
