@@ -50,6 +50,8 @@ static int  __wt_bt_promote_col_indx(WT_TOC *, WT_PAGE *, void *);
 static int  __wt_bt_promote_row_indx(WT_TOC *, WT_PAGE *, WT_ITEM *, WT_ITEM *);
 static inline void __wt_bt_promote_col_rec(WT_PAGE *, u_int64_t);
 static inline void __wt_bt_promote_row_rec(WT_PAGE *, u_int64_t);
+static int __wt_bt_scratch_page(
+	WT_TOC *, u_int32_t, u_int32_t, u_int32_t, WT_PAGE **, DBT **);
 
 /*
  * __wt_db_bulk_load --
@@ -91,9 +93,8 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 {
 	DB *db;
 	DBT *key, *data, *tmp;
-	ENV *env;
 	IDB *idb;
-	WT_PAGE _page, *page;
+	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	WT_STACK stack;
 	u_int64_t insert_cnt;
@@ -104,7 +105,6 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 
 	db = toc->db;
 	tmp = NULL;
-	env = toc->env;
 	idb = db->idb;
 	insert_cnt = 0;
 	WT_CLEAR(stack);
@@ -113,32 +113,10 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	len = db->fixed_len +
 	    (F_ISSET(idb, WT_REPEAT_COMP) ? sizeof(u_int16_t) : 0);
 
-	/*
-	 * We don't run the leaf pages through the cache -- that means passing
-	 * a lot of messages we don't want to bother with.  We're the only user
-	 * of the database, which means we can grab file space whenever we want.
-	 *
-	 * Make sure the TOC's scratch buffer is big enough to hold a leaf page,
-	 * and clear the memory so it's never random bytes.
-	 */
-	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
-	if (tmp->mem_size < db->leafmin)
-		WT_ERR(__wt_realloc(
-		    env, &tmp->mem_size, db->leafmin, &tmp->data));
-	memset(tmp->data, 0, db->leafmin);
-
-	/*
-	 * Initialize the WT_PAGE and WT_PAGE_HDR information and allocate the
-	 * first page.
-	 */
-	WT_CLEAR(_page);
-	page = &_page;
-	page->hdr = hdr = tmp->data;
-	WT_ERR(__wt_cache_alloc(toc, &page->addr, db->leafmin));
-	page->size = db->leafmin;
-	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
-	hdr->type = WT_PAGE_COL_FIX;
-	hdr->level = WT_LLEAF;
+	/* Get a scratch buffer and make it look like our work page. */
+	WT_ERR(__wt_bt_scratch_page(toc,
+	    db->leafmin, WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
+	hdr = page->hdr;
 
 	/* Update the descriptor record. */
 	idb->root_addr = page->addr;
@@ -254,7 +232,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 err:	if (stack.page != NULL)
 		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, tmp);
+		__wt_toc_scratch_discard(toc, &tmp);
 
 	return (ret);
 }
@@ -276,7 +254,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	IDB *idb;
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
 	WT_OVFL key_ovfl, data_ovfl;
-	WT_PAGE *page, _page, *next, _next, *swap;
+	WT_PAGE *page, *next;
 	WT_STACK stack;
 	u_int64_t insert_cnt;
 	u_int32_t dup_count, dup_space, len;
@@ -302,43 +280,11 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	WT_ERR(__wt_toc_scratch_alloc(toc, &lastkey_copy));
 
 	/*
-	 * We don't run the leaf pages through the cache -- that means passing
-	 * a lot of messages we don't want to bother with.  We're the only user
-	 * of the database, which means we can grab file space whenever we want.
-	 *
-	 * Make sure the TOC's scratch buffers are big enough to hold a leaf
-	 * page, and clear the memory so it's never random bytes.
+	 * Get a pair of scratch buffers and make them look like our two work
+	 * pages.
 	 */
-	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp1));
-	if (tmp1->mem_size < db->leafmin)
-		WT_ERR(__wt_realloc(
-		    env, &tmp1->mem_size, db->leafmin, &tmp1->data));
-	memset(tmp1->data, 0, db->leafmin);
-	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp2));
-	if (tmp2->mem_size < db->leafmin)
-		WT_ERR(__wt_realloc(
-		    env, &tmp2->mem_size, db->leafmin, &tmp2->data));
-	memset(tmp2->data, 0, db->leafmin);
-
-	/*
-	 * Initialize the WT_PAGE and WT_PAGE_HDR information and allocate the
-	 * first page.
-	 */
-	WT_CLEAR(_page);
-	page = &_page;
-	page->hdr = tmp1->data;
-	page->size = db->leafmin;
-	page->hdr->type = type;
-	page->hdr->level = WT_LLEAF;
-	WT_ERR(__wt_cache_alloc(toc, &page->addr, db->leafmin));
-	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
-
-	WT_CLEAR(_next);
-	next = &_next;
-	next->hdr = tmp2->data;
-	next->size = db->leafmin;
-	next->hdr->type = type;
-	next->hdr->level = WT_LLEAF;
+	WT_ERR(__wt_bt_scratch_page(toc,
+	    db->leafmin, type, WT_LLEAF, &page, &tmp1));
 
 	/* Update the descriptor record. */
 	idb->root_addr = page->addr;
@@ -477,11 +423,8 @@ skip_read:	/*
 		 */
 		if ((key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
 		    WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
-			WT_ERR(__wt_cache_alloc(toc, &next->addr, db->leafmin));
-			next->records = 0;
-			next->hdr->u.entries = 0;
-			__wt_bt_set_ff_and_sa_from_offset(
-			    next, WT_PAGE_BYTE(next));
+			WT_ERR(__wt_bt_scratch_page(toc,
+			    db->leafmin, type, WT_LLEAF, &next, &tmp2));
 
 			/*
 			 * If in the middle of loading a set of duplicates, but
@@ -558,9 +501,22 @@ skip_read:	/*
 			    toc, page, page->records, &stack, 0, NULL));
 			WT_ERR(__wt_bt_bulk_write(toc, page));
 
-			swap = page;
+			/*
+			 * Discard the last page, and switch to the next page.
+			 *
+			 * XXX
+			 * The obvious speed-up here is to re-initialize page
+			 * instead of discarding it and acquiring it again as
+			 * as soon as the just-allocated page fills up.  I am
+			 * not doing that deliberately: eventually we'll use
+			 * asynchronous I/O in bulk load, which means the page
+			 * won't be reusable until the I/O completes.
+			 */
+			__wt_toc_scratch_discard(toc, &tmp1);
 			page = next;
-			next = swap;
+			next = NULL;
+			tmp1 = tmp2;
+			tmp2 = NULL;
 		}
 
 		++page->records;
@@ -666,11 +622,11 @@ skip_read:	/*
 err:	if (stack.page != NULL)
 		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (lastkey_copy != NULL)
-		__wt_toc_scratch_discard(toc, lastkey_copy);
+		__wt_toc_scratch_discard(toc, &lastkey_copy);
 	if (tmp1 != NULL)
-		__wt_toc_scratch_discard(toc, tmp1);
+		__wt_toc_scratch_discard(toc, &tmp1);
 	if (tmp2 != NULL)
-		__wt_toc_scratch_discard(toc, tmp2);
+		__wt_toc_scratch_discard(toc, &tmp2);
 
 	return (ret);
 }
@@ -687,19 +643,17 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 {
 	DB *db;
 	DBT *key, *data, *tmp;
-	ENV *env;
 	IDB *idb;
 	WT_ITEM data_item;
 	WT_OFF off;
 	WT_OVFL data_ovfl;
-	WT_PAGE *page, _page;
+	WT_PAGE *page;
 	WT_STACK stack;
 	u_int32_t len, root_addr;
 	u_int8_t *p;
 	int ret, success_return;
 
 	db = toc->db;
-	env = toc->env;
 	idb = db->idb;
 	success_return = 0;
 
@@ -737,32 +691,9 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	WT_CLEAR(stack);
 	ret = 0;
 
-	/*
-	 * We don't run the leaf pages through the cache -- that means passing
-	 * a lot of messages we don't want to bother with.  We're the only user
-	 * of the database, which means we can grab file space whenever we want.
-	 *
-	 * Make sure the TOC's scratch buffer is big enough to hold a leaf page,
-	 * and clear the memory so it's never random bytes.
-	 */
-	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
-	if (tmp->mem_size < db->leafmin)
-		WT_ERR(__wt_realloc(
-		    env, &tmp->mem_size, db->leafmin, &tmp->data));
-	memset(tmp->data, 0, db->leafmin);
-
-	/*
-	 * Initialize the WT_PAGE and WT_PAGE_HDR information and allocate
-	 * the first page.
-	 */
-	WT_CLEAR(_page);
-	page = &_page;
-	page->hdr = tmp->data;
-	page->size = db->leafmin;
-	page->hdr->type = WT_PAGE_DUP_LEAF;
-	page->hdr->level = WT_LLEAF;
-	WT_ERR(__wt_cache_alloc(toc, &page->addr, db->leafmin));
-	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
+	/* Get a scratch buffer and make it look like our work page. */
+	WT_ERR(__wt_bt_scratch_page(toc,
+	    db->leafmin, WT_PAGE_DUP_LEAF, WT_LLEAF, &page, &tmp));
 
 	/* Move the duplicates onto the page. */
 	page->records = dup_count;
@@ -876,7 +807,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 err:	if (stack.page != NULL)
 		WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, tmp);
+		__wt_toc_scratch_discard(toc, &tmp);
 
 	return (ret == 0 ? success_return : ret);
 }
@@ -1515,63 +1446,87 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 {
 	DB *db;
 	DBT *tmp;
-	ENV *env;
-	WT_PAGE page;
+	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	u_int32_t remain, size;
-	u_int8_t *p;
+	u_int32_t size;
 	int ret;
 
 	db = toc->db;
 	tmp = NULL;
-	env = toc->env;
 
-	/* Make sure the TOC's scratch buffer is big enough. */
-	WT_RET(__wt_toc_scratch_alloc(toc, &tmp));
+	/* Get a scratch buffer and make it look like our work page. */
 	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + dbt->size, db->allocsize);
-	if (tmp->mem_size < size)
-		WT_ERR(__wt_realloc(env, &tmp->mem_size, size, &tmp->data));
-	p = tmp->data;
-	remain = size;
+	WT_ERR(__wt_bt_scratch_page(toc,
+	    size, WT_PAGE_DUP_LEAF, WT_LLEAF, &page, &tmp));
+	*addrp = page->addr;
 
-	/*
-	 * Allocate a chunk of file space -- we don't go through the cache
-	 * to do that, it's going to take additional time because we'd have
-	 * to pass messages around, and during a bulk load there shouldn't
-	 * be any other threads of control accessing this file.
-	 */
-	WT_RET(
-	    __wt_cache_alloc(toc, addrp, WT_HDR_BYTES_TO_ALLOC(db, dbt->size)));
-
-	/* Initialize the page header and copy the overflow item in. */
-	hdr = tmp->data;
-	memset(hdr, 0, sizeof(WT_PAGE_HDR));
+	/* Initialize the page header and copy the record into place. */
+	hdr = page->hdr;
 	hdr->type = WT_PAGE_OVFL;
 	hdr->level = WT_LLEAF;
 	hdr->u.datalen = dbt->size;
-	p += sizeof(WT_PAGE_HDR);
-	remain -= sizeof(WT_PAGE_HDR);
+	memcpy((u_int8_t *)hdr + sizeof(WT_PAGE_HDR), dbt->data, dbt->size);
 
-	/* Copy the record into place. */
-	memcpy(p, dbt->data, dbt->size);
-	p += dbt->size;
-	remain -= dbt->size;
-
-	/* Clear any remaining bytes. */
-	if (remain > 0)
-		memset(p, 0, remain);
-
-	/* Build a page structure. */
-	WT_CLEAR(page);
-	page.hdr = tmp->data;
-	page.addr = *addrp;
-	page.size = size;
-
-	ret = __wt_bt_bulk_write(toc, &page);
+	ret = __wt_bt_bulk_write(toc, page);
 
 err:	if (tmp != NULL)
-		__wt_toc_scratch_discard(toc, tmp);
+		__wt_toc_scratch_discard(toc, &tmp);
 
+	return (ret);
+}
+
+/*
+ * __wt_bt_bulk_scratch_page --
+ *	Allocate a scratch buffer and make it look like a database page.
+ */
+static int
+__wt_bt_scratch_page(WT_TOC *toc,
+    u_int32_t page_size, u_int32_t page_type, u_int32_t page_level,
+    WT_PAGE **page_ret, DBT **tmp_ret)
+{
+	ENV *env;
+	DBT *tmp;
+	WT_PAGE *page;
+	WT_PAGE_HDR *hdr;
+	u_int32_t size;
+	int ret;
+
+	env = toc->env;
+	ret = 0;
+
+	/*
+	 * Allocate a scratch buffer and make sure it's big enough to hold a
+	 * WT_PAGE structure plus the page itself, and clear the memory so
+	 * it's never random bytes.
+	 */
+	WT_ERR(__wt_toc_scratch_alloc(toc, &tmp));
+	size = page_size + sizeof(WT_PAGE);
+	if (tmp->mem_size < size)
+		WT_ERR(__wt_realloc(env, &tmp->mem_size, size, &tmp->data));
+	memset(tmp->data, 0, size);
+
+	/*
+	 * Set up the page and allocate a file address.
+	 *
+	 * We don't run the leaf pages through the cache -- that means passing
+	 * a lot of messages we don't want to bother with.  We're the only user
+	 * of the file, which means we can grab file space whenever we want.
+	 */
+	page = tmp->data;
+	page->hdr = hdr =
+	    (WT_PAGE_HDR *)((u_int8_t *)tmp->data + sizeof(WT_PAGE));
+	WT_ERR(__wt_cache_alloc(toc, &page->addr, page_size));
+	page->size = page_size;
+	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
+	hdr->type = (u_int8_t)page_type;
+	hdr->level = (u_int8_t)page_level;
+
+	*page_ret = page;
+	*tmp_ret = tmp;
+	return (0);
+
+err:	if (tmp != NULL)
+		__wt_toc_scratch_discard(toc, &tmp);
 	return (ret);
 }
 
