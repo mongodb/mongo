@@ -372,10 +372,10 @@ namespace mongo {
 
     class SplitChunkCommand : public Command {
     public:
-        SplitChunkCommand() : Command( "splitChunk_ForDevOnly" ){}
+        SplitChunkCommand() : Command( "splitChunk" ){}
         virtual void help( stringstream& help ) const {
             help << 
-                "internal command ** under development ** \n" 
+                "internal command usage only\n" 
                 "example:\n"
                 " { splitChunk:\"db.foo\" , keyPattern: {a:1} , min : {a:100} , max: {a:200} { splitKeys : [ {a:150} , ... ]}";
         }
