@@ -552,7 +552,7 @@ onpage:		p = WT_ITEM_BYTE(item);
 		huffman = idb->huffman_data;
 offpage:	WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), &ovfl));
 		p = WT_PAGE_BYTE(ovfl);
-		size = ovfl->size;
+		size = ovfl->hdr->u.datalen;
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
