@@ -565,7 +565,7 @@ offpage:	WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), &ovfl));
 	 * copy it into the caller's DBT.
 	 */
 	if (huffman == NULL) {
-		if (ovfl_ret == NULL) {
+		if (ovfl == NULL || ovfl_ret == NULL) {
 			if (size > dbt_ret->mem_size)
 				WT_ERR(__wt_realloc(env,
 				    &dbt_ret->mem_size, size, &dbt_ret->data));
