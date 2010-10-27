@@ -1241,9 +1241,14 @@ __wt_bt_verify_checkfrag(DB *db, WT_VSTUFF *vs)
 			}
 		}
 		if (ffc_start != -1) {
-			__wt_api_db_errx(db,
-			    "fragments %d to %d were never verified",
-			    ffc_start, ffc_end);
+			if (ffc_start == ffc_end)
+				__wt_api_db_errx(db,
+				    "fragment %d was never verified",
+				    ffc_start);
+			else
+				__wt_api_db_errx(db,
+				    "fragments %d to %d were never verified",
+				    ffc_start, ffc_end);
 			ret = WT_ERROR;
 		}
 		ffc_start = ffc_end = ffc;
