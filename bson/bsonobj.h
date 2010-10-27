@@ -78,8 +78,7 @@ namespace mongo {
         BSONObj(const Record *r);
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj();
-        // defensive
-        ~BSONObj() { _objdata = 0; }
+        ~BSONObj() { /*defensive:*/ _objdata = 0; }
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
@@ -151,9 +150,7 @@ namespace mongo {
         }
 
 		/** @return true if field exists */
-        bool hasField( const char * name )const {
-            return ! getField( name ).eoo();
-        }
+        bool hasField( const char * name ) const { return ! getField( name ).eoo(); }
 
         /** @return "" if DNE or wrong type */
         const char * getStringField(const char *name) const;
@@ -190,9 +187,7 @@ namespace mongo {
             return _objdata;
         }
         /** @return total size of the BSON object in bytes */
-        int objsize() const {
-            return *(reinterpret_cast<const int*>(objdata()));
-        }
+        int objsize() const { return *(reinterpret_cast<const int*>(objdata())); }
 
         /** performs a cursory check on the object's size only. */
         bool isValid();
@@ -362,22 +357,13 @@ private:
         const char *_objdata;
         boost::shared_ptr< Holder > _holder;
 
+        void _assertInvalid() const;
         void init(const char *data, bool ifree) {
             if ( ifree )
                 _holder.reset( new Holder( data ) );
             _objdata = data;
-            if ( ! isValid() ){
-                StringBuilder ss;
-                int os = objsize();
-                ss << "Invalid BSONObj spec size: " << os << " (" << toHex( &os, 4 ) << ")";
-                try {
-                    BSONElement e = firstElement();
-                    ss << " first element:" << e.toString() << " ";
-                }
-                catch ( ... ){}
-                string s = ss.str();
-                massert( 10334 , s , 0 );
-            }
+            if ( !isValid() )
+                _assertInvalid();
         }
     };
     ostream& operator<<( ostream &s, const BSONObj &o );

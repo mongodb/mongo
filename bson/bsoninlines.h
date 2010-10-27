@@ -47,6 +47,18 @@ namespace mongo {
         int strSizeWNull = *(int *)( value() + 4 );
         return BSONObj( value() + 4 + 4 + strSizeWNull );
     }
+
+    inline NOINLINE_DECL void BSONObj::_assertInvalid() const { 
+        StringBuilder ss;
+        int os = objsize();
+        ss << "Invalid BSONObj size: " << os << " (0x" << toHex( &os, 4 ) << ')';
+        try {
+            BSONElement e = firstElement();
+            ss << " first element: " << e.toString();
+        }
+        catch ( ... ) { }
+        massert( 10334 , ss.str() , 0 );
+    }
     
     /* the idea with NOINLINE_DECL here is to keep this from inlining in the 
        getOwned() method.  the presumption being that is better.
@@ -75,7 +87,6 @@ namespace mongo {
         b.appendAs(*this,newName);
         return b.obj();
     }
-
 
     inline bool BSONObj::hasElement(const char *name) const {
         if ( !isEmpty() ) {
