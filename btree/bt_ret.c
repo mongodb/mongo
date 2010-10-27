@@ -139,8 +139,13 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 			 */
 			WT_ERR(__wt_bt_item_process(toc, item,
 			    callback == NULL ? NULL : &ovfl_page, &toc->data));
-			data_ret = toc->data.data;
-			size_ret = toc->data.size;
+			if (ovfl_page == NULL) {
+				data_ret = toc->data.data;
+				size_ret = toc->data.size;
+			} else {
+				data_ret = WT_PAGE_BYTE(ovfl_page);
+				size_ret = ovfl_page->hdr->u.datalen;
+			}
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
