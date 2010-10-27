@@ -597,24 +597,8 @@ namespace mongo {
         assert( !isHead() );
 
         BtreeBucket *p = parent.btreemod();
-        if ( p->nextChild == thisLoc ) {
-            p->nextChild.Null();
-        }
-        else {
-            for ( int i = 0; i < p->n; i++ ) {
-                if ( p->k(i).prevChildBucket == thisLoc ) {
-                    p->k(i).prevChildBucket.Null();
-                    goto found;
-                }
-            }
-            out() << "ERROR: can't find ref to deleted bucket.\n";
-            out() << "To delete:\n";
-            dump();
-            out() << "Parent:\n";
-            p->dump();
-            assert(false);
-        }
-found:
+        int parentIdx = indexInParent( thisLoc );
+        p->child( parentIdx ).Null();
         deallocBucket( thisLoc, id );
     }
     
