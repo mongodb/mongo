@@ -41,7 +41,7 @@ namespace mongo {
     protected:
         WriteBackListener( const string& addr );
 
-        string name() { return "WriteBackListener"; }        
+        string name() const { return "WriteBackListener"; }        
         void run();
 
     private:
