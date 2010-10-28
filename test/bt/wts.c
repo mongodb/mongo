@@ -198,8 +198,23 @@ wts_dump()
 	 * If we dumped a printable version of the database, compare it against
 	 * BDB's dump.
 	 */
-	if (g.dump != DUMP_DEBUG && system("sh ./s_dumpcmp") != 0)
+	if (g.dump == DUMP_DEBUG)
+		return (0);
+
+	track("dump comparison", (u_int64_t)0);
+	switch (g.c_database_type) {
+	case FIX:
+	case VAR:
+		p = "./s_dumpcmp -c";
+		break;
+	case ROW:
+		p = "./s_dumpcmp";
+		break;
+	}
+	if (system(p) != 0) {
+		db->errx(db, "dump comparison failed");
 		return (1);
+	}
 
 	return (0);
 }

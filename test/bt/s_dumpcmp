@@ -1,10 +1,36 @@
 #! /bin/sh
 
-../../db-4.8.26/build_unix/db_dump -p __wt.bdb |
-sed -e '1,/HEADER=END/d' \
-    -e 's/^ //' > __wt.dump_bdb
+colflag=0
+while :
+	do case "$1" in
+	# -c means it was a column-store.
+	-c)
+		colflag=1
+		shift ;;
+	*)
+		break ;;
+	esac
+done
 
-sed -e '1,/HEADER=END/d' __wt.dump > __wt.dump_wt
+if test $# -ne 0; then
+	echo 'usage: s_dumpcmp [-c]' >&2
+	exit 1
+fi
 
-diff __wt.dump_bdb __wt.dump_wt > __wt.dump.diff
+if test $colflag -eq 0; then
+	../../db-4.8.26/build_unix/db_dump -p __wt.bdb |
+	    sed -e '1,/HEADER=END/d' \
+		-e 's/^ //' > __wt.dump_bdb
+else
+	../../db-4.8.26/build_unix/db_dump -p __wt.bdb |
+	    sed -e '1,/HEADER=END/d' \
+		-e 's/^ //' |
+	    sed -n \
+		-e '$p' \
+		-e n \
+		-e p > __wt.dump_bdb
+fi
+
+sed -e '1,/HEADER=END/d' __wt.dump |
+    diff - __wt.dump_bdb > __wt.dump.diff
 exit $?
