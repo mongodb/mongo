@@ -32,5 +32,5 @@ else
 fi
 
 sed -e '1,/HEADER=END/d' __wt.dump |
-    diff - __wt.dump_bdb > __wt.dump.diff
+    cmp - __wt.dump_bdb > __wt.dump.diff
 exit $?
