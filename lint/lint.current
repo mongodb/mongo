@@ -23,23 +23,23 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 ../btree/bt_bulk.c  240  Info 830: Location cited in prior message
                        _
 	WT_RECORDS(&off) = dup_count;
-../btree/bt_bulk.c  782  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  781  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1061  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1060  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1092  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1090  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                _
 				WT_RECORDS((WT_OFF *)elem->data) += incr;
-../btree/bt_bulk.c  1130  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1128  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                       _
 				    (WT_OFF *)WT_ITEM_BYTE(elem->data)) += incr;
-../btree/bt_bulk.c  1135  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1133  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_close.c (C)
