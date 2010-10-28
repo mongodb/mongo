@@ -1359,24 +1359,25 @@ namespace mongo {
 
             } else {
 
-                Query idQuery = QUERY( "_id" << out["_id"]);
-
                 if (cmdObj["remove"].trueValue()){
                     uassert(12515, "can't remove and update", cmdObj["update"].eoo());
-                    db.remove(ns, idQuery, 1);
+                    db.remove(ns, QUERY("_id" << out["_id"]), 1);
 
                 } else { // update
 
-                    // need to include original query for $ positional operator
-                    BSONObjBuilder b;
-                    b.append(out["_id"]);
-                    BSONObjIterator it(origQuery);
-                    while (it.more()){
-                        BSONElement e = it.next();
-                        if (strcmp(e.fieldName(), "_id"))
-                            b.append(e);
+                    if (getGtLtOp(origQuery["_id"]) != BSONObj::Equality){
+                        // need to include original query for $ positional operator
+
+                        BSONObjBuilder b;
+                        b.append(out["_id"]);
+                        BSONObjIterator it(origQuery);
+                        while (it.more()){
+                            BSONElement e = it.next();
+                            if (strcmp(e.fieldName(), "_id"))
+                                b.append(e);
+                        }
+                        q = Query(b.obj());
                     }
-                    q = Query(b.obj());
 
                     BSONElement update = cmdObj["update"];
                     uassert(12516, "must specify remove or update", !update.eoo());
@@ -1389,7 +1390,7 @@ namespace mongo {
                     }
 
                     if (cmdObj["new"].trueValue())
-                        out = db.findOne(ns, idQuery, fields);
+                        out = db.findOne(ns, QUERY("_id" << out["_id"]), fields);
                 }
             }
 
