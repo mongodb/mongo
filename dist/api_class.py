@@ -625,6 +625,8 @@ flags['wt_page_in'] = [
 ###################################################
 # Structure flag declarations
 ###################################################
+flags['dbt'] = [
+	'SCRATCH_INUSE' ]
 flags['env'] = [
 	'MEMORY_CHECK' ]
 flags['idb'] = [
