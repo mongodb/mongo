@@ -10,14 +10,17 @@
 #include "wt_internal.h"
 
 /*
- * __wt_toc_scratch_alloc --
- *	Get a scratch buffer.
+ * __wt_scr_alloc --
+ *	Scratch buffer allocation function.
  */
 int
-__wt_toc_scratch_alloc(WT_TOC *toc, DBT **dbtp)
+__wt_scr_alloc(WT_TOC *toc, DBT **dbtp)
 {
+	DBT *scratch;
 	ENV *env;
+	u_int32_t allocated;
 	u_int i;
+	int ret;
 
 	env = toc->env;
 
@@ -28,46 +31,57 @@ __wt_toc_scratch_alloc(WT_TOC *toc, DBT **dbtp)
 	 * Scratch buffers are allocated only by a single thread of control, so
 	 * no locking is necessary.
 	 */
-	for (i = 0; i < WT_ELEMENTS(toc->scratch); ++i)
-		if (toc->scratch_inuse[i] == 0) {
-			*dbtp = &toc->scratch[i];
-			toc->scratch_inuse[i] = 1;
+	for (i = 0,
+	    scratch = toc->scratch; i < toc->scratch_alloc; ++i, ++scratch)
+		if (!F_ISSET(scratch, WT_SCRATCH_INUSE)) {
+			*dbtp = scratch;
+			F_SET(scratch, WT_SCRATCH_INUSE);
 			return (0);
 		}
 
-	__wt_api_env_errx(env, "WT_TOC has no more scratch buffer to allocate");
-	return (WT_ERROR);
+	allocated = toc->scratch_alloc * sizeof(DBT);
+	WT_ERR(__wt_realloc(env, &allocated,
+	    (toc->scratch_alloc + 10) * sizeof(DBT), &toc->scratch));
+	toc->scratch_alloc += 10;
+	return (__wt_scr_alloc(toc, dbtp));
+
+err:	__wt_api_env_errx(env,
+	    "WT_TOC unable to allocate more scratch buffers");
+	return (ret);
 }
 
 /*
- * __wt_toc_scratch_discard --
- *	Discard a scratch buffer.
+ * __wt_scr_release --
+ *	Release a scratch buffer.
  */
 void
-__wt_toc_scratch_discard(WT_TOC *toc, DBT *dbt)
+__wt_scr_release(DBT **dbt)
 {
-	toc->scratch_inuse[dbt - &toc->scratch[0]] = 0;
+	DBT *scratch;
+
+	scratch = *dbt;
+	*dbt = NULL;
+
+	F_CLR(scratch, WT_SCRATCH_INUSE);
 }
 
 /*
- * __wt_toc_scratch_free --
+ * __wt_scr_free --
  *	Free all memory associated with the scratch buffers.
  */
 void
-__wt_toc_scratch_free(WT_TOC *toc)
+__wt_scr_free(WT_TOC *toc)
 {
+	DBT *scratch;
 	ENV *env;
 	u_int i;
 
 	env = toc->env;
 
-	for (i = 0; i < WT_ELEMENTS(toc->scratch); ++i) {
-		if (toc->scratch_inuse[i] != 0)
-			__wt_api_env_errx(env,
-			    "WT_TOC scratch buffers allocated but never "
-			    "discarded");
-		if (toc->scratch[i].data != NULL)
-			__wt_free(env,
-			    toc->scratch[i].data, toc->scratch[i].mem_size);
-	}
+	for (i = 0,
+	    scratch = toc->scratch; i < toc->scratch_alloc; ++i, ++scratch)
+		if (scratch->data != NULL)
+			__wt_free(env, scratch->data, scratch->mem_size);
+
+	__wt_free(env, toc->scratch, toc->scratch_alloc * sizeof(DBT));
 }
