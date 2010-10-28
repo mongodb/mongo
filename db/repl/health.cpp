@@ -19,6 +19,7 @@
 #include "health.h"
 #include "../../util/background.h"
 #include "../../client/dbclient.h"
+#include "../../client/connpool.h"
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/concurrency/task.h"
@@ -189,7 +190,7 @@ namespace mongo {
         //const bo fields = BSON( "o" << false << "o2" << false );
         const bo fields;
 
-        ScopedConn conn(m->fullName());        
+        ScopedDbConnection conn(m->fullName());
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
         if( c.get() == 0 ) { 
@@ -248,8 +249,6 @@ namespace mongo {
         ss << _table();
         ss << p(time_t_to_String_short(time(0)) + " current time");
 
-        //ss << "</pre>\n";
-
         if( !otEnd.isNull() ) {
             ss << "<p>Log length in time: ";
             unsigned d = otEnd.getSecs() - otFirst.getSecs();
@@ -262,6 +261,7 @@ namespace mongo {
             ss << "</p>\n";
         }
 
+        conn.done();
     }
 
     void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 

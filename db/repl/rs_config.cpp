@@ -311,9 +311,8 @@ namespace mongo {
         clear();
         int level = 2;
         DEV level = 0;
-        //log(0) << "replSet load config from: " << h.toString() << rsLog;
 
-        auto_ptr<DBClientCursor> c;
+        BSONObj cfg;
         int v = -5;
         try {
             if( h.isSelf() ) {
@@ -346,10 +345,12 @@ namespace mongo {
             }
 
             v = -4;
+            long long count = 0;
             try {
                 ScopedConn conn(h.toString());
                 v = -3;
-                c = conn->query( rsConfigNs, Query() );
+                cfg = conn->findOne(rsConfigNs, Query()).getOwned();
+                count = conn->count(rsConfigNs);
             }
             catch ( DBException& ) {
                 if ( !h.isSelf() ) {
@@ -358,13 +359,14 @@ namespace mongo {
 
                 // on startup, socket is not listening yet
                 DBDirectClient cli;
-                c = cli.query( rsConfigNs, Query() );
+                cfg = cli.findOne( rsConfigNs, Query() ).getOwned();
+                count = cli.count(rsConfigNs);
             }
+
+            if( count > 1 )
+                uasserted(13109, str::stream() << "multiple rows in " << rsConfigNs << " not supported host: " << h.toString());
             
-            if( c.get() == 0 ) {
-                version = v; return;
-            }
-            if( !c->more() ) {
+            if( cfg.isEmpty() ) {
                 version = EMPTYCONFIG;
                 return;
             }
@@ -376,9 +378,7 @@ namespace mongo {
             return;
         }
 
-        BSONObj o = c->nextSafe();
-        uassert(13109, "multiple rows in " + rsConfigNs + " not supported", !c->more());
-        from(o);
+        from(cfg);
         checkRsConfig();
         _ok = true;
         log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
