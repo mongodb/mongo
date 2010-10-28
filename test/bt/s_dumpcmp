@@ -6,5 +6,5 @@ sed -e '1,/HEADER=END/d' \
 
 sed -e '1,/HEADER=END/d' __wt.dump > __wt.dump_wt
 
-diff __wt.dump_bdb __wt.dump_wt
+diff __wt.dump_bdb __wt.dump_wt > __wt.dump.diff
 exit $?
