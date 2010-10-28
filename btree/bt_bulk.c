@@ -363,13 +363,13 @@ skip_read:	/*
 			 */
 			if (++dup_count == 1) {
 				dup_count = 2;
-				WT_ITEM_TYPE_SET(dup_data,
+				WT_ITEM_SET_TYPE(dup_data,
 				    WT_ITEM_TYPE(dup_data) == WT_ITEM_DATA ?
 				    WT_ITEM_DATA_DUP : WT_ITEM_DATA_DUP_OVFL);
 			}
 
 			/* Reset the type of the current item to a duplicate. */
-			WT_ITEM_TYPE_SET(&data_item,
+			WT_ITEM_SET_TYPE(&data_item,
 			    WT_ITEM_TYPE(&data_item) == WT_ITEM_DATA ?
 			    WT_ITEM_DATA_DUP : WT_ITEM_DATA_DUP_OVFL);
 
@@ -751,7 +751,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 		++leaf_page->records;		/* Parent page key/data count */
 
 		/* Copy the data item onto the page. */
-		WT_ITEM_LEN_SET(&data_item, data->size);
+		WT_ITEM_SET_LEN(&data_item, data->size);
 		memcpy(page->first_free, &data_item, sizeof(data_item));
 		memcpy(page->first_free +
 		    sizeof(data_item), data->data, data->size);
@@ -777,8 +777,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	 * Replace the caller's duplicate set with a WT_OFF structure, and
 	 * reset the caller's page information.
 	 */
-	WT_ITEM_LEN_SET(&data_item, sizeof(WT_OFF));
-	WT_ITEM_TYPE_SET(&data_item, WT_ITEM_OFF);
+	WT_ITEM_SET(&data_item, WT_ITEM_OFF, sizeof(WT_OFF));
 	WT_RECORDS(&off) = dup_count;
 	off.addr = root_addr;
 	off.size = db->intlmin;
@@ -850,16 +849,15 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 			switch (hdr->type) {
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_ROW_LEAF:
-				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY);
+				WT_ITEM_SET(&item, WT_ITEM_KEY, key->size);
 				break;
 			case WT_PAGE_DUP_INT:
 			case WT_PAGE_DUP_LEAF:
-				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_DUP);
+				WT_ITEM_SET(&item, WT_ITEM_KEY_DUP, key->size);
 				break;
 			default:		/* Not possible */
 				break;
 			}
-			WT_ITEM_LEN_SET(&item, key->size);
 			break;
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DATA_DUP_OVFL:
@@ -876,16 +874,17 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 			switch (hdr->type) {
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_ROW_LEAF:
-				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
+				WT_ITEM_SET(&item,
+				    WT_ITEM_KEY_OVFL, sizeof(WT_OVFL));
 				break;
 			case WT_PAGE_DUP_INT:
 			case WT_PAGE_DUP_LEAF:
-				WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_DUP_OVFL);
+				WT_ITEM_SET(&item,
+				    WT_ITEM_KEY_DUP_OVFL, sizeof(WT_OVFL));
 				break;
 			default:		/* Not possible */
 				break;
 			}
-			WT_ITEM_LEN_SET(&item, sizeof(tmp_ovfl));
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -1087,8 +1086,7 @@ split:		switch (hdr->type) {
 		parent->space_avail -= WT_ITEM_SPACE_REQ(key->size);
 
 		/* Create the WT_ITEM(WT_OFF) reference. */
-		WT_ITEM_LEN_SET(&item, sizeof(WT_OFF));
-		WT_ITEM_TYPE_SET(&item, WT_ITEM_OFF);
+		WT_ITEM_SET(&item, WT_ITEM_OFF, sizeof(WT_OFF));
 		WT_RECORDS(&off) = page->records;
 		off.addr = page->addr;
 		off.size = hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
@@ -1187,6 +1185,8 @@ __wt_bt_build_key_item(
 
 	/* Create an overflow object if the data won't fit. */
 	if (dbt->size > db->leafitemsize) {
+		WT_STAT_INCR(stats, OVERFLOW_KEY);
+
 		WT_CLEAR(*ovfl);
 		ovfl->size = dbt->size;
 		if (bulk_load)
@@ -1196,12 +1196,9 @@ __wt_bt_build_key_item(
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
-		WT_ITEM_TYPE_SET(item, WT_ITEM_KEY_OVFL);
-		WT_STAT_INCR(stats, OVERFLOW_KEY);
+		WT_ITEM_SET(item, WT_ITEM_KEY_OVFL, dbt->size);
 	} else
-		WT_ITEM_TYPE_SET(item, WT_ITEM_KEY);
-
-	WT_ITEM_LEN_SET(item, dbt->size);
+		WT_ITEM_SET(item, WT_ITEM_KEY, dbt->size);
 	return (0);
 }
 
@@ -1235,7 +1232,7 @@ __wt_bt_build_data_item(
 	 * bulk insert and reconciliation, we aren't returning key/data pairs.
 	 */
 	WT_CLEAR(*item);
-	WT_ITEM_TYPE_SET(
+	WT_ITEM_SET_TYPE(
 	    item, LF_ISSET(WT_IS_DUP) ? WT_ITEM_DATA_DUP : WT_ITEM_DATA);
 
 	/*
@@ -1243,7 +1240,7 @@ __wt_bt_build_data_item(
 	 * a deleted column-store variable length item.
 	 */
 	if (dbt->size == 0) {
-		WT_ITEM_LEN_SET(item, 0);
+		WT_ITEM_SET_LEN(item, 0);
 		return (0);
 	}
 
@@ -1270,12 +1267,12 @@ __wt_bt_build_data_item(
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
-		WT_ITEM_TYPE_SET(item, LF_ISSET(WT_IS_DUP) ?
+		WT_ITEM_SET_TYPE(item, LF_ISSET(WT_IS_DUP) ?
 		    WT_ITEM_DATA_DUP_OVFL : WT_ITEM_DATA_OVFL);
 		WT_STAT_INCR(stats, OVERFLOW_DATA);
 	}
 
-	WT_ITEM_LEN_SET(item, dbt->size);
+	WT_ITEM_SET_LEN(item, dbt->size);
 	return (0);
 }
 

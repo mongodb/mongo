@@ -522,8 +522,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 */
 			if (WT_REPL_DELETED_ISSET(repl)) {
 				WT_CLEAR(data_item);
-				WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DEL);
-				WT_ITEM_LEN_SET(&data_item, 0);
+				WT_ITEM_SET(&data_item, WT_ITEM_DEL, 0);
 				len = WT_ITEM_SPACE_REQ(0);
 			} else {
 				data->data = WT_REPL_DATA(repl);
@@ -676,9 +675,9 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				WT_ILLEGAL_FORMAT(db);
 				}
 			if (data_loc == DATA_ON_PAGE)
-				WT_ITEM_TYPE_SET(rip->data, type);
+				WT_ITEM_SET_TYPE(rip->data, type);
 			else
-				WT_ITEM_TYPE_SET(&data_item, type);
+				WT_ITEM_SET_TYPE(&data_item, type);
 			key_loc = KEY_NONE;
 		} else {
 			/* Take the key's WT_ITEM from the original page. */

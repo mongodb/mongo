@@ -627,14 +627,16 @@ struct __wt_item {
 #define	WT_ITEM_DEL		0x08000000 /* Deleted */
 #define	WT_ITEM_OFF		0x09000000 /* Off-page reference */
 
-#define	WT_ITEM_LEN(addr)						\
-	(((WT_ITEM *)(addr))->__item_chunk & 0x00ffffff)
-#define	WT_ITEM_LEN_SET(addr, size)					\
-	(((WT_ITEM *)(addr))->__item_chunk = WT_ITEM_TYPE(addr) | (size))
 #define	WT_ITEM_TYPE(addr)						\
 	(((WT_ITEM *)(addr))->__item_chunk & 0x0f000000)
-#define	WT_ITEM_TYPE_SET(addr, type)					\
-	(((WT_ITEM *)(addr))->__item_chunk = WT_ITEM_LEN(addr) | (type))
+#define	WT_ITEM_LEN(addr)						\
+	(((WT_ITEM *)(addr))->__item_chunk & 0x00ffffff)
+#define	WT_ITEM_SET(addr, type, size)					\
+	(((WT_ITEM *)(addr))->__item_chunk = (type) | (size))
+#define	WT_ITEM_SET_LEN(addr, size)					\
+	WT_ITEM_SET(addr, WT_ITEM_TYPE(addr), size)
+#define	WT_ITEM_SET_TYPE(addr, type)					\
+	WT_ITEM_SET(addr, type, WT_ITEM_LEN(addr))
 
 /* WT_ITEM_BYTE is the first data byte for an item. */
 #define	WT_ITEM_BYTE(addr)						\
