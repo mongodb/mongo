@@ -134,7 +134,7 @@ namespace mongo {
         assert( theReplSet == 0 || !theReplSet->lockedByMe() );
 
         ScopedConn conn(memberFullName);
-        return conn->runCommand("admin", cmd, result);
+        return conn.runCommand("admin", cmd, result, 0);
     }
 
     /* poll every other set member to check its status */
