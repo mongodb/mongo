@@ -45,7 +45,7 @@ bdb_teardown(void)
 	db = g.bdb_db;
 	dbenv = db->dbenv;
 
-	assert(db->close(db, DB_NOSYNC) == 0);
+	assert(db->close(db, 0) == 0);
 	assert(dbenv->close(dbenv, 0) == 0);
 }
 
