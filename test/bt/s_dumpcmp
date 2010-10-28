@@ -1,0 +1,10 @@
+#! /bin/sh
+
+../../db-4.8.26/build_unix/db_dump -p __wt.bdb |
+sed -e '1,/HEADER=END/d' \
+    -e 's/^ //' > __wt.dump_bdb
+
+sed -e '1,/HEADER=END/d' __wt.dump > __wt.dump_wt
+
+diff __wt.dump_bdb __wt.dump_wt
+exit $?
