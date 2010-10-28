@@ -99,6 +99,8 @@ struct __dbt {
 
 					/* callback return */
 	int (*callback)(DB *, DBT *, DBT *);
+
+	u_int32_t flags;
 };
 
 /*******************************************
@@ -129,8 +131,8 @@ struct __wt_toc {
 	DB	*db;			/* Current database */
 	DBT	 key, data;		/* Returned key/data pairs */
 
-	DBT	 scratch[10];		/* Temporary memory for any function */
-	u_int8_t scratch_inuse[10];	/* Currently in-use */
+	DBT	*scratch;		/* Temporary memory for any function */
+	u_int	 scratch_alloc;		/* Currently allocated */
 
 	/*
 	 * Each WT_TOC structure is assigned a generation number as it enters
@@ -543,6 +545,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_READ_DRAIN					0x00000002
 #define	WT_READ_PRIORITY				0x00000001
 #define	WT_REPEAT_COMP					0x00000001
+#define	WT_SCRATCH_INUSE				0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_TELEPHONE					0x00000001
 #define	WT_VERB_ALL					0x00000020
@@ -573,6 +576,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000
 #define	WT_APIMASK_DB_SYNC				0x00000001
 #define	WT_APIMASK_DB_VERIFY				0x00000000
+#define	WT_APIMASK_DBT					0x00000001
 #define	WT_APIMASK_ENV					0x00000001
 #define	WT_APIMASK_ENV_CLOSE				0x00000000
 #define	WT_APIMASK_ENV_DB				0x00000000
