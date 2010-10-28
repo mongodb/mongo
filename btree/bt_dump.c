@@ -17,7 +17,7 @@ typedef struct {
 	void (*f)(const char *, u_int64_t);	/* Progress callback */
 	u_int64_t fcnt;				/* Progress counter */
 
-	DBT *dupkey;				/* Key for offpage duplicates */
+	DBT *dupkey;				/* Offpage duplicate tree key */
 } WT_DSTUFF;
 
 static int  __wt_bt_dump_page(WT_TOC *, WT_PAGE *, void *);
@@ -25,7 +25,6 @@ static int  __wt_bt_dump_page_fixed(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_bt_dump_page_item(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
 static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
-static inline int __wt_bt_dup_ahead(WT_ITEM *);
 
 /*
  * __wt_db_dump --
@@ -68,8 +67,11 @@ __wt_db_dump(WT_TOC *toc,
 	 * safe -- root pages are pinned into memory when a database is opened,
 	 * and never re-written until the database is closed.
 	 */
+	fprintf(stream, "VERSION=1\n");
+	fprintf(stream, "HEADER=END\n");
 	ret = __wt_bt_tree_walk(
 	    toc, idb->root_addr, idb->root_size, __wt_bt_dump_page, &dstuff);
+	fprintf(stream, "DATA=END\n");
 
 	/* Wrap up reporting. */
 	if (f != NULL)
@@ -115,20 +117,6 @@ __wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 }
 
 /*
- * __wt_bt_dup_ahead --
- *	Check if the next page entry is part of a duplicate data set.
- */
-static inline int
-__wt_bt_dup_ahead(WT_ITEM *item)
-{
-	u_int32_t type;
-
-	type = WT_ITEM_TYPE(WT_ITEM_NEXT(item));
-	return (type == WT_ITEM_DATA_DUP ||
-	    type == WT_ITEM_DATA_DUP_OVFL || type == WT_ITEM_OFF ? 1 : 0);
-}
-
-/*
  * __wt_bt_dump_page_item --
  *	Dump a page of WT_ITEM structures.
  */
@@ -136,109 +124,122 @@ static int
 __wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
-	DBT *last_key_ovfl, last_key_std, *last_key;
+	IDB *idb;
+	DBT *key, *data, *key_process, *data_process, key_onpage, data_onpage;
 	WT_ITEM *item;
 	WT_OFF *off;
-	WT_OVFL *ovfl;
-	WT_PAGE *ovfl_page;
-	u_int32_t i, item_len;
-	int dup_ahead, ret;
+	WT_PAGE *key_ovfl, *data_ovfl;
+	u_int32_t i;
+	int ret;
 
 	db = toc->db;
-	last_key_ovfl = NULL;
+	idb = db->idb;
+	key = NULL;
+	key_process = data_process = NULL;
+	key_ovfl = data_ovfl = NULL;
 	ret = 0;
-	WT_CLEAR(last_key_std);
-
-	/* We may need a scratch buffer to hold copies of overflow keys. */
-	WT_ERR(__wt_toc_scratch_alloc(toc, &last_key_ovfl));
 
 	/*
-	 * If we're passed a key, then we're dumping an off-page duplicate tree,
-	 * and we'll write the key for each off-page item.
+	 * There are two pairs of DBTs, one pair for key items and one pair for
+	 * data items.  One of the pair is used for on-page items, the other is
+	 * used for compressed or overflow items, that require processing.
+	 */
+	WT_CLEAR(key_onpage);
+	WT_CLEAR(data_onpage);
+	WT_ERR(__wt_scr_alloc(toc, &key_process));
+	WT_ERR(__wt_scr_alloc(toc, &data_process));
+
+	/*
+	 * If we're passed a key by our caller, we're dumping an off-page
+	 * duplicate tree and we'll write that key for each off-page item.
 	 */
 	if (dp->dupkey != NULL)
-		last_key = dp->dupkey;
+		key = dp->dupkey;
 
 	WT_ITEM_FOREACH(page, item, i) {
-		item_len = WT_ITEM_LEN(item);
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
-		case WT_ITEM_KEY_DUP:
-			last_key_std.data = WT_ITEM_BYTE(item);
-			last_key_std.size = item_len;
-			last_key = &last_key_std;
-			/*
-			 * If about to dump an off-page duplicate tree, don't
-			 * write the key here, we'll write it when writing the
-			 * off-page duplicates.
-			 */
-			dup_ahead = __wt_bt_dup_ahead(item);
-			if (!dup_ahead)
-				dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);
-			break;
-		case WT_ITEM_DATA:
-			dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);
-			break;
-		case WT_ITEM_DATA_DUP:
-			dp->p(last_key->data, last_key->size, dp->stream);
-			dp->p(WT_ITEM_BYTE(item), item_len, dp->stream);
-			break;
+			if (idb->huffman_key == NULL) {
+				key_onpage.data = WT_ITEM_BYTE(item);
+				key_onpage.size = WT_ITEM_LEN(item);
+				key = &key_onpage;
+				continue;
+			}
+			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_KEY_DUP_OVFL:
-			/*
-			 * If the overflow key has duplicate records, we'll need
-			 * a copy of the key to write for each of those records.
-			 * Look ahead and see if it's a set of duplicates.
-			 */
-			dup_ahead = __wt_bt_dup_ahead(item);
+			/* Discard any previous overflow key page. */
+			if (key_ovfl != NULL)
+				__wt_bt_page_out(toc, &key_ovfl, 0);
+
+			/* Get a copy of the key or an overflow key page. */
+			WT_ERR(__wt_bt_item_process(
+			    toc, item, &key_ovfl, key_process));
+			if (key_ovfl == NULL)
+				key = key_process;
+			else {
+				key_onpage.data = WT_PAGE_BYTE(key_ovfl);
+				key_onpage.size = key_ovfl->hdr->u.datalen;
+				key = &key_onpage;
+			}
+			continue;
+		case WT_ITEM_DATA:
+			if (idb->huffman_data == NULL) {
+				data_onpage.data = WT_ITEM_BYTE(item);
+				data_onpage.size = WT_ITEM_LEN(item);
+				data = &data_onpage;
+				break;
+			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
+		case WT_ITEM_DATA_DUP:
 		case WT_ITEM_DATA_DUP_OVFL:
-			ovfl = WT_ITEM_BYTE_OVFL(item);
-			WT_ERR(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page));
+			/* Discard any previous overflow data page. */
+			if (data_ovfl != NULL)
+				__wt_bt_page_out(toc, &data_ovfl, 0);
 
-			/* If we're already in a duplicate set, dump the key. */
-			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_DUP_OVFL)
-				dp->p(
-				    last_key->data, last_key->size, dp->stream);
-
-			/*
-			 * If starting a new duplicate set with an overflow key,
-			 * save a copy of the key for later writing.  Otherwise,
-			 * dump this item.
-			 */
-			if (dup_ahead) {
-				WT_ERR(__wt_bt_data_copy_to_dbt(db,
-				    WT_PAGE_BYTE(
-					ovfl_page), ovfl->size, last_key_ovfl));
-				last_key = last_key_ovfl;
-				dup_ahead = 0;
-			} else
-				dp->p(WT_PAGE_BYTE(
-				   ovfl_page), ovfl->size, dp->stream);
-
-			__wt_bt_page_out(toc, &ovfl_page, 0);
+			/* Get a copy of the data or an overflow data page. */
+			WT_ERR(__wt_bt_item_process(
+			    toc, item, &data_ovfl, data_process));
+			if (data_ovfl == NULL)
+				data = data_process;
+			else {
+				data_onpage.data = WT_PAGE_BYTE(data_ovfl);
+				data_onpage.size = data_ovfl->hdr->u.datalen;
+				data = &data_onpage;
+			}
 			break;
 		case WT_ITEM_DEL:
-			break;
+			continue;
 		case WT_ITEM_OFF:
 			/*
 			 * Off-page duplicate tree.   Set the key for display,
 			 * and dump the entire tree.
 			 */
-			dp->dupkey = last_key;
+			dp->dupkey = key;
 			off = WT_ITEM_BYTE_OFF(item);
 			WT_RET_RESTART(__wt_bt_tree_walk(toc,
-			    off->addr, off->size, __wt_bt_stat_page, dp));
+			    off->addr, off->size, __wt_bt_dump_page, dp));
 			dp->dupkey = NULL;
-			break;
+			continue;
 		WT_ILLEGAL_FORMAT(db);
 		}
+
+		if (key != NULL)
+			dp->p(key->data, key->size, dp->stream);
+		dp->p(data->data, data->size, dp->stream);
 	}
 
-err:	/* Discard any space allocated to hold an overflow key. */
-	if (last_key_ovfl != NULL)
-		__wt_toc_scratch_discard(toc, last_key_ovfl);
+err:	/* Discard any space allocated to hold off-page key/data items. */
+	if (key_process != NULL)
+		__wt_scr_release(&key_process);
+	if (data_process != NULL)
+		__wt_scr_release(&data_process);
+
+	/* Discard any overflow pages we're still holding. */
+	if (key_ovfl != NULL)
+		__wt_bt_page_out(toc, &key_ovfl, 0);
+	if (data_ovfl != NULL)
+		__wt_bt_page_out(toc, &data_ovfl, 0);
 
 	return (ret);
 }
