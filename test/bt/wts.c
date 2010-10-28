@@ -33,8 +33,8 @@ wts_startup(int logfile)
 	char *p;
 
 	if (g.wts_log != NULL) {
-		g.wts_log = NULL;
 		(void)fclose(g.wts_log);
+		g.wts_log = NULL;
 	}
 	if (logfile) {
 		p = fname("log");
@@ -175,11 +175,12 @@ wts_dump()
 {
 	DB *db;
 	FILE *fp;
-	char *p;
 	int ret;
+	char *p;
 
 	db = g.wts_db;
 
+	/* Dump the WiredTiger database. */
 	track("dump", (u_int64_t)0);
 	p = fname("dump");
 	if ((fp = fopen(p, "w")) == NULL) {
@@ -192,6 +193,13 @@ wts_dump()
 		return (1);
 	}
 	(void)fclose(fp);
+
+	/*
+	 * If we dumped a printable version of the database, compare it against
+	 * BDB's dump.
+	 */
+	if (g.dump != DUMP_DEBUG && system("sh ./s_dumpcmp") != 0)
+		return (1);
 
 	return (0);
 }
