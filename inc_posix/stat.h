@@ -48,12 +48,13 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_EVICT_HAZARD		    3
 #define	WT_STAT_CACHE_EVICT_MODIFIED		    4
 #define	WT_STAT_CACHE_EVICT_UNMODIFIED		    5
-#define	WT_STAT_CACHE_HASH_BUCKETS		    6
-#define	WT_STAT_CACHE_HIT			    7
-#define	WT_STAT_CACHE_MAX_BUCKET_ENTRIES	    8
-#define	WT_STAT_CACHE_MISS			    9
-#define	WT_STAT_CACHE_PAGES_INUSE		   10
-#define	WT_STAT_CACHE_READ_RESTARTS		   11
+#define	WT_STAT_CACHE_FREE			    6
+#define	WT_STAT_CACHE_HASH_BUCKETS		    7
+#define	WT_STAT_CACHE_HIT			    8
+#define	WT_STAT_CACHE_MAX_BUCKET_ENTRIES	    9
+#define	WT_STAT_CACHE_MISS			   10
+#define	WT_STAT_CACHE_PAGES_INUSE		   11
+#define	WT_STAT_CACHE_READ_RESTARTS		   12
 
 /*
  * Statistics entries for DB/IDB database.
@@ -89,15 +90,16 @@ struct __wt_stats {
  * Statistics entries for DB/IDB handle.
  */
 #define	WT_STAT_DB_CACHE_ALLOC			    0
-#define	WT_STAT_DB_CACHE_HIT			    1
-#define	WT_STAT_DB_CACHE_MISS			    2
-#define	WT_STAT_DUPLICATE_ITEMS_INSERTED	    3
-#define	WT_STAT_HUFFMAN_DATA			    4
-#define	WT_STAT_HUFFMAN_KEY			    5
-#define	WT_STAT_ITEMS_INSERTED			    6
-#define	WT_STAT_OVERFLOW_DATA			    7
-#define	WT_STAT_OVERFLOW_KEY			    8
-#define	WT_STAT_REPEAT_COUNT			    9
+#define	WT_STAT_DB_CACHE_FREE			    1
+#define	WT_STAT_DB_CACHE_HIT			    2
+#define	WT_STAT_DB_CACHE_MISS			    3
+#define	WT_STAT_DUPLICATE_ITEMS_INSERTED	    4
+#define	WT_STAT_HUFFMAN_DATA			    5
+#define	WT_STAT_HUFFMAN_KEY			    6
+#define	WT_STAT_ITEMS_INSERTED			    7
+#define	WT_STAT_OVERFLOW_DATA			    8
+#define	WT_STAT_OVERFLOW_KEY			    9
+#define	WT_STAT_REPEAT_COUNT			   10
 
 /*
  * Statistics entries for ENV/IENV handle.
@@ -109,8 +111,7 @@ struct __wt_stats {
 #define	WT_STAT_TOTAL_READ_IO			    4
 #define	WT_STAT_TOTAL_WRITE_IO			    5
 #define	WT_STAT_WORKQ_PASSES			    6
-#define	WT_STAT_WORKQ_SLEEP			    7
-#define	WT_STAT_WORKQ_YIELD			    8
+#define	WT_STAT_WORKQ_YIELD			    7
 
 /*
  * Statistics entries for FH handle.

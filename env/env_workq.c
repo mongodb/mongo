@@ -20,11 +20,10 @@ __wt_workq_srvr(void *arg)
 	IENV *ienv;
 	WT_TOC **tp, *toc;
 	u_int32_t low_gen;
-	int chk_read, nowork, read_force;
+	int chk_read, read_force, request;
 
 	env = (ENV *)arg;
 	ienv = env->ienv;
-	nowork = 1;
 
 	/* Walk the WT_TOC list and execute requests. */
 	while (F_ISSET(ienv, WT_WORKQ_RUN)) {
@@ -32,19 +31,19 @@ __wt_workq_srvr(void *arg)
 		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
 
 		low_gen = UINT32_MAX;
-		chk_read = read_force = 0;
+		chk_read = read_force = request = 0;
 		for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 			if (toc->gen < low_gen)
 				low_gen = toc->gen;
 			switch (toc->wq_state) {
 			case WT_WORKQ_NONE:
-				continue;
+				break;
 			case WT_WORKQ_FUNC:
-				nowork = 0;
+				request = 1;
 				(void)toc->wq_func(toc);
 				break;
 			case WT_WORKQ_READ:
-				nowork = 0;
+				request = 1;
 
 				/*
 				 * Call a function which makes a request of the
@@ -89,19 +88,10 @@ __wt_workq_srvr(void *arg)
 		/* Check on the cache drain server. */
 		__wt_workq_drain_server(env, 0);
 
-		/*
-		 * If we didn't find work, yield the processor.  If we
-		 * don't find work for awhile, sleep.
-		 */
-		if (nowork++) {
-			if (nowork >= 100000) {
-				WT_STAT_INCR(ienv->stats, WORKQ_SLEEP);
-				__wt_sleep(0, nowork);
-				nowork = 100000;
-			} else {
-				WT_STAT_INCR(ienv->stats, WORKQ_YIELD);
-				__wt_yield();
-			}
+		/* If we didn't find work, yield the processor. */
+		if (!request) {
+			WT_STAT_INCR(ienv->stats, WORKQ_YIELD);
+			__wt_yield();
 		}
 	}
 

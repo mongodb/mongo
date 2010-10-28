@@ -164,7 +164,7 @@ __wt_stat_alloc_env_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 10, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 9, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DATABASE_OPEN].desc = "database open";
 	stats[WT_STAT_MEMALLOC].desc = "memory allocations";
@@ -173,7 +173,6 @@ __wt_stat_alloc_env_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_TOTAL_READ_IO].desc = "total read I/Os";
 	stats[WT_STAT_TOTAL_WRITE_IO].desc = "total write I/Os";
 	stats[WT_STAT_WORKQ_PASSES].desc = "workQ queue passes";
-	stats[WT_STAT_WORKQ_SLEEP].desc = "workQ sleeps";
 	stats[WT_STAT_WORKQ_YIELD].desc = "workQ yields";
 
 	*statsp = stats;
@@ -190,7 +189,6 @@ __wt_stat_clear_env_stats(WT_STATS *stats)
 	stats[WT_STAT_TOTAL_READ_IO].v = 0;
 	stats[WT_STAT_TOTAL_WRITE_IO].v = 0;
 	stats[WT_STAT_WORKQ_PASSES].v = 0;
-	stats[WT_STAT_WORKQ_SLEEP].v = 0;
 	stats[WT_STAT_WORKQ_YIELD].v = 0;
 }
 

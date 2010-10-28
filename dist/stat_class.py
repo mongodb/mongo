@@ -23,7 +23,6 @@ ienv_stats['MTX_LOCK'] = Stat([], 'mutex lock calls')
 ienv_stats['TOTAL_READ_IO'] = Stat([], 'total read I/Os')
 ienv_stats['TOTAL_WRITE_IO'] = Stat([], 'total write I/Os')
 ienv_stats['WORKQ_PASSES'] = Stat([], 'workQ queue passes')
-ienv_stats['WORKQ_SLEEP'] = Stat([], 'workQ sleeps')
 ienv_stats['WORKQ_YIELD'] = Stat([], 'workQ yields')
 
 ##########################################
