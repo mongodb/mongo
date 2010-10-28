@@ -35,7 +35,7 @@ main(int argc, char *argv[])
 
 	/* Set values from the command line. */
 	log = 0;
-	while ((ch = getopt(argc, argv, "1C:cd:lrsv")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:cdlrsv")) != EOF)
 		switch (ch) {
 		case '1':
 			g.c_runs = 1;
@@ -47,16 +47,7 @@ main(int argc, char *argv[])
 			config_names();
 			return (EXIT_SUCCESS);
 		case 'd':
-			switch (optarg[0]) {
-			case 'd':
-				g.dump = DUMP_DEBUG;
-				break;
-			case 'p':
-				g.dump = DUMP_PRINT;
-				break;
-			default:
-				usage();
-			}
+			g.dump = DUMP_DEBUG;
 			break;
 		case 'l':
 			log = 1;
@@ -99,9 +90,6 @@ main(int argc, char *argv[])
 		if (wts_verify())		/* Verify the database */
 			goto err;
 
-		if (g.dump && wts_dump())	/* Optional dump */
-			goto err;
-
 		/* XXX: can't get dups, don't have cursor ops yet. */
 		if (g.c_duplicates_pct != 0)
 			goto skip_ops;
@@ -119,8 +107,12 @@ main(int argc, char *argv[])
 				break;
 			}
 
+#if 0 /* DO OPERATIONS */
 			if (wts_ops())		/* Random operations */
 				goto err;
+#else
+			break;
+#endif
 		}
 
 skip_ops:	if (g.stats && wts_stats())	/* Optional statistics */
@@ -128,6 +120,14 @@ skip_ops:	if (g.stats && wts_stats())	/* Optional statistics */
 						/* Close the databases */
 		track("shutting down BDB", (u_int64_t)0);
 		bdb_teardown();	
+
+		/*
+		 * BDB doesn't have a dump method, so close it, flushing
+		 * data to disk, and then dump & compare the results.
+		 */
+		if (wts_dump())
+			goto err;
+
 		track("shutting down WT", (u_int64_t)0);
 		wts_teardown();
 
@@ -159,8 +159,7 @@ static void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-1clrsv] [-C config] [-d debug | print] "
-	    "[name=value ...]\n",
+	    "usage: %s [-1clrsv] [-C config] [name=value ...]\n",
 	    g.progname);
 	exit(EXIT_FAILURE);
 }
