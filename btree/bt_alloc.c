@@ -62,12 +62,19 @@ static void
 __wt_cache_extend(WT_TOC *toc, u_int32_t *addrp, u_int32_t size)
 {
 	DB *db;
+	IDB *idb;
+	WT_CACHE *cache;
 	WT_FH *fh;
 
+	cache = toc->env->ienv->cache;
 	db = toc->db;
-	fh = db->idb->fh;
+	idb = db->idb;
+	fh = idb->fh;
 
 	/* Extend the file. */
 	*addrp = WT_OFF_TO_ADDR(db, fh->file_size);
 	fh->file_size += size;
+
+	WT_STAT_INCR(cache->stats, CACHE_ALLOC_FILE);
+	WT_STAT_INCR(idb->stats, DB_CACHE_ALLOC_FILE);
 }

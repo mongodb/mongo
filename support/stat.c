@@ -7,9 +7,10 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 14, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 15, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_ALLOC].desc = "cache allocations";
+	stats[WT_STAT_CACHE_ALLOC_FILE].desc = "cache file extensions";
 	stats[WT_STAT_CACHE_BYTES_INUSE].desc = "bytes in the cache";
 	stats[WT_STAT_CACHE_BYTES_MAX].desc =
 	    "maximum bytes configured for the cache";
@@ -36,6 +37,7 @@ void
 __wt_stat_clear_cache_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_CACHE_ALLOC].v = 0;
+	stats[WT_STAT_CACHE_ALLOC_FILE].v = 0;
 	stats[WT_STAT_CACHE_EVICT_HAZARD].v = 0;
 	stats[WT_STAT_CACHE_EVICT_MODIFIED].v = 0;
 	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].v = 0;
@@ -124,9 +126,10 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 12, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 13, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DB_CACHE_ALLOC].desc = "database cache allocations";
+	stats[WT_STAT_DB_CACHE_ALLOC_FILE].desc = "database file extensions";
 	stats[WT_STAT_DB_CACHE_FREE].desc = "database cache frees";
 	stats[WT_STAT_DB_CACHE_HIT].desc = "database cache read hits";
 	stats[WT_STAT_DB_CACHE_MISS].desc = "database cache read misses";
@@ -147,6 +150,7 @@ void
 __wt_stat_clear_db_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
+	stats[WT_STAT_DB_CACHE_ALLOC_FILE].v = 0;
 	stats[WT_STAT_DB_CACHE_FREE].v = 0;
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;

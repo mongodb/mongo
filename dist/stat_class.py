@@ -30,6 +30,7 @@ ienv_stats['WORKQ_YIELD'] = Stat([], 'workQ yields')
 ##########################################
 cache_stats = {}
 cache_stats['CACHE_ALLOC'] = Stat([], 'cache allocations')
+cache_stats['CACHE_ALLOC_FILE'] = Stat([], 'cache file extensions')
 cache_stats['CACHE_BYTES_INUSE'] = Stat(['perm'], 'bytes in the cache')
 cache_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'maximum bytes configured for the cache')
 cache_stats['CACHE_EVICT_HAZARD'] = Stat([], 'pages selected for eviction not evicted because of a hazard reference')
@@ -48,6 +49,7 @@ cache_stats['CACHE_READ_RESTARTS'] = Stat([], 'cache read restarts')
 ##########################################
 idb_stats = {}
 idb_stats['DB_CACHE_ALLOC'] = Stat([], 'database cache allocations')
+idb_stats['DB_CACHE_ALLOC_FILE'] = Stat([], 'database file extensions')
 idb_stats['DB_CACHE_FREE'] = Stat([], 'database cache frees')
 idb_stats['DB_CACHE_HIT'] = Stat([], 'database cache read hits')
 idb_stats['DB_CACHE_MISS'] = Stat([], 'database cache read misses')
