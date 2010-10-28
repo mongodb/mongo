@@ -1365,7 +1365,8 @@ namespace mongo {
 
                 } else { // update
 
-                    if (getGtLtOp(origQuery["_id"]) != BSONObj::Equality){
+                    BSONElement queryId = origQuery["_id"];
+                    if (queryId.eoo() || getGtLtOp(queryId) != BSONObj::Equality){
                         // need to include original query for $ positional operator
 
                         BSONObjBuilder b;
