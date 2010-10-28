@@ -398,11 +398,11 @@ __wt_prime(u_int32_t n);
 void
 __wt_progress(const char *s, u_int64_t v);
 int
-__wt_toc_scratch_alloc(WT_TOC *toc, DBT **dbtp);
+__wt_scr_alloc(WT_TOC *toc, DBT **dbtp);
 void
-__wt_toc_scratch_discard(WT_TOC *toc, DBT *dbt);
+__wt_scr_release(DBT **dbt);
 void
-__wt_toc_scratch_free(WT_TOC *toc);
+__wt_scr_free(WT_TOC *toc);
 int
 __wt_toc_serialize_func(
     WT_TOC *toc, wq_state_t op, int spin, int (*func)(WT_TOC *), void *args);

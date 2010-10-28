@@ -102,7 +102,7 @@ __wt_wt_toc_close(WT_TOC *toc)
 	/* Discard DBT memory. */
 	__wt_free(env, toc->key.data, toc->key.mem_size);
 	__wt_free(env, toc->data.data, toc->data.mem_size);
-	__wt_toc_scratch_free(toc);
+	__wt_scr_free(toc);
 
 	/* Unlock and destroy the thread's mutex. */
 	if (toc->mtx != NULL) {
