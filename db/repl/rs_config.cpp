@@ -345,12 +345,12 @@ namespace mongo {
             }
 
             v = -4;
-            long long count = 0;
+            unsigned long long count = 0;
             try {
                 ScopedConn conn(h.toString());
                 v = -3;
-                cfg = conn->findOne(rsConfigNs, Query()).getOwned();
-                count = conn->count(rsConfigNs);
+                cfg = conn.findOne(rsConfigNs, Query()).getOwned();
+                count = conn.count(rsConfigNs);
             }
             catch ( DBException& ) {
                 if ( !h.isSelf() ) {

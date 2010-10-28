@@ -44,7 +44,22 @@ namespace mongo {
         /** throws assertions if connect failure etc. */
         ScopedConn(string hostport);
         ~ScopedConn();
-        DBClientConnection* operator->();
+
+        /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
+           So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes 
+           ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
+           */
+
+        bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0) {
+            return conn()->runCommand(dbname, cmd, info, options);
+        }
+        unsigned long long count(const string &ns) { 
+            return conn()->count(ns); 
+        }
+        BSONObj findOne(const string &ns, const Query& q, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) { 
+            return conn()->findOne(ns, q, fieldsToReturn, queryOptions);
+        }
+
     private:
         auto_ptr<scoped_lock> connLock;
         static mutex mapMutex;
@@ -57,6 +72,7 @@ namespace mongo {
         } *x;
         typedef map<string,ScopedConn::X*> M;
         static M& _map;
+        DBClientConnection* conn() { return &x->cc; }
     };
 
     inline ScopedConn::ScopedConn(string hostport) {
@@ -84,8 +100,8 @@ namespace mongo {
         // conLock releases...
     }
 
-    inline DBClientConnection* ScopedConn::operator->() { 
+    /*inline DBClientConnection* ScopedConn::operator->() { 
         return &x->cc; 
-    }
+    }*/
 
 }
