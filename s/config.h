@@ -123,6 +123,11 @@ namespace mongo {
         ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique );
         
         /**
+           @return true if there was sharding info to remove
+         */
+        bool removeSharding( const string& ns );
+
+        /**
          * @return whether or not the 'ns' collection is partitioned
          */
         bool isSharded( const string& ns );
@@ -172,12 +177,6 @@ namespace mongo {
         bool _reload();
         void _save();
 
-        
-        /**
-           @return true if there was sharding info to remove
-         */
-        bool removeSharding( const string& ns );
-
         string _name; // e.g. "alleyinsider"
         Shard _primary; // e.g. localhost , mongo.foo.com:9999
         bool _shardingEnabled;
@@ -188,8 +187,6 @@ namespace mongo {
         Collections _collections;
 
         mongo::mutex _lock; // TODO: change to r/w lock ??
-
-        friend class ChunkManager;
     };
 
     class ConfigServer : public DBConfig {
