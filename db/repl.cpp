@@ -335,6 +335,7 @@ namespace mongo {
                 
                 if ( level > 1 ){
                     dbtemprelease unlock;
+                    // note: there is no so-style timeout on this connection; perhaps we should have one.
                     ScopedDbConnection conn( s["host"].valuestr() );
                     DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn.conn() );
                     if ( cliConn && replAuthenticate( cliConn ) ) {

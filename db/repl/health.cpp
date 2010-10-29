@@ -172,10 +172,7 @@ namespace mongo {
             if( skip.count(e.fieldName()) ) continue;
             ss << e.toString() << ' ';
         }
-        ss << "</td>";
-
-        ss << "</tr>";
-        ss << '\n';
+        ss << "</td></tr>\n";
     }
 
     void ReplSetImpl::_getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { 
@@ -191,9 +188,16 @@ namespace mongo {
         const bo fields;
 
         /** todo fix we might want an so timeout here */
-        ScopedDbConnection conn(m->fullName());
+        DBClientConnection conn(false, 0, /*timeout*/ 20);
+        {
+            string errmsg;
+            if( !conn.connect(m->fullName(), errmsg) ) { 
+                ss << "couldn't connect to " << m->fullName() << ' ' << errmsg;
+                return;
+            }
+        }
 
-        auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
+        auto_ptr<DBClientCursor> c = conn.query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
         if( c.get() == 0 ) { 
             ss << "couldn't query " << rsoplog;
             return;
@@ -224,7 +228,7 @@ namespace mongo {
             ss << rsoplog << " is empty\n";
         }
         else { 
-            auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
+            auto_ptr<DBClientCursor> c = conn.query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
             if( c.get() == 0 ) { 
                 ss << "couldn't query [2] " << rsoplog;
                 return;
@@ -261,8 +265,6 @@ namespace mongo {
                 ss << h / 24.0 << " days";
             ss << "</p>\n";
         }
-
-        conn.done();
     }
 
     void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 
