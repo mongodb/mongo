@@ -422,13 +422,12 @@ namespace mongo {
             if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
                 c_.reset();
                 _cc.reset();
-                massert( 13337, "cursor dropped during count", false );
-                // TODO maybe we want to prevent recording the winning plan as well?
+                // we don't fail query since we're fine with returning partial data if collection dropped
             }
         }
         
         virtual void next() {
-            if ( !c_->ok() ) {
+            if ( !c_ || !c_->ok() ) {
                 setComplete();
                 return;
             }
@@ -665,8 +664,7 @@ namespace mongo {
                 _c.reset();
                 _cc.reset();
                 _so.reset();
-                massert( 13338, "cursor dropped during query", false );
-                // TODO maybe we want to prevent recording the winning plan as well?
+                // we don't fail query since we're fine with returning partial data if collection dropped
             }
         }
         
@@ -689,7 +687,7 @@ namespace mongo {
                 return;
             }
             
-            if ( !_c->ok() ) {
+            if ( !_c || !_c->ok() ) {
                 finish( false );
                 return;
             }
