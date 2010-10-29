@@ -164,7 +164,7 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 * Figure out how much space we need: this code limits the maximum size
 	 * of a data item stored in the database.  In summary, for a big item we
 	 * have to store a WT_TOC_UPDATE structure, the WT_REPL structure and
-	 * the data, all in an allocated buffer.   We only pass a 32-bit value to
+	 * the data, all in an allocated buffer.   We only pass a 32-bit value
 	 * to our allocation routine, so we can't store an item bigger than the
 	 * maximum 32-bit value minus the sizes of those two structures, where
 	 * the WT_REPL structure and data item are aligned to a 32-bit boundary.
@@ -183,7 +183,7 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 		return (__wt_database_item_too_big(db));
 
 	/*
-	 * If we already have a buffer and the data fits, we can copy the WT_REPL
+	 * If we already have a buffer and the data fits, just copy the WT_REPL
 	 * structure and data into place, we're done.
 	 */
 	update = toc->update;
@@ -198,17 +198,17 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 *
 	 * XXX
 	 * I have no reason for the 4x the request size, I just hate to allocate
-	 * a buffer for every change to the database.  A better approach would be
-	 * to grow the allocation buffer as the thread makes more changes; if a
-	 * thread is doing lots of work, give it lots of memory, otherwise only
-	 * allocate as it's necessary.
+	 * a buffer for every change to the database.  A better approach would
+	 * be to grow the allocation buffer as the thread makes more changes; if
+	 * a thread is doing lots of work, give it lots of memory, otherwise
+	 * only allocate as it's necessary.
 	 */
 	if (align_size > env->data_update_max) {
 		alloc_size = sizeof(WT_TOC_UPDATE) + align_size;
 		single_use = 1;
 	} else {
-		alloc_size =
-		    __wt_nlpo2(WT_MAX(align_size * 4, env->data_update_initial));
+		alloc_size = __wt_nlpo2(
+		    WT_MAX(align_size * 4, env->data_update_initial));
 		single_use = 0;
 	}
 	WT_RET(__wt_calloc(env, 1, alloc_size, &update));
