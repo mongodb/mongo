@@ -491,7 +491,7 @@ namespace mongo {
             return 1;
         }
         
-    } setShardVersion;
+    } setShardVersionCmd;
     
     class GetShardVersion : public MongodShardCommand {
     public:
