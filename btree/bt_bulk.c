@@ -104,11 +104,6 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	    db->leafmin, WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
 	hdr = page->hdr;
 
-	/* Update the descriptor record. */
-	idb->root_addr = page->addr;
-	idb->root_size = page->size;
-	WT_ERR(__wt_bt_desc_write(toc));
-
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key != NULL) {
 			__wt_api_db_errx(db,
@@ -270,11 +265,6 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	 */
 	WT_ERR(__wt_bt_scratch_page(
 	    toc, db->leafmin, type, WT_LLEAF, &page, &tmp1));
-
-	/* Update the descriptor record. */
-	idb->root_addr = page->addr;
-	idb->root_size = page->size;
-	WT_ERR(__wt_bt_desc_write(toc));
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (F_ISSET(idb, WT_COLUMN) ) {
@@ -769,8 +759,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	success_return = ret;
 
 	/* Promote a key from the partially-filled page and write it. */
-	WT_ERR(
-	    __wt_bt_promote(toc, page, page->records, &stack, 0, &root_addr));
+	WT_ERR(__wt_bt_promote(toc, page, page->records, &stack, 0, &root_addr));
 	WT_ERR(__wt_bt_bulk_write(toc, page));
 
 	/*
@@ -998,16 +987,14 @@ split:		switch (hdr->type) {
 		    toc, db->intlmin, type, hdr->level + 1, &next, &next_tmp));
 
 		/*
-		 * Case #1 -- there's no parent, it's a root split.  If in a
-		 * primary tree, update the description page, in an off-page
-		 * duplicates tree, return the root of the off-page tree.
+		 * Case #1 -- there's no parent, it's a root split.  There's no
+		 * additional work in a primary tree; in an off-page duplicates
+		 * tree, return the root of the off-page tree.
 		 */
 		if (parent == NULL) {
 			switch (type) {
 			case WT_PAGE_COL_INT:
 			case WT_PAGE_ROW_INT:
-				WT_ERR(__wt_bt_desc_write_root(
-				    toc, next->addr, db->intlmin));
 				break;
 			case WT_PAGE_DUP_INT:
 				*dup_root_addrp = next->addr;
@@ -1378,17 +1365,28 @@ static int
 __wt_bt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 {
 	ENV *env;
+	IDB *idb;
 	WT_STACK_ELEM *elem;
 	int ret;
 
 	env = toc->env;
+	idb = toc->db->idb;
 	ret = 0;
-
-	if (stack->elem == NULL)
-		return (0);
 
 	for (elem = stack->elem; elem->page != NULL; ++elem) {
 		WT_TRET(__wt_bt_bulk_write(toc, elem->page));
+
+		/*
+		 * If we've reached the last element in the stack, it's the
+		 * root page of the tree.  Update the in-memory root address
+		 * and the descriptor record.
+		 */
+		if ((elem + 1)->page == NULL) {
+			idb->root_addr = elem->page->addr;
+			idb->root_size = elem->page->size;
+			WT_TRET(__wt_bt_desc_write(toc));
+		}
+
 		__wt_scr_release(&elem->tmp);
 	}
 	__wt_free(env, stack->elem, stack->size * sizeof(WT_STACK_ELEM));
