@@ -332,8 +332,6 @@ namespace mongo {
 
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
         virtual void recv( Message& m ) { assert(false); }
-
-        virtual string getServerAddress() const = 0;
     };
 
     /**
@@ -363,6 +361,7 @@ namespace mongo {
         */
         virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
+        virtual string getServerAddress() const = 0;
 
     };
 
