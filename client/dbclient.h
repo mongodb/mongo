@@ -780,31 +780,15 @@ namespace mongo {
         This is the main entry point for talking to a simple Mongo setup
     */
     class DBClientConnection : public DBClientBase {
-        DBClientReplicaSet *clientSet;
-        boost::scoped_ptr<MessagingPort> p;
-        boost::scoped_ptr<SockAddr> server;
-        bool failed; // true if some sort of fatal error has ever happened
-        bool autoReconnect;
-        time_t lastReconnectTry;
-        HostAndPort _server; // remember for reconnects
-        string _serverString;
-        int _port;
-        void _checkConnection();
-        void checkConnection() { if( failed ) _checkConnection(); }
-		map< string, pair<string,string> > authCache;
-        double _timeout;
-        
-        bool _connect( string& errmsg );
     public:
-
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure
            @param cp used by DBClientReplicaSet.  You do not need to specify this parameter
            @param timeout tcp timeout in seconds - this is for read/write, not connect.  
            Connect timeout is fixed, but short, at 5 seconds.
          */
-        DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double timeout=0) :
-                clientSet(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _timeout(timeout) { }
+        DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double so_timeout=0) :
+                clientSet(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _so_timeout(so_timeout) { }
 
         /** Connect to a Mongo database server.
 
@@ -856,8 +840,11 @@ namespace mongo {
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions , batchSize );
         }
 
-        /** uses QueryOption_Exhaust 
-            use DBClientCursorBatchIterator if you want to do items in large blocks, perhpas to avoid granular locking and such.
+        /** Uses QueryOption_Exhaust 
+            Exhaust mode sends back all data queries as fast as possible, with no back-and-for for OP_GETMORE.  If you are certain 
+            you will exhaust the query, it could be useful.
+
+            Use DBClientCursorBatchIterator version if you want to do items in large blocks, perhaps to avoid granular locking and such.
          */
         unsigned long long query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
         unsigned long long query( boost::function<void(DBClientCursorBatchIterator&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
@@ -866,13 +853,9 @@ namespace mongo {
            @return true if this connection is currently in a failed state.  When autoreconnect is on, 
                    a connection will transition back to an ok state after reconnecting.
          */
-        bool isFailed() const {
-            return failed;
-        }
+        bool isFailed() const { return failed; }
 
-        MessagingPort& port() {
-            return *p;
-        }
+        MessagingPort& port() { return *p; }
 
         string toStringLong() const {
             stringstream ss;
@@ -882,27 +865,16 @@ namespace mongo {
         }
 
         /** Returns the address of the server */
-        string toString() {
-            return _serverString;
-        }
+        string toString() { return _serverString; }
         
-        string getServerAddress() const {
-            return _serverString;
-        }
+        string getServerAddress() const { return _serverString; }
         
         virtual void killCursor( long long cursorID );
-
-        virtual bool callRead( Message& toSend , Message& response ){
-            return call( toSend , response );
-        }
-
+        virtual bool callRead( Message& toSend , Message& response ) { return call( toSend , response ); }
         virtual void say( Message &toSend );
-        virtual bool call( Message &toSend, Message &response, bool assertOk = true );
-        
+        virtual bool call( Message &toSend, Message &response, bool assertOk = true );        
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }  
-
         virtual bool isMember( const DBConnector * conn ) const { return this == conn; };
-
         virtual void checkResponse( const char *data, int nReturned );
 
     protected:
@@ -910,6 +882,20 @@ namespace mongo {
         virtual void recv( Message& m );
         virtual void sayPiggyBack( Message &toSend );
 
+        DBClientReplicaSet *clientSet;
+        boost::scoped_ptr<MessagingPort> p;
+        boost::scoped_ptr<SockAddr> server;
+        bool failed; // true if some sort of fatal error has ever happened
+        const bool autoReconnect;
+        time_t lastReconnectTry;
+        HostAndPort _server; // remember for reconnects
+        string _serverString;
+        //int _port;
+        void _checkConnection();
+        void checkConnection() { if( failed ) _checkConnection(); }
+		map< string, pair<string,string> > authCache;
+        const double _so_timeout;        
+        bool _connect( string& errmsg );
     };
     
     /** Use this class to connect to a replica set of servers.  The class will manage

@@ -190,6 +190,7 @@ namespace mongo {
         //const bo fields = BSON( "o" << false << "o2" << false );
         const bo fields;
 
+        /** todo fix we might want an so timeout here */
         ScopedDbConnection conn(m->fullName());
 
         auto_ptr<DBClientCursor> c = conn->query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
