@@ -43,12 +43,12 @@ namespace mongo {
     
     Chunk::Chunk( ChunkManager * manager )
       : _manager(manager),
-        _lastmod(0), _modified(false), _dataWritten(0)
+        _lastmod(0), _dataWritten(0)
     {}
 
     Chunk::Chunk(ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
       : _manager(info), _min(min), _max(max), _shard(shard),
-        _lastmod(0), _modified(false), _dataWritten(0)
+        _lastmod(0), _dataWritten(0)
     {}
 
     string Chunk::getns() const {
@@ -623,7 +623,6 @@ namespace mongo {
 
     void ChunkManager::createFirstChunk(){
         ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), _config->getPrimary()) );
-        c->setModified( true );
         
         _chunkMap[c->getMax()] = c;
         _chunkRanges.reloadAll(_chunkMap);
@@ -846,7 +845,7 @@ namespace mongo {
     }
     
     void ChunkManager::save_inlock( bool major ){
-        // we do not update update the chunk manager on the mongos side any more
+        // we do not update update the chunk manager on the mongos side anymore
         // the only exception case should be first chunk creation
         assert( _chunkMap.size() == 1 );
 
@@ -867,8 +866,6 @@ namespace mongo {
         int numOps = 0;
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
             ChunkPtr c = i->second;
-            if ( ! c->getModified() )
-                continue;
 
             numOps++;
             _sequenceNumber = ++NextSequenceNumber;
@@ -937,7 +934,6 @@ namespace mongo {
         // instead of reloading, adjust ShardChunkVersion for the chunks that were updated in the configdb
         for ( unsigned i=0; i<toFix.size(); i++ ){
             toFix[i]->setLastmod( newVersions[i] );
-            toFix[i]->setModified( false );
         }
 
         massert( 10417 ,  "how did version get smalled" , getVersion_inlock() >= version );

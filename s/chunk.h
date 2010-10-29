@@ -86,9 +86,6 @@ namespace mongo {
         string genID() const;
         static string genID( const string& ns , const BSONObj& min );
 
-        bool getModified() { return _modified; }
-        void setModified( bool modified ) { _modified = modified; }
-
         ShardChunkVersion getLastmod() const { return _lastmod; }
         void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
 
@@ -163,8 +160,6 @@ namespace mongo {
         Shard _shard;
         ShardChunkVersion _lastmod;
 
-        bool _modified;
-        
         // transient stuff
 
         long _dataWritten;
