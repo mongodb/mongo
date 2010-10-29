@@ -281,7 +281,7 @@ namespace mongo {
         int bufSize = 512;
         if ( cc ){
             bufSize += sizeof( QueryResult );
-            bufSize += ntoreturn ? MaxBytesToReturnToClientAtOnce : MaxBytesToReturnToClientAtOnce / 4;
+            bufSize += MaxBytesToReturnToClientAtOnce;
         }
 
         BufBuilder b( bufSize );
@@ -356,8 +356,7 @@ namespace mongo {
                         // show disk loc should be part of the main query, not in an $or clause, so this should be ok
                         fillQueryResultFromObj(b, cc->fields.get(), js, ( cc->pq.get() && cc->pq->showDiskLoc() ? &last : 0));
                         n++;
-                        if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-                             (ntoreturn==0 && b.len()>1*1024*1024) ) {
+                        if ( ( ntoreturn && n >= ntoreturn ) || b.len() > MaxBytesToReturnToClientAtOnce ){
                             c->advance();
                             cc->incPos( n );
                             break;
