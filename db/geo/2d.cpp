@@ -497,6 +497,102 @@ namespace mongo {
         Point _max;
     };
 
+
+    class Polygon {
+    public:
+
+        Polygon( void ) : _centroidCalculated( false ) {}
+
+        Polygon( vector<Point> points ) : _centroidCalculated( false ),
+            _points( points ) { }
+
+        void add( Point p ) {
+            _centroidCalculated = false;
+            _points.push_back( p );
+        }
+
+        int size( void ) {
+            return _points.size();
+        }
+
+        /**
+         * Determine if the point supplied is contained by the current polygon.
+         *
+         * The algorithm uses a ray casting method.
+         */
+        bool contains( Point &p ) {
+
+            int counter = 0;
+            Point p1 = _points[0];
+            for ( int i = 1; i <= size(); i++ ) {
+                Point p2 = _points[i % size()];
+                if ( p._y > std::min( p1._y, p2._y ) ) {
+                    if ( p._y <= std::max( p1._y, p2._y ) ) {
+                        if ( p._x <= std::max( p1._x, p2._x ) ) {
+                            if ( p1._y != p2._y ) {
+                                 double xinters = (p._y-p1._y)*(p2._x-p1._x)/(p2._y-p1._y)+p1._x;
+                                 if ( p1._x == p2._x || p._x <= xinters ) {
+                                      counter++;
+                                 }
+                            }
+                        }
+                    }
+                }
+                p1 = p2;
+            }
+
+            if ( counter % 2 == 0 ) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+        /**
+         * Calculate the centroid, or center of mass of the polygon object.
+         */
+        Point centroid( void ) {
+
+            /* Centroid is cached, it won't change betwen points */
+            if ( _centroidCalculated ) {
+              return _centroid;
+            }
+
+            Point cent;
+            double signedArea = 0.0;
+            double area = 0.0;  // Partial signed area
+
+            /// For all vertices except last
+            int i = 0;
+            for ( i = 0; i < size() - 1; ++i ) {
+              area = _points[i]._x * _points[i+1]._y - _points[i+1]._x * _points[i]._y ;
+              signedArea += area;
+              cent._x += ( _points[i]._x + _points[i+1]._x ) * area;
+              cent._y += ( _points[i]._y + _points[i+1]._y ) * area;
+            }
+
+            // Do last vertex
+            area = _points[i]._x * _points[0]._y - _points[0]._x * _points[i]._y;
+            cent._x += ( _points[i]._x + _points[0]._x ) * area;
+            cent._y += ( _points[i]._y + _points[0]._y ) * area;
+            signedArea += area;
+            signedArea *= 0.5;
+            cent._x /= ( 6 * signedArea );
+            cent._y /= ( 6 * signedArea );
+
+            _centroidCalculated = true;
+            _centroid = cent;
+
+            return cent;
+        }
+
+    private:
+
+        bool _centroidCalculated;
+        Point _centroid;
+        vector<Point> _points;
+    };
+
     class Geo2dPlugin : public IndexPlugin {
     public:
         Geo2dPlugin() : IndexPlugin( GEO2DNAME ) {
@@ -2008,6 +2104,104 @@ namespace mongo {
 
     };
 
+    class GeoPolygonBrowse : public GeoBrowse {
+    public:
+
+        enum State {
+            START ,
+            DOING_EXPAND ,
+            DONE
+        } _state;
+
+        GeoPolygonBrowse( const Geo2dType* g , const BSONObj& polyPoints ,
+            BSONObj filter = BSONObj() ) : GeoBrowse( g , "polygon" , filter ) {
+
+            GEODEBUG( "In Polygon" )
+
+            BSONObjIterator i( polyPoints );
+            BSONElement first = i.next();
+            _poly.add( Point( first ) );
+
+            while ( i.more() ) {
+                _poly.add( Point( i.next() ) );
+            }
+
+            assert( _poly.size() >= 3 );
+
+            GeoHash _start = g->_tohash( first );
+            _prefix = _start;
+
+            _state = START;
+            _found = 0;
+
+            ok();
+        }
+
+        virtual bool moreToDo( void ) {
+            return _state != DONE;
+        }
+
+        virtual void fillStack( void ) {
+            if ( _state == START ){
+
+                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max ,
+                                               _prefix , _found , this ) ){
+                    _state = DONE;
+                    return;
+                }
+                _state = DOING_EXPAND;
+            }
+
+            if ( _state == DOING_EXPAND ){
+                GEODEBUG( "polygon prefix [" << _prefix << "]" );
+                PREFIXDEBUG( _prefix , _g );
+
+                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
+                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+
+                if ( ! _prefix.constrains() ){
+                    GEODEBUG( "\t exhausted the btree" );
+                    _state = DONE;
+                    return;
+                }
+
+                _prefix = _prefix.up();
+
+                return;
+            }
+        }
+
+        virtual bool checkDistance( const GeoHash& h , double& d ) {
+
+            Point p = Point( _g , h );
+
+            // Find centroid of the polygon.
+            Point centroid = _poly.centroid();
+
+            // Use the centroid to find the distance to the current point.
+            d = centroid.distance( p );
+
+            // Use the point in polygon algorihtm to see if the point
+            // is contained in the polygon.
+            bool in = _poly.contains( p );
+            if ( in ) {
+                GEODEBUG( "Point: [" << p._x << ", " << p._y << "] in polygon" );
+            } else {
+                GEODEBUG( "Point: [" << p._x << ", " << p._y << "] not in polygon" );
+            }
+            return in;
+        }
+
+    private:
+
+        Polygon _poly;
+        int _found;
+        GeoHash _prefix;
+        BtreeLocation _min;
+        BtreeLocation _max;
+    };
+
+
     shared_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
         if ( numWanted < 0 )
             numWanted = numWanted * -1;
@@ -2075,6 +2269,10 @@ namespace mongo {
                 else if ( type == "$box" ) {
                     uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
                     shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                    return c;   
+                } else if ( startsWith( type, "$poly" ) ) {
+                    uassert( 13509 , "$polygon has to take an object or array" , e.isABSONObj() );
+                    shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query ) );
                     return c;
                 }
                 throw UserException( 13058 , (string)"unknown $with type: " + type );
