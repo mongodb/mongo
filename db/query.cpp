@@ -158,7 +158,7 @@ namespace mongo {
         auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout, cPtr, ns) );
         cc->setDoingDeletes( true );
             
-        CursorId id = cc->cursorid;
+        CursorId id = cc->cursorid();
             
         bool justOne = justOneOrig;
         bool canYield = !god && !creal->matcher()->docMatcher().atomic();
@@ -169,7 +169,7 @@ namespace mongo {
                 // TODO should we assert or something?
                 break;
             }
-            if ( !cc->c->ok() ) {
+            if ( !cc->ok() ) {
                 break; // if we yielded, could have hit the end
             }
                 
@@ -177,26 +177,26 @@ namespace mongo {
             // as well as some other nuances handled
             cc->setDoingDeletes( true );
                 
-            DiskLoc rloc = cc->c->currLoc();
-            BSONObj key = cc->c->currKey();
+            DiskLoc rloc = cc->currLoc();
+            BSONObj key = cc->currKey();
 
             // NOTE Calling advance() may change the matcher, so it's important 
             // to try to match first.
             bool match = creal->matcher()->matches( key , rloc );
             
-            if ( ! cc->c->advance() )
+            if ( ! cc->advance() )
                 justOne = true;
                 
             if ( ! match )
                 continue;
                             
-            assert( !cc->c->getsetdup(rloc) ); // can't be a dup, we deleted it!
+            assert( !cc->c()->getsetdup(rloc) ); // can't be a dup, we deleted it!
                 
             if ( !justOne ) {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
                     blocks.  here we might call millions of times which would be bad.
                     */
-                cc->c->noteLocation();
+                cc->c()->noteLocation();
             }
                 
             if ( logop ) {
@@ -219,9 +219,9 @@ namespace mongo {
             if ( justOne ) {
                 break;
             }
-            cc->c->checkLocation();
+            cc->c()->checkLocation();
                 
-        } while ( cc->c->ok() );
+        } while ( cc->ok() );
 
         if ( cc.get() && ClientCursor::find( id , false ) == 0 ){
             cc.release();
@@ -301,15 +301,15 @@ namespace mongo {
             if ( pass == 0 )
                 cc->updateSlaveLocation( curop );
 
-            int queryOptions = cc->_queryOptions;
+            int queryOptions = cc->queryOptions();
 
             if( pass == 0 ) {
                 StringBuilder& ss = curop.debug().str;
-                ss << " getMore: " << cc->query.toString() << " ";
+                ss << " getMore: " << cc->query().toString() << " ";
             }
             
-            start = cc->pos;
-            Cursor *c = cc->c.get();
+            start = cc->pos();
+            Cursor *c = cc->c();
             c->checkLocation();
             DiskLoc last;
 
@@ -359,7 +359,7 @@ namespace mongo {
                         if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
                              (ntoreturn==0 && b.len()>1*1024*1024) ) {
                             c->advance();
-                            cc->pos += n;
+                            cc->incPos( n );
                             break;
                         }
                     }
@@ -371,7 +371,7 @@ namespace mongo {
                 cc->updateLocation();
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
-                exhaust = cc->_queryOptions & QueryOption_Exhaust;
+                exhaust = cc->queryOptions() & QueryOption_Exhaust;
             }
         }
 
@@ -854,7 +854,7 @@ namespace mongo {
         
         void finishForOplogReplay( ClientCursor * cc ){
             if ( _oplogReplay && ! _slaveReadTill.isNull() )
-                cc->_slaveReadTill = _slaveReadTill;
+                cc->slaveReadTill( _slaveReadTill );
 
         }
     private:
@@ -1076,14 +1076,14 @@ namespace mongo {
                 cursor->setMatcher( dqo.matcher() );
                 cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
             }
-            cursorid = cc->cursorid;
+            cursorid = cc->cursorid();
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
-            cc->pos = n;
+            cc->setPos( n );
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();
             cc->originalMessage = m;
             cc->updateLocation();
-            if ( !cc->c->ok() && cc->c->tailable() )
+            if ( !cc->ok() && cc->c()->tailable() )
                 DEV tlog() << "query has no more but tailable, cursorid: " << cursorid << endl;
             if( queryOptions & QueryOption_Exhaust ) {
                 exhaust = ns;

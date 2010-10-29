@@ -1220,7 +1220,7 @@ namespace mongo {
             {
                 shared_ptr<Cursor> c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
                 ClientCursor *cc = new ClientCursor(0, c, fromNs.c_str());
-                id = cc->cursorid;
+                id = cc->cursorid();
             }
 
             DBDirectClient client;
