@@ -110,65 +110,6 @@ namespace mongo {
         return _manager->getShardKey().extractKey( end );
     }
 
-    BSONObj Chunk::pickSplitPoint_DEPRECATED( const vector<BSONObj> * possibleSplitPoints ) const {
-        
-        // check to see if we're at the edge of the key range
-        // if so, split on the edge for sequential insertion efficienc
-
-        if ( minIsInf() ) 
-            return _getExtremeKey( 1 );
-        if ( maxIsInf() )
-            return _getExtremeKey( -1 );
-
-        // we're not at an edge, so use the hint if we have one
-        if ( possibleSplitPoints && possibleSplitPoints->size() )
-            return possibleSplitPoints->at(0);
-        
-        // no edge, no hint, so find the median of the range
-        
-        BSONObj cmd = BSON( "medianKey" << _manager->getns()
-                            << "keyPattern" << _manager->getShardKey().key()
-                            << "min" << getMin()
-                            << "max" << getMax() );
-
-        ScopedDbConnection conn( getShard().getConnString() );
-        BSONObj result;
-        if ( ! conn->runCommand( "admin" , cmd , result ) ){
-            stringstream ss;
-            ss << "medianKey command failed: " << result;
-            uassert( 10164 ,  ss.str() , 0 );
-        }
-
-        BSONObj median = result.getObjectField( "median" ).getOwned();
-
-        if ( median == getMin() ) {
-            // if the median is the same as the min
-            // we don't want to split on the median, 
-            // but the maximum real value
-            // otherwise we'll never be able to split up a chunk with lots of key dups
-
-            Query q;
-            q.minKey(_min).maxKey(_max);
-            q.sort(_manager->getShardKey().key());
-
-            median = conn->findOne(_manager->getns(), q);
-            median = _manager->getShardKey().extractKey( median );
-        }
-        
-        conn.done();
-        
-        // sanity check median - purely defensive
-        if ( median < getMin() || median >= getMax() ){
-            stringstream ss;
-            ss << "medianKey returned value out of range.  " 
-               << " cmd: " << cmd 
-               << " result: " << result;
-            uasserted( 13394 , ss.str() );
-        }
-        
-        return median;
-    }
-
     void Chunk::pickMedianKey( BSONObj& medianKey ) const {
         // Ask the mongod holding this chunk to figure out the split points.
         ScopedDbConnection conn( getShard().getConnString() );
@@ -224,12 +165,6 @@ namespace mongo {
         conn.done();
     }
 
-    ChunkPtr Chunk::split_DEPRECATED(){
-        vector<BSONObj> splitPoints;
-        splitPoints.push_back( pickSplitPoint_DEPRECATED() );
-        return multiSplit( splitPoints );
-    }
-
     ChunkPtr Chunk::singleSplit( bool force ){
         vector<BSONObj> splitPoint;
 
@@ -283,7 +218,6 @@ namespace mongo {
             return ChunkPtr();
         }
 
-        //return multiSplit_DEPRECATED( splitPoint );
         return multiSplit( splitPoint );
     }
     
@@ -333,128 +267,6 @@ namespace mongo {
         // return the second half, if a single split, or the first new chunk, if a multisplit.
         return _manager->findChunk( m[0] );
      }
-
-    ChunkPtr Chunk::multiSplit_DEPRECATED( const vector<BSONObj>& m ){
-        dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
-        uassert( 10166 , "locking namespace failed" , dlk.got() );
-
-        // const size_t maxSplitPoints = 256;
-
-        // uassert( 99910165 , "can't split as shard doesn't have a manager" , _manager );
-        // uassert( 99913332 , "need a split key to split chunk" , !m.empty() );
-        // uassert( 99913333 , "can't split a chunk in that many parts", m.size() < maxSplitPoints );
-        // uassert( 99913003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
-        
-        {
-            ShardChunkVersion onServer = getVersionOnConfigServer();
-            ShardChunkVersion mine = _lastmod;
-            if ( onServer > mine ){
-                stringstream ss;
-                ss << "mulitSplit failing because config not up to date" 
-                   << " onServer: " << onServer.toString()
-                   << " mine: " << mine.toString();
-
-                //reload config
-                grid.getDBConfig(_manager->_ns)->getChunkManager(_manager->_ns, true);
-
-                uasserted( 13387 , ss.str() );
-            }
-        }
-
-        // Now that we're sure to have the freshest data about the shard, sanity check the split
-        // keys. Recall we get the split keys without any lock. It is possible that another split
-        // started in front of us and made the split vector used here invalid.
-        if ( ( _min.woCompare( m.front() ) > 0 ) || ( _max.woCompare( m.back() ) <= 0 ) ){
-            stringstream ss;
-            ss << "attempt to split on stale range (other split got through first?)"
-               << " min / max on split request: " << m.front() << " / " << m.back() 
-               << " min / max on shard: " << _min << " / " << _max;
-
-            uasserted( 13442 , ss.str() );
-        }
-
-        BSONObjBuilder detail;
-        appendShortVersion( "before" , detail );
-        log(1) << "before split on " << m.size() << " points " << toString() << endl;
-
-        // Iterate over the split points in 'm', splitting off a new chunk per entry. That chunk's range 
-        // covers until the next entry in 'm' or _max .
-        vector<ChunkPtr> newChunks;
-        vector<BSONObj>::const_iterator i = m.begin();
-        BSONObj nextPoint = i->getOwned();
-        _modified = true;
-        do {
-            BSONObj splitPoint = nextPoint;
-            log(4) << "splitPoint: " << splitPoint << endl;
-            nextPoint = (++i != m.end()) ? i->getOwned() : _max.getOwned();
-            log(4) << "nextPoint: " << nextPoint << endl;
-
-            if ( nextPoint <= splitPoint) {
-                stringstream ss;
-                ss << "multiSplit failing because keys min: " << splitPoint << " and max: " << nextPoint
-                   << " do not define a valid chunk";
-                uasserted( 13395, ss.str() );
-            }
-
-            ChunkPtr c( new Chunk( _manager, splitPoint , nextPoint , _shard) );
-            c->_modified = true;
-            newChunks.push_back( c );
-        } while ( i != m.end() );
-
-        // Have the chunk manager reflect the key change for the first chunk and create an entry for every
-        // new chunk spawned by it.
-        {
-            rwlock lk( _manager->_lock , true );
-
-            setMax(m[0].getOwned());
-            DEV assert( shared_from_this() );
-            _manager->_chunkMap[_max] = shared_from_this();
-
-            for ( vector<ChunkPtr>::const_iterator it = newChunks.begin(); it != newChunks.end(); ++it ){
-                ChunkPtr s = *it;
-                _manager->_chunkMap[s->getMax()] = s;
-            }
-        }
-        
-        log(1) << "after split adjusted range: " << toString() << endl;
-        for ( vector<ChunkPtr>::const_iterator it = newChunks.begin(); it != newChunks.end(); ++it ){
-            ChunkPtr s = *it;
-            log(1) << "after split created new chunk: " << s->toString() << endl;
-        }
-
-        // Save the new key boundaries in the configDB.
-        _manager->save( false /* does not inc 'major', ie no moves, in ShardChunkVersion control */);
-
-        // Log all these changes in the configDB's log. We log a single split differently than a multi-split.
-        if ( newChunks.size() == 1) {
-            appendShortVersion( "left" , detail );
-            newChunks[0]->appendShortVersion( "right" , detail );
-            configServer.logChange( "split" , _manager->getns(), detail.obj() );
-
-        } else {
-            BSONObj beforeDetailObj = detail.obj();
-            BSONObj firstDetailObj = beforeDetailObj.getOwned();
-            const int newChunksSize = newChunks.size();
-
-            BSONObjBuilder firstDetail;
-            firstDetail.appendElements( beforeDetailObj );
-            firstDetail.append( "number" , 0 );
-            firstDetail.append( "of" , newChunksSize );
-            appendShortVersion( "chunk" , firstDetail );
-            configServer.logChange( "multi-split" , _manager->getns() , firstDetail.obj() );
-
-            for ( int i=0; i < newChunksSize; i++ ){
-                BSONObjBuilder chunkDetail;
-                chunkDetail.appendElements( beforeDetailObj );
-                chunkDetail.append( "number", i+1 );
-                chunkDetail.append( "of" , newChunksSize );
-                newChunks[i]->appendShortVersion( "chunk" , chunkDetail );
-                configServer.logChange( "multi-split" , _manager->getns() , chunkDetail.obj() );
-            }
-        }
-
-        return newChunks[0];
-    }
 
     bool Chunk::moveAndCommit( const Shard& to , BSONObj& res ){
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );

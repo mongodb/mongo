@@ -97,13 +97,6 @@ namespace mongo {
         //
 
         /**
-         * @param a vector of possible split points
-         *        used as a hint only
-         */
-        BSONObj pickSplitPoint_DEPRECATED( const vector<BSONObj> * possibleSplitPoints = 0 ) const;
-        ChunkPtr split_DEPRECATED();
-
-        /**
          * if the amount of data written nears the max size of a shard
          * then we check the real size, and if its too big, we split
          */
@@ -124,7 +117,6 @@ namespace mongo {
          * @param splitPoints the vector of keys that should be used to divide this chunk
          * @return shared pointer to the first new Chunk
          */
-        ChunkPtr multiSplit_DEPRECATED( const vector<BSONObj>& splitPoints );
         ChunkPtr multiSplit( const  vector<BSONObj>& splitPoints );
 
         /**
