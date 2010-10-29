@@ -719,8 +719,8 @@ namespace mongo {
             kill_wrapper( pid, signal, port );
             
             int i = 0;
-            for( ; i < 65; ++i ) {
-                if ( i == 5 ) {
+            for( ; i < 130; ++i ) {
+                if ( i == 30 ) {
                     char now[64];
                     time_t_to_String(time(0), now);
                     now[ 20 ] = 0;
