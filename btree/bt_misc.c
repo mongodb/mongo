@@ -86,15 +86,16 @@ __wt_bt_build_verify(void)
  *	Copy a data/length pair into allocated memory in a DBT.
  */
 int
-__wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
+__wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t size, DBT *copy)
 {
 	ENV *env;
 
 	env = db->env;
 
-	if (copy->data == NULL || copy->mem_size < len)
-		WT_RET(__wt_realloc(env, &copy->mem_size, len, &copy->data));
-	memcpy(copy->data, data, copy->size = len);
+	if (copy->data == NULL || copy->mem_size < size)
+		WT_RET(__wt_realloc(env, &copy->mem_size, size, &copy->data));
+	memcpy(copy->data, data, size);
+	copy->size = size;
 
 	return (0);
 }
