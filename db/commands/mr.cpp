@@ -442,7 +442,7 @@ namespace mongo {
                     MRTL * mrtl = new MRTL( state );
                     _tlmr.reset( mrtl );
 
-                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter ) ) );
+                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter , 0 , mr.limit ) ) );
                     long long mapTime = 0;
                     {
                         readlock lock( mr.ns );

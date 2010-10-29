@@ -2,7 +2,7 @@
 
 port = allocatePorts( 1 )[ 0 ];
 
-var baseName = "jstests_preallocate2";
+var baseName = "jstests_preallocate";
 
 var m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName );
 

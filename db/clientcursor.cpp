@@ -43,7 +43,7 @@ namespace mongo {
         if( clientCursorsById.size() ) { 
             log() << "ERROR clientcursors exist but should not at this point" << endl;
             ClientCursor *cc = clientCursorsById.begin()->second;
-            log() << "first one: " << cc->cursorid << ' ' << cc->ns << endl;
+            log() << "first one: " << cc->_cursorid << ' ' << cc->_ns << endl;
             clientCursorsById.clear();
             assert(false);
         }
@@ -51,7 +51,7 @@ namespace mongo {
 
 
     void ClientCursor::setLastLoc_inlock(DiskLoc L) {
-        assert( pos != -2 ); // defensive - see ~ClientCursor
+        assert( _pos != -2 ); // defensive - see ~ClientCursor
 
         if ( L == _lastLoc )
             return;
@@ -59,11 +59,11 @@ namespace mongo {
         CCByLoc& bl = byLoc();
 
         if ( !_lastLoc.isNull() ) {
-            bl.erase( ByLocKey( _lastLoc, cursorid ) );
+            bl.erase( ByLocKey( _lastLoc, _cursorid ) );
         }
 
         if ( !L.isNull() )
-            bl[ByLocKey(L,cursorid)] = this;
+            bl[ByLocKey(L,_cursorid)] = this;
         _lastLoc = L;
     }
 
@@ -96,7 +96,7 @@ namespace mongo {
                 ClientCursor *cc = i->second;
                 if( cc->_db != db ) 
                     continue;
-                if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 ) {
+                if ( strncmp(nsPrefix, cc->_ns.c_str(), len) == 0 ) {
                     toDelete.push_back(i->second);
                 }
             }
@@ -140,7 +140,7 @@ namespace mongo {
             i++;
             if( j->second->shouldTimeout( millis ) ){
                 numberTimedOut++;
-                log(1) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns 
+                log(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns 
                        << " idle:" << j->second->idleTime() << "ms\n";
                 delete j->second;
             }
@@ -158,7 +158,7 @@ namespace mongo {
             log() << "perf warning: byLoc.size=" << bl.size() << " in aboutToDeleteBucket\n";
         }
         for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); i++ )
-            i->second->c->aboutToDeleteBucket(b);
+            i->second->_c->aboutToDeleteBucket(b);
     }
     void aboutToDeleteBucket(const DiskLoc& b) {
         ClientCursor::informAboutToDeleteBucket(b); 
@@ -192,12 +192,12 @@ namespace mongo {
         if( toAdvance.size() >= 3000 ) { 
             log() << "perf warning MPW101: " << toAdvance.size() << " cursors for one diskloc " 
                 << dl.toString()
-                << ' ' << toAdvance[1000]->ns
-                << ' ' << toAdvance[2000]->ns
+                << ' ' << toAdvance[1000]->_ns
+                << ' ' << toAdvance[2000]->_ns
                 << ' ' << toAdvance[1000]->_pinValue 
                 << ' ' << toAdvance[2000]->_pinValue
-                << ' ' << toAdvance[1000]->pos
-                << ' ' << toAdvance[2000]->pos
+                << ' ' << toAdvance[1000]->_pos
+                << ' ' << toAdvance[2000]->_pos
                 << ' ' << toAdvance[1000]->_idleAgeMillis
                 << ' ' << toAdvance[2000]->_idleAgeMillis
                 << ' ' << toAdvance[1000]->_doingDeletes 
@@ -212,7 +212,7 @@ namespace mongo {
             
             if ( cc->_doingDeletes ) continue;
 
-            Cursor *c = cc->c.get();
+            Cursor *c = cc->_c.get();
             if ( c->capped() ){
                 delete cc;
                 continue;
@@ -240,16 +240,16 @@ namespace mongo {
     void aboutToDelete(const DiskLoc& dl) { ClientCursor::aboutToDelete(dl); }
 
     ClientCursor::~ClientCursor() {
-        assert( pos != -2 );
+        assert( _pos != -2 );
 
         {
             recursive_scoped_lock lock(ccmutex);
             setLastLoc_inlock( DiskLoc() ); // removes us from bylocation multimap
-            clientCursorsById.erase(cursorid);
+            clientCursorsById.erase(_cursorid);
 
             // defensive:
-            (CursorId&) cursorid = -1;
-            pos = -2;
+            (CursorId&)_cursorid = -1;
+            _pos = -2;
         }
     }
 
@@ -258,9 +258,9 @@ namespace mongo {
        need to call when you are ready to "unlock".
     */
     void ClientCursor::updateLocation() {
-        assert( cursorid );
+        assert( _cursorid );
         _idleAgeMillis = 0;
-        DiskLoc cl = c->refLoc();
+        DiskLoc cl = _c->refLoc();
         if ( lastLoc() == cl ) {
             //log() << "info: lastloc==curloc " << ns << '\n';
         } else {
@@ -268,7 +268,7 @@ namespace mongo {
             setLastLoc_inlock(cl);
         }
         // may be necessary for MultiCursor even when cl hasn't changed
-        c->noteLocation();
+        _c->noteLocation();
     }
     
     int ClientCursor::yieldSuggest() {
@@ -310,10 +310,10 @@ namespace mongo {
     }
     
     bool ClientCursor::prepareToYield( YieldData &data ) {
-        if ( ! c->supportYields() )
+        if ( ! _c->supportYields() )
             return false;
         // need to store in case 'this' gets deleted
-        data._id = cursorid;
+        data._id = _cursorid;
         
         data._doingDeletes = _doingDeletes;
         _doingDeletes = false;
@@ -331,13 +331,13 @@ namespace mongo {
                 inEmpty = true;
                 log() << "TEST: manipulate collection during cc:yield" << endl;
                 if( test == 1 ) 
-                    Helpers::emptyCollection(ns.c_str());
+                    Helpers::emptyCollection(_ns.c_str());
                 else if( test == 2 ) {
                     BSONObjBuilder b; string m;
-                    dropCollection(ns.c_str(), m, b);
+                    dropCollection(_ns.c_str(), m, b);
                 }
                 else { 
-                    dropDatabase(ns.c_str());
+                    dropDatabase(_ns.c_str());
                 }
             }
         }        
@@ -352,12 +352,12 @@ namespace mongo {
         }
         
         cc->_doingDeletes = data._doingDeletes;
-        cc->c->checkLocation();
+        cc->_c->checkLocation();
         return true;        
     }
     
     bool ClientCursor::yield( int micros ) {
-        if ( ! c->supportYields() )
+        if ( ! _c->supportYields() )
             return true;
         YieldData data; 
         prepareToYield( data );
@@ -404,7 +404,7 @@ namespace mongo {
     void ClientCursor::updateSlaveLocation( CurOp& curop ){
         if ( _slaveReadTill.isNull() )
             return;
-        mongo::updateSlaveLocation( curop , ns.c_str() , _slaveReadTill );
+        mongo::updateSlaveLocation( curop , _ns.c_str() , _slaveReadTill );
     }
 
 
@@ -451,7 +451,7 @@ namespace mongo {
         recursive_scoped_lock lock(ccmutex);
         
         for ( CCById::iterator i=clientCursorsById.begin(); i!=clientCursorsById.end(); ++i ){
-            if ( i->second->ns == ns )
+            if ( i->second->_ns == ns )
                 all.insert( i->first );
         }
     }

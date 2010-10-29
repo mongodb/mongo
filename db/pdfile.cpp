@@ -1196,20 +1196,20 @@ namespace mongo {
                 shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                 cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
             }
-            CursorId id = cc->cursorid;
+            CursorId id = cc->cursorid();
 
-            while ( cc->c->ok() ) {
-                BSONObj js = cc->c->current();
+            while ( cc->ok() ) {
+                BSONObj js = cc->current();
                 try { 
-                    _indexRecord(d, idxNo, js, cc->c->currLoc(), dupsAllowed);
-                    cc->c->advance();
+                    _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                    cc->advance();
                 } catch( AssertionException& e ) { 
                     if( e.interrupted() )
                         throw;
 
                     if ( dropDups ) {
-                        DiskLoc toDelete = cc->c->currLoc();
-                        bool ok = cc->c->advance();
+                        DiskLoc toDelete = cc->currLoc();
+                        bool ok = cc->advance();
                         cc->updateLocation();
                         theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
                         if( ClientCursor::find(id, false) == 0 ) {

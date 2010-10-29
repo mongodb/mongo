@@ -695,7 +695,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("rest","turn on simple rest api")
         ("jsonp","allow JSONP access via http (has security implications)")
         ("noscripting", "disable scripting engine")
-        ("noprealloc", "disable data file preallocation")
+        ("noprealloc", "disable data file preallocation - will often hurt performance")
         ("smallfiles", "use a smaller default file size")
         ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
         ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
@@ -866,6 +866,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("noprealloc")) {
             cmdLine.prealloc = false;
+            cout << "note: noprealloc may hurt performance in many applications" << endl;
         }
         if (params.count("smallfiles")) {
             cmdLine.smallfiles = true;

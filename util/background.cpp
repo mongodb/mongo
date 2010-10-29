@@ -25,10 +25,9 @@ namespace mongo {
 
     // both the BackgroundJob and the internal thread point to JobStatus
     struct BackgroundJob::JobStatus {
-        JobStatus( const string& name , bool delFlag )  
-            : threadName(name), deleteSelf(delFlag), m("backgroundJob"), state(NotStarted) { }
+        JobStatus( bool delFlag )  
+            : deleteSelf(delFlag), m("backgroundJob"), state(NotStarted) { }
         
-        const string threadName;
         const bool deleteSelf;
 
         mongo::mutex m;  // protects state below
@@ -37,7 +36,7 @@ namespace mongo {
     };
 
     BackgroundJob::BackgroundJob( bool selfDelete ) {
-        _status.reset( new JobStatus( name() , selfDelete ) );
+        _status.reset( new JobStatus( selfDelete ) );
     }
 
     // Background object can be only be destroyed after jobBody() ran
@@ -48,18 +47,18 @@ namespace mongo {
             status->state = Running;
         }
 
-        const string& name = status->threadName;
-        if( ! name.empty() )
-            setThreadName( name.c_str() );
+        const string threadName = name();
+        if( ! threadName.empty() )
+            setThreadName( threadName.c_str() );
 
         try {
             run();
         }
         catch ( std::exception& e ){
-            log( LL_ERROR ) << "backgroundjob " << name << "error: " << e.what() << endl;
+            log( LL_ERROR ) << "backgroundjob " << name() << "error: " << e.what() << endl;
         }
         catch(...) {
-            log( LL_ERROR ) << "uncaught exception in BackgroundJob " << name << endl;
+            log( LL_ERROR ) << "uncaught exception in BackgroundJob " << name() << endl;
         }
 
         { 

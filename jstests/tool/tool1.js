@@ -18,7 +18,7 @@ function fileSize(){
 port = allocatePorts( 1 )[ 0 ];
 resetDbpath( externalPath );
 
-m = startMongod( "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = startMongod( "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--noprealloc" , "--bind_ip", "127.0.0.1" );
 c = m.getDB( baseName ).getCollection( baseName );
 c.save( { a: 1 } );
 assert( c.findOne() );

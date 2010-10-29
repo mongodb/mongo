@@ -69,8 +69,6 @@ namespace mongo {
         }
     }
 
-    int ctr = 0;
-
     KillCurrentOp killCurrentOp;
     
     int lockFile = 0;
@@ -273,7 +271,7 @@ namespace mongo {
         ss << opToString( op ) << " ";
 
         int logThreshold = cmdLine.slowMS;
-        bool log = logLevel >= 1 || ++ctr % 512 == 0;
+        bool log = logLevel >= 1;
         
         if ( op == dbQuery ) {
             if ( handlePossibleShardedMessage( m , &dbresponse ) )
