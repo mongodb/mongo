@@ -1,5 +1,7 @@
 .cvsignore
 CONFIG
+__rand
+__wt.*
 a.db
 flexlint.out
 ht
