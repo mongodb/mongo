@@ -288,8 +288,13 @@ namespace mongo {
     }
     
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ) {
-        // TODO use current multiSplit asserts here
+        const size_t maxSplitPoints = 256;
 
+        uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
+        uassert( 13332 , "need a split key to split chunk" , !m.empty() );
+        uassert( 13333 , "can't split a chunk in that many parts", m.size() < maxSplitPoints );
+        uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
+        
         ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
         BSONObjBuilder cmd;
@@ -333,12 +338,12 @@ namespace mongo {
         dist_lock_try dlk( &_manager->_nsLock , string("split-") + toString() );
         uassert( 10166 , "locking namespace failed" , dlk.got() );
 
-        const size_t maxSplitPoints = 256;
+        // const size_t maxSplitPoints = 256;
 
-        uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
-        uassert( 13332 , "need a split key to split chunk" , !m.empty() );
-        uassert( 13333 , "can't split a chunk in that many parts", m.size() < maxSplitPoints );
-        uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
+        // uassert( 99910165 , "can't split as shard doesn't have a manager" , _manager );
+        // uassert( 99913332 , "need a split key to split chunk" , !m.empty() );
+        // uassert( 99913333 , "can't split a chunk in that many parts", m.size() < maxSplitPoints );
+        // uassert( 99913003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
         
         {
             ShardChunkVersion onServer = getVersionOnConfigServer();
