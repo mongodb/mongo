@@ -65,11 +65,11 @@ struct __wt_stats {
 #define	WT_STAT_FIXED_LEN			    2
 #define	WT_STAT_INTLMAX				    3
 #define	WT_STAT_INTLMIN				    4
-#define	WT_STAT_ITEM_DATA_OVFL			    5
-#define	WT_STAT_ITEM_DUP_DATA			    6
-#define	WT_STAT_ITEM_KEY_OVFL			    7
-#define	WT_STAT_ITEM_TOTAL_DATA			    8
-#define	WT_STAT_ITEM_TOTAL_DELETED		    9
+#define	WT_STAT_ITEM_COL_DELETED		    5
+#define	WT_STAT_ITEM_DATA_OVFL			    6
+#define	WT_STAT_ITEM_DUP_DATA			    7
+#define	WT_STAT_ITEM_KEY_OVFL			    8
+#define	WT_STAT_ITEM_TOTAL_DATA			    9
 #define	WT_STAT_ITEM_TOTAL_KEY			   10
 #define	WT_STAT_LEAFMAX				   11
 #define	WT_STAT_LEAFMIN				   12
@@ -82,9 +82,9 @@ struct __wt_stats {
 #define	WT_STAT_PAGE_DUP_INTERNAL		   19
 #define	WT_STAT_PAGE_DUP_LEAF			   20
 #define	WT_STAT_PAGE_FREE			   21
-#define	WT_STAT_PAGE_INTERNAL			   22
-#define	WT_STAT_PAGE_LEAF			   23
-#define	WT_STAT_PAGE_OVERFLOW			   24
+#define	WT_STAT_PAGE_OVERFLOW			   22
+#define	WT_STAT_PAGE_ROW_INTERNAL		   23
+#define	WT_STAT_PAGE_ROW_LEAF			   24
 #define	WT_STAT_TREE_LEVEL			   25
 
 /*
