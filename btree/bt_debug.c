@@ -292,14 +292,21 @@ __wt_bt_debug_col_fix_indx(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
 	if (F_ISSET(idb, WT_REPEAT_COMP)) {
 		fprintf(fp,
 		    "\trepeat %lu {", (u_long)WT_FIX_REPEAT_COUNT(cip->data));
-		__wt_bt_print(WT_FIX_REPEAT_DATA(cip->data), db->fixed_len, fp);
+		if (WT_FIX_DELETE_ISSET(WT_FIX_REPEAT_DATA(cip->data)))
+			fprintf(fp, "deleted");
+		else
+			__wt_bt_print(
+			    WT_FIX_REPEAT_DATA(cip->data), db->fixed_len, fp);
 		fprintf(fp, "}\n");
 
 		if ((exp = WT_COL_EXPCOL(page, cip)) != NULL)
 			__wt_bt_debug_expcol(exp, fp);
 	} else {
 		fprintf(fp, "\tdata {");
-		__wt_bt_print(cip->data, db->fixed_len, fp);
+		if (WT_FIX_DELETE_ISSET(cip->data))
+			fprintf(fp, "deleted");
+		else
+			__wt_bt_print(cip->data, db->fixed_len, fp);
 		fprintf(fp, "}\n");
 
 		if ((repl = WT_COL_REPL(page, cip)) != NULL)
