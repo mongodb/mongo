@@ -137,7 +137,8 @@ namespace mongo {
     /** @param o old config
         @param n new config 
         */
-    /*static*/ bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) { 
+    /*static*/ 
+    bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) { 
         assert( theReplSet );
 
         if( o._id != n._id ) { 
@@ -170,6 +171,11 @@ namespace mongo {
                     log() << "replSet reconfig error with member: " << m.h.toString() << rsLog;
                     uasserted(13476, "buildIndexes may not change for members");
                 }
+                if( oldCfg.arbiterOnly != m.arbiterOnly ) { 
+                    log() << "replSet reconfig error with member: " << m.h.toString() << " arbiterOnly cannot change. remove and readd the member instead " << rsLog;
+                    uasserted(13510, "arbiterOnly may not change for members");
+                }
+              }
            }
             if( m.h.isSelf() ) 
                 me++;

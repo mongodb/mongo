@@ -23,23 +23,10 @@
 namespace mongo {
 
     using namespace bson;
-
     extern unsigned replSetForceInitialSyncFailure;
 
-    void startSyncThread() {
-        static int n;
-        assert( n == 0 );
-        n++;
-
-        Client::initThread("rs_sync");
-        cc().iAmSyncThread();
-        theReplSet->syncThread();
-        cc().shutdown();
-    }
-
+    /* apply the log op that is in param o */
     void ReplSetImpl::syncApply(const BSONObj &o) {
-        //const char *op = o.getStringField("op");
-        
         char db[MaxDatabaseNameLen];
         const char *ns = o.getStringField("ns");
         nsToDatabase(ns, db);
@@ -58,6 +45,10 @@ namespace mongo {
         applyOperation_inlock(o);
     }
 
+    /* initial oplog application, during initial sync, after cloning. 
+       @return false on failure.  
+       this method returns an error and doesn't throw exceptions (i think).
+    */
     bool ReplSetImpl::initialSyncOplogApplication(
         string hn, 
         const Member *primary,
@@ -397,7 +388,7 @@ namespace mongo {
             }
             catch(...) { 
                 sethbmsg("unexpected exception in syncThread()");
-                // TODO : SET NOT SECONDARY here.
+                // TODO : SET NOT SECONDARY here?
                 sleepsecs(60);
             }
             sleepsecs(1);
@@ -408,6 +399,17 @@ namespace mongo {
                */
             OCCASIONALLY mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
         }
+    }
+
+    void startSyncThread() {
+        static int n;
+        assert( n == 0 );
+        n++;
+
+        Client::initThread("rs_sync");
+        cc().iAmSyncThread();
+        theReplSet->syncThread();
+        cc().shutdown();
     }
 
 }
