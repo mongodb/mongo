@@ -389,7 +389,7 @@ namespace mongo {
     class CountOp : public QueryOp {
     public:
         CountOp( const string& ns , const BSONObj &spec ) :
-            _ns(ns), count_(), _myCount(),
+            _ns(ns), _capped(false), count_(), _myCount(),
             skip_( spec["skip"].numberLong() ),
             limit_( spec["limit"].numberLong() ),
             bc_(){
@@ -397,7 +397,7 @@ namespace mongo {
         
         virtual void _init() {
             c_ = qp().newCursor();
-            
+            _capped = c_->capped();
             if ( qp().exactKeyMatch() && ! matcher()->needRecord() ) {
                 query_ = qp().simplifiedQuery( qp().indexKey() );
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
@@ -421,7 +421,13 @@ namespace mongo {
             if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
                 c_.reset();
                 _cc.reset();
-                // we don't fail query since we're fine with returning partial data if collection dropped
+
+                if ( _capped ){
+                    msgassertedNoTrace( 13337, "capped cursor overrun during count" );
+                }
+                else {
+                    // we don't fail query since we're fine with returning partial data if collection dropped
+                }
             }
         }
         
@@ -486,7 +492,8 @@ namespace mongo {
         }
 
         string _ns;
-        
+        bool _capped;
+
         long long count_;
         long long _myCount;
         long long skip_;
@@ -612,6 +619,7 @@ namespace mongo {
             _nChunkSkips(),
             _chunkMatcher(shardingState.getChunkMatcher(pq.ns())),
             _inMemSort(false),
+            _capped(false),
             _saveClientCursor(false),
             _wouldSaveClientCursor(false),
             _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
@@ -628,8 +636,10 @@ namespace mongo {
             
             if ( _oplogReplay ) {
                 _findingStartCursor.reset( new FindingStartCursor( qp() ) );
+                _capped = true;
             } else {
                 _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
+                _capped = _c->capped();
             }
 
             if ( qp().scanAndOrderRequired() ) {
@@ -640,6 +650,7 @@ namespace mongo {
             if ( _pq.isExplain() ) {
                 _eb.noteCursor( _c.get() );
             }
+
         }
         
         virtual bool prepareToYield() {
@@ -663,7 +674,14 @@ namespace mongo {
                 _c.reset();
                 _cc.reset();
                 _so.reset();
-                // we don't fail query since we're fine with returning partial data if collection dropped
+
+                if ( _capped ){
+                    msgassertedNoTrace( 13338, "capped cursor overrun during query" );
+                }
+                else {
+                    // we don't fail query since we're fine with returning partial data if collection dropped
+                }
+
             }
         }
         
@@ -683,6 +701,7 @@ namespace mongo {
                 } else {
                     _findingStartCursor->next();
                 }
+                _capped = true;
                 return;
             }
             
@@ -882,6 +901,7 @@ namespace mongo {
         ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
 
+        bool _capped;
         bool _saveClientCursor;
         bool _wouldSaveClientCursor;
         bool _oplogReplay;
