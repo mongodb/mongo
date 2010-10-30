@@ -26,7 +26,11 @@ namespace mongo {
 
     extern unsigned replSetForceInitialSyncFailure;
 
-    void startSyncThread() { 
+    void startSyncThread() {
+        static int n;
+        assert( n == 0 );
+        n++;
+
         Client::initThread("rs_sync");
         cc().iAmSyncThread();
         theReplSet->syncThread();
