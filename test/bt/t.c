@@ -35,7 +35,7 @@ main(int argc, char *argv[])
 
 	/* Set values from the command line. */
 	log = 0;
-	while ((ch = getopt(argc, argv, "1C:cdlrsv")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:cdlrv")) != EOF)
 		switch (ch) {
 		case '1':
 			g.c_runs = 1;
@@ -55,9 +55,6 @@ main(int argc, char *argv[])
 		case 'r':
 			g.replay = 1;
 			g.c_runs = 1;
-			break;
-		case 's':
-			g.stats = 1;
 			break;
 		case 'v':
 			g.verbose = 1;
@@ -115,7 +112,7 @@ main(int argc, char *argv[])
 #endif
 		}
 
-skip_ops:	if (g.stats && wts_stats())	/* Optional statistics */
+skip_ops:	if (wts_stats())		/* Optional statistics */
 			goto err;
 						/* Close the databases */
 		track("shutting down BDB", (u_int64_t)0);
@@ -159,7 +156,7 @@ static void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-1clrsv] [-C config] [name=value ...]\n",
+	    "usage: %s [-1clrv] [-C config] [name=value ...]\n",
 	    g.progname);
 	exit(EXIT_FAILURE);
 }

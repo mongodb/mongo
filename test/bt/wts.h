@@ -57,7 +57,6 @@ typedef struct {
 	u_int32_t run_cnt;			/* Run counter */
 
 	int replay;				/* Replaying a run. */
-	int stats;				/* Statistics */
 	int verbose;				/* Verbosity */
 
 	char *key_gen_buf;
