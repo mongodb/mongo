@@ -194,29 +194,19 @@ namespace mongo {
         to.append("primary", _primary.getName() );
     }
     
-    bool DBConfig::unserialize(const BSONObj& from){
+    void DBConfig::unserialize(const BSONObj& from){
         log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
         assert( _name == from["_id"].String() );
 
         _shardingEnabled = from.getBoolField("partitioned");
         _primary.reset( from.getStringField("primary") );
 
-        // this is a temporary migration thing
+        // In the 1.5.x series, we used to have collection metadata nested in the database entry. The 1.6.x series
+        // had migration code that ported that info to where it belongs now: the 'collections' collection. We now
+        // just assert that we're not migrating from a 1.5.x directly into a 1.7.x without first converting. 
         BSONObj sharded = from.getObjectField( "sharded" );
-        if ( sharded.isEmpty() )
-             return false;
-        
-        BSONObjIterator i(sharded);
-        while ( i.more() ){
-            BSONElement e = i.next();
-            uassert( 10182 ,  "sharded things have to be objects" , e.type() == Object );
-            
-            BSONObj c = e.embeddedObject();
-            uassert( 10183 ,  "key has to be an object" , c["key"].type() == Object );
-            
-            _collections[e.fieldName()].shard( this , e.fieldName() , c["key"].Obj() , c["unique"].trueValue() );
-        }
-        return true;
+        if ( ! sharded.isEmpty() )
+            uasserted( 13509 , "can't migrate from 1.5.x release to the current one; need to upgrade to 1.6.x first");
     }
 
     bool DBConfig::load(){
@@ -229,18 +219,15 @@ namespace mongo {
         
         BSONObj o = conn->findOne( ShardNS::database , BSON( "_id" << _name ) );
 
-
         if ( o.isEmpty() ){
             conn.done();
             return false;
         }
         
-        if ( unserialize( o ) )
-            _save();
+        unserialize( o );
         
         BSONObjBuilder b;
         b.appendRegex( "_id" , (string)"^" + _name + "." );
-        
 
         auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection ,b.obj() );
         assert( cursor.get() );

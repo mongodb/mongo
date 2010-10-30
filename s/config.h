@@ -157,10 +157,7 @@ namespace mongo {
         // lockless loading
         void serialize(BSONObjBuilder& to);
 
-        /**
-         * if i need save in new format
-         */
-        bool unserialize(const BSONObj& from);
+        void unserialize(const BSONObj& from);
 
         void getAllShards(set<Shard>& shards) const;
 
