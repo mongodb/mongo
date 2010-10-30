@@ -65,7 +65,14 @@ namespace mongo {
                 return false;
             }
 
-            r.query(rsoplog, bo());
+            {
+                BSONObjBuilder q;
+                q.appendDate("$gte", applyGTE.asDate());
+                BSONObjBuilder query;
+                query.append("ts", q.done());
+                BSONObj queryObj = query.done();
+                r.query(rsoplog, queryObj);
+            }
             assert( r.haveCursor() );
 
             /* we lock outside the loop to avoid the overhead of locking on every operation.  server isn't usable yet anyway! */
