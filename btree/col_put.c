@@ -86,7 +86,7 @@ __wt_bt_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 	 * a new WT_REPL entry, and link it to the WT_COL_EXPAND entry's WT_REPL
 	 * list.
 	 */
-	if (!F_ISSET(idb, WT_REPEAT_COMP)) {		/* #1 */
+	if (page->hdr->type == WT_PAGE_COL_FIX) {	/* #1 */
 		/* Allocate a page replacement array if necessary. */
 		if (page->repl == NULL)
 			WT_ERR(__wt_calloc(env,
