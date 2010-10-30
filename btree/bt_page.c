@@ -9,9 +9,10 @@
 
 #include "wt_internal.h"
 
-static int  __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
-static int  __wt_bt_page_inmem_col_int(WT_PAGE *);
-static int  __wt_bt_page_inmem_col_var(WT_PAGE *);
+static void __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
+static void __wt_bt_page_inmem_col_int(WT_PAGE *);
+static void __wt_bt_page_inmem_col_rcc(DB *, WT_PAGE *);
+static void __wt_bt_page_inmem_col_var(WT_PAGE *);
 static int  __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_row_int(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
@@ -64,7 +65,7 @@ __wt_bt_page_in(
 	WT_RET(__wt_page_in(toc, addr, size, &page, 0));
 
 	/* Optionally build the in-memory version of the page. */
-	if (inmem && page->indx_count == 0)
+	if (inmem && !WT_PAGE_INMEM_SET(page))
 		WT_RET((__wt_bt_page_inmem(db, page)));
 
 	*pagep = page;
@@ -124,6 +125,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 		nindx = hdr->u.entries;
@@ -157,6 +159,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 		WT_RET((__wt_calloc(env,
 		    nindx, sizeof(WT_COL), &page->u.icol)));
@@ -173,13 +176,16 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		ret = __wt_bt_page_inmem_col_fix(db, page);
+		__wt_bt_page_inmem_col_fix(db, page);
 		break;
 	case WT_PAGE_COL_INT:
-		ret = __wt_bt_page_inmem_col_int(page);
+		__wt_bt_page_inmem_col_int(page);
+		break;
+	case WT_PAGE_COL_RCC:
+		__wt_bt_page_inmem_col_rcc(db, page);
 		break;
 	case WT_PAGE_COL_VAR:
-		ret = __wt_bt_page_inmem_col_var(page);
+		__wt_bt_page_inmem_col_var(page);
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -340,7 +346,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
  * __wt_bt_page_inmem_col_int --
  *	Build in-memory index for column-store internal pages.
  */
-static int
+static void
 __wt_bt_page_inmem_col_int(WT_PAGE *page)
 {
 	WT_COL *cip;
@@ -367,7 +373,6 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 	page->records = records;
 
 	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)off);
-	return (0);
 }
 
 /*
@@ -375,7 +380,7 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
  *	Build in-memory index for variable-length, data-only leaf pages in
  *	column-store trees.
  */
-static int
+static void
 __wt_bt_page_inmem_col_var(WT_PAGE *page)
 {
 	WT_COL *cip;
@@ -384,6 +389,7 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 	u_int32_t i;
 
 	hdr = page->hdr;
+	cip = page->u.icol;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -391,17 +397,14 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 	 * data (WT_ITEM_DATA), overflow (WT_ITEM_DATA_OVFL) or deleted
 	 * (WT_ITEM_DEL) items.
 	 */
-	cip = page->u.icol;
 	WT_ITEM_FOREACH(page, item, i) {
 		cip->data = item;
 		++cip;
 	}
 
-	page->indx_count = hdr->u.entries;
-	page->records = hdr->u.entries;
+	page->indx_count = page->records = hdr->u.entries;
 
 	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
-	return (0);
 }
 
 /*
@@ -452,19 +455,47 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 
 /*
  * __wt_bt_page_inmem_col_fix --
- *	Build in-memory index for column-store fixed-length leaf pages.
+ *	Build in-memory index for fixed-length column-store leaf pages.
  */
-static int
+static void
 __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 {
-	IDB *idb;
+	WT_COL *cip;
+	WT_PAGE_HDR *hdr;
+	u_int32_t i;
+	u_int8_t *p;
+
+	hdr = page->hdr;
+	cip = page->u.icol;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains fixed-length objects.
+	 */
+	WT_FIX_FOREACH(db, page, p, i) {
+		cip->data = p;
+		++cip;
+	}
+
+	page->indx_count = page->records = hdr->u.entries;
+
+	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)p);
+}
+
+/*
+ * __wt_bt_page_inmem_col_rcc --
+ *	Build in-memory index for repeat-compressed, fixed-length column-store
+ *	leaf pages.
+ */
+static void
+__wt_bt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
+{
 	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
 	u_int32_t i;
 	u_int8_t *p;
 
-	idb = db->idb;
 	hdr = page->hdr;
 	cip = page->u.icol;
 	records = 0;
@@ -473,24 +504,16 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains fixed-length objects.
 	 */
-	if (F_ISSET(idb, WT_REPEAT_COMP))
-		WT_FIX_REPEAT_FOREACH(db, page, p, i) {
-			cip->data = p;
-			++cip;
-			++records;
-		}
-	else
-		WT_FIX_FOREACH(db, page, p, i) {
-			cip->data = p;
-			++cip;
-			++records;
-		}
+	WT_RCC_REPEAT_FOREACH(db, page, p, i) {
+		records += WT_RCC_REPEAT_COUNT(p);
+		cip->data = p;
+		++cip;
+	}
 
 	page->indx_count = hdr->u.entries;
 	page->records = records;
 
 	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)p);
-	return (0);
 }
 
 /*

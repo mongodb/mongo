@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_bt_stat_page_col_fix(WT_TOC *, WT_PAGE *);
-static int __wt_bt_stat_page_col_fix_rcc(WT_TOC *, WT_PAGE *);
+static int __wt_bt_stat_page_col_rcc(WT_TOC *, WT_PAGE *);
 static int __wt_bt_stat_page_col_var(WT_TOC *, WT_PAGE *);
 static int __wt_bt_stat_page_dup_leaf(WT_TOC *, WT_PAGE *);
 static int __wt_bt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
@@ -76,6 +76,7 @@ __wt_bt_tree_walk(WT_TOC *toc, u_int32_t addr,
 			    WT_ROW_OFF_SIZE(rip), work, arg));
 		break;
 	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
@@ -115,14 +116,15 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	 */
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		WT_STAT_INCR(stats, PAGE_COL_FIXED);
-		if (F_ISSET(idb, WT_REPEAT_COMP))
-			WT_RET(__wt_bt_stat_page_col_fix_rcc(toc, page));
-		else
-			WT_RET(__wt_bt_stat_page_col_fix(toc, page));
+		WT_STAT_INCR(stats, PAGE_COL_FIX);
+		WT_RET(__wt_bt_stat_page_col_fix(toc, page));
 		break;
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, PAGE_COL_INTERNAL);
+		break;
+	case WT_PAGE_COL_RCC:
+		WT_STAT_INCR(stats, PAGE_COL_RCC);
+		WT_RET(__wt_bt_stat_page_col_rcc(toc, page));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_STAT_INCR(stats, PAGE_COL_VARIABLE);
@@ -151,11 +153,11 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 }
 
 /*
- * __wt_bt_stat_page_col_fix_rcc --
+ * __wt_bt_stat_page_col_rcc --
  *	Stat a repeat-compressed, fixed-length column-store leaf page
  */
 static int
-__wt_bt_stat_page_col_fix_rcc(WT_TOC *toc, WT_PAGE *page)
+__wt_bt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_COL_EXPAND *exp;
@@ -167,12 +169,12 @@ __wt_bt_stat_page_col_fix_rcc(WT_TOC *toc, WT_PAGE *page)
 
 	/* Walk the page, counting data items. */
 	WT_INDX_FOREACH(page, cip, i) {
-		if (WT_FIX_DELETE_ISSET(WT_FIX_REPEAT_DATA(cip->data)))
+		if (WT_FIX_DELETE_ISSET(WT_RCC_REPEAT_DATA(cip->data)))
 			WT_STAT_INCRV(stats,
-			    ITEM_COL_DELETED, WT_FIX_REPEAT_COUNT(cip->data));
+			    ITEM_COL_DELETED, WT_RCC_REPEAT_COUNT(cip->data));
 		else
 			WT_STAT_INCRV(stats,
-			    ITEM_TOTAL_DATA, WT_FIX_REPEAT_COUNT(cip->data));
+			    ITEM_TOTAL_DATA, WT_RCC_REPEAT_COUNT(cip->data));
 
 		/*
 		 * Check for corrections.

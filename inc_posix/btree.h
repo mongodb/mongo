@@ -179,10 +179,10 @@ struct __wt_page {
 	 *
 	 * The modified set must be flushed before the page's hazard reference
 	 * is released and the cache drain server is able to select this page.
-	 * We rely on the memory flush in the workQ server loop (which happens
-	 * before control returns to the calling thread, that is, before control
-	 * returns to the thread that's holding the hazard reference), so there
-	 * is no need to flush explicitly.
+	 * We rely on the memory flush in __wt_toc_serialize_wrapup() which is
+	 * always called before control returns to the calling thread, that is,
+	 * before control returns to the thread holding the hazard reference,
+	 * so there's no need to flush explicitly.
 	 */
 	u_int16_t modified;		/* Page is modified */
 #define	WT_PAGE_MODIFY_ISSET(p)		((p)->modified)
@@ -210,11 +210,24 @@ struct __wt_page {
 	 * XXX
 	 * 64KB seems big enough: at some point we're going to have to clean
 	 * up pages as soon as there have been sufficient modifications to
-	 * make our linked lists too slow to search.
+	 * make our linked lists of inserted items too slow to search, or as
+	 * soon as there's been enough memory allocated in service of page
+	 * modifications (although we should be able to release memory from
+	 * the page replacement array as soon as no running thread/txn might
+	 * want that version of the data).
 	 */
 	u_int16_t write_gen;		/* Write generation */
 #define	WT_PAGE_WRITE_GEN(p)						\
 	((p)->write_gen)
+
+	/*
+	 * We have to be able to find a page's parent when it's written back to
+	 * disk, because its address changes.  For some page types we can take
+	 * a search key off the page, but not for column store databases.  Save
+	 * the search key in the in-memory page when it's first brought in to
+	 * memory, as part of a search.
+	 */
+	u_int64_t  search_recno;
 
 	/*
 	 * Each disk page entry is referenced by an array of WT_ROW/WT_COL
@@ -237,6 +250,7 @@ struct __wt_page {
 	 * cache, including for read-only databases.)  Instead, a single indx
 	 * entry represents all of the identical records.
 	 */
+#define	WT_PAGE_INMEM_SET(p)	((p)->indx_count != 0)
 	u_int32_t indx_count;		/* On-disk entry count */
 	union {				/* On-disk entry index */
 		WT_COL *icol;		/* On-disk column store entries */
@@ -319,16 +333,17 @@ struct __wt_page_hdr {
 
 	u_int32_t checksum;		/* 08-11: checksum */
 
-#define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_DESCRIPT	1	/* Database description page */
-#define	WT_PAGE_COL_FIX		2	/* Col store fixed-length leaf page */
-#define	WT_PAGE_COL_INT		3	/* Col store internal page */
-#define	WT_PAGE_COL_VAR		4	/* Col store var-length leaf page */
-#define	WT_PAGE_DUP_INT		5	/* Duplicate tree internal page */
-#define	WT_PAGE_DUP_LEAF	6	/* Duplicate tree leaf page */
-#define	WT_PAGE_OVFL		7	/* Overflow page */
-#define	WT_PAGE_ROW_INT		8	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	9	/* Row-store leaf page */
+#define	WT_PAGE_INVALID		 0	/* Invalid page */
+#define	WT_PAGE_DESCRIPT	 1	/* Database description page */
+#define	WT_PAGE_COL_FIX		 2	/* Col store fixed-len leaf */
+#define	WT_PAGE_COL_INT		 3	/* Col store internal page */
+#define	WT_PAGE_COL_RCC	 	 4	/* Col store repeat-compressed leaf */
+#define	WT_PAGE_COL_VAR		 5	/* Col store var-length leaf page */
+#define	WT_PAGE_DUP_INT		 6	/* Duplicate tree internal page */
+#define	WT_PAGE_DUP_LEAF	 7	/* Duplicate tree leaf page */
+#define	WT_PAGE_OVFL		 8	/* Overflow page */
+#define	WT_PAGE_ROW_INT		 9	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	10	/* Row-store leaf page */
 	u_int8_t type;			/* 12: page type */
 
 	/*
@@ -525,10 +540,10 @@ struct __wt_col_expand {
  * WT_ITEM --
  *	Trailing data length (in bytes) plus item type.
  *
- * After the page header, on pages with variable-length data, there is
- * Pages with variable-length items (all page types except for WT_PAGE_COL_INT
- * and WT_PAGE_COL_LEAF_FIXED), are comprised of a list of WT_ITEMs in sorted
- * order.  Or, specifically, 4 bytes followed by a variable length chunk.
+ * After the page header, on pages with variable-length data, there are
+ * variable-length items (all page types except WT_PAGE_COL_{INT,FIX,RCC}),
+ * comprised of a list of WT_ITEMs in sorted order.  Or, specifically, 4
+ * bytes followed by a variable length chunk.
  *
  * The first 8 bits of that 4 bytes holds an item type, followed by an item
  * length.  The item type defines the following set of bytes and the item
@@ -600,10 +615,10 @@ struct __wt_item {
  *
  * WT_PAGE_COL_INT (Column-store internal page):
  * WT_PAGE_COL_FIX (Column-store leaf page storing fixed-length items):
+ * WT_PAGE_COL_RCC (Column-store leaf page storing fixed-length items):
  * WT_PAGE_OVFL (Overflow page):
- *	These pages contain fixed-sized structures (WT_PAGE_COL_INT and
- *	WT_PAGE_COL_FIX), or a string of bytes (WT_PAGE_OVFL), and so do
- *	not contain WT_ITEM structures.
+ *	These pages contain fixed-sized structures (WT_PAGE_COL_{INT,FIX,RCC}),
+ *	or a string of bytes (WT_PAGE_OVFL), not WT_ITEM structures.
  *
  * There are currently 10 item types, requiring 4 bits, with 6 values unused.
  *
@@ -729,28 +744,28 @@ struct __wt_ovfl {
 	    (p) = (u_int8_t *)(p) + (db)->fixed_len)
 
 /*
- * WT_FIX_REPEAT_FOREACH is a loop that walks fixed-length, repeat-counted
+ * WT_RCC_REPEAT_FOREACH is a loop that walks fixed-length, repeat-compressed
  * entries on a page.
  */
-#define	WT_FIX_REPEAT_FOREACH(db, page, p, i)				\
+#define	WT_RCC_REPEAT_FOREACH(db, page, p, i)				\
 	for ((p) = WT_PAGE_BYTE(page),					\
 	    (i) = (page)->hdr->u.entries; (i) > 0; --(i),		\
 	    (p) = (u_int8_t *)(p) + (db)->fixed_len + sizeof(u_int16_t))
 
 /*
- * WT_FIX_REPEAT_COUNT and WT_FIX_REPEAT_DATA reference the data and count
- * values for repeat-compressed, fixed-length page entries.
+ * WT_RCC_REPEAT_COUNT and WT_RCC_REPEAT_DATA reference the data and count
+ * values for fixed-length, repeat-compressed page entries.
  */
-#define	WT_FIX_REPEAT_COUNT(p)	(*(u_int16_t *)(p))
-#define	WT_FIX_REPEAT_DATA(p)	((u_int8_t *)(p) + sizeof(u_int16_t))
+#define	WT_RCC_REPEAT_COUNT(p)	(*(u_int16_t *)(p))
+#define	WT_RCC_REPEAT_DATA(p)	((u_int8_t *)(p) + sizeof(u_int16_t))
 
 /*
- * WT_FIX_REPEAT_ITERATE is a loop that walks fixed-length, repeat-counted
+ * WT_RCC_REPEAT_ITERATE is a loop that walks fixed-length, repeat-compressed
  * references on a page, visiting each entry the appropriate number of times.
  */
-#define	WT_FIX_REPEAT_ITERATE(db, page, p, i, j)			\
-	WT_FIX_REPEAT_FOREACH(db, page, p, i)				\
-		for ((j) = WT_FIX_REPEAT_COUNT(p); (j) > 0; --(j))
+#define	WT_RCC_REPEAT_ITERATE(db, page, p, i, j)			\
+	WT_RCC_REPEAT_FOREACH(db, page, p, i)				\
+		for ((j) = WT_RCC_REPEAT_COUNT(p); (j) > 0; --(j))
 
 #if defined(__cplusplus)
 }

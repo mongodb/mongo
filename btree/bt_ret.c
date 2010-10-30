@@ -109,8 +109,11 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	/* Otherwise, take the item from the original page. */
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		data_ret = F_ISSET(idb, WT_REPEAT_COMP) ?
-		    WT_FIX_REPEAT_DATA(cip->data) : cip->data;
+		data_ret = cip->data;
+		size_ret = db->fixed_len;
+		break;
+	case WT_PAGE_COL_RCC:
+		data_ret = WT_RCC_REPEAT_DATA(cip->data);
 		size_ret = db->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:

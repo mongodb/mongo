@@ -54,36 +54,38 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 27, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 28, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_DUP_TREE].desc = "duplicate data off-page trees";
 	stats[WT_STAT_FIXED_LEN].desc = "database fixed-record size";
 	stats[WT_STAT_INTLMAX].desc = "maximum internal page size";
 	stats[WT_STAT_INTLMIN].desc = "minimum internal page size";
-	stats[WT_STAT_ITEM_DATA_OVFL].desc = "overflow data items";
-	stats[WT_STAT_ITEM_DUP_DATA].desc = "duplicate data items";
-	stats[WT_STAT_ITEM_KEY_OVFL].desc = "overflow keys";
-	stats[WT_STAT_ITEM_TOTAL_DATA].desc = "total database data items";
-	stats[WT_STAT_ITEM_TOTAL_DELETED].desc =
-	    "total database deleted items";
-	stats[WT_STAT_ITEM_TOTAL_KEY].desc = "total database keys";
+	stats[WT_STAT_ITEM_COL_DELETED].desc =
+	    "column store deleted data items";
+	stats[WT_STAT_ITEM_DATA_OVFL].desc = "total overflow data items";
+	stats[WT_STAT_ITEM_DUP_DATA].desc = "total duplicate data items";
+	stats[WT_STAT_ITEM_KEY_OVFL].desc = "total overflow keys";
+	stats[WT_STAT_ITEM_TOTAL_DATA].desc = "total data items";
+	stats[WT_STAT_ITEM_TOTAL_KEY].desc = "total keys";
 	stats[WT_STAT_LEAFMAX].desc = "maximum leaf page size";
 	stats[WT_STAT_LEAFMIN].desc = "minimum leaf page size";
 	stats[WT_STAT_MAGIC].desc = "magic number";
 	stats[WT_STAT_MAJOR].desc = "major version number";
 	stats[WT_STAT_MINOR].desc = "minor version number";
-	stats[WT_STAT_PAGE_COL_FIXED].desc =
+	stats[WT_STAT_PAGE_COL_FIX].desc =
 	    "column-store fixed-size leaf pages";
 	stats[WT_STAT_PAGE_COL_INTERNAL].desc = "column-store internal pages";
+	stats[WT_STAT_PAGE_COL_RCC].desc =
+	    "column-store repeat-count compressed fixed-size leaf pages";
 	stats[WT_STAT_PAGE_COL_VARIABLE].desc =
 	    "column-store variable-size leaf pages";
 	stats[WT_STAT_PAGE_DUP_INTERNAL].desc = "duplicate internal pages";
 	stats[WT_STAT_PAGE_DUP_LEAF].desc = "duplicate leaf pages";
 	stats[WT_STAT_PAGE_FREE].desc = "unused on-page space in bytes";
-	stats[WT_STAT_PAGE_INTERNAL].desc = "row-store internal pages";
-	stats[WT_STAT_PAGE_LEAF].desc = "row-store leaf pages";
 	stats[WT_STAT_PAGE_OVERFLOW].desc = "overflow pages";
+	stats[WT_STAT_PAGE_ROW_INTERNAL].desc = "row-store internal pages";
+	stats[WT_STAT_PAGE_ROW_LEAF].desc = "row-store leaf pages";
 	stats[WT_STAT_TREE_LEVEL].desc = "number of levels in the btree";
 
 	*statsp = stats;
@@ -98,26 +100,27 @@ __wt_stat_clear_database_stats(WT_STATS *stats)
 	stats[WT_STAT_FIXED_LEN].v = 0;
 	stats[WT_STAT_INTLMAX].v = 0;
 	stats[WT_STAT_INTLMIN].v = 0;
+	stats[WT_STAT_ITEM_COL_DELETED].v = 0;
 	stats[WT_STAT_ITEM_DATA_OVFL].v = 0;
 	stats[WT_STAT_ITEM_DUP_DATA].v = 0;
 	stats[WT_STAT_ITEM_KEY_OVFL].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_DATA].v = 0;
-	stats[WT_STAT_ITEM_TOTAL_DELETED].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_KEY].v = 0;
 	stats[WT_STAT_LEAFMAX].v = 0;
 	stats[WT_STAT_LEAFMIN].v = 0;
 	stats[WT_STAT_MAGIC].v = 0;
 	stats[WT_STAT_MAJOR].v = 0;
 	stats[WT_STAT_MINOR].v = 0;
-	stats[WT_STAT_PAGE_COL_FIXED].v = 0;
+	stats[WT_STAT_PAGE_COL_FIX].v = 0;
 	stats[WT_STAT_PAGE_COL_INTERNAL].v = 0;
+	stats[WT_STAT_PAGE_COL_RCC].v = 0;
 	stats[WT_STAT_PAGE_COL_VARIABLE].v = 0;
 	stats[WT_STAT_PAGE_DUP_INTERNAL].v = 0;
 	stats[WT_STAT_PAGE_DUP_LEAF].v = 0;
 	stats[WT_STAT_PAGE_FREE].v = 0;
-	stats[WT_STAT_PAGE_INTERNAL].v = 0;
-	stats[WT_STAT_PAGE_LEAF].v = 0;
 	stats[WT_STAT_PAGE_OVERFLOW].v = 0;
+	stats[WT_STAT_PAGE_ROW_INTERNAL].v = 0;
+	stats[WT_STAT_PAGE_ROW_LEAF].v = 0;
 	stats[WT_STAT_TREE_LEVEL].v = 0;
 }
 

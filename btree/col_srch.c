@@ -53,21 +53,18 @@ restart:
 		/* Walk the page looking for the record. */
 		switch (page->hdr->type) {
 		case WT_PAGE_COL_FIX:
-			if (F_ISSET(idb, WT_REPEAT_COMP)) {
-				WT_INDX_FOREACH(page, cip, i) {
-					if (record_cnt +
-					    WT_FIX_REPEAT_COUNT(cip->data) >=
-					    recno) {
-						rcc_offset = (u_int16_t)
-						    (recno - record_cnt);
-						break;
-					}
-					record_cnt +=
-					    WT_FIX_REPEAT_COUNT(cip->data);
+			cip = page->u.icol + ((recno - record_cnt) - 1);
+			goto done;
+		case WT_PAGE_COL_RCC:
+			WT_INDX_FOREACH(page, cip, i) {
+				if (record_cnt +
+				    WT_RCC_REPEAT_COUNT(cip->data) >= recno) {
+					rcc_offset =
+					    (u_int16_t)(recno - record_cnt);
+					break;
 				}
-			} else
-				cip =
-				    page->u.icol + ((recno - record_cnt) - 1);
+				record_cnt += WT_RCC_REPEAT_COUNT(cip->data);
+			}
 			goto done;
 		case WT_PAGE_COL_VAR:
 			cip = page->u.icol + ((recno - record_cnt) - 1);
@@ -109,34 +106,9 @@ done:	/*
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_FIX:
 		/*
-		 * In a repeat-compressed column store:
-		 *
-		 * Search for an individual record in the page's WT_COL_EXPAND
-		 * array.  If found, the record has been modified before: check
-		 * for deletion, and return its WT_COL_EXPAND entry.  If not
-		 * found, check for deletion in the original index, and return
-		 * the original index.
-		 */
-		if (F_ISSET(idb, WT_REPEAT_COMP)) {
-			for (exp = WT_COL_EXPCOL(page, cip);
-			    exp != NULL; exp = exp->next)
-				if (exp->rcc_offset == rcc_offset) {
-					repl = exp->repl;
-					if (!LF_ISSET(WT_INSERT) &&
-					    WT_REPL_DELETED_ISSET(repl))
-						goto notfound;
-					break;
-				}
-			if (exp == NULL && !LF_ISSET(WT_INSERT) &&
-			    WT_FIX_DELETE_ISSET(WT_FIX_REPEAT_DATA(cip->data)))
-				goto notfound;
-			break;
-		}
-
-		/*
-		 * In all other column stores, check for a replacement in the
-		 * page's WT_REPL array.  If found, check for deletion.   If
-		 * not found, check for deletion in the original index.
+		 * Check for a replacement in the page's WT_REPL array.  If
+		 * found, check for deletion.   If not found, check for
+		 * deletion in the original index.
 		 */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
 			if (!LF_ISSET(WT_INSERT) && WT_REPL_DELETED_ISSET(repl))
@@ -144,6 +116,27 @@ done:	/*
 			break;
 		}
 		if (!LF_ISSET(WT_INSERT) && WT_FIX_DELETE_ISSET(cip->data))
+			goto notfound;
+		break;
+	case WT_PAGE_COL_RCC:
+		/*
+		 * Search for an individual record in the page's WT_COL_EXPAND
+		 * array.  If found, the record has been modified before: check
+		 * for deletion, and return its WT_COL_EXPAND entry.  If not
+		 * found, check for deletion in the original index, and return
+		 * the original index.
+		 */
+		for (exp =
+		    WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next)
+			if (exp->rcc_offset == rcc_offset) {
+				repl = exp->repl;
+				if (!LF_ISSET(WT_INSERT) &&
+				    WT_REPL_DELETED_ISSET(repl))
+					goto notfound;
+				break;
+			}
+		if (exp == NULL && !LF_ISSET(WT_INSERT) &&
+		    WT_FIX_DELETE_ISSET(WT_RCC_REPEAT_DATA(cip->data)))
 			goto notfound;
 		break;
 	case WT_PAGE_COL_VAR:
@@ -172,6 +165,7 @@ done:	/*
 
 notfound:
 	ret = WT_NOTFOUND;
+
 	if (page != idb->root_page)
 		__wt_bt_page_out(toc, &page, 0);
 	return (ret);

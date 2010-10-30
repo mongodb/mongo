@@ -87,7 +87,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	u_int32_t len;
 	u_int16_t *last_repeat;
 	u_int8_t *last_data;
-	int ret;
+	int rcc, ret;
 
 	db = toc->db;
 	tmp = NULL;
@@ -95,13 +95,16 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	insert_cnt = 0;
 	WT_CLEAR(stack);
 
+	rcc = F_ISSET(idb, WT_REPEAT_COMP) ? 1 : 0;
+
 	/* Figure out how large is the chunk we're storing on the page. */
-	len = db->fixed_len +
-	    (F_ISSET(idb, WT_REPEAT_COMP) ? sizeof(u_int16_t) : 0);
+	len = db->fixed_len;
+	if (rcc)
+		len += sizeof(u_int16_t);
 
 	/* Get a scratch buffer and make it look like our work page. */
-	WT_ERR(__wt_bt_scratch_page(toc,
-	    db->leafmin, WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
+	WT_ERR(__wt_bt_scratch_page(toc, db->leafmin,
+	    rcc ? WT_PAGE_COL_RCC : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
 	hdr = page->hdr;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
@@ -145,7 +148,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		 * and increment that item's repeat count instead of entering
 		 * new data.
 		 */
-		if (F_ISSET(idb, WT_REPEAT_COMP) && hdr->u.entries != 0)
+		if (rcc && hdr->u.entries != 0)
 			if (*last_repeat < UINT16_MAX &&
 			    memcmp(last_data, data->data, data->size) == 0) {
 				++*last_repeat;
@@ -181,7 +184,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		 * Copy the data item onto the page -- if we're doing repeat
 		 * compression, track the location of the item for comparison.
 		 */
-		if (F_ISSET(idb, WT_REPEAT_COMP)) {
+		if (rcc) {
 			last_repeat = (u_int16_t *)page->first_free;
 			*last_repeat = 1;
 			page->first_free += sizeof(u_int16_t);
@@ -880,6 +883,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 		key = NULL;
 		break;
@@ -970,6 +974,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 split:		switch (hdr->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:
+		case WT_PAGE_COL_RCC:
 		case WT_PAGE_COL_VAR:
 			type = WT_PAGE_COL_INT;
 			break;

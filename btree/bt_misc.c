@@ -135,26 +135,28 @@ const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr)
 {
 	switch (hdr->type) {
+	case WT_PAGE_INVALID:
+		return ("invalid");
 	case WT_PAGE_DESCRIPT:
 		return ("database descriptor page");
 	case WT_PAGE_COL_FIX:
-		return ("column fixed-length leaf");
+		return ("column-store fixed-length leaf");
 	case WT_PAGE_COL_INT:
-		return ("column internal");
+		return ("column-store internal");
+	case WT_PAGE_COL_RCC:
+		return ("column-store fixed-length repeat-compressed leaf");
 	case WT_PAGE_COL_VAR:
-		return ("column variable-length leaf");
+		return ("column-store variable-length leaf");
 	case WT_PAGE_DUP_INT:
-		return ("duplicate internal");
+		return ("duplicate tree internal");
 	case WT_PAGE_DUP_LEAF:
-		return ("duplicate leaf");
+		return ("duplicate tree leaf");
 	case WT_PAGE_OVFL:
 		return ("overflow");
 	case WT_PAGE_ROW_INT:
-		return ("row internal");
+		return ("row-store internal");
 	case WT_PAGE_ROW_LEAF:
-		return ("row leaf");
-	case WT_PAGE_INVALID:
-		return ("invalid");
+		return ("row-store leaf");
 	default:
 		break;
 	}

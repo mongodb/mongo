@@ -58,6 +58,7 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DESCRIPT:
 	case WT_PAGE_OVFL:

@@ -21,8 +21,9 @@ typedef struct {
 } WT_DSTUFF;
 
 static int  __wt_bt_dump_page(WT_TOC *, WT_PAGE *, void *);
-static int  __wt_bt_dump_page_fixed(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static void __wt_bt_dump_page_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_bt_dump_page_item(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static void __wt_bt_dump_page_rcc(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
 static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
 
@@ -99,7 +100,10 @@ __wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	case WT_PAGE_ROW_INT:
 		break;
 	case WT_PAGE_COL_FIX:
-		WT_RET(__wt_bt_dump_page_fixed(toc, page, dp));
+		__wt_bt_dump_page_fix(toc, page, dp);
+		break;
+	case WT_PAGE_COL_RCC:
+		__wt_bt_dump_page_rcc(toc, page, dp);
 		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
@@ -245,27 +249,37 @@ err:	/* Discard any space allocated to hold off-page key/data items. */
 }
 
 /*
- * __wt_bt_dump_page_fixed --
- *	Dump a page of fixed-length objects.
+ * __wt_bt_dump_page_fix --
+ *	Dump a WT_PAGE_COL_FIX page.
  */
-static int
-__wt_bt_dump_page_fixed(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+static void
+__wt_bt_dump_page_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
-	IDB *idb;
+	u_int32_t i;
+	u_int8_t *p;
+
+	db = toc->db;
+
+	WT_FIX_FOREACH(db, page, p, i)
+		dp->p(p, db->fixed_len, dp->stream);
+}
+
+/*
+ * __wt_bt_dump_page_rcc --
+ *	Dump a WT_PAGE_COL_RCC page.
+ */
+static void
+__wt_bt_dump_page_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+{
+	DB *db;
 	u_int32_t i, j;
 	u_int8_t *p;
 
 	db = toc->db;
-	idb = db->idb;
 
-	if (F_ISSET(idb, WT_REPEAT_COMP))
-		WT_FIX_REPEAT_ITERATE(db, page, p, i, j)
-			dp->p(WT_FIX_REPEAT_DATA(p), db->fixed_len, dp->stream);
-	else
-		WT_FIX_FOREACH(db, page, p, i)
-			dp->p(p, db->fixed_len, dp->stream);
-	return (0);
+	WT_RCC_REPEAT_ITERATE(db, page, p, i, j)
+		dp->p(WT_RCC_REPEAT_DATA(p), db->fixed_len, dp->stream);
 }
 
 static const char hex[] = "0123456789abcdef";

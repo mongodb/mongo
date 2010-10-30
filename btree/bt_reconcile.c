@@ -13,7 +13,7 @@ static int __wt_bt_rcc_expand_compare(const void *, const void *);
 static int __wt_bt_rcc_expand_sort(
 		ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, u_int32_t *);
 static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_col_fix_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -30,7 +30,6 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	DBT *tmp;
-	IDB *idb;
 	ENV *env;
 	WT_PAGE *new;
 	WT_PAGE_HDR *hdr;
@@ -39,7 +38,6 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	db = toc->db;
 	tmp = NULL;
-	idb = db->idb;
 	env = toc->env;
 	hdr = page->hdr;
 
@@ -88,15 +86,12 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		goto done;
 	case WT_PAGE_COL_FIX:
 		/*
-		 * When reconciling a fixed-width page that doesn't support
-		 * repeat count compression, the on-page information cannot
-		 * change size -- there's no reason to ever split such a page.
+		 * Fixed-width pages without repeat count compression cannot
+		 * change size.
 		 */
-		if (!F_ISSET(idb, WT_REPEAT_COMP)) {
-			max = page->size;
-			break;
-		}
-		/* FALLTHROUGH */
+		max = page->size;
+		break;
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
@@ -137,10 +132,10 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		if (F_ISSET(idb, WT_REPEAT_COMP))
-			WT_ERR(__wt_bt_rec_col_fix_rcc(toc, page, new));
-		else
-			WT_ERR(__wt_bt_rec_col_fix(toc, page, new));
+		WT_ERR(__wt_bt_rec_col_fix(toc, page, new));
+		break;
+	case WT_PAGE_COL_RCC:
+		WT_ERR(__wt_bt_rec_col_rcc(toc, page, new));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_ERR(__wt_bt_rec_col_var(toc, page, new));
@@ -283,11 +278,11 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_bt_rec_col_fix_rcc --
+ * __wt_bt_rec_col_rcc --
  *	Reconcile a repeat-count compressed, fixed-width column-store leaf page.
  */
 static int
-__wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	DB *db;
 	DBT *tmp;
@@ -320,8 +315,8 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	if (tmp->mem_size < len)
 		WT_ERR(__wt_realloc(env, &tmp->mem_size, len, &tmp->data));
 	memset(tmp->data, 0, len);
-	WT_FIX_REPEAT_COUNT(tmp->data) = 1;
-	WT_FIX_DELETE_SET(WT_FIX_REPEAT_DATA(tmp->data));
+	WT_RCC_REPEAT_COUNT(tmp->data) = 1;
+	WT_FIX_DELETE_SET(WT_RCC_REPEAT_DATA(tmp->data));
 
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
@@ -338,7 +333,7 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * records listed in the WT_COL_EXPAND array, and original data
 		 * otherwise.
 		 */
-		total = WT_FIX_REPEAT_COUNT(cip->data);
+		total = WT_RCC_REPEAT_COUNT(cip->data);
 		for (expp = expsort, n = 1; n <= total; n += repeat_count) {
 			rc_prefix = 0;
 			if ((exp = *expp) != NULL && n == exp->rcc_offset) {
@@ -375,10 +370,10 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 * repeat count where possible.
 			 */
 			if (last_data != NULL &&
-			    memcmp(WT_FIX_REPEAT_DATA(last_data),
-			    WT_FIX_REPEAT_DATA(data), db->fixed_len) == 0 &&
-			    WT_FIX_REPEAT_COUNT(last_data) < UINT16_MAX) {
-				WT_FIX_REPEAT_COUNT(last_data) += repeat_count;
+			    memcmp(WT_RCC_REPEAT_DATA(last_data),
+			    WT_RCC_REPEAT_DATA(data), db->fixed_len) == 0 &&
+			    WT_RCC_REPEAT_COUNT(last_data) < UINT16_MAX) {
+				WT_RCC_REPEAT_COUNT(last_data) += repeat_count;
 				continue;
 			}
 
@@ -403,8 +398,8 @@ __wt_bt_rec_col_fix_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 */
 			last_data = new->first_free;
 			if (rc_prefix) {
-				WT_FIX_REPEAT_COUNT(last_data) = repeat_count;
-				memcpy(WT_FIX_REPEAT_DATA(
+				WT_RCC_REPEAT_COUNT(last_data) = repeat_count;
+				memcpy(WT_RCC_REPEAT_DATA(
 				    last_data), data, db->fixed_len);
 			} else
 				memcpy(last_data, data, len);
@@ -757,6 +752,9 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	db = toc->db;
 	env = toc->env;
+
+	/* Verify the page to catch reconciliation errors early on. */
+	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
 	/*
 	 * Set the page's size to the minimum number of allocation units needed
