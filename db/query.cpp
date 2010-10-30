@@ -389,37 +389,37 @@ namespace mongo {
     class CountOp : public QueryOp {
     public:
         CountOp( const string& ns , const BSONObj &spec ) :
-            _ns(ns), _capped(false), count_(), _myCount(),
-            skip_( spec["skip"].numberLong() ),
-            limit_( spec["limit"].numberLong() ),
-            bc_(){
+            _ns(ns), _capped(false), _count(), _myCount(),
+            _skip( spec["skip"].numberLong() ),
+            _limit( spec["limit"].numberLong() ),
+            _bc(){
         }
         
         virtual void _init() {
-            c_ = qp().newCursor();
-            _capped = c_->capped();
+            _c = qp().newCursor();
+            _capped = _c->capped();
             if ( qp().exactKeyMatch() && ! matcher()->needRecord() ) {
-                query_ = qp().simplifiedQuery( qp().indexKey() );
-                bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
-                bc_->forgetEndKey();
+                _query = qp().simplifiedQuery( qp().indexKey() );
+                _bc = dynamic_cast< BtreeCursor* >( _c.get() );
+                _bc->forgetEndKey();
             }
         }
 
         virtual long long nscanned() {
-            assert( c_.get() );
-            return c_->nscanned();
+            assert( _c.get() );
+            return _c->nscanned();
         }
         
         virtual bool prepareToYield() {
             if ( ! _cc ) {
-                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , _ns.c_str() ) );
+                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , _ns.c_str() ) );
             }
             return _cc->prepareToYield( _yieldData );
         }
         
         virtual void recoverFromYield() {
             if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
-                c_.reset();
+                _c.reset();
                 _cc.reset();
 
                 if ( _capped ){
@@ -432,22 +432,22 @@ namespace mongo {
         }
         
         virtual void next() {
-            if ( !c_ || !c_->ok() ) {
+            if ( ! _c || !_c->ok() ) {
                 setComplete();
                 return;
             }
 
-            if ( bc_ ) {
-                if ( firstMatch_.isEmpty() ) {
-                    firstMatch_ = bc_->currKeyNode().key;
+            if ( _bc ) {
+                if ( _firstMatch.isEmpty() ) {
+                    _firstMatch = _bc->currKeyNode().key;
                     // if not match
-                    if ( query_.woCompare( firstMatch_, BSONObj(), false ) ) {
+                    if ( _query.woCompare( _firstMatch, BSONObj(), false ) ) {
                         setComplete();
                         return;
                     }
                     _gotOne();
                 } else {
-                    if ( !firstMatch_.woEqual( bc_->currKeyNode().key ) ) {
+                    if ( ! _firstMatch.woEqual( _bc->currKeyNode().key ) ) {
                         setComplete();
                         return;
                     }
@@ -455,53 +455,53 @@ namespace mongo {
                 }
             } 
             else {
-                if ( !matcher()->matches(c_->currKey(), c_->currLoc() ) ) {
+                if ( !matcher()->matches(_c->currKey(), _c->currLoc() ) ) {
                 }
-                else if( !c_->getsetdup(c_->currLoc()) ) {
+                else if( !_c->getsetdup(_c->currLoc()) ) {
                     _gotOne();
                 }                
             }
-            c_->advance();
+            _c->advance();
         }
         virtual QueryOp *_createChild() const {
             CountOp *ret = new CountOp( _ns , BSONObj() );
-            ret->count_ = count_;
-            ret->skip_ = skip_;
-            ret->limit_ = limit_;
+            ret->_count = _count;
+            ret->_skip = _skip;
+            ret->_limit = _limit;
             return ret;
         }
-        long long count() const { return count_; }
+        long long count() const { return _count; }
         virtual bool mayRecordPlan() const {
-            return ( _myCount > limit_ / 2 ) || ( complete() && !stopRequested() );
+            return ( _myCount > _limit / 2 ) || ( complete() && !stopRequested() );
         }
     private:
         
         void _gotOne(){
-            if ( skip_ ){
-                skip_--;
+            if ( _skip ){
+                _skip--;
                 return;
             }
             
-            if ( limit_ > 0 && count_ >= limit_ ){
+            if ( _limit > 0 && _count >= _limit ){
                 setStop();
                 return;
             }
 
-            count_++;
+            _count++;
             _myCount++;
         }
 
         string _ns;
         bool _capped;
 
-        long long count_;
+        long long _count;
         long long _myCount;
-        long long skip_;
-        long long limit_;
-        shared_ptr<Cursor> c_;
-        BSONObj query_;
-        BtreeCursor *bc_;
-        BSONObj firstMatch_;
+        long long _skip;
+        long long _limit;
+        shared_ptr<Cursor> _c;
+        BSONObj _query;
+        BtreeCursor * _bc;
+        BSONObj _firstMatch;
 
         ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
