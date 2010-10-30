@@ -214,6 +214,10 @@ namespace mongo {
 
             Cursor *c = cc->_c.get();
             if ( c->capped() ){
+                /* note we cannot advance here. if this condition occurs, writes to the oplog 
+                   have "caught" the reader.  skipping ahead, the reader would miss postentially 
+                   important data.
+                   */
                 delete cc;
                 continue;
             }
