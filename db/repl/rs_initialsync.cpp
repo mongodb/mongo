@@ -142,8 +142,7 @@ namespace mongo {
         sethbmsg("initial sync drop all databases", 0);
         dropAllDatabasesExceptLocal();
 
-//        sethbmsg("initial sync drop oplog", 0);
-//        emptyOplog();
+        sethbmsg("initial sync clone all databases", 0);
 
         list<string> dbs = r.conn()->getDatabaseNames();
         for( list<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
@@ -173,10 +172,10 @@ namespace mongo {
         OpTime mvoptime = minValid["ts"]._opTime();
         assert( !mvoptime.isNull() );
 
-        /* copy the oplog 
+        /* apply relevant portion of the oplog 
         */
         {
-            sethbmsg("initial sync copy+apply oplog");
+            sethbmsg("initial sync initial oplog application");
             if( ! initialSyncOplogApplication(masterHostname, cp, startingTS, mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
@@ -189,7 +188,7 @@ namespace mongo {
                     cx.db()->flushFiles(true);            
                 }
                 log() << "replSet cleaning up [2]" << rsLog;
-                sleepsecs(2);
+                sleepsecs(5);
                 return;
             }
         }

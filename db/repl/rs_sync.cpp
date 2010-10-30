@@ -66,7 +66,7 @@ namespace mongo {
         try {
             OplogReader r;
             if( !r.connect(hn) ) { 
-                log(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
+                log() << "replSet initial sync error can't connect to " << hn << " to read " << rsoplog << rsLog;
                 return false;
             }
 
@@ -79,14 +79,23 @@ namespace mongo {
             {
                 if( !r.more() ) { 
                     sethbmsg("replSet initial sync error reading remote oplog");
+                    log() << "replSet initial sync error remote oplog (" << rsoplog << ") on host " << hn << " is empty?" << rsLog;
                     return false;
                 }
                 bo op = r.next();
                 OpTime t = op["ts"]._opTime();
                 r.putBack(op);
-                massert( 13508 , str::stream() << "no 'ts' in oplog: " << op , !t.isNull() );
+
+                if( op.firstElement().fieldName() == string("$err") ) { 
+                    log() << "replSet initial sync error querying " << rsoplog << " on " << hn << " : " << op.toString() << rsLog;
+                    return false;
+                }
+
+                uassert( 13508 , str::stream() << "no 'ts' in first op in oplog: " << op , !t.isNull() );
                 if( t > applyGTE ) {
                     sethbmsg(str::stream() << "error " << hn << " oplog wrapped during initial sync");
+                    log() << "replSet initial sync expected first optime of " << applyGTE << rsLog;
+                    log() << "replSet initial sync but received a first optime of " << t << " from " << hn << rsLog;
                     return false;
                 }
             }
@@ -99,8 +108,6 @@ namespace mongo {
                     break;
                 BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
                 {
-                    //writelock lk("");
-
                     ts = o["ts"]._opTime();
 
                     /* if we have become primary, we dont' want to apply things from elsewhere
@@ -244,11 +251,8 @@ namespace mongo {
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) { 
-                log(1) << "TEMP our last op time written: " << lastOpTimeWritten.toStringPretty() << endl;
-                log(1) << "TEMP primary's GTE: " << ts.toStringPretty() << endl;
-                /*
-                }*/
-
+                log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << endl;
+                log() << "replset primary's GTE: " << ts.toStringPretty() << endl;
                 syncRollback(r);
                 return;
             }
