@@ -25,11 +25,15 @@ typedef struct {
 	WT_PAGE *leaf;				/* Child page */
 } WT_VSTUFF;
 
+static int __wt_bt_verify_delfmt(DB *, u_int32_t, u_int32_t);
+static int __wt_bt_verify_eof(DB *, u_int32_t, u_int32_t);
+static int __wt_bt_verify_eop(DB *, u_int32_t, u_int32_t);
 static int __wt_bt_verify_addfrag(DB *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_checkfrag(DB *, WT_VSTUFF *);
 static int __wt_bt_verify_cmp(WT_TOC *, WT_ROW *, WT_PAGE *, int);
 static int __wt_bt_verify_page_col_fix(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_col_int(DB *, WT_PAGE *);
+static int __wt_bt_verify_page_col_rcc(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_desc(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_page_ovfl(WT_TOC *, WT_PAGE *);
@@ -238,6 +242,7 @@ __wt_bt_verify_tree(WT_TOC *toc,
 	 */
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 		__wt_bt_page_out(toc, &page, 0);
 		return (0);
@@ -440,6 +445,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	case WT_PAGE_DESCRIPT:
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -462,6 +468,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 			goto err_level;
 		break;
 	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_OVFL:
@@ -508,6 +515,9 @@ err_level:		__wt_api_db_errx(db,
 		break;
 	case WT_PAGE_COL_FIX:
 		WT_RET(__wt_bt_verify_page_col_fix(db, page));
+		break;
+	case WT_PAGE_COL_RCC:
+		WT_RET(__wt_bt_verify_page_col_rcc(db, page));
 		break;
 	case WT_PAGE_OVFL:
 		WT_RET(__wt_bt_verify_page_ovfl(toc, page));
@@ -635,7 +645,8 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 			/*
 			 * XXX
 			 * You can delete items from fixed-length pages, why
-			 * aren't we checking against WT_PAGE_COL_FIX here?
+			 * aren't we checking against WT_PAGE_COL_FIX and
+			 * WT_PAGE_COL_RCC here?
 			 */
 			if (hdr->type != WT_PAGE_COL_VAR)
 				goto item_vs_page;
@@ -696,11 +707,8 @@ item_len:			__wt_api_db_errx(db,
 
 		/* Check if the item is entirely on the page. */
 		if ((u_int8_t *)WT_ITEM_NEXT(item) > end) {
-eop:			__wt_api_db_errx(db,
-			    "item %lu on page at addr %lu extends past the end "
-			    " of the page",
-			    (u_long)item_num, (u_long)addr);
-			goto err_set;
+eop:			ret = __wt_bt_verify_eop(db, item_num, addr);
+			goto err;
 		}
 
 		/*
@@ -724,12 +732,8 @@ eop:			__wt_api_db_errx(db,
 			off = WT_ITEM_BYTE_OFF(item);
 			if (WT_ADDR_TO_OFF(db, off->addr) +
 			    off->size > idb->fh->file_size) {
-eof:				__wt_api_db_errx(db,
-				    "off-page reference in item %lu on "
-				    "page at addr %lu extends past the "
-				    "end of the file",
-				    (u_long)item_num, (u_long)addr);
-				goto err_set;
+eof:				ret = __wt_bt_verify_eof(db, item_num, addr);
+				goto err;
 			}
 			break;
 		default:
@@ -944,23 +948,13 @@ __wt_bt_verify_page_col_int(DB *db, WT_PAGE *page)
 		++entry_num;
 
 		/* Check if this entry is entirely on the page. */
-		if ((u_int8_t *)off + sizeof(WT_OFF) > end) {
-			__wt_api_db_errx(db,
-			    "offpage reference %lu on page at addr %lu extends "
-			    "past the end of the page",
-			    (u_long)entry_num, (u_long)addr);
-			return (WT_ERROR);
-		}
+		if ((u_int8_t *)off + sizeof(WT_OFF) > end)
+			return (__wt_bt_verify_eop(db, entry_num, addr));
 
 		/* Check if the reference is past the end-of-file. */
 		if (WT_ADDR_TO_OFF(
-		    db, off->addr) + off->size > idb->fh->file_size) {
-			__wt_api_db_errx(db,
-			    "off-page reference in object %lu on page at "
-			    "addr %lu extends past the end of the file",
-			    (u_long)entry_num, (u_long)addr);
-			return (WT_ERROR);
-		}
+		    db, off->addr) + off->size > idb->fh->file_size)
+			return (__wt_bt_verify_eof(db, entry_num, addr));
 	}
 
 	return (0);
@@ -973,100 +967,104 @@ __wt_bt_verify_page_col_int(DB *db, WT_PAGE *page)
 static int
 __wt_bt_verify_page_col_fix(DB *db, WT_PAGE *page)
 {
-	IDB *idb;
 	u_int len;
 	u_int32_t addr, i, j, entry_num;
-	u_int8_t *data, *end, *last_data, *p;
+	u_int8_t *data, *end, *p;
 
-	idb = db->idb;
+	len = db->fixed_len;
 	end = (u_int8_t *)page->hdr + page->size;
 	addr = page->addr;
 
-	if (F_ISSET(idb, WT_REPEAT_COMP)) {
-		last_data = NULL;
-		len = db->fixed_len + sizeof(u_int16_t);
+	entry_num = 0;
+	WT_FIX_FOREACH(db, page, data, i) {
+		++entry_num;
 
-		entry_num = 0;
-		WT_FIX_REPEAT_FOREACH(db, page, data, i) {
-			++entry_num;
+		/* Check if this entry is entirely on the page. */
+		if (data + len > end)
+			return (__wt_bt_verify_eop(db, entry_num, addr));
 
-			/* Check if this entry is entirely on the page. */
-			if (data + len > end)
-				goto eop;
-
-			/* Count must be non-zero. */
-			if (WT_FIX_REPEAT_COUNT(data) == 0) {
-				__wt_api_db_errx(db,
-				    "fixed-length entry %lu on page at addr "
-				    "%lu has a repeat count of 0",
-				    (u_long)entry_num, (u_long)addr);
-				return (WT_ERROR);
-			}
-
-			/* Deleted items are entirely nul bytes. */
-			p = WT_FIX_REPEAT_DATA(data);
-			if (WT_FIX_DELETE_ISSET(p)) {
-				if (*p != WT_FIX_DELETE_BYTE)
+		/* Deleted items are entirely nul bytes. */
+		p = data;
+		if (WT_FIX_DELETE_ISSET(data)) {
+			if (*p != WT_FIX_DELETE_BYTE)
+				goto delfmt;
+			for (j = 1; j < db->fixed_len; ++j)
+				if (*++p != '\0')
 					goto delfmt;
-				for (j = 1; j < db->fixed_len; ++j)
-					if (*++p != '\0')
-						goto delfmt;
-			}
-
-			/*
-			 * If the previous data is the same as this data, we
-			 * missed an opportunity for compression -- complain.
-			 */
-			if (last_data != NULL &&
-			    memcmp(WT_FIX_REPEAT_DATA(last_data),
-			    WT_FIX_REPEAT_DATA(data), db->fixed_len) == 0 &&
-			    WT_FIX_REPEAT_COUNT(last_data) < UINT16_MAX) {
-				__wt_api_db_errx(db,
-				    "fixed-length entries %lu and %lu on page "
-				    "at addr %lu are identical and should have "
-				    "been compressed",
-				    (u_long)entry_num,
-				    (u_long)entry_num - 1, (u_long)addr);
-				return (WT_ERROR);
-			}
-			last_data = data;
-		}
-	} else {
-		len = db->fixed_len;
-
-		entry_num = 0;
-		WT_FIX_FOREACH(db, page, data, i) {
-			++entry_num;
-
-			/* Check if this entry is entirely on the page. */
-			if (data + len > end)
-				goto eop;
-
-			/* Deleted items are entirely nul bytes. */
-			p = data;
-			if (WT_FIX_DELETE_ISSET(data)) {
-				if (*p != WT_FIX_DELETE_BYTE)
-					goto delfmt;
-				for (j = 1; j < db->fixed_len; ++j)
-					if (*++p != '\0')
-						goto delfmt;
-			}
 		}
 	}
 
 	return (0);
 
-eop:	__wt_api_db_errx(db,
-	    "fixed-length entry %lu on page at addr %lu extends past the end "
-	    "of the page",
-	    (u_long)entry_num, (u_long)addr);
-	return (WT_ERROR);
+delfmt:	return (__wt_bt_verify_delfmt(db, entry_num, addr));
+}
 
-delfmt:	__wt_api_db_errx(db,
-	    "deleted fixed-length entry %lu on page at addr %lu has non-nul "
-	    "bytes",
-	    (u_long)entry_num, (u_long)addr);
-	return (WT_ERROR);
+/*
+ * __wt_bt_verify_page_col_rcc --
+ *	Walk a WT_PAGE_COL_RCC page and verify it.
+ */
+static int
+__wt_bt_verify_page_col_rcc(DB *db, WT_PAGE *page)
+{
+	u_int len;
+	u_int32_t addr, i, j, entry_num;
+	u_int8_t *data, *end, *last_data, *p;
+
+	end = (u_int8_t *)page->hdr + page->size;
+	addr = page->addr;
+
+	last_data = NULL;
+	len = db->fixed_len + sizeof(u_int16_t);
+
+	entry_num = 0;
+	WT_RCC_REPEAT_FOREACH(db, page, data, i) {
+		++entry_num;
+
+		/* Check if this entry is entirely on the page. */
+		if (data + len > end)
+			return (__wt_bt_verify_eop(db, entry_num, addr));
+
+		/* Count must be non-zero. */
+		if (WT_RCC_REPEAT_COUNT(data) == 0) {
+			__wt_api_db_errx(db,
+			    "fixed-length entry %lu on page at addr "
+			    "%lu has a repeat count of 0",
+			    (u_long)entry_num, (u_long)addr);
+			return (WT_ERROR);
+		}
+
+		/* Deleted items are entirely nul bytes. */
+		p = WT_RCC_REPEAT_DATA(data);
+		if (WT_FIX_DELETE_ISSET(p)) {
+			if (*p != WT_FIX_DELETE_BYTE)
+				goto delfmt;
+			for (j = 1; j < db->fixed_len; ++j)
+				if (*++p != '\0')
+					goto delfmt;
+		}
+
+		/*
+		 * If the previous data is the same as this data, we
+		 * missed an opportunity for compression -- complain.
+		 */
+		if (last_data != NULL &&
+		    memcmp(WT_RCC_REPEAT_DATA(last_data),
+		    WT_RCC_REPEAT_DATA(data), db->fixed_len) == 0 &&
+		    WT_RCC_REPEAT_COUNT(last_data) < UINT16_MAX) {
+			__wt_api_db_errx(db,
+			    "fixed-length entries %lu and %lu on page "
+			    "at addr %lu are identical and should have "
+			    "been compressed",
+			    (u_long)entry_num,
+			    (u_long)entry_num - 1, (u_long)addr);
+			return (WT_ERROR);
+		}
+		last_data = data;
+	}
+
+	return (0);
+
+delfmt:	return (__wt_bt_verify_delfmt(db, entry_num, addr));
 }
 
 /*
@@ -1189,6 +1187,48 @@ __wt_bt_verify_page_ovfl(WT_TOC *toc, WT_PAGE *page)
 		}
 
 	return (0);
+}
+
+/*
+ * __wt_bt_verify_eop --
+ *	Generic item extends past the end-of-page error.
+ */
+static int
+__wt_bt_verify_eop(DB *db, u_int32_t entry_num, u_int32_t addr)
+{
+	__wt_api_db_errx(db,
+	    "item %lu on page at addr %lu extends past the end of the page",
+	    (u_long)entry_num, (u_long)addr);
+	return (WT_ERROR);
+}
+
+/*
+ * __wt_bt_verify_eof --
+ *	Generic item references non-existent file pages error.
+ */
+static int
+__wt_bt_verify_eof(DB *db, u_int32_t entry_num, u_int32_t addr)
+{
+	__wt_api_db_errx(db,
+	    "off-page item %lu on page at addr %lu references non-existent "
+	    "file pages",
+	    (u_long)entry_num, (u_long)addr);
+	return (WT_ERROR);
+}
+
+/*
+ * __wt_bt_verify_delfmt --
+ *	WT_PAGE_COL_FIX and WT_PAGE_COL_RCC error where a deleted item has
+ *	non-nul bytes.
+ */
+static int
+__wt_bt_verify_delfmt(DB *db, u_int32_t entry_num, u_int32_t addr)
+{
+	__wt_api_db_errx(db,
+	    "deleted fixed-length entry %lu on page at addr %lu has non-nul "
+	    "bytes",
+	    (u_long)entry_num, (u_long)addr);
+	return (WT_ERROR);
 }
 
 /*
