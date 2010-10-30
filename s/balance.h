@@ -34,7 +34,7 @@ namespace mongo {
 
         virtual void run();
 
-        virtual string name() { return "Balancer"; }        
+        virtual string name() const { return "Balancer"; }        
 
     private:
         typedef BalancerPolicy::ChunkInfo CandidateChunk;
