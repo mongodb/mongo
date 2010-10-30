@@ -961,10 +961,6 @@ int main(int argc, char* argv[], char *envp[] )
                 out() << "bad --oplogSize arg" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-            if (x < 16) {
-                out() << "--oplogSize arg is too small" << endl;
-                dbexit( EXIT_BADOPTIONS );
-            }
             if( x > 1000 && sizeof(void*) == 4 ) { 
                 out() << "--oplogSize of " << x << "MB is too big for 32 bit version. Use 64 bit build instead." << endl;
                 dbexit( EXIT_BADOPTIONS );
