@@ -31,6 +31,5 @@ else
 		-e p > __wt.dump_bdb
 fi
 
-sed -e '1,/HEADER=END/d' __wt.dump |
-    cmp - __wt.dump_bdb > __wt.dump.diff
+sed -e '1,/HEADER=END/d' __wt.dump | cmp - __wt.dump_bdb > /dev/null
 exit $?
