@@ -961,6 +961,7 @@ int main(int argc, char* argv[], char *envp[] )
                 out() << "bad --oplogSize arg" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
+            // note a small size such as x==1 is ok for an arbiter.
             if( x > 1000 && sizeof(void*) == 4 ) { 
                 out() << "--oplogSize of " << x << "MB is too big for 32 bit version. Use 64 bit build instead." << endl;
                 dbexit( EXIT_BADOPTIONS );
