@@ -410,7 +410,10 @@ namespace mongo {
 
     void startSyncThread() {
         static int n;
-        assert( n == 0 );
+        if( n != 0 ) {
+            log() << "replSet ERROR : more than one sync thread?" << rsLog;
+            assert( n == 0 );
+        }
         n++;
 
         Client::initThread("rs_sync");

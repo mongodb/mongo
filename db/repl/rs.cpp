@@ -465,7 +465,8 @@ namespace mongo {
         else {
             changeState(MemberState::RS_RECOVERING);
 
-            // oplog will be allocated when sync begins            
+            // oplog will be allocated when sync begins     
+            /* TODO : could this cause two sync threads to exist (race condition)? */
             boost::thread t(startSyncThread);
         }
     }
