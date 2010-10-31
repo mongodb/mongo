@@ -423,7 +423,7 @@ namespace mongo {
                 _cc.reset();
 
                 if ( _capped ){
-                    msgassertedNoTrace( 13337, "capped cursor overrun during count" );
+                    msgassertedNoTrace( 13337, str::stream() << "capped cursor overrun during count: " << _ns );
                 }
                 else {
                     // we don't fail query since we're fine with returning partial data if collection dropped
@@ -676,7 +676,7 @@ namespace mongo {
                 _so.reset();
 
                 if ( _capped ){
-                    msgassertedNoTrace( 13338, "capped cursor overrun during query" );
+                    msgassertedNoTrace( 13338, str::stream() << "capped cursor overrun during query: " << _pq.ns() );
                 }
                 else {
                     // we don't fail query since we're fine with returning partial data if collection dropped
