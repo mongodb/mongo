@@ -913,7 +913,9 @@ namespace mongo {
         OpTime _slaveReadTill;
     };
     
-    /* run a query -- includes checking for and running a Command */
+    /* run a query -- includes checking for and running a Command \
+       @return points to ns if exhaust mode. 0=normal mode
+    */
     const char *runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         StringBuilder& ss = curop.debug().str;
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
@@ -955,7 +957,10 @@ namespace mongo {
                 qr->nReturned = 1;
                 result.setData( qr.release(), true );
             }
-            return false;
+            else { 
+                uasserted(10000, "bad or malformed command request?");
+            }
+            return 0;
         }
         
         /* --- regular query --- */
