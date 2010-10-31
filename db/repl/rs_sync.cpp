@@ -19,7 +19,7 @@
 #include "../../client/dbclient.h"
 #include "rs.h"
 #include "../repl.h"
-
+#include "connections.h"
 namespace mongo {
 
     using namespace bson;
@@ -382,6 +382,23 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncThread() {
+        /* test here was to force a receive timeout
+        ScopedConn c("localhost");
+        bo info;
+        try {
+            log() << "this is temp" << endl;
+            c.runCommand("admin", BSON("sleep"<<120), info);
+            log() << info.toString() << endl;
+            c.runCommand("admin", BSON("sleep"<<120), info);
+            log() << "temp" << endl;
+        }
+        catch( DBException& e ) { 
+            log() << e.toString() << endl;
+            c.runCommand("admin", BSON("sleep"<<120), info);
+            log() << "temp" << endl;
+        }
+        */
+
         while( 1 ) {
             if( myConfig().arbiterOnly )
                 return;
@@ -416,7 +433,7 @@ namespace mongo {
         }
         n++;
 
-        Client::initThread("rs_sync");
+        Client::initThread("replica set sync");
         cc().iAmSyncThread();
         theReplSet->syncThread();
         cc().shutdown();

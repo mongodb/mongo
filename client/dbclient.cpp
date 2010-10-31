@@ -520,18 +520,22 @@ namespace mongo {
     void DBClientConnection::_checkConnection() {
         if ( !failed )
             return;
-        if ( lastReconnectTry && time(0)-lastReconnectTry < 2 )
-            return;
+        if ( lastReconnectTry && time(0)-lastReconnectTry < 2 ) {
+            // we wait a little before reconnect attempt to avoid constant hammering.
+            // but we throw we don't want to try to use a connection in a bad state
+            throw SocketException(SocketException::FAILED_STATE);
+        }
         if ( !autoReconnect )
-            return;
+            throw SocketException(SocketException::FAILED_STATE);
 
         lastReconnectTry = time(0);
         log(_logLevel) << "trying reconnect to " << _serverString << endl;
         string errmsg;
         failed = false;
         if ( ! _connect(errmsg) ) { 
+            failed = true;
             log(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
-			return;
+            throw SocketException(SocketException::CONNECT_ERROR);
 		}
 
 		log(_logLevel) << "reconnect " << _serverString << " ok" << endl;

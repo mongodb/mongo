@@ -428,13 +428,14 @@ struct OP_GETMORE : public MSGHEADER {
 
     class SocketException : public DBException {
     public:
-        enum Type { CLOSED , RECV_ERROR , SEND_ERROR } type;
-        SocketException( Type t ) : DBException( "socket exception" , 9001 ) , type(t){}
-        
-        bool shouldPrint() const {
-            return type != CLOSED;
-        }
-        
+        const enum Type { CLOSED , RECV_ERROR , SEND_ERROR, RECV_TIMEOUT, SEND_TIMEOUT, FAILED_STATE, CONNECT_ERROR } _type;
+        SocketException( Type t ) : DBException( "socket exception" , 9001 ) , _type(t) { }        
+        bool shouldPrint() const { return _type != CLOSED; }        
+        virtual string toString() const {
+            stringstream ss; 
+            ss << "9001 socket exception " << _type;
+            return ss.str();
+        }        
     };
 
     MSGID nextMessageId();

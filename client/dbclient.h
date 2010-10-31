@@ -884,14 +884,16 @@ namespace mongo {
         DBClientReplicaSet *clientSet;
         boost::scoped_ptr<MessagingPort> p;
         boost::scoped_ptr<SockAddr> server;
-        bool failed; // true if some sort of fatal error has ever happened
+        bool failed;
         const bool autoReconnect;
         time_t lastReconnectTry;
         HostAndPort _server; // remember for reconnects
         string _serverString;
-        //int _port;
         void _checkConnection();
+
+        // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
         void checkConnection() { if( failed ) _checkConnection(); }
+
 		map< string, pair<string,string> > authCache;
         const double _so_timeout;        
         bool _connect( string& errmsg );

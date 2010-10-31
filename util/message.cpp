@@ -523,8 +523,12 @@ namespace mongo {
             int ret = ::send( sock , data , len , portSendFlags );
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
+                    SocketException::Type t = SocketException::SEND_ERROR;
+#if defined(_WINDOWS)
+                    if( e == WSAETIMEDOUT ) t = SocketException::SEND_TIMEOUT;
+#endif
                     log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
-                    throw SocketException( SocketException::SEND_ERROR );                    
+                    throw SocketException( t );                    
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {
                         log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
@@ -611,9 +615,15 @@ namespace mongo {
                     }
                 }
 #endif
-                if ( e != EAGAIN || _timeout == 0 ) {                
+                if ( e != EAGAIN || _timeout == 0 ) {
+                    SocketException::Type t = SocketException::RECV_ERROR;
+#if defined(_WINDOWS)
+                    if( e == WSAETIMEDOUT ) t = SocketException::RECV_TIMEOUT;
+#else
+                    /* todo: what is the error code on an SO_RCVTIMEO on linux? EGAIN? EWOULDBLOCK? */
+#endif
                     log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
-                    throw SocketException( SocketException::RECV_ERROR );
+                    throw SocketException(t);
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {
                         log(_logLevel) << "MessagingPort recv() remote dead " << farEnd.toString() << endl;

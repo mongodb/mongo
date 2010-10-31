@@ -95,14 +95,10 @@ namespace mongo {
         ExceptionInfo( const string& m , int c )
             : msg( m ) , code( c ){
         }
-
-        void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;
-        
+        void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;        
         string toString() const { stringstream ss; ss << "exception: " << code << " " << msg; return ss.str(); }
-
         bool empty() const { return msg.empty(); }
                 
-
         string msg;
         int code;
     };
