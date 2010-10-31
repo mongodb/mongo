@@ -32,16 +32,16 @@ namespace mongo {
     */
     struct MemberState { 
         enum MS { 
-            RS_STARTUP,
-            RS_PRIMARY,
-            RS_SECONDARY,
-            RS_RECOVERING,
-            RS_FATAL,
-            RS_STARTUP2,
-            RS_UNKNOWN, /* remote node not yet reached */
-            RS_ARBITER,
-            RS_DOWN, /* node not reachable for a report */
-            RS_ROLLBACK
+            RS_STARTUP = 0,
+            RS_PRIMARY = 1,
+            RS_SECONDARY = 2,
+            RS_RECOVERING = 3,
+            RS_FATAL = 4,
+            RS_STARTUP2 = 5,
+            RS_UNKNOWN = 6, /* remote node not yet reached */
+            RS_ARBITER = 7,
+            RS_DOWN = 8, /* node not reachable for a report */
+            RS_ROLLBACK = 9
         } s;
 
         MemberState(MS ms = RS_UNKNOWN) : s(ms) { }

@@ -89,7 +89,7 @@ print("2");
 statusSoon(7);
 assert.eq(replTest.liveNodes.slaves[1].getDB("local").oplog.rs.count(), 0);
 
-
+/*
 print("3");
 delete config.members[2].arbiterOnly;
 reconfig();
@@ -134,7 +134,7 @@ reconfig();
 print("11");
 statusSoon(7);
 assert.eq(replTest.liveNodes.slaves[1].getDB("local").oplog.rs.count(), 0);
-
+*/
 
 replTest.stopSet( 15 );
 
