@@ -1279,7 +1279,8 @@ rs.help = function () {
     print("\trs.add(hostportstr)             add a new member to the set with default attributes (disconnects)");
     print("\trs.add(membercfgobj)            add a new member to the set with extra attributes (disconnects)");
     print("\trs.addArb(hostportstr)          add a new member which is arbiterOnly:true (disconnects)");
-    print("\trs.stepDown()                   step down as primary (momentarily) (disconnects)");
+    print("\trs.stepDown([secs])             step down as primary (momentarily) (disconnects)");
+    print("\trs.freeze(secs)                 make a node ineligible to become primary for the time specified");
     print("\trs.remove(hostportstr)          remove a host from the replica set (disconnects)");
     print("\trs.slaveOk()                    shorthand for db.getMongo().setSlaveOk()");
     print();
@@ -1319,7 +1320,8 @@ rs.add = function (hostport, arb) {
     c.members.push(cfg);
     return db._adminCommand({ replSetReconfig: c });
 }
-rs.stepDown = function () { return db._adminCommand({ replSetStepDown:true}); }
+rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:secs||60}); }
+rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
 
