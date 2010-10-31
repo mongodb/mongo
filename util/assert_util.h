@@ -172,6 +172,7 @@ namespace mongo {
     inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }
     void uassert_nothrow(const char *msg); // reported via lasterror, but don't throw exception
     void msgassertedNoTrace(int msgid, const char *msg);
+    inline void msgassertedNoTrace(int msgid, const string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
     void msgasserted(int msgid, const char *msg);
     inline void msgasserted(int msgid, string msg) { msgasserted(msgid, msg.c_str()); }
 
