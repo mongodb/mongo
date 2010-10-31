@@ -171,10 +171,14 @@ namespace mongo {
                     log() << "replSet reconfig error with member: " << m.h.toString() << rsLog;
                     uasserted(13476, "buildIndexes may not change for members");
                 }
+                /* are transitions to and from arbiterOnly guaranteed safe?  if not, we should disallow here.
+                   there is a test at replsets/replsetarb3.js
+                   
                 if( oldCfg.arbiterOnly != m.arbiterOnly ) { 
                     log() << "replSet reconfig error with member: " << m.h.toString() << " arbiterOnly cannot change. remove and readd the member instead " << rsLog;
                     uasserted(13510, "arbiterOnly may not change for members");
                 }
+                */
             }
             if( m.h.isSelf() ) 
                 me++;
