@@ -36,7 +36,7 @@ __wt_bt_stat_desc(WT_TOC *toc)
 	WT_STAT_SET(stats, INTLMIN, desc->intlmin);
 	WT_STAT_SET(stats, LEAFMAX, desc->leafmax);
 	WT_STAT_SET(stats, LEAFMIN, desc->leafmin);
-	WT_STAT_SET(stats, BASE_RECNO, desc->base_recno);
+	WT_STAT_SET(stats, BASE_RECNO, desc->recno_offset);
 	WT_STAT_SET(stats, FIXED_LEN, desc->fixed_len);
 
 	__wt_bt_page_out(toc, &page, 0);
@@ -146,7 +146,7 @@ __wt_bt_desc_write(WT_TOC *toc)
 	desc->intlmin = db->intlmin;
 	desc->leafmax = db->leafmax;
 	desc->leafmin = db->leafmin;
-	desc->base_recno = 0;
+	desc->recno_offset = 0;
 	desc->root_addr = idb->root_addr;
 	desc->root_size = idb->root_size;
 	desc->free_addr = idb->free_addr;
