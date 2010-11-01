@@ -21,9 +21,11 @@ typedef struct {
 } WT_DSTUFF;
 
 static int  __wt_bt_dump_page(WT_TOC *, WT_PAGE *, void *);
-static void __wt_bt_dump_page_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_bt_dump_page_item(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static void __wt_bt_dump_page_rcc(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static void __wt_bt_dump_page_col_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_bt_dump_page_col_rcc(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_bt_dump_page_col_var(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_bt_dump_page_dup_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_bt_dump_page_row_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
 static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
 
@@ -100,15 +102,19 @@ __wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	case WT_PAGE_ROW_INT:
 		break;
 	case WT_PAGE_COL_FIX:
-		__wt_bt_dump_page_fix(toc, page, dp);
+		__wt_bt_dump_page_col_fix(toc, page, dp);
 		break;
 	case WT_PAGE_COL_RCC:
-		__wt_bt_dump_page_rcc(toc, page, dp);
+		WT_RET(__wt_bt_dump_page_col_rcc(toc, page, dp));
 		break;
 	case WT_PAGE_COL_VAR:
+		WT_RET(__wt_bt_dump_page_col_var(toc, page, dp));
+		break;
 	case WT_PAGE_DUP_LEAF:
+		WT_RET(__wt_bt_dump_page_dup_leaf(toc, page, dp));
+		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_bt_dump_page_item(toc, page, dp));
+		WT_RET(__wt_bt_dump_page_row_leaf(toc, page, dp));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -121,123 +127,323 @@ __wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 }
 
 /*
- * __wt_bt_dump_page_item --
- *	Dump a page of WT_ITEM structures.
+ * __wt_bt_dump_page_col_fix --
+ *	Dump a WT_PAGE_COL_FIX page.
  */
-static int
-__wt_bt_dump_page_item(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+static void
+__wt_bt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
-	IDB *idb;
-	DBT *key, *data, *key_process, *data_process, key_onpage, data_onpage;
-	WT_ITEM *item;
-	WT_OFF *off;
-	WT_PAGE *key_ovfl, *data_ovfl;
+	WT_COL *cip;
+	WT_REPL *repl;
 	u_int32_t i;
-	int ret;
 
 	db = toc->db;
-	idb = db->idb;
-	key = NULL;
-	key_process = data_process = NULL;
-	key_ovfl = data_ovfl = NULL;
+
+	/* Walk the page, dumping data items. */
+	WT_INDX_FOREACH(page, cip, i) {
+		if ((repl = WT_COL_REPL(page, cip)) == NULL) {
+			if (!WT_FIX_DELETE_ISSET(cip->data))
+				dp->p(cip->data, db->fixed_len, dp->stream);
+		} else
+			if (!WT_REPL_DELETED_ISSET(repl))
+				dp->p(WT_REPL_DATA(repl),
+				    db->fixed_len, dp->stream);
+	}
+}
+
+/*
+ * __wt_bt_dump_page_col_rcc --
+ *	Dump a WT_PAGE_COL_RCC page.
+ */
+static int
+__wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+{
+	DB *db;
+	ENV *env;
+	WT_COL *cip;
+	WT_COL_EXPAND *exp, **expsort, **expp;
+	WT_REPL *repl;
+	u_int64_t recno;
+	u_int32_t i, n_expsort;
+	u_int16_t n_repeat;
+
+	db = toc->db;
+	env = toc->env;
+	expsort = NULL;
+	n_expsort = 0;
+
+	recno = page->hdr->start_recno;
+	WT_INDX_FOREACH(page, cip, i) {
+		/*
+		 * Get a sorted list of any expansion entries we've created for
+		 * this set of records.  The sort function returns a NULL-
+		 * terminated array of references to WT_COL_EXPAND structures,
+		 * sorted by record number.
+		 */
+		WT_RET(__wt_bt_rcc_expand_sort(
+		    env, page, cip, &expsort, &n_expsort));
+
+		/*
+		 * Dump the records.   We use the WT_REPL entry for records in
+		 * in the WT_COL_EXPAND array, and original data otherwise.
+		 */
+		for (expp = expsort,
+		    n_repeat = WT_RCC_REPEAT_COUNT(cip->data);
+		    n_repeat > 0; --n_repeat, ++recno)
+			if ((exp = *expp) != NULL && exp->recno == recno) {
+				++expp;
+				repl = exp->repl;
+				if (WT_REPL_DELETED_ISSET(repl))
+					continue;
+				dp->p(
+				    WT_REPL_DATA(repl), repl->size, dp->stream);
+			} else
+				dp->p(WT_RCC_REPEAT_DATA(cip->data),
+				    db->fixed_len, dp->stream);
+	}
+	/* Free the sort array. */
+	if (expsort != NULL)
+		__wt_free(env, expsort, n_expsort * sizeof(WT_COL_EXPAND *));
+
+	return (0);
+}
+
+/*
+ * __wt_bt_dump_page_col_var --
+ *	Dump a WT_PAGE_COL_VAR page.
+ */
+static int
+__wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+{
+	DB *db;
+	DBT *tmp;
+	WT_COL *cip;
+	WT_ITEM *item;
+	WT_PAGE *ovfl;
+	WT_REPL *repl;
+	u_int32_t i;
+	int ret;
+	void *huffman;
+
+	db = toc->db;
+	huffman = db->idb->huffman_data;
 	ret = 0;
 
-	/*
-	 * There are two pairs of DBTs, one pair for key items and one pair for
-	 * data items.  One of the pair is used for on-page items, the other is
-	 * used for compressed or overflow items, that require processing.
-	 */
-	WT_CLEAR(key_onpage);
-	WT_CLEAR(data_onpage);
-	WT_ERR(__wt_scr_alloc(toc, &key_process));
-	WT_ERR(__wt_scr_alloc(toc, &data_process));
-
-	/*
-	 * If we're passed a key by our caller, we're dumping an off-page
-	 * duplicate tree and we'll write that key for each off-page item.
-	 */
-	if (dp->dupkey != NULL)
-		key = dp->dupkey;
-
-	WT_ITEM_FOREACH(page, item, i) {
-		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_KEY:
-			if (idb->huffman_key == NULL) {
-				key_onpage.data = WT_ITEM_BYTE(item);
-				key_onpage.size = WT_ITEM_LEN(item);
-				key = &key_onpage;
-				continue;
-			}
-			/* FALLTHROUGH */
-		case WT_ITEM_KEY_OVFL:
-			/* Discard any previous overflow key page. */
-			if (key_ovfl != NULL)
-				__wt_bt_page_out(toc, &key_ovfl, 0);
-
-			/* Get a copy of the key or an overflow key page. */
-			WT_ERR(__wt_bt_item_process(
-			    toc, item, &key_ovfl, key_process));
-			if (key_ovfl == NULL)
-				key = key_process;
-			else {
-				key_onpage.data = WT_PAGE_BYTE(key_ovfl);
-				key_onpage.size = key_ovfl->hdr->u.datalen;
-				key = &key_onpage;
-			}
+	WT_ERR(__wt_scr_alloc(toc, &tmp));
+	WT_INDX_FOREACH(page, cip, i) {
+		/* Check for replace or deletion. */
+		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
+			if (!WT_REPL_DELETED_ISSET(repl))
+				dp->p(
+				    WT_REPL_DATA(repl), repl->size, dp->stream);
 			continue;
+		}
+
+		/* Process the original data. */
+		item = cip->data;
+		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA:
-			if (idb->huffman_data == NULL) {
-				data_onpage.data = WT_ITEM_BYTE(item);
-				data_onpage.size = WT_ITEM_LEN(item);
-				data = &data_onpage;
+			if (huffman == NULL) {
+				dp->p(WT_ITEM_BYTE(item),
+				    WT_ITEM_LEN(item), dp->stream);
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DATA_DUP:
-		case WT_ITEM_DATA_DUP_OVFL:
-			/* Discard any previous overflow data page. */
-			if (data_ovfl != NULL)
-				__wt_bt_page_out(toc, &data_ovfl, 0);
-
-			/* Get a copy of the data or an overflow data page. */
-			WT_ERR(__wt_bt_item_process(
-			    toc, item, &data_ovfl, data_process));
-			if (data_ovfl == NULL)
-				data = data_process;
+			WT_ERR(__wt_bt_item_process(toc, item, &ovfl, tmp));
+			if (ovfl == NULL)
+				dp->p(tmp->data, tmp->size, dp->stream);
 			else {
-				data_onpage.data = WT_PAGE_BYTE(data_ovfl);
-				data_onpage.size = data_ovfl->hdr->u.datalen;
-				data = &data_onpage;
+				dp->p(WT_PAGE_BYTE(ovfl),
+				    ovfl->hdr->u.datalen, dp->stream);
+				__wt_bt_page_out(toc, &ovfl, 0);
 			}
 			break;
-		case WT_ITEM_DEL:
+		WT_ILLEGAL_FORMAT_ERR(db, ret);
+		}
+	}
+
+err:	__wt_scr_release(&tmp);
+	return (ret);
+}
+
+/*
+ * __wt_bt_dump_page_dup_leaf --
+ *	Dump a WT_PAGE_DUP_LEAF page.
+ */
+static int
+__wt_bt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+{
+	DB *db;
+	DBT *dupkey, *tmp;
+	WT_ITEM *item;
+	WT_PAGE *ovfl;
+	WT_REPL *repl;
+	WT_ROW *rip;
+	u_int32_t i;
+	int ret;
+	void *huffman;
+
+	db = toc->db;
+	dupkey = dp->dupkey;
+	huffman = db->idb->huffman_data;
+	ret = 0;
+
+	WT_ERR(__wt_scr_alloc(toc, &tmp));
+	WT_INDX_FOREACH(page, rip, i) {
+		/* Check for deletion. */
+		if ((repl = WT_ROW_REPL(
+		    page, rip)) != NULL && WT_REPL_DELETED_ISSET(repl))
 			continue;
-		case WT_ITEM_OFF:
-			/*
-			 * Off-page duplicate tree.   Set the key for display,
-			 * and dump the entire tree.
-			 */
-			dp->dupkey = key;
-			off = WT_ITEM_BYTE_OFF(item);
-			WT_RET_RESTART(__wt_bt_tree_walk(toc,
-			    off->addr, off->size, __wt_bt_dump_page, dp));
-			dp->dupkey = NULL;
+
+		/* Output the key, we're going to need it. */
+		dp->p(dupkey->data, dupkey->size, dp->stream);
+
+		/* Output the replacement item. */
+		if (repl != NULL) {
+			dp->p(WT_REPL_DATA(repl), repl->size, dp->stream);
 			continue;
-		WT_ILLEGAL_FORMAT(db);
 		}
 
-		if (key != NULL)
+		/* Process the original data. */
+		item = rip->data;
+		switch (WT_ITEM_TYPE(item)) {
+		case WT_ITEM_DATA_DUP:
+			if (huffman == NULL) {
+				dp->p(WT_ITEM_BYTE(item),
+				    WT_ITEM_LEN(item), dp->stream);
+				break;
+			}
+			/* FALLTHROUGH */
+		case WT_ITEM_DATA_DUP_OVFL:
+			WT_ERR(__wt_bt_item_process(toc, item, &ovfl, tmp));
+			if (ovfl == NULL)
+				dp->p(tmp->data, tmp->size, dp->stream);
+			else {
+				dp->p(WT_PAGE_BYTE(ovfl),
+				    ovfl->hdr->u.datalen, dp->stream);
+				__wt_bt_page_out(toc, &ovfl, 0);
+			}
+			break;
+		WT_ILLEGAL_FORMAT_ERR(db, ret);
+		}
+	}
+
+err:	__wt_scr_release(&tmp);
+	return (ret);
+}
+
+/*
+ * __wt_bt_dump_page_row_leaf --
+ *	Dump a WT_PAGE_ROW_LEAF page.
+ */
+static int
+__wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+{
+	DB *db;
+	DBT *key, *data, *key_tmp, *data_tmp, key_local, data_local;
+	WT_PAGE *key_ovfl, *data_ovfl;
+	WT_ITEM *item;
+	WT_REPL *repl;
+	WT_ROW *rip;
+	u_int32_t i;
+	int ret;
+	void *huffman;
+
+	db = toc->db;
+	key = data = key_tmp = data_tmp = NULL;
+	key_ovfl = data_ovfl = NULL;
+	huffman = db->idb->huffman_data;
+	ret = 0;
+
+	WT_ERR(__wt_scr_alloc(toc, &key_tmp));
+	WT_ERR(__wt_scr_alloc(toc, &data_tmp));
+	WT_CLEAR(key_local);
+	WT_CLEAR(data_local);
+
+	WT_INDX_FOREACH(page, rip, i) {
+		/* Check for deletion. */
+		if ((repl = WT_ROW_REPL(
+		    page, rip)) != NULL && WT_REPL_DELETED_ISSET(repl))
+			continue;
+
+		/*
+		 * The key and data variables reference the DBT's we'll print.
+		 * Set the key.
+		 */
+		if (WT_KEY_PROCESS(rip)) {
+			/* Discard any previously held key overflow page. */
+			if (key_ovfl != NULL)
+				__wt_bt_page_out(toc, &key_ovfl, 0);
+			WT_ERR(__wt_bt_item_process(
+			    toc, rip->key, &key_ovfl, key_tmp));
+			if (key_ovfl == NULL)
+				key = key_tmp;
+			else {
+				key_local.data = WT_PAGE_BYTE(key_ovfl);
+				key_local.size = key_ovfl->hdr->u.datalen;
+				key = &key_local;
+			}
+		} else
+			key = (DBT *)rip;
+
+		/*
+		 * If the item was ever replaced, we're done: it can't be an
+		 * off-page tree, and we don't care what kind of item it was
+		 * originally.  Dump the data from the replacement entry.
+		 */
+		if (repl != NULL) {
 			dp->p(key->data, key->size, dp->stream);
+			dp->p(WT_REPL_DATA(repl), repl->size, dp->stream);
+			continue;
+		}
+
+		/* Set data to reference the data we'll dump. */
+		item = rip->data;
+		switch (WT_ITEM_TYPE(item)) {
+		case WT_ITEM_DATA:
+		case WT_ITEM_DATA_DUP:
+			if (huffman == NULL) {
+				data_local.data = WT_ITEM_BYTE(item);
+				data_local.size = WT_ITEM_LEN(item);
+				data = &data_local;
+				break;
+			}
+			/* FALLTHROUGH */
+		case WT_ITEM_DATA_DUP_OVFL:
+		case WT_ITEM_DATA_OVFL:
+			/* Discard any previously held data overflow page. */
+			if (data_ovfl != NULL)
+				__wt_bt_page_out(toc, &data_ovfl, 0);
+			WT_ERR(__wt_bt_item_process(
+			    toc, item, &data_ovfl, data_tmp));
+			if (data_ovfl == NULL)
+				data = data_tmp;
+			else {
+				data_local.data = WT_PAGE_BYTE(data_ovfl);
+				data_local.size = data_ovfl->hdr->u.datalen;
+				data = &data_local;
+			}
+			break;
+		case WT_ITEM_OFF:
+			dp->dupkey = key;
+			WT_RET_RESTART(__wt_bt_tree_walk(toc,
+			    WT_ROW_OFF_ADDR(rip), WT_ROW_OFF_SIZE(rip),
+			    __wt_bt_dump_page, dp));
+			continue;
+		WT_ILLEGAL_FORMAT_ERR(db, ret);
+		}
+
+		dp->p(key->data, key->size, dp->stream);
 		dp->p(data->data, data->size, dp->stream);
 	}
 
 err:	/* Discard any space allocated to hold off-page key/data items. */
-	if (key_process != NULL)
-		__wt_scr_release(&key_process);
-	if (data_process != NULL)
-		__wt_scr_release(&data_process);
+	if (key_tmp != NULL)
+		__wt_scr_release(&key_tmp);
+	if (data_tmp != NULL)
+		__wt_scr_release(&data_tmp);
 
 	/* Discard any overflow pages we're still holding. */
 	if (key_ovfl != NULL)
@@ -246,40 +452,6 @@ err:	/* Discard any space allocated to hold off-page key/data items. */
 		__wt_bt_page_out(toc, &data_ovfl, 0);
 
 	return (ret);
-}
-
-/*
- * __wt_bt_dump_page_fix --
- *	Dump a WT_PAGE_COL_FIX page.
- */
-static void
-__wt_bt_dump_page_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
-{
-	DB *db;
-	u_int32_t i;
-	u_int8_t *p;
-
-	db = toc->db;
-
-	WT_FIX_FOREACH(db, page, p, i)
-		dp->p(p, db->fixed_len, dp->stream);
-}
-
-/*
- * __wt_bt_dump_page_rcc --
- *	Dump a WT_PAGE_COL_RCC page.
- */
-static void
-__wt_bt_dump_page_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
-{
-	DB *db;
-	u_int32_t i, j;
-	u_int8_t *p;
-
-	db = toc->db;
-
-	WT_RCC_REPEAT_ITERATE(db, page, p, i, j)
-		dp->p(WT_RCC_REPEAT_DATA(p), db->fixed_len, dp->stream);
 }
 
 static const char hex[] = "0123456789abcdef";
