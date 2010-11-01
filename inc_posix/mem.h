@@ -47,29 +47,13 @@ typedef struct __wt_mem {
  * remember to put the & operator on the pointer.
  */
 #ifdef HAVE_DIAGNOSTIC
-#define	__wt_free(a, b, c)	__wt_free_func(a, &(b), c)
-#else
-#define	__wt_free(a, b, c)	__wt_free_func(a, &(b))
-#endif
-
-/*
- * There's no malloc interface, WiredTiger never calls malloc.  The problem is
- * an application might: allocate memory, write secret stuff into it, free the
- * memory, we allocate the memory, and then use it for a database page or log
- * record and write it to disk.  That would result in the secret stuff being
- * protected by the WiredTiger permission mechanisms, potentially inappropriate
- * for the secret stuff.
- *
- * When DIAGNOSTIC is configured, we optionally track memory allocations and
- * report memory leaks.  These memory checks cannot be used by multi-threaded
- * applications.
- */
-#ifdef HAVE_DIAGNOSTIC
 #define	__wt_calloc(a, b, c, d)	__wt_calloc_func(a, b, c, d, __FILE__, __LINE__)
+#define	__wt_free(a, b, c)	__wt_free_func(a, &(b), c)
 #define	__wt_realloc(a, b, c,d)	__wt_realloc_func(a, b, c,d, __FILE__, __LINE__)
 #define	__wt_strdup(a, b, c)	__wt_strdup_func(a, b, c, __FILE__, __LINE__)
 #else
 #define	__wt_calloc(a, b, c, d)	__wt_calloc_func(a, b, c, d)
+#define	__wt_free(a, b, c)	__wt_free_func(a, &(b))
 #define	__wt_realloc(a, b, c,d)	__wt_realloc_func(a, b, c, d)
 #define	__wt_strdup(a, b, c)	__wt_strdup_func(a, b, c)
 #endif
