@@ -12,6 +12,6 @@
 void
 __wt_progress(const char *s, uint64_t v)
 {
-	(void)printf("\r\t%s: %llu", s, (u_quad)v);
+	(void)printf("\r\t%s: %llu", s, (unsigned long long)v);
 	(void)fflush(stdout);
 }
