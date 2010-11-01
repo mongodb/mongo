@@ -153,8 +153,38 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 }
 
 /*
+ * __wt_bt_stat_page_col_fix --
+ *	Stat a WT_PAGE_COL_FIX page.
+ */
+static int
+__wt_bt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
+{
+	WT_COL *cip;
+	WT_REPL *repl;
+	WT_STATS *stats;
+	u_int32_t i;
+
+	stats = toc->db->idb->dstats;
+
+	/* Walk the page, counting data items. */
+	WT_INDX_FOREACH(page, cip, i) {
+		if ((repl = WT_COL_REPL(page, cip)) == NULL)
+			if (WT_FIX_DELETE_ISSET(cip->data))
+				WT_STAT_INCR(stats, ITEM_COL_DELETED);
+			else
+				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
+		else
+			if (WT_REPL_DELETED_ISSET(repl))
+				WT_STAT_INCR(stats, ITEM_COL_DELETED);
+			else
+				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
+	}
+	return (0);
+}
+
+/*
  * __wt_bt_stat_page_col_rcc --
- *	Stat a repeat-compressed, fixed-length column-store leaf page
+ *	Stat a WT_PAGE_COL_RCC page.
  */
 static int
 __wt_bt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
@@ -200,38 +230,8 @@ __wt_bt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_stat_page_col_fix --
- *	Stat a (not repeat-compressed) fixed-length column-store leaf page.
- */
-static int
-__wt_bt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
-{
-	WT_COL *cip;
-	WT_REPL *repl;
-	WT_STATS *stats;
-	u_int32_t i;
-
-	stats = toc->db->idb->dstats;
-
-	/* Walk the page, counting data items. */
-	WT_INDX_FOREACH(page, cip, i) {
-		if ((repl = WT_COL_REPL(page, cip)) == NULL)
-			if (WT_FIX_DELETE_ISSET(cip->data))
-				WT_STAT_INCR(stats, ITEM_COL_DELETED);
-			else
-				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-		else
-			if (WT_REPL_DELETED_ISSET(repl))
-				WT_STAT_INCR(stats, ITEM_COL_DELETED);
-			else
-				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-	}
-	return (0);
-}
-
-/*
  * __wt_bt_stat_page_col_var --
- *	Stat a variable-length column-store leaf page.
+ *	Stat a WT_PAGE_COL_VAR page.
  */
 static int
 __wt_bt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
@@ -277,7 +277,7 @@ __wt_bt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 
 /*
  * __wt_bt_stat_page_dup_leaf --
- *	Stat a row-store duplicate tree leaf page.
+ *	Stat a WT_PAGE_DUP_LEAF page.
  */
 static int
 __wt_bt_stat_page_dup_leaf(WT_TOC *toc, WT_PAGE *page)
@@ -323,7 +323,7 @@ __wt_bt_stat_page_dup_leaf(WT_TOC *toc, WT_PAGE *page)
 
 /*
  * __wt_bt_stat_page_row_leaf --
- *	Stat a row-store leaf page.
+ *	Stat a WT_PAGE_ROW_LEAF page.
  */
 static int
 __wt_bt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
