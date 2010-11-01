@@ -22,7 +22,7 @@ static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_int(WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_rcc(DB *, WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *);
-static void __wt_bt_debug_pair(const char *, void *, u_int32_t, FILE *);
+static void __wt_bt_debug_pair(const char *, void *, uint32_t, FILE *);
 static void __wt_bt_debug_repl(WT_REPL *, FILE *);
 static int  __wt_bt_debug_set_fp(const char *, FILE **, int *);
 
@@ -81,7 +81,7 @@ __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
  */
 int
 __wt_bt_debug_addr(
-    WT_TOC *toc, u_int32_t addr, u_int32_t size, char *ofile, FILE *fp)
+    WT_TOC *toc, uint32_t addr, uint32_t size, char *ofile, FILE *fp)
 {
 	WT_PAGE *page;
 	int ret;
@@ -135,11 +135,12 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		    "\trecords %llu, starting recno %llu, level %lu, "
 		    "entries %lu, lsn %lu/%lu\n"
 		    "\tfirst-free %p (offset: %lu), space avail %lu\n",
-		    (u_quad)page->records, (u_quad)hdr->start_recno,
+		    (unsigned long long)page->records,
+		    (unsigned long long)hdr->start_recno,
 		    (u_long)hdr->level, (u_long)hdr->u.entries,
 		    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1],
 		    page->first_free,
-		    (u_long)(page->first_free - (u_int8_t *)page->hdr),
+		    (u_long)(page->first_free - (uint8_t *)page->hdr),
 		    (u_long)page->space_avail);
 		break;
 	case WT_PAGE_OVFL:
@@ -201,7 +202,7 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 	fprintf(fp, "\t\tleaf page min/max size: %lu/%lu\n",
 	    (u_long)desc->leafmin, (u_long)desc->leafmax);
 	fprintf(fp, "\t\toffset record: %llu, fixed_len: %lu\n",
-	    (u_quad)desc->recno_offset, (u_long)desc->fixed_len);
+	    (unsigned long long)desc->recno_offset, (u_long)desc->fixed_len);
 	if (desc->root_addr == WT_ADDR_INVALID)
 		fprintf(fp, "\t\troot addr (none)\n");
 	else
@@ -225,7 +226,7 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	DB *db;
 	WT_COL *cip;
 	WT_ROW *rip;
-	u_int32_t i;
+	uint32_t i;
 	int do_close;
 
 	db = toc->db;
@@ -421,7 +422,7 @@ static int
 __wt_bt_debug_page_item(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_ITEM *item;
-	u_int32_t i;
+	uint32_t i;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
@@ -489,7 +490,7 @@ static void
 __wt_bt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 {
 	WT_OFF *off;
-	u_int32_t i;
+	uint32_t i;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
@@ -497,7 +498,7 @@ __wt_bt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 	WT_OFF_FOREACH(page, off, i)
 		fprintf(fp, "\toffpage: addr %lu, size %lu, records %llu\n",
 		    (u_long)off->addr,
-		    (u_long)off->size, (u_quad)WT_RECORDS(off));
+		    (u_long)off->size, (unsigned long long)WT_RECORDS(off));
 }
 
 /*
@@ -507,8 +508,8 @@ __wt_bt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 static void
 __wt_bt_debug_page_col_fix(DB *db, WT_PAGE *page, FILE *fp)
 {
-	u_int32_t i;
-	u_int8_t *p;
+	uint32_t i;
+	uint8_t *p;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
@@ -530,8 +531,8 @@ __wt_bt_debug_page_col_fix(DB *db, WT_PAGE *page, FILE *fp)
 static void
 __wt_bt_debug_page_col_rcc(DB *db, WT_PAGE *page, FILE *fp)
 {
-	u_int32_t i;
-	u_int8_t *p;
+	uint32_t i;
+	uint8_t *p;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
@@ -558,8 +559,8 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	DBT *tmp;
 	IDB *idb;
 	WT_PAGE *ovfl;
-	u_int32_t size;
-	u_int8_t *p;
+	uint32_t size;
+	uint8_t *p;
 	int ret;
 
 	if (fp == NULL)				/* Default to stderr */
@@ -599,11 +600,11 @@ process:	WT_ERR(__wt_scr_alloc(toc, &tmp));
 		}
 		break;
 	case WT_ITEM_DEL:
-		p = (u_int8_t *)"deleted";
+		p = (uint8_t *)"deleted";
 		size = 7;
 		break;
 	case WT_ITEM_OFF:
-		p = (u_int8_t *)"offpage";
+		p = (uint8_t *)"offpage";
 		size = 7;
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
@@ -632,7 +633,7 @@ __wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
 
 	/*
 	 * The argument isn't necessarily a DBT structure, but the first two
-	 * fields of the argument are always a void *data/u_int32_t size pair.
+	 * fields of the argument are always a void *data/uint32_t size pair.
 	 */
 	dbt = arg_dbt;
 	__wt_bt_debug_pair(tag, dbt->data, dbt->size, fp);
@@ -643,7 +644,7 @@ __wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
  *	Dump a single data/size pair, with an optional tag.
  */
 static void
-__wt_bt_debug_pair(const char *tag, void *data, u_int32_t size, FILE *fp)
+__wt_bt_debug_pair(const char *tag, void *data, uint32_t size, FILE *fp)
 {
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;

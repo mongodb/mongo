@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_cache_entry_grow(WT_TOC *, u_int32_t, WT_CACHE_ENTRY **);
+static int __wt_cache_entry_grow(WT_TOC *, uint32_t, WT_CACHE_ENTRY **);
 static int __wt_cache_read(WT_READ_REQ *);
 
 /*
@@ -20,7 +20,7 @@ void
 __wt_workq_read_server(ENV *env, int force)
 {
 	WT_CACHE *cache;
-	u_int64_t bytes_inuse, bytes_max;
+	uint64_t bytes_inuse, bytes_max;
 
 	cache = env->ienv->cache;
 
@@ -39,7 +39,8 @@ __wt_workq_read_server(ENV *env, int force)
 	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
 		WT_VERBOSE(env, WT_VERB_SERVERS, (env,
 		    "workQ locks out reads: bytes-inuse %llu of bytes-max %llu",
-		    (u_quad)bytes_inuse, (u_quad)bytes_max));
+		    (unsigned long long)bytes_inuse,
+		    (unsigned long long)bytes_max));
 		cache->read_lockout = 1;
 	}
 
@@ -65,7 +66,7 @@ __wt_workq_read_server(ENV *env, int force)
  */
 int
 __wt_cache_read_queue(
-    WT_TOC *toc, u_int32_t *addrp, u_int32_t size, WT_PAGE **pagep)
+    WT_TOC *toc, uint32_t *addrp, uint32_t size, WT_PAGE **pagep)
 {
 	ENV *env;
 	WT_CACHE *cache;
@@ -184,7 +185,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_FH *fh;
 	WT_PAGE *page;
 	WT_TOC *toc;
-	u_int32_t addr, addr_hash, size, i;
+	uint32_t addr, addr_hash, size, i;
 	int newpage, ret;
 
 	toc = rr->toc;
@@ -239,7 +240,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * better alignment from the underlying heap memory allocator.
 	 */
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
-	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(u_int8_t), &page->hdr));
+	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &page->hdr));
 
 	/* If it's an allocation, extend the file; otherwise read the page. */
 	if (newpage)
@@ -300,12 +301,12 @@ err:	if (page != NULL) {
  *	Grow the hash bucket's WT_CACHE_ENTRY array.
  */
 static int
-__wt_cache_entry_grow(WT_TOC *toc, u_int32_t bucket, WT_CACHE_ENTRY **emptyp)
+__wt_cache_entry_grow(WT_TOC *toc, uint32_t bucket, WT_CACHE_ENTRY **emptyp)
 {
 	ENV *env;
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e, *new;
-	u_int32_t entries;
+	uint32_t entries;
 
 	env = toc->env;
 	cache = env->ienv->cache;
