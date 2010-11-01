@@ -31,7 +31,6 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	toc->srch_ip = NULL;
 	toc->srch_repl = repl = NULL;
 	toc->srch_exp = NULL;
-	toc->srch_rcc_offset = 0;
 	toc->srch_write_gen = 0;
 
 	db = toc->db;

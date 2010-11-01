@@ -24,14 +24,13 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno, u_int32_t flags)
 	WT_REPL *repl;
 	u_int64_t record_cnt;
 	u_int32_t addr, size, i;
-	u_int16_t write_gen, rcc_offset;
+	u_int16_t write_gen;
 	int ret;
 
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
 	toc->srch_repl = repl = NULL;
 	toc->srch_exp = exp = NULL;
-	toc->srch_rcc_offset = rcc_offset = 0;
 	toc->srch_write_gen = 0;
 
 	db = toc->db;
@@ -46,37 +45,39 @@ restart:
 		return (WT_NOTFOUND);
 
 	/* Search the tree. */
-	for (record_cnt = 0;;) {
+	for (;;) {
 		/* Save the write generation value before the search. */
 		write_gen = WT_PAGE_WRITE_GEN(page);
 
 		/* Walk the page looking for the record. */
 		switch (page->hdr->type) {
 		case WT_PAGE_COL_FIX:
-			cip = page->u.icol + ((recno - record_cnt) - 1);
+		case WT_PAGE_COL_VAR:
+			cip = page->u.icol + (recno - page->hdr->start_recno);
 			goto done;
 		case WT_PAGE_COL_RCC:
+			/*
+			 * Walk the page, counting records -- do the record
+			 * count calculation in a funny way to avoid overflow.
+			 */
+			record_cnt = recno - page->hdr->start_recno;
 			WT_INDX_FOREACH(page, cip, i) {
-				if (record_cnt +
-				    WT_RCC_REPEAT_COUNT(cip->data) >= recno) {
-					rcc_offset =
-					    (u_int16_t)(recno - record_cnt);
+				if (record_cnt < WT_RCC_REPEAT_COUNT(cip->data))
 					break;
-				}
-				record_cnt += WT_RCC_REPEAT_COUNT(cip->data);
+				record_cnt -= WT_RCC_REPEAT_COUNT(cip->data);
 			}
-			goto done;
-		case WT_PAGE_COL_VAR:
-			cip = page->u.icol + ((recno - record_cnt) - 1);
 			goto done;
 		case WT_PAGE_COL_INT:
 		default:
-			/* Walk the page, counting records. */
+			/*
+			 * Walk the page, counting records -- do the record
+			 * count calculation in a funny way to avoid overflow.
+			 */
+			record_cnt = recno - page->hdr->start_recno;
 			WT_INDX_FOREACH(page, cip, i) {
-				if (record_cnt +
-				    WT_COL_OFF_RECORDS(cip) >= recno)
+				if (record_cnt < WT_COL_OFF_RECORDS(cip))
 					break;
-				record_cnt += WT_COL_OFF_RECORDS(cip);
+				record_cnt -= WT_COL_OFF_RECORDS(cip);
 			}
 			break;
 		}
@@ -94,7 +95,7 @@ restart:
 		case WT_RESTART:
 			goto restart;
 		default:
-			return (ret);
+			goto err;
 		}
 	}
 
@@ -128,7 +129,7 @@ done:	/*
 		 */
 		for (exp =
 		    WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next)
-			if (exp->rcc_offset == rcc_offset) {
+			if (exp->recno == recno) {
 				repl = exp->repl;
 				if (!LF_ISSET(WT_INSERT) &&
 				    WT_REPL_DELETED_ISSET(repl))
@@ -159,14 +160,13 @@ done:	/*
 	toc->srch_ip = cip;
 	toc->srch_repl = repl;
 	toc->srch_exp = exp;
-	toc->srch_rcc_offset = rcc_offset;
 	toc->srch_write_gen = write_gen;
 	return (0);
 
 notfound:
 	ret = WT_NOTFOUND;
 
-	if (page != idb->root_page)
+err:	if (page != idb->root_page)
 		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }

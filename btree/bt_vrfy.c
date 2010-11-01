@@ -37,8 +37,8 @@ static int __wt_bt_verify_page_col_rcc(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_desc(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_page_ovfl(WT_TOC *, WT_PAGE *);
-static int __wt_bt_verify_tree(
-		WT_TOC *, WT_ROW *, u_int32_t, WT_OFF *, WT_VSTUFF *);
+static int __wt_bt_verify_tree(WT_TOC *,
+    WT_ROW *, u_int64_t, u_int32_t, WT_OFF *, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -119,7 +119,8 @@ __wt_bt_verify(
 	WT_RECORDS(&off) = 0;
 	off.addr = idb->root_addr;
 	off.size = idb->root_size;
-	WT_ERR(__wt_bt_verify_tree(toc, NULL, WT_LDESC, &off, &vstuff));
+	WT_ERR(__wt_bt_verify_tree(
+	    toc, NULL, (u_int64_t)0, WT_LDESC, &off, &vstuff));
 
 	WT_ERR(__wt_bt_verify_checkfrag(db, &vstuff));
 
@@ -164,19 +165,26 @@ err:	if (page != NULL)
  *	Verify a subtree of the tree, recursively descending through the tree.
  */
 static int
-__wt_bt_verify_tree(WT_TOC *toc,
-    WT_ROW *parent_rip, u_int32_t level, WT_OFF *off, WT_VSTUFF *vs)
+__wt_bt_verify_tree(WT_TOC *toc, WT_ROW *parent_rip,
+    u_int64_t start_recno, u_int32_t level, WT_OFF *off, WT_VSTUFF *vs)
 {
 	DB *db;
 	WT_COL *cip;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	WT_ROW *rip;
-	int ret;
+	int is_root, ret;
 
 	db = toc->db;
 	page = NULL;
 	ret = 0;
+
+	/*
+	 * If passed a level of WT_LDESC, that is, the only level that can't
+	 * possibly be a valid database page level, this is the root page of
+	 * the tree.
+	 */
+	is_root = level == WT_LDESC ? 1 : 0;
 
 	/*
 	 * Read and verify the page.
@@ -201,14 +209,11 @@ __wt_bt_verify_tree(WT_TOC *toc,
 	hdr = page->hdr;
 
 	/*
-	 * Check the tree levels and records counts match up.
-	 *
-	 * If passed a level of WT_LDESC, that is, the only level that can't
-	 * possibly be a valid database page level, this is the root page of
-	 * the tree, so we use this page's level to initialize expected values
-	 * for the rest of the tree, and there's no record count to check.
+	 * If it's the root, use this page's level to initialize expected the
+	 * values for the rest of the tree; otherwise, check that tree levels
+	 * and record counts match up.
 	 */
-	if (level == WT_LDESC)
+	if (is_root)
 		level = hdr->level;
 	else {
 		if (hdr->level != level) {
@@ -219,6 +224,15 @@ __wt_bt_verify_tree(WT_TOC *toc,
 			    (u_long)hdr->level, (u_long)level);
 			goto err;
 		}
+
+		/*
+		 * This check isn't strictly an on-disk format check, but it's
+		 * useful to confirm that the number of records found on this
+		 * page (by summing the WT_OFF structure record counts) matches
+		 * the WT_OFF structure record count in our parent.  We could
+		 * sum as we walk the page below, but we did that when bringing
+		 * the page into memory, there's no reason to do it again.
+		 */
 		if (page->records != WT_RECORDS(off)) {
 			__wt_api_db_errx(db,
 			    "page at addr %lu has a record count of %llu where "
@@ -228,12 +242,48 @@ __wt_bt_verify_tree(WT_TOC *toc,
 		}
 	}
 
-	/*
-	 * In row stores we're passed the parent page's key that references this
-	 * page: it must sort less than or equal to the first key on this page.
-	 */
-	if (parent_rip != NULL)
-		WT_ERR(__wt_bt_verify_cmp(toc, parent_rip, page, 1));
+	switch (hdr->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_VAR:
+		/*
+		 * In column stores we need to confirm the starting record
+		 * number on the child page is correct.
+		 */
+		if (is_root)
+			start_recno = 1;
+		if (hdr->start_recno != start_recno) {
+			__wt_api_db_errx(db,
+			    "page at addr %lu has a starting record of %llu "
+			    "where the expected starting record was %llu",
+			    (u_long)off->addr, hdr->start_recno, start_recno);
+			goto err;
+		}
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		/* Row stores never have non-zero starting record numbers. */
+		if (hdr->start_recno != 0) {
+			__wt_api_db_errx(db,
+			    "page at addr %lu has a starting record of %llu, "
+			    "which should never be non-zero",
+			    (u_long)off->addr, hdr->start_recno);
+			goto err;
+		}
+		/*
+		 * In row stores we're passed the parent page's key referencing
+		 * this page: it must sort less than or equal to the first key
+		 * on this page.
+		 */
+		if (!is_root)
+			WT_ERR(__wt_bt_verify_cmp(toc, parent_rip, page, 1));
+		break;
+	default:
+		break;
+	}
 
 	/*
 	 * Leaf pages need no further processing; in the case of row-store leaf
@@ -258,9 +308,12 @@ __wt_bt_verify_tree(WT_TOC *toc,
 	switch (hdr->type) {
 	u_int32_t i;
 	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(page, cip, i)
+		start_recno = hdr->start_recno;
+		WT_INDX_FOREACH(page, cip, i) {
 			WT_ERR(__wt_bt_verify_tree(
-			    toc, NULL, level - 1, cip->data, vs));
+			    toc, NULL, start_recno, level - 1, cip->data, vs));
+			start_recno += WT_COL_OFF_RECORDS(cip);
+		}
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -282,7 +335,7 @@ __wt_bt_verify_tree(WT_TOC *toc,
 				__wt_bt_page_out(toc, &vs->leaf, 0);
 				vs->leaf = NULL;
 			}
-			WT_ERR(__wt_bt_verify_tree(toc, rip,
+			WT_ERR(__wt_bt_verify_tree(toc, rip, (u_int64_t)0,
 			    level - 1, WT_ITEM_BYTE_OFF(rip->data), vs));
 		}
 		break;
@@ -894,8 +947,8 @@ offpagedups:	/*
 			switch (item_type) {
 			case WT_ITEM_OFF:
 				off = WT_ITEM_BYTE_OFF(item);
-				WT_ERR(__wt_bt_verify_tree(
-				    toc, NULL, WT_LDESC, off, vs));
+				WT_ERR(__wt_bt_verify_tree(toc,
+				    NULL, (u_int64_t)0, WT_LDESC, off, vs));
 				break;
 			default:
 				break;
@@ -1119,9 +1172,9 @@ __wt_bt_verify_page_desc(DB *db, WT_PAGE *page)
 		    (u_long)db->leafmax, (u_long)desc->leafmax);
 		ret = WT_ERROR;
 	}
-	if (desc->base_recno != 0) {
-		__wt_api_db_errx(db, "base recno %llu, expected 0",
-		    (u_quad)desc->base_recno);
+	if (desc->recno_offset != 0) {
+		__wt_api_db_errx(db, "recno offset %llu, expected 0",
+		    (u_quad)desc->recno_offset);
 		ret = WT_ERROR;
 	}
 	if (F_ISSET(desc, ~WT_PAGE_DESC_MASK)) {

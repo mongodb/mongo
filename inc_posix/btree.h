@@ -100,7 +100,7 @@ struct __wt_page_desc {
 	u_int32_t leafmax;		/* 16-19: Maximum leaf page size */
 	u_int32_t leafmin;		/* 20-23: Minimum leaf page size */
 
-	u_int64_t base_recno;		/* 24-31: Base record number */
+	u_int64_t recno_offset;		/* 24-31: Offset record number */
 	u_int32_t root_addr;		/* 32-35: Root page address */
 	u_int32_t root_size;		/* 36-39: Root page length */
 	u_int32_t free_addr;		/* 40-43: Free list page address */
@@ -221,15 +221,6 @@ struct __wt_page {
 	((p)->write_gen)
 
 	/*
-	 * We have to be able to find a page's parent when it's written back to
-	 * disk, because its address changes.  For some page types we can take
-	 * a search key off the page, but not for column store databases.  Save
-	 * the search key in the in-memory page when it's first brought in to
-	 * memory, as part of a search.
-	 */
-	u_int64_t  search_recno;
-
-	/*
 	 * Each disk page entry is referenced by an array of WT_ROW/WT_COL
 	 * structures: this is where the on-page index in DB 1.85 and Berkeley
 	 * DB is re-created, when a page is read into the cache.  It's sorted
@@ -329,9 +320,24 @@ struct __wt_page {
  * For more information on page layouts and types, see the file btree_layout.
  */
 struct __wt_page_hdr {
-	u_int32_t lsn[2];		/* 00-07: LSN */
+	/*
+	 * The record number of the first record on the page is stored for two
+	 * reasons: first, we have to find the page's stack when writing a page
+	 * writing leaf pages and second, when salvaging a database it's the
+	 * only way to know where a column-store page fits in the keyspace.
+	 * (We could work around the first reason by storing the base record
+	 * number in the WT_PAGE structure when we read a page into memory, but
+	 * we can't work around the second reason.)
+	 */
+	u_int64_t start_recno;		/* 00-07: column-store starting recno */
+	u_int32_t lsn[2];		/* 08-15: LSN */
 
-	u_int32_t checksum;		/* 08-11: checksum */
+	u_int32_t checksum;		/* 16-19: checksum */
+
+	union {
+		u_int32_t datalen;	/* 20-23: overflow data length */
+		u_int32_t entries;	/* 20-23: number of items on page */
+	} u;
 
 #define	WT_PAGE_INVALID		 0	/* Invalid page */
 #define	WT_PAGE_DESCRIPT	 1	/* Database description page */
@@ -344,7 +350,7 @@ struct __wt_page_hdr {
 #define	WT_PAGE_OVFL		 8	/* Overflow page */
 #define	WT_PAGE_ROW_INT		 9	/* Row-store internal page */
 #define	WT_PAGE_ROW_LEAF	10	/* Row-store leaf page */
-	u_int8_t type;			/* 12: page type */
+	u_int8_t type;			/* 24: page type */
 
 	/*
 	 * WiredTiger is no-overwrite: each time a page is written, it's written
@@ -365,14 +371,16 @@ struct __wt_page_hdr {
 	 */
 #define	WT_LDESC	0
 #define	WT_LLEAF	1
-	u_int8_t level;			/* 13: tree level */
+	u_int8_t level;			/* 25: tree level */
 
-	u_int8_t unused[2];		/* 14-15: unused padding */
-
-	union {
-		u_int32_t datalen;	/* 16-19: overflow data length */
-		u_int32_t entries;	/* 16-19: number of items on page */
-	} u;
+	/*
+	 * It would be possible to decrease the size of the page header by two
+	 * bytes by only writing out the first 26 bytes of the structure to the
+	 * page, but I'm not bothering -- I don't think the space is worth it,
+	 * and having a little bit of on-page data to play with in the future
+	 * can be a good thing.
+	 */
+	u_int8_t unused[2];		/* 26-27: unused padding */
 };
 /*
  * WT_PAGE_HDR_SIZE is the expected structure size --  we check at startup to
@@ -380,7 +388,7 @@ struct __wt_page_hdr {
  * The size must also be a multiple of a 4-byte boundary, because the header
  * is followed by WT_ITEM structures, which require 4-byte alignment.
  */
-#define	WT_PAGE_HDR_SIZE		20
+#define	WT_PAGE_HDR_SIZE		28
 
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.
@@ -475,7 +483,7 @@ struct __wt_col_expand {
 	 * We know we can store the offset in 16-bits because that's the
 	 * maximum number of records in a single compressed group.
 	 */
-	u_int16_t rcc_offset;		/* recno offset in this index */
+	u_int64_t recno;		/* recno */
 
 	WT_REPL *repl;                  /* modifications/deletions */
 
