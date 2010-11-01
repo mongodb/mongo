@@ -45,6 +45,7 @@ __wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
 static int
 __wt_bt_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
 	WT_COL_EXPAND *exp, **new_expcol;
@@ -53,7 +54,8 @@ __wt_bt_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 	int ret;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	db = toc->db;
+	idb = db->idb;
 
 	page = NULL;
 	exp = NULL;
@@ -78,15 +80,17 @@ __wt_bt_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 	 * from the on-disk page by creating a new WT_REPL entry, and linking it
 	 * into the WT_REPL array.
 	 *
-	 * 2: an RCC column store delete of a record not yet modified: create
-	 * a new WT_COL_EXPAND/WT_REPL pair, and link it into the WT_COL_EXPAND
-	 * array.
-	 *
-	 * 3: an RCC columstore n delete of an already modified record: create
+	 * 2: an RCC column store delete of an already modified record: create
 	 * a new WT_REPL entry, and link it to the WT_COL_EXPAND entry's WT_REPL
 	 * list.
+	 *
+	 * 3: an RCC column store delete of a record not yet modified: create
+	 * a new WT_COL_EXPAND/WT_REPL pair, and link it into the WT_COL_EXPAND
+	 * array.
 	 */
-	if (page->hdr->type == WT_PAGE_COL_FIX) {	/* #1 */
+	switch (page->hdr->type) {
+	case WT_PAGE_COL_FIX:				/* #1 */
+	case WT_PAGE_COL_VAR:
 		/* Allocate a page replacement array if necessary. */
 		if (page->repl == NULL)
 			WT_ERR(__wt_calloc(env,
@@ -95,10 +99,21 @@ __wt_bt_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 		/* Allocate a WT_REPL structure and fill it in. */
 		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
 
-		/* Schedule the workQ to insert the WT_REPL structure. */
+		/* workQ: schedule insert of the WT_REPL structure. */
 		__wt_bt_update_serial(toc, page, toc->srch_write_gen,
 		    WT_COL_SLOT(page, toc->srch_ip), new_repl, repl, ret);
-	} else if (toc->srch_repl == NULL) {		/* #2 */
+		 break;
+	case WT_PAGE_COL_RCC:
+		if (toc->srch_repl != NULL) {		/* #2 */
+			/* Allocate a WT_REPL structure and fill it in. */
+			WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
+
+			/* workQ: schedule insert of the WT_REPL structure. */
+			__wt_bt_rcc_expand_repl_serial(toc, page,
+			    toc->srch_write_gen, toc->srch_exp, repl, ret);
+			break;
+		}
+							/* #3 */
 		/* Allocate a page expansion array as necessary. */
 		if (page->expcol == NULL)
 			WT_ERR(__wt_calloc(env, page->indx_count,
@@ -109,20 +124,14 @@ __wt_bt_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
 
 		/* Allocate a WT_COL_EXPAND structure and fill it in. */
 		WT_ERR(__wt_calloc(env, 1, sizeof(WT_COL_EXPAND), &exp));
-		exp->rcc_offset = toc->srch_rcc_offset;
+		exp->recno = recno;
 		exp->repl = repl;
 
 		/* Schedule the workQ to link in the WT_COL_EXPAND structure. */
 		__wt_bt_rcc_expand_serial(toc, page, toc->srch_write_gen,
 		    WT_COL_SLOT(page, toc->srch_ip), new_expcol, exp, ret);
-		goto done;
-	} else {					/* #3 */
-		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
-
-		/* Schedule the workQ to insert the WT_REPL structure. */
-		__wt_bt_rcc_expand_repl_serial(
-		    toc, page, toc->srch_write_gen, toc->srch_exp, repl, ret);
+		break;
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
 	if (ret != 0) {
@@ -132,7 +141,7 @@ err:		if (exp != NULL)
 			__wt_bt_repl_free(toc, repl);
 	}
 
-done:	/* Free any allocated page expansion array unless the workQ used it. */
+	/* Free any allocated page expansion array unless the workQ used it. */
 	if (new_expcol != NULL && new_expcol != page->expcol)
 		__wt_free(env,
 		    new_expcol, page->indx_count * sizeof(WT_COL_EXPAND *));
