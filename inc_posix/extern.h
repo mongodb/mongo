@@ -43,7 +43,7 @@ __wt_bt_print(u_int8_t *data, u_int32_t size, FILE *stream);
 int
 __wt_bt_build_verify(void);
 int
-__wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
+__wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t size, DBT *copy);
 inline void
 __wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, u_int8_t *p);
 inline int
@@ -77,6 +77,9 @@ __wt_bt_item_process(
     WT_TOC *toc, WT_ITEM *item, WT_PAGE **ovfl_ret, DBT *dbt_ret);
 int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page);
+int
+__wt_bt_rcc_expand_sort(ENV *env,
+    WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, u_int32_t *np);
 int
 __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
