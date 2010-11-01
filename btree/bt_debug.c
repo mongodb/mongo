@@ -10,10 +10,12 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_bt_debug_col_fix_indx(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
-static int  __wt_bt_debug_col_var_indx(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
 static void __wt_bt_debug_expcol(WT_COL_EXPAND *, FILE *);
+static void __wt_bt_debug_inmem_col_fix(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
+static void __wt_bt_debug_inmem_col_rcc(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
+static int  __wt_bt_debug_inmem_col_var(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
+static int  __wt_bt_debug_inmem_row(WT_TOC *, WT_PAGE *, WT_ROW *, FILE *);
 static int  __wt_bt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
@@ -22,7 +24,6 @@ static void __wt_bt_debug_page_col_rcc(DB *, WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_pair(const char *, void *, u_int32_t, FILE *);
 static void __wt_bt_debug_repl(WT_REPL *, FILE *);
-static int  __wt_bt_debug_row_indx(WT_TOC *, WT_PAGE *, WT_ROW *, FILE *);
 static int  __wt_bt_debug_set_fp(const char *, FILE **, int *);
 
 static int
@@ -113,24 +114,38 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 
 	WT_RET(__wt_bt_debug_set_fp(ofile, &fp, &do_close));
 
-	fprintf(fp, "addr: %lu-%lu {\n", (u_long)page->addr,
-	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1));
+	fprintf(fp,
+	    "addr: %lu-%lu {\n\t%s: size %lu\n",
+	    (u_long)page->addr,
+	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
+  	    __wt_bt_hdr_type(hdr), (u_long)page->size);
 
-	fprintf(fp, "\taddr %lu, size %lu, lsn %lu/%lu\n",
-	    (u_long)page->addr, (u_long)page->size,
-	    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1]);
-
-	fprintf(fp, "\t%s: ", __wt_bt_hdr_type(hdr));
-	if (hdr->type == WT_PAGE_OVFL)
-		fprintf(fp, "bytes %lu\n", (u_long)hdr->u.datalen);
-	else {
-		fprintf(fp, "level %lu, entries %lu, records %llu\n",
-		    (u_long)hdr->level, (u_long)hdr->u.entries, page->records);
+	switch (hdr->type) {
+	case WT_PAGE_DESCRIPT:
+		break;
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_INT:
 		fprintf(fp,
-		    "\tfirst-free %p (offset: %lu), space avail %lu\n\n",
+		    "\trecords %llu, starting recno %llu, level %lu, "
+		    "entries %lu, lsn %lu/%lu\n"
+		    "\tfirst-free %p (offset: %lu), space avail %lu\n",
+		    (u_quad)page->records, (u_quad)hdr->start_recno,
+		    (u_long)hdr->level, (u_long)hdr->u.entries,
+		    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1],
 		    page->first_free,
 		    (u_long)(page->first_free - (u_int8_t *)page->hdr),
 		    (u_long)page->space_avail);
+		break;
+	case WT_PAGE_OVFL:
+		fprintf(fp, "size %lu\n", (u_long)hdr->u.datalen);
+		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	switch (hdr->type) {
@@ -153,9 +168,8 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_COL_INT:
 		__wt_bt_debug_page_col_int(page, fp);
 		break;
-	case WT_PAGE_OVFL:
+	default:
 		break;
-	WT_ILLEGAL_FORMAT(db);
 	}
 
 	fprintf(fp, "}\n");
@@ -186,8 +200,8 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 	    (u_long)desc->intlmin, (u_long)desc->intlmax);
 	fprintf(fp, "\t\tleaf page min/max size: %lu/%lu\n",
 	    (u_long)desc->leafmin, (u_long)desc->leafmax);
-	fprintf(fp, "\t\tbase record: %llu, fixed_len: %lu\n",
-	    (u_quad)desc->base_recno, (u_long)desc->fixed_len);
+	fprintf(fp, "\t\toffset record: %llu, fixed_len: %lu\n",
+	    (u_quad)desc->recno_offset, (u_long)desc->fixed_len);
 	if (desc->root_addr == WT_ADDR_INVALID)
 		fprintf(fp, "\t\troot addr (none)\n");
 	else
@@ -228,16 +242,20 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_INDX_FOREACH(page, rip, i)
-			WT_RET(__wt_bt_debug_row_indx(toc, page, rip, fp));
+			WT_RET(__wt_bt_debug_inmem_row(toc, page, rip, fp));
 		break;
 	case WT_PAGE_COL_FIX:
 		WT_INDX_FOREACH(page, cip, i)
-			__wt_bt_debug_col_fix_indx(toc, page, cip, fp);
+			__wt_bt_debug_inmem_col_fix(toc, page, cip, fp);
+		break;
+	case WT_PAGE_COL_RCC:
+		WT_INDX_FOREACH(page, cip, i)
+			__wt_bt_debug_inmem_col_rcc(toc, page, cip, fp);
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
 		WT_INDX_FOREACH(page, cip, i)
-			WT_RET(__wt_bt_debug_col_var_indx(toc, page, cip, fp));
+			WT_RET(__wt_bt_debug_inmem_col_var(toc, page, cip, fp));
 		break;
 	case WT_PAGE_OVFL:
 		break;
@@ -253,12 +271,12 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_bt_debug_col_var_indx --
+ * __wt_bt_debug_inmem_col_var --
  *	Dump a WT_COL structure (including any modifications/deletions) for a
  *	WT_PAGE_COL_{INT,VAR} page.
  */
 static int
-__wt_bt_debug_col_var_indx(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
+__wt_bt_debug_inmem_col_var(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
 {
 	WT_REPL *repl;
 
@@ -275,55 +293,65 @@ __wt_bt_debug_col_var_indx(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
 }
 
 /*
- * __wt_bt_debug_col_fix_indx --
- *	Dump a WT_COL structure (including any modifications/deletions) for a
- *	WT_PAGE_COL_FIX page.
+ * __wt_bt_debug_inmem_col_fix --
+ *	Dump the WT_COL structures (including any modifications/deletions)
+ *	for a WT_PAGE_COL_FIX page.
  */
 static void
-__wt_bt_debug_col_fix_indx(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
+__wt_bt_debug_inmem_col_fix(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
 {
 	DB *db;
-	IDB *idb;
-	WT_COL_EXPAND *exp;
 	WT_REPL *repl;
 
 	db = toc->db;
-	idb = db->idb;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	if (F_ISSET(idb, WT_REPEAT_COMP)) {
-		fprintf(fp,
-		    "\trepeat %lu {", (u_long)WT_RCC_REPEAT_COUNT(cip->data));
-		if (WT_FIX_DELETE_ISSET(WT_RCC_REPEAT_DATA(cip->data)))
-			fprintf(fp, "deleted");
-		else
-			__wt_bt_print(
-			    WT_RCC_REPEAT_DATA(cip->data), db->fixed_len, fp);
-		fprintf(fp, "}\n");
+	fprintf(fp, "\tdata {");
+	if (WT_FIX_DELETE_ISSET(cip->data))
+		fprintf(fp, "deleted");
+	else
+		__wt_bt_print(cip->data, db->fixed_len, fp);
+	fprintf(fp, "}\n");
 
-		if ((exp = WT_COL_EXPCOL(page, cip)) != NULL)
-			__wt_bt_debug_expcol(exp, fp);
-	} else {
-		fprintf(fp, "\tdata {");
-		if (WT_FIX_DELETE_ISSET(cip->data))
-			fprintf(fp, "deleted");
-		else
-			__wt_bt_print(cip->data, db->fixed_len, fp);
-		fprintf(fp, "}\n");
-
-		if ((repl = WT_COL_REPL(page, cip)) != NULL)
-			__wt_bt_debug_repl(repl, fp);
-	}
+	if ((repl = WT_COL_REPL(page, cip)) != NULL)
+		__wt_bt_debug_repl(repl, fp);
 }
 
 /*
- * __wt_bt_debug_row_indx --
+ * __wt_bt_debug_inmem_col_rcc --
+ *	Dump the WT_COL structures (including any modifications/deletions)
+ *	for a WT_PAGE_COL_RCC page.
+ */
+static void
+__wt_bt_debug_inmem_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
+{
+	DB *db;
+	WT_COL_EXPAND *exp;
+
+	db = toc->db;
+
+	if (fp == NULL)				/* Default to stderr */
+		fp = stderr;
+
+	fprintf(fp, "\trepeat %lu {", (u_long)WT_RCC_REPEAT_COUNT(cip->data));
+	if (WT_FIX_DELETE_ISSET(WT_RCC_REPEAT_DATA(cip->data)))
+		fprintf(fp, "deleted");
+	else
+		__wt_bt_print(WT_RCC_REPEAT_DATA(cip->data), db->fixed_len, fp);
+	fprintf(fp, "}\n");
+
+	if ((exp = WT_COL_EXPCOL(page, cip)) != NULL)
+		__wt_bt_debug_expcol(exp, fp);
+}
+
+/*
+ * __wt_bt_debug_inmem_row --
  *	Dump a single WT_ROW structure.
  */
 static int
-__wt_bt_debug_row_indx(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, FILE *fp)
+__wt_bt_debug_inmem_row(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip, FILE *fp)
 {
 	WT_REPL *repl;
 
