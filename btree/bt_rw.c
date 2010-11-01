@@ -16,10 +16,10 @@ static int __wt_cache_read_serial_func(WT_TOC *);
  *	Allocate bytes from a file and associate it with a WT_PAGE structure.
  */
 int
-__wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep)
+__wt_page_alloc(WT_TOC *toc, uint32_t size, WT_PAGE **pagep)
 {
 	ENV *env;
-	u_int32_t addr;
+	uint32_t addr;
 	int ret;
 
 	*pagep = NULL;
@@ -38,7 +38,7 @@ __wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep)
  */
 int
 __wt_page_in(WT_TOC *toc,
-    u_int32_t addr, u_int32_t size, WT_PAGE **pagep, u_int32_t flags)
+    uint32_t addr, uint32_t size, WT_PAGE **pagep, uint32_t flags)
 {
 	DB *db;
 	ENV *env;
@@ -46,7 +46,7 @@ __wt_page_in(WT_TOC *toc,
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e;
 	WT_PAGE *page;
-	u_int32_t i;
+	uint32_t i;
 	int found, ret;
 
 	*pagep = NULL;
@@ -108,7 +108,7 @@ static int
 __wt_cache_read_serial_func(WT_TOC *toc)
 {
 	WT_PAGE **pagep;
-	u_int32_t *addrp, size;
+	uint32_t *addrp, size;
 
 	__wt_cache_read_unpack(toc, addrp, size, pagep);
 
@@ -136,7 +136,7 @@ __wt_page_read(DB *db, WT_PAGE *page)
 	WT_FH *fh;
 	WT_PAGE_HDR *hdr;
 	off_t offset;
-	u_int32_t checksum;
+	uint32_t checksum;
 
 	env = db->env;
 	fh = db->idb->fh;
@@ -150,7 +150,8 @@ __wt_page_read(DB *db, WT_PAGE *page)
 	if (checksum != __wt_cksum(hdr, page->size)) {
 		__wt_api_env_errx(env,
 		    "read checksum error: addr/size %lu/%lu at offset %llu",
-		    (u_long)page->addr, (u_long)page->size, (u_quad)offset);
+		    (u_long)page->addr,
+		    (u_long)page->size, (unsigned long long)offset);
 		return (WT_ERROR);
 	}
 

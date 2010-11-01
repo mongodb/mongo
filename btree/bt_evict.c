@@ -30,7 +30,7 @@ void
 __wt_workq_drain_server(ENV *env, int force)
 {
 	WT_CACHE *cache;
-	u_int64_t bytes_inuse, bytes_max;
+	uint64_t bytes_inuse, bytes_max;
 
 	cache = env->ienv->cache;
 
@@ -52,9 +52,9 @@ __wt_workq_drain_server(ENV *env, int force)
 	    "bytes inuse %s max (%lluMB %s %lluMB), ",
 	    force ? "" : "not ", cache->read_lockout ? "" : "not ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    (u_quad)(bytes_inuse / WT_MEGABYTE),
+	    (unsigned long long)(bytes_inuse / WT_MEGABYTE),
 	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    (u_quad)(bytes_max / WT_MEGABYTE)));
+	    (unsigned long long)(bytes_max / WT_MEGABYTE)));
 
 	cache->drain_sleeping = 0;
 	__wt_unlock(env, cache->mtx_drain);
@@ -71,7 +71,7 @@ __wt_cache_drain_server(void *arg)
 	IENV *ienv;
 	WT_CACHE *cache;
 	WT_TOC *toc;
-	u_int64_t bytes_inuse, bytes_max;
+	uint64_t bytes_inuse, bytes_max;
 	int ret;
 
 	env = arg;
@@ -165,8 +165,8 @@ __wt_drain_trickle(WT_TOC *toc)
 	ENV *env;
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e, **drain;
-	u_int64_t cache_pages;
-	u_int32_t i, review_cnt;
+	uint64_t cache_pages;
+	uint32_t i, review_cnt;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -189,7 +189,7 @@ __wt_drain_trickle(WT_TOC *toc)
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
 	    "cache drain: bucket %lu: review %lu of %llu total pages",
 	    (u_long)cache->bucket_cnt,
-	    (u_long)review_cnt, (u_quad)cache_pages));
+	    (u_long)review_cnt, (unsigned long long)cache_pages));
 
 	/* Allocate more space in the drain list as necessary. */
 	if (review_cnt > cache->drain_len / sizeof(WT_CACHE_ENTRY *))
@@ -258,7 +258,7 @@ __wt_drain_set(ENV *env)
 {
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e, **drain;
-	u_int32_t drain_elem;
+	uint32_t drain_elem;
 
 	cache = env->ienv->cache;
 
@@ -299,7 +299,7 @@ __wt_drain_hazard_check(ENV *env)
 	WT_CACHE_ENTRY **drain, *e;
 	WT_PAGE **hazard, **end_hazard, *page;
 	WT_STATS *stats;
-	u_int32_t drain_elem;
+	uint32_t drain_elem;
 
 	ienv = env->ienv;
 	cache = ienv->cache;
@@ -361,7 +361,7 @@ __wt_drain_write(WT_TOC *toc)
 	WT_CACHE_ENTRY *e, **drain;
 	WT_PAGE *page;
 	WT_STATS *stats;
-	u_int32_t drain_elem;
+	uint32_t drain_elem;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -398,7 +398,7 @@ __wt_drain_evict(ENV *env)
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY **drain, *e;
 	WT_PAGE *page;
-	u_int32_t drain_elem;
+	uint32_t drain_elem;
 
 	cache = env->ienv->cache;
 
@@ -435,7 +435,7 @@ __wt_drain_evict(ENV *env)
 static int
 __wt_drain_compare_lru(const void *a, const void *b)
 {
-	u_int32_t a_lru, b_lru;
+	uint32_t a_lru, b_lru;
 
 	a_lru = (*(WT_CACHE_ENTRY **)a)->page->lru;
 	b_lru = (*(WT_CACHE_ENTRY **)b)->page->lru;
@@ -521,7 +521,7 @@ __wt_drain_dump(ENV *env, const char *tag)
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY **drain;
 	WT_MBUF mb;
-	u_int32_t drain_elem;
+	uint32_t drain_elem;
 	int sep;
 
 	cache = env->ienv->cache;
