@@ -135,8 +135,8 @@ track(const char *s, u_int64_t i)
 	else if (i == 0)
 		len = snprintf(msg, sizeof(msg), "%4d: %s", g.run_cnt, s);
 	else
-		len =
-		    snprintf(msg, sizeof(msg), "%4d: %s %llu", g.run_cnt, s, i);
+		len = snprintf(msg, sizeof(msg),
+		    "%4d: %s %llu", g.run_cnt, s, (unsigned long long)i);
 
 	for (p = msg + len; len < lastlen; ++len)
 		*p++ = ' ';

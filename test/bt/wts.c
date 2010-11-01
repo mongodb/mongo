@@ -451,7 +451,7 @@ wts_read_row(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "read {%llu}\n", keyno);
+		fprintf(g.wts_log, "read {%llu}\n", (unsigned long long)keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
@@ -462,7 +462,8 @@ wts_read_row(u_int64_t keyno)
 	if ((ret = db->row_get(
 	    db, toc, &key, &data, 0)) != 0 && ret != WT_NOTFOUND) {
 		env->err(env, ret,
-		    "wts_read_key: read row %llu by key", keyno);
+		    "wts_read_key: read row %llu by key",
+		    (unsigned long long)keyno);
 		return (1);
 	}
 
@@ -473,7 +474,8 @@ wts_read_row(u_int64_t keyno)
 	if (data.size != bdb_data.size ||
 	    memcmp(data.data, bdb_data.data, data.size) != 0) {
 		fprintf(stderr,
-		    "wts_read_key: read row %llu by key:\n", keyno);
+		    "wts_read_key: read row %llu by key:\n",
+		    (unsigned long long)keyno);
 		__wt_bt_debug_dbt("\tbdb", &bdb_data, stderr);
 		__wt_bt_debug_dbt("\twt", &data, stderr);
 		return (1);
@@ -525,7 +527,7 @@ wts_read_col(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "read {%llu}\n", keyno);
+		fprintf(g.wts_log, "read {%llu}\n", (unsigned long long)keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
@@ -535,7 +537,8 @@ wts_read_col(u_int64_t keyno)
 	if ((ret = db->col_get(
 	    db, toc, keyno, &data, 0)) != 0 && ret != WT_NOTFOUND) {
 		env->err(env, ret,
-		    "wts_read_recno: read column %llu by recno", keyno);
+		    "wts_read_recno: read column %llu by recno",
+		    (unsigned long long)keyno);
 		return (1);
 	}
 
@@ -546,7 +549,8 @@ wts_read_col(u_int64_t keyno)
 	if (data.size != bdb_data.size ||
 	    memcmp(data.data, bdb_data.data, data.size) != 0) {
 		fprintf(stderr,
-		    "wts_read_recno: read column %llu by recno:\n", keyno);
+		    "wts_read_recno: read column %llu by recno:\n",
+		    (unsigned long long)keyno);
 		__wt_bt_debug_dbt("\tbdb data", &bdb_data, stderr);
 		__wt_bt_debug_dbt("\t wt data", &data, stderr);
 		return (1);
@@ -577,14 +581,15 @@ wts_put_row(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "put {%llu}\n", keyno);
+		fprintf(g.wts_log, "put {%llu}\n", (unsigned long long)keyno);
 
 	if (bdb_put(keyno, data.data, data.size, &notfound))
 		return (1);
 
 	if ((ret = db->row_put(
 	    db, toc, &key, &data, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(env, ret, "wts_put_row: put row %llu by key", keyno);
+		env->err(env, ret, "wts_put_row: put row %llu by key",
+		    (unsigned long long)keyno);
 		return (1);
 	}
 	return (0);
@@ -611,14 +616,15 @@ wts_put_col(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "put {%llu}\n", keyno);
+		fprintf(g.wts_log, "put {%llu}\n", (unsigned long long)keyno);
 
 	if (bdb_put(keyno, data.data, data.size, &notfound))
 		return (1);
 	
 	if ((ret = db->col_put(
 	    db, toc, keyno, &data, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(env, ret, "wts_put_col: put row %llu by key", keyno);
+		env->err(env, ret, "wts_put_col: put row %llu by key",
+		    (unsigned long long)keyno);
 		return (1);
 	}
 	return (0);
@@ -645,14 +651,16 @@ wts_del_row(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "delete {%llu}\n", keyno);
+		fprintf(g.wts_log,
+		    "delete {%llu}\n", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
 	if ((ret = db->row_del(db, toc, &key, 0)) != 0 && ret != WT_NOTFOUND) {
 		env->err(
-		    env, ret, "wts_del_row: delete row %llu by key", keyno);
+		    env, ret, "wts_del_row: delete row %llu by key",
+		        (unsigned long long)keyno);
 		return (1);
 	}
 	NTF_CHK(wts_notfound_chk(env, "wts_del_row", ret, notfound, keyno));
@@ -677,14 +685,15 @@ wts_del_col(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "delete {%llu}\n", keyno);
+		fprintf(g.wts_log,
+		    "delete {%llu}\n", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
 	if ((ret = db->col_del(db, toc, keyno, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(
-		    env, ret, "wts_del_col: delete row %llu by key", keyno);
+		env->err(env, ret, "wts_del_col: delete row %llu by key",
+		        (unsigned long long)keyno);
 		return (1);
 	}
 
@@ -707,13 +716,13 @@ wts_notfound_chk(
 
 		env->errx(env,
 		    "%s: row %llu: deleted in Berkeley DB, found in WiredTiger",
-		    f, keyno);
+		    f, (unsigned long long)keyno);
 		return (1);
 	}
 	if (wt_ret == WT_NOTFOUND) {
 		env->errx(env,
 		    "%s: row %llu: found in Berkeley DB, deleted in WiredTiger",
-		    f, keyno);
+		    f, (unsigned long long)keyno);
 		return (1);
 	}
 	return (0);
