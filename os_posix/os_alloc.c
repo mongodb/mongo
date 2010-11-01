@@ -15,6 +15,15 @@ static void __wt_mtrack(
 #endif
 
 /*
+ * There's no malloc interface, WiredTiger never calls malloc.  The problem is
+ * an application might: allocate memory, write secret stuff into it, free the
+ * memory, we allocate the memory, and then use it for a database page or log
+ * record and write it to disk.  That would result in the secret stuff being
+ * protected by the WiredTiger permission mechanisms, potentially inappropriate
+ * for the secret stuff.
+ */
+
+/*
  * __wt_calloc_func --
  *	ANSI calloc function.
  */
