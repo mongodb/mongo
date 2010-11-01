@@ -13,3 +13,6 @@ end
 define fp
 print __wt_bt_debug_page(toc, $arg0, "/tmp/o", 0)
 end
+define dumpfile
+print __wt_bt_debug_dump(toc, "/tmp/o", 0)
+end
