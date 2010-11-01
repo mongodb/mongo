@@ -108,10 +108,10 @@ static int __wt_api_db_btree_compare_set(
 
 static int __wt_api_db_btree_dup_offpage_get(
 	DB *db,
-	u_int32_t *btree_dup_offpage);
+	uint32_t *btree_dup_offpage);
 static int __wt_api_db_btree_dup_offpage_get(
 	DB *db,
-	u_int32_t *btree_dup_offpage)
+	uint32_t *btree_dup_offpage)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -125,10 +125,10 @@ static int __wt_api_db_btree_dup_offpage_get(
 
 static int __wt_api_db_btree_dup_offpage_set(
 	DB *db,
-	u_int32_t btree_dup_offpage);
+	uint32_t btree_dup_offpage);
 static int __wt_api_db_btree_dup_offpage_set(
 	DB *db,
-	u_int32_t btree_dup_offpage)
+	uint32_t btree_dup_offpage)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -144,12 +144,12 @@ static int __wt_api_db_btree_dup_offpage_set(
 
 static int __wt_api_db_btree_itemsize_get(
 	DB *db,
-	u_int32_t *intlitemsize,
-	u_int32_t *leafitemsize);
+	uint32_t *intlitemsize,
+	uint32_t *leafitemsize);
 static int __wt_api_db_btree_itemsize_get(
 	DB *db,
-	u_int32_t *intlitemsize,
-	u_int32_t *leafitemsize)
+	uint32_t *intlitemsize,
+	uint32_t *leafitemsize)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -164,12 +164,12 @@ static int __wt_api_db_btree_itemsize_get(
 
 static int __wt_api_db_btree_itemsize_set(
 	DB *db,
-	u_int32_t intlitemsize,
-	u_int32_t leafitemsize);
+	uint32_t intlitemsize,
+	uint32_t leafitemsize);
 static int __wt_api_db_btree_itemsize_set(
 	DB *db,
-	u_int32_t intlitemsize,
-	u_int32_t leafitemsize)
+	uint32_t intlitemsize,
+	uint32_t leafitemsize)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -184,18 +184,18 @@ static int __wt_api_db_btree_itemsize_set(
 
 static int __wt_api_db_btree_pagesize_get(
 	DB *db,
-	u_int32_t *allocsize,
-	u_int32_t *intlmin,
-	u_int32_t *intlmax,
-	u_int32_t *leafmin,
-	u_int32_t *leafmax);
+	uint32_t *allocsize,
+	uint32_t *intlmin,
+	uint32_t *intlmax,
+	uint32_t *leafmin,
+	uint32_t *leafmax);
 static int __wt_api_db_btree_pagesize_get(
 	DB *db,
-	u_int32_t *allocsize,
-	u_int32_t *intlmin,
-	u_int32_t *intlmax,
-	u_int32_t *leafmin,
-	u_int32_t *leafmax)
+	uint32_t *allocsize,
+	uint32_t *intlmin,
+	uint32_t *intlmax,
+	uint32_t *leafmin,
+	uint32_t *leafmax)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -213,18 +213,18 @@ static int __wt_api_db_btree_pagesize_get(
 
 static int __wt_api_db_btree_pagesize_set(
 	DB *db,
-	u_int32_t allocsize,
-	u_int32_t intlmin,
-	u_int32_t intlmax,
-	u_int32_t leafmin,
-	u_int32_t leafmax);
+	uint32_t allocsize,
+	uint32_t intlmin,
+	uint32_t intlmax,
+	uint32_t leafmin,
+	uint32_t leafmax);
 static int __wt_api_db_btree_pagesize_set(
 	DB *db,
-	u_int32_t allocsize,
-	u_int32_t intlmin,
-	u_int32_t intlmax,
-	u_int32_t leafmin,
-	u_int32_t leafmax)
+	uint32_t allocsize,
+	uint32_t intlmin,
+	uint32_t intlmax,
+	uint32_t leafmin,
+	uint32_t leafmax)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -242,13 +242,13 @@ static int __wt_api_db_btree_pagesize_set(
 
 static int __wt_api_db_bulk_load(
 	DB *db,
-	u_int32_t flags,
-	void (*progress)(const char *, u_int64_t),
+	uint32_t flags,
+	void (*progress)(const char *, uint64_t),
 	int (*cb)(DB *, DBT **, DBT **));
 static int __wt_api_db_bulk_load(
 	DB *db,
-	u_int32_t flags,
-	void (*progress)(const char *, u_int64_t),
+	uint32_t flags,
+	void (*progress)(const char *, uint64_t),
 	int (*cb)(DB *, DBT **, DBT **))
 {
 	const char *method_name = "DB.bulk_load";
@@ -268,10 +268,10 @@ static int __wt_api_db_bulk_load(
 
 static int __wt_api_db_close(
 	DB *db,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_close(
 	DB *db,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.close";
 	ENV *env = db->env;
@@ -290,13 +290,13 @@ static int __wt_api_db_close(
 static int __wt_api_db_col_del(
 	DB *db,
 	WT_TOC *toc,
-	u_int64_t recno,
-	u_int32_t flags);
+	uint64_t recno,
+	uint32_t flags);
 static int __wt_api_db_col_del(
 	DB *db,
 	WT_TOC *toc,
-	u_int64_t recno,
-	u_int32_t flags)
+	uint64_t recno,
+	uint32_t flags)
 {
 	const char *method_name = "DB.col_del";
 	ENV *env = db->env;
@@ -317,15 +317,15 @@ static int __wt_api_db_col_del(
 static int __wt_api_db_col_get(
 	DB *db,
 	WT_TOC *toc,
-	u_int64_t recno,
+	uint64_t recno,
 	DBT *data,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_col_get(
 	DB *db,
 	WT_TOC *toc,
-	u_int64_t recno,
+	uint64_t recno,
 	DBT *data,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.col_get";
 	ENV *env = db->env;
@@ -344,15 +344,15 @@ static int __wt_api_db_col_get(
 static int __wt_api_db_col_put(
 	DB *db,
 	WT_TOC *toc,
-	u_int64_t recno,
+	uint64_t recno,
 	DBT *data,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_col_put(
 	DB *db,
 	WT_TOC *toc,
-	u_int64_t recno,
+	uint64_t recno,
 	DBT *data,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.col_put";
 	ENV *env = db->env;
@@ -372,14 +372,14 @@ static int __wt_api_db_col_put(
 
 static int __wt_api_db_column_set(
 	DB *db,
-	u_int32_t fixed_len,
+	uint32_t fixed_len,
 	const char *dictionary,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_column_set(
 	DB *db,
-	u_int32_t fixed_len,
+	uint32_t fixed_len,
 	const char *dictionary,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -401,13 +401,13 @@ static int __wt_api_db_column_set(
 static int __wt_api_db_dump(
 	DB *db,
 	FILE *stream,
-	void (*progress)(const char *, u_int64_t),
-	u_int32_t flags);
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags);
 static int __wt_api_db_dump(
 	DB *db,
 	FILE *stream,
-	void (*progress)(const char *, u_int64_t),
-	u_int32_t flags)
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags)
 {
 	const char *method_name = "DB.dump";
 	ENV *env = db->env;
@@ -527,14 +527,14 @@ static int __wt_api_db_errpfx_set(
 
 static int __wt_api_db_huffman_set(
 	DB *db,
-	u_int8_t const *huffman_table,
+	uint8_t const *huffman_table,
 	u_int huffman_table_size,
-	u_int32_t huffman_flags);
+	uint32_t huffman_flags);
 static int __wt_api_db_huffman_set(
 	DB *db,
-	u_int8_t const *huffman_table,
+	uint8_t const *huffman_table,
 	u_int huffman_table_size,
-	u_int32_t huffman_flags)
+	uint32_t huffman_flags)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -555,12 +555,12 @@ static int __wt_api_db_open(
 	DB *db,
 	const char *name,
 	mode_t mode,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_open(
 	DB *db,
 	const char *name,
 	mode_t mode,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.open";
 	ENV *env = db->env;
@@ -580,12 +580,12 @@ static int __wt_api_db_row_del(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_row_del(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.row_del";
 	ENV *env = db->env;
@@ -608,13 +608,13 @@ static int __wt_api_db_row_get(
 	WT_TOC *toc,
 	DBT *key,
 	DBT *data,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_row_get(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
 	DBT *data,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.row_get";
 	ENV *env = db->env;
@@ -635,13 +635,13 @@ static int __wt_api_db_row_put(
 	WT_TOC *toc,
 	DBT *key,
 	DBT *data,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_row_put(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
 	DBT *data,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.row_put";
 	ENV *env = db->env;
@@ -661,10 +661,10 @@ static int __wt_api_db_row_put(
 
 static int __wt_api_db_stat_clear(
 	DB *db,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_stat_clear(
 	DB *db,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.stat_clear";
 	ENV *env = db->env;
@@ -680,11 +680,11 @@ static int __wt_api_db_stat_clear(
 static int __wt_api_db_stat_print(
 	DB *db,
 	FILE *stream,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_db_stat_print(
 	DB *db,
 	FILE *stream,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "DB.stat_print";
 	ENV *env = db->env;
@@ -702,12 +702,12 @@ static int __wt_api_db_stat_print(
 
 static int __wt_api_db_sync(
 	DB *db,
-	void (*progress)(const char *, u_int64_t),
-	u_int32_t flags);
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags);
 static int __wt_api_db_sync(
 	DB *db,
-	void (*progress)(const char *, u_int64_t),
-	u_int32_t flags)
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags)
 {
 	const char *method_name = "DB.sync";
 	ENV *env = db->env;
@@ -726,12 +726,12 @@ static int __wt_api_db_sync(
 
 static int __wt_api_db_verify(
 	DB *db,
-	void (*progress)(const char *, u_int64_t),
-	u_int32_t flags);
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags);
 static int __wt_api_db_verify(
 	DB *db,
-	void (*progress)(const char *, u_int64_t),
-	u_int32_t flags)
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags)
 {
 	const char *method_name = "DB.verify";
 	ENV *env = db->env;
@@ -749,10 +749,10 @@ static int __wt_api_db_verify(
 
 static int __wt_api_env_cache_drain_cnt_get(
 	ENV *env,
-	u_int32_t *cache_drain_cnt);
+	uint32_t *cache_drain_cnt);
 static int __wt_api_env_cache_drain_cnt_get(
 	ENV *env,
-	u_int32_t *cache_drain_cnt)
+	uint32_t *cache_drain_cnt)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -764,10 +764,10 @@ static int __wt_api_env_cache_drain_cnt_get(
 
 static int __wt_api_env_cache_drain_cnt_set(
 	ENV *env,
-	u_int32_t cache_drain_cnt);
+	uint32_t cache_drain_cnt);
 static int __wt_api_env_cache_drain_cnt_set(
 	ENV *env,
-	u_int32_t cache_drain_cnt)
+	uint32_t cache_drain_cnt)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -779,10 +779,10 @@ static int __wt_api_env_cache_drain_cnt_set(
 
 static int __wt_api_env_cache_hash_size_get(
 	ENV *env,
-	u_int32_t *cache_hash_size);
+	uint32_t *cache_hash_size);
 static int __wt_api_env_cache_hash_size_get(
 	ENV *env,
-	u_int32_t *cache_hash_size)
+	uint32_t *cache_hash_size)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -794,10 +794,10 @@ static int __wt_api_env_cache_hash_size_get(
 
 static int __wt_api_env_cache_hash_size_set(
 	ENV *env,
-	u_int32_t cache_hash_size);
+	uint32_t cache_hash_size);
 static int __wt_api_env_cache_hash_size_set(
 	ENV *env,
-	u_int32_t cache_hash_size)
+	uint32_t cache_hash_size)
 {
 	IENV *ienv = env->ienv;
 	WT_RET((__wt_env_cache_hash_size_set_verify(
@@ -811,10 +811,10 @@ static int __wt_api_env_cache_hash_size_set(
 
 static int __wt_api_env_cache_size_get(
 	ENV *env,
-	u_int32_t *cache_size);
+	uint32_t *cache_size);
 static int __wt_api_env_cache_size_get(
 	ENV *env,
-	u_int32_t *cache_size)
+	uint32_t *cache_size)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -826,10 +826,10 @@ static int __wt_api_env_cache_size_get(
 
 static int __wt_api_env_cache_size_set(
 	ENV *env,
-	u_int32_t cache_size);
+	uint32_t cache_size);
 static int __wt_api_env_cache_size_set(
 	ENV *env,
-	u_int32_t cache_size)
+	uint32_t cache_size)
 {
 	IENV *ienv = env->ienv;
 	WT_RET((__wt_env_cache_size_set_verify(
@@ -843,10 +843,10 @@ static int __wt_api_env_cache_size_set(
 
 static int __wt_api_env_close(
 	ENV *env,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_env_close(
 	ENV *env,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "ENV.close";
 	IENV *ienv = env->ienv;
@@ -860,10 +860,10 @@ static int __wt_api_env_close(
 
 static int __wt_api_env_data_update_initial_get(
 	ENV *env,
-	u_int32_t *data_update_initial);
+	uint32_t *data_update_initial);
 static int __wt_api_env_data_update_initial_get(
 	ENV *env,
-	u_int32_t *data_update_initial)
+	uint32_t *data_update_initial)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -875,10 +875,10 @@ static int __wt_api_env_data_update_initial_get(
 
 static int __wt_api_env_data_update_initial_set(
 	ENV *env,
-	u_int32_t data_update_initial);
+	uint32_t data_update_initial);
 static int __wt_api_env_data_update_initial_set(
 	ENV *env,
-	u_int32_t data_update_initial)
+	uint32_t data_update_initial)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -890,10 +890,10 @@ static int __wt_api_env_data_update_initial_set(
 
 static int __wt_api_env_data_update_max_get(
 	ENV *env,
-	u_int32_t *data_update_max);
+	uint32_t *data_update_max);
 static int __wt_api_env_data_update_max_get(
 	ENV *env,
-	u_int32_t *data_update_max)
+	uint32_t *data_update_max)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -905,10 +905,10 @@ static int __wt_api_env_data_update_max_get(
 
 static int __wt_api_env_data_update_max_set(
 	ENV *env,
-	u_int32_t data_update_max);
+	uint32_t data_update_max);
 static int __wt_api_env_data_update_max_set(
 	ENV *env,
-	u_int32_t data_update_max)
+	uint32_t data_update_max)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -920,11 +920,11 @@ static int __wt_api_env_data_update_max_set(
 
 static int __wt_api_env_db(
 	ENV *env,
-	u_int32_t flags,
+	uint32_t flags,
 	DB **dbp);
 static int __wt_api_env_db(
 	ENV *env,
-	u_int32_t flags,
+	uint32_t flags,
 	DB **dbp)
 {
 	const char *method_name = "ENV.db";
@@ -1029,10 +1029,10 @@ static int __wt_api_env_errpfx_set(
 
 static int __wt_api_env_hazard_size_get(
 	ENV *env,
-	u_int32_t *hazard_size);
+	uint32_t *hazard_size);
 static int __wt_api_env_hazard_size_get(
 	ENV *env,
-	u_int32_t *hazard_size)
+	uint32_t *hazard_size)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -1044,10 +1044,10 @@ static int __wt_api_env_hazard_size_get(
 
 static int __wt_api_env_hazard_size_set(
 	ENV *env,
-	u_int32_t hazard_size);
+	uint32_t hazard_size);
 static int __wt_api_env_hazard_size_set(
 	ENV *env,
-	u_int32_t hazard_size)
+	uint32_t hazard_size)
 {
 	IENV *ienv = env->ienv;
 	WT_RET((__wt_env_hazard_size_set_verify(
@@ -1123,12 +1123,12 @@ static int __wt_api_env_open(
 	ENV *env,
 	const char *home,
 	mode_t mode,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_env_open(
 	ENV *env,
 	const char *home,
 	mode_t mode,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "ENV.open";
 	IENV *ienv = env->ienv;
@@ -1142,10 +1142,10 @@ static int __wt_api_env_open(
 
 static int __wt_api_env_stat_clear(
 	ENV *env,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_env_stat_clear(
 	ENV *env,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "ENV.stat_clear";
 	IENV *ienv = env->ienv;
@@ -1160,11 +1160,11 @@ static int __wt_api_env_stat_clear(
 static int __wt_api_env_stat_print(
 	ENV *env,
 	FILE *stream,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_env_stat_print(
 	ENV *env,
 	FILE *stream,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "ENV.stat_print";
 	IENV *ienv = env->ienv;
@@ -1178,12 +1178,12 @@ static int __wt_api_env_stat_print(
 
 static int __wt_api_env_sync(
 	ENV *env,
-	void (*progress)(const char *, u_int64_t),
-	u_int32_t flags);
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags);
 static int __wt_api_env_sync(
 	ENV *env,
-	void (*progress)(const char *, u_int64_t),
-	u_int32_t flags)
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags)
 {
 	const char *method_name = "ENV.sync";
 	IENV *ienv = env->ienv;
@@ -1197,11 +1197,11 @@ static int __wt_api_env_sync(
 
 static int __wt_api_env_toc(
 	ENV *env,
-	u_int32_t flags,
+	uint32_t flags,
 	WT_TOC **tocp);
 static int __wt_api_env_toc(
 	ENV *env,
-	u_int32_t flags,
+	uint32_t flags,
 	WT_TOC **tocp)
 {
 	const char *method_name = "ENV.toc";
@@ -1218,10 +1218,10 @@ static int __wt_api_env_toc(
 
 static int __wt_api_env_toc_size_get(
 	ENV *env,
-	u_int32_t *toc_size);
+	uint32_t *toc_size);
 static int __wt_api_env_toc_size_get(
 	ENV *env,
-	u_int32_t *toc_size)
+	uint32_t *toc_size)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -1233,10 +1233,10 @@ static int __wt_api_env_toc_size_get(
 
 static int __wt_api_env_toc_size_set(
 	ENV *env,
-	u_int32_t toc_size);
+	uint32_t toc_size);
 static int __wt_api_env_toc_size_set(
 	ENV *env,
-	u_int32_t toc_size)
+	uint32_t toc_size)
 {
 	IENV *ienv = env->ienv;
 	WT_RET((__wt_env_toc_size_set_verify(
@@ -1250,10 +1250,10 @@ static int __wt_api_env_toc_size_set(
 
 static int __wt_api_env_verbose_get(
 	ENV *env,
-	u_int32_t *verbose);
+	uint32_t *verbose);
 static int __wt_api_env_verbose_get(
 	ENV *env,
-	u_int32_t *verbose)
+	uint32_t *verbose)
 {
 	IENV *ienv = env->ienv;
 	__wt_lock(env, ienv->mtx);
@@ -1265,10 +1265,10 @@ static int __wt_api_env_verbose_get(
 
 static int __wt_api_env_verbose_set(
 	ENV *env,
-	u_int32_t verbose);
+	uint32_t verbose);
 static int __wt_api_env_verbose_set(
 	ENV *env,
-	u_int32_t verbose)
+	uint32_t verbose)
 {
 	IENV *ienv = env->ienv;
 	WT_RET((__wt_env_verbose_set_verify(
@@ -1282,10 +1282,10 @@ static int __wt_api_env_verbose_set(
 
 static int __wt_api_wt_toc_close(
 	WT_TOC *wt_toc,
-	u_int32_t flags);
+	uint32_t flags);
 static int __wt_api_wt_toc_close(
 	WT_TOC *wt_toc,
-	u_int32_t flags)
+	uint32_t flags)
 {
 	const char *method_name = "WT_TOC.close";
 	ENV *env = wt_toc->env;
@@ -1329,40 +1329,40 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
 	    __wt_db_lockout;
 	db->btree_dup_offpage_get = (int (*)
-	    (DB *, u_int32_t *))
+	    (DB *, uint32_t *))
 	    __wt_db_lockout;
 	db->btree_dup_offpage_set = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, uint32_t ))
 	    __wt_db_lockout;
 	db->btree_itemsize_get = (int (*)
-	    (DB *, u_int32_t *, u_int32_t *))
+	    (DB *, uint32_t *, uint32_t *))
 	    __wt_db_lockout;
 	db->btree_itemsize_set = (int (*)
-	    (DB *, u_int32_t , u_int32_t ))
+	    (DB *, uint32_t , uint32_t ))
 	    __wt_db_lockout;
 	db->btree_pagesize_get = (int (*)
-	    (DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *))
+	    (DB *, uint32_t *, uint32_t *, uint32_t *, uint32_t *, uint32_t *))
 	    __wt_db_lockout;
 	db->btree_pagesize_set = (int (*)
-	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    (DB *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = (int (*)
-	    (DB *, u_int32_t , void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **)))
+	    (DB *, uint32_t , void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **)))
 	    __wt_db_lockout;
 	db->col_del = (int (*)
-	    (DB *, WT_TOC *, u_int64_t , u_int32_t ))
+	    (DB *, WT_TOC *, uint64_t , uint32_t ))
 	    __wt_db_lockout;
 	db->col_get = (int (*)
-	    (DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, uint64_t , DBT *, uint32_t ))
 	    __wt_db_lockout;
 	db->col_put = (int (*)
-	    (DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, uint64_t , DBT *, uint32_t ))
 	    __wt_db_lockout;
 	db->column_set = (int (*)
-	    (DB *, u_int32_t , const char *, u_int32_t ))
+	    (DB *, uint32_t , const char *, uint32_t ))
 	    __wt_db_lockout;
 	db->dump = (int (*)
-	    (DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t ))
+	    (DB *, FILE *, void (*)(const char *, uint64_t), uint32_t ))
 	    __wt_db_lockout;
 	db->err = (void (*)
 	    (DB *, int , const char *, ...))
@@ -1389,31 +1389,31 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, const char *, ...))
 	    __wt_db_lockout;
 	db->huffman_set = (int (*)
-	    (DB *, u_int8_t const *, u_int , u_int32_t ))
+	    (DB *, uint8_t const *, u_int , uint32_t ))
 	    __wt_db_lockout;
 	db->open = (int (*)
-	    (DB *, const char *, mode_t , u_int32_t ))
+	    (DB *, const char *, mode_t , uint32_t ))
 	    __wt_db_lockout;
 	db->row_del = (int (*)
-	    (DB *, WT_TOC *, DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, DBT *, uint32_t ))
 	    __wt_db_lockout;
 	db->row_get = (int (*)
-	    (DB *, WT_TOC *, DBT *, DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, DBT *, DBT *, uint32_t ))
 	    __wt_db_lockout;
 	db->row_put = (int (*)
-	    (DB *, WT_TOC *, DBT *, DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, DBT *, DBT *, uint32_t ))
 	    __wt_db_lockout;
 	db->stat_clear = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, uint32_t ))
 	    __wt_db_lockout;
 	db->stat_print = (int (*)
-	    (DB *, FILE *, u_int32_t ))
+	    (DB *, FILE *, uint32_t ))
 	    __wt_db_lockout;
 	db->sync = (int (*)
-	    (DB *, void (*)(const char *, u_int64_t), u_int32_t ))
+	    (DB *, void (*)(const char *, uint64_t), uint32_t ))
 	    __wt_db_lockout;
 	db->verify = (int (*)
-	    (DB *, void (*)(const char *, u_int64_t), u_int32_t ))
+	    (DB *, void (*)(const char *, uint64_t), uint32_t ))
 	    __wt_db_lockout;
 }
 
@@ -1459,19 +1459,19 @@ __wt_methods_db_open_transition(DB *db)
 	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
 	    __wt_db_lockout;
 	db->btree_dup_offpage_set = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, uint32_t ))
 	    __wt_db_lockout;
 	db->btree_itemsize_set = (int (*)
-	    (DB *, u_int32_t , u_int32_t ))
+	    (DB *, uint32_t , uint32_t ))
 	    __wt_db_lockout;
 	db->btree_pagesize_set = (int (*)
-	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    (DB *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t ))
 	    __wt_db_lockout;
 	db->column_set = (int (*)
-	    (DB *, u_int32_t , const char *, u_int32_t ))
+	    (DB *, uint32_t , const char *, uint32_t ))
 	    __wt_db_lockout;
 	db->huffman_set = (int (*)
-	    (DB *, u_int8_t const *, u_int , u_int32_t ))
+	    (DB *, uint8_t const *, u_int , uint32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = __wt_api_db_bulk_load;
 	db->col_del = __wt_api_db_col_del;
@@ -1502,37 +1502,37 @@ void
 __wt_methods_env_lockout(ENV *env)
 {
 	env->cache_drain_cnt_get = (int (*)
-	    (ENV *, u_int32_t *))
+	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
 	env->cache_drain_cnt_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->cache_hash_size_get = (int (*)
-	    (ENV *, u_int32_t *))
+	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
 	env->cache_hash_size_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->cache_size_get = (int (*)
-	    (ENV *, u_int32_t *))
+	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
 	env->cache_size_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->data_update_initial_get = (int (*)
-	    (ENV *, u_int32_t *))
+	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
 	env->data_update_initial_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->data_update_max_get = (int (*)
-	    (ENV *, u_int32_t *))
+	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
 	env->data_update_max_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->db = (int (*)
-	    (ENV *, u_int32_t , DB **))
+	    (ENV *, uint32_t , DB **))
 	    __wt_env_lockout;
 	env->err = (void (*)
 	    (ENV *, int , const char *, ...))
@@ -1559,10 +1559,10 @@ __wt_methods_env_lockout(ENV *env)
 	    (ENV *, const char *, ...))
 	    __wt_env_lockout;
 	env->hazard_size_get = (int (*)
-	    (ENV *, u_int32_t *))
+	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
 	env->hazard_size_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->msgcall_get = (int (*)
 	    (ENV *, void (**)(const ENV *, const char *)))
@@ -1577,31 +1577,31 @@ __wt_methods_env_lockout(ENV *env)
 	    (ENV *, FILE *))
 	    __wt_env_lockout;
 	env->open = (int (*)
-	    (ENV *, const char *, mode_t , u_int32_t ))
+	    (ENV *, const char *, mode_t , uint32_t ))
 	    __wt_env_lockout;
 	env->stat_clear = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->stat_print = (int (*)
-	    (ENV *, FILE *, u_int32_t ))
+	    (ENV *, FILE *, uint32_t ))
 	    __wt_env_lockout;
 	env->sync = (int (*)
-	    (ENV *, void (*)(const char *, u_int64_t), u_int32_t ))
+	    (ENV *, void (*)(const char *, uint64_t), uint32_t ))
 	    __wt_env_lockout;
 	env->toc = (int (*)
-	    (ENV *, u_int32_t , WT_TOC **))
+	    (ENV *, uint32_t , WT_TOC **))
 	    __wt_env_lockout;
 	env->toc_size_get = (int (*)
-	    (ENV *, u_int32_t *))
+	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
 	env->toc_size_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->verbose_get = (int (*)
-	    (ENV *, u_int32_t *))
+	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
 	env->verbose_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 }
 
@@ -1646,16 +1646,16 @@ void
 __wt_methods_env_open_transition(ENV *env)
 {
 	env->cache_size_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->hazard_size_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->open = (int (*)
-	    (ENV *, const char *, mode_t , u_int32_t ))
+	    (ENV *, const char *, mode_t , uint32_t ))
 	    __wt_env_lockout;
 	env->toc_size_set = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, uint32_t ))
 	    __wt_env_lockout;
 	env->db = __wt_api_env_db;
 	env->sync = __wt_api_env_sync;

@@ -11,11 +11,11 @@
 
 typedef struct {
 	void (*p)				/* Print function */
-	    (u_int8_t *, u_int32_t, FILE *);
+	    (uint8_t *, uint32_t, FILE *);
 	FILE *stream;				/* Dump stream */
 
-	void (*f)(const char *, u_int64_t);	/* Progress callback */
-	u_int64_t fcnt;				/* Progress counter */
+	void (*f)(const char *, uint64_t);	/* Progress callback */
+	uint64_t fcnt;				/* Progress counter */
 
 	DBT *dupkey;				/* Offpage duplicate tree key */
 } WT_DSTUFF;
@@ -26,8 +26,8 @@ static int  __wt_bt_dump_page_col_rcc(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_bt_dump_page_col_var(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_bt_dump_page_dup_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_bt_dump_page_row_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
-static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
+static void __wt_bt_hexprint(uint8_t *, uint32_t, FILE *);
+static void __wt_bt_print_nl(uint8_t *, uint32_t, FILE *);
 
 /*
  * __wt_db_dump --
@@ -35,7 +35,7 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
  */
 int
 __wt_db_dump(WT_TOC *toc,
-    FILE *stream, void (*f)(const char *, u_int64_t), u_int32_t flags)
+    FILE *stream, void (*f)(const char *, uint64_t), uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -136,7 +136,7 @@ __wt_bt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DB *db;
 	WT_COL *cip;
 	WT_REPL *repl;
-	u_int32_t i;
+	uint32_t i;
 
 	db = toc->db;
 
@@ -164,9 +164,9 @@ __wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_COL *cip;
 	WT_COL_EXPAND *exp, **expsort, **expp;
 	WT_REPL *repl;
-	u_int64_t recno;
-	u_int32_t i, n_expsort;
-	u_int16_t n_repeat;
+	uint64_t recno;
+	uint32_t i, n_expsort;
+	uint16_t n_repeat;
 
 	db = toc->db;
 	env = toc->env;
@@ -222,7 +222,7 @@ __wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_ITEM *item;
 	WT_PAGE *ovfl;
 	WT_REPL *repl;
-	u_int32_t i;
+	uint32_t i;
 	int ret;
 	void *huffman;
 
@@ -281,7 +281,7 @@ __wt_bt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_PAGE *ovfl;
 	WT_REPL *repl;
 	WT_ROW *rip;
-	u_int32_t i;
+	uint32_t i;
 	int ret;
 	void *huffman;
 
@@ -347,7 +347,7 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_ITEM *item;
 	WT_REPL *repl;
 	WT_ROW *rip;
-	u_int32_t i;
+	uint32_t i;
 	int ret;
 	void *huffman;
 
@@ -463,7 +463,7 @@ static const char hex[] = "0123456789abcdef";
  *	itself terminated with a <newline> character.
  */
 static void
-__wt_bt_print_nl(u_int8_t *data, u_int32_t size, FILE *stream)
+__wt_bt_print_nl(uint8_t *data, uint32_t size, FILE *stream)
 {
 	if (data[size - 1] == '\n')
 		--size;
@@ -476,7 +476,7 @@ __wt_bt_print_nl(u_int8_t *data, u_int32_t size, FILE *stream)
  *	Output a single key/data entry in printable characters, where possible.
  */
 void
-__wt_bt_print(u_int8_t *data, u_int32_t size, FILE *stream)
+__wt_bt_print(uint8_t *data, uint32_t size, FILE *stream)
 {
 	int ch;
 
@@ -495,7 +495,7 @@ __wt_bt_print(u_int8_t *data, u_int32_t size, FILE *stream)
  *	Output a single key/data entry in hex.
  */
 static void
-__wt_bt_hexprint(u_int8_t *data, u_int32_t size, FILE *stream)
+__wt_bt_hexprint(uint8_t *data, uint32_t size, FILE *stream)
 {
 	for (; size > 0; --size, ++data)
 		fprintf(stream, "%x%x",

@@ -20,7 +20,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	IDB *idb;
 	WT_PAGE *page;
 	WT_ROW *rip;
-	u_int32_t type;
+	uint32_t type;
 	int ret;
 
 	db = toc->db;

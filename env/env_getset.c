@@ -14,7 +14,7 @@
  *	Verify an argument to the Env.cache_size_set method.
  */
 int
-__wt_env_cache_size_set_verify(ENV *env, u_int32_t cache_size)
+__wt_env_cache_size_set_verify(ENV *env, uint32_t cache_size)
 {
 	return (__wt_api_arg_min(env,
 	    "Env.cache_size_set", "cache size", cache_size, 1));
@@ -25,7 +25,7 @@ __wt_env_cache_size_set_verify(ENV *env, u_int32_t cache_size)
  *	Verify an argument to the Env.hash_size_set method.
  */
 int
-__wt_env_cache_hash_size_set_verify(ENV *env, u_int32_t hash_size)
+__wt_env_cache_hash_size_set_verify(ENV *env, uint32_t hash_size)
 {
 	return (__wt_api_arg_min(env,
 	    "Env.hash_size_set", "hash size", hash_size, 1));
@@ -36,7 +36,7 @@ __wt_env_cache_hash_size_set_verify(ENV *env, u_int32_t hash_size)
  *	Verify an argument to the Env.hazard_size_set method.
  */
 int
-__wt_env_hazard_size_set_verify(ENV *env, u_int32_t hazard_size)
+__wt_env_hazard_size_set_verify(ENV *env, uint32_t hazard_size)
 {
 	return (__wt_api_arg_min(env,
 	    "Env.hazard_size_set", "hazard size", hazard_size, 1));
@@ -47,7 +47,7 @@ __wt_env_hazard_size_set_verify(ENV *env, u_int32_t hazard_size)
  *	Verify an argument to the Env.toc_size_set method.
  */
 int
-__wt_env_toc_size_set_verify(ENV *env, u_int32_t toc_size)
+__wt_env_toc_size_set_verify(ENV *env, uint32_t toc_size)
 {
 	return (__wt_api_arg_min(env,
 	    "Env.toc_size_set", "toc size", toc_size, 1));
@@ -58,7 +58,7 @@ __wt_env_toc_size_set_verify(ENV *env, u_int32_t toc_size)
  *	Verify an argument to the Env.verbose_set method.
  */
 int
-__wt_env_verbose_set_verify(ENV *env, u_int32_t verbose)
+__wt_env_verbose_set_verify(ENV *env, uint32_t verbose)
 {
 #ifdef HAVE_VERBOSE
 	WT_ENV_FCHK(env,

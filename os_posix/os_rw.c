@@ -14,7 +14,7 @@
  *	Read a chunk.
  */
 int
-__wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
+__wt_read(ENV *env, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
 	WT_STAT_INCR(fh->stats, READ_IO);
 	WT_STAT_INCR(env->ienv->stats, TOTAL_READ_IO);
@@ -37,7 +37,7 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
  *	Write a chunk.
  */
 int
-__wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
+__wt_write(ENV *env, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
 	WT_STAT_INCR(fh->stats, WRITE_IO);
 	WT_STAT_INCR(env->ienv->stats, TOTAL_WRITE_IO);

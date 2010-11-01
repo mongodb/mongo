@@ -69,12 +69,12 @@ extern "C" {
  *	A structure to accumulate database changes on a per-thread basis.
  */
 struct __wt_toc_update {
-	u_int32_t len;				/* Buffer original size */
-	u_int32_t space_avail;			/* Buffer's available memory */
-	u_int8_t *first_free;			/* Buffer's first free byte */
+	uint32_t len;				/* Buffer original size */
+	uint32_t space_avail;			/* Buffer's available memory */
+	uint8_t *first_free;			/* Buffer's first free byte */
 
-	u_int16_t in;				/* Buffer chunks in use */
-	u_int16_t out;				/* Buffer chunks not in use */
+	uint16_t in;				/* Buffer chunks in use */
+	uint16_t out;				/* Buffer chunks not in use */
 };
 
 /*******************************************
@@ -94,11 +94,11 @@ struct __idb {
 	char	 *name;			/* Database name */
 	mode_t	  mode;			/* Database file create mode */
 
-	u_int32_t file_id;		/* In-memory file ID */
+	uint32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
-	u_int32_t root_addr;		/* Root page addr */
-	u_int32_t root_size;		/* Root page size */
+	uint32_t root_addr;		/* Root page addr */
+	uint32_t root_size;		/* Root page size */
 
 	/*
 	 * The root page is pinned into memory when the database is opened
@@ -108,8 +108,8 @@ struct __idb {
 #define	WT_UNOPENED_DATABASE(idb)	((idb)->root_page == NULL ? 1 : 0)
 	WT_PAGE  *root_page;		/* Root page */
 
-	u_int32_t free_addr;		/* Free page addr */
-	u_int32_t free_size;		/* Free page size */
+	uint32_t free_addr;		/* Free page addr */
+	uint32_t free_size;		/* Free page size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_data;		/* Data huffman encoding */
@@ -117,7 +117,7 @@ struct __idb {
 	WT_STATS *stats;		/* Database handle statistics */
 	WT_STATS *dstats;		/* Database file statistics */
 
-	u_int32_t flags;
+	uint32_t flags;
 };
 
 /*******************************************
@@ -137,7 +137,7 @@ struct __ienv {
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
 	u_int next_file_id;		/* Locked: file ID counter */
 
-	u_int32_t volatile api_gen;	/* API generation number */
+	uint32_t volatile api_gen;	/* API generation number */
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous threads of control by
@@ -151,7 +151,7 @@ struct __ienv {
 	 * running.
 	 */
 	WT_TOC	**toc;			/* TOC reference */
-	u_int32_t toc_cnt;		/* TOC count */
+	uint32_t toc_cnt;		/* TOC count */
 	void	 *toc_array;		/* TOC array */
 
 	/*
@@ -179,7 +179,7 @@ struct __ienv {
 	char *sep;			/* Display separator line */
 	char err_buf[32];		/* Last-ditch error buffer */
 
-	u_int32_t flags;
+	uint32_t flags;
 };
 
 #include "serial.h"

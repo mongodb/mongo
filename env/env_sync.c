@@ -14,7 +14,7 @@
  *	Flush the environment's cache.
  */
 int
-__wt_env_sync(ENV *env, void (*f)(const char *, u_int64_t))
+__wt_env_sync(ENV *env, void (*f)(const char *, uint64_t))
 {
 	IDB *idb;
 	IENV *ienv;

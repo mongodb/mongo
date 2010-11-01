@@ -29,7 +29,7 @@ __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int)
  *	Verify arguments to the Db.btree_dup_offpage_set method.
  */
 int
-__wt_db_btree_dup_offpage_set_verify(DB *db, u_int32_t dup_offpage)
+__wt_db_btree_dup_offpage_set_verify(DB *db, uint32_t dup_offpage)
 {
 	/*
 	 * Limiting this value to something between 10 and 50 is a sanity test,
@@ -55,7 +55,7 @@ __wt_db_btree_dup_offpage_set_verify(DB *db, u_int32_t dup_offpage)
  */
 int
 __wt_db_column_set_verify(DB *db,
-    u_int32_t fixed_len, const char *dictionary, u_int32_t flags)
+    uint32_t fixed_len, const char *dictionary, uint32_t flags)
 {
 	ENV *env;
 	IDB *idb;

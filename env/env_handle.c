@@ -17,7 +17,7 @@ static int __wt_ienv_config(ENV *);
  *	ENV constructor.
  */
 int
-__wt_env_create(u_int32_t flags, ENV **envp)
+__wt_env_create(uint32_t flags, ENV **envp)
 {
 	ENV *env;
 	IENV *ienv;

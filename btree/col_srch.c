@@ -14,7 +14,7 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_bt_search_col(WT_TOC *toc, u_int64_t recno, u_int32_t flags)
+__wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -22,9 +22,9 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno, u_int32_t flags)
 	WT_COL_EXPAND *exp;
 	WT_PAGE *page;
 	WT_REPL *repl;
-	u_int64_t record_cnt;
-	u_int32_t addr, size, i;
-	u_int16_t write_gen;
+	uint64_t record_cnt;
+	uint32_t addr, size, i;
+	uint16_t write_gen;
 	int ret;
 
 	toc->srch_page = NULL;			/* Return values. */

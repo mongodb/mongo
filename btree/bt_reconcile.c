@@ -11,7 +11,7 @@
 
 static int __wt_bt_rcc_expand_compare(const void *, const void *);
 static int __wt_bt_rcc_expand_sort(
-		ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, u_int32_t *);
+		ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, uint32_t *);
 static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -33,7 +33,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	ENV *env;
 	WT_PAGE *new;
 	WT_PAGE_HDR *hdr;
-	u_int32_t max;
+	uint32_t max;
 	int ret;
 
 	db = toc->db;
@@ -124,7 +124,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	/* Initialize the reconciliation buffer as a replacement page. */
 	new = tmp->data;
-	new->hdr = (WT_PAGE_HDR *)((u_int8_t *)tmp->data + sizeof(WT_PAGE));
+	new->hdr = (WT_PAGE_HDR *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
 	new->addr = page->addr;
 	__wt_bt_set_ff_and_sa_from_offset(new, WT_PAGE_BYTE(new));
 	new->hdr->type = page->hdr->type;
@@ -221,8 +221,8 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
-	u_int32_t i, len;
-	u_int8_t *data;
+	uint32_t i, len;
+	uint8_t *data;
 	int ret;
 
 	db = toc->db;
@@ -291,9 +291,9 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_COL_EXPAND *exp, **expsort, **expp;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
-	u_int32_t i, len, n_expsort;
-	u_int16_t n, repeat_count, total;
-	u_int8_t *data, *last_data;
+	uint32_t i, len, n_expsort;
+	uint16_t n, repeat_count, total;
+	uint8_t *data, *last_data;
 	int rc_prefix, ret;
 
 	db = toc->db;
@@ -310,7 +310,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * WT_TOC's scratch buffer is big enough.  Clear the buffer's contents
 	 * and set the delete flag.
 	 */
-	len = db->fixed_len + sizeof(u_int16_t);
+	len = db->fixed_len + sizeof(uint16_t);
 	WT_ERR(__wt_scr_alloc(toc, &tmp));
 	if (tmp->mem_size < len)
 		WT_ERR(__wt_realloc(env, &tmp->mem_size, len, &tmp->data));
@@ -443,10 +443,10 @@ __wt_bt_rcc_expand_compare(const void *a, const void *b)
  */
 static int
 __wt_bt_rcc_expand_sort(ENV *env,
-    WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, u_int32_t *np)
+    WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, uint32_t *np)
 {
 	WT_COL_EXPAND *exp;
-	u_int16_t n;
+	uint16_t n;
 
 	/* Figure out how big the array needs to be. */
 	for (n = 0,
@@ -496,7 +496,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_OVFL data_ovfl;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
-	u_int32_t i, len;
+	uint32_t i, len;
 
 	hdr = new->hdr;
 
@@ -579,7 +579,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_PAGE_HDR *hdr;
 	WT_ROW *rip;
 	WT_REPL *repl;
-	u_int32_t i, len, type;
+	uint32_t i, len, type;
 
 	db = toc->db;
 	hdr = new->hdr;
@@ -765,7 +765,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * expects the WT_PAGE->size field to be valid.
 	 */
 	new->size = WT_ALIGN(
-	    new->first_free - (u_int8_t *)new->hdr, db->allocsize);
+	    new->first_free - (uint8_t *)new->hdr, db->allocsize);
 
 	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
@@ -800,7 +800,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 static int
 __wt_cache_alloc_serial_func(WT_TOC *toc)
 {
-	u_int32_t *addrp, size;
+	uint32_t *addrp, size;
 
 	__wt_cache_alloc_unpack(toc, addrp, size);
 	return (__wt_cache_read_queue(toc, addrp, size, NULL));

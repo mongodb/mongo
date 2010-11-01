@@ -22,7 +22,7 @@
  * character in text where it occurs, and tab appears about as frequently as
  * 'a' and 'n' in text where it occurs.
  */
-static u_int8_t const __wt_huffman_ascii_english[256] = {
+static uint8_t const __wt_huffman_ascii_english[256] = {
 	1,	/* 000 nul */
 	1,	/* 001 soh */
 	1,	/* 002 stx */
@@ -159,11 +159,11 @@ static u_int8_t const __wt_huffman_ascii_english[256] = {
  */
 int
 __wt_db_huffman_set(DB *db,
-    u_int8_t const *huffman_table, u_int huffman_table_size, u_int32_t flags)
+    uint8_t const *huffman_table, u_int huffman_table_size, uint32_t flags)
 {
 	ENV *env;
 	IDB *idb;
-	u_int8_t phone[256];
+	uint8_t phone[256];
 
 	env = db->env;
 	idb = db->idb;

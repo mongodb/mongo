@@ -1,7 +1,7 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 int
-__wt_db_bulk_load(WT_TOC *toc, u_int32_t flags,
-    void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **));
+__wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
+    void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **));
 int
 __wt_bt_build_key_item(
     WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load);
@@ -18,7 +18,7 @@ int
 __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp);
 int
 __wt_bt_debug_addr(
-    WT_TOC *toc, u_int32_t addr, u_int32_t size, char *ofile, FILE *fp);
+    WT_TOC *toc, uint32_t addr, uint32_t size, char *ofile, FILE *fp);
 int
 __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
 int
@@ -30,24 +30,24 @@ __wt_bt_stat_desc(WT_TOC *toc);
 int
 __wt_bt_desc_read(WT_TOC *toc);
 int
-__wt_bt_desc_write_root(WT_TOC *toc, u_int32_t root_addr, u_int32_t root_size);
+__wt_bt_desc_write_root(WT_TOC *toc, uint32_t root_addr, uint32_t root_size);
 int
 __wt_bt_desc_write(WT_TOC *toc);
 void
 __wt_bt_page_discard(ENV *env, WT_PAGE *page);
 int
 __wt_db_dump(WT_TOC *toc,
-    FILE *stream, void (*f)(const char *, u_int64_t), u_int32_t flags);
+    FILE *stream, void (*f)(const char *, uint64_t), uint32_t flags);
 void
-__wt_bt_print(u_int8_t *data, u_int32_t size, FILE *stream);
+__wt_bt_print(uint8_t *data, uint32_t size, FILE *stream);
 int
 __wt_bt_build_verify(void);
 int
-__wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t size, DBT *copy);
+__wt_bt_data_copy_to_dbt(DB *db, uint8_t *data, size_t size, DBT *copy);
 inline void
-__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, u_int8_t *p);
+__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, uint8_t *p);
 inline int
-__wt_page_write_gen_update(WT_PAGE *page, u_int32_t write_gen);
+__wt_page_write_gen_update(WT_PAGE *page, uint32_t write_gen);
 const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *
@@ -59,17 +59,17 @@ __wt_bt_root_pin(WT_TOC *toc, int pin);
 int
 __wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep);
 int
-__wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp);
+__wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp);
 int
 __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy);
 int
 __wt_bt_page_alloc(
-    WT_TOC *toc, u_int type, u_int level, u_int32_t size, WT_PAGE **pagep);
+    WT_TOC *toc, u_int type, u_int level, uint32_t size, WT_PAGE **pagep);
 int
 __wt_bt_page_in(
-    WT_TOC *toc, u_int32_t addr, u_int32_t size, int inmem, WT_PAGE **pagep);
+    WT_TOC *toc, uint32_t addr, uint32_t size, int inmem, WT_PAGE **pagep);
 void
-__wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags);
+__wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, uint32_t flags);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
@@ -78,36 +78,33 @@ __wt_bt_item_process(
 int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page);
 int
-__wt_bt_rcc_expand_sort(ENV *env,
-    WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, u_int32_t *np);
-int
 __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
-__wt_bt_tree_walk(WT_TOC *toc, u_int32_t addr,
-    u_int32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg);
+__wt_bt_tree_walk(WT_TOC *toc, uint32_t addr,
+    uint32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg);
 int
 __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg);
 int
-__wt_bt_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
+__wt_bt_sync(WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags);
 int
-__wt_db_verify(WT_TOC *toc, void (*f)(const char *, u_int64_t));
+__wt_db_verify(WT_TOC *toc, void (*f)(const char *, uint64_t));
 int
 __wt_bt_verify(
-    WT_TOC *toc, void (*f)(const char *, u_int64_t), FILE *stream);
+    WT_TOC *toc, void (*f)(const char *, uint64_t), FILE *stream);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 int
-__wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data);
+__wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data);
 inline int
-__wt_db_col_del(WT_TOC *toc, u_int64_t recno);
+__wt_db_col_del(WT_TOC *toc, uint64_t recno);
 inline int
-__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data);
+__wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data);
 int
 __wt_bt_rcc_expand_serial_func(WT_TOC *toc);
 int
 __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc);
 int
-__wt_bt_search_col(WT_TOC *toc, u_int64_t recno, u_int32_t flags);
+__wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t flags);
 int
 __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
 inline int
@@ -121,11 +118,11 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data);
 void
 __wt_bt_repl_free(WT_TOC *toc, WT_REPL *repl);
 int
-__wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags);
+__wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t flags);
 int
-__wt_cache_alloc(WT_TOC *toc, u_int32_t *addrp, u_int32_t size);
+__wt_cache_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
 int
-__wt_cache_free(WT_TOC *toc, u_int32_t addr, u_int32_t size);
+__wt_cache_free(WT_TOC *toc, uint32_t addr, uint32_t size);
 void
 __wt_workq_drain_server(ENV *env, int force);
 void *
@@ -134,9 +131,9 @@ void
 __wt_drain_dump(ENV *env, const char *tag);
 int
 __wt_cache_create(ENV *env);
-u_int64_t
+uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache);
-u_int64_t
+uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache);
 void
 __wt_cache_stats(ENV *env);
@@ -145,10 +142,10 @@ __wt_cache_destroy(ENV *env);
 void
 __wt_cache_dump(ENV *env);
 int
-__wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep);
+__wt_page_alloc(WT_TOC *toc, uint32_t size, WT_PAGE **pagep);
 int
 __wt_page_in(WT_TOC *toc,
-    u_int32_t addr, u_int32_t size, WT_PAGE **pagep, u_int32_t flags);
+    uint32_t addr, uint32_t size, WT_PAGE **pagep, uint32_t flags);
 void
 __wt_page_out(WT_TOC *toc, WT_PAGE *page);
 int
@@ -159,12 +156,12 @@ void
 __wt_workq_read_server(ENV *env, int force);
 int
 __wt_cache_read_queue(
-    WT_TOC *toc, u_int32_t *addrp, u_int32_t size, WT_PAGE **pagep);
+    WT_TOC *toc, uint32_t *addrp, uint32_t size, WT_PAGE **pagep);
 void *
 __wt_cache_read_server(void *arg);
 int
 __wt_cache_sync(
-    WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
+    WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags);
 void
 __wt_api_db_err(DB *db, int error, const char *fmt, ...);
 void
@@ -172,10 +169,10 @@ __wt_api_db_errx(DB *db, const char *fmt, ...);
 int
 __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int);
 int
-__wt_db_btree_dup_offpage_set_verify(DB *db, u_int32_t dup_offpage);
+__wt_db_btree_dup_offpage_set_verify(DB *db, uint32_t dup_offpage);
 int
 __wt_db_column_set_verify(DB *db,
-    u_int32_t fixed_len, const char *dictionary, u_int32_t flags);
+    uint32_t fixed_len, const char *dictionary, uint32_t flags);
 int
 __wt_env_db(ENV *env, DB **dbp);
 int
@@ -186,31 +183,31 @@ int
 __wt_db_lockout_open(DB *db);
 int
 __wt_db_huffman_set(DB *db,
-    u_int8_t const *huffman_table, u_int huffman_table_size, u_int32_t flags);
+    uint8_t const *huffman_table, u_int huffman_table_size, uint32_t flags);
 int
-__wt_db_open(WT_TOC *toc, const char *name, mode_t mode, u_int32_t flags);
+__wt_db_open(WT_TOC *toc, const char *name, mode_t mode, uint32_t flags);
 int
-__wt_db_close(WT_TOC *toc, u_int32_t flags);
+__wt_db_close(WT_TOC *toc, uint32_t flags);
 int
 __wt_db_stat_print(WT_TOC *toc, FILE *stream);
 int
 __wt_db_stat_clear(DB *db);
 int
-__wt_db_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
+__wt_db_sync(WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags);
 void
 __wt_api_env_err(ENV *env, int error, const char *fmt, ...);
 void
 __wt_api_env_errx(ENV *env, const char *fmt, ...);
 int
-__wt_env_cache_size_set_verify(ENV *env, u_int32_t cache_size);
+__wt_env_cache_size_set_verify(ENV *env, uint32_t cache_size);
 int
-__wt_env_cache_hash_size_set_verify(ENV *env, u_int32_t hash_size);
+__wt_env_cache_hash_size_set_verify(ENV *env, uint32_t hash_size);
 int
-__wt_env_hazard_size_set_verify(ENV *env, u_int32_t hazard_size);
+__wt_env_hazard_size_set_verify(ENV *env, uint32_t hazard_size);
 int
-__wt_env_toc_size_set_verify(ENV *env, u_int32_t toc_size);
+__wt_env_toc_size_set_verify(ENV *env, uint32_t toc_size);
 int
-__wt_env_verbose_set_verify(ENV *env, u_int32_t verbose);
+__wt_env_verbose_set_verify(ENV *env, uint32_t verbose);
 int
 __wt_library_init(void);
 int
@@ -218,7 +215,7 @@ __wt_breakpoint(void);
 void
 __wt_attach(ENV *env);
 int
-__wt_env_create(u_int32_t flags, ENV **envp);
+__wt_env_create(uint32_t flags, ENV **envp);
 int
 __wt_ienv_destroy(ENV *env);
 void
@@ -242,7 +239,7 @@ __wt_env_stat_clear(ENV *env);
 void
 __wt_stat_print(ENV *env, WT_STATS *s, FILE *stream);
 int
-__wt_env_sync(ENV *env, void (*f)(const char *, u_int64_t));
+__wt_env_sync(ENV *env, void (*f)(const char *, uint64_t));
 int
 __wt_env_toc(ENV *env, WT_TOC **tocp);
 int
@@ -258,14 +255,14 @@ __wt_workq_srvr(void *arg);
 void
 __wt_abort(ENV *env);
 int
-__wt_calloc_func(ENV *env, u_int32_t number, u_int32_t size, void *retp
+__wt_calloc_func(ENV *env, uint32_t number, uint32_t size, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
     );
 int
 __wt_realloc_func(ENV *env,
-    u_int32_t *bytes_allocated_ret, u_int32_t bytes_to_allocate, void *retp
+    uint32_t *bytes_allocated_ret, uint32_t bytes_to_allocate, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -279,7 +276,7 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
 void
 __wt_free_func(ENV *env, void *p_arg
 #ifdef HAVE_DIAGNOSTIC
-    , u_int32_t len
+    , uint32_t len
 #endif
     );
 int
@@ -305,9 +302,9 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp);
 int
 __wt_close(ENV *env, WT_FH *fh);
 int
-__wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
+__wt_read(ENV *env, WT_FH *fh, off_t offset, uint32_t bytes, void *buf);
 int
-__wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
+__wt_write(ENV *env, WT_FH *fh, off_t offset, uint32_t bytes, void *buf);
 void
 __wt_sleep(long seconds, long micro_seconds);
 int
@@ -336,8 +333,8 @@ void
 __wt_methods_wt_toc_lockout(WT_TOC *wt_toc);
 void
 __wt_methods_wt_toc_init_transition(WT_TOC *wt_toc);
-u_int32_t
-__wt_cksum(void *chunk, u_int32_t bytes);
+uint32_t
+__wt_cksum(void *chunk, uint32_t bytes);
 void
 __wt_msg_call(void *cb, void *handle,
     const char *pfx1, const char *pfx2,
@@ -351,14 +348,14 @@ int
 __wt_api_args(ENV *env, const char *name);
 int
 __wt_api_arg_min(ENV *env,
-    const char *name, const char *arg_name, u_int32_t v, u_int32_t min);
+    const char *name, const char *arg_name, uint32_t v, uint32_t min);
 int
 __wt_api_arg_max(ENV *env,
-    const char *name, const char *arg_name, u_int32_t v, u_int32_t max);
+    const char *name, const char *arg_name, uint32_t v, uint32_t max);
 int
 __wt_database_method_type(DB *db, const char *name, int column_err);
 int
-__wt_database_wrong_fixed_size(WT_TOC *toc, u_int32_t len);
+__wt_database_wrong_fixed_size(WT_TOC *toc, uint32_t len);
 int
 __wt_database_readonly(DB *db, const char *name);
 int
@@ -379,27 +376,27 @@ void
 __wt_hazard_empty(WT_TOC *toc, const char *name);
 int
 __wt_huffman_open(ENV *env,
-    u_int8_t const *byte_frequency_array, u_int nbytes, void *retp);
+    uint8_t const *byte_frequency_array, u_int nbytes, void *retp);
 void
 __wt_huffman_close(ENV *env, void *huffman_arg);
 int
-__wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol);
+__wt_print_huffman_code(ENV *env, void *huffman_arg, uint16_t symbol);
 int
 __wt_huffman_encode(void *huffman_arg,
-    u_int8_t *from, u_int32_t from_len,
-    void *top, u_int32_t *to_len, u_int32_t *out_bytes_used);
+    uint8_t *from, uint32_t from_len,
+    void *top, uint32_t *to_len, uint32_t *out_bytes_used);
 int
 __wt_huffman_decode(void *huffman_arg,
-    u_int8_t *from, u_int32_t from_len,
-    void *top, u_int32_t *to_len, u_int32_t *out_bytes_used);
-u_int32_t
-__wt_nlpo2(u_int32_t v);
+    uint8_t *from, uint32_t from_len,
+    void *top, uint32_t *to_len, uint32_t *out_bytes_used);
+uint32_t
+__wt_nlpo2(uint32_t v);
 int
-__wt_ispo2(u_int32_t v);
-u_int32_t
-__wt_prime(u_int32_t n);
+__wt_ispo2(uint32_t v);
+uint32_t
+__wt_prime(uint32_t n);
 void
-__wt_progress(const char *s, u_int64_t v);
+__wt_progress(const char *s, uint64_t v);
 int
 __wt_scr_alloc(WT_TOC *toc, DBT **dbtp);
 void

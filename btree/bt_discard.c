@@ -21,7 +21,7 @@ void
 __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 {
 	WT_ROW *rip;
-	u_int32_t i;
+	uint32_t i;
 	void *last_key;
 
 	WT_ASSERT(env, page->modified == 0);

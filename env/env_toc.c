@@ -18,7 +18,7 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 {
 	IENV *ienv;
 	WT_TOC *toc;
-	u_int32_t slot;
+	uint32_t slot;
 
 	ienv = env->ienv;
 	*tocp = NULL;

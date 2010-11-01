@@ -9,14 +9,14 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_col_update(WT_TOC *, u_int64_t, DBT *, int);
+static int __wt_bt_col_update(WT_TOC *, uint64_t, DBT *, int);
 
 /*
  * __wt_db_col_del --
  *	Db.col_del method.
  */
 inline int
-__wt_db_col_del(WT_TOC *toc, u_int64_t recno)
+__wt_db_col_del(WT_TOC *toc, uint64_t recno)
 {
 	return (__wt_bt_col_update(toc, recno, NULL, 0));
 }
@@ -26,7 +26,7 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
  *	Db.put method.
  */
 inline int
-__wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
+__wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data)
 {
 	DB *db;
 
@@ -43,7 +43,7 @@ __wt_db_col_put(WT_TOC *toc, u_int64_t recno, DBT *data)
  *	Column store delete and update.
  */
 static int
-__wt_bt_col_update(WT_TOC *toc, u_int64_t recno, DBT *data, int insert)
+__wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int insert)
 {
 	DB *db;
 	ENV *env;
@@ -167,7 +167,7 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc)
 	WT_PAGE *page;
 	WT_COL_EXPAND **new_exp, *exp;
 	int ret, slot;
-	u_int16_t write_gen;
+	uint16_t write_gen;
 
 	__wt_bt_rcc_expand_unpack(toc, page, write_gen, slot, new_exp, exp);
 
@@ -213,7 +213,7 @@ __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
 	WT_PAGE *page;
 	WT_COL_EXPAND *exp;
 	WT_REPL *repl;
-	u_int16_t write_gen;
+	uint16_t write_gen;
 	int ret;
 
 	__wt_bt_rcc_expand_repl_unpack(toc, page, write_gen, exp, repl);

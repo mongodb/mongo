@@ -19,7 +19,7 @@ __wt_workq_srvr(void *arg)
 	ENV *env;
 	IENV *ienv;
 	WT_TOC **tp, *toc;
-	u_int32_t low_gen;
+	uint32_t low_gen;
 	int chk_read, read_force, request;
 
 	env = (ENV *)arg;

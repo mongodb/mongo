@@ -27,7 +27,7 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	WT_ROW *rip;
 	WT_REPL *repl;
 	void *data_ret;
-	u_int32_t size_ret;
+	uint32_t size_ret;
 	int (*callback)(DB *, DBT *, DBT *), ret;
 
 	db = toc->db;

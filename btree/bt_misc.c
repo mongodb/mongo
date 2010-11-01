@@ -32,10 +32,10 @@ __wt_bt_build_verify(void)
 		char *name;
 		u_int size, align;
 	} align_check[] = {
-		{ "WT_OFF", sizeof(WT_OFF), sizeof(u_int32_t) },
-		{ "WT_OVFL", sizeof(WT_OVFL), sizeof(u_int32_t) },
-		{ "WT_PAGE_HDR", sizeof(WT_PAGE_HDR), sizeof(u_int32_t) },
-		{ "WT_TOC_UPDATE", sizeof(WT_TOC_UPDATE), sizeof(u_int32_t) }
+		{ "WT_OFF", sizeof(WT_OFF), sizeof(uint32_t) },
+		{ "WT_OVFL", sizeof(WT_OVFL), sizeof(uint32_t) },
+		{ "WT_PAGE_HDR", sizeof(WT_PAGE_HDR), sizeof(uint32_t) },
+		{ "WT_TOC_UPDATE", sizeof(WT_TOC_UPDATE), sizeof(uint32_t) }
 	};
 	u_int i;
 
@@ -71,7 +71,7 @@ __wt_bt_build_verify(void)
 	 * library expects size_t values for the length of memory objects.  We
 	 * check, just to be sure.
 	 */
-	if (sizeof(size_t) < sizeof(u_int32_t)) {
+	if (sizeof(size_t) < sizeof(uint32_t)) {
 		__wt_api_env_errx(NULL, "%s",
 		    "Build verification failed, a size_t is smaller than "
 		    "4-bytes");
@@ -86,7 +86,7 @@ __wt_bt_build_verify(void)
  *	Copy a data/length pair into allocated memory in a DBT.
  */
 int
-__wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t size, DBT *copy)
+__wt_bt_data_copy_to_dbt(DB *db, uint8_t *data, size_t size, DBT *copy)
 {
 	ENV *env;
 
@@ -106,10 +106,10 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t size, DBT *copy)
  *	address positioned one past the last used byte on the page.
  */
 inline void
-__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, u_int8_t *p)
+__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, uint8_t *p)
 {
 	page->first_free = p;
-	page->space_avail = page->size - (u_int)(p - (u_int8_t *)page->hdr);
+	page->space_avail = page->size - (u_int)(p - (uint8_t *)page->hdr);
 }
 
 /*
@@ -117,7 +117,7 @@ __wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, u_int8_t *p)
  *	Handle the page's write generation number.
  */
 inline int
-__wt_page_write_gen_update(WT_PAGE *page, u_int32_t write_gen)
+__wt_page_write_gen_update(WT_PAGE *page, uint32_t write_gen)
 {
 	if (page->write_gen != write_gen)
 		return (WT_RESTART);

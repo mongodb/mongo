@@ -18,7 +18,7 @@ __wt_cache_create(ENV *env)
 {
 	IENV *ienv;
 	WT_CACHE *cache;
-	u_int32_t i;
+	uint32_t i;
 	int ret;
 
 	ienv = env->ienv;
@@ -73,10 +73,10 @@ err:	(void)__wt_cache_destroy(env);
  * __wt_cache_pages_inuse --
  *	Return the number of pages in use.
  */
-u_int64_t
+uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache)
 {
-	u_int64_t pages_in, pages_out;
+	uint64_t pages_in, pages_out;
 
 	/*
 	 * Other threads of control may be modifying these fields -- we don't
@@ -92,10 +92,10 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
  * __wt_cache_bytes_inuse --
  *	Return the number of bytes in use.
  */
-u_int64_t
+uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache)
 {
-	u_int64_t bytes_in, bytes_out;
+	uint64_t bytes_in, bytes_out;
 
 	/*
 	 * Other threads of control may be modifying these fields -- we don't
@@ -135,7 +135,7 @@ __wt_cache_destroy(ENV *env)
 	IENV *ienv;
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e, *etmp;
-	u_int32_t i, j;
+	uint32_t i, j;
 	int ret;
 
 	ienv = env->ienv;
@@ -200,7 +200,7 @@ __wt_cache_dump(ENV *env)
 	IENV *ienv;
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e;
-	u_int32_t i, j;
+	uint32_t i, j;
 
 	ienv = env->ienv;
 	cache = ienv->cache;

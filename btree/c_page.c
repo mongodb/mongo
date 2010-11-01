@@ -150,8 +150,7 @@ __wt_page_read(DB *db, WT_PAGE *page)
 	if (checksum != __wt_cksum(hdr, page->size)) {
 		__wt_api_env_errx(env,
 		    "read checksum error: addr/size %lu/%lu at offset %llu",
-		    (u_long)page->addr,
-		    (u_long)page->size, (unsigned long long)offset);
+		    (u_long)page->addr, (u_long)page->size, (u_quad)offset);
 		return (WT_ERROR);
 	}
 

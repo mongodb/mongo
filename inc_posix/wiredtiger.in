@@ -86,21 +86,21 @@ struct __wt_toc_update;		typedef struct __wt_toc_update WT_TOC_UPDATE;
 /*******************************************
  * Exported types
  *******************************************/
-typedef u_int64_t wt_recno_t;		/* logical record numbers */
+typedef uint64_t wt_recno_t;		/* logical record numbers */
 
 /*******************************************
  * Key/data structure -- a Data-Base Thang
  *******************************************/
 struct __dbt {
 	void	 *data;			/* returned/specified data */
-	u_int32_t size;			/* returned/specified data length */
+	uint32_t size;			/* returned/specified data length */
 
-	u_int32_t mem_size;		/* associated allocated memory size */
+	uint32_t mem_size;		/* associated allocated memory size */
 
 					/* callback return */
 	int (*callback)(DB *, DBT *, DBT *);
 
-	u_int32_t flags;
+	uint32_t flags;
 };
 
 /*******************************************
@@ -140,7 +140,7 @@ struct __wt_toc {
 	 * API.  The value is used to determine when chunks of memory are known
 	 * to be unreferenced, and can be discarded.
 	 */
-	u_int32_t volatile gen;		/* API generation */
+	uint32_t volatile gen;		/* API generation */
 
 					/* WT_TOC workQ request */
 	wq_state_t volatile wq_state;	/* Request state */
@@ -157,12 +157,12 @@ struct __wt_toc {
 
 					/* Search return values: */
 	WT_PAGE  *srch_page;		/*    page */
-	u_int16_t srch_write_gen;	/*    page's write-generation */
+	uint16_t srch_write_gen;	/*    page's write-generation */
 	void	 *srch_ip;		/*    WT_{COL,ROW} index */
 	WT_REPL	 *srch_repl;		/*    WT_REPL array index */
 					/* Repeat-compress column store only: */
 	WT_COL_EXPAND *srch_exp;	/*    WT_COL_EXPAND array index */
-	u_int16_t srch_rcc_offset;	/*    WT_COL index record offset */
+	uint16_t srch_rcc_offset;	/*    WT_COL index record offset */
 
 
 	/*
@@ -170,13 +170,13 @@ struct __wt_toc {
 	 * WT_TOC methods: BEGIN
 	 */
 	int (*close)(
-	    WT_TOC *, u_int32_t );
+	    WT_TOC *, uint32_t );
 	/*
 	 * WT_TOC methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 
-	 u_int32_t flags;
+	 uint32_t flags;
 };
 
 /*******************************************
@@ -188,7 +188,7 @@ struct __db {
 
 	void	*app_private;		/* Application-private information */
 
-	u_int32_t flags;
+	uint32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -200,18 +200,18 @@ struct __db {
 
 	int (*btree_compare)(DB *, const DBT *, const DBT *);
 
-	u_int32_t btree_dup_offpage;
+	uint32_t btree_dup_offpage;
 
-	u_int32_t intlitemsize;
-	u_int32_t leafitemsize;
+	uint32_t intlitemsize;
+	uint32_t leafitemsize;
 
-	u_int32_t allocsize;
-	u_int32_t intlmin;
-	u_int32_t intlmax;
-	u_int32_t leafmin;
-	u_int32_t leafmax;
+	uint32_t allocsize;
+	uint32_t intlmin;
+	uint32_t intlmax;
+	uint32_t leafmin;
+	uint32_t leafmax;
 
-	u_int32_t fixed_len;
+	uint32_t fixed_len;
 	const char *dictionary;
 
 	void (*errcall)(const DB *, const char *);
@@ -247,43 +247,43 @@ struct __db {
 	    DB *, int (*)(DB *, const DBT *, const DBT *));
 
 	int (*btree_dup_offpage_get)(
-	    DB *, u_int32_t *);
+	    DB *, uint32_t *);
 
 	int (*btree_dup_offpage_set)(
-	    DB *, u_int32_t );
+	    DB *, uint32_t );
 
 	int (*btree_itemsize_get)(
-	    DB *, u_int32_t *, u_int32_t *);
+	    DB *, uint32_t *, uint32_t *);
 
 	int (*btree_itemsize_set)(
-	    DB *, u_int32_t , u_int32_t );
+	    DB *, uint32_t , uint32_t );
 
 	int (*btree_pagesize_get)(
-	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
+	    DB *, uint32_t *, uint32_t *, uint32_t *, uint32_t *, uint32_t *);
 
 	int (*btree_pagesize_set)(
-	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t , u_int32_t );
+	    DB *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t );
 
 	int (*bulk_load)(
-	    DB *, u_int32_t , void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
+	    DB *, uint32_t , void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
 
 	int (*close)(
-	    DB *, u_int32_t );
+	    DB *, uint32_t );
 
 	int (*col_del)(
-	    DB *, WT_TOC *, u_int64_t , u_int32_t );
+	    DB *, WT_TOC *, uint64_t , uint32_t );
 
 	int (*col_get)(
-	    DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t );
+	    DB *, WT_TOC *, uint64_t , DBT *, uint32_t );
 
 	int (*col_put)(
-	    DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t );
+	    DB *, WT_TOC *, uint64_t , DBT *, uint32_t );
 
 	int (*column_set)(
-	    DB *, u_int32_t , const char *, u_int32_t );
+	    DB *, uint32_t , const char *, uint32_t );
 
 	int (*dump)(
-	    DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t );
+	    DB *, FILE *, void (*)(const char *, uint64_t), uint32_t );
 
 	void (*err)(
 	    DB *, int , const char *, ...);
@@ -310,31 +310,31 @@ struct __db {
 	    DB *, const char *, ...);
 
 	int (*huffman_set)(
-	    DB *, u_int8_t const *, u_int , u_int32_t );
+	    DB *, uint8_t const *, u_int , uint32_t );
 
 	int (*open)(
-	    DB *, const char *, mode_t , u_int32_t );
+	    DB *, const char *, mode_t , uint32_t );
 
 	int (*row_del)(
-	    DB *, WT_TOC *, DBT *, u_int32_t );
+	    DB *, WT_TOC *, DBT *, uint32_t );
 
 	int (*row_get)(
-	    DB *, WT_TOC *, DBT *, DBT *, u_int32_t );
+	    DB *, WT_TOC *, DBT *, DBT *, uint32_t );
 
 	int (*row_put)(
-	    DB *, WT_TOC *, DBT *, DBT *, u_int32_t );
+	    DB *, WT_TOC *, DBT *, DBT *, uint32_t );
 
 	int (*stat_clear)(
-	    DB *, u_int32_t );
+	    DB *, uint32_t );
 
 	int (*stat_print)(
-	    DB *, FILE *, u_int32_t );
+	    DB *, FILE *, uint32_t );
 
 	int (*sync)(
-	    DB *, void (*)(const char *, u_int64_t), u_int32_t );
+	    DB *, void (*)(const char *, uint64_t), uint32_t );
 
 	int (*verify)(
-	    DB *, void (*)(const char *, u_int64_t), u_int32_t );
+	    DB *, void (*)(const char *, uint64_t), uint32_t );
 	/*
 	 * DB methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -356,21 +356,21 @@ struct __env {
 
 	void	*app_private;		/* Application-private information */
 
-	 u_int32_t flags;
+	 uint32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * ENV getter/setter variables: BEGIN
 	 */
-	u_int32_t cache_drain_cnt;
+	uint32_t cache_drain_cnt;
 
-	u_int32_t cache_hash_size;
+	uint32_t cache_hash_size;
 
-	u_int32_t cache_size;
+	uint32_t cache_size;
 
-	u_int32_t data_update_initial;
+	uint32_t data_update_initial;
 
-	u_int32_t data_update_max;
+	uint32_t data_update_max;
 
 	void (*errcall)(const ENV *, const char *);
 
@@ -378,15 +378,15 @@ struct __env {
 
 	const char *errpfx;
 
-	u_int32_t hazard_size;
+	uint32_t hazard_size;
 
 	void (*msgcall)(const ENV *, const char *);
 
 	FILE *msgfile;
 
-	u_int32_t toc_size;
+	uint32_t toc_size;
 
-	u_int32_t verbose;
+	uint32_t verbose;
 	/*
 	 * ENV getter/setter variables: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -397,40 +397,40 @@ struct __env {
 	 * ENV methods: BEGIN
 	 */
 	int (*cache_drain_cnt_get)(
-	    ENV *, u_int32_t *);
+	    ENV *, uint32_t *);
 
 	int (*cache_drain_cnt_set)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*cache_hash_size_get)(
-	    ENV *, u_int32_t *);
+	    ENV *, uint32_t *);
 
 	int (*cache_hash_size_set)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*cache_size_get)(
-	    ENV *, u_int32_t *);
+	    ENV *, uint32_t *);
 
 	int (*cache_size_set)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*close)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*data_update_initial_get)(
-	    ENV *, u_int32_t *);
+	    ENV *, uint32_t *);
 
 	int (*data_update_initial_set)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*data_update_max_get)(
-	    ENV *, u_int32_t *);
+	    ENV *, uint32_t *);
 
 	int (*data_update_max_set)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*db)(
-	    ENV *, u_int32_t , DB **);
+	    ENV *, uint32_t , DB **);
 
 	void (*err)(
 	    ENV *, int , const char *, ...);
@@ -457,10 +457,10 @@ struct __env {
 	    ENV *, const char *, ...);
 
 	int (*hazard_size_get)(
-	    ENV *, u_int32_t *);
+	    ENV *, uint32_t *);
 
 	int (*hazard_size_set)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*msgcall_get)(
 	    ENV *, void (**)(const ENV *, const char *));
@@ -475,31 +475,31 @@ struct __env {
 	    ENV *, FILE *);
 
 	int (*open)(
-	    ENV *, const char *, mode_t , u_int32_t );
+	    ENV *, const char *, mode_t , uint32_t );
 
 	int (*stat_clear)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*stat_print)(
-	    ENV *, FILE *, u_int32_t );
+	    ENV *, FILE *, uint32_t );
 
 	int (*sync)(
-	    ENV *, void (*)(const char *, u_int64_t), u_int32_t );
+	    ENV *, void (*)(const char *, uint64_t), uint32_t );
 
 	int (*toc)(
-	    ENV *, u_int32_t , WT_TOC **);
+	    ENV *, uint32_t , WT_TOC **);
 
 	int (*toc_size_get)(
-	    ENV *, u_int32_t *);
+	    ENV *, uint32_t *);
 
 	int (*toc_size_set)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 
 	int (*verbose_get)(
-	    ENV *, u_int32_t *);
+	    ENV *, uint32_t *);
 
 	int (*verbose_set)(
-	    ENV *, u_int32_t );
+	    ENV *, uint32_t );
 	/*
 	 * ENV methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -509,9 +509,9 @@ struct __env {
 /*******************************************
  * Prototypes.
  *******************************************/
-int	 wiredtiger_env_init(ENV **, u_int32_t);
+int	 wiredtiger_env_init(ENV **, uint32_t);
 void	 wiredtiger_err_stream(FILE *);
-int	 wiredtiger_simple_setup(const char *, DB **, u_int32_t, u_int32_t);
+int	 wiredtiger_simple_setup(const char *, DB **, uint32_t, uint32_t);
 int	 wiredtiger_simple_teardown(const char *, DB *);
 char	*wiredtiger_strerror(int);
 char	*wiredtiger_version(int *, int *, int *);

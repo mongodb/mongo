@@ -52,9 +52,9 @@ __wt_workq_drain_server(ENV *env, int force)
 	    "bytes inuse %s max (%lluMB %s %lluMB), ",
 	    force ? "" : "not ", cache->read_lockout ? "" : "not ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    (unsigned long long)(bytes_inuse / WT_MEGABYTE),
+	    (u_quad)(bytes_inuse / WT_MEGABYTE),
 	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    (unsigned long long)(bytes_max / WT_MEGABYTE)));
+	    (u_quad)(bytes_max / WT_MEGABYTE)));
 
 	cache->drain_sleeping = 0;
 	__wt_unlock(env, cache->mtx_drain);
@@ -189,7 +189,7 @@ __wt_drain_trickle(WT_TOC *toc)
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
 	    "cache drain: bucket %lu: review %lu of %llu total pages",
 	    (u_long)cache->bucket_cnt,
-	    (u_long)review_cnt, (unsigned long long)cache_pages));
+	    (u_long)review_cnt, (u_quad)cache_pages));
 
 	/* Allocate more space in the drain list as necessary. */
 	if (review_cnt > cache->drain_len / sizeof(WT_CACHE_ENTRY *))

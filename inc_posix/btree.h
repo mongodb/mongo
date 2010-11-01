@@ -55,14 +55,14 @@ extern "C" {
 #define	WT_ADDR_TO_OFF(db, addr)					\
 	((off_t)(addr) * (db)->allocsize)
 #define	WT_OFF_TO_ADDR(db, off)						\
-	((u_int32_t)((off) / (db)->allocsize))
+	((uint32_t)((off) / (db)->allocsize))
 
 /*
  * Return database allocation units needed for length (optionally including a
  * page header), rounded to an allocation unit.
  */
 #define	WT_BYTES_TO_ALLOC(db, size)					\
-	((u_int32_t)WT_ALIGN((size), (db)->allocsize))
+	((uint32_t)WT_ALIGN((size), (db)->allocsize))
 #define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
 	WT_BYTES_TO_ALLOC(db, (size) + sizeof(WT_PAGE_HDR))
 
@@ -84,36 +84,36 @@ extern "C" {
  */
 struct __wt_page_desc {
 #define	WT_BTREE_MAGIC		120897
-	u_int32_t magic;		/* 00-03: Magic number */
+	uint32_t magic;		/* 00-03: Magic number */
 #define	WT_BTREE_MAJOR_VERSION	0
-	u_int16_t majorv;		/* 04-05: Major version */
+	uint16_t majorv;		/* 04-05: Major version */
 #define	WT_BTREE_MINOR_VERSION	1
-	u_int16_t minorv;		/* 06-07: Minor version */
+	uint16_t minorv;		/* 06-07: Minor version */
 
 #define	WT_BTREE_INTLMAX_DEFAULT	(2 * 1024)
 #define	WT_BTREE_INTLMIN_DEFAULT	(2 * 1024)
-	u_int32_t intlmax;		/* 08-11: Maximum intl page size */
-	u_int32_t intlmin;		/* 12-15: Minimum intl page size */
+	uint32_t intlmax;		/* 08-11: Maximum intl page size */
+	uint32_t intlmin;		/* 12-15: Minimum intl page size */
 
 #define	WT_BTREE_LEAFMAX_DEFAULT	WT_MEGABYTE
 #define	WT_BTREE_LEAFMIN_DEFAULT	(32 * 1024)
-	u_int32_t leafmax;		/* 16-19: Maximum leaf page size */
-	u_int32_t leafmin;		/* 20-23: Minimum leaf page size */
+	uint32_t leafmax;		/* 16-19: Maximum leaf page size */
+	uint32_t leafmin;		/* 20-23: Minimum leaf page size */
 
-	u_int64_t recno_offset;		/* 24-31: Offset record number */
-	u_int32_t root_addr;		/* 32-35: Root page address */
-	u_int32_t root_size;		/* 36-39: Root page length */
-	u_int32_t free_addr;		/* 40-43: Free list page address */
-	u_int32_t free_size;		/* 44-47: Free list page length */
+	uint64_t recno_offset;		/* 24-31: Offset record number */
+	uint32_t root_addr;		/* 32-35: Root page address */
+	uint32_t root_size;		/* 36-39: Root page length */
+	uint32_t free_addr;		/* 40-43: Free list page address */
+	uint32_t free_size;		/* 44-47: Free list page length */
 
 #define	WT_PAGE_DESC_REPEAT	0x01	/* Repeat count compression */
 #define	WT_PAGE_DESC_MASK	0x01	/* Valid bit mask */
-	u_int32_t flags;		/* 48-51: Flags */
+	uint32_t flags;		/* 48-51: Flags */
 
-	u_int8_t  fixed_len;		/* 51-52: Fixed length byte count */
-	u_int8_t  unused1[3];		/* Unused */
+	uint8_t  fixed_len;		/* 51-52: Fixed length byte count */
+	uint8_t  unused1[3];		/* Unused */
 
-	u_int32_t unused2[114];		/* Unused */
+	uint32_t unused2[114];		/* Unused */
 };
 /*
  * WT_PAGE_DESC_SIZE is the expected structure size -- we check at startup to
@@ -137,10 +137,10 @@ struct __wt_repl {
 	 */
 #define	WT_REPL_DELETED_ISSET(repl)	((repl)->size == UINT32_MAX)
 #define	WT_REPL_DELETED_SET(repl)	((repl)->size = UINT32_MAX)
-	u_int32_t size;			/* data length */
+	uint32_t size;			/* data length */
 
 	/* The data immediately follows the repl structure. */
-#define	WT_REPL_DATA(repl)		((u_int8_t *)repl + sizeof(WT_REPL))
+#define	WT_REPL_DATA(repl)		((uint8_t *)repl + sizeof(WT_REPL))
 };
 
 /*
@@ -154,21 +154,21 @@ struct __wt_page {
 	 * need something bigger, but the page-size configuration code limits
 	 * page sizes already.
 	 */
-	u_int32_t addr;			/* Page's file allocation address */
-	u_int32_t size;			/* Page size */
+	uint32_t addr;			/* Page's file allocation address */
+	uint32_t size;			/* Page size */
 
 	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
 
-	u_int8_t *first_free;		/* Page's first free byte address */
-	u_int32_t space_avail;		/* Page's available memory */
+	uint8_t *first_free;		/* Page's first free byte address */
+	uint32_t space_avail;		/* Page's available memory */
 
-	u_int64_t records;		/* Records in this subtree */
+	uint64_t records;		/* Records in this subtree */
 
 	/*
 	 * The page's LRU access generation is set on each cache retrieval and
 	 * used to find pages no longer useful in the cache.
 	 */
-	u_int32_t lru;			/* Read generation */
+	uint32_t lru;			/* Read generation */
 
 	/*
 	 * The page modified flag is set by the workQ thread when it modifies
@@ -184,7 +184,7 @@ struct __wt_page {
 	 * before control returns to the thread holding the hazard reference,
 	 * so there's no need to flush explicitly.
 	 */
-	u_int16_t modified;		/* Page is modified */
+	uint16_t modified;		/* Page is modified */
 #define	WT_PAGE_MODIFY_ISSET(p)		((p)->modified)
 #define	WT_PAGE_MODIFY_SET(p)		((p)->modified = 1)
 #define	WT_PAGE_MODIFY_CLR(p)		((p)->modified = 0)
@@ -216,7 +216,7 @@ struct __wt_page {
 	 * the page replacement array as soon as no running thread/txn might
 	 * want that version of the data).
 	 */
-	u_int16_t write_gen;		/* Write generation */
+	uint16_t write_gen;		/* Write generation */
 #define	WT_PAGE_WRITE_GEN(p)						\
 	((p)->write_gen)
 
@@ -242,7 +242,7 @@ struct __wt_page {
 	 * entry represents all of the identical records.
 	 */
 #define	WT_PAGE_INMEM_SET(p)	((p)->indx_count != 0)
-	u_int32_t indx_count;		/* On-disk entry count */
+	uint32_t indx_count;		/* On-disk entry count */
 	union {				/* On-disk entry index */
 		WT_COL *icol;		/* On-disk column store entries */
 		WT_ROW *irow;		/* On-disk row store entries */
@@ -283,7 +283,7 @@ struct __wt_page {
 	 */
 	WT_COL_EXPAND **expcol;
 
-	u_int32_t flags;
+	uint32_t flags;
 };
 
 /*
@@ -329,14 +329,14 @@ struct __wt_page_hdr {
 	 * number in the WT_PAGE structure when we read a page into memory, but
 	 * we can't work around the second reason.)
 	 */
-	u_int64_t start_recno;		/* 00-07: column-store starting recno */
-	u_int32_t lsn[2];		/* 08-15: LSN */
+	uint64_t start_recno;		/* 00-07: column-store starting recno */
+	uint32_t lsn[2];		/* 08-15: LSN */
 
-	u_int32_t checksum;		/* 16-19: checksum */
+	uint32_t checksum;		/* 16-19: checksum */
 
 	union {
-		u_int32_t datalen;	/* 20-23: overflow data length */
-		u_int32_t entries;	/* 20-23: number of items on page */
+		uint32_t datalen;	/* 20-23: overflow data length */
+		uint32_t entries;	/* 20-23: number of items on page */
 	} u;
 
 #define	WT_PAGE_INVALID		 0	/* Invalid page */
@@ -350,7 +350,7 @@ struct __wt_page_hdr {
 #define	WT_PAGE_OVFL		 8	/* Overflow page */
 #define	WT_PAGE_ROW_INT		 9	/* Row-store internal page */
 #define	WT_PAGE_ROW_LEAF	10	/* Row-store leaf page */
-	u_int8_t type;			/* 24: page type */
+	uint8_t type;			/* 24: page type */
 
 	/*
 	 * WiredTiger is no-overwrite: each time a page is written, it's written
@@ -371,7 +371,7 @@ struct __wt_page_hdr {
 	 */
 #define	WT_LDESC	0
 #define	WT_LLEAF	1
-	u_int8_t level;			/* 25: tree level */
+	uint8_t level;			/* 25: tree level */
 
 	/*
 	 * It would be possible to decrease the size of the page header by two
@@ -380,7 +380,7 @@ struct __wt_page_hdr {
 	 * and having a little bit of on-page data to play with in the future
 	 * can be a good thing.
 	 */
-	u_int8_t unused[2];		/* 26-27: unused padding */
+	uint8_t unused[2];		/* 26-27: unused padding */
 };
 /*
  * WT_PAGE_HDR_SIZE is the expected structure size --  we check at startup to
@@ -393,7 +393,7 @@ struct __wt_page_hdr {
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.
  */
-#define	WT_PAGE_BYTE(page)	(((u_int8_t *)(page)->hdr) + WT_PAGE_HDR_SIZE)
+#define	WT_PAGE_BYTE(page)	(((uint8_t *)(page)->hdr) + WT_PAGE_HDR_SIZE)
 
 /*
  * WT_ROW --
@@ -425,7 +425,7 @@ struct __wt_row {
 	(ip)->size = 0;							\
 } while (0)
 	void	 *key;			/* Key */
-	u_int32_t size;			/* Key length */
+	uint32_t size;			/* Key length */
 
 	WT_ITEM	 *data;			/* Data */
 };
@@ -435,7 +435,7 @@ struct __wt_row {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_ROW_SIZE	(2 * sizeof(void *) + sizeof(u_int32_t))
+#define	WT_ROW_SIZE	(2 * sizeof(void *) + sizeof(uint32_t))
 /*
  * WT_ROW_INSERT --
  * The WT_ROW_INSERT structure describes the in-memory information about an
@@ -483,7 +483,7 @@ struct __wt_col_expand {
 	 * We know we can store the offset in 16-bits because that's the
 	 * maximum number of records in a single compressed group.
 	 */
-	u_int64_t recno;		/* recno */
+	uint64_t recno;		/* recno */
 
 	WT_REPL *repl;                  /* modifications/deletions */
 
@@ -504,8 +504,8 @@ struct __wt_col_expand {
  * Macro returns if a WT_ROW structure's key references on-page data.
  */
 #define	WT_ROW_KEY_ON_PAGE(page, rip)					\
-	((u_int8_t *)(rip)->key >= (u_int8_t *)(page)->hdr &&		\
-	    (u_int8_t *)(rip)->key < (u_int8_t *)(page)->hdr + (page)->size)
+	((uint8_t *)(rip)->key >= (uint8_t *)(page)->hdr &&		\
+	    (uint8_t *)(rip)->key < (uint8_t *)(page)->hdr + (page)->size)
 
 /*
  * WT_REPL_FOREACH --
@@ -572,7 +572,7 @@ struct __wt_col_expand {
  */
 #define	WT_ITEM_MAX_LEN	(16 * 1024 * 1024 - 1)
 struct __wt_item {
-	u_int32_t __item_chunk;
+	uint32_t __item_chunk;
 };
 /*
  * WT_ITEM_SIZE is the expected structure size --  we check at startup to make
@@ -663,7 +663,7 @@ struct __wt_item {
 
 /* WT_ITEM_BYTE is the first data byte for an item. */
 #define	WT_ITEM_BYTE(addr)						\
-	((u_int8_t *)(addr) + sizeof(WT_ITEM))
+	((uint8_t *)(addr) + sizeof(WT_ITEM))
 
 /*
  * On row-store pages, the on-page data referenced by the WT_ROW data field
@@ -682,11 +682,11 @@ struct __wt_item {
  * WT_ITEMs on a page all start at a 4-byte boundary.
  */
 #define	WT_ITEM_SPACE_REQ(size)						\
-	WT_ALIGN(sizeof(WT_ITEM) + (size), sizeof(u_int32_t))
+	WT_ALIGN(sizeof(WT_ITEM) + (size), sizeof(uint32_t))
 
 /* WT_ITEM_NEXT is the first byte of the next item. */
 #define	WT_ITEM_NEXT(item)						\
-	((WT_ITEM *)((u_int8_t *)(item) + WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item))))
+	((WT_ITEM *)((uint8_t *)(item) + WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item))))
 
 /* WT_ITEM_FOREACH is a loop that walks the items on a page */
 #define	WT_ITEM_FOREACH(page, item, i)					\
@@ -707,10 +707,10 @@ struct __wt_off {
  * that a cast won't work; if we find one, we'll have to go to bit masks, or to
  * reading/write the bytes to/from a local variable.
  */
-#define	WT_RECORDS(offp)	(*(u_int64_t *)(&(offp)->__record_chunk[0]))
-	u_int32_t __record_chunk[2];	/* Subtree record count */
-	u_int32_t addr;			/* Subtree root page address */
-	u_int32_t size;			/* Subtree root page length */
+#define	WT_RECORDS(offp)	(*(uint64_t *)(&(offp)->__record_chunk[0]))
+	uint32_t __record_chunk[2];	/* Subtree record count */
+	uint32_t addr;			/* Subtree root page address */
+	uint32_t size;			/* Subtree root page length */
 };
 /*
  * WT_OFF_SIZE is the expected structure size -- we check at startup to
@@ -728,8 +728,8 @@ struct __wt_off {
  * structure.
  */
 struct __wt_ovfl {
-	u_int32_t addr;			/* Overflow address */
-	u_int32_t size;			/* Overflow length */
+	uint32_t addr;			/* Overflow address */
+	uint32_t size;			/* Overflow length */
 };
 /*
  * WT_OVFL_SIZE is the expected structure size --  we check at startup to
@@ -742,14 +742,14 @@ struct __wt_ovfl {
  * the top bit of the data.
  */
 #define	WT_FIX_DELETE_BYTE	0x80
-#define	WT_FIX_DELETE_ISSET(b)	(((u_int8_t *)(b))[0] & WT_FIX_DELETE_BYTE)
-#define	WT_FIX_DELETE_SET(b)	(((u_int8_t *)(b))[0] = WT_FIX_DELETE_BYTE)
+#define	WT_FIX_DELETE_ISSET(b)	(((uint8_t *)(b))[0] & WT_FIX_DELETE_BYTE)
+#define	WT_FIX_DELETE_SET(b)	(((uint8_t *)(b))[0] = WT_FIX_DELETE_BYTE)
 
 /* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
 #define	WT_FIX_FOREACH(db, page, p, i)					\
 	for ((p) = WT_PAGE_BYTE(page),					\
 	    (i) = (page)->hdr->u.entries; (i) > 0; --(i),		\
-	    (p) = (u_int8_t *)(p) + (db)->fixed_len)
+	    (p) = (uint8_t *)(p) + (db)->fixed_len)
 
 /*
  * WT_RCC_REPEAT_FOREACH is a loop that walks fixed-length, repeat-compressed
@@ -758,14 +758,14 @@ struct __wt_ovfl {
 #define	WT_RCC_REPEAT_FOREACH(db, page, p, i)				\
 	for ((p) = WT_PAGE_BYTE(page),					\
 	    (i) = (page)->hdr->u.entries; (i) > 0; --(i),		\
-	    (p) = (u_int8_t *)(p) + (db)->fixed_len + sizeof(u_int16_t))
+	    (p) = (uint8_t *)(p) + (db)->fixed_len + sizeof(uint16_t))
 
 /*
  * WT_RCC_REPEAT_COUNT and WT_RCC_REPEAT_DATA reference the data and count
  * values for fixed-length, repeat-compressed page entries.
  */
-#define	WT_RCC_REPEAT_COUNT(p)	(*(u_int16_t *)(p))
-#define	WT_RCC_REPEAT_DATA(p)	((u_int8_t *)(p) + sizeof(u_int16_t))
+#define	WT_RCC_REPEAT_COUNT(p)	(*(uint16_t *)(p))
+#define	WT_RCC_REPEAT_DATA(p)	((uint8_t *)(p) + sizeof(uint16_t))
 
 /*
  * WT_RCC_REPEAT_ITERATE is a loop that walks fixed-length, repeat-compressed

@@ -21,14 +21,14 @@ static int __wt_bt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
  *	each page.
  */
 int
-__wt_bt_tree_walk(WT_TOC *toc, u_int32_t addr,
-    u_int32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
+__wt_bt_tree_walk(WT_TOC *toc, uint32_t addr,
+    uint32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
 {
 	DB *db;
 	WT_COL *cip;
 	WT_PAGE *page;
 	WT_ROW *rip;
-	u_int32_t i;
+	uint32_t i;
 	int ret;
 
 	db = toc->db;
@@ -162,7 +162,7 @@ __wt_bt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 	WT_COL *cip;
 	WT_REPL *repl;
 	WT_STATS *stats;
-	u_int32_t i;
+	uint32_t i;
 
 	stats = toc->db->idb->dstats;
 
@@ -193,7 +193,7 @@ __wt_bt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 	WT_COL_EXPAND *exp;
 	WT_REPL *repl;
 	WT_STATS *stats;
-	u_int32_t i;
+	uint32_t i;
 
 	stats = toc->db->idb->dstats;
 
@@ -240,7 +240,7 @@ __wt_bt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 	WT_COL *cip;
 	WT_REPL *repl;
 	WT_STATS *stats;
-	u_int32_t i;
+	uint32_t i;
 
 	db = toc->db;
 	stats = db->idb->dstats;
@@ -286,7 +286,7 @@ __wt_bt_stat_page_dup_leaf(WT_TOC *toc, WT_PAGE *page)
 	WT_REPL *repl;
 	WT_ROW *rip;
 	WT_STATS *stats;
-	u_int32_t i;
+	uint32_t i;
 
 	db = toc->db;
 	stats = db->idb->dstats;
@@ -332,7 +332,7 @@ __wt_bt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 	WT_REPL *repl;
 	WT_ROW *rip;
 	WT_STATS *stats;
-	u_int32_t i;
+	uint32_t i;
 
 	db = toc->db;
 	stats = db->idb->dstats;

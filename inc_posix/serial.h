@@ -2,7 +2,7 @@
 
 typedef struct {
 	WT_PAGE * page;
-	u_int16_t write_gen;
+	uint16_t write_gen;
 	int slot;
 	WT_COL_EXPAND ** new_expcol;
 	WT_COL_EXPAND * exp;
@@ -27,7 +27,7 @@ typedef struct {
 
 typedef struct {
 	WT_PAGE * page;
-	u_int16_t write_gen;
+	uint16_t write_gen;
 	WT_COL_EXPAND * exp;
 	WT_REPL * repl;
 } __wt_bt_rcc_expand_repl_args;
@@ -49,7 +49,7 @@ typedef struct {
 
 typedef struct {
 	WT_PAGE * page;
-	u_int16_t write_gen;
+	uint16_t write_gen;
 	int slot;
 	WT_REPL ** new_repl;
 	WT_REPL * repl;
@@ -73,8 +73,8 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	u_int32_t * addrp;
-	u_int32_t size;
+	uint32_t * addrp;
+	uint32_t size;
 } __wt_cache_alloc_args;
 #define	 __wt_cache_alloc_serial(toc, _addrp, _size, ret) do {\
 	__wt_cache_alloc_args _args;\
@@ -89,8 +89,8 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	u_int32_t * addrp;
-	u_int32_t size;
+	uint32_t * addrp;
+	uint32_t size;
 	WT_PAGE ** pagep;
 } __wt_cache_read_args;
 #define	 __wt_cache_read_serial(toc, _addrp, _size, _pagep, ret) do {\

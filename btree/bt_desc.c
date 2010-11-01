@@ -90,7 +90,7 @@ __wt_bt_desc_read(WT_TOC *toc)
  *	Update the root information on the description page.
  */
 int
-__wt_bt_desc_write_root(WT_TOC *toc, u_int32_t root_addr, u_int32_t root_size)
+__wt_bt_desc_write_root(WT_TOC *toc, uint32_t root_addr, uint32_t root_size)
 {
 	IDB *idb;
 	WT_PAGE *page;
@@ -151,7 +151,7 @@ __wt_bt_desc_write(WT_TOC *toc)
 	desc->root_size = idb->root_size;
 	desc->free_addr = idb->free_addr;
 	desc->free_size = idb->free_size;
-	desc->fixed_len = (u_int8_t)db->fixed_len;
+	desc->fixed_len = (uint8_t)db->fixed_len;
 	desc->flags = 0;
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		F_SET(desc, WT_PAGE_DESC_REPEAT);

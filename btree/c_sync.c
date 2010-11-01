@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_cache_sync_drain(WT_TOC *, void (*)(const char *, u_int64_t));
+static int __wt_cache_sync_drain(WT_TOC *, void (*)(const char *, uint64_t));
 
 /*
  * __wt_cache_sync --
@@ -17,7 +17,7 @@ static int __wt_cache_sync_drain(WT_TOC *, void (*)(const char *, u_int64_t));
  */
 int
 __wt_cache_sync(
-    WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags)
+    WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags)
 {
 	ENV *env;
 	IDB *idb;
@@ -38,8 +38,8 @@ __wt_cache_sync(
 }
 
 typedef struct __wt_sync_list {
-	u_int32_t addr;				/* Address */
-	u_int8_t  level;			/* Level */
+	uint32_t addr;				/* Address */
+	uint8_t  level;			/* Level */
 } WT_SYNC_LIST;
 
 /*
@@ -66,7 +66,7 @@ __wt_sync_compare_level(const void *a, const void *b)
  *	Flush all modified pages for the caller's DB handle.
  */
 static int
-__wt_cache_sync_drain(WT_TOC *toc, void (*f)(const char *, u_int64_t))
+__wt_cache_sync_drain(WT_TOC *toc, void (*f)(const char *, uint64_t))
 {
 	ENV *env;
 	DB *db;
@@ -74,8 +74,8 @@ __wt_cache_sync_drain(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	WT_CACHE_ENTRY *e;
 	WT_PAGE *page;
 	WT_SYNC_LIST *drain, *drain_base;
-	u_int64_t fcnt;
-	u_int32_t drain_elem, drain_len, i, j;
+	uint64_t fcnt;
+	uint32_t drain_elem, drain_len, i, j;
 	int ret;
 
 	env = toc->env;

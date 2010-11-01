@@ -14,7 +14,7 @@
  *	Initialize the library, creating an ENV handle.
  */
 int
-wiredtiger_env_init(ENV **envp, u_int32_t flags)
+wiredtiger_env_init(ENV **envp, uint32_t flags)
 {
 	static int library_init = 0;
 	ENV *env;

@@ -9,14 +9,14 @@
 
 #include "wt_internal.h"
 
-static void __wt_cache_extend(WT_TOC *, u_int32_t *, u_int32_t);
+static void __wt_cache_extend(WT_TOC *, uint32_t *, uint32_t);
 
 /*
  * __wt_cache_alloc --
  *	Alloc a chunk of space from the underlying cache.
  */
 int
-__wt_cache_alloc(WT_TOC *toc, u_int32_t *addrp, u_int32_t size)
+__wt_cache_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 {
 	WT_CACHE *cache;
 	IDB *idb;
@@ -37,7 +37,7 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t *addrp, u_int32_t size)
  *	Free a chunk of space to the underlying cache.
  */
 int
-__wt_cache_free(WT_TOC *toc, u_int32_t addr, u_int32_t size)
+__wt_cache_free(WT_TOC *toc, uint32_t addr, uint32_t size)
 {
 	WT_CACHE *cache;
 	IDB *idb;
@@ -59,7 +59,7 @@ __wt_cache_free(WT_TOC *toc, u_int32_t addr, u_int32_t size)
  *	Extend the file to allocate space.
  */
 static void
-__wt_cache_extend(WT_TOC *toc, u_int32_t *addrp, u_int32_t size)
+__wt_cache_extend(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 {
 	DB *db;
 	IDB *idb;

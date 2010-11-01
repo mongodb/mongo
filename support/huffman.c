@@ -129,7 +129,7 @@ indexed_byte_comparator(const void *elem1, const void *elem2)
  */
 static void
 traverse_tree(
-    WT_FREQTREE_NODE *node, uint16_t current_length, u_int16_t *max_depth)
+    WT_FREQTREE_NODE *node, uint16_t current_length, uint16_t *max_depth)
 {
 	/* Recursively traverse the tree */
 	if (node->left != NULL)
@@ -422,7 +422,7 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, uint16_t symbol)
 int
 __wt_huffman_encode(void *huffman_arg,
     uint8_t *from, uint32_t from_len,
-    void *top, uint32_t *to_len, u_int32_t *out_bytes_used)
+    void *top, uint32_t *to_len, uint32_t *out_bytes_used)
 {
 	ENV *env;
 	WT_HUFFMAN_OBJ *huffman;
@@ -520,7 +520,7 @@ __wt_huffman_encode(void *huffman_arg,
 int
 __wt_huffman_decode(void *huffman_arg,
     uint8_t *from, uint32_t from_len,
-    void *top, uint32_t *to_len, u_int32_t *out_bytes_used)
+    void *top, uint32_t *to_len, uint32_t *out_bytes_used)
 {
 	ENV *env;
 	WT_HUFFMAN_OBJ *huffman;

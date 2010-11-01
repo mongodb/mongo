@@ -109,7 +109,7 @@ __wt_api_args(ENV *env, const char *name)
  */
 int
 __wt_api_arg_min(ENV *env,
-    const char *name, const char *arg_name, u_int32_t v, u_int32_t min)
+    const char *name, const char *arg_name, uint32_t v, uint32_t min)
 {
 	if (v >= min)
 		return (0);
@@ -127,7 +127,7 @@ __wt_api_arg_min(ENV *env,
  */
 int
 __wt_api_arg_max(ENV *env,
-    const char *name, const char *arg_name, u_int32_t v, u_int32_t max)
+    const char *name, const char *arg_name, uint32_t v, uint32_t max)
 {
 	if (v <= max)
 		return (0);
@@ -158,7 +158,7 @@ __wt_database_method_type(DB *db, const char *name, int column_err)
  *	into a fixed-size database.
  */
 int
-__wt_database_wrong_fixed_size(WT_TOC *toc, u_int32_t len)
+__wt_database_wrong_fixed_size(WT_TOC *toc, uint32_t len)
 {
 	DB *db;
 

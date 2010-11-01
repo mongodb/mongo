@@ -39,8 +39,7 @@ __wt_workq_read_server(ENV *env, int force)
 	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
 		WT_VERBOSE(env, WT_VERB_SERVERS, (env,
 		    "workQ locks out reads: bytes-inuse %llu of bytes-max %llu",
-		    (unsigned long long)bytes_inuse,
-		    (unsigned long long)bytes_max));
+		    (u_quad)bytes_inuse, (u_quad)bytes_max));
 		cache->read_lockout = 1;
 	}
 

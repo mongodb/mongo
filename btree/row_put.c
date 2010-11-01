@@ -89,7 +89,7 @@ __wt_bt_update_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 	WT_REPL **new_repl, *repl;
-	u_int16_t write_gen;
+	uint16_t write_gen;
 	int ret, slot;
 
 	__wt_bt_update_unpack(toc, page, write_gen, slot, new_repl, repl);
@@ -137,7 +137,7 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	ENV *env;
 	WT_REPL *repl;
 	WT_TOC_UPDATE *update;
-	u_int32_t align_size, alloc_size, size;
+	uint32_t align_size, alloc_size, size;
 	int single_use;
 
 	env = toc->env;
@@ -176,9 +176,9 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 * check the total required space for this item.
 	 */
 	size = data == NULL ? 0 : data->size;
-	if (UINT32_MAX - size < sizeof(WT_REPL) + sizeof(u_int32_t))
+	if (UINT32_MAX - size < sizeof(WT_REPL) + sizeof(uint32_t))
 		return (__wt_database_item_too_big(db));
-	align_size = WT_ALIGN(size + sizeof(WT_REPL), sizeof(u_int32_t));
+	align_size = WT_ALIGN(size + sizeof(WT_REPL), sizeof(uint32_t));
 	if (UINT32_MAX - align_size < sizeof(WT_TOC_UPDATE))
 		return (__wt_database_item_too_big(db));
 
@@ -215,7 +215,7 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 
 	update->len = alloc_size;
 	update->space_avail = alloc_size - sizeof(WT_TOC_UPDATE);
-	update->first_free = (u_int8_t *)update + sizeof(WT_TOC_UPDATE);
+	update->first_free = (uint8_t *)update + sizeof(WT_TOC_UPDATE);
 
 	/*
 	 * If it's a single use allocation, ignore any current update buffer.

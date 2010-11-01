@@ -42,7 +42,7 @@ __wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep)
  *	Store overflow items in the database, returning the page addr.
  */
 int
-__wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
+__wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp)
 {
 	DB *db;
 	WT_PAGE *page;

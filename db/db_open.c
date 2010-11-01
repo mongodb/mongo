@@ -9,14 +9,14 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_idb_open(DB *, const char *, mode_t, u_int32_t);
+static int __wt_db_idb_open(DB *, const char *, mode_t, uint32_t);
 
 /*
  * __wt_db_open --
  *	Open a DB handle.
  */
 int
-__wt_db_open(WT_TOC *toc, const char *name, mode_t mode, u_int32_t flags)
+__wt_db_open(WT_TOC *toc, const char *name, mode_t mode, uint32_t flags)
 {
 	DB *db;
 	ENV *env;
@@ -43,7 +43,7 @@ __wt_db_open(WT_TOC *toc, const char *name, mode_t mode, u_int32_t flags)
  *	Routine to intialize any IDB values based on a DB value during open.
  */
 static int
-__wt_db_idb_open(DB *db, const char *name, mode_t mode, u_int32_t flags)
+__wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 {
 	ENV *env;
 	IENV *ienv;
@@ -72,7 +72,7 @@ __wt_db_idb_open(DB *db, const char *name, mode_t mode, u_int32_t flags)
  *	Db.close method (DB close & handle destructor).
  */
 int
-__wt_db_close(WT_TOC *toc, u_int32_t flags)
+__wt_db_close(WT_TOC *toc, uint32_t flags)
 {
 	DB *db;
 	int ret;

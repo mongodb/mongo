@@ -14,7 +14,7 @@
  *	Db.col_get method.
  */
 int
-__wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data)
+__wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data)
 {
 	DB *db;
 	IDB *idb;

@@ -21,8 +21,8 @@ struct __wt_read_req;		typedef struct __wt_read_req WT_READ_REQ;
  */
 struct __wt_read_req {
 	WT_TOC	  *toc;			/* Requesting thread */
-	u_int32_t *addrp;		/* Address */
-	u_int32_t  size;		/* Bytes */
+	uint32_t *addrp;		/* Address */
+	uint32_t  size;		/* Bytes */
 	WT_PAGE  **pagep;		/* Returned page */
 };
 #define	WT_READ_REQ_ISEMPTY(r)						\
@@ -92,9 +92,9 @@ struct __wt_cache {
 #define	WT_ADDR_HASH(cache, addr)	((addr) % (cache)->hb_size)
 #define	WT_CACHE_ENTRY_CHUNK	20	/* Entries in a WT_CACHE_ENTRY array */
 	WT_CACHE_ENTRY **hb;		/* Array of hash buckets */
-	u_int32_t	 hb_size;	/* Number of hash buckets */
+	uint32_t	 hb_size;	/* Number of hash buckets */
 
-	u_int32_t	 lru;		/* LRU generation number */
+	uint32_t	 lru;		/* LRU generation number */
 
 	/*
 	 * Different threads read/write pages to/from the cache, so we cannot
@@ -111,19 +111,19 @@ struct __wt_cache {
 	++(c)->stat_pages_out;						\
 	(c)->stat_bytes_out += bytes;					\
 } while (0);
-	u_int64_t stat_pages_in;
-	u_int64_t stat_bytes_in;
-	u_int64_t stat_pages_out;
-	u_int64_t stat_bytes_out;
+	uint64_t stat_pages_in;
+	uint64_t stat_bytes_in;
+	uint64_t stat_pages_out;
+	uint64_t stat_bytes_out;
 
 	WT_CACHE_ENTRY **drain;		/* List of entries being drained */
-	u_int32_t drain_elem;		/* Number of entries in the list */
-	u_int32_t drain_len;		/* Bytes in the list */
-	u_int32_t bucket_cnt;		/* Drain review: last hash bucket */
+	uint32_t drain_elem;		/* Number of entries in the list */
+	uint32_t drain_len;		/* Bytes in the list */
+	uint32_t bucket_cnt;		/* Drain review: last hash bucket */
 
 	WT_PAGE **hazard;		/* Copy of the hazard references */
-	u_int32_t hazard_elem;		/* Number of entries in the list */
-	u_int32_t hazard_len;		/* Bytes in the list */
+	uint32_t hazard_elem;		/* Number of entries in the list */
+	uint32_t hazard_len;		/* Bytes in the list */
 
 	WT_STATS *stats;		/* Cache statistics */
 };
@@ -157,7 +157,7 @@ struct __wt_cache {
  */
 struct __wt_cache_entry {
 	DB	 *db;			/* Page's backing database */
-	u_int32_t addr;			/* Page's allocation address */
+	uint32_t addr;			/* Page's allocation address */
 	WT_PAGE	 *page;			/* Page */
 
 	/*
@@ -178,7 +178,7 @@ struct __wt_cache_entry {
 #define	WT_EMPTY	0		/* 0 so cleared memory works */
 #define	WT_DRAIN	1
 #define	WT_OK		2
-	u_int32_t volatile state;
+	uint32_t volatile state;
 };
 #define	WT_CACHE_ENTRY_SET(e, _db, _addr, _page, _state) do {		\
 	(e)->db = _db;							\

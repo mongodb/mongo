@@ -25,27 +25,27 @@ typedef struct {
 } WT_STACK;
 
 static int  __wt_bt_bulk_fix(WT_TOC *,
-	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
-static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, u_int32_t *);
+	void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, uint32_t *);
 static int __wt_bt_bulk_stack_put(WT_TOC *, WT_STACK *);
-static int  __wt_bt_bulk_var(WT_TOC *, u_int32_t,
-	void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
+static int  __wt_bt_bulk_var(WT_TOC *, uint32_t,
+	void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
 static inline int __wt_bt_bulk_write(WT_TOC *, WT_PAGE *);
 static int  __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
-	DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
+	DBT *, WT_ITEM *, uint32_t, int (*cb)(DB *, DBT **, DBT **));
 static int  __wt_bt_promote(
-	WT_TOC *, WT_PAGE *, u_int64_t, WT_STACK *, u_int, u_int32_t *);
+	WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
 static int __wt_bt_scratch_page(
-	WT_TOC *, u_int32_t, u_int32_t, u_int32_t, WT_PAGE **, DBT **);
+	WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
 
 /*
  * __wt_db_bulk_load --
  *	Db.bulk_load method.
  */
 int
-__wt_db_bulk_load(WT_TOC *toc, u_int32_t flags,
-    void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
+__wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
+    void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
 	IDB *idb;
@@ -75,7 +75,7 @@ __wt_db_bulk_load(WT_TOC *toc, u_int32_t flags,
  */
 static int
 __wt_bt_bulk_fix(WT_TOC *toc,
-    void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
+    void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
 	DBT *key, *data, *tmp;
@@ -83,10 +83,10 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	WT_STACK stack;
-	u_int64_t insert_cnt;
-	u_int32_t len;
-	u_int16_t *last_repeat;
-	u_int8_t *last_data;
+	uint64_t insert_cnt;
+	uint32_t len;
+	uint16_t *last_repeat;
+	uint8_t *last_data;
 	int rcc, ret;
 
 	db = toc->db;
@@ -100,7 +100,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	/* Figure out how large is the chunk we're storing on the page. */
 	len = db->fixed_len;
 	if (rcc)
-		len += sizeof(u_int16_t);
+		len += sizeof(uint16_t);
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bt_scratch_page(toc, db->leafmin,
@@ -188,10 +188,10 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		 * compression, track the location of the item for comparison.
 		 */
 		if (rcc) {
-			last_repeat = (u_int16_t *)page->first_free;
+			last_repeat = (uint16_t *)page->first_free;
 			*last_repeat = 1;
-			page->first_free += sizeof(u_int16_t);
-			page->space_avail -= sizeof(u_int16_t);
+			page->first_free += sizeof(uint16_t);
+			page->space_avail -= sizeof(uint16_t);
 			last_data = page->first_free;
 		}
 		memcpy(page->first_free, data->data, data->size);
@@ -228,8 +228,8 @@ err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
  *	pages.
  */
 static int
-__wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
-    void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
+__wt_bt_bulk_var(WT_TOC *toc, uint32_t flags,
+    void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
 	DBT *key, *data, key_copy, data_copy;
@@ -241,9 +241,9 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	WT_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
 	WT_STACK stack;
-	u_int64_t insert_cnt;
-	u_int32_t dup_count, dup_space, len;
-	u_int8_t type;
+	uint64_t insert_cnt;
+	uint32_t dup_count, dup_space, len;
+	uint8_t type;
 	int ret;
 
 	db = toc->db;
@@ -441,8 +441,8 @@ skip_read:	/*
 				 * fix up "page", we're never going to use it
 				 * again.
 				 */
-				len = (u_int32_t)
-				    (page->first_free - (u_int8_t *)dup_key);
+				len = (uint32_t)
+				    (page->first_free - (uint8_t *)dup_key);
 				memcpy(next->first_free, dup_key, len);
 				next->first_free += len;
 				next->space_avail -= len;
@@ -458,7 +458,7 @@ skip_read:	/*
 				 * is the dup set's key.
 				 */
 				dup_key = (WT_ITEM *)WT_PAGE_BYTE(next);
-				dup_data = (WT_ITEM *)((u_int8_t *)dup_key +
+				dup_data = (WT_ITEM *)((uint8_t *)dup_key +
 				    WT_ITEM_SPACE_REQ(WT_ITEM_LEN(dup_key)));
 
 				/*
@@ -619,7 +619,7 @@ err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 static int
 __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
     DBT **keyp, DBT **datap, DBT *lastkey, WT_ITEM *dup_data,
-    u_int32_t dup_count, int (*cb)(DB *, DBT **, DBT **))
+    uint32_t dup_count, int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
 	DBT *key, *data, *tmp;
@@ -629,8 +629,8 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	WT_OVFL data_ovfl;
 	WT_PAGE *page;
 	WT_STACK stack;
-	u_int32_t len, root_addr;
-	u_int8_t *p;
+	uint32_t len, root_addr;
+	uint8_t *p;
 	int ret, success_return;
 
 	db = toc->db;
@@ -678,7 +678,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	/* Move the duplicates onto the page. */
 	page->records = dup_count;
 	page->hdr->u.entries = dup_count;
-	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
+	len = (uint32_t)(leaf_page->first_free - (uint8_t *)dup_data);
 	memcpy(page->first_free, dup_data, (size_t)len);
 	page->first_free += len;
 	page->space_avail -= len;
@@ -776,11 +776,11 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	WT_RECORDS(&off) = dup_count;
 	off.addr = root_addr;
 	off.size = db->intlmin;
-	p = (u_int8_t *)dup_data;
+	p = (uint8_t *)dup_data;
 	memcpy(p, &data_item, sizeof(data_item));
 	memcpy(p + sizeof(data_item), &off, sizeof(WT_OFF));
 	__wt_bt_set_ff_and_sa_from_offset(leaf_page,
-	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)));
+	    (uint8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)));
 
 err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
@@ -794,8 +794,8 @@ err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
  *	Promote the first entry on a page to its parent.
  */
 static int
-__wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
-    WT_STACK *stack, u_int level, u_int32_t *dup_root_addrp)
+__wt_bt_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
+    WT_STACK *stack, u_int level, uint32_t *dup_root_addrp)
 {
 	DB *db;
 	DBT *key, key_build, *next_tmp;
@@ -954,7 +954,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 #define	WT_STACK_ALLOC_INCR	20
 #endif
 	if (stack->size == 0 || level == stack->size - 1) {
-		u_int32_t
+		uint32_t
 		    bytes_allocated = stack->size * sizeof(WT_STACK_ELEM);
 		WT_RET(__wt_realloc(env, &bytes_allocated,
 		    (stack->size + WT_STACK_ALLOC_INCR) * sizeof(WT_STACK_ELEM),
@@ -1278,13 +1278,13 @@ __wt_bt_build_data_item(
  *	addr.
  */
 static int
-__wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
+__wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp)
 {
 	DB *db;
 	DBT *tmp;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	u_int32_t size;
+	uint32_t size;
 	int ret;
 
 	db = toc->db;
@@ -1301,7 +1301,7 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	hdr->type = WT_PAGE_OVFL;
 	hdr->level = WT_LLEAF;
 	hdr->u.datalen = dbt->size;
-	memcpy((u_int8_t *)hdr + sizeof(WT_PAGE_HDR), dbt->data, dbt->size);
+	memcpy((uint8_t *)hdr + sizeof(WT_PAGE_HDR), dbt->data, dbt->size);
 
 	ret = __wt_bt_bulk_write(toc, page);
 
@@ -1317,14 +1317,14 @@ err:	if (tmp != NULL)
  */
 static int
 __wt_bt_scratch_page(WT_TOC *toc,
-    u_int32_t page_size, u_int32_t page_type, u_int32_t page_level,
+    uint32_t page_size, uint32_t page_type, uint32_t page_level,
     WT_PAGE **page_ret, DBT **tmp_ret)
 {
 	ENV *env;
 	DBT *tmp;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	u_int32_t size;
+	uint32_t size;
 	int ret;
 
 	env = toc->env;
@@ -1350,12 +1350,12 @@ __wt_bt_scratch_page(WT_TOC *toc,
 	 */
 	page = tmp->data;
 	page->hdr = hdr =
-	    (WT_PAGE_HDR *)((u_int8_t *)tmp->data + sizeof(WT_PAGE));
+	    (WT_PAGE_HDR *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
 	WT_ERR(__wt_cache_alloc(toc, &page->addr, page_size));
 	page->size = page_size;
 	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
-	hdr->type = (u_int8_t)page_type;
-	hdr->level = (u_int8_t)page_level;
+	hdr->type = (uint8_t)page_type;
+	hdr->level = (uint8_t)page_level;
 
 	*page_ret = page;
 	*tmp_ret = tmp;

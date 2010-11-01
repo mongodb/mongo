@@ -16,8 +16,8 @@
 int
 __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 {
-	u_int32_t len;
-	u_int8_t *userp, *treep;
+	uint32_t len;
+	uint8_t *userp, *treep;
 
 	/*
 	 * The DB * argument isn't used by the default routine, but is
@@ -53,7 +53,7 @@ __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 int
 __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 {
-	u_int64_t user_int, tree_int;
+	uint64_t user_int, tree_int;
 
 	/*
 	 * The DBT must hold the low-order bits in machine integer order.

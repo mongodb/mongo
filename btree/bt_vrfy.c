@@ -1174,7 +1174,7 @@ __wt_bt_verify_page_desc(DB *db, WT_PAGE *page)
 	}
 	if (desc->recno_offset != 0) {
 		__wt_api_db_errx(db, "recno offset %llu, expected 0",
-		    (unsigned long long)desc->recno_offset);
+		    (u_quad)desc->recno_offset);
 		ret = WT_ERROR;
 	}
 	if (F_ISSET(desc, ~WT_PAGE_DESC_MASK)) {

@@ -23,7 +23,7 @@ static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
  */
 int
 __wt_bt_page_alloc(
-    WT_TOC *toc, u_int type, u_int level, u_int32_t size, WT_PAGE **pagep)
+    WT_TOC *toc, u_int type, u_int level, uint32_t size, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
@@ -38,8 +38,8 @@ __wt_bt_page_alloc(
 	 * and the level.
 	 */
 	hdr = page->hdr;
-	hdr->type = (u_int8_t)type;
-	hdr->level = (u_int8_t)level;
+	hdr->type = (uint8_t)type;
+	hdr->level = (uint8_t)level;
 
 	*pagep = page;
 	return (0);
@@ -51,7 +51,7 @@ __wt_bt_page_alloc(
  */
 int
 __wt_bt_page_in(
-    WT_TOC *toc, u_int32_t addr, u_int32_t size, int inmem, WT_PAGE **pagep)
+    WT_TOC *toc, uint32_t addr, uint32_t size, int inmem, WT_PAGE **pagep)
 {
 	DB *db;
 	WT_PAGE *page;
@@ -77,7 +77,7 @@ __wt_bt_page_in(
  *	Return a btree page to the cache.
  */
 void
-__wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags)
+__wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, uint32_t flags)
 {
 	WT_PAGE *page;
 
@@ -112,7 +112,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 {
 	ENV *env;
 	WT_PAGE_HDR *hdr;
-	u_int32_t nindx;
+	uint32_t nindx;
 	int ret;
 
 	env = db->env;
@@ -215,8 +215,8 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
 	WT_ROW *rip;
-	u_int64_t records;
-	u_int32_t i;
+	uint64_t records;
+	uint32_t i;
 	void *huffman;
 
 	idb = db->idb;
@@ -262,7 +262,7 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries / 2;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)item);
 	return (0);
 }
 
@@ -276,8 +276,8 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	IDB *idb;
 	WT_ITEM *item;
 	WT_ROW *rip;
-	u_int32_t i, indx_count;
-	u_int64_t records;
+	uint32_t i, indx_count;
+	uint64_t records;
 
 	idb = db->idb;
 	records = 0;
@@ -338,7 +338,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	page->indx_count = indx_count;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)item);
 	return (0);
 }
 
@@ -352,8 +352,8 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 	WT_COL *cip;
 	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
-	u_int64_t records;
-	u_int32_t i;
+	uint64_t records;
+	uint32_t i;
 
 	hdr = page->hdr;
 	cip = page->u.icol;
@@ -372,7 +372,7 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)off);
+	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)off);
 }
 
 /*
@@ -386,7 +386,7 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
-	u_int32_t i;
+	uint32_t i;
 
 	hdr = page->hdr;
 	cip = page->u.icol;
@@ -404,7 +404,7 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 
 	page->indx_count = page->records = hdr->u.entries;
 
-	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)item);
 }
 
 /*
@@ -418,7 +418,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	WT_ROW *rip;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
-	u_int32_t i;
+	uint32_t i;
 
 	hdr = page->hdr;
 
@@ -449,7 +449,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = hdr->u.entries;
 
-	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)item);
 	return (0);
 }
 
@@ -462,8 +462,8 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
-	u_int32_t i;
-	u_int8_t *p;
+	uint32_t i;
+	uint8_t *p;
 
 	hdr = page->hdr;
 	cip = page->u.icol;
@@ -479,7 +479,7 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 
 	page->indx_count = page->records = hdr->u.entries;
 
-	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)p);
+	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)p);
 }
 
 /*
@@ -492,9 +492,9 @@ __wt_bt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
-	u_int64_t records;
-	u_int32_t i;
-	u_int8_t *p;
+	uint64_t records;
+	uint32_t i;
+	uint8_t *p;
 
 	hdr = page->hdr;
 	cip = page->u.icol;
@@ -513,7 +513,7 @@ __wt_bt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)p);
+	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)p);
 }
 
 /*
@@ -530,7 +530,7 @@ __wt_bt_item_process(
 	IDB *idb;
 	WT_PAGE *ovfl;
 	void *huffman, *p;
-	u_int32_t size;
+	uint32_t size;
 	int ret;
 
 	db = toc->db;

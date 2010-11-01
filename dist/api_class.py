@@ -60,7 +60,7 @@ class Api:
 methods['wt_toc.close'] = Api(
 	'wt_toc.close',
 	'method, ienvlock',
-	['flags/u_int32_t @S'],
+	['flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
@@ -70,79 +70,79 @@ methods['wt_toc.close'] = Api(
 methods['env.cache_drain_cnt_get'] = Api(
 	'env.cache_drain_cnt_get',
 	'method, getter',
-	['cache_drain_cnt/u_int32_t *@S'],
+	['cache_drain_cnt/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['env.cache_drain_cnt_set'] = Api(
 	'env.cache_drain_cnt_set',
 	'method, setter',
-	['cache_drain_cnt/u_int32_t @S/10'],
+	['cache_drain_cnt/uint32_t @S/10'],
 	[],
 	['init'], [])
 
 methods['env.cache_hash_size_get'] = Api(
 	'env.cache_hash_size_get',
 	'method, getter',
-	['cache_hash_size/u_int32_t *@S'],
+	['cache_hash_size/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['env.cache_hash_size_set'] = Api(
 	'env.cache_hash_size_set',
 	'method, setter, verify',
-	['cache_hash_size/u_int32_t @S'],
+	['cache_hash_size/uint32_t @S'],
 	[],
 	['init'], [])
 
 methods['env.cache_size_get'] = Api(
 	'env.cache_size_get',
 	'method, getter',
-	['cache_size/u_int32_t *@S'],
+	['cache_size/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['env.cache_size_set'] = Api(
 	'env.cache_size_set',
 	'method, setter, verify',
-	['cache_size/u_int32_t @S/20'],
+	['cache_size/uint32_t @S/20'],
 	[],
 	['init'], ['open'])
 
 methods['env.close'] = Api(
 	'env.close',
 	'method',
-	['flags/u_int32_t @S'],
+	['flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
 methods['env.data_update_initial_get'] = Api(
 	'env.data_update_initial_get',
 	'method, getter',
-	['data_update_initial/u_int32_t *@S'],
+	['data_update_initial/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['env.data_update_initial_set'] = Api(
 	'env.data_update_initial_set',
 	'method, setter',
-	['data_update_initial/u_int32_t @S/8 * 1024'],
+	['data_update_initial/uint32_t @S/8 * 1024'],
 	[],
 	['init'], [])
 
 methods['env.data_update_max_get'] = Api(
 	'env.data_update_max_get',
 	'method, getter',
-	['data_update_max/u_int32_t *@S'],
+	['data_update_max/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['env.data_update_max_set'] = Api(
 	'env.data_update_max_set',
 	'method, setter',
-	['data_update_max/u_int32_t @S/32 * 1024'],
+	['data_update_max/uint32_t @S/32 * 1024'],
 	[],
 	['init'], [])
 
 methods['env.db'] = Api(
 	'env.db',
 	'method',
-	['flags/u_int32_t @S',
+	['flags/uint32_t @S',
 	 'dbp/DB **@S'],
 	['__NONE__'],
 	['open'], [])
@@ -204,13 +204,13 @@ methods['env.errx'] = Api(
 methods['env.hazard_size_get'] = Api(
 	'env.hazard_size_get',
 	'method, getter',
-	['hazard_size/u_int32_t *@S/15'],
+	['hazard_size/uint32_t *@S/15'],
 	[],
 	['init'], [])
 methods['env.hazard_size_set'] = Api(
 	'env.hazard_size_set',
 	'method, setter, verify',
-	['hazard_size/u_int32_t @S'],
+	['hazard_size/uint32_t @S'],
 	[],
 	['init'], ['open'])
 
@@ -245,14 +245,14 @@ methods['env.open'] = Api(
 	'method',
 	['home/const char *@S',
 	 'mode/mode_t @S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], ['open'])
 
 methods['env.stat_clear'] = Api(
 	'env.stat_clear',
 	'method',
-	['flags/u_int32_t @S'],
+	['flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
@@ -260,22 +260,22 @@ methods['env.stat_print'] = Api(
 	'env.stat_print',
 	'method',
 	['stream/FILE *@S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
 methods['env.sync'] = Api(
 	'env.sync',
 	'method',
-	['progress/void (*@S)(const char *, u_int64_t)',
-	 'flags/u_int32_t @S'],
+	['progress/void (*@S)(const char *, uint64_t)',
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 methods['env.toc'] = Api(
 	'env.toc',
 	'method, ienvlock',
-	['flags/u_int32_t @S',
+	['flags/uint32_t @S',
 	 'tocp/WT_TOC **@S'],
 	['__NONE__'],
 	['open'], [])
@@ -283,26 +283,26 @@ methods['env.toc'] = Api(
 methods['env.toc_size_get'] = Api(
 	'env.toc_size_get',
 	'method, getter',
-	['toc_size/u_int32_t *@S'],
+	['toc_size/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['env.toc_size_set'] = Api(
 	'env.toc_size_set',
 	'method, setter, verify',
-	['toc_size/u_int32_t @S/50'],
+	['toc_size/uint32_t @S/50'],
 	[],
 	['init'], ['open'])
 
 methods['env.verbose_get'] = Api(
 	'env.verbose_get',
 	'method, getter',
-	['verbose/u_int32_t *@S'],
+	['verbose/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['env.verbose_set'] = Api(
 	'env.verbose_set',
 	'method, setter, verify',
-	['verbose/u_int32_t @S'],
+	['verbose/uint32_t @S'],
 	['VERB_ALL',
 	 'VERB_CACHE',
 	 'VERB_HAZARD',
@@ -356,57 +356,57 @@ methods['db.btree_compare_int_set'] = Api(
 methods['db.btree_dup_offpage_get'] = Api(
 	'db.btree_dup_offpage_get',
 	'method, getter',
-	['btree_dup_offpage/u_int32_t *@S'],
+	['btree_dup_offpage/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['db.btree_dup_offpage_set'] = Api(
 	'db.btree_dup_offpage_set',
 	'method, setter, verify',
-	['btree_dup_offpage/u_int32_t @S'],
+	['btree_dup_offpage/uint32_t @S'],
 	[],
 	['init'], ['open'])
 
 methods['db.btree_itemsize_get'] = Api(
 	'db.btree_itemsize_get',
 	'method, getter',
-	['intlitemsize/u_int32_t *@S',
-	 'leafitemsize/u_int32_t *@S'],
+	['intlitemsize/uint32_t *@S',
+	 'leafitemsize/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['db.btree_itemsize_set'] = Api(
 	'db.btree_itemsize_set',
 	'method, setter',
-	['intlitemsize/u_int32_t @S',
-	 'leafitemsize/u_int32_t @S'],
+	['intlitemsize/uint32_t @S',
+	 'leafitemsize/uint32_t @S'],
 	[],
 	['init'], ['open'])
 
 methods['db.btree_pagesize_get'] = Api(
 	'db.btree_pagesize_get',
 	'method, getter',
-	['allocsize/u_int32_t *@S',
-	 'intlmin/u_int32_t *@S',
-	 'intlmax/u_int32_t *@S',
-	 'leafmin/u_int32_t *@S',
-	 'leafmax/u_int32_t *@S'],
+	['allocsize/uint32_t *@S',
+	 'intlmin/uint32_t *@S',
+	 'intlmax/uint32_t *@S',
+	 'leafmin/uint32_t *@S',
+	 'leafmax/uint32_t *@S'],
 	[],
 	['init'], [])
 methods['db.btree_pagesize_set'] = Api(
 	'db.btree_pagesize_set',
 	'method, setter',
-	['allocsize/u_int32_t @S',
-	 'intlmin/u_int32_t @S',
-	 'intlmax/u_int32_t @S',
-	 'leafmin/u_int32_t @S',
-	 'leafmax/u_int32_t @S'],
+	['allocsize/uint32_t @S',
+	 'intlmin/uint32_t @S',
+	 'intlmax/uint32_t @S',
+	 'leafmin/uint32_t @S',
+	 'leafmax/uint32_t @S'],
 	[],
 	['init'], ['open'])
 
 methods['db.bulk_load'] = Api(
 	'db.bulk_load',
 	'method, rdonly, toc',
-	['flags/u_int32_t @S',
-	 'progress/void (*@S)(const char *, u_int64_t)',
+	['flags/uint32_t @S',
+	 'progress/void (*@S)(const char *, uint64_t)',
 	 'cb/int (*@S)(DB *, DBT **, DBT **)'],
 	[ 'DUPLICATES' ],
 	['open'], [])
@@ -414,7 +414,7 @@ methods['db.bulk_load'] = Api(
 methods['db.close'] = Api(
 	'db.close',
 	'method, toc',
-	['flags/u_int32_t @S'],
+	['flags/uint32_t @S'],
 	['NOWRITE',
 	 'OSWRITE'],
 	['init'], [])
@@ -423,8 +423,8 @@ methods['db.col_del'] = Api(
 	'db.col_del',
 	'method, colonly, rdonly, restart, toc',
 	['toc/WT_TOC *@S',
-	 'recno/u_int64_t @S',
-	 'flags/u_int32_t @S'],
+	 'recno/uint64_t @S',
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
@@ -432,9 +432,9 @@ methods['db.col_get'] = Api(
 	'db.col_get',
 	'method, colonly, toc',
 	['toc/WT_TOC *@S',
-	 'recno/u_int64_t @S',
+	 'recno/uint64_t @S',
 	 'data/DBT *@S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
@@ -442,18 +442,18 @@ methods['db.col_put'] = Api(
 	'db.col_put',
 	'method, colonly, rdonly, restart, toc',
 	['toc/WT_TOC *@S',
-	 'recno/u_int64_t @S',
+	 'recno/uint64_t @S',
 	 'data/DBT *@S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 methods['db.column_set'] = Api(
 	'db.column_set',
 	'method, setter, verify',
-	['fixed_len/u_int32_t @S',
+	['fixed_len/uint32_t @S',
 	 'dictionary/const char *@S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	[ 'REPEAT_COMP' ],
 	['init'], ['open'])
 
@@ -461,8 +461,8 @@ methods['db.dump'] = Api(
 	'db.dump',
 	'method, toc',
 	['stream/FILE *@S',
-	 'progress/void (*@S)(const char *, u_int64_t)',
-	 'flags/u_int32_t @S'],
+	 'progress/void (*@S)(const char *, uint64_t)',
+	 'flags/uint32_t @S'],
 	['DEBUG',
 	 'PRINTABLES' ],
 	['open'], [])
@@ -524,9 +524,9 @@ methods['db.errx'] = Api(
 methods['db.huffman_set'] = Api(
 	'db.huffman_set',
 	'method, extfunc, setter',
-	['huffman_table/u_int8_t const *@S',
+	['huffman_table/uint8_t const *@S',
 	 'huffman_table_size/u_int @S',
-	 'huffman_flags/u_int32_t @S'],
+	 'huffman_flags/uint32_t @S'],
 	[ 'ASCII_ENGLISH', 'HUFFMAN_DATA', 'HUFFMAN_KEY', 'TELEPHONE' ],
 	['init'], ['open'])
 
@@ -535,7 +535,7 @@ methods['db.open'] = Api(
 	'method, toc',
 	['name/const char *@S',
 	 'mode/mode_t @S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	[ 'CREATE',
 	  'RDONLY' ],
 	['init'], [])
@@ -545,7 +545,7 @@ methods['db.row_del'] = Api(
 	'method, rdonly, restart, rowonly, toc',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
@@ -555,7 +555,7 @@ methods['db.row_get'] = Api(
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'data/DBT *@S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
@@ -565,14 +565,14 @@ methods['db.row_put'] = Api(
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'data/DBT *@S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 methods['db.stat_clear'] = Api(
 	'db.stat_clear',
 	'method',
-	['flags/u_int32_t @S'],
+	['flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
@@ -580,23 +580,23 @@ methods['db.stat_print'] = Api(
 	'db.stat_print',
 	'method, toc',
 	['stream/FILE *@S',
-	 'flags/u_int32_t @S'],
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 methods['db.sync'] = Api(
 	'db.sync',
 	'method, rdonly, toc',
-	['progress/void (*@S)(const char *, u_int64_t)',
-	 'flags/u_int32_t @S'],
+	['progress/void (*@S)(const char *, uint64_t)',
+	 'flags/uint32_t @S'],
 	['OSWRITE'],
 	['open'], [])
 
 methods['db.verify'] = Api(
 	'db.verify',
 	'method, toc',
-	['progress/void (*@S)(const char *, u_int64_t)',
-	 'flags/u_int32_t @S'],
+	['progress/void (*@S)(const char *, uint64_t)',
+	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 

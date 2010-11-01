@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 struct __wt_stats {
-	u_int64_t	 v;				/* 64-bit value */
+	uint64_t	 v;				/* 64-bit value */
 	const char	*desc;				/* text description */
 };
 

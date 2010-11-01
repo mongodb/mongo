@@ -17,7 +17,7 @@ serial['bt_rcc_expand'] = Serial(
 	'bt_rcc_expand',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
-	 'u_int16_t/write_gen',
+	 'uint16_t/write_gen',
 	 'int/slot',
 	 'WT_COL_EXPAND **/new_expcol',
 	 'WT_COL_EXPAND */exp'])
@@ -26,7 +26,7 @@ serial['bt_rcc_expand_repl'] = Serial(
 	'bt_rcc_expand_repl',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
-	 'u_int16_t/write_gen',
+	 'uint16_t/write_gen',
 	 'WT_COL_EXPAND */exp',
 	 'WT_REPL */repl'])
 
@@ -34,7 +34,7 @@ serial['bt_update'] = Serial(
 	'bt_update',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
-	 'u_int16_t/write_gen',
+	 'uint16_t/write_gen',
 	 'int/slot',
 	 'WT_REPL **/new_repl',
 	 'WT_REPL */repl'])
@@ -42,14 +42,14 @@ serial['bt_update'] = Serial(
 serial['cache_alloc'] = Serial(
 	'cache_alloc',
 	'WT_WORKQ_READ', '1',
-	['u_int32_t */addrp',
-	 'u_int32_t/size'])
+	['uint32_t */addrp',
+	 'uint32_t/size'])
 
 serial['cache_read'] = Serial(
 	'cache_read',
 	'WT_WORKQ_READ', '0',
-	['u_int32_t */addrp',
-	 'u_int32_t/size',
+	['uint32_t */addrp',
+	 'uint32_t/size',
 	 'WT_PAGE **/pagep'])
 
 # func_serial --

@@ -17,8 +17,8 @@
  *	http://www.cl.cam.ac.uk/research/srg/
  *	    bluebook/21/crc/node6.html#SECTION00060000000000000000
  */
-u_int32_t
-__wt_cksum(void *chunk, u_int32_t bytes)
+uint32_t
+__wt_cksum(void *chunk, uint32_t bytes)
 {
 	#if 0
 	/*
@@ -50,7 +50,7 @@ __wt_cksum(void *chunk, u_int32_t bytes)
 	}
 	#endif
 
-	static const u_int32_t crctab[256] = {
+	static const uint32_t crctab[256] = {
 		0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9,
 		0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
 		0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61,
@@ -116,8 +116,8 @@ __wt_cksum(void *chunk, u_int32_t bytes)
 		0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668,
 		0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 	};
-	u_int32_t i, result;
-	u_int8_t *data;
+	uint32_t i, result;
+	uint8_t *data;
 
 	data = chunk;
 	result = *data++ << 24;

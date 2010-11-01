@@ -16,15 +16,15 @@ static int __wt_bt_key_build(WT_TOC *, WT_PAGE *, WT_ROW *);
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
+__wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_REPL *repl;
-	u_int32_t addr, base, indx, limit, size;
-	u_int16_t write_gen;
+	uint32_t addr, base, indx, limit, size;
+	uint16_t write_gen;
 	int cmp, isleaf, ret;
 
 	toc->srch_page = NULL;			/* Return values. */
@@ -155,7 +155,7 @@ __wt_bt_key_build(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip_arg)
 	DBT *dbt, local_dbt;
 	WT_ROW *rip;
 	WT_ITEM *item;
-	u_int32_t i;
+	uint32_t i;
 
 	WT_CLEAR(local_dbt);
 	dbt = &local_dbt;
