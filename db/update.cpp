@@ -661,7 +661,7 @@ namespace mongo {
             switch ( cmp ){
                 
             case LEFT_SUBFIELD: { // Mod is embeddeed under this element
-                uassert( 10145 ,  "LEFT_SUBFIELD only supports Object" , e.type() == Object || e.type() == Array );
+                uassert( 10145 ,  str::stream() << "LEFT_SUBFIELD only supports Object: " << field << " not: " << e.type() , e.type() == Object || e.type() == Array );
                 if ( onedownseen.count( e.fieldName() ) == 0 ){
                     onedownseen.insert( e.fieldName() );
                     if ( e.type() == Object ) {
