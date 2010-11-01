@@ -237,7 +237,8 @@ __wt_bt_verify_tree(WT_TOC *toc, WT_ROW *parent_rip,
 			__wt_api_db_errx(db,
 			    "page at addr %lu has a record count of %llu where "
 			    "the expected record count was %llu",
-			    (u_long)off->addr, page->records, WT_RECORDS(off));
+			    (u_long)off->addr, page->records,
+			    (unsigned long long)WT_RECORDS(off));
 			goto err;
 		}
 	}
@@ -257,7 +258,9 @@ __wt_bt_verify_tree(WT_TOC *toc, WT_ROW *parent_rip,
 			__wt_api_db_errx(db,
 			    "page at addr %lu has a starting record of %llu "
 			    "where the expected starting record was %llu",
-			    (u_long)off->addr, hdr->start_recno, start_recno);
+			    (u_long)off->addr,
+			    (unsigned long long)hdr->start_recno,
+			    (unsigned long long)start_recno);
 			goto err;
 		}
 		break;
@@ -270,7 +273,8 @@ __wt_bt_verify_tree(WT_TOC *toc, WT_ROW *parent_rip,
 			__wt_api_db_errx(db,
 			    "page at addr %lu has a starting record of %llu, "
 			    "which should never be non-zero",
-			    (u_long)off->addr, hdr->start_recno);
+			    (u_long)off->addr,
+			    (unsigned long long)hdr->start_recno);
 			goto err;
 		}
 		/*
@@ -1174,7 +1178,7 @@ __wt_bt_verify_page_desc(DB *db, WT_PAGE *page)
 	}
 	if (desc->recno_offset != 0) {
 		__wt_api_db_errx(db, "recno offset %llu, expected 0",
-		    (u_quad)desc->recno_offset);
+		    (unsigned long long)desc->recno_offset);
 		ret = WT_ERROR;
 	}
 	if (F_ISSET(desc, ~WT_PAGE_DESC_MASK)) {

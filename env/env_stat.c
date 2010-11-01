@@ -73,11 +73,14 @@ __wt_stat_print(ENV *env, WT_STATS *s, FILE *stream)
 	for (; s->desc != NULL; ++s)
 		if (s->v >= WT_BILLION)
 			fprintf(stream, "%lluB\t%s (%llu bytes)\n",
-			    s->v / WT_BILLION, s->desc, s->v);
+			    (unsigned long long)s->v / WT_BILLION,
+			    s->desc, (unsigned long long)s->v);
 		else if (s->v >= WT_MILLION)
 			fprintf(stream, "%lluM\t%s (%llu bytes)\n",
-			    s->v / WT_MILLION, s->desc, s->v);
+			    (unsigned long long)s->v / WT_MILLION,
+			    s->desc, (unsigned long long)s->v);
 		else
-			fprintf(stream, "%llu\t%s\n", s->v, s->desc);
+			fprintf(stream,
+			    "%llu\t%s\n", (unsigned long long)s->v, s->desc);
 	fprintf(stream, "%s\n", ienv->sep);
 }

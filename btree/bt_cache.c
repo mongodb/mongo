@@ -205,7 +205,8 @@ __wt_cache_dump(ENV *env)
 	ienv = env->ienv;
 	cache = ienv->cache;
 
-	__wt_msg(env, "cache dump (%llu pages)", __wt_cache_pages_inuse(cache));
+	__wt_msg(env, "cache dump (%llu pages)",
+	    (unsigned long long)__wt_cache_pages_inuse(cache));
 
 	for (i = 0; i < cache->hb_size; ++i) {
 		__wt_msg(env, "==== cache bucket %lu", (u_long)i);

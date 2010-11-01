@@ -135,7 +135,8 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		    "\trecords %llu, starting recno %llu, level %lu, "
 		    "entries %lu, lsn %lu/%lu\n"
 		    "\tfirst-free %p (offset: %lu), space avail %lu\n",
-		    (u_quad)page->records, (u_quad)hdr->start_recno,
+		    (unsigned long long)page->records,
+		    (unsigned long long)hdr->start_recno,
 		    (u_long)hdr->level, (u_long)hdr->u.entries,
 		    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1],
 		    page->first_free,
@@ -201,7 +202,7 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 	fprintf(fp, "\t\tleaf page min/max size: %lu/%lu\n",
 	    (u_long)desc->leafmin, (u_long)desc->leafmax);
 	fprintf(fp, "\t\toffset record: %llu, fixed_len: %lu\n",
-	    (u_quad)desc->recno_offset, (u_long)desc->fixed_len);
+	    (unsigned long long)desc->recno_offset, (u_long)desc->fixed_len);
 	if (desc->root_addr == WT_ADDR_INVALID)
 		fprintf(fp, "\t\troot addr (none)\n");
 	else
@@ -470,7 +471,8 @@ __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_OFF:
 		off = WT_ITEM_BYTE_OFF(item);
 		fprintf(fp, ", addr %lu, size %lu, records %llu\n",
-		    (u_long)off->addr, (u_long)off->size, WT_RECORDS(off));
+		    (u_long)off->addr, (u_long)off->size,
+		    (unsigned long long)WT_RECORDS(off));
 		return (0);
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -497,7 +499,7 @@ __wt_bt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 	WT_OFF_FOREACH(page, off, i)
 		fprintf(fp, "\toffpage: addr %lu, size %lu, records %llu\n",
 		    (u_long)off->addr,
-		    (u_long)off->size, (u_quad)WT_RECORDS(off));
+		    (u_long)off->size, (unsigned long long)WT_RECORDS(off));
 }
 
 /*
