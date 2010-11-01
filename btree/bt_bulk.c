@@ -106,6 +106,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	WT_ERR(__wt_bt_scratch_page(toc, db->leafmin,
 	    rcc ? WT_PAGE_COL_RCC : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
 	hdr = page->hdr;
+	hdr->start_recno = 1;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key != NULL) {
@@ -152,7 +153,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			if (*last_repeat < UINT16_MAX &&
 			    memcmp(last_data, data->data, data->size) == 0) {
 				++*last_repeat;
-				++hdr->u.entries;
+				++page->records;
 				WT_STAT_INCR(idb->stats, REPEAT_COUNT);
 				continue;
 			}
@@ -168,17 +169,19 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			 * to its parent and discard it, then switch to the new
 			 * page.
 			 */
-			page->records = hdr->u.entries;
 			WT_ERR(__wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL));
 			WT_ERR(__wt_bt_bulk_write(toc, page));
 			hdr->u.entries = 0;
+			page->records = 0;
+			hdr->start_recno = insert_cnt;
 			WT_ERR(__wt_cache_alloc(toc, &page->addr, db->leafmin));
 			__wt_bt_set_ff_and_sa_from_offset(
 			    page, WT_PAGE_BYTE(page));
 		}
 
 		++hdr->u.entries;
+		++page->records;
 
 		/*
 		 * Copy the data item onto the page -- if we're doing repeat
@@ -203,7 +206,6 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 
 	/* Promote a key from any partially-filled page and write it. */
 	if (hdr->u.entries != 0) {
-		page->records = hdr->u.entries;
 		ret = __wt_bt_promote(
 		    toc, page, page->records, &stack, 0, NULL);
 		WT_ERR(__wt_bt_bulk_write(toc, page));
@@ -262,12 +264,11 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	WT_CLEAR(lastkey_std);
 	WT_ERR(__wt_scr_alloc(toc, &lastkey_copy));
 
-	/*
-	 * Get a pair of scratch buffers and make them look like our two work
-	 * pages.
-	 */
+	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bt_scratch_page(
 	    toc, db->leafmin, type, WT_LLEAF, &page, &tmp1));
+	if (type == WT_PAGE_COL_VAR)
+		page->hdr->start_recno = 1;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (F_ISSET(idb, WT_COLUMN) ) {
@@ -403,6 +404,8 @@ skip_read:	/*
 		    WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
 			WT_ERR(__wt_bt_scratch_page(toc,
 			    db->leafmin, type, WT_LLEAF, &next, &tmp2));
+			if (type == WT_PAGE_COL_VAR)
+				next->hdr->start_recno = insert_cnt;
 
 			/*
 			 * If in the middle of loading a set of duplicates, but
@@ -899,8 +902,8 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
 	 * reference information from the page to the parent, and we're done.
 	 * This is a modified root-split: we're putting a single key on an
 	 * internal page, which is illegal, but we know another page on this
-	 * page's level was created, and it will be promoted to the parent at
-	 * some point.  This is case #1.
+	 * page's level will be created, and it will be promoted to the parent
+	 * at some point.  This is case #1.
 	 *
 	 * The second path into this code is if we have a page and its parent,
 	 * but the page's reference information doesn't fit on the parent and
@@ -988,44 +991,45 @@ split:		switch (hdr->type) {
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
+
 		WT_ERR(__wt_bt_scratch_page(
 		    toc, db->intlmin, type, hdr->level + 1, &next, &next_tmp));
 
 		/*
-		 * Case #1 -- there's no parent, it's a root split.  There's no
-		 * additional work in a primary tree; in an off-page duplicates
-		 * tree, return the root of the off-page tree.
+		 * Column stores set the starting record number to the starting
+		 * record number of the promoted leaf -- the new leaf is always
+		 * the first record in the new parent's page.  Ignore the type
+		 * of the database, it's simpler ot just promote 0 up the tree
+		 * in row store databases.
 		 */
+		next->hdr->start_recno = page->hdr->start_recno;
+
 		if (parent == NULL) {
-			switch (type) {
-			case WT_PAGE_COL_INT:
-			case WT_PAGE_ROW_INT:
-				break;
-			case WT_PAGE_DUP_INT:
-				*dup_root_addrp = next->addr;
-				break;
-			default:
-				break;
-			}
-			need_promotion = 0;
-		}
-		/*
-		 * Case #2 and #3.
-		 */
-		else {
 			/*
-			 * Case #3 -- it's a root split, so we have to promote
-			 * a key from both of the parent pages: promote the key
-			 * from the existing parent page.
+			 * Case #1 -- there's no parent, it's a root split.  No
+			 * additional work in the main tree.  In an off-page
+			 * duplicates tree, return the new root of the off-page
+			 * tree.
+			 */
+			if (type == WT_PAGE_DUP_INT)
+				*dup_root_addrp = next->addr;
+			need_promotion = 0;
+		} else {
+			/*
+			 * Case #2 and #3.
+			 *
+			 * Case #3: a root split, so we have to promote a key
+			 * from both of the parent pages: promote the key from
+			 * the existing parent page.
 			 */
 			if (stack->elem[level + 1].page == NULL)
 				WT_ERR(__wt_bt_promote(toc, parent,
 				    incr, stack, level + 1, dup_root_addrp));
+			need_promotion = 1;
 
 			/* Write the last parent page, we have a new one. */
 			WT_ERR(__wt_bt_bulk_write(toc, parent));
 			__wt_scr_release(&stack->elem[level].tmp);
-			need_promotion = 1;
 		}
 
 		/* There's a new parent page, reset the stack. */
