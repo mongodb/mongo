@@ -204,8 +204,11 @@ namespace mongo {
                     down(mem, info.getStringField("errmsg"));
                 }
             }
-            catch(...) { 
-                down(mem, "connect/transport error");             
+            catch(DBException& e) {
+                down(mem, e.what());
+            }
+            catch(...) {
+                down(mem, "something unusual went wrong");
             }
             m = mem;
 
@@ -230,7 +233,7 @@ namespace mongo {
             if( mem.upSince || mem.downSince == 0 ) {
                 mem.upSince = 0;
                 mem.downSince = jsTime();
-                log() << "replSet info " << h.toString() << " is now down (or slow to respond)" << rsLog;
+                log() << "replSet info " << h.toString() << " is now down (or slow to respond): " << msg << rsLog;
             }
             mem.lastHeartbeatMsg = msg;
         }
