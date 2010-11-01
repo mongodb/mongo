@@ -18,9 +18,9 @@ typedef struct __wt_freqtree_node {
 	 * 32-bit weight and pointers to the left and right child nodes.
 	 * The node either has two child nodes or none.
 	 */
-	u_int16_t symbol;			/* only used in leaf nodes */
-	u_int32_t weight;
-	u_int16_t codeword_length;
+	uint16_t symbol;			/* only used in leaf nodes */
+	uint32_t weight;
+	uint16_t codeword_length;
 	struct __wt_freqtree_node *left;	/* bit 0 */
 	struct __wt_freqtree_node *right;	/* bit 1 */
 } WT_FREQTREE_NODE;
@@ -34,9 +34,9 @@ typedef struct __wt_static_huffman_node {
 	 * In the binary tree's array representation if a node's index is i,
 	 * then its left child node is 2i+1 and its right child node is 2i+2.
 	 */
-	u_int8_t valid;
-	u_int16_t symbol;
-	u_int16_t codeword_length;
+	uint8_t valid;
+	uint16_t symbol;
+	uint16_t codeword_length;
 } WT_STATIC_HUFFMAN_NODE;
 
 typedef struct __wt_huffman_obj {
@@ -46,11 +46,11 @@ typedef struct __wt_huffman_obj {
 	 * This contains the frequency table (tree) used to produce optimal
 	 * results.  This version of the encoder supports 1- and 2-byte symbols.
 	 */
-	u_int32_t numSymbols;
-	u_int8_t  numBytes;	/* 1 or 2 */
+	uint32_t numSymbols;
+	uint8_t  numBytes;	/* 1 or 2 */
 				/* The tree in static array reprentation */
 	WT_STATIC_HUFFMAN_NODE *nodes;
-	u_int16_t max_depth;
+	uint16_t max_depth;
 } WT_HUFFMAN_OBJ;
 
 /*
@@ -92,7 +92,7 @@ static void recursive_free_node(ENV *env, WT_FREQTREE_NODE *node);
 	*((ptr) + ((pos) / 8)) |= 1 << (7 - ((pos) % 8))
 #undef	CLEAR_BIT
 #define	CLEAR_BIT(ptr, pos)						\
-	*((ptr) + ((pos) / 8)) &= ~(u_int8_t)(1 << (7 - ((pos) % 8)))
+	*((ptr) + ((pos) / 8)) &= ~(uint8_t)(1 << (7 - ((pos) % 8)))
 #undef	MODIFY_BIT
 #define	MODIFY_BIT(ptr, pos, bit)					\
 	if (bit)							\
@@ -105,8 +105,8 @@ static void recursive_free_node(ENV *env, WT_FREQTREE_NODE *node);
  * frequency array.
  */
 typedef struct __indexed_byte {
-	u_int8_t frequency;
-	u_int16_t symbol;
+	uint8_t frequency;
+	uint16_t symbol;
 } INDEXED_BYTE;
 
 /*
@@ -129,7 +129,7 @@ indexed_byte_comparator(const void *elem1, const void *elem2)
  */
 static void
 traverse_tree(
-    WT_FREQTREE_NODE *node, u_int16_t current_length, u_int16_t *max_depth)
+    WT_FREQTREE_NODE *node, uint16_t current_length, u_int16_t *max_depth)
 {
 	/* Recursively traverse the tree */
 	if (node->left != NULL)
@@ -204,14 +204,14 @@ recursive_free_node(ENV *env, WT_FREQTREE_NODE *node)
  */
 int
 __wt_huffman_open(ENV *env,
-    u_int8_t const *byte_frequency_array, u_int nbytes, void *retp)
+    uint8_t const *byte_frequency_array, u_int nbytes, void *retp)
 {
 	INDEXED_BYTE *indexed_freqs;
 	NODE_QUEUE *combined_nodes, *leaves;
 	WT_FREQTREE_NODE *node, *node2, **refnode, *tempnode;
 	WT_HUFFMAN_OBJ *huffman;
-	u_int32_t w1, w2;
-	u_int16_t i;
+	uint32_t w1, w2;
+	uint16_t i;
 	int ret;
 
 	indexed_freqs = NULL;
@@ -368,7 +368,7 @@ __wt_huffman_close(ENV *env, void *huffman_arg)
  *	Prints a symbol's huffman code. Can be used for debugging purposes.
  */
 int
-__wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
+__wt_print_huffman_code(ENV *env, void *huffman_arg, uint16_t symbol)
 {
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE *node;
@@ -421,15 +421,15 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
  */
 int
 __wt_huffman_encode(void *huffman_arg,
-    u_int8_t *from, u_int32_t from_len,
-    void *top, u_int32_t *to_len, u_int32_t *out_bytes_used)
+    uint8_t *from, uint32_t from_len,
+    void *top, uint32_t *to_len, u_int32_t *out_bytes_used)
 {
 	ENV *env;
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE *node;
-	u_int32_t bitpos, i, n, j;
-	u_int16_t symbol;
-	u_int8_t padding_info, *to;
+	uint32_t bitpos, i, n, j;
+	uint16_t symbol;
+	uint8_t padding_info, *to;
 	int p;
 
 	huffman = huffman_arg;
@@ -449,7 +449,7 @@ __wt_huffman_encode(void *huffman_arg,
 		WT_RET(__wt_realloc(env, to_len, from_len + 1, top));
 	}
 
-	to = *(u_int8_t **)top;
+	to = *(uint8_t **)top;
 	memset(to, 0, from_len + 1);
 
 	/*
@@ -463,7 +463,7 @@ __wt_huffman_encode(void *huffman_arg,
 		if (huffman->numBytes == 1)
 			symbol = *from++;
 		else {
-			symbol = ((u_int16_t)(*from++)) << 8;
+			symbol = ((uint16_t)(*from++)) << 8;
 			symbol |= *from++;
 		}
 
@@ -519,14 +519,14 @@ __wt_huffman_encode(void *huffman_arg,
  */
 int
 __wt_huffman_decode(void *huffman_arg,
-    u_int8_t *from, u_int32_t from_len,
-    void *top, u_int32_t *to_len, u_int32_t *out_bytes_used)
+    uint8_t *from, uint32_t from_len,
+    void *top, uint32_t *to_len, u_int32_t *out_bytes_used)
 {
 	ENV *env;
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE* node;
-	u_int32_t bytes, i, from_len_bits, node_idx;
-	u_int8_t bitpos, mask, bit, padding_info, *to;
+	uint32_t bytes, i, from_len_bits, node_idx;
+	uint8_t bitpos, mask, bit, padding_info, *to;
 
 	huffman = huffman_arg;
 	env = huffman->env;
@@ -545,7 +545,7 @@ __wt_huffman_decode(void *huffman_arg,
 		WT_RET(__wt_realloc(env, to_len, 2 * from_len + 1, top));
 	}
 
-	to = *(u_int8_t **)top;
+	to = *(uint8_t **)top;
 
 	bitpos = 4;			/* Skipping the first 3 bits. */
 	bytes = 0;
@@ -566,7 +566,7 @@ __wt_huffman_decode(void *huffman_arg,
 	 */
 	for (i = 3; i < from_len_bits; i++) {
 		/* Extracting the current bit */
-		mask = (u_int8_t)(1 << bitpos);
+		mask = (uint8_t)(1 << bitpos);
 		bit = (*from & mask);
 
 		/*
@@ -583,7 +583,7 @@ __wt_huffman_decode(void *huffman_arg,
 		/* If this is a leaf, we've found a complete symbol. */
 		if (node->valid && node->codeword_length > 0) {
 			if (huffman->numBytes == 1)
-				*to++ = (u_int8_t)node->symbol;
+				*to++ = (uint8_t)node->symbol;
 			else {
 				*to++ = (node->symbol & 0xFF00) >> 8;
 				*to++ = node->symbol & 0xFF;

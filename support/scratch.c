@@ -18,7 +18,7 @@ __wt_scr_alloc(WT_TOC *toc, DBT **dbtp)
 {
 	DBT *scratch;
 	ENV *env;
-	u_int32_t allocated;
+	uint32_t allocated;
 	u_int i;
 	int ret;
 

@@ -32,8 +32,8 @@
  *	http://graphics.stanford.edu/~seander/bithacks.html
  *	Sean Eron Anderson, seander@cs.stanford.edu
  */
-u_int32_t
-__wt_nlpo2(u_int32_t v)
+uint32_t
+__wt_nlpo2(uint32_t v)
 {
 	v--;
 	v |= v >> 1;
@@ -50,7 +50,7 @@ __wt_nlpo2(u_int32_t v)
  *	Return if a number is a power-of-two.
  */
 int
-__wt_ispo2(u_int32_t v)
+__wt_ispo2(uint32_t v)
 {
 	return ((v & (v - 1)) == 0 ? 1 : 0);
 }

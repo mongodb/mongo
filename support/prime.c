@@ -13,8 +13,8 @@
  * __wt_prime
  *	Return a prime number relatively close to a value.
  */
-u_int32_t
-__wt_prime(u_int32_t n)
+uint32_t
+__wt_prime(uint32_t n)
 {
 	/*
 	 * Ref: the hash functions section of "Algorithms in C", by Sedgewick.
@@ -24,8 +24,8 @@ __wt_prime(u_int32_t n)
 	 * to a maximum of 2^30.
 	 */
 	static const struct {
-		u_int32_t value;
-		u_int32_t prime;
+		uint32_t value;
+		uint32_t prime;
 	} t[] = {
 		{ 32, 37 },			/* 2^5 */
 		{ 64, 67 },			/* 2^6 */

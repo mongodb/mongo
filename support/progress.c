@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 void
-__wt_progress(const char *s, u_int64_t v)
+__wt_progress(const char *s, uint64_t v)
 {
 	(void)printf("\r\t%s: %llu", s, (u_quad)v);
 	(void)fflush(stdout);
