@@ -24,6 +24,8 @@ __wt_scr_alloc(WT_TOC *toc, DBT **dbtp)
 
 	env = toc->env;
 
+	*dbtp = NULL;	/* Don't risk the caller not catching the error. */
+
 	/*
 	 * There's an array of scratch buffers in each WT_TOC that can be used
 	 * by any function.  We use DBTs for scratch buffers because we already
