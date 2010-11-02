@@ -550,7 +550,8 @@ namespace mongo {
         _objData = b.obj();
         newVal = _objData.firstElement();            
     }    
-    
+
+    // dur version
     void ModSetState::ApplyModsInPlace() {
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             ModState& m = i->second;
@@ -574,6 +575,7 @@ namespace mongo {
                 m.fixed = &(m.old);
                 break;
             case Mod::SET:
+                 // ReplaceTypeAndValue - dur version
                 BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
                 break;
             default:

@@ -226,6 +226,7 @@
     <ClInclude Include="..\db\mongommf.h">
       <Filter>storage related</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\jsobjmanipulator.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
