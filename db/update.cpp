@@ -551,63 +551,43 @@ namespace mongo {
         newVal = _objData.firstElement();            
     }    
     
-    template< class Builder >
-    void ModSetState::appendNewFromMod( ModState& ms , Builder& b ) {
-        if ( ms.dontApply )
-            return;
-            
-        Mod& m = *((Mod*)(ms.m)); // HACK
-                
-        switch ( m.op ){
-                    
-        case Mod::PUSH: 
-        case Mod::ADDTOSET: { 
-            if ( m.isEach() ){
-                b.appendArray( m.shortFieldName , m.getEach() );
+    void ModSetState::ApplyModsInPlace() {
+        for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
+            ModState& m = i->second;
+            if ( m.dontApply ) {
+                continue;
             }
-            else {
-                BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
-                arr.appendAs( m.elt, "0" );
-                arr.done();
+
+            switch ( m.m->op ){
+            case Mod::UNSET:
+            case Mod::PULL:
+            case Mod::PULL_ALL:
+            case Mod::ADDTOSET:
+            case Mod::RENAME_FROM:
+            case Mod::RENAME_TO:
+                // this should have been handled by prepare
+                break;
+            // [dm] the BSONElementManipulator statements below are for replication (correct?)
+            case Mod::INC:
+                m.m->IncrementMe( m.old );
+                m.fixedOpName = "$set";
+                m.fixed = &(m.old);
+                break;
+            case Mod::SET:
+                BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
+                break;
+            default:
+                uassert( 10144 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
             }
-            break;
-        } 
-                
-        case Mod::PUSH_ALL: {
-            b.appendAs( m.elt, m.shortFieldName );
-            break;
-        } 
-                
-        case Mod::UNSET:
-        case Mod::PULL:
-        case Mod::PULL_ALL:
-            // no-op b/c unset/pull of nothing does nothing
-            break;
-                
-        case Mod::INC:
-            ms.fixedOpName = "$set";
-        case Mod::SET: {
-            m._checkForAppending( m.elt );
-            b.appendAs( m.elt, m.shortFieldName );
-            break;
         }
-        // shouldn't see RENAME_FROM here
-        case Mod::RENAME_TO:
-            ms.handleRename( b, m.shortFieldName );
-            break;
-        default: 
-            stringstream ss;
-            ss << "unknown mod in appendNewFromMod: " << m.op;
-            throw UserException( 9015, ss.str() );
-        }
-         
     }
 
     void ModSetState::applyModsInPlace() {
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             ModState& m = i->second;  
-            if ( m.dontApply )
+            if ( m.dontApply ) {
                 continue;
+            }
             
             switch ( m.m->op ){
             case Mod::UNSET:
@@ -1014,7 +994,7 @@ namespace mongo {
             auto_ptr<ModSetState> mss = mods->prepare( onDisk );
                     
             if( mss->canApplyInPlace() ) {
-                mss->applyModsInPlace();                    
+                mss->ApplyModsInPlace();                    
                 DEBUGUPDATE( "\t\t\t updateById doing in place update" );
                 /*if ( profile )
                     ss << " fastmod "; */
@@ -1206,7 +1186,7 @@ namespace mongo {
                 }
                     
                 if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ){
-                    mss->applyModsInPlace();// const_cast<BSONObj&>(onDisk) );
+                    mss->ApplyModsInPlace();// const_cast<BSONObj&>(onDisk) );
                     
                     DEBUGUPDATE( "\t\t\t doing in place update" );
                     if ( profile )
