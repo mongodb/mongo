@@ -1449,7 +1449,7 @@ namespace mongo {
 
     /** transform a BSON array into a vector of BSONElements.
         we match array # positions with their vector position, and ignore 
-        any non-numeric fields. 
+        any fields with non-numeric field names. 
         */
     vector<BSONElement> BSONElement::Array() const { 
         chk(mongo::Array);
