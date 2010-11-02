@@ -60,3 +60,5 @@ assert( m.getDBs().totalSize > 0, "bad size calc" );
 db.dropDatabase();
 files = listFiles( dbpath );
 files.forEach( function( f ) { assert( !new RegExp( baseName ).test( f.name ), "drop database - dir not cleared" ); } );
+
+print("SUCCESS directoryperdb.js");
