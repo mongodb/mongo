@@ -23,7 +23,6 @@
 #include "../bson/util/atomic_int.h"
 #include "../client/dbclient.h"
 #include "../client/distlock.h"
-#include "../client/model.h"
 
 #include "shardkey.h"
 #include "shard.h"
@@ -45,7 +44,7 @@ namespace mongo {
     typedef map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
     
     typedef shared_ptr<ChunkManager> ChunkManagerPtr;
-    
+
     /**
        config.chunks
        { ns : "alleyinsider.fs.chunks" , min : {} , max : {} , server : "localhost:30001" }
@@ -64,7 +63,6 @@ namespace mongo {
 
         void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
         void unserialize(const BSONObj& from);
-        string modelServer() const;
         
         //
         // chunk boundary support
@@ -89,7 +87,6 @@ namespace mongo {
         // 
 
         void appendShortVersion( const char * name , BSONObjBuilder& b );
-        ShardChunkVersion getVersionOnConfigServer() const;
 
         ShardChunkVersion getLastmod() const { return _lastmod; }
         void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
@@ -160,6 +157,11 @@ namespace mongo {
         
         int countObjects(int maxcount=0) const;
         
+        //
+        // public constants 
+        //
+
+        static string chunkMetadataNS;    
         static int MaxChunkSize;
 
         //
@@ -190,7 +192,7 @@ namespace mongo {
         // transient stuff
 
         long _dataWritten;
-        
+
         // methods, etc..
         
         /**
