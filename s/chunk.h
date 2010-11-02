@@ -57,7 +57,19 @@ namespace mongo {
     public:
         Chunk( ChunkManager * info );
         Chunk( ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
+
+        //
+        // serialization support
+        //
+
+        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
+        void unserialize(const BSONObj& from);
+        string modelServer() const;
         
+        //
+        // chunk boundary support
+        //
+
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
         void setMin(const BSONObj& o) { _min = o; }
@@ -69,25 +81,15 @@ namespace mongo {
 
         bool contains( const BSONObj& obj ) const;
 
-        string toString() const;
-        friend ostream& operator << (ostream& out, const Chunk& c){ return (out << c.toString()); }
-        bool operator==(const Chunk& s) const;
-        bool operator!=(const Chunk& s) const { return ! ( *this == s ); }
-        
-        string getns() const;
-        const char * getNS() { return "config.chunks"; }
-        Shard getShard() const { return _shard; }
-        const ChunkManager* getManager() const { return _manager; }
-
-        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
-        void unserialize(const BSONObj& from);
-        string modelServer() const;
-        
-        void appendShortVersion( const char * name , BSONObjBuilder& b );
-        ShardChunkVersion getVersionOnConfigServer() const;
-
         string genID() const;
         static string genID( const string& ns , const BSONObj& min );
+
+        //
+        // chunk version support
+        // 
+
+        void appendShortVersion( const char * name , BSONObjBuilder& b );
+        ShardChunkVersion getVersionOnConfigServer() const;
 
         ShardChunkVersion getLastmod() const { return _lastmod; }
         void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
@@ -134,14 +136,10 @@ namespace mongo {
          */
         void pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize , int maxPoints = 0, int maxObjs = 0) const;
 
-        /**
-         * @return size of shard in bytes
-         *  talks to mongod to do this
-         */
-        long getPhysicalSize() const;
-        
-        int countObjects(int maxcount=0) const;
-        
+        //
+        // migration support
+        // 
+
         /**
          * moves either this shard or newShard if it makes sense too
          *
@@ -151,7 +149,33 @@ namespace mongo {
 
         bool moveAndCommit( const Shard& to , BSONObj& res );
 
+        /**
+         * @return size of shard in bytes
+         *  talks to mongod to do this
+         */
+        long getPhysicalSize() const;
+
+        //
+        // chunk size support
+        
+        int countObjects(int maxcount=0) const;
+        
         static int MaxChunkSize;
+
+        //
+        // accessors and helpers
+        //
+
+        string toString() const;
+
+        friend ostream& operator << (ostream& out, const Chunk& c){ return (out << c.toString()); }
+        bool operator==(const Chunk& s) const;
+        bool operator!=(const Chunk& s) const { return ! ( *this == s ); }
+        
+        string getns() const;
+        const char * getNS() { return "config.chunks"; }
+        Shard getShard() const { return _shard; }
+        const ChunkManager* getManager() const { return _manager; }
 
     private:
         // main shard info
