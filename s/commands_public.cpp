@@ -183,7 +183,7 @@ namespace mongo {
 
         class DBStatsCmd : public RunOnAllShardsCommand {
         public:
-            DBStatsCmd() :  RunOnAllShardsCommand("dbstats") {}
+            DBStatsCmd() :  RunOnAllShardsCommand("dbStats", "dbstats") {}
 
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
                 long long objects = 0;
@@ -438,7 +438,7 @@ namespace mongo {
 
         class CollectionStats : public PublicGridCommand {
         public:
-            CollectionStats() : PublicGridCommand("collstats") { }
+            CollectionStats() : PublicGridCommand("collStats", "collstats") { }
             bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -517,7 +517,7 @@ namespace mongo {
 
         class FindAndModifyCmd : public PublicGridCommand {
         public:
-            FindAndModifyCmd() : PublicGridCommand("findandmodify") { }
+            FindAndModifyCmd() : PublicGridCommand("findAndModify", "findandmodify") { }
             bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
