@@ -506,101 +506,13 @@ namespace mongo {
      * the goal is to make ModSet const so its re-usable
      */
     class ModSetState : boost::noncopyable {
-        struct FieldCmp {
-            bool operator()( const string &l, const string &r ) const {
-                return lexNumCmp( l.c_str(), r.c_str() ) < 0;
-            }
-        };
-        typedef map<string,ModState,FieldCmp> ModStateHolder;
-        const BSONObj& _obj;
-        ModStateHolder _mods;
-        bool _inPlacePossible;
-        BSONObj _newFromMods; // keep this data alive, as oplog generation may depend on it
-        
-        ModSetState( const BSONObj& obj ) 
-            : _obj( obj ) , _inPlacePossible(true){
-        }
-        
-        /**
-         * @return if in place is still possible
-         */
-        bool amIInPlacePossible( bool inPlacePossible ){
-            if ( ! inPlacePossible )
-                _inPlacePossible = false;
-            return _inPlacePossible;
-        }
-
-        template< class Builder >
-        void createNewFromMods( const string& root , Builder& b , const BSONObj &obj );
-
-        template< class Builder >
-        void _appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen );
-        
-        template< class Builder >
-        void appendNewFromMod( ModState& ms , Builder& b ){
-            if ( ms.dontApply ) {
-                return;
-            }
-            
-            //const Mod& m = *(ms.m); // HACK
-            Mod& m = *((Mod*)(ms.m)); // HACK
-                
-            switch ( m.op ){
-                    
-            case Mod::PUSH: 
-            case Mod::ADDTOSET: { 
-                if ( m.isEach() ){
-                    b.appendArray( m.shortFieldName , m.getEach() );
-                }
-                else {
-                    BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
-                    arr.appendAs( m.elt, "0" );
-                    arr.done();
-                }
-                break;
-            } 
-                
-            case Mod::PUSH_ALL: {
-                b.appendAs( m.elt, m.shortFieldName );
-                break;
-            } 
-                
-            case Mod::UNSET:
-            case Mod::PULL:
-            case Mod::PULL_ALL:
-                // no-op b/c unset/pull of nothing does nothing
-                break;
-                
-            case Mod::INC:
-                ms.fixedOpName = "$set";
-            case Mod::SET: {
-                m._checkForAppending( m.elt );
-                b.appendAs( m.elt, m.shortFieldName );
-                break;
-            }
-            // shouldn't see RENAME_FROM here
-            case Mod::RENAME_TO:
-                ms.handleRename( b, m.shortFieldName );
-                break;
-            default: 
-                stringstream ss;
-                ss << "unknown mod in appendNewFromMod: " << m.op;
-                throw UserException( 9015, ss.str() );
-            }
-         
-        }
-
     public:
-        
-        bool canApplyInPlace() const {
-            return _inPlacePossible;
-        }
+        bool canApplyInPlace() const { return _inPlacePossible; }
         
         /**
          * modified underlying _obj
          */
         void applyModsInPlace();
-        void ApplyModsInPlace();
 
         BSONObj createNewFromMods();
 
@@ -640,9 +552,39 @@ namespace mongo {
         }
 
         string toString() const;
-
+    private:
         friend class ModSet;
-    };
-    
-}
+        struct FieldCmp {
+            bool operator()( const string &l, const string &r ) const {
+                return lexNumCmp( l.c_str(), r.c_str() ) < 0;
+            }
+        };
+        typedef map<string,ModState,FieldCmp> ModStateHolder;
+        const BSONObj& _obj;
+        ModStateHolder _mods;
+        bool _inPlacePossible;
+        BSONObj _newFromMods; // keep this data alive, as oplog generation may depend on it
+        
+        ModSetState( const BSONObj& obj ) 
+            : _obj( obj ) , _inPlacePossible(true) { }
+        
+        /**
+         * @return if in place is still possible
+         */
+        bool amIInPlacePossible( bool inPlacePossible ) {
+            if ( ! inPlacePossible )
+                _inPlacePossible = false;
+            return _inPlacePossible;
+        }
 
+        template< class Builder >
+        void createNewFromMods( const string& root , Builder& b , const BSONObj &obj );
+
+        template< class Builder >
+        void _appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen );
+        
+        template< class Builder >
+        void appendNewFromMod( ModState& ms , Builder& b );
+    };
+
+}
