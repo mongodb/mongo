@@ -123,7 +123,8 @@ class EC2InstanceConfigurator(BaseConfigurator):
     def __init__(self, **kwargs):
         super(EC2InstanceConfigurator, self).__init__(**kwargs)
         self.configuration += [("ec2_ami",
-                                ((("ubuntu", "10.10", "x86_64"), "ami-548c783d"),
+                                ((("ubuntu", "10.10", "x86_64"), "ami-688c7801"),
+                                 (("ubuntu", "10.10", "x86"), "ami-1a837773"),
                                  (("ubuntu", "10.10", "x86"), "ami-508c7839"),
                                  (("ubuntu", "10.4", "x86_64"), "ami-bf07ead6"),
                                  (("ubuntu", "10.4", "x86"), "ami-f707ea9e"),
