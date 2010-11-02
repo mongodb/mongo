@@ -578,6 +578,14 @@ namespace mongo {
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
             uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+
+            { // check no $ modifiers
+                BSONObjIterator i( js );
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    uassert( 13511 , "object to insert can't have $ mofidiers" , e.fieldName()[0] != '$' );
+                }
+            }
             theDataFileMgr.insertWithObjMod(ns, js, false);
             logOp("i", ns, js);
             globalOpCounters.gotInsert();

@@ -46,11 +46,13 @@ DB.prototype.runCommand = function( obj ){
 
 DB.prototype._dbCommand = DB.prototype.runCommand;
 
-DB.prototype._adminCommand = function( obj ){
+DB.prototype.adminCommand = function( obj ){
     if ( this._name == "admin" )
         return this.runCommand( obj );
     return this.getSisterDB( "admin" ).runCommand( obj );
 }
+
+DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
 
 DB.prototype.addUser = function( username , pass, readOnly ){
     readOnly = readOnly || false;

@@ -35,10 +35,12 @@ namespace mongo {
 
     class Tool {
     public:
-        enum DBAccess{
-            NONE,
-            ALL,
-            NO_LOCAL
+        enum DBAccess {
+            NONE = 0 , 
+            REMOTE_SERVER = 1 << 1 , 
+            LOCAL_SERVER = 1 << 2 , 
+            SPECIFY_DBCOL = 1 << 3 ,
+            ALL = REMOTE_SERVER | LOCAL_SERVER | SPECIFY_DBCOL
         };
 
         Tool( string name , DBAccess access=ALL, string defaultDB="test" , 

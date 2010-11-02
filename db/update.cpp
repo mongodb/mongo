@@ -67,8 +67,16 @@ namespace mongo {
             ms.inclong = elt.numberLong() + in.numberLong();
         }
         else {
-            ms.incType = NumberInt;
-            ms.incint = elt.numberInt() + in.numberInt();
+            int x = elt.numberInt() + in.numberInt();
+            if ( x < 0 && elt.numberInt() > 0 && in.numberInt() > 0 ){
+                // overflow
+                ms.incType = NumberLong;
+                ms.inclong = elt.numberLong() + in.numberLong();
+            }
+            else {
+                ms.incType = NumberInt;
+                ms.incint = elt.numberInt() + in.numberInt();
+            }
         }
         
         ms.appendIncValue( bb , false );
@@ -398,6 +406,11 @@ namespace mongo {
                         // if i'm incrememnting with a double, then the storage has to be a double
                         mss->amIInPlacePossible( m.elt.type() != NumberDouble ); 
                     }
+                    
+                    // check for overflow
+                    if ( e.type() == NumberInt && e.numberLong() + m.elt.numberLong() > numeric_limits<int>::max() ){
+                        mss->amIInPlacePossible( false );
+                    }
                 }
                 break;
 
@@ -537,7 +550,8 @@ namespace mongo {
         _objData = b.obj();
         newVal = _objData.firstElement();            
     }    
-    
+
+    // dur version
     void ModSetState::ApplyModsInPlace() {
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             ModState& m = i->second;
@@ -561,6 +575,7 @@ namespace mongo {
                 m.fixed = &(m.old);
                 break;
             case Mod::SET:
+                 // ReplaceTypeAndValue - dur version
                 BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
                 break;
             default:
