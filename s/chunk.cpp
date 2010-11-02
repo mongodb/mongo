@@ -611,16 +611,50 @@ namespace mongo {
     }
 
     void ChunkManager::createFirstChunk( const Shard& shard ){
+        assert( _chunkMap.size() == 0 );
+
         ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), shard ) );
         
+        // this is the first chunk; start the versioning from scratch
+        ShardChunkVersion version;
+        version.incMajor();
+
+        // build update for the chunk collection 
+        BSONObjBuilder chunkBuilder;
+        c->serialize( chunkBuilder , version );
+        BSONObj chunkCmd = chunkBuilder.obj();
+
+        log() << "about to create first chunk for: " << _ns << endl;
+
+        ScopedDbConnection conn( configServer.modelServer() );
+        BSONObj res;
+        conn->update( Chunk::chunkMetadataNS, QUERY( "_id" << c->genID() ), chunkCmd,  true, false );
+
+        string errmsg = conn->getLastError();
+        if ( errmsg.size() ){
+            stringstream ss;
+            ss << "saving first chunk failed.  cmd: " << chunkCmd << " result: " << errmsg;
+            log( LL_ERROR ) << ss.str() << endl;
+            msgasserted( 13327 , ss.str() );
+        }
+
+        conn.done();
+
+        // every instance of ChunkManager has a unique sequence number; callers of ChunkManager may
+        // inquiry about whether there were changes in chunk configuration (see re/load() calls) since
+        // the last access to ChunkManager by checking the sequence number
+        _sequenceNumber = ++NextSequenceNumber;
+
         _chunkMap[c->getMax()] = c;
-        _chunkRanges.reloadAll(_chunkMap);
-        
+        _chunkRanges.reloadAll(_chunkMap);        
         _shards.insert(c->getShard());
+        c->setLastmod(version);
 
-        save_inlock( true );
+        // the ensure index will have the (desired) indirect effect of creating the collection on the 
+        // assigned shard, as it sets up the index over the sharding keys.
+        ensureIndex_inlock();
 
-        log() << "no chunks for:" << _ns << " so creating first: " << c->toString() << endl;
+        log() << "successfully created first chunk for " << c->toString() << endl;
     }
 
     ChunkPtr ChunkManager::findChunk( const BSONObj & obj , bool retry ){
@@ -824,108 +858,6 @@ namespace mongo {
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
     
-    void ChunkManager::save( bool major ){
-        rwlock lk( _lock , true ); 
-        save_inlock( major );
-    }
-    
-    void ChunkManager::save_inlock( bool major ){
-        // we do not update update the chunk manager on the mongos side anymore
-        // the only exception case should be first chunk creation
-        assert( _chunkMap.size() == 1 );
-
-        ShardChunkVersion version = getVersion_inlock();
-        assert( version > 0 || _chunkMap.size() <= 1 );
-        ShardChunkVersion nextChunkVersion = version;
-        nextChunkVersion.inc( major );
-
-        vector<ChunkPtr> toFix;
-        vector<ShardChunkVersion> newVersions;
-        
-        // Instead of upating the 'chunks' collection directly, we use the 'applyOps' command. It allows us 
-        // (a) to serialize the changes to that collection and (b) to only actually perform the update if this
-        // ChunkManager has the proper ShardChunkVersion.
-        BSONObjBuilder cmdBuilder;
-        BSONArrayBuilder updates( cmdBuilder.subarrayStart( "applyOps" ) );
-        
-        int numOps = 0;
-        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){
-            ChunkPtr c = i->second;
-
-            numOps++;
-            _sequenceNumber = ++NextSequenceNumber;
-
-            ShardChunkVersion myVersion = nextChunkVersion;
-            nextChunkVersion.incMinor();
-            toFix.push_back( c );
-            newVersions.push_back( myVersion );
-
-            // build an update operation against the chunks collection of the config database with 
-            // upsert true
-            BSONObjBuilder op;
-            op.append( "op" , "u" );
-            op.appendBool( "b" , true );
-            op.append( "ns" , ShardNS::chunk );
-
-            // add the modified (new) chunk infomation as the update object
-            BSONObjBuilder n( op.subobjStart( "o" ) );
-            c->serialize( n , myVersion ); // n will get full 'c' info plus version
-            n.done();
-
-            // add the chunk's _id as the query part of the update statement
-            BSONObjBuilder q( op.subobjStart( "o2" ) );
-            q.append( "_id" , c->genID() );
-            q.done();
-
-            updates.append( op.obj() );
-        }
-        
-        if ( numOps == 0 )
-            return;
-        
-        updates.done();
-        
-        if ( version > 0 || _chunkMap.size() > 1 ){
-            BSONArrayBuilder temp( cmdBuilder.subarrayStart( "preCondition" ) );
-            BSONObjBuilder b;
-            b.append( "ns" , ShardNS::chunk );
-            b.append( "q" , BSON( "query" << BSON( "ns" << _ns ) << "orderby" << BSON( "lastmod" << -1 ) ) );
-            {
-                BSONObjBuilder bb( b.subobjStart( "res" ) );
-                bb.appendTimestamp( "lastmod" , version );
-                bb.done();
-            }
-            temp.append( b.obj() );
-            temp.done();
-        }
-        // TODO preCondition for initial chunk or starting collection 
-
-        BSONObj cmd = cmdBuilder.obj();
-        
-        log(7) << "ChunkManager::save update: " << cmd << endl;
-        
-        ScopedDbConnection conn( configServer.modelServer() );
-        BSONObj res;
-        bool ok = conn->runCommand( "config" , cmd , res );
-        conn.done();
-
-        if ( ! ok ){
-            stringstream ss;
-            ss << "saving chunks failed.  cmd: " << cmd << " result: " << res;
-            log( LL_ERROR ) << ss.str() << endl;
-            msgasserted( 13327 , ss.str() );
-        }
-
-        // instead of reloading, adjust ShardChunkVersion for the chunks that were updated in the configdb
-        for ( unsigned i=0; i<toFix.size(); i++ ){
-            toFix[i]->setLastmod( newVersions[i] );
-        }
-
-        massert( 10417 ,  "how did version get smalled" , getVersion_inlock() >= version );
-        
-        ensureIndex_inlock(); // TODO: this is too aggressive - but not really sooo bad
-    }
-    
     void ChunkManager::maybeChunkCollection() {
         uassert( 13346 , "can't pre-split already splitted collection" , (_chunkMap.size() == 1) );
 
@@ -959,10 +891,7 @@ namespace mongo {
 
     ShardChunkVersion ChunkManager::getVersion() const{
         rwlock lk( _lock , false ); 
-        return getVersion_inlock();
-    }
-    
-    ShardChunkVersion ChunkManager::getVersion_inlock() const{
+
         ShardChunkVersion max = 0;
         
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ){

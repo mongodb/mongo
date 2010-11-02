@@ -307,8 +307,6 @@ namespace mongo {
         void getAllShards( set<Shard>& all );
         void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max); // [min, max)
 
-        void save( bool major );
-
         string toString() const;
 
         ShardChunkVersion getVersion( const Shard& shard ) const;
@@ -338,8 +336,6 @@ namespace mongo {
         void _reload_inlock();
         void _load();
 
-        void save_inlock( bool major );
-        ShardChunkVersion getVersion_inlock() const;
         void ensureIndex_inlock();
         
         string _ns;
