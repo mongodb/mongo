@@ -66,7 +66,9 @@ var slave2 = replTest.liveNodes.slaves[1];
 slave2.getDB("admin").runCommand({replSetTest:1, blind:true});
 reconnect(mdb);
 reconnect(slave2.getDB("foo"));
-
+print("waiting until the master knows the slave is blind");
+assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health == 0 });
+print("okay");
 
 print("4: overflow oplog");
 reconnect(master.getDB("local"));
@@ -87,6 +89,9 @@ print("5: unblind s2");
 slave2.getDB("admin").runCommand({replSetTest:1, blind:false});
 reconnect(mdb);
 reconnect(slave2.getDB("admin"));
+print("waiting until the master knows the slave is not blind");
+assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health != 0 });
+print("okay");
 
 
 print("6: check s2.state == 3");
@@ -107,10 +112,13 @@ replTest.restart(2);
 
 print("8: check s2.state == 3");
 status = master.getDB("admin").runCommand({replSetGetStatus:1});
-while (status == 0) {
+while (status.state == 0) {
+  print("state is 0: ");
+  printjson(status);
   sleep(1000);
   status = master.getDB("admin").runCommand({replSetGetStatus:1});
 }
+
 printjson(status);
 assert.eq(status.members[2].state, 3, 'recovering');
 
