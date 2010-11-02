@@ -41,6 +41,8 @@ namespace mongo {
 
     // -------  Shard --------
 
+    string Chunk::chunkMetadataNS = "config.chunks";
+    
     int Chunk::MaxChunkSize = 1024 * 1024 * 200;
     
     Chunk::Chunk( ChunkManager * manager )
@@ -486,18 +488,6 @@ namespace mongo {
         uassert( 10173 ,  "Chunk needs a max" , ! _max.isEmpty() );
     }
 
-    string Chunk::modelServer() const {
-        // TODO: this could move around?
-        return configServer.modelServer();
-    }
-    
-    ShardChunkVersion Chunk::getVersionOnConfigServer() const {
-        ScopedDbConnection conn( modelServer() );
-        BSONObj o = conn->findOne( ShardNS::chunk , BSON( "_id" << genID() ) );
-        conn.done();
-        return o["lastmod"];
-    }
-
     string Chunk::toString() const {
         stringstream ss;
         ss << "ns:" << _manager->getns() << " at: " << _shard.toString() << " lastmod: " << _lastmod.toString() << " min: " << _min << " max: " << _max;
@@ -561,12 +551,10 @@ namespace mongo {
     }
 
     void ChunkManager::_load(){
-        static Chunk temp(0);
-        
-        ScopedDbConnection conn( temp.modelServer() );
+        ScopedDbConnection conn( configServer.modelServer() );
 
         // TODO really need the sort?
-        auto_ptr<DBClientCursor> cursor = conn->query(temp.getNS(), QUERY("ns" << _ns).sort("lastmod",1), 0, 0, 0, 0,
+        auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",1), 0, 0, 0, 0,
                 (DEBUG_BUILD ? 2 : 1000000)); // batch size. Try to induce potential race conditions in debug builds
         assert( cursor.get() );
         while ( cursor->more() ){
@@ -819,9 +807,8 @@ namespace mongo {
         log(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;        
 
         // remove chunk data
-        static Chunk temp(0);
-        ScopedDbConnection conn( temp.modelServer() );
-        conn->remove( temp.getNS() , BSON( "ns" << _ns ) );
+        ScopedDbConnection conn( configServer.modelServer() );
+        conn->remove( Chunk::chunkMetadataNS , BSON( "ns" << _ns ) );
         conn.done();
         log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;                
         
@@ -917,7 +904,7 @@ namespace mongo {
         
         log(7) << "ChunkManager::save update: " << cmd << endl;
         
-        ScopedDbConnection conn( Chunk(0).modelServer() );
+        ScopedDbConnection conn( configServer.modelServer() );
         BSONObj res;
         bool ok = conn->runCommand( "config" , cmd , res );
         conn.done();
@@ -954,11 +941,9 @@ namespace mongo {
     }
 
     ShardChunkVersion ChunkManager::getVersionOnConfigServer() const {
-        static Chunk temp(0);
+        ScopedDbConnection conn( configServer.modelServer() );
         
-        ScopedDbConnection conn( temp.modelServer() );
-        
-        auto_ptr<DBClientCursor> cursor = conn->query(temp.getNS(), QUERY("ns" << _ns).sort("lastmod",1), 1 );
+        auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",1), 1 );
         assert( cursor.get() );
         BSONObj o;
         if ( cursor->more() )
