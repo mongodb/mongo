@@ -46,27 +46,30 @@ namespace mongo {
             ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
             ;
 
-        if ( access == ALL || access == NO_LOCAL){
+        if ( access & REMOTE_SERVER )
             _options->add_options()
                 ("host,h",po::value<string>(), "mongo host to connect to (\"left,right\" for pairs)" )
                 ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
-                ("db,d",po::value<string>(), "database to use" )
-                ("collection,c",po::value<string>(), "collection to use (some commands)" )
+                ("ipv6", "enable IPv6 support (disabled by default)")
+
                 ("username,u",po::value<string>(), "username" )
                 ("password,p", new PasswordValue( &_password ), "password" )
-                ("ipv6", "enable IPv6 support (disabled by default)")
                 ;
-        }
-
-        if ( access == ALL ) {
+        
+        if ( access & LOCAL_SERVER )
             _options->add_options()
                 ("dbpath",po::value<string>(), "directly access mongod database "
                  "files in the given path, instead of connecting to a mongod  "
                  "server - needs to lock the data directory, so cannot be "
                  "used if a mongod is currently accessing the same path" )
                 ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
+                ;            
+        
+        if ( access & SPECIFY_DBCOL )
+            _options->add_options()
+                ("db,d",po::value<string>(), "database to use" )
+                ("collection,c",po::value<string>(), "collection to use (some commands)" )
                 ;
-        }
 
         _hidden_options = new po::options_description( name + " hidden options" );
 

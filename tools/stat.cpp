@@ -36,7 +36,7 @@ namespace mongo {
     class Stat : public Tool {
     public:
 
-        Stat() : Tool( "stat" , NO_LOCAL , "admin" ){
+        Stat() : Tool( "stat" , REMOTE_SERVER , "admin" ){
             _sleep = 1;
             _http = false;
             _many = false;
