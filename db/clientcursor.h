@@ -135,21 +135,7 @@ namespace mongo {
             CursorId _id;
         };
 
-        ClientCursor(int queryOptions, const shared_ptr<Cursor>& c, const string& ns, BSONObj query = BSONObj()) :
-            _ns(ns), _db( cc().database() ),
-            _c(c), _pos(0), 
-            _query(query),  _queryOptions(queryOptions), 
-            _idleAgeMillis(0), _pinValue(0), 
-            _doingDeletes(false), _yieldSometimesTracker(128,10)
-        {
-            assert( _db );
-            assert( str::startsWith(_ns, _db->name) );
-            if( queryOptions & QueryOption_NoCursorTimeout )
-                noTimeout();
-            recursive_scoped_lock lock(ccmutex);
-            _cursorid = allocCursorId_inlock();
-            clientCursorsById.insert( make_pair(_cursorid, this) );
-        }
+        ClientCursor(int queryOptions, const shared_ptr<Cursor>& c, const string& ns, BSONObj query = BSONObj() );
 
         ~ClientCursor();
 
@@ -337,7 +323,7 @@ namespace mongo {
 
         const shared_ptr<Cursor> _c;
         int _pos;                        // # objects into the cursor so far 
-
+        
         const BSONObj _query;            // used for logging diags only; optional in constructor
         int _queryOptions;        // see enum QueryOptions dbclient.h
         
