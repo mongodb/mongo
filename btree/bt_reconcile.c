@@ -10,8 +10,6 @@
 #include "wt_internal.h"
 
 static int __wt_bt_rcc_expand_compare(const void *, const void *);
-static int __wt_bt_rcc_expand_sort(
-		ENV *, WT_PAGE *, WT_COL *, WT_COL_EXPAND ***, uint32_t *);
 static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -753,9 +751,6 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	db = toc->db;
 	env = toc->env;
 
-	/* Verify the page to catch reconciliation errors early on. */
-	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
-
 	/*
 	 * Set the page's size to the minimum number of allocation units needed
 	 * (note the page size can either grow or shrink).
@@ -767,6 +762,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	new->size = WT_ALIGN(
 	    new->first_free - (uint8_t *)new->hdr, db->allocsize);
 
+	/* Verify the page to catch reconciliation errors early on. */
 	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
 	/*
