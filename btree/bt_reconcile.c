@@ -289,10 +289,11 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_COL_EXPAND *exp, **expsort, **expp;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
+	uint64_t recno;
 	uint32_t i, len, n_expsort;
-	uint16_t n, repeat_count, total;
+	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *last_data;
-	int rc_prefix, ret;
+	int from_repl, ret;
 
 	db = toc->db;
 	tmp = NULL;
@@ -316,32 +317,37 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_RCC_REPEAT_COUNT(tmp->data) = 1;
 	WT_FIX_DELETE_SET(WT_RCC_REPEAT_DATA(tmp->data));
 
+	/* Set recno to the first record on the page. */
+	recno = page->hdr->start_recno;
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
 		 * terminated array of references to WT_COL_EXPAND structures,
-		 * sorted by record offset.
+		 * sorted by record number.
 		 */
 		WT_ERR(__wt_bt_rcc_expand_sort(
 		    env, page, cip, &expsort, &n_expsort));
 
 		/*
-		 * Generate entries on the page: using the WT_REPL entry for
-		 * records listed in the WT_COL_EXPAND array, and original data
-		 * otherwise.
+		 *
+		 * Generate entries for the new page: loop through the repeat
+		 * records, checking for WT_COL_EXPAND entries that match the
+		 * current record number.
 		 */
-		total = WT_RCC_REPEAT_COUNT(cip->data);
-		for (expp = expsort, n = 1; n <= total; n += repeat_count) {
-			rc_prefix = 0;
-			if ((exp = *expp) != NULL && n == exp->rcc_offset) {
+		nrepeat = WT_RCC_REPEAT_COUNT(cip->data);
+		for (expp = expsort, n = 1;
+		    n <= nrepeat; n += repeat_count, recno += repeat_count) {
+			from_repl = 0;
+			if ((exp = *expp) != NULL && recno == exp->recno) {
 				++expp;
 
+				/* Use the WT_COL_EXPAND's WT_REPL field. */
 				repl = exp->repl;
 				if (WT_REPL_DELETED_ISSET(repl))
 					data = tmp->data;
 				else {
-					rc_prefix = 1;
+					from_repl = 1;
 					data = WT_REPL_DATA(repl);
 				}
 				repeat_count = 1;
@@ -357,9 +363,10 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				 * more WT_COL_EXPAND records.
 				 */
 				if (exp == NULL)
-					repeat_count = (total - n) + 1;
+					repeat_count = (nrepeat - n) + 1;
 				else
-					repeat_count = exp->rcc_offset - n;
+					repeat_count =
+					    (uint16_t)(exp->recno - recno);
 			}
 
 			/*
@@ -395,7 +402,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 * structure, which has no repeat count.
 			 */
 			last_data = new->first_free;
-			if (rc_prefix) {
+			if (from_repl) {
 				WT_RCC_REPEAT_COUNT(last_data) = repeat_count;
 				memcpy(WT_RCC_REPEAT_DATA(
 				    last_data), data, db->fixed_len);
@@ -431,7 +438,7 @@ __wt_bt_rcc_expand_compare(const void *a, const void *b)
 	a_exp = *(WT_COL_EXPAND **)a;
 	b_exp = *(WT_COL_EXPAND **)b;
 
-	return (a_exp->rcc_offset > b_exp->rcc_offset ? 1 : 0);
+	return (a_exp->recno > b_exp->recno ? 1 : 0);
 }
 
 /*
