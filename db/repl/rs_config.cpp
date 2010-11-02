@@ -94,6 +94,12 @@ namespace mongo {
         if( slaveDelay ) b << "slaveDelay" << slaveDelay;
         if( hidden ) b << "hidden" << hidden;
         if( !buildIndexes ) b << "buildIndexes" << buildIndexes;
+        if( !tags.empty() ) { 
+            BSONArrayBuilder a;
+            for( set<string>::iterator i = tags.begin(); i != tags.end(); i++ )
+                a.append(*i);
+            b.appendArray("tags", a.done());
+        }
         return b.obj();
     }
 
@@ -245,7 +251,7 @@ namespace mongo {
             BSONObj mobj = members[i].Obj();
             MemberCfg m;
             try {
-                static const string legal[] = {"_id","votes","priority","host","hidden","slaveDelay","arbiterOnly","buildIndexes"};
+                static const string legal[] = {"_id","votes","priority","host","hidden","slaveDelay","arbiterOnly","buildIndexes","tags"};
                 static const set<string> legals(legal, legal + 8);
                 assertOnlyHas(mobj, legals);
 
@@ -275,6 +281,11 @@ namespace mongo {
                     m.priority = mobj["priority"].Number();
                 if( mobj.hasElement("votes") )
                     m.votes = (unsigned) mobj["votes"].Number();
+                if( mobj.hasElement("tags") ) {
+                    vector<BSONElement> v = mobj["tags"].Array();
+                    for( unsigned i = 0; i < v.size(); i++ )
+                        m.tags.insert( v[i].String() );
+                }
                 m.check();
             }
             catch( const char * p ) { 

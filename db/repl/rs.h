@@ -43,6 +43,7 @@ namespace mongo {
     class Member : public List1<Member>::Base {
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
+
         string fullName() const { return h().toString(); }
         const ReplSetConfig::MemberCfg& config() const { return _config; }
         const HeartbeatInfo& hbinfo() const { return _hbinfo; }
@@ -51,10 +52,12 @@ namespace mongo {
         MemberState state() const { return _hbinfo.hbstate; }
         const HostAndPort& h() const { return _h; }
         unsigned id() const { return _hbinfo.id(); }
+
         bool potentiallyHot() const { return _config.potentiallyHot(); } // not arbiter, not priority 0
         void summarizeMember(stringstream& s) const;
-        friend class ReplSetImpl;
+
     private:
+        friend class ReplSetImpl;
         const ReplSetConfig::MemberCfg _config;
         const HostAndPort _h;
         HeartbeatInfo _hbinfo;
