@@ -322,6 +322,7 @@ namespace mongo {
         Database * _db;
 
         const shared_ptr<Cursor> _c;
+        map<string,int> _indexedFields;  // map from indexed field to offset in key object
         int _pos;                        // # objects into the cursor so far 
         
         const BSONObj _query;            // used for logging diags only; optional in constructor
