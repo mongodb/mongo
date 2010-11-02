@@ -759,7 +759,7 @@ namespace UpdateTests {
                 while ( start < max ){
                     update( BSON( "$inc" << BSON( "x" << 500000 ) ) );
                     start += 500000;
-                    //ASSERT_EQUALS( start , findOne()["x"].numberLong() ); // SERVER-2005
+                    ASSERT_EQUALS( start , findOne()["x"].numberLong() ); // SERVER-2005
                 }
 
             }

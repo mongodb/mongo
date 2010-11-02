@@ -67,8 +67,16 @@ namespace mongo {
             ms.inclong = elt.numberLong() + in.numberLong();
         }
         else {
-            ms.incType = NumberInt;
-            ms.incint = elt.numberInt() + in.numberInt();
+            int x = elt.numberInt() + in.numberInt();
+            if ( x < 0 && elt.numberInt() > 0 && in.numberInt() > 0 ){
+                // overflow
+                ms.incType = NumberLong;
+                ms.inclong = elt.numberLong() + in.numberLong();
+            }
+            else {
+                ms.incType = NumberInt;
+                ms.incint = elt.numberInt() + in.numberInt();
+            }
         }
         
         ms.appendIncValue( bb , false );
@@ -397,6 +405,11 @@ namespace mongo {
                     if ( m.elt.type() != e.type() ){
                         // if i'm incrememnting with a double, then the storage has to be a double
                         mss->amIInPlacePossible( m.elt.type() != NumberDouble ); 
+                    }
+                    
+                    // check for overflow
+                    if ( e.type() == NumberInt && e.numberLong() + m.elt.numberLong() > numeric_limits<int>::max() ){
+                        mss->amIInPlacePossible( false );
                     }
                 }
                 break;
