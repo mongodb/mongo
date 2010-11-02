@@ -439,7 +439,7 @@ __wt_bt_rcc_expand_compare(const void *a, const void *b)
  *	Return the current on-page index's array of WT_COL_EXPAND structures,
  *	sorted by record offset.
  */
-static int
+int
 __wt_bt_rcc_expand_sort(ENV *env,
     WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, uint32_t *np)
 {
