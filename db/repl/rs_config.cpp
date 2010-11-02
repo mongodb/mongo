@@ -96,7 +96,7 @@ namespace mongo {
         if( !buildIndexes ) b << "buildIndexes" << buildIndexes;
         if( !tags.empty() ) { 
             BSONArrayBuilder a;
-            for( set<string>::iterator i = tags.begin(); i != tags.end(); i++ )
+            for( set<string>::const_iterator i = tags.begin(); i != tags.end(); i++ )
                 a.append(*i);
             b.appendArray("tags", a.done());
         }
