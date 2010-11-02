@@ -322,7 +322,14 @@ namespace mongo {
         /** add all elements of the object to the specified list */
         void elems(list<BSONElement> &) const;
 
-        /** add all values of the object to the specified vector.  If type mismatches, exception. */
+        /** add all values of the object to the specified vector.  If type mismatches, exception. 
+            this is most useful when the BSONObj is an array, but can be used with non-arrays too in theory.
+
+            example:
+              bo sub = y["subobj"].Obj();
+              vector<int> myints;
+              sub.Vals(myints);
+        */
         template <class T>
         void Vals(vector<T> &) const;
         /** add all values of the object to the specified list.  If type mismatches, exception. */
