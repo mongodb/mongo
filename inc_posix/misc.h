@@ -81,7 +81,7 @@ extern "C" {
 #define	WT_VERBOSE(env, f, msg)
 #endif
 
-/* Clear a chunk of memory. */
+/* Clear a structure. */
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
