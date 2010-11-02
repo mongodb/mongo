@@ -26,8 +26,10 @@
 #include "../db/namespace.h"
 #include "../client/dbclient.h"
 #include "../client/model.h"
-#include "shardkey.h"
+
+#include "chunk.h"
 #include "shard.h"
+#include "shardkey.h"
 
 namespace mongo {
 
@@ -58,9 +60,6 @@ namespace mongo {
     extern DBConfigPtr configServerPtr;
     extern ConfigServer& configServer;
 
-    class ChunkManager;
-    typedef shared_ptr<ChunkManager> ChunkManagerPtr;
-    
     /**
      * top level configuration for a database
      */
@@ -72,7 +71,7 @@ namespace mongo {
                 _dropped = false;
             }
             
-            CollectionInfo( DBConfig * db , const BSONObj& in );
+            CollectionInfo( const BSONObj& in );
             
             bool isSharded() const {
                 return _cm.get();
@@ -82,7 +81,7 @@ namespace mongo {
                 return _cm;
             }
 
-            void shard( DBConfig * db , const string& ns , const ShardKeyPattern& key , bool unique );
+            void shard( const string& ns , const ShardKeyPattern& key , bool unique );
             void unshard();
 
             bool isDirty() const { return _dirty; }

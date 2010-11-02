@@ -19,13 +19,14 @@
 #pragma once
 
 #include "../pch.h"
-#include "../client/dbclient.h"
-#include "../client/model.h"
-#include "../client/distlock.h"
+
 #include "../bson/util/atomic_int.h"
+#include "../client/dbclient.h"
+#include "../client/distlock.h"
+#include "../client/model.h"
+
 #include "shardkey.h"
 #include "shard.h"
-#include "config.h"
 #include "util.h"
 
 namespace mongo {
@@ -42,6 +43,8 @@ namespace mongo {
     // key is max for each Chunk or ChunkRange
     typedef map<BSONObj,ChunkPtr,BSONObjCmp> ChunkMap;
     typedef map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
+    
+    typedef shared_ptr<ChunkManager> ChunkManagerPtr;
     
     /**
        config.chunks
@@ -257,7 +260,7 @@ namespace mongo {
     class ChunkManager {
     public:
 
-        ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique );
+        ChunkManager( string ns , ShardKeyPattern pattern , bool unique );
         virtual ~ChunkManager();
 
         string getns() const { return _ns; }
@@ -265,7 +268,7 @@ namespace mongo {
         int numChunks() const { rwlock lk( _lock , false ); return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj );
 
-        void createFirstChunk();
+        void createFirstChunk( const Shard& shard );
         ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
         
@@ -309,8 +312,8 @@ namespace mongo {
         void _printChunks() const;
         
         int getCurrentDesiredChunkSize() const;
-    private:
-        
+
+    private:        
         void _reload();
         void _reload_inlock();
         void _load();
@@ -319,7 +322,6 @@ namespace mongo {
         ShardChunkVersion getVersion_inlock() const;
         void ensureIndex_inlock();
         
-        DBConfig * _config;
         string _ns;
         ShardKeyPattern _key;
         bool _unique;

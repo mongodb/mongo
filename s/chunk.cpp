@@ -17,13 +17,15 @@
  */
 
 #include "pch.h"
-#include "chunk.h"
-#include "config.h"
-#include "grid.h"
-#include "../util/unittest.h"
+
 #include "../client/connpool.h"
 #include "../db/queryutil.h"
+#include "../util/unittest.h"
+
+#include "chunk.h"
+#include "config.h"
 #include "cursors.h"
+#include "grid.h"
 #include "strategy.h"
 
 namespace mongo {
@@ -510,10 +512,9 @@ namespace mongo {
 
     AtomicUInt ChunkManager::NextSequenceNumber = 1;
 
-    ChunkManager::ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique ) : 
-        _config( config ) , _ns( ns ) , 
-        _key( pattern ) , _unique( unique ) , 
-        _lock("rw:ChunkManager"), _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
+    ChunkManager::ChunkManager( string ns , ShardKeyPattern pattern , bool unique ) : 
+        _ns( ns ) , _key( pattern ) , _unique( unique ) , _lock("rw:ChunkManager"), 
+        _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
     {
         _reload_inlock();  // will set _sequenceNumber
     }
@@ -621,8 +622,8 @@ namespace mongo {
         return _key.hasShardKey( obj );
     }
 
-    void ChunkManager::createFirstChunk(){
-        ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), _config->getPrimary()) );
+    void ChunkManager::createFirstChunk( const Shard& shard ){
+        ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), shard ) );
         
         _chunkMap[c->getMax()] = c;
         _chunkRanges.reloadAll(_chunkMap);
@@ -817,9 +818,6 @@ namespace mongo {
         
         log(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;        
 
-        // clean up database meta-data
-        uassert( 10176 ,  "no sharding data?" , _config->removeSharding( _ns ) );
-        
         // remove chunk data
         static Chunk temp(0);
         ScopedDbConnection conn( temp.modelServer() );

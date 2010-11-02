@@ -25,10 +25,10 @@
 #include "../db/pdfile.h"
 #include "../db/cmdline.h"
 
-#include "server.h"
-#include "config.h"
 #include "chunk.h"
+#include "config.h"
 #include "grid.h"
+#include "server.h"
 
 namespace mongo {
 
@@ -50,16 +50,16 @@ namespace mongo {
 
     /* --- DBConfig --- */
 
-    DBConfig::CollectionInfo::CollectionInfo( DBConfig * db , const BSONObj& in ){
+    DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ){
         _dirty = false;
         _dropped = in["dropped"].trueValue();
         if ( in["key"].isABSONObj() )
-            shard( db , in["_id"].String() , in["key"].Obj() , in["unique"].trueValue() );
+            shard( in["_id"].String() , in["key"].Obj() , in["unique"].trueValue() );
     }
 
 
-    void DBConfig::CollectionInfo::shard( DBConfig * db , const string& ns , const ShardKeyPattern& key , bool unique ){
-        _cm.reset( new ChunkManager( db, ns , key , unique ) );
+    void DBConfig::CollectionInfo::shard( const string& ns , const ShardKeyPattern& key , bool unique ){
+        _cm.reset( new ChunkManager( ns , key , unique ) );
         _dirty = true;
         _dropped = false;
     }
@@ -133,10 +133,10 @@ namespace mongo {
         // From this point on, 'ns' is going to be treated as a sharded collection. We assume this is the first 
         // time it is seen by the sharded system and thus create the first chunk for the collection. All the remaining
         // chunks will be created as a by-product of splitting.
-        ci.shard( this , ns , fieldsAndOrder , unique );        
+        ci.shard( ns , fieldsAndOrder , unique );        
         ChunkManagerPtr cm = ci.getCM();
         uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
-        cm->createFirstChunk();
+        cm->createFirstChunk( getPrimary() );
         _save(); 
                 
         try {
@@ -233,7 +233,7 @@ namespace mongo {
         assert( cursor.get() );
         while ( cursor->more() ){
             BSONObj o = cursor->next();
-            _collections[o["_id"].String()] = CollectionInfo( this , o );
+            _collections[o["_id"].String()] = CollectionInfo( o );
         }
         
         conn.done();        
@@ -310,7 +310,7 @@ namespace mongo {
 
         // 3
         while ( true ){
-            int num;
+            int num = 0;
             if ( ! _dropShardedCollections( num , allServers , errmsg ) )
                 return 0;
             log() << "   DBConfig::dropDatabase: " << _name << " dropped sharded collections: " << num << endl;
@@ -355,7 +355,7 @@ namespace mongo {
                 if ( i->second.isSharded() )
                     break;
             }
-            
+
             if ( i == _collections.end() )
                 break;
 
@@ -369,15 +369,16 @@ namespace mongo {
 
             i->second.getCM()->getAllShards( allServers );
             i->second.getCM()->drop( i->second.getCM() );
-            
+            uassert( 10176 , str::stream() << "shard state missing for " << i->first , removeSharding( i->first ) );
+
             num++;
             uassert( 10184 ,  "_dropShardedCollections too many collections - bailing" , num < 100000 );
             log(2) << "\t\t dropped " << num << " so far" << endl;
         }
-        
+
         return true;
     }
-    
+
     void DBConfig::getAllShards(set<Shard>& shards) const{
         shards.insert(getPrimary());
         for (Collections::const_iterator it(_collections.begin()), end(_collections.end()); it != end; ++it){

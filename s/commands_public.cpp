@@ -236,6 +236,7 @@ namespace mongo {
                 massert( 10418 ,  "how could chunk manager be null!" , cm );
                 
                 cm->drop( cm );
+                uassert( 13512 , "drop collection attempted on non-sharded collection" , conf->removeSharding( fullns ) );
 
                 return 1;
             }
