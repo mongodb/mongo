@@ -314,12 +314,6 @@ namespace mongo {
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;
 
-        /** 
-         * actually does a query on the server
-         * doesn't look at any local data
-         */
-        ShardChunkVersion getVersionOnConfigServer() const;
-        
         /**
          * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
          */

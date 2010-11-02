@@ -940,19 +940,6 @@ namespace mongo {
         soleChunk->multiSplit( splitPoints );
     }
 
-    ShardChunkVersion ChunkManager::getVersionOnConfigServer() const {
-        ScopedDbConnection conn( configServer.modelServer() );
-        
-        auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",1), 1 );
-        assert( cursor.get() );
-        BSONObj o;
-        if ( cursor->more() )
-            o = cursor->next();
-        conn.done();
-             
-        return o["lastmod"];
-    }
-
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const{
         rwlock lk( _lock , false ); 
         // TODO: cache or something?
