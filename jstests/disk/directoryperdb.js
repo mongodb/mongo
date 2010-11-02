@@ -9,7 +9,7 @@ db[ baseName ].save( {} );
 assert.eq( 1, db[ baseName ].count() , "A : " + tojson( db[baseName].find().toArray() ) );
 
 checkDir = function( dir ) {
-    db.runCommand( {fsync:1} );
+    db.adminCommand( {fsync:1} );
     files = listFiles( dir );
     found = false;
     for( f in files ) {
