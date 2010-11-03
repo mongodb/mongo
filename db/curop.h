@@ -97,7 +97,8 @@ namespace mongo {
         void append( BSONObjBuilder& b , const StringData& name ){
             _lock.lock();
             try {
-                b.append( name , _get( false ) );
+                BSONObj temp = _get(false);
+                b.append( name , temp );
                 _lock.unlock();
             }
             catch ( ... ){
