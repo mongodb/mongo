@@ -319,6 +319,9 @@ namespace BasicTests {
     class LexNumCmp {
     public:
         void run() {
+            
+            ASSERT( ! isNumber( (char)255 ) );
+
             ASSERT_EQUALS( 0, lexNumCmp( "a", "a" ) );
             ASSERT_EQUALS( -1, lexNumCmp( "a", "aa" ) );
             ASSERT_EQUALS( 1, lexNumCmp( "aa", "a" ) );
@@ -346,7 +349,7 @@ namespace BasicTests {
             ASSERT_EQUALS( -1, lexNumCmp( "f12f", "f12g" ) );
             ASSERT_EQUALS( 1, lexNumCmp( "f12g", "f12f" ) );
             ASSERT_EQUALS( 1, lexNumCmp( "aa{", "aab" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "aa{", "aa1" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "aa{", "aa1" ) );
             ASSERT_EQUALS( -1, lexNumCmp( "a1{", "a11" ) );
             ASSERT_EQUALS( 1, lexNumCmp( "a1{a", "a1{" ) );
             ASSERT_EQUALS( -1, lexNumCmp( "a1{", "a1{a" ) );
@@ -355,6 +358,10 @@ namespace BasicTests {
             
             ASSERT_EQUALS( -1 , lexNumCmp( "a.0" , "a.1" ) );
             ASSERT_EQUALS( -1 , lexNumCmp( "a.0.b" , "a.1" ) );
+
+            ASSERT_EQUALS( -1 , lexNumCmp( "b." , "b.|" ) );
+            ASSERT_EQUALS( -1 , lexNumCmp( "b.0e" , (string("b.") + (char)255).c_str() ) );
+            ASSERT_EQUALS( -1 , lexNumCmp( "b." , "b.0e" ) );
         }
     };
 
