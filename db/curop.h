@@ -36,6 +36,11 @@ namespace mongo {
         void reset() { str.reset(); }
     };
     
+    /**
+     * stores a copy of a bson obj in a fixed size buffer
+     * if its too big for the buffer, says "too big"
+     * useful for keeping a copy around indefinitely without wasting a lot of space or doing malloc
+     */
     class CachedBSONObj {
     public:
         enum { TOO_BIG_SENTINEL = 1 } ;
