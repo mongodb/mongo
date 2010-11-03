@@ -119,8 +119,8 @@ namespace mongo {
         }
 
         SpinLock _lock;
-        char _buf[512];
         int * _size;
+        char _buf[512];
     };
 
     /* Current operation (for the current Client).
