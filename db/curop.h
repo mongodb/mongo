@@ -1,4 +1,5 @@
-// curop.h
+// @file curop.h
+
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -32,10 +33,7 @@ namespace mongo {
     class OpDebug {
     public:
         StringBuilder str;
-        
-        void reset(){
-            str.reset();
-        }
+        void reset() { str.reset(); }
     };
     
     class CachedBSONObj {
@@ -48,9 +46,7 @@ namespace mongo {
             reset();
         }
         
-        void reset( int sz = 0 ){
-            _size[0] = sz;
-        }
+        void reset( int sz = 0 ) { _size[0] = sz; }
         
         void set( const BSONObj& o ){
             _lock.lock();
@@ -77,10 +73,8 @@ namespace mongo {
         bool have() const { return size() > 0; }
 
         BSONObj get( bool threadSafe ){
-            _lock.lock();
-            
+            _lock.lock();            
             BSONObj o;
-
             try {
                 o = _get( threadSafe );
                 _lock.unlock();
@@ -88,10 +82,8 @@ namespace mongo {
             catch ( ... ){
                 _lock.unlock();
                 throw;
-            }
-            
-            return o;
-            
+            }            
+            return o;            
         }
 
         void append( BSONObjBuilder& b , const StringData& name ){
@@ -108,7 +100,6 @@ namespace mongo {
         }
         
     private:
-
         /** you have to be locked when you call this */
         BSONObj _get( bool getCopy ){
             int sz = size();
@@ -129,21 +120,7 @@ namespace mongo {
     */
     class CurOp : boost::noncopyable {
     public:
-        CurOp( Client * client , CurOp * wrapped = 0 ) { 
-            _client = client;
-            _wrapped = wrapped;
-            if ( _wrapped ){
-                _client->_curOp = this;
-            }
-            _start = _checkpoint = 0;
-            _active = false;
-            _reset();
-            _op = 0;
-            // These addresses should never be written to again.  The zeroes are
-            // placed here as a precaution because currentOp may be accessed
-            // without the db mutex.
-            memset(_ns, 0, sizeof(_ns));
-        }
+        CurOp( Client * client , CurOp * wrapped = 0 );
         ~CurOp();
 
         bool haveQuery() const { return _query.have(); }
@@ -322,71 +299,38 @@ namespace mongo {
        handled by the client of this class
     */
     extern class KillCurrentOp { 
-        volatile bool _globalKill;
     public:
-        void killAll() {
-            _globalKill = true;
-            interruptJs( 0 );
-        }
-        void kill(AtomicUInt i) {
-            bool found = false;
-            {
-                scoped_lock l( Client::clientsMutex );
-                for( set< Client* >::const_iterator j = Client::clients.begin(); !found && j != Client::clients.end(); ++j ) {
-                    for( CurOp *k = ( *j )->curop(); !found && k; k = k->parent() ) {
-                        if ( k->opNum() == i ) {
-                            k->kill();
-                            for( CurOp *l = ( *j )->curop(); l != k; l = l->parent() ) {
-                                l->kill();
-                            }
-                            found = true;
-                        }                        
-                    }
-                }
-            }
-            if ( found ) {
-                interruptJs( &i );
-            }
-        }
+        void killAll();
+        void kill(AtomicUInt i);
 
         /** @return true if global interrupt and should terminate the operation */
         bool globalInterruptCheck() const { return _globalKill; }
         
         void checkForInterrupt( bool heedMutex = true ) {
-            if ( heedMutex && dbMutex.isWriteLocked() ) {
+            if ( heedMutex && dbMutex.isWriteLocked() )
                 return;
-            }
-            if( _globalKill ) {
+            if( _globalKill )
                 uasserted(11600,"interrupted at shutdown");
-            }
-            if( cc().curop()->killed() ) { 
+            if( cc().curop()->killed() )
                 uasserted(11601,"interrupted");
-            }
         }
         
+        /** @return "" if not interrupted.  otherwise, you should stop. */
         const char *checkForInterruptNoAssert( bool heedMutex = true ) {
-            if ( heedMutex && dbMutex.isWriteLocked() ) {
+            if ( heedMutex && dbMutex.isWriteLocked() )
                 return "";
-            }
-            if( _globalKill ) {
+            if( _globalKill )
                 return "interrupted at shutdown";
-            }
-            if( cc().curop()->killed() ) { 
+            if( cc().curop()->killed() )
                 return "interrupted";
-            }
             return "";
         }
         
     private:
-        void interruptJs( AtomicUInt *op ) {
-            if ( !globalScriptEngine ) {
-                return;
-            }
-            if ( !op ) {
-                globalScriptEngine->interruptAll();
-            } else {
-                globalScriptEngine->interrupt( *op );
-            }
-        }
+        void interruptJs( AtomicUInt *op );
+        volatile bool _globalKill;
     } killCurrentOp;
+
 }
+
+#include "curop-inl.h"

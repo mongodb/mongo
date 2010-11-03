@@ -277,6 +277,42 @@ namespace mongo {
             co->gotLock();
     }
 
+    void KillCurrentOp::interruptJs( AtomicUInt *op ) {
+        if ( !globalScriptEngine )
+            return;
+        if ( !op ) {
+            globalScriptEngine->interruptAll();
+        } else {
+            globalScriptEngine->interrupt( *op );
+        }
+    }
+
+    void KillCurrentOp::killAll() {
+        _globalKill = true;
+        interruptJs( 0 );
+    }
+
+    void KillCurrentOp::kill(AtomicUInt i) {
+        bool found = false;
+        {
+            scoped_lock l( Client::clientsMutex );
+            for( set< Client* >::const_iterator j = Client::clients.begin(); !found && j != Client::clients.end(); ++j ) {
+                for( CurOp *k = ( *j )->curop(); !found && k; k = k->parent() ) {
+                    if ( k->opNum() == i ) {
+                        k->kill();
+                        for( CurOp *l = ( *j )->curop(); l != k; l = l->parent() ) {
+                            l->kill();
+                        }
+                        found = true;
+                    }                        
+                }
+            }
+        }
+        if ( found ) {
+            interruptJs( &i );
+        }
+    }
+        
     CurOp::~CurOp(){
         if ( _wrapped ){
             scoped_lock bl(Client::clientsMutex);
