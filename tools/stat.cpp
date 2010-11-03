@@ -300,13 +300,20 @@ namespace mongo {
             cout << endl;            
         }
 
-        static void printData( const BSONObj& o ){
-            BSONObjIterator i(o);
-            while ( i.more() ){
-                BSONObj x = i.next().Obj();
-                int w = x["width"].numberInt();
+        static void printData( const BSONObj& o , const BSONObj& headers ){
                 
-                BSONElement data = x["data"];
+            BSONObjIterator i(headers);
+            while ( i.more() ){
+                BSONElement e = i.next();
+                BSONObj h = e.Obj();
+                int w = h["width"].numberInt();
+                
+                BSONElement data;
+                {
+                    BSONElement temp = o[e.fieldName()];
+                    if ( temp.isABSONObj() )
+                        data = temp.Obj()["data"];
+                }
                 
                 if ( data.type() == String )
                     cout << setw(w) << data.String();
@@ -314,6 +321,10 @@ namespace mongo {
                     cout << setw(w) << setprecision(3) << data.number();
                 else if ( data.type() == NumberInt )
                     cout << setw(w) << data.numberInt();
+                else if ( data.eoo() )
+                    cout << setw(w) << "";
+                else 
+                    cout << setw(w) << "???";
                 
                 cout << ' ';
             }
@@ -351,7 +362,7 @@ namespace mongo {
                         printHeaders( out );
                     }
                     
-                    printData( out );
+                    printData( out , out );
 
                 }
                 catch ( AssertionException& e ){
@@ -557,7 +568,7 @@ namespace mongo {
                     if ( rows[i].data.nFields() > biggest.nFields() )
                         biggest = rows[i].data;
                 }
-
+                
                 
                 // display data
                 
@@ -577,7 +588,7 @@ namespace mongo {
                     else if ( rows[i].data.isEmpty() )
                         cout << "no data" << endl;
                     else 
-                        printData( rows[i].data );
+                        printData( rows[i].data , biggest );
                 }
                 
             }
