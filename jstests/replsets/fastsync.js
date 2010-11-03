@@ -98,7 +98,7 @@ reconnect(p);
 print("4");
 var status = admin.runCommand({replSetGetStatus : 1});
 var count = 0;
-while (status.members[1].state != 2 && count < 100) {
+while (status.members[1].state != 2 && count < 200) {
   print("not a secondary yet");
   if (count % 10 == 0) {
     printjson(status);
