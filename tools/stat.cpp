@@ -569,6 +569,40 @@ namespace mongo {
                         biggest = rows[i].data;
                 }
                 
+                { // check for any headers not in biggest
+
+                    // TODO: we put any new headers at end, 
+                    //       ideally we would interleave
+
+                    set<string> seen;
+                    
+                    BSONObjBuilder b;
+                    
+                    { // iterate biggest
+                        BSONObjIterator i( biggest );
+                        while ( i.more() ){
+                            BSONElement e = i.next();
+                            seen.insert( e.fieldName() );
+                            b.append( e );
+                        }
+                    }
+                    
+                    // now do the rest
+                    for ( unsigned j=0; j<rows.size(); j++ ){
+                        BSONObjIterator i( rows[j].data );
+                        while ( i.more() ){
+                            BSONElement e = i.next();
+                            if ( seen.count( e.fieldName() ) )
+                                continue;
+                            seen.insert( e.fieldName() );
+                            b.append( e );
+                        }
+
+                    }
+
+                    biggest = b.obj();
+                    
+                }
                 
                 // display data
                 
