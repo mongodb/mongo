@@ -551,42 +551,14 @@ namespace mongo {
         newVal = _objData.firstElement();            
     }    
 
-    // dur version
-    void ModSetState::ApplyModsInPlace() {
-        for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-            ModState& m = i->second;
-            if ( m.dontApply ) {
-                continue;
-            }
+    void ModSetState::applyModsInPlace( bool isOnDisk ) {
+        // TODO i think this assert means that we can get rid of the isOnDisk param
+        //      and just use isOwned as the determination
+        DEV assert( isOnDisk == ! _obj.isOwned() );
 
-            switch ( m.m->op ){
-            case Mod::UNSET:
-            case Mod::PULL:
-            case Mod::PULL_ALL:
-            case Mod::ADDTOSET:
-            case Mod::RENAME_FROM:
-            case Mod::RENAME_TO:
-                // this should have been handled by prepare
-                break;
-            // [dm] the BSONElementManipulator statements below are for replication (correct?)
-            case Mod::INC:
-                m.m->IncrementMe( m.old );
-                m.fixedOpName = "$set";
-                m.fixed = &(m.old);
-                break;
-            case Mod::SET:
-                 // ReplaceTypeAndValue - dur version
-                BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
-                break;
-            default:
-                uassert( 10144 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
-            }
-        }
-    }
-
-    void ModSetState::applyModsInPlace() {
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             ModState& m = i->second;  
+            
             if ( m.dontApply ) {
                 continue;
             }
@@ -602,12 +574,18 @@ namespace mongo {
                 break;
             // [dm] the BSONElementManipulator statements below are for replication (correct?)
             case Mod::INC:
-                m.m->incrementMe( m.old );
+                if ( isOnDisk )
+                    m.m->IncrementMe( m.old );
+                else
+                    m.m->incrementMe( m.old );
                 m.fixedOpName = "$set";
                 m.fixed = &(m.old);
                 break;
             case Mod::SET:
-                BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
+                if ( isOnDisk )
+                    BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
+                else
+                    BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
                 break;
             default:
                 uassert( 13478 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
@@ -781,7 +759,7 @@ namespace mongo {
         auto_ptr<ModSetState> mss = prepare( newObj );
 
         if ( mss->canApplyInPlace() )
-            mss->applyModsInPlace();
+            mss->applyModsInPlace( false );
         else
             newObj = mss->createNewFromMods();
         
@@ -996,7 +974,7 @@ namespace mongo {
             auto_ptr<ModSetState> mss = mods->prepare( onDisk );
                     
             if( mss->canApplyInPlace() ) {
-                mss->ApplyModsInPlace();                    
+                mss->applyModsInPlace(true);
                 DEBUGUPDATE( "\t\t\t updateById doing in place update" );
                 /*if ( profile )
                     ss << " fastmod "; */
@@ -1188,7 +1166,7 @@ namespace mongo {
                 }
                     
                 if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ){
-                    mss->ApplyModsInPlace();// const_cast<BSONObj&>(onDisk) );
+                    mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
                     
                     DEBUGUPDATE( "\t\t\t doing in place update" );
                     if ( profile )

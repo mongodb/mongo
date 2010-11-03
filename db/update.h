@@ -598,9 +598,9 @@ namespace mongo {
         
         /**
          * modified underlying _obj
+         * @param isOnDisk - true means this is an on disk object, and this update needs to be made durable
          */
-        void applyModsInPlace();
-        void ApplyModsInPlace();
+        void applyModsInPlace( bool isOnDisk );
 
         BSONObj createNewFromMods();
 
