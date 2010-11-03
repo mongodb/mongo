@@ -440,7 +440,7 @@ namespace mongo {
                     tablecell( ss , co.getOp() );
                     tablecell( ss , co.getNS() );
                     if ( co.haveQuery() ){
-                        tablecell( ss , co.query( true ) );
+                        tablecell( ss , co.query() );
                     }
                     else
                         tablecell( ss , "" );
