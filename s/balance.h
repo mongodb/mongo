@@ -69,11 +69,6 @@ namespace mongo {
         time_t          _started;          // time Balancer starte running
         int             _balancedLastTime; // number of moved chunks in last round
         BalancerPolicy* _policy;           // decide which chunks to move; owned here.
-
-        // non-copyable, non-assignable
-
-        Balancer(const Balancer&);
-        Balancer operator=(const Balancer&);
     };
     
     extern Balancer balancer;

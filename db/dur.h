@@ -10,7 +10,6 @@ namespace mongo {
     namespace dur { 
 
 #if !defined(_DURABLE)
-
         inline void* writingPtr(void *x, size_t len) { return x; }
         inline DiskLoc& writingDiskLoc(DiskLoc& d) { return d; }
         inline int& writingInt(int& d) { return d; }
@@ -24,7 +23,8 @@ namespace mongo {
             Use these methods to declare "i'm about to write to x and it should be logged for redo." 
             
             Failure to call writing...() is checked in _DEBUG mode by using a read only mapped view
-            (i.e., you'll segfault if the code is covered in that situation)
+            (i.e., you'll segfault if the code is covered in that situation).  The _DEBUG check doesn't 
+            verify that your length is correct though.
         */
 
         void* writingPtr(void *x, size_t len);
@@ -49,7 +49,7 @@ namespace mongo {
         template <typename T> 
         inline 
         T* writingNoLog(T *x) { 
-            log() << "todo dur" << endl;
+            log() << "todo dur nolog not yet optimized" << endl;
             return (T*) writingPtr(x, sizeof(T));
         }
 

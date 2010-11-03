@@ -15,6 +15,7 @@
 */
 
 #include "pch.h"
+#include "../repl.h"
 #include "../client.h"
 #include "../../client/dbclient.h"
 #include "rs.h"
@@ -139,26 +140,31 @@ namespace mongo {
             isyncassert( "flapping [2]?", !o.isEmpty() );
         }
 
-        sethbmsg("initial sync drop all databases", 0);
-        dropAllDatabasesExceptLocal();
+        if (replSettings.fastsync) {
+            log() << "fastsync: skipping database clone" << rsLog;
+        }
+        else {
+            sethbmsg("initial sync drop all databases", 0);
+            dropAllDatabasesExceptLocal();
 
-        sethbmsg("initial sync clone all databases", 0);
+            sethbmsg("initial sync clone all databases", 0);
 
-        list<string> dbs = r.conn()->getDatabaseNames();
-        for( list<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
-            string db = *i;
-            if( db != "local" ) {
-                sethbmsg( str::stream() << "initial sync cloning db: " << db , 0);
-                bool ok;
-                {
-                    writelock lk(db);
-                    Client::Context ctx(db);
-                    ok = clone(masterHostname.c_str(), db);
-                }
-                if( !ok ) { 
-                    sethbmsg( str::stream() << "initial sync error clone of " << db << " failed sleeping 5 minutes" ,0);
-                    sleepsecs(300);
-                    return;
+            list<string> dbs = r.conn()->getDatabaseNames();
+            for( list<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
+                string db = *i;
+                if( db != "local" ) {
+                    sethbmsg( str::stream() << "initial sync cloning db: " << db , 0);
+                    bool ok;
+                    {
+                        writelock lk(db);
+                        Client::Context ctx(db);
+                        ok = clone(masterHostname.c_str(), db);
+                    }
+                    if( !ok ) { 
+                        sethbmsg( str::stream() << "initial sync error clone of " << db << " failed sleeping 5 minutes" ,0);
+                        sleepsecs(300);
+                        return;
+                    }
                 }
             }
         }
