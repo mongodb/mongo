@@ -40,7 +40,8 @@ var basePath = "/data/db/" + basename;
 var hostname = getHostName();
 
 var pargs = new MongodRunner( ports[ 0 ], basePath + "-p", false, false,
-                              ["--replSet", basename], {no_bind : true} );
+                              ["--replSet", basename, "--oplogSize", 2],
+                              {no_bind : true} );
 p = pargs.start();
 
 var admin = p.getDB("admin");
@@ -82,8 +83,8 @@ admin.$cmd.sys.unlock.findOne();
 
 print("3");
 var sargs = new MongodRunner( ports[ 1 ], basePath + "-s", false, false,
-                              ["--replSet", basename, "--fastsync"],
-                              {no_bind : true} );
+                              ["--replSet", basename, "--fastsync",
+                               "--oplogSize", 2], {no_bind : true} );
 var reuseData = true;
 sargs.start(reuseData);
 
