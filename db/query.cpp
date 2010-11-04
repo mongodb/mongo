@@ -30,7 +30,7 @@
 #include "replpair.h"
 #include "scanandorder.h"
 #include "security.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "commands.h"
 #include "queryoptimizer.h"
 #include "lasterror.h"

@@ -24,7 +24,7 @@
 #include "../commands.h"
 #include "../pdfile.h"
 #include "../btree.h"
-#include "../curop.h"
+#include "../curop-inl.h"
 #include "../matcher.h"
 
 #include "core.h"

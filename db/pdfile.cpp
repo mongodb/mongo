@@ -39,7 +39,7 @@ _ disallow system* manipulations from the database.
 #include "namespace.h"
 #include "queryutil.h"
 #include "extsort.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "background.h"
 
 namespace mongo {

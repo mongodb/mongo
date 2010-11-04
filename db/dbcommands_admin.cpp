@@ -29,7 +29,7 @@
 #include "commands.h"
 #include "cmdline.h"
 #include "btree.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "../util/background.h"
 #include "../scripting/engine.h"
 

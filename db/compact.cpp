@@ -24,7 +24,7 @@
 #include "pdfile.h"
 #include "concurrency.h"
 #include "commands.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "../util/concurrency/task.h"
 
 namespace mongo { 

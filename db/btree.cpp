@@ -24,7 +24,7 @@
 #include "clientcursor.h"
 #include "client.h"
 #include "dbhelpers.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "stats/counters.h"
 
 namespace mongo {

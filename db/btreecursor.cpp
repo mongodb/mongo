@@ -20,7 +20,7 @@
 #include "btree.h"
 #include "pdfile.h"
 #include "jsobj.h"
-#include "curop.h"
+#include "curop-inl.h"
 
 namespace mongo {
 

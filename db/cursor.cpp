@@ -16,7 +16,7 @@
 
 #include "pch.h"
 #include "pdfile.h"
-#include "curop.h"
+#include "curop-inl.h"
 
 namespace mongo {
 

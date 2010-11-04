@@ -337,5 +337,3 @@ namespace mongo {
     } killCurrentOp;
 
 }
-
-#include "curop-inl.h"

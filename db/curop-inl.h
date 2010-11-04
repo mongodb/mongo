@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "curop.h"
+
 namespace mongo { 
 
     // todo : move more here
