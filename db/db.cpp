@@ -68,7 +68,7 @@ namespace mongo {
     void exitCleanly( ExitCode code );
 
     CmdLine cmdLine;
-    bool useJNI = true;
+    static bool scriptingEnabled = true;
     bool noHttpInterface = false;
     bool shouldRepairDatabases = 0;
     bool forceRepair = 0;
@@ -555,7 +555,7 @@ sendmore:
 
         Module::initAll();
 
-        if ( useJNI ) {
+        if ( scriptingEnabled ) {
             ScriptEngine::setup();
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
             globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
@@ -851,7 +851,7 @@ int main(int argc, char* argv[], char *envp[] )
             cmdLine.jsonp = true;
         }
         if (params.count("noscripting")) {
-            useJNI = false;
+            scriptingEnabled = false;
         }
         if (params.count("noprealloc")) {
             cmdLine.prealloc = false;
