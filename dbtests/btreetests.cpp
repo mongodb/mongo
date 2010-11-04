@@ -526,7 +526,7 @@ namespace BtreeTests {
         }
         static void set( const DiskLoc &l, IndexDetails &id ) {
             ArtificialTree::is( id.head )->deallocBucket( id.head, id );
-            id.head = l;
+            dur::writingDiskLoc(id.head) = l;
         }
         static void checkStructure( const BSONObj &spec, const DiskLoc &node ) {
             ArtificialTree *n = ArtificialTree::is( node );

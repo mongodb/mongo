@@ -39,6 +39,7 @@
 #include "client.h"
 #include "restapi.h"
 #include "dbwebserver.h"
+#include "dur_journal.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -71,7 +72,7 @@ namespace mongo {
     static bool scriptingEnabled = true;
     bool noHttpInterface = false;
     bool shouldRepairDatabases = 0;
-    bool forceRepair = 0;
+    static bool forceRepair = 0;
     Timer startupSrandTimer;
 
     const char *ourgetns() { 
@@ -562,6 +563,8 @@ sendmore:
         }
 
         repairDatabasesAndCheckVersion();
+
+        dur::openJournal();
 
         /* we didn't want to pre-open all fiels for the repair check above. for regular
            operation we do for read/write lock concurrency reasons.

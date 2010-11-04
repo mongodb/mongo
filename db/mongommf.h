@@ -22,8 +22,9 @@
 
 namespace mongo {
 
-    /* Adds some of our layers atop memory mapped files - specifically our handling of private views & such 
-       if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, not this.
+    /** MongoMMF adds some layers atop memory mapped files - specifically our handling of private views & such.
+        if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, 
+        not this.
     */
     class MongoMMF : private MemoryMappedFile { 
     public:
@@ -34,18 +35,25 @@ namespace mongo {
         bool open(string fname, bool sequentialHint);
         bool create(string fname, unsigned long long& len, bool sequentialHint);
 
-        // we will re-map the private few frequently, thus the use of MoveableBuffer
+        /* Get the "standard" view (which is the private one).
+           We re-map the private view frequently, thus the use of MoveableBuffer 
+           use.
+           @return the private view
+        */
         MoveableBuffer getView();
 
         static void* _switchToWritableView(void *private_ptr);
 
-        // for _DEBUG build
+        /** for _DEBUG build.
+            translates the read view pointer into a pointer to the corresponding 
+            place in the private view.
+        */
         static void* switchToPrivateView(void *debug_readonly_ptr);
 
     private:
-        void *view_write;
-        void *view_private;
-        void *view_readonly; // for _DEBUG build
+        void *_view_write;
+        void *_view_private;
+        void *_view_readonly; // for _DEBUG build
     };
 
 }

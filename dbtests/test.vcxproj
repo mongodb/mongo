@@ -264,6 +264,7 @@
     <ClCompile Include="..\db\commands\isself.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
     <ClCompile Include="..\db\dur.cpp" />
+    <ClCompile Include="..\db\dur_journal.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
