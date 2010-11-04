@@ -393,9 +393,9 @@ namespace mongo {
     inline Extent* DiskLoc::ext() const {
         return DataFileMgr::getExtent(*this);
     }
-    inline BtreeBucket* DiskLoc::btree() const {
+    inline const BtreeBucket* DiskLoc::btree() const {
         assert( _a != -1 );
-        return (BtreeBucket *) rec()->data;
+        return (const BtreeBucket *) rec()->data;
     }
 
 } // namespace mongo

@@ -883,7 +883,7 @@ namespace mongo {
         void exec(){
             const IndexDetails& id = *_spec->getDetails();
             
-            BtreeBucket * head = id.head.btree();
+            const BtreeBucket * head = id.head.btree();
             assert( head );
             /*
              * Search algorithm

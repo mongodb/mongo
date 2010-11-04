@@ -140,8 +140,8 @@ namespace mongo {
         while ( 1 ) {
             if ( !ok() )
                 break;
-            BtreeBucket *b = bucket.btree();
-            _KeyNode& kn = b->k(keyOfs);
+            const BtreeBucket *b = bucket.btree();
+            const _KeyNode& kn = b->k(keyOfs);
             if ( kn.isUsed() )
                 break;
             bucket = b->advance(bucket, keyOfs, direction, "skipUnusedKeys");
@@ -223,7 +223,7 @@ namespace mongo {
         multikey = d->isMultikey(idxNo);
 
         if ( keyOfs >= 0 ) {
-            BtreeBucket *b = bucket.btree();
+            const BtreeBucket *b = bucket.btree();
 
             assert( !keyAtKeyOfs.isEmpty() );
 

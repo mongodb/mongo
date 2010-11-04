@@ -53,7 +53,7 @@ namespace BtreeTests {
             }
         }
     protected:
-        BtreeBucket* bt() {
+        const BtreeBucket* bt() {
             return id().head.btree();
         }
         DiskLoc dl() {
@@ -109,7 +109,7 @@ namespace BtreeTests {
         BSONObj order() {
             return id().keyPattern();
         }
-        BtreeBucket *child( BtreeBucket *b, int i ) {
+        const BtreeBucket *child( const BtreeBucket *b, int i ) {
             assert( i <= b->nKeys() );
             DiskLoc d;
             if ( i == b->nKeys() ) {
@@ -497,7 +497,7 @@ namespace BtreeTests {
             return ret;
         }
         static ArtificialTree *is( const DiskLoc &l ) {
-            return static_cast< ArtificialTree * >( l.btree() );
+            return static_cast< ArtificialTree * >( l.btreemod() );
         }
         static DiskLoc makeTree( const string &spec, IndexDetails &id ) {
             return makeTree( fromjson( spec ), id );

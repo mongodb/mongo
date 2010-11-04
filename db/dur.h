@@ -60,6 +60,6 @@ namespace mongo {
 
     } // namespace dur
 
-    inline DiskLoc& DiskLoc::writing() { return dur::writingDiskLoc(*this); }
+    inline DiskLoc& DiskLoc::writing() const { return dur::writingDiskLoc(*const_cast< DiskLoc * >( this )); }
 
 }

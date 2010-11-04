@@ -33,7 +33,14 @@ namespace mongo {
 	 */
     class IndexDetails {
     public:
-        DiskLoc head; /* btree head disk location */
+        /**
+         * btree head disk location
+         * TODO We should make this variable private, since btree operations
+         * may change its value and we don't want clients to rely on an old
+         * value.  If we create a btree class, we can provide a btree object
+         * to clients instead of 'head'.
+         */
+        DiskLoc head;
 
         /* Location of index info object. Format:
 
