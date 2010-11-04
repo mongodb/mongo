@@ -439,7 +439,7 @@ namespace mongo {
 
             if ( _bc ) {
                 if ( _firstMatch.isEmpty() ) {
-                    _firstMatch = _bc->currKeyNode().key;
+                    _firstMatch = _bc->currKeyNode().key.copy();
                     // if not match
                     if ( _query.woCompare( _firstMatch, BSONObj(), false ) ) {
                         setComplete();
