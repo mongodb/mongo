@@ -36,7 +36,7 @@ _ disallow system* manipulations from the database.
 #include "query.h"
 #include "repl.h"
 #include "dbhelpers.h"
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "queryutil.h"
 #include "extsort.h"
 #include "curop-inl.h"

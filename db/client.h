@@ -26,7 +26,7 @@
 
 #include "../pch.h"
 #include "security.h"
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "lasterror.h"
 #include "stats/top.h"
 

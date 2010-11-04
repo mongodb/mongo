@@ -18,7 +18,7 @@
 
 #include "diskloc.h"
 #include "jsobj.h"
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "../util/message.h"
 #include "../client/constants.h"
 

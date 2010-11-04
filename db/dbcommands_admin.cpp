@@ -25,7 +25,7 @@
 #include "pch.h"
 #include "jsobj.h"
 #include "pdfile.h"
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "commands.h"
 #include "cmdline.h"
 #include "btree.h"

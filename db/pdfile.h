@@ -29,7 +29,7 @@
 #include "../util/mmap.h"
 #include "diskloc.h"
 #include "jsobjmanipulator.h"
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "client.h"
 
 namespace mongo {

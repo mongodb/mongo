@@ -17,7 +17,7 @@
 */
 
 #include "pch.h"
-#include "../namespace.h"
+#include "../namespace-inl.h"
 #include "../jsobj.h"
 #include "../index.h"
 #include "../../util/unittest.h"
