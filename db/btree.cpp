@@ -34,7 +34,7 @@ namespace mongo {
     BtreeBucket* DiskLoc::btreemod() const {
         assert( _a != -1 );
         BtreeBucket *b = const_cast< BtreeBucket * >( btree() );
-        return dur::writing(b);
+        return static_cast< BtreeBucket* >( dur::writingPtr( b, BucketSize ) );
     }
 
     _KeyNode& _KeyNode::writing() const { 
