@@ -244,6 +244,11 @@ namespace mongo {
                 _append( result , "repl" , 4 , ss.str() );
                 
             }
+            else if ( b["shardCursorType"].type() == Object ){
+                // is a mongos
+                // TODO: should have a better check
+                _append( result , "repl" , 4 , "RTR" );
+            }
 
             {
                 struct tm t;
@@ -295,13 +300,20 @@ namespace mongo {
             cout << endl;            
         }
 
-        static void printData( const BSONObj& o ){
-            BSONObjIterator i(o);
-            while ( i.more() ){
-                BSONObj x = i.next().Obj();
-                int w = x["width"].numberInt();
+        static void printData( const BSONObj& o , const BSONObj& headers ){
                 
-                BSONElement data = x["data"];
+            BSONObjIterator i(headers);
+            while ( i.more() ){
+                BSONElement e = i.next();
+                BSONObj h = e.Obj();
+                int w = h["width"].numberInt();
+                
+                BSONElement data;
+                {
+                    BSONElement temp = o[e.fieldName()];
+                    if ( temp.isABSONObj() )
+                        data = temp.Obj()["data"];
+                }
                 
                 if ( data.type() == String )
                     cout << setw(w) << data.String();
@@ -309,6 +321,10 @@ namespace mongo {
                     cout << setw(w) << setprecision(3) << data.number();
                 else if ( data.type() == NumberInt )
                     cout << setw(w) << data.numberInt();
+                else if ( data.eoo() )
+                    cout << setw(w) << "";
+                else 
+                    cout << setw(w) << "???";
                 
                 cout << ' ';
             }
@@ -346,7 +362,7 @@ namespace mongo {
                         printHeaders( out );
                     }
                     
-                    printData( out );
+                    printData( out , out );
 
                 }
                 catch ( AssertionException& e ){
@@ -367,12 +383,14 @@ namespace mongo {
             scoped_ptr<boost::thread> thr;
             
             mongo::mutex lock;
-
+            
             BSONObj prev;
             BSONObj now;
             time_t lastUpdate;
+            vector<BSONObj> shards;
 
             string error;
+            bool mongos;
         };
             
         static void serverThread( shared_ptr<ServerState> state ){
@@ -382,8 +400,10 @@ namespace mongo {
                 string errmsg;
                 if ( ! conn.connect( state->host , errmsg ) )
                     state->error = errmsg;
+                
+                long long cycleNumber = 0;
 
-                while ( 1 ){
+                while ( ++cycleNumber ){
                     try {
                         BSONObj out;
                         if ( conn.simpleCommand( "admin" , &out , "serverStatus" ) ){
@@ -399,6 +419,18 @@ namespace mongo {
                             state->lastUpdate = time(0);
                         }
                         
+                        if ( out["shardCursorType"].type() == Object ){
+                            state->mongos = true;
+                            if ( cycleNumber % 10 == 1 ){
+                                auto_ptr<DBClientCursor> c = conn.query( "config.shards" , BSONObj() );
+                                vector<BSONObj> shards;
+                                while ( c->more() ){
+                                    shards.push_back( c->next().getOwned() );
+                                }
+                                scoped_lock lk( state->lock );
+                                state->shards = shards;
+                            }
+                        }
                     }
                     catch ( std::exception& e ){
                         scoped_lock lk( state->lock );
@@ -430,7 +462,10 @@ namespace mongo {
             state->thr.reset( new boost::thread( boost::bind( serverThread , state ) ) );
             return true;
         }
-
+        
+        /**
+         * @param hosts [ "a.foo.com" , "b.foo.com" ]
+         */
         bool _addAll( StateMap& threads , const BSONObj& hosts ){
             BSONObjIterator i( hosts );
             bool added = false;
@@ -441,10 +476,47 @@ namespace mongo {
             return added;
         }
 
+        bool _discover( StateMap& threads , const string& host , const shared_ptr<ServerState>& ss ){
+            
+            BSONObj info = ss->now;
+
+            bool found = false;
+            
+            if ( info["repl"].isABSONObj() ){
+                BSONObj x = info["repl"].Obj();
+                if ( x["hosts"].isABSONObj() )
+                    if ( _addAll( threads , x["hosts"].Obj() ) )
+                        found = true;
+                if ( x["passives"].isABSONObj() )
+                    if ( _addAll( threads , x["passives"].Obj() ) )
+                        found = true;
+            }
+            
+            if ( ss->mongos ){
+                for ( unsigned i=0; i<ss->shards.size(); i++ ){
+                    BSONObj x = ss->shards[i];
+
+                    string errmsg;
+                    ConnectionString cs = ConnectionString::parse( x["host"].String() , errmsg );
+                    if ( errmsg.size() ){
+                        cerr << errmsg << endl;
+                        continue;
+                    }
+                    
+                    vector<HostAndPort> v = cs.getServers();
+                    for ( unsigned i=0; i<v.size(); i++ ){
+                        if ( _add( threads , v[i].toString() ) )
+                            found = true;
+                    }
+                }
+            }
+            
+            return found;
+        }
+        
         int runMany(){
             StateMap threads;
             
-            unsigned longestHost = 0;
 
             {
                 string orig = getParam( "host" );
@@ -453,58 +525,106 @@ namespace mongo {
                 StringSplitter ss( orig.c_str() , "," );
                 while ( ss.more() ){
                     string host = ss.next();
-                    if ( host.size() > longestHost )
-                        longestHost = host.size();
-
                     _add( threads , host );
                 }
             }
             
             sleepsecs(1);
-
+            
             int row = 0;
             bool discover = hasParam( "discover" );
 
             while ( 1 ){
                 sleepsecs( _sleep );
                 
-                cout << endl;
-                int x = 0;
+                // collect data
+                vector<Row> rows;
                 for ( map<string,shared_ptr<ServerState> >::iterator i=threads.begin(); i!=threads.end(); ++i ){
                     scoped_lock lk( i->second->lock );
-
+                    
                     if ( i->second->error.size() ){
-                        cout << setw( longestHost ) << i->first << "\t";
-                        cout << i->second->error << endl;
+                        rows.push_back( Row( i->first , i->second->error ) );
                     }
                     else if ( i->second->prev.isEmpty() || i->second->now.isEmpty() ){
-                        cout << setw( longestHost ) << i->first << "\t";
-                        cout << "no data" << endl;
+                        rows.push_back( Row( i->first ) );
                     }
                     else {
                         BSONObj out = doRow( i->second->prev , i->second->now );
-                        
-                        if ( x++ == 0 && row++ % 5 == 0 ){
-                            cout << setw( longestHost ) << "" << "\t";
-                            printHeaders( out );
-                        }
-
-                        cout << setw( longestHost ) << i->first << "\t";
-                        printData( out );
+                        rows.push_back( Row( i->first , out ) );
                     }
-
+                    
                     if ( discover && ! i->second->now.isEmpty() ){
-                        if ( i->second->now["repl"].isABSONObj() ){
-                            BSONObj x = i->second->now["repl"].Obj();
-                            if ( x["hosts"].isABSONObj() )
-                                if ( _addAll( threads , x["hosts"].Obj() ) )
-                                    break;
-                            if ( x["passives"].isABSONObj() )
-                                if ( _addAll( threads , x["passives"].Obj() ) )
-                                    break; 
-                        }
+                        if ( _discover( threads , i->first , i->second ) )
+                            break;
                     }
                 }
+                
+                // compute some stats
+                unsigned longestHost = 0;
+                BSONObj biggest;
+                for ( unsigned i=0; i<rows.size(); i++ ){
+                    if ( rows[i].host.size() > longestHost )
+                        longestHost = rows[i].host.size();
+                    if ( rows[i].data.nFields() > biggest.nFields() )
+                        biggest = rows[i].data;
+                }
+                
+                { // check for any headers not in biggest
+
+                    // TODO: we put any new headers at end, 
+                    //       ideally we would interleave
+
+                    set<string> seen;
+                    
+                    BSONObjBuilder b;
+                    
+                    { // iterate biggest
+                        BSONObjIterator i( biggest );
+                        while ( i.more() ){
+                            BSONElement e = i.next();
+                            seen.insert( e.fieldName() );
+                            b.append( e );
+                        }
+                    }
+                    
+                    // now do the rest
+                    for ( unsigned j=0; j<rows.size(); j++ ){
+                        BSONObjIterator i( rows[j].data );
+                        while ( i.more() ){
+                            BSONElement e = i.next();
+                            if ( seen.count( e.fieldName() ) )
+                                continue;
+                            seen.insert( e.fieldName() );
+                            b.append( e );
+                        }
+
+                    }
+
+                    biggest = b.obj();
+                    
+                }
+                
+                // display data
+                
+                cout << endl;
+
+                //    header
+                if ( row++ % 5 == 0 && ! biggest.isEmpty() ){
+                    cout << setw( longestHost ) << "" << "\t";
+                    printHeaders( biggest );
+                }
+                
+                //    rows
+                for ( unsigned i=0; i<rows.size(); i++ ){
+                    cout << setw( longestHost ) << rows[i].host << "\t";
+                    if ( rows[i].err.size() )
+                        cout << rows[i].err << endl;
+                    else if ( rows[i].data.isEmpty() )
+                        cout << "no data" << endl;
+                    else 
+                        printData( rows[i].data , biggest );
+                }
+                
             }
 
             return 0;
@@ -514,6 +634,25 @@ namespace mongo {
         bool _http;
         bool _many;
         bool _all;
+
+        struct Row {
+            Row( string h , string e ){
+                host = h;
+                err = e;
+            }
+            
+            Row( string h ){
+                host = h;
+            }
+
+            Row( string h , BSONObj d ){
+                host = h;
+                data = d;
+            }
+            string host;
+            string err;
+            BSONObj data;
+        };
     };
 
 }

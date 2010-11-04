@@ -157,11 +157,21 @@ doTest = function (signal) {
     // Wait for initial replication
     var a = a_conn.getDB("foo");
     var b = b_conn.getDB("foo");
+    wait(function () {
+        var status = A.runCommand({replSetGetStatus : 1});
+        return status.members[1].state == 2;
+      });
+
     doInitialWrites(a);
 
     // wait for secondary to get this data
     wait(function () { return b.bar.count() == a.bar.count(); });
+    wait(function () {
+        var status = A.runCommand({replSetGetStatus : 1});
+        return status.members[1].state == 2;
+      });
 
+    
     A.runCommand({ replSetTest: 1, blind: true });
     reconnect(a, b);
     

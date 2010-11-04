@@ -35,6 +35,23 @@ public:
             ;
     }
 
+    // This is a functor that writes a BSONObj to a file
+    struct Writer{
+        Writer(ostream& out, ProgressMeter* m) :_out(out), _m(m) {}
+
+        void operator () (const BSONObj& obj) {
+            _out.write( obj.objdata() , obj.objsize() );
+
+            // if there's a progress bar, hit it
+            if (_m) {
+                _m->hit();
+            }
+        }
+
+        ostream& _out;
+        ProgressMeter* _m;
+    };
+
     void doCollection( const string coll , ostream &out , ProgressMeter *m ) {
         Query q;
         if ( _query.isEmpty() && !hasParam("dbpath"))
@@ -42,15 +59,19 @@ public:
         else
             q = _query;
 
-        auto_ptr<DBClientCursor> cursor = conn( true ).query( coll.c_str() , q , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
+        DBClientBase& connBase = conn(true);
+        Writer writer(out, m);
 
-        while ( cursor->more() ) {
-            BSONObj obj = cursor->next();
-            out.write( obj.objdata() , obj.objsize() );
-
-            // if there's a progress bar, hit it
-            if (m) {
-                m->hit();
+        // use low-latency "exhaust" mode if going over the network
+        if (typeid(connBase) == typeid(DBClientConnection&)){
+            DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
+            boost::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
+            conn.query( castedWriter, coll.c_str() , q , NULL, QueryOption_SlaveOk | QueryOption_NoCursorTimeout | QueryOption_Exhaust);
+        } else {
+            //This branch should only be taken with DBDirectClient which doesn't support exhaust mode
+            scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout ));
+            while ( cursor->more() ) {
+                writer(cursor->next());
             }
         }
     }

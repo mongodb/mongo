@@ -36,6 +36,11 @@ namespace mongo {
         void reset() { str.reset(); }
     };
     
+    /**
+     * stores a copy of a bson obj in a fixed size buffer
+     * if its too big for the buffer, says "too big"
+     * useful for keeping a copy around indefinitely without wasting a lot of space or doing malloc
+     */
     class CachedBSONObj {
     public:
         enum { TOO_BIG_SENTINEL = 1 } ;
@@ -72,11 +77,11 @@ namespace mongo {
         int size() const { return *_size; }
         bool have() const { return size() > 0; }
 
-        BSONObj get( bool threadSafe ){
+        BSONObj get(){
             _lock.lock();            
             BSONObj o;
             try {
-                o = _get( threadSafe );
+                o = _get();
                 _lock.unlock();
             }
             catch ( ... ){
@@ -89,7 +94,7 @@ namespace mongo {
         void append( BSONObjBuilder& b , const StringData& name ){
             _lock.lock();
             try {
-                BSONObj temp = _get(false);
+                BSONObj temp = _get();
                 b.append( name , temp );
                 _lock.unlock();
             }
@@ -101,7 +106,7 @@ namespace mongo {
         
     private:
         /** you have to be locked when you call this */
-        BSONObj _get( bool getCopy ){
+        BSONObj _get(){
             int sz = size();
             if ( sz == 0 )
                 return BSONObj();
@@ -124,7 +129,7 @@ namespace mongo {
         ~CurOp();
 
         bool haveQuery() const { return _query.have(); }
-        BSONObj query( bool threadSafe = false ){ return _query.get( threadSafe );  }
+        BSONObj query(){ return _query.get();  }
 
         void ensureStarted(){
             if ( _start == 0 )
