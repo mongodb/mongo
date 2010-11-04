@@ -393,6 +393,34 @@ namespace mongo {
         pack( order, refPos );
     }
 
+    /**
+     * In the standard btree algorithm, we would split based on the
+     * existing keys _and_ the new key.  But that's more work to
+     * implement, so we split the existing keys and then add the new key.
+     */
+    int BucketBasics::splitPos( int keypos ) const {
+        assert( n > 2 );
+        int split = 0;
+        int rightSize = 0;
+        // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split. 
+        // see SERVER-983
+        int rightSizeLimit = topSize / ( keypos == n ? 10 : 2 );
+        for( int i = n - 1; i > -1; --i ) {
+            rightSize += keyNode( i ).key.objsize();
+            if ( rightSize > rightSizeLimit ) {
+                split = i;
+                break;
+            }
+        }
+        if ( split < 1 ) {
+            split = 1;
+        } else if ( split > n - 2 ) {
+            split = n - 2;
+        }
+        
+        return split;
+    }
+        
     /* - BtreeBucket --------------------------------------------------- */
 
     /* return largest key in the subtree. */
@@ -857,29 +885,7 @@ namespace mongo {
         if ( split_debug )
             out() << "    " << thisLoc.toString() << ".split" << endl;
 
-        // In the standard btree algorithm, we would split based on the
-        // existing keys _and_ the new key.  But that's more work to
-        // implement, so we split the existing keys and then add the new key.
-        
-        assert( n > 2 );
-        int split = 0;
-        int rightSize = 0;
-        // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split. 
-        // see SERVER-983
-        int rightSizeLimit = topSize / ( keypos == n ? 10 : 2 );
-        for( int i = n - 1; i > -1; --i ) {
-            rightSize += keyNode( i ).key.objsize();
-            if ( rightSize > rightSizeLimit ) {
-                split = i;
-                break;
-            }
-        }
-        if ( split < 1 ) {
-            split = 1;
-        } else if ( split > n - 2 ) {
-            split = n - 2;
-        }
-
+        int split = splitPos( keypos );
         DiskLoc rLoc = addBucket(idx);
         BtreeBucket *r = rLoc.btreemod();
         if ( split_debug )

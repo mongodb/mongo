@@ -214,6 +214,9 @@ namespace mongo {
         int Size() const;
         const _KeyNode& k(int i) const { return ((const _KeyNode*)data)[i]; }
         _KeyNode& k(int i) { return ((_KeyNode*)data)[i]; }
+        
+        // @return the key position where a split should occur on insert
+        int splitPos( int keypos ) const;
     };
 
     /**
