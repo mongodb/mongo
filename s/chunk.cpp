@@ -914,12 +914,6 @@ namespace mongo {
         }
         return ss.str();
     }
-
-    void ChunkManager::_migrationNotification(Chunk* c){
-        _chunkRanges.reloadRange(_chunkMap, c->getMin(), c->getMax());
-        _shards.insert(c->getShard());
-    }
-
     
     void ChunkRangeManager::assertValid() const{
         if (_ranges.empty())

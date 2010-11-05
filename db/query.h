@@ -254,12 +254,13 @@ namespace mongo {
 
                 if ( strcmp( "$orderby" , name ) == 0 ||
                      strcmp( "orderby" , name ) == 0 ){
-                    if ( e.type() == Object )
+                    if ( e.type() == Object ) {
                         _order = e.embeddedObject();
-                    else if ( e.type() == Array )
+                    } else if ( e.type() == Array ) {
                         _order = transformOrderFromArrayFormat( _order );
-                    else
-                        assert( 0 );
+                    } else {
+                        uassert(13513, "sort must be an object or array", 0);
+                    }
                 }
                 else if ( strcmp( "$explain" , name ) == 0 )
                     _explain = e.trueValue();

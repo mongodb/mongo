@@ -342,8 +342,6 @@ namespace mongo {
         ShardKeyPattern _key;
         bool _unique;
         
-        map<string,unsigned long long> _maxMarkers;
-
         ChunkMap _chunkMap;
         ChunkRangeManager _chunkRanges;
 
@@ -353,9 +351,6 @@ namespace mongo {
         
         mutable RWLock _lock;
         DistributedLock _nsLock;
-
-        // This should only be called from Chunk after it has been migrated
-        void _migrationNotification(Chunk* c);
 
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
