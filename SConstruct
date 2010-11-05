@@ -219,7 +219,7 @@ AddOption( "--libpath",
            action="store",
            help="Library path if you have libraries in a nonstandard directory" )
 
-# 
+#
 # to use CPUPROFILE=/tmp/profile
 # to view pprof -gv mongod /tmp/profile
 #
@@ -385,7 +385,7 @@ class InstallSetup:
 
     def __init__(self):
         self.default()
-    
+
     def default(self):
         self.binaries = True
         self.libraries = False
@@ -403,7 +403,7 @@ class InstallSetup:
         self.bannerDir = "distsrc/client/"
         self.headerRoot = ""
         self.clientTestsDir = "client/examples/"
-        
+
 installSetup = InstallSetup()
 if distBuild:
     installSetup.bannerDir = "distsrc"
@@ -416,9 +416,9 @@ if GetOption( "full" ):
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
-commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
+commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ,
                  "util/assert_util.cpp" , "util/log.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
-                 "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
+                 "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" , "util/processinfo.cpp" ,
                  "util/concurrency/synchronization.cpp" ]
 commonFiles += Glob( "util/*.c" )
@@ -439,9 +439,9 @@ else:
     commonFiles += [ "util/processinfo_none.cpp" ]
 
 coreDbFiles = [ "db/commands.cpp" ]
-coreServerFiles = [ "util/message_server_port.cpp" , 
-                    "client/parallel.cpp" ,  
-                    "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
+coreServerFiles = [ "util/message_server_port.cpp" ,
+                    "client/parallel.cpp" ,
+                    "util/miniwebserver.cpp" , "db/dbwebserver.cpp" ,
                     "db/matcher.cpp" , "db/indexkey.cpp" , "db/dbcommands_generic.cpp" ]
 
 if GetOption( "asio" ) != None:
@@ -612,7 +612,7 @@ elif "win32" == os.sys.platform:
 	env['ENV'] = dict(os.environ)
 
     def find_boost():
-        for x in ('', ' (x86)'):	
+        for x in ('', ' (x86)'):
             boostDir = "C:/Program Files" + x + "/boost/latest"
             if os.path.exists( boostDir ):
                 return boostDir
@@ -659,7 +659,7 @@ elif "win32" == os.sys.platform:
 
     # some warnings we don't like:
     env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
-    
+
     env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","SUPPORT_UCP","SUPPORT_UTF8,PSAPI_VERSION=1" ] )
 
     #env.Append( CPPFLAGS='  /Yu"pch.h" ' ) # this would be for pre-compiled headers, could play with it later
@@ -673,12 +673,12 @@ elif "win32" == os.sys.platform:
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
         # /LTCG link time code generation
-        env.Append( CPPFLAGS= " /GL " ) 
+        env.Append( CPPFLAGS= " /GL " )
         env.Append( LINKFLAGS=" /LTCG " )
     else:
 
         # /Od disable optimization
-        # /ZI debug info w/edit & continue 
+        # /ZI debug info w/edit & continue
         # /TP it's a c++ file
         # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
         env.Append( CPPFLAGS=" /RTC1 /MDd /Z7 /TP /errorReport:none " )
@@ -687,7 +687,7 @@ elif "win32" == os.sys.platform:
         if debugBuild:
             env.Append( LINKFLAGS=" /debug " )
             env.Append( CPPFLAGS=" /Od " )
-            
+
         if debugLogging:
             env.Append( CPPDEFINES=[ "_DEBUG" ] )
 
@@ -736,7 +736,7 @@ elif "win32" == os.sys.platform:
     winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib"
 
     if force64:
-        
+
         winLibString += ""
         #winLibString += " LIBCMT LIBCPMT "
 
@@ -782,7 +782,7 @@ if nix:
         #env.Append( LINKFLAGS=" -fprofile-generate" )
         # then:
         #env.Append( CPPFLAGS=" -fprofile-use" )
-        #env.Append( LINKFLAGS=" -fprofile-use" )        
+        #env.Append( LINKFLAGS=" -fprofile-use" )
 
     if debugLogging:
         env.Append( CPPFLAGS=" -D_DEBUG" );
@@ -993,7 +993,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
                     J = [ "js32r", "js", "mozjs" , "js_static" ]
                 else:
                     J = [ "js32d", "js", "mozjs" , "js_static" ]
-                
+
         myCheckLib( J , True )
         mozHeader = "js"
         if bigLibString(myenv).find( "mozjs" ) >= 0:
@@ -1066,7 +1066,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
             if not found:
                 raise "can't find a static %s" % l
 
-    # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
+    # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this
     # point.
     if ( GetOption( "heapcheck" ) is not None ) and ( not shell ):
         if ( not debugBuild ) and ( not debugLogging ):
@@ -1081,7 +1081,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
         myenv.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
         myenv.Append( CPPFLAGS="-fno-omit-frame-pointer" )
 
-    # FIXME doConfigure() is being called twice, in the case of the shell. So if it is called 
+    # FIXME doConfigure() is being called twice, in the case of the shell. So if it is called
     # with shell==True, it'd be on its second call and it would need to rearrange the libraries'
     # order. The following removes tcmalloc from the LIB's list and reinserts it at the end.
     if ( GetOption( "heapcheck" ) is not None ) and ( shell ):
@@ -1182,7 +1182,7 @@ checkErrorCodes()
 # main db target
 mongodOnlyFiles = [ "db/db.cpp" ]
 if windows:
-    mongodOnlyFiles.append( "util/ntservice.cpp" ) 
+    mongodOnlyFiles.append( "util/ntservice.cpp" )
 mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + mongodOnlyFiles )
 Default( mongod )
 
@@ -1222,6 +1222,7 @@ test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 if windows:
     testEnv.Alias( "test" , "test.exe" )
 perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
+clientTests += [ clientEnv.Program( "clientNamespaceTest" , [ "client/examples/clientNamespaceTest.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
@@ -1444,7 +1445,7 @@ def getSystemInstallName():
         n += "-debugsymbols"
     if nix and os.uname()[2].startswith( "8." ):
         n += "-tiger"
-        
+
     if len(moduleNames) > 0:
         n += "-" + "-".join( moduleNames )
 
@@ -1455,7 +1456,7 @@ def getSystemInstallName():
     except:
         pass
 
-        
+
     dn = GetOption( "distmod" )
     if dn and len(dn) > 0:
         n = n + "-" + dn
@@ -1568,7 +1569,7 @@ if installSetup.clientSrc:
 #lib
 if installSetup.libraries:
     env.Install( installDir + "/" + nixLibPrefix, clientLibName )
-    if GetOption( "sharedclient" ): 
+    if GetOption( "sharedclient" ):
         env.Install( installDir + "/" + nixLibPrefix, sharedClientLibName )
 
 
@@ -1652,7 +1653,7 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
         name = name.lower()
     else:
         name = remoteName
-        
+
     if isDriverBuild():
         name = "cxx-driver/" + name
     elif platformDir:
