@@ -79,7 +79,7 @@ public:
         log(2) << "drillDown: " << root.string() << endl;
 
         // skip hidden files and directories
-        if (root.leaf()[0] == '.')
+        if (root.leaf()[0] == '.' && root.leaf() != ".")
             return;
 
         if ( is_directory( root ) ) {
