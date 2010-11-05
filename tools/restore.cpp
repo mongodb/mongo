@@ -33,16 +33,15 @@ class Restore : public BSONTool {
 public:
     
     bool _drop;
-    bool _indexesLast;
     const char * _curns;
 
     Restore() : BSONTool( "restore" ) , _drop(false){
         add_options()
             ("drop" , "drop each collection before import" )
-            ("indexesLast" , "wait to add indexes (faster if data isn't inserted in index order)" )
             ;
         add_hidden_options()
             ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
+            ("indexesLast" , "wait to add indexes (now default)") // left in for backwards compatibility
             ;
         addPositionArg("dir", 1);
     }
@@ -61,7 +60,6 @@ public:
         }
         
         _drop = hasParam( "drop" );
-        _indexesLast = hasParam("indexesLast");
 
         /* If _db is not "" then the user specified a db name to restore as.
          *
@@ -106,7 +104,7 @@ public:
                     }
                 }
 
-                if ( _indexesLast && p.leaf() == "system.indexes.bson" )
+                if ( p.leaf() == "system.indexes.bson" )
                     indexes = p;
                 else
                     drillDown(p, use_db, use_coll);
