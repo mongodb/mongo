@@ -78,6 +78,10 @@ public:
     void drillDown( path root, bool use_db = false, bool use_coll = false ) {
         log(2) << "drillDown: " << root.string() << endl;
 
+        // skip hidden files and directories
+        if (root.leaf()[0] == '.')
+            return;
+
         if ( is_directory( root ) ) {
             directory_iterator end;
             directory_iterator i(root);
