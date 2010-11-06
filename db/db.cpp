@@ -713,9 +713,9 @@ int main(int argc, char* argv[], char *envp[] )
         ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
-        ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
+        ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
         ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
-        ("arbiter", po::value<string>(), "address of arbiter server DEPRECATED")
+        ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
         ;
 
         ms_options.add_options()
