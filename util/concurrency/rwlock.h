@@ -185,37 +185,39 @@ namespace mongo {
 
 #endif
 
+    /** throws on failure to acquire in the specified time period. */
     class rwlock_try_write {
-        RWLock& _l;
     public:
         struct exception { };
         rwlock_try_write(RWLock& l, int millis = 0) : _l(l) {
-            if( !l.lock_try(millis) ) throw exception();
+            if( !l.lock_try(millis) ) 
+                throw exception();
         }
         ~rwlock_try_write() { _l.unlock(); }
+    private:
+        RWLock& _l;
     };
 
-    /* scoped lock */
-    struct rwlock {
+    /* scoped lock for RWLock */
+    class rwlock {
+    public:
         rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false )
-            : _lock( (RWLock&)lock ) , _write( write ){
-
-            if ( ! alreadyHaveLock ){
+            : _lock( (RWLock&)lock ) , _write( write ) {
+            if ( ! alreadyHaveLock ) {
                 if ( _write )
                     _lock.lock();
                 else
                     _lock.lock_shared();
             }
         }
-
-        ~rwlock(){
+        ~rwlock() {
             if ( _write )
                 _lock.unlock();
             else
                 _lock.unlock_shared();
         }
-        
+    private:        
         RWLock& _lock;
-        bool _write;
+        const bool _write;
     };
 }

@@ -22,7 +22,7 @@ namespace mongo {
 
     /* the 'big lock' we use for most operations. a read/write lock.
        there is one of these, dbMutex.  
-       generally if you need to declare a mutex use the right primitive class no this.
+       generally if you need to declare a mutex use the right primitive class, not this.
 
        use readlock and writelock classes for scoped locks on this rather than direct 
        manipulation.
