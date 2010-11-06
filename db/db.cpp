@@ -1,4 +1,4 @@
-// @file db.cpp : Defines the entry point for the mongod application.
+// @file db.cpp : Defines main() for the mongod program.
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -39,6 +39,7 @@
 #include "client.h"
 #include "restapi.h"
 #include "dbwebserver.h"
+#include "dur_journal.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -68,10 +69,10 @@ namespace mongo {
     void exitCleanly( ExitCode code );
 
     CmdLine cmdLine;
-    bool useJNI = true;
+    static bool scriptingEnabled = true;
     bool noHttpInterface = false;
     bool shouldRepairDatabases = 0;
-    bool forceRepair = 0;
+    static bool forceRepair = 0;
     Timer startupSrandTimer;
 
     const char *ourgetns() { 
@@ -307,13 +308,9 @@ sendmore:
         globalScriptEngine->threadDone();
     }
 
+    /* todo: eliminate msg */
     void msg(const char *m, const char *address, int port, int extras = 0) {
         SockAddr db(address, port);
-
-        //  SockAddr db("127.0.0.1", DBPort);
-        //  SockAddr db("192.168.37.1", MessagingPort::DBPort);
-        //  SockAddr db("10.0.21.60", MessagingPort::DBPort);
-        //  SockAddr db("172.16.0.179", MessagingPort::DBPort);
 
         MessagingPort p;
         if ( !p.connect(db) ){
@@ -380,7 +377,8 @@ sendmore:
         return repairDatabase( dbName.c_str(), errmsg );
     }
     
-    void repairDatabases() {
+    // ran at startup.
+    static void repairDatabasesAndCheckVersion() {
 		//        LastError * le = lastError.get( true );
         Client::GodScope gs;
         log(1) << "enter repairDatabases (to check pdfile version #)" << endl;
@@ -409,7 +407,7 @@ sendmore:
                     assert( doDBUpgrade( dbName , errmsg , h ) );
                 }
                 else {
-                    log() << "\t Not upgrading, exiting!" << endl;
+                    log() << "\t Not upgrading, exiting" << endl;
                     log() << "\t run --upgrade to upgrade dbs, then start again" << endl;
                     log() << "****" << endl;
                     dbexit( EXIT_NEED_UPGRADE );
@@ -558,21 +556,15 @@ sendmore:
 
         Module::initAll();
 
-#if 0
-        {
-            stringstream indexpath;
-            indexpath << dbpath << "/indexes.dat";
-            RecCache::tempStore.init(indexpath.str().c_str(), BucketSize);
-        }
-#endif
-
-        if ( useJNI ) {
+        if ( scriptingEnabled ) {
             ScriptEngine::setup();
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
             globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
         }
 
-        repairDatabases();
+        repairDatabasesAndCheckVersion();
+
+        dur::openJournal();
 
         /* we didn't want to pre-open all fiels for the repair check above. for regular
            operation we do for read/write lock concurrency reasons.
@@ -862,7 +854,7 @@ int main(int argc, char* argv[], char *envp[] )
             cmdLine.jsonp = true;
         }
         if (params.count("noscripting")) {
-            useJNI = false;
+            scriptingEnabled = false;
         }
         if (params.count("noprealloc")) {
             cmdLine.prealloc = false;
@@ -1237,6 +1229,3 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 #endif
 
 } // namespace mongo
-
-//#include "recstore.h"
-//#include "reccache.h"

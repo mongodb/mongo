@@ -411,6 +411,12 @@
     <ClCompile Include="commands\isself.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="dur.cpp">
+      <Filter>db\storage engine</Filter>
+    </ClCompile>
+    <ClCompile Include="dur_journal.cpp">
+      <Filter>db\storage engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -784,6 +790,9 @@
     </ClInclude>
     <ClInclude Include="mongomutex.h">
       <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="dur_journal.h">
+      <Filter>db\storage engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

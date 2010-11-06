@@ -20,8 +20,8 @@
 
 #include "../pch.h"
 #include "jsobj.h"
-#include "namespace.h"
-#include "curop.h"
+#include "namespace-inl.h"
+#include "curop-inl.h"
 #include "../util/array.h"
 
 namespace mongo {

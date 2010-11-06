@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "client.h"
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/spin_lock.h"
@@ -337,5 +337,3 @@ namespace mongo {
     } killCurrentOp;
 
 }
-
-#include "curop-inl.h"

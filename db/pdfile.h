@@ -29,8 +29,9 @@
 #include "../util/mmap.h"
 #include "diskloc.h"
 #include "jsobjmanipulator.h"
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "client.h"
+#include "mongommf.h"
 
 namespace mongo {
 
@@ -69,17 +70,17 @@ namespace mongo {
         */
         Extent* createExtent(const char *ns, int approxSize, bool capped = false, int loops = 0);
 
-        DataFileHeader *getHeader() { return header; }
+        DataFileHeader *getHeader() { return header(); }
 
         /* return max size an extent may be */
         static int maxSize();
         
+        /** fsync */
         void flush( bool sync );
         
     private:
         void badOfs(int) const;
         void badOfs2(int) const;
-
         int defaultSize( const char *filename ) const;
 
         Extent* getExtent(DiskLoc loc);
@@ -88,9 +89,11 @@ namespace mongo {
         Record* makeRecord(DiskLoc dl, int size);
 		void grow(DiskLoc dl, int size);
 
-        MMF mmf;
-        char* _p;
-        DataFileHeader *header;
+        char* p() { return (char *) _mb.p; }
+        DataFileHeader* header() { return (DataFileHeader*) _mb.p; }
+
+        MongoMMF mmf;
+        MoveableBuffer _mb;
         int fileNo;
     };
 
@@ -322,7 +325,7 @@ namespace mongo {
 
     inline Extent* MongoDataFile::_getExtent(DiskLoc loc) {
         loc.assertOk();
-        Extent *e = (Extent *) (_p+loc.getOfs());
+        Extent *e = (Extent *) (p()+loc.getOfs());
         return e;
     }
 
@@ -341,13 +344,13 @@ namespace mongo {
     inline Record* MongoDataFile::recordAt(DiskLoc dl) {
         int ofs = dl.getOfs();
         if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
-        return (Record*) (_p+ofs);
+        return (Record*) (p()+ofs);
     }
 
     inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) { 
         int ofs = dl.getOfs();	   
         if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
-        return (Record*) (_p+ofs);
+        return (Record*) (p()+ofs);
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {

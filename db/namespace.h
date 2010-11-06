@@ -583,5 +583,3 @@ namespace mongo {
     }
 
 } // namespace mongo
-
-#include "namespace-inl.h"

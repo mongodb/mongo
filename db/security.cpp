@@ -20,7 +20,7 @@
 #include "security.h"
 #include "instance.h"
 #include "client.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "db.h"
 #include "dbhelpers.h"
 

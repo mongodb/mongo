@@ -19,7 +19,7 @@
 #include "pch.h"
 
 #include "extsort.h"
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "../util/file.h"
 #include <sys/types.h>
 #include <sys/stat.h>

@@ -36,10 +36,10 @@ _ disallow system* manipulations from the database.
 #include "query.h"
 #include "repl.h"
 #include "dbhelpers.h"
-#include "namespace.h"
+#include "namespace-inl.h"
 #include "queryutil.h"
 #include "extsort.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "background.h"
 
 namespace mongo {
@@ -378,17 +378,19 @@ namespace mongo {
         }
 
         {
+            assert( _mb.p == 0 );
             unsigned long long sz = size;
-            _p = (char *) mmf.map(filename, sz);
+            if( mmf.create(filename, sz, false) )
+                _mb = mmf.getView();
             assert( sz <= 0x7fffffff );
             size = (int) sz;
         }
-        header = (DataFileHeader *) _p;
+        //header = (DataFileHeader *) _p;
         if( sizeof(char *) == 4 ) 
-            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", header);
+            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb.p != 0);
         else
-            uassert( 10085 , "can't map file memory", header);
-        header->init(fileNo, size);
+            uassert( 10085 , "can't map file memory", _mb.p != 0);
+        header()->init(fileNo, size);
     }
 
     void MongoDataFile::flush( bool sync ){
@@ -421,8 +423,8 @@ namespace mongo {
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
         massert( 10357 ,  "shutdown in progress", !goingAway );
         massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= Extent::maxSize() );
-        massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
-        int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
+        massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
+        int ExtentSize = approxSize <= header()->unusedLength ? approxSize : header()->unusedLength;
         DiskLoc loc;
         if ( ExtentSize <= 0 ) {
             /* not there could be a lot of looping here is db just started and
@@ -434,9 +436,9 @@ namespace mongo {
             log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
             return cc().database()->addAFile( 0, true )->createExtent(ns, approxSize, newCapped, loops+1);
         }
-        int offset = header->unused.getOfs();
+        int offset = header()->unused.getOfs();
 
-        DataFileHeader *h = dur::writing(header);
+        DataFileHeader *h = dur::writing(header());
         h->unused.set( fileNo, offset + ExtentSize );
         h->unusedLength -= ExtentSize;
         loc.set(fileNo, offset);

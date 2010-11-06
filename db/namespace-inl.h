@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "namespace.h"
+
 namespace mongo { 
 
     inline Namespace& Namespace::operator=(const char *ns) {

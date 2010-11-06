@@ -24,13 +24,21 @@
 #include "clientcursor.h"
 #include "client.h"
 #include "dbhelpers.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "stats/counters.h"
 
 namespace mongo {
 
+#if !defined(_DURABLE) || !defined(_DEBUG)
 #define VERIFYTHISLOC dassert( thisLoc.btree() == this );
+#else
+// with _DURABLE, this assert wouldn't work without getting fancier as there are multiple mmap views for _DEBUG mode...
+#define VERIFYTHISLOC 
+#endif
 
+    /** give us a writable version of the btree bucket (declares write intent). 
+        note it is likely more efficient to declare write intent on something smaller when you can.
+    */
     BtreeBucket* DiskLoc::btreemod() const {
         assert( _a != -1 );
         BtreeBucket *b = const_cast< BtreeBucket * >( btree() );
@@ -46,12 +54,17 @@ namespace mongo {
             recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
     { }
 
-    const int KeyMax = BucketSize / 10;
+    /* largest key size we allow.  note we very much need to support bigger keys (somehow) in the future. */
+    static const int KeyMax = BucketSize / 10;
+
+    static const int split_debug = 0;
+    static const int insert_debug = 0;
 
     extern int otherTraceLevel;
-    const int split_debug = 0;
-    const int insert_debug = 0;
 
+    /* this error is ok/benign when doing a background indexing -- that logic in pdfile checks explicitly 
+       for the 10287 error code.
+       */
     static void alreadyInIndex() { 
         // we don't use massert() here as that does logging and this is 'benign' - see catches in _indexRecord()
         throw MsgAssertionException(10287, "btree: key+recloc already in index");

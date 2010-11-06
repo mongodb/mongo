@@ -42,8 +42,6 @@
 
 #if !defined(_DURABLE)
 
-        // _DURABLE flag turns on durability in storage module.  if off you can ignore rest of this file
-
 #else
 
 #include "dur.h"

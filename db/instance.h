@@ -21,7 +21,7 @@
 
 
 #include "../client/dbclient.h"
-#include "curop.h"
+#include "curop-inl.h"
 #include "security.h"
 #include "cmdline.h"
 #include "client.h"

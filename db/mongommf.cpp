@@ -46,10 +46,10 @@ namespace mongo {
             MongoMMF *mmf = i->second;
             assert( mmf );
 
-            size_t ofs = ((char *)p) - ((char*)mmf->view_readonly);
+            size_t ofs = ((char *)p) - ((char*)mmf->_view_readonly);
 
             if( ofs < mmf->length() ) { 
-                return ((char *)mmf->view_private) + ofs;
+                return ((char *)mmf->_view_private) + ofs;
             }
         }
 
@@ -62,7 +62,7 @@ namespace mongo {
         }
 
         for( std::map<void*,MongoMMF*>::iterator i = our_read_views.begin(); i != our_read_views.end(); i++ ) { 
-            char *wl = (char *) i->second->view_private;
+            char *wl = (char *) i->second->_view_private;
             char *wh = wl + i->second->length();
             if( p >= wl && p < wh ) { 
                 log() << "dur: perf warning p=" << p << " is already in the writable view of " << i->second->filename() << endl;
@@ -75,8 +75,8 @@ namespace mongo {
     }
 #endif
 
-    /* switch to view_write.  normally, this is a bad idea since your changes will not 
-       show up in view_private if there have been changes there; thus the leading underscore
+    /* switch to _view_write.  normally, this is a bad idea since your changes will not 
+       show up in _view_private if there have been changes there; thus the leading underscore
        as a tad of a "warning".  but useful when done with some care, such as during 
        initialization.
     */
@@ -90,15 +90,15 @@ namespace mongo {
     }
 
     bool MongoMMF::open(string fname, bool sequentialHint) {
-        view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
-        // temp : view_private pending more work!
-        view_private = view_write;
-        if( view_write ) { 
+        _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
+        // temp : _view_private pending more work!
+        _view_private = _view_write;
+        if( _view_write ) { 
              if( durable ) {
 #if defined(_DEBUG)
-                 view_readonly = MemoryMappedFile::createReadOnlyMap();
+                 _view_readonly = MemoryMappedFile::createReadOnlyMap();
                  mutex::scoped_lock lk(our_views_mutex);
-                 our_read_views[view_readonly] = this; 
+                 our_read_views[_view_readonly] = this; 
 #endif
              }
             return true;
@@ -107,15 +107,15 @@ namespace mongo {
     }
 
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) { 
-        view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
-        // temp : view_private pending more work!
-        view_private = view_write;
-        if( view_write ) {
+        _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
+        // temp : _view_private pending more work!
+        _view_private = _view_write;
+        if( _view_write ) {
             if( durable ) {
 #if defined(_DEBUG)
-                view_readonly = MemoryMappedFile::createReadOnlyMap();
+                _view_readonly = MemoryMappedFile::createReadOnlyMap();
                 mutex::scoped_lock lk(our_views_mutex);
-                our_read_views[view_readonly] = this;
+                our_read_views[_view_readonly] = this;
 #endif
             }
             return true;
@@ -126,12 +126,12 @@ namespace mongo {
     /* we will re-map the private few frequently, thus the use of MoveableBuffer */
     MoveableBuffer MongoMMF::getView() { 
         if( durable && debug )
-            return view_readonly;
-        return view_private;
+            return _view_readonly;
+        return _view_private;
     }
 
     MongoMMF::MongoMMF() {
-        view_write = view_private = view_readonly = 0; 
+        _view_write = _view_private = _view_readonly = 0; 
     }
 
     MongoMMF::~MongoMMF() { 
@@ -142,10 +142,10 @@ namespace mongo {
 #if defined(_DEBUG) && defined(_DURABLE)
         {
             mutex::scoped_lock lk(our_views_mutex);
-            our_read_views.erase(view_readonly);
+            our_read_views.erase(_view_readonly);
         }
 #endif
-        view_write = view_private = view_readonly = 0;
+        _view_write = _view_private = _view_readonly = 0;
         MemoryMappedFile::close();
     }
 
