@@ -361,6 +361,8 @@ namespace mongo {
             bb.append("health", 1.0);
             bb.append("state", (int) box.getState().s);
             bb.append("stateStr", box.getState().toString());
+            bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
+            bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);
             string s = _self->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
