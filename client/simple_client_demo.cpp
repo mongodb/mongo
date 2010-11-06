@@ -9,7 +9,7 @@
     ./a.out
 
    (2) using client_lib.cpp:
-    g++ -I .. simple_client_demo.cpp client_lib.cpp -lboost_thread-mt -lboost_filesystem
+    g++ -I .. simple_client_demo.cpp mongo_client_lib.cpp -lboost_thread-mt -lboost_filesystem
     ./a.out
 */
 
