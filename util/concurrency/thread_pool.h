@@ -15,6 +15,8 @@
  *    limitations under the License.
  */
 
+#pragma once
+
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
 #undef assert
