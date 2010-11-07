@@ -227,6 +227,7 @@
       <Filter>storage related</Filter>
     </ClInclude>
     <ClInclude Include="..\db\jsobjmanipulator.h" />
+    <ClInclude Include="..\util\logfile.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -697,6 +698,9 @@
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\dur_journal.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\logfile.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>

@@ -246,6 +246,7 @@
     <ClInclude Include="..\util\hashtab.h" />
     <ClInclude Include="..\db\lasterror.h" />
     <ClInclude Include="..\util\log.h" />
+    <ClInclude Include="..\util\logfile.h" />
     <ClInclude Include="..\util\lruishmap.h" />
     <ClInclude Include="..\util\md5.h" />
     <ClInclude Include="..\util\md5.hpp" />
@@ -564,6 +565,7 @@
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\log.cpp" />
+    <ClCompile Include="..\util\logfile.cpp" />
     <ClCompile Include="..\util\mmap_win.cpp" />
     <ClCompile Include="..\db\namespace.cpp" />
     <ClCompile Include="..\db\nonce.cpp" />
