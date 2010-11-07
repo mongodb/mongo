@@ -1066,7 +1066,7 @@ namespace mongo {
 
                     // do not apply deletes if they do not belong to the chunk being migrated
                     BSONObj fullObj;
-                    if ( cmdLine.moveParanoia && Helpers::findById( cc() , ns.c_str() , id, fullObj ) ) {
+                    if ( Helpers::findById( cc() , ns.c_str() , id, fullObj ) ) {
                         if ( ! isInRange( fullObj , min , max ) ) {
                             log() << "not applying out of range deletion: " << fullObj << endl;
 
