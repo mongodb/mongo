@@ -120,7 +120,7 @@ namespace mongo {
     void LogFile::synchronousAppend(void *buf, size_t len) { 
         assert(_fd);
         ssize_t written = write(_fd, buf, len);
-        if( written != len ) { 
+        if( written != (ssize_t) len ) { 
             uasserted(13515, str::stream() << "error appending to file " << errnoWithDescription());
         }
 #if !defined(O_SYNC)
