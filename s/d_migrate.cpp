@@ -300,7 +300,7 @@ namespace mongo {
         }
 
         void xfer( list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ){
-            static long long maxSize = 1024 * 1024;
+            const long long maxSize = 1024 * 1024;
             
             if ( l->size() == 0 || size > maxSize )
                 return;
@@ -1063,6 +1063,17 @@ namespace mongo {
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ){
                     BSONObj id = i.next().Obj();
+
+                    // do not apply deletes if they do not belong to the chunk being migrated
+                    BSONObj fullObj;
+                    if ( cmdLine.moveParanoia && Helpers::findById( cc() , ns.c_str() , id, fullObj ) ) {
+                        if ( ! isInRange( fullObj , min , max ) ) {
+                            log() << "not applying out of range deletion: " << fullObj << endl;
+
+                            continue;
+                        }
+                    }
+
                     Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0 );
                     didAnything = true;
                 }
