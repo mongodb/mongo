@@ -111,7 +111,7 @@ namespace mongo {
 
         const Member *cp = sp.primary;
         if( cp == 0 ) {
-            sethbmsg("initial sync need a member to be primary",0);
+            sethbmsg("initial sync need a member to be primary to do our initial sync", 0);
             sleepsecs(15);
             return;
         }
@@ -132,14 +132,6 @@ namespace mongo {
         }
         OpTime startingTS = lastOp["ts"]._opTime();
         
-        {
-            /* make sure things aren't too flappy */
-            sleepsecs(5);
-            isyncassert( "flapping?", box.getPrimary() == cp );
-            BSONObj o = r.getLastOp(rsoplog);
-            isyncassert( "flapping [2]?", !o.isEmpty() );
-        }
-
         if (replSettings.fastsync) {
             log() << "fastsync: skipping database clone" << rsLog;
         }
@@ -171,10 +163,12 @@ namespace mongo {
 
         sethbmsg("initial sync query minValid",0);
 
+        isyncassert( "initial sync source must remain primary throughout our initial sync", box.getPrimary() == cp );
+
         /* our cloned copy will be strange until we apply oplog events that occurred 
            through the process.  we note that time point here. */
         BSONObj minValid = r.getLastOp(rsoplog);
-        assert( !minValid.isEmpty() );
+        isyncassert( "getLastOp is empty ", !minValid.isEmpty() );
         OpTime mvoptime = minValid["ts"]._opTime();
         assert( !mvoptime.isNull() );
 
@@ -182,7 +176,8 @@ namespace mongo {
         */
         {
             sethbmsg("initial sync initial oplog application");
-            if( ! initialSyncOplogApplication(masterHostname, cp, startingTS, mvoptime) ) { // note we assume here that this call does not throw
+            isyncassert( "initial sync source must remain primary throughout our initial sync [2]", box.getPrimary() == cp );
+            if( ! initialSyncOplogApplication(/*primary*/cp, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
 				lastOpTimeWritten = OpTime();
