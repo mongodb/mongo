@@ -337,7 +337,7 @@ namespace mongo {
 
     private:
         /* pulling data from primary related - see rs_sync.cpp */
-        bool initialSyncOplogApplication(string hn, const Member *primary, OpTime applyGTE, OpTime minValid);
+        bool initialSyncOplogApplication(const Member *primary, OpTime applyGTE, OpTime minValid);
         void _syncDoInitialSync();
         void syncDoInitialSync();
         void _syncThread();

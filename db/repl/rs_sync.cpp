@@ -50,13 +50,13 @@ namespace mongo {
        this method returns an error and doesn't throw exceptions (i think).
     */
     bool ReplSetImpl::initialSyncOplogApplication(
-        string hn, 
         const Member *primary,
         OpTime applyGTE,
         OpTime minValid)
     { 
         if( primary == 0 ) return false;
 
+        const string hn = primary->h().toString();
         OpTime ts;
         try {
             OplogReader r;
