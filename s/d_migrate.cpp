@@ -129,9 +129,11 @@ namespace mongo {
             log() << "moveChunk deleted: " << num << endl;
         }
     };
+
+    static const char * const cleanUpThreadName = "cleanupOldData";
     
     void _cleanupOldData( OldDataCleanup cleanup ){
-        Client::initThread( "cleanupOldData");
+        Client::initThread( cleanUpThreadName );
         log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << endl;
 
         int loops = 0;
@@ -274,7 +276,7 @@ namespace mongo {
                 
             case 'd': {
                 
-                if ( getThreadName() == "cleanupOldData" ){
+                if ( getThreadName() == cleanUpThreadName ){
                     // we don't want to xfer things we're cleaning
                     // as then they'll be deleted on TO
                     // which is bad
