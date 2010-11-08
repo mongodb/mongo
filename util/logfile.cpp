@@ -20,25 +20,32 @@
 #include "logfile.h"
 #include "text.h"
 #include "mongoutils/str.h"
+#include "unittest.h"
 
 using namespace mongoutils;
 
 namespace mongo {
-    struct ___Test { 
-        ___Test() { 
-            if( 0 ) {
+    struct LogfileTest : public UnitTest { 
+      LogfileTest() { }
+      void run() { 
+            if( 0 && debug ) {
                 try { 
-                    LogFile f("foo");
-                    char *buf = (char*) malloc(16384);
-                    memset(buf, 'z', 16384);
-                    buf[16382] = '\n';
-                    buf[16383] = 'B';
+                    LogFile f("logfile_test");
+		    void *p = malloc(16384);
+                    char *buf = (char*) p;
+		    buf += 4095;
+		    buf = (char*) (((size_t)buf)&(~0xfff));
+                    memset(buf, 'z', 8192);
+                    buf[8190] = '\n';
+                    buf[8191] = 'B';
                     buf[0] = 'A';
-                    f.synchronousAppend(buf, 16384);
-                    f.synchronousAppend(buf, 16384);
+                    f.synchronousAppend(buf, 8192);
+                    f.synchronousAppend(buf, 8192);
+		    free(p);
                 }
                 catch(DBException& e ) { 
-                    log() << e.what() << endl;
+		    log() << "logfile.cpp test failed : " << e.what() << endl;
+		    throw;
                 }
             }
         }
@@ -95,7 +102,7 @@ namespace mongo {
     LogFile::LogFile(string name) {
         _fd = open(name.c_str(), 
                      O_APPEND 
-                   | O_CREAT
+                   | O_CREAT | O_RDWR
 #if defined(O_DIRECT)
                    | O_DIRECT
 #endif
@@ -107,25 +114,32 @@ namespace mongo {
 #endif
                    ,
                    S_IRUSR | S_IWUSR);
+        log() << "TEMP logfile open " << _fd << endl;
         if( _fd < 0 ) {
             uasserted(13516, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription());
         }
+	//	log() << "\nWRITE TEST: " << write(_fd, "abc", 3) << ' ' << errno << endl;
     }
 
     LogFile::~LogFile() { 
         if( _fd >= 0 )
             close(_fd);
+	_fd = -1;
     }
 
-    void LogFile::synchronousAppend(void *buf, size_t len) { 
+    void LogFile::synchronousAppend(void *b, size_t len) {
+        char *buf = (char *) b;
         assert(_fd);
+	assert(((size_t)buf)%4096==0); // aligned
+	assert(len % 4096 == 0);
         ssize_t written = write(_fd, buf, len);
         if( written != (ssize_t) len ) { 
-            uasserted(13515, str::stream() << "error appending to file " << errnoWithDescription());
+  	    log() << "write fails written:" << written << " len:" << len << " errno:" << errno << endl;
+  	    uasserted(13515, str::stream() << "error appending to file " << _fd << errnoWithDescription());
         }
 #if !defined(O_SYNC)
         if( fdatasync(_fd) < 0 ) { 
-            uasserted(13514, str::stream() << "error appending to file on fsync " << errnoWithDescription());
+  	    uasserted(13514, str::stream() << "error appending to file on fsync " << errnoWithDescription());
         }
 #endif
     }
