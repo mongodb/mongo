@@ -785,6 +785,9 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         if ( lockFile ){
             log() << "shutdown: removing fs lock..." << endl;
+            /* This ought to be an unlink(), but Eliot says the last
+               time that was attempted, there was a race condition
+               with acquirePathLock().  */
             if( ftruncate( lockFile , 0 ) ) 
                 log() << "couldn't remove fs lock " << errnoWithDescription() << endl;
             flock( lockFile, LOCK_UN );
