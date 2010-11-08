@@ -1,5 +1,7 @@
 // test rollback of replica sets
 
+load("jstests/replsets/rslib.js");
+
 var debugging=0;
 
 w = 0;
@@ -161,7 +163,16 @@ doTest = function (signal) {
     print("\nsync1.js ********************************************************************** part 10");
 
     // now, let's see if rollback works
-    var result = dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: false });
+    try {
+      var result = dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: false });
+    }
+    catch(e) {
+      print(e);
+    }
+    reconnect(dbs[0]);
+    reconnect(dbs[1]);
+    
+    
     dbs[0].getMongo().setSlaveOk();
 
     printjson(result);
