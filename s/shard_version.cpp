@@ -108,7 +108,6 @@ namespace mongo {
         ShardChunkVersion version = 0;
         if ( isSharded ){
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
-            assert( officialSequenceNumber == manager->getSequenceNumber() ); // this is to make sure there isn't a race condition
         }
         
         log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns 
