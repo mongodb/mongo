@@ -803,9 +803,7 @@ namespace mongo {
 
         // this plan won, so set data for response broadly
         void finish( bool stop ) {
-            if ( _c.get() ) {
-                _nscanned = _c->nscanned();
-            }
+            
             if ( _pq.isExplain() ) {
                 _n = _inMemSort ? _so->size() : _n;
             } 
@@ -813,25 +811,32 @@ namespace mongo {
                 if( _so.get() )
                     _so->fill( _buf, _pq.getFields() , _n );
             }
-            
-            if ( _pq.hasOption( QueryOption_CursorTailable ) && _pq.getNumToReturn() != 1 )
-                _c->setTailable();
-            
-            // If the tailing request succeeded.
-            if ( _c->tailable() )
-                _saveClientCursor = true;
 
-            if ( _pq.isExplain()) {
+            if ( _c.get() ) {
+                _nscanned = _c->nscanned();
+                
+                if ( _pq.hasOption( QueryOption_CursorTailable ) && _pq.getNumToReturn() != 1 )
+                    _c->setTailable();
+                
+                // If the tailing request succeeded.
+                if ( _c->tailable() )
+                    _saveClientCursor = true;
+            }
+
+            if ( _pq.isExplain() ) {
                 _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(), _curop.elapsedMillis(), useHints && !_pq.getHint().eoo(), _nYields , _nChunkSkips);
-            } else {
-                if (_buf.len()) {
+            } 
+            else {
+                if ( _buf.len() ) {
                     _response.appendData( _buf.buf(), _buf.len() );
                     _buf.decouple();
                 }
             }
+
             if ( stop ) {
                 setStop();
-            } else {
+            } 
+            else {
                 setComplete();
             }
 
