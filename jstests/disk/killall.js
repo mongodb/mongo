@@ -16,7 +16,13 @@ sleep( 1000 );
 s2 = startParallelShell( "db." + baseName + ".drop()", port );
 sleep( 1000 );
 
-assert.eq( 12, stopMongod( port ) ); // 12 == interrupt exit code
+/**
+ * 12 == mongod's exit code on interrupt (eg standard kill)
+ * stopMongod sends a standard kill signal to mongod, then waits for mongod to stop.  If mongod doesn't stop
+ * in a reasonable amount of time, stopMongod sends kill -9 and in that case will not return 12.  We're checking
+ * in this assert that mongod will stop quickly even while evaling an infinite loop in server side js.
+ */
+assert.eq( 12, stopMongod( port ) );
 
 s1();
 s2();
