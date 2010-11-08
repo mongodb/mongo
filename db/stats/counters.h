@@ -130,4 +130,18 @@ namespace mongo {
         map<string,long long> _counts; // TODO: replace with thread safe map
         mongo::mutex _mutex;
     };
+
+    class NetworkCounter {
+    public:
+        NetworkCounter() : _bytesIn(0), _bytesOut(0), _overflows(0) , _mutex( "NetworkCounter" ){}
+        void hit( long long bytesIn , long long bytesOut );
+        BSONObj getObj();
+    private:
+        long long _bytesIn;
+        long long _bytesOut;
+        long long _overflows;
+        mongo::mutex _mutex;
+    };
+    
+    extern NetworkCounter networkCounter;
 }

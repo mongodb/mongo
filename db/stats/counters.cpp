@@ -141,9 +141,34 @@ namespace mongo {
         return b.obj();
     }
 
+
+    void NetworkCounter::hit( long long bytesIn , long long bytesOut ) {
+        static const long long MAX = pow( 2 , 60 );
+        mongo::mutex::scoped_lock lk( _mutex );
+        if ( _bytesIn > MAX || _bytesOut > MAX ){
+            _overflows++;
+            _bytesIn = bytesIn;
+            _bytesOut = bytesOut;
+        }
+        else {
+            _bytesIn += bytesIn;
+            _bytesOut += bytesOut;
+            
+        }
+    }
+    
+    BSONObj NetworkCounter::getObj() {
+        BSONObjBuilder b( 64 );
+        mongo::mutex::scoped_lock lk( _mutex );
+        b.appendNumber( "bytesIn" , _bytesIn );
+        b.appendNumber( "bytesOut" , _bytesOut );
+        return b.obj();
+    }
     
 
     OpCounters globalOpCounters;
     IndexCounters globalIndexCounters;
     FlushCounters globalFlushCounters;
+    NetworkCounter networkCounter;
+    
 }
