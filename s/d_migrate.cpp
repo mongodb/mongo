@@ -242,6 +242,14 @@ namespace mongo {
             switch ( opstr[0] ){
                 
             case 'd': {
+                
+                if ( getThreadName() == "cleanupOldData" ){
+                    // we don't want to xfer things we're cleaning
+                    // as then they'll be deleted on TO
+                    // which is bad
+                    return;
+                }
+                
                 // can't filter deletes :(
                 scoped_lock lk( _mutex );
                 _deleted.push_back( ide.wrap() );
