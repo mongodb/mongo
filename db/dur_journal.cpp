@@ -29,8 +29,13 @@ namespace mongo {
 
 #else
 
+#include "../util/logfile.h"
+
 namespace mongo {
     namespace dur {
+
+        /* temp - this will become more elaborate and probably a class. */
+
 
         /** call at init.  uasserts on failure.  if fails, you likely want to terminate. */
         void openJournal() { 

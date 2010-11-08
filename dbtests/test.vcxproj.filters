@@ -7,9 +7,6 @@
     <Filter Include="misc and third party\pcre">
       <UniqueIdentifier>{0a50fb63-4ac3-4e30-a9d4-b0841878ee73}</UniqueIdentifier>
     </Filter>
-    <Filter Include="storage related">
-      <UniqueIdentifier>{eb2684bf-ca8d-4162-9313-56a81233c471}</UniqueIdentifier>
-    </Filter>
     <Filter Include="client">
       <UniqueIdentifier>{45dab36c-864e-45de-bb8e-cf1d87a2c4f6}</UniqueIdentifier>
     </Filter>
@@ -44,14 +41,17 @@
     <Filter Include="replsets">
       <UniqueIdentifier>{9320a670-3b28-471a-bf92-6c8d881a37a4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="btree related">
-      <UniqueIdentifier>{4fff2dbf-30c4-4295-8db8-d513c1e36220}</UniqueIdentifier>
-    </Filter>
     <Filter Include="util\concurrency">
       <UniqueIdentifier>{d499fdba-b256-4b12-af20-cdd1ae1addff}</UniqueIdentifier>
     </Filter>
     <Filter Include="util\h">
       <UniqueIdentifier>{353b6f01-1cab-4156-a576-bc75ab204776}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="btree">
+      <UniqueIdentifier>{4fff2dbf-30c4-4295-8db8-d513c1e36220}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="dur">
+      <UniqueIdentifier>{c296d097-0d46-46ee-9097-f2df659d9596}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -173,7 +173,7 @@
       <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="..\db\btree.h">
-      <Filter>btree related</Filter>
+      <Filter>btree</Filter>
     </ClInclude>
     <ClInclude Include="..\util\concurrency\list.h">
       <Filter>util\concurrency</Filter>
@@ -223,11 +223,19 @@
     <ClInclude Include="..\util\sock.h">
       <Filter>util\h</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\mongommf.h">
-      <Filter>storage related</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\jsobjmanipulator.h" />
-    <ClInclude Include="..\util\logfile.h" />
+    <ClInclude Include="..\db\dur.h">
+      <Filter>dur</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\dur_journal.h">
+      <Filter>dur</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\logfile.h">
+      <Filter>dur</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\mongommf.h">
+      <Filter>dur</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -572,10 +580,10 @@
       <Filter>replsets</Filter>
     </ClCompile>
     <ClCompile Include="..\db\btree.cpp">
-      <Filter>btree related</Filter>
+      <Filter>btree</Filter>
     </ClCompile>
     <ClCompile Include="..\db\btreecursor.cpp">
-      <Filter>btree related</Filter>
+      <Filter>btree</Filter>
     </ClCompile>
     <ClCompile Include="..\db\repl\manager.cpp">
       <Filter>db\cpp</Filter>
@@ -685,23 +693,23 @@
     <ClCompile Include="..\scripting\bench.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\dur.cpp">
-      <Filter>db\cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\mongommf.cpp">
-      <Filter>storage related</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\compact.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\commands\isself.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\dur.cpp">
+      <Filter>dur</Filter>
+    </ClCompile>
     <ClCompile Include="..\db\dur_journal.cpp">
-      <Filter>db\cpp</Filter>
+      <Filter>dur</Filter>
     </ClCompile>
     <ClCompile Include="..\util\logfile.cpp">
-      <Filter>db\cpp</Filter>
+      <Filter>dur</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\mongommf.cpp">
+      <Filter>dur</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
