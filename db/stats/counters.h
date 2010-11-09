@@ -62,6 +62,8 @@ namespace mongo {
     };
     
     extern OpCounters globalOpCounters;
+    extern OpCounters replOpCounters;
+
 
     class IndexCounters {
     public:

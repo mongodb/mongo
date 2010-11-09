@@ -22,6 +22,7 @@
 #include "repl.h"
 #include "commands.h"
 #include "repl/rs.h"
+#include "stats/counters.h"
 
 namespace mongo {
 
@@ -469,7 +470,9 @@ namespace mongo {
         }
     }
 
-    void applyOperation_inlock(const BSONObj& op){
+    void applyOperation_inlock(const BSONObj& op , bool fromRepl ){
+        OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
+
         if( logLevel >= 6 ) 
             log() << "applying op: " << op << endl;
         
@@ -482,6 +485,8 @@ namespace mongo {
         const char *opType = op.getStringField("op");
 
         if ( *opType == 'i' ) {
+            opCounters->gotInsert();
+
             const char *p = strchr(ns, '.');
             if ( p && strcmp(p, ".system.indexes") == 0 ) {
                 // updates aren't allowed for indexes -- so we will do a regular insert. if index already
@@ -514,10 +519,14 @@ namespace mongo {
             }
         }
         else if ( *opType == 'u' ) {
+            opCounters->gotUpdate();
+            
             RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
             updateObjects(ns, o, op.getObjectField("o2"), /*upsert*/ op.getBoolField("b"), /*multi*/ false, /*logop*/ false , debug );
         }
         else if ( *opType == 'd' ) {
+            opCounters->gotDelete();
+
             if ( opType[1] == 0 )
                 deleteObjects(ns, o, op.getBoolField("b"));
             else
@@ -527,6 +536,8 @@ namespace mongo {
             // no op
         }
         else if ( *opType == 'c' ){
+            opCounters->gotCommand();
+
             BufBuilder bb;
             BSONObjBuilder ob;
             _runCommands(ns, o, bb, ob, true, 0);
@@ -590,7 +601,7 @@ namespace mongo {
             BSONObjIterator i( ops );
             while ( i.more() ){
                 BSONElement e = i.next();
-                applyOperation_inlock( e.Obj() );
+                applyOperation_inlock( e.Obj() , false );
                 num++;
             }
 

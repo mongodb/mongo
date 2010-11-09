@@ -211,5 +211,10 @@ namespace mongo {
     void pretouchOperation(const BSONObj& op);
     void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
 
-    void applyOperation_inlock(const BSONObj& op);
+    /**
+     * take an op and apply locally
+     * used for applying from an oplog
+     * @param fromRepl really from replication or for testing/internal/command/etc...
+     */
+    void applyOperation_inlock(const BSONObj& op , bool fromRepl = true );
 }

@@ -175,6 +175,7 @@ namespace mongo {
     
 
     OpCounters globalOpCounters;
+    OpCounters replOpCounters;
     IndexCounters globalIndexCounters;
     FlushCounters globalFlushCounters;
     NetworkCounter networkCounter;
