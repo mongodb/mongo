@@ -1245,6 +1245,8 @@ namespace mongo {
             assert( isInRange( BSON( "x" << 4 ) , min , max ) );
             assert( ! isInRange( BSON( "x" << 5 ) , min , max ) );
             assert( ! isInRange( BSON( "x" << 6 ) , min , max ) );
+
+            log(1) << "isInRangeTest passed" << endl;
         }
     } isInRangeTest;
 }
