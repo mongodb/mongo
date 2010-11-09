@@ -11,8 +11,8 @@
 
 GLOBAL g;
 
-static void	usage(void);
-static void	restart(void);
+static void restart(void);
+static void usage(void);
 
 int
 main(int argc, char *argv[])
@@ -35,7 +35,7 @@ main(int argc, char *argv[])
 
 	/* Set values from the command line. */
 	log = 0;
-	while ((ch = getopt(argc, argv, "1C:cdlrv")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:clrv")) != EOF)
 		switch (ch) {
 		case '1':
 			g.c_runs = 1;
@@ -46,9 +46,6 @@ main(int argc, char *argv[])
 		case 'c':
 			config_names();
 			return (EXIT_SUCCESS);
-		case 'd':
-			g.dump = DUMP_DEBUG;
-			break;
 		case 'l':
 			log = 1;
 			break;
@@ -104,12 +101,8 @@ main(int argc, char *argv[])
 				break;
 			}
 
-#if 0 /* DO OPERATIONS */
 			if (wts_ops())		/* Random operations */
 				goto err;
-#else
-			break;
-#endif
 		}
 
 skip_ops:	if (wts_stats())		/* Optional statistics */
@@ -118,10 +111,6 @@ skip_ops:	if (wts_stats())		/* Optional statistics */
 		track("shutting down BDB", (u_int64_t)0);
 		bdb_teardown();	
 
-		/*
-		 * BDB doesn't have a dump method, so close it, flushing
-		 * data to disk, and then dump & compare the results.
-		 */
 		if (wts_dump())
 			goto err;
 
