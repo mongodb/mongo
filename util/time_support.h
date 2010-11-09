@@ -48,6 +48,16 @@ namespace mongo {
         return buf;
     }
 
+    /** 
+     * assumes both times are in the same day
+     */
+    inline int compareTimeOfDay( const struct tm& a, const struct tm& b ) {
+        int aSecs = a.tm_hour * 3600 + a.tm_min * 60 + a.tm_sec;
+        int bSecs = b.tm_hour * 3600 + b.tm_min * 60 + b.tm_sec;
+        return bSecs - aSecs;
+    }
+
+
 #define MONGO_asctime _asctime_not_threadsafe_
 #define asctime MONGO_asctime
 #define MONGO_gmtime _gmtime_not_threadsafe_

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "../util/time_support.h"
 #include "../util/concurrency/mutex.h"
 
 #include "config.h"  // DBConfigPtr
@@ -60,10 +61,10 @@ namespace mongo {
          * on the provided address. Adding a shard that is a replica set is supported. 
          *
          * @param name is an optional string with the name of the shard. if ommited, grid will
-         * generate one and update the parameter.
+         *        generate one and update the parameter.
          * @param servers is the connection string of the shard being added
          * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
-         * space usage
+         *        space usage
          * @param errMsg is the error description in case the operation failed. 
          * @return true if shard was successfully added.
          */
@@ -97,6 +98,20 @@ namespace mongo {
          * @return whether a give dbname is used for shard "local" databases (e.g., admin or local)
          */
         static bool _isSpecialLocalDB( const string& dbName );
+
+        /**
+         * @param balancerDoc bson that may contain a marker to stop the balancer
+         *        format { ... , stopped: [ "true" | "false" ] , ... }
+         * @return true if the marker is present and is set to true
+         */
+        bool _balancerStopped( const BSONObj& balancerDoc ) const;
+
+        /**
+         * @param balancerDoc bson that may contain a window of time for the balancer to work
+         *        format { ... , activeWindow: { start: "8:30" , stop: "19:00" } , ... } 
+         * @return true if there is no window of time specified for the balancer or it we're currently in it
+         */
+        bool _inBalancingWindow( const BSONObj& balancerDoc ) const;
 
     };
 
