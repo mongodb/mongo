@@ -396,21 +396,22 @@ namespace mongo {
             return true;
         }
 
-        // convert time, if the activeWindow was correctly specified
-        struct tm startTime, endTime;
-        //const char * fmt = "%H:%M";
         // TODO suspend, pending windows compilation
+
+        // convert time, if the activeWindow was correctly specified
+        //struct tm startTime, endTime;
+        //const char * fmt = "%H:%M";
         //if ( ! strptime( start.c_str() , fmt , &startTime ) || ! strptime( stop.c_str() , fmt , &endTime ) ){
         //    log(LL_WARNING) << "cannot parse active window (use hh:mm[am|pm]) format: " << intervalDoc << endl;
         //    return true;
         //}
         
         // balance if during the activeWindow
-        struct tm now;
-        time_t_to_Struct( time(0) , &now, true /* local time */ );
-        if ( ( compareTimeOfDay( now , startTime ) >= 0 ) && ( compareTimeOfDay( now, endTime ) <=0 ) ){
-            return true;
-        }
+        //struct tm now;
+        //time_t_to_Struct( time(0) , &now, true /* local time */ );
+        //if ( ( compareTimeOfDay( now , startTime ) >= 0 ) && ( compareTimeOfDay( now, endTime ) <=0 ) ){
+        //    return true;
+        //}
 
         return false;
     }
