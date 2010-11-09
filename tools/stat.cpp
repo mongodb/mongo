@@ -155,6 +155,31 @@ namespace mongo {
             ss << setprecision(3) << sz << unit;
             _append( result , name , width , ss.str() );
         }
+        
+        void _appendNet( BSONObjBuilder& result , const string& name , double diff ){
+            // I think 1000 is correct for megabit, but I've seen conflicting things (ERH 11/2010)
+            const double div = 1000;
+            
+            string unit = "b";
+
+            if ( diff >= div ){
+                unit = "k";
+                diff /= div;
+            }
+            
+            if ( diff >= div ){
+                unit = "m";
+                diff /= div;
+            }
+
+            if ( diff >= div ){
+                unit = "g";
+                diff /= div;
+            }
+
+            string out = str::stream() << (int)diff << unit;
+            _append( result , name , 6 , out );
+        }
 
         /**
          * BSON( <field> -> BSON( width : ### , data : XXX ) )
@@ -214,7 +239,13 @@ namespace mongo {
                 temp << r << "|" << w;
                 _append( result , "ar|aw" , 7 , temp.str() );
             }
-
+            
+            if ( b["network"].isABSONObj() ){
+                BSONObj ax = a["network"].embeddedObject();
+                BSONObj bx = b["network"].embeddedObject();
+                _appendNet( result , "netIn" , diff( "bytesIn" , ax , bx ) );
+                _appendNet( result , "netOut" , diff( "bytesOut" , ax , bx ) );
+            }
 
             _append( result , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
