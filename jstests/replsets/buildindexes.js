@@ -34,8 +34,10 @@ doTest = function( signal ) {
   print("namespace: "+ns);
 
   // can't query system.indexes from slave, so we'll look at coll.stats()
+  printjson(slave[0].stats());
+  printjson(slave[1].stats());
   var indexes = slave[0].stats().indexes;
-  assert.eq(indexes, 2);
+  assert.eq(indexes, 2, 'number of indexes');
 
   indexes = slave[1].stats().indexes;
   assert.eq(indexes, 1);
