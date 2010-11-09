@@ -78,6 +78,9 @@ __wt_bt_item_process(
 int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page);
 int
+__wt_bt_rcc_expand_sort(ENV *env,
+    WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, uint32_t *np);
+int
 __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
 __wt_bt_tree_walk(WT_TOC *toc, uint32_t addr,
@@ -104,7 +107,7 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc);
 int
 __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc);
 int
-__wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t flags);
+__wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags);
 int
 __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
 inline int
@@ -112,13 +115,13 @@ __wt_db_row_del(WT_TOC *toc, DBT *key);
 inline int
 __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
 int
-__wt_bt_update_serial_func(WT_TOC *toc);
+__wt_bt_item_update_serial_func(WT_TOC *toc);
 int
 __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data);
 void
 __wt_bt_repl_free(WT_TOC *toc, WT_REPL *repl);
 int
-__wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t flags);
+__wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags);
 int
 __wt_cache_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
 int

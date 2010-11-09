@@ -11,13 +11,13 @@
 
 static int __wt_bt_rcc_expand_compare(const void *, const void *);
 static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_col_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_col_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_bt_rec_parent_update(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_cache_alloc_serial_func(WT_TOC *);
 
 /*
  * __wt_bt_rec_page --
@@ -109,7 +109,6 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		max = db->intlmax;
 		break;
 	case WT_PAGE_OVFL:
-		 /* FALLTHROUGH */
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
@@ -122,9 +121,11 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	/* Initialize the reconciliation buffer as a replacement page. */
 	new = tmp->data;
-	new->hdr = (WT_PAGE_HDR *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
 	new->addr = page->addr;
+	new->size = max;
+	new->hdr = (WT_PAGE_HDR *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
 	__wt_bt_set_ff_and_sa_from_offset(new, WT_PAGE_BYTE(new));
+	new->hdr->start_recno = page->hdr->start_recno;
 	new->hdr->type = page->hdr->type;
 	new->hdr->level = page->hdr->level;
 
@@ -140,12 +141,10 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 		break;
 	case WT_PAGE_COL_INT:
 		WT_ERR(__wt_bt_rec_col_int(toc, page, new));
-		new = page;
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_ERR(__wt_bt_rec_row_int(toc, page, new));
-		new = page;
 		break;
 	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_DUP_LEAF:
@@ -155,6 +154,15 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	}
 
 	WT_ERR(__wt_bt_rec_page_write(toc, page, new));
+
+	/*
+	 * The original page is no longer referenced, and can be free'd, even
+	 * though the in-memory version continues to be in-use.  Update the
+	 * page's address and size.
+	 */
+	WT_ERR(__wt_cache_free(toc, page->addr, page->size));
+	page->addr = new->addr;
+	page->size = new->size;
 
 done:	/*
 	 * Clear the modification flag.  This doesn't sound safe, because the
@@ -184,24 +192,114 @@ err:	F_CLR(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
 static int
 __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	toc = NULL;
-	page = NULL;
-	new = NULL;
-	/* Don't forget to remove the "new = page" line in the caller. */
+	WT_COL *cip;
+	WT_OFF *from;
+	WT_PAGE_HDR *hdr;
+	WT_REPL *repl;
+	uint32_t i;
+
+	hdr = new->hdr;
+	WT_INDX_FOREACH(page, cip, i) {
+		from =
+		    (WT_OFF *)((repl = WT_COL_REPL(page, cip)) == NULL ?
+		    cip->data : WT_REPL_DATA(repl));
+
+		/*
+		 * XXX
+		 * We don't yet handle splits:  we allocated the maximum page
+		 * size, but it still wasn't enough.  We must allocate another
+		 * page and split the parent.
+		 */
+		if (sizeof(WT_OFF) > new->space_avail) {
+			fprintf(stderr,
+			   "__wt_bt_rec_col_int: page %lu split\n",
+			   (u_long)page->addr);
+			__wt_abort(toc->env);
+		}
+
+		memcpy(new->first_free, from, sizeof(WT_OFF));
+		new->first_free += sizeof(WT_OFF);
+		new->space_avail -= sizeof(WT_OFF);
+		++hdr->u.entries;
+	}
+
+	new->records = page->records;
 	return (0);
 }
 
 /*
  * __wt_bt_rec_row_int --
- *	Reconcile a row store internal page.
+ *	Reconcile a row store, or off-page duplicate tree, internal page.
  */
 static int
 __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	toc = NULL;
-	page = NULL;
-	new = NULL;
-	/* Don't forget to remove the "new = page" line in the caller. */
+	WT_ITEM *item;
+	WT_PAGE_HDR *hdr;
+	WT_REPL *repl;
+	WT_ROW *rip;
+	uint32_t i, len;
+	void *p;
+
+	/*
+	 * We have to walk both the WT_ROW structures as well as the original
+	 * page: the problem is keys that require processing.  When a page is
+	 * read into memory from a simple database, the WT_ROW key/size pair
+	 * is set to reference an on-page group of bytes in the key's WT_ITEM
+	 * structure.  As Btree keys are immutable, that original WT_ITEM is
+	 * usually what we want to write, and we can pretty easily find it by
+	 * moving to immediately before the on-page key.
+	 *
+	 * Keys that require processing are harder (for example, a Huffman
+	 * encoded key).  When we have to use a key that requires processing,
+	 * we process the key and set the WT_ROW key/size pair to reference
+	 * the allocated memory that holds the key.  At that point we've lost
+	 * any reference to the original WT_ITEM structure, which is what we
+	 * want to re-write when reconciling the page.  We don't want to make
+	 * the WT_ROW structure bigger by another sizeof(void *) bytes, so we
+	 * walk the original page at the same time we walk the WT_PAGE array
+	 * when reconciling the page so we can find the original WT_ITEM.
+	 */
+	hdr = new->hdr;
+	item = (WT_ITEM *)WT_PAGE_BYTE(page);
+	WT_INDX_FOREACH(page, rip, i) {
+		/*
+		 * Copy the paired items off the old page into the new page; if
+		 * the page has been replaced, update its information.
+		 *
+		 * XXX
+		 * Internal pages can't grow, yet, so we could more easily just
+		 * update the old page.   We do the copy because eventually we
+		 * will have to split the internal pages, and they'll be able to
+		 * grow.
+		 */
+		p = item;
+		item = WT_ITEM_NEXT(item);
+		if ((repl = WT_ROW_REPL(page, rip)) != NULL)
+			*(WT_OFF *)WT_ITEM_BYTE(item)  =
+			    *(WT_OFF *)WT_REPL_DATA(repl);
+		len = sizeof(WT_ITEM) * 2 + WT_ITEM_LEN(item) + sizeof(WT_OFF);
+
+		/*
+		 * XXX
+		 * We don't yet handle splits:  we allocated the maximum page
+		 * size, but it still wasn't enough.  We must allocate another
+		 * page and split the parent.
+		 */
+		if (len > new->space_avail) {
+			fprintf(stderr,
+			    "__wt_bt_rec_row_int: page %lu split\n",
+			    (u_long)page->addr);
+			__wt_abort(toc->env);
+		}
+
+		memcpy(new->first_free, p, len);
+		new->first_free += len;
+		new->space_avail -= len;
+		++hdr->u.entries;
+	}
+	new->records = page->records;
+
 	return (0);
 }
 
@@ -266,9 +364,9 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		memcpy(new->first_free, data, len);
 		new->first_free += len;
 		new->space_avail -= len;
-
 		++hdr->u.entries;
 	}
+	new->records = page->records;
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -390,7 +488,8 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 */
 			if (len > new->space_avail) {
 				fprintf(stderr,
-				    "PAGE %lu SPLIT\n", (u_long)page->addr);
+				    "__wt_bt_rec_col_rcc: page %lu split\n",
+				    (u_long)page->addr);
 				__wt_abort(env);
 			}
 
@@ -410,10 +509,10 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				memcpy(last_data, data, len);
 			new->first_free += len;
 			new->space_avail -= len;
-
 			++hdr->u.entries;
 		}
 	}
+	new->records = page->records;
 
 	/* Free the sort array. */
 err:	if (expsort != NULL)
@@ -546,7 +645,9 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * another leaf page and split the parent.
 		 */
 		if (len > new->space_avail) {
-			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
+			fprintf(stderr,
+			    "__wt_bt_rec_col_var: page %lu split\n",
+			    (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
 
@@ -565,6 +666,8 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 		++hdr->u.entries;
 	}
+	new->records = page->records;
+
 	return (0);
 }
 
@@ -710,7 +813,8 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * another leaf page and split the parent.
 		 */
 		if (len > new->space_avail) {
-			fprintf(stderr, "PAGE %lu SPLIT\n", (u_long)page->addr);
+			fprintf(stderr, "__wt_bt_rec_row: page %lu split\n",
+			    (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
 
@@ -758,53 +862,235 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	db = toc->db;
 	env = toc->env;
 
-	/*
-	 * Set the page's size to the minimum number of allocation units needed
-	 * (note the page size can either grow or shrink).
-	 *
-	 * Do so before verifying the page in debugging mode, the verification
-	 * code checks for entries that extend past the end of the page, and so
-	 * expects the WT_PAGE->size field to be valid.
-	 */
-	new->size = WT_ALIGN(
-	    new->first_free - (uint8_t *)new->hdr, db->allocsize);
+	if (new->hdr->u.entries == 0) {
+		new->addr = WT_ADDR_INVALID;
+		WT_VERBOSE(env, WT_VERB_CACHE, (env,
+		    "reconcile removing empty page %lu", (u_long)page->addr));
+		fprintf(stderr, "PAGE %lu EMPTIED\n", (u_long)page->addr);
+		__wt_abort(env);
+	} else {
+		/*
+		 * Set the page's size to the minimum number of allocation units
+		 * needed (note the page size can either grow or shrink).
+		 *
+		 * Set the page size before verifying the page, the verification
+		 * code checks for entries that extend past the end of the page,
+		 * and expects the WT_PAGE->size field to be valid.
+		 */
+		new->size = WT_ALIGN(
+		    new->first_free - (uint8_t *)new->hdr, db->allocsize);
 
-	/* Verify the page to catch reconciliation errors early on. */
-	WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
+		/* Verify the page to catch reconciliation errors early on. */
+		WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
-	/*
-	 * Don't overwrite pages on disk -- if the write only partially succeeds
-	 * in Berkeley DB, you're forced into catastrophic recovery.  I never
-	 * saw Berkeley DB fail in the field with a torn write, but that may be
-	 * because Berkeley DB's maximum page size is only 64KB.  WiredTiger
-	 * supports much larger page sizes, and is much more likely to see torn
-	 * write failures.
-	 */
-	new->addr = WT_ADDR_INVALID;
-	__wt_cache_alloc_serial(toc, &new->addr, new->size, ret);
-	if (ret != 0)
+		/*
+		 * Allocate file space for the page.
+		 *
+		 * The cache drain server is the only thread allocating space
+		 * from the file, so there's no need to do any serialization.
+		 *
+		 * Don't overwrite pages -- if a write only partially succeeds
+		 * in Berkeley DB, you're forced into catastrophic recovery.
+		 * I never saw Berkeley DB fail in the field with a torn write,
+		 * but that may be because Berkeley DB's maximum page size is
+		 * only 64KB.  WiredTiger supports much larger page sizes, and
+		 * is far more likely to see torn write failures.
+		 *
+		 * XXX
+		 * We do not relocate the page in the cache after its address
+		 * changes, which means any thread trying to get to the page
+		 * we're draining will have to do a real read, which will be
+		 * satisfied in the OS buffer cache, in all likelihood.  But,
+		 * if Db.sync is called to flush the file while the file is
+		 * being read, or if trickle-write functionality is added in
+		 * the future it's going to hurt.   The alternative would be
+		 * to copy the reconciled page to cache memory and relocate it
+		 * in the cache for those methods.  There's little reason to
+		 * relocate the reconciled page for the cache drain code --
+		 * this page was LRU-selected because no thread wanted it.
+		 */
+		WT_RET(__wt_cache_alloc(toc, &new->addr, new->size));
+
+		/*
+		 * Write the page.
+		 *
+		 * XXX
+		 * We write the page before we update the parent's reference as
+		 * a reader can immediately search the parent page after it's
+		 * updated, and the newly reconciled page must exist to satisfy
+		 * those reads.
+		 *
+		 */
+		WT_RET(__wt_page_write(db, new));
+
+		WT_VERBOSE(env, WT_VERB_CACHE,
+		    (env, "reconcile move %lu to %lu, resize %lu to %lu",
+		    (u_long)page->addr, (u_long)new->addr,
+		    (u_long)page->size, (u_long)new->size));
+	}
+
+	/* Update the page's parent. */
+	if ((ret = __wt_bt_rec_parent_update(toc, page, new)) != 0) {
+		(void)__wt_cache_free(toc, new->addr, new->size);
 		return (ret);
+	}
 
-	/* Reset the page's address and the parent page's reference. */
-	WT_VERBOSE(env, WT_VERB_CACHE,
-	    (env, "reconcile move %lu to %lu, resize %lu to %lu",
-	    (u_long)page->addr, (u_long)new->addr,
-	    (u_long)page->size, (u_long)new->size));
-	page->addr = new->addr;
-
-	return (__wt_page_write(db, new));
+	return (0);
 }
 
 /*
- * __wt_cache_alloc_serial_func --
- *	Allocation serialization function called when we need to allocate a
- *	chunk of space from the underlying file.
+ * __wt_bt_rec_srch_first --
+ *	Return a parent page and WT_ROW reference for the first key on the
+ *	argument page.
  */
 static int
-__wt_cache_alloc_serial_func(WT_TOC *toc)
+__wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	uint32_t *addrp, size;
+	DB *db;
+	DBT *key, *key_scratch, off_dbt, tmp;
+	ENV *env;
+	IDB *idb;
+	WT_ITEM *item;
+	WT_OFF off;
+	WT_PAGE *ovfl_page, *parent;
+	WT_PAGE_HDR *hdr;
+	WT_REPL **new_repl, *repl;
+	int ret, slot;
 
-	__wt_cache_alloc_unpack(toc, addrp, size);
-	return (__wt_cache_read_queue(toc, addrp, size, NULL));
+	db = toc->db;
+	key_scratch = NULL;
+	env = toc->env;
+	idb = db->idb;
+	ovfl_page = parent = NULL;
+	hdr = page->hdr;
+	new_repl = NULL;
+	repl = NULL;
+	ret = 0;
+
+	/*
+	 * If we're writing the root of the tree, then we have to update the
+	 * descriptor record, there's no parent to update.
+	 */
+	if (page->addr == idb->root_addr) {
+		  idb->root_addr = new->addr;
+		  idb->root_size = new->size;
+		  return (__wt_bt_desc_write(toc));
+	 }
+
+	/* Get the parent page. */
+	switch (hdr->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_VAR:
+		WT_RET(__wt_bt_search_col(
+		    toc, hdr->start_recno, hdr->level + 1, 0));
+		parent = toc->srch_page;
+		slot = WT_COL_SLOT(parent, toc->srch_ip);
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+		/*
+		 * XXX
+		 * We don't have a key for offpage-duplicate trees, which kind
+		 * of screws this whole approach.  I'm going to wait for Michael
+		 * to be on board, because he's really good at solving horrible
+		 * problems like this one.
+		 */
+		WT_ASSERT(env,
+		    hdr->type != WT_PAGE_DUP_INT &&
+		    hdr->type != WT_PAGE_DUP_LEAF);
+		/* FALLTHROUGH */
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * We need to search for this page, and that means setting up a
+		 * DBT to point to a key for which a search will descend to this
+		 * page.  We use the original on-disk page because we know it
+		 * had a valid key on it when we read it from disk, and the new,
+		 * rewritten page might be empty.
+		 *
+		 * Get a reference to the first item on the page (it better be a
+		 * key), process it as necessary, and then search for it.
+		 */
+		item = (WT_ITEM *)WT_PAGE_BYTE(page);
+		switch (WT_ITEM_TYPE(item)) {
+		case WT_ITEM_KEY:
+		case WT_ITEM_KEY_DUP:
+			if ((hdr->type == WT_PAGE_DUP_INT ?
+			    idb->huffman_data : idb->huffman_key) == NULL) {
+				WT_ERR(__wt_bt_search_row(toc, (DBT *)
+				    WT_ITEM_BYTE(item), hdr->level + 1, 0));
+				break;
+			}
+			/* FALLTHROUGH */
+		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_KEY_DUP_OVFL:
+			WT_ERR(__wt_scr_alloc(toc, &key_scratch));
+			WT_ERR(__wt_bt_item_process(
+			    toc, item, &ovfl_page, key_scratch));
+			if (ovfl_page != NULL) {
+				WT_CLEAR(tmp);
+				tmp.data = WT_PAGE_BYTE(ovfl_page);
+				tmp.size = ovfl_page->hdr->u.datalen;
+				key = &tmp;
+			} else
+				key = key_scratch;
+			WT_ERR(__wt_bt_search_row(toc, key, hdr->level + 1, 0));
+			break;
+		WT_ILLEGAL_FORMAT_ERR(db, ret);
+		}
+		parent = toc->srch_page;
+		slot = WT_ROW_SLOT(parent, toc->srch_ip);
+		break;
+	WT_ILLEGAL_FORMAT(db);
+	}
+
+	/*
+	 * We have the parent page.   We can't just update the WT_OFF structure
+	 * because there are two memory locations that can change (address and
+	 * size), and we could race.  We already have functions that take a DBT
+	 * and move it into a WT_REPL structure for an item -- use them.
+	 *
+	 * Create and initialize the WT_OFF structure.
+	 */
+	WT_CLEAR(off);
+	off.addr = new->addr;
+	off.size = new->size;
+
+	/* Set up a DBT to point to the WT_OFF structure. */
+	WT_CLEAR(off_dbt);
+	off_dbt.data = &off;
+	off_dbt.size = sizeof(WT_OFF);
+
+	/* Allocate the parent's page replacement array as necessary. */
+	if (parent->repl == NULL)
+		WT_ERR(__wt_calloc(
+		    env, parent->indx_count, sizeof(WT_REPL *), &new_repl));
+
+	/* Allocate room for the new data item from per-thread memory. */
+	WT_ERR(__wt_bt_repl_alloc(toc, &repl, &off_dbt));
+
+	/* Schedule the workQ to insert the WT_REPL structure. */
+	__wt_bt_item_update_serial(toc,
+	    parent, toc->srch_write_gen, slot, new_repl, repl, ret);
+
+	if (ret != 0) {
+err:           if (repl != NULL)
+			__wt_bt_repl_free(toc, repl);
+	}
+
+	/* Free any replacement array unless the workQ used it. */
+	if (new_repl != NULL && new_repl != parent->repl)
+		__wt_free(
+		    env, new_repl, parent->indx_count * sizeof(WT_REPL *));
+
+	if (parent != NULL && parent != idb->root_page)
+		__wt_bt_page_out(toc, &parent, 0);
+	if (ovfl_page != NULL)
+		__wt_bt_page_out(toc, &ovfl_page, 0);
+	if (key_scratch != NULL)
+		__wt_scr_release(&key_scratch);
+
+	return (ret);
 }
