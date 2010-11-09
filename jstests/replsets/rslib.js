@@ -31,3 +31,14 @@ var reconnect = function(a) {
       }
     });
 };
+
+
+var getLatestOp = function(server) {
+    server.getDB("admin").getMongo().setSlaveOk();
+    var log = server.getDB("local")['oplog.rs'];
+    var cursor = log.find({}).sort({'$natural': -1}).limit(1);
+    if (cursor.hasNext()) {
+      return cursor.next();
+    }
+    return null;
+};

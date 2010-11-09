@@ -50,13 +50,13 @@ namespace mongo {
        this method returns an error and doesn't throw exceptions (i think).
     */
     bool ReplSetImpl::initialSyncOplogApplication(
-        const Member *primary,
+        const Member *source,
         OpTime applyGTE,
         OpTime minValid)
     { 
-        if( primary == 0 ) return false;
+        if( source == 0 ) return false;
 
-        const string hn = primary->h().toString();
+        const string hn = source->h().toString();
         OpTime ts;
         try {
             OplogReader r;
@@ -115,15 +115,17 @@ namespace mongo {
                     /* if we have become primary, we dont' want to apply things from elsewhere
                         anymore. assumePrimary is in the db lock so we are safe as long as 
                         we check after we locked above. */
-					const Member *p1 = box.getPrimary();
-                    if( p1 != primary || replSetForceInitialSyncFailure ) {
+                    if( (source->state() != MemberState::RS_PRIMARY &&
+                         source->state() != MemberState::RS_SECONDARY) ||
+                        replSetForceInitialSyncFailure ) {
+                        
                         int f = replSetForceInitialSyncFailure;
                         if( f > 0 ) {
                             replSetForceInitialSyncFailure = f-1;
                             log() << "replSet test code invoked, replSetForceInitialSyncFailure" << rsLog;
+                            throw DBException("forced error",0);
                         }
-                        log() << "replSet primary was:" << primary->fullName() << " now:" << 
-                            (p1 != 0 ? p1->fullName() : "none") << rsLog;
+                        log() << "replSet we are now primary" << rsLog;
                         throw DBException("primary changed",0);
                     }
 
@@ -367,14 +369,15 @@ namespace mongo {
             return;
         }
 
-        /* later, we can sync from up secondaries if we want. tbd. */
-        if( sp.primary == 0 )
-            return;
-
         /* do we have anything at all? */
         if( lastOpTimeWritten.isNull() ) {
             syncDoInitialSync();
             return; // _syncThread will be recalled, starts from top again in case sync failed.
+        }
+
+        /* later, we can sync from up secondaries if we want. tbd. */
+        if( sp.primary == 0 ) {
+            return;
         }
 
         /* we have some data.  continue tailing. */

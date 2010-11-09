@@ -269,6 +269,7 @@ namespace mongo {
         void assumePrimary();
         void loadLastOpTimeWritten();
         void changeState(MemberState s);
+        const Member* getMemberToSyncTo();
         void _changeArbiterState();
     protected:
         // "heartbeat message"

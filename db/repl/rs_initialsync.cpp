@@ -63,8 +63,8 @@ namespace mongo {
     /* todo : progress metering to sethbmsg. */
     static bool clone(const char *master, string db) {
         string err;
-        return cloneFrom(master, err, db, false, 
-            /*slaveok later can be true*/ false, true, false);
+        return cloneFrom(master, err, db, false,
+            /* slave_ok */ true, true, false);
     }
 
     void _logOpObjRS(const BSONObj& op);
@@ -103,23 +103,60 @@ namespace mongo {
         */
     }
 
-    void ReplSetImpl::_syncDoInitialSync() { 
-        sethbmsg("initial sync pending",0);
+    /**
+     * Choose a member to sync from. Prefers a secondary, if available.
+     *
+     * TODO: make a config setting like "cloneFromPrimary" or something to force
+     * machines to clone from the primary.  We might want to integrate this with
+     * tags functionality, if we only want it to be able to clone from certain
+     * machines.
+     */
+    const Member* ReplSetImpl::getMemberToSyncTo() {
+        for( Member *m = head(); m; m = m->next() ) {
+            if (m->hbinfo().up() && m->state() == MemberState::RS_SECONDARY) {
+                sethbmsg( str::stream() << "syncing to secondary: " << m->fullName(), 0);
+                return const_cast<Member*>(m);
+            }
+        }
 
+        // can't find secondary, try primary
         StateBox::SP sp = box.get();
         assert( !sp.state.primary() ); // wouldn't make sense if we were.
 
-        const Member *cp = sp.primary;
-        if( cp == 0 ) {
-            sethbmsg("initial sync need a member to be primary to do our initial sync", 0);
+        // we just checked in _syncDoInitialSync, but we could have lost a
+        // primary since then
+        if (!sp.primary) {
+            return 0;
+        }
+        sethbmsg( str::stream() << "syncing to primary: " << sp.primary->fullName(), 0);
+        return const_cast<Member*>(sp.primary);
+    }
+    
+    /**
+     * Do the initial sync for this member.  There must be a primary available
+     * for the whole intial sync, even if we're syncing from a secondary.
+     */
+    void ReplSetImpl::_syncDoInitialSync() { 
+        sethbmsg("initial sync pending",0);
+        
+        const Member *cp = box.getPrimary();
+        if (!cp) {
+            sethbmsg("initial sync needs a member to be primary to begin");
             sleepsecs(15);
             return;
         }
-
-        string masterHostname = cp->h().toString();
+        
+        const Member *source = getMemberToSyncTo();
+        if (!source) {
+            sethbmsg("initial sync need a member to be primary or secondary to do our initial sync", 0);
+            sleepsecs(15);
+            return;
+        }
+        
+        string sourceHostname = source->h().toString();
         OplogReader r;
-        if( !r.connect(masterHostname) ) {
-            sethbmsg( str::stream() << "initial sync couldn't connect to " << cp->h().toString() , 0);
+        if( !r.connect(sourceHostname) ) {
+            sethbmsg( str::stream() << "initial sync couldn't connect to " << source->h().toString() , 0);
             sleepsecs(15);
             return;
         }
@@ -150,7 +187,7 @@ namespace mongo {
                     {
                         writelock lk(db);
                         Client::Context ctx(db);
-                        ok = clone(masterHostname.c_str(), db);
+                        ok = clone(sourceHostname.c_str(), db);
                     }
                     if( !ok ) { 
                         sethbmsg( str::stream() << "initial sync error clone of " << db << " failed sleeping 5 minutes" ,0);
@@ -177,7 +214,7 @@ namespace mongo {
         {
             sethbmsg("initial sync initial oplog application");
             isyncassert( "initial sync source must remain primary throughout our initial sync [2]", box.getPrimary() == cp );
-            if( ! initialSyncOplogApplication(/*primary*/cp, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
+            if( ! initialSyncOplogApplication(source, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
 				lastOpTimeWritten = OpTime();

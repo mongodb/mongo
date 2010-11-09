@@ -30,7 +30,7 @@ namespace mongo {
         }
         DBClientConnection* conn() { return _conn.get(); }
         BSONObj findOne(const char *ns, const Query& q) { 
-            return conn()->findOne(ns, q);
+            return conn()->findOne(ns, q, 0, QueryOption_SlaveOk);
         }
 
         BSONObj getLastOp(const char *ns) { 
