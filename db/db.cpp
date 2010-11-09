@@ -217,6 +217,7 @@ namespace mongo {
 
             Message m;
             while ( 1 ) {
+                inPort->clearCounters();
 
                 if ( !dbMsgPort->recv(m) ) {
                     if( !cmdLine.quiet )
@@ -274,6 +275,8 @@ sendmore:
                         }
                     }
                 }
+
+                networkCounter.hit( inPort->getBytesIn() , inPort->getBytesOut() );
 
                 m.reset();
             }

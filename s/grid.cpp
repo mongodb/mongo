@@ -353,9 +353,67 @@ namespace mongo {
         ShardConnection conn( configServer.getPrimary() , "" );
 
         // look for the stop balancer marker
-        BSONObj stopMarker = conn->findOne( ShardNS::settings, BSON( "_id" << "balancer" << "stopped" << true ) );
+        BSONObj balancerDoc = conn->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
         conn.done();
-        return stopMarker.isEmpty();
+
+        if ( _balancerStopped( balancerDoc ) /* TODO pending tests || ! _inBalancingWindow( balancerDoc ) */ ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Grid::_balancerStopped( const BSONObj& balancerDoc ) const { 
+        // check the 'stopped' marker maker
+        // if present, it is a simple bool
+        BSONElement stoppedElem = balancerDoc["stopped"];
+        if ( ! stoppedElem.eoo() && stoppedElem.isBoolean() ) {
+            return ! stoppedElem.boolean();
+        }
+        return false;
+    }
+
+    bool Grid::_inBalancingWindow( const BSONObj& balancerDoc ) const { 
+        // check the 'activeWindow' marker
+        // if present, it is an interval during the day when the balancer should be active
+        // { start: "08:00" , stop: "19:30" }, strftime format is %H:%M 
+        BSONElement windowElem = balancerDoc["activeWindow"];
+        if ( windowElem.eoo() ) {
+            return true;
+        }
+
+        // check format
+        if ( ! windowElem.isABSONObj() ) {
+            log(LL_WARNING) << "'activeWindow' format is { start: \"hh:mm\" , end: ... }" << balancerDoc << endl;
+            return true;
+        }
+
+        BSONObj intervalDoc = windowElem.Obj();
+        const string start = intervalDoc["start"].str();
+        const string stop = intervalDoc["stop"].str();
+        if ( start.empty() || stop.empty() ) {
+            log(LL_WARNING) << "must specify both start and end of balancing window: " << intervalDoc << endl;
+            return true;
+        }
+
+        // TODO suspend, pending windows compilation
+
+        // convert time, if the activeWindow was correctly specified
+        //struct tm startTime, endTime;
+        //const char * fmt = "%H:%M";
+        //if ( ! strptime( start.c_str() , fmt , &startTime ) || ! strptime( stop.c_str() , fmt , &endTime ) ){
+        //    log(LL_WARNING) << "cannot parse active window (use hh:mm[am|pm]) format: " << intervalDoc << endl;
+        //    return true;
+        //}
+        
+        // balance if during the activeWindow
+        //struct tm now;
+        //time_t_to_Struct( time(0) , &now, true /* local time */ );
+        //if ( ( compareTimeOfDay( now , startTime ) >= 0 ) && ( compareTimeOfDay( now, endTime ) <=0 ) ){
+        //    return true;
+        //}
+
+        return false;
     }
 
     unsigned long long Grid::getNextOpTime() const {

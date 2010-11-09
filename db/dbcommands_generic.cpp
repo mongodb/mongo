@@ -117,28 +117,6 @@ namespace mongo {
         }
     } cmdSet;
 
-    /* just to check if the db has asserted */
-    class CmdAssertInfo : public Command {
-    public:
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual void help( stringstream& help ) const {
-            help << "check if any asserts have occurred on the server";
-        }
-        virtual LockType locktype() const { return WRITE; } 
-        CmdAssertInfo() : Command("assertInfo",true,"assertinfo") {}
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            result.appendBool("dbasserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet());
-            result.appendBool("asserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet() || lastAssert[3].isSet());
-            result.append("assert", lastAssert[AssertRegular].toString());
-            result.append("assertw", lastAssert[AssertW].toString());
-            result.append("assertmsg", lastAssert[AssertMsg].toString());
-            result.append("assertuser", lastAssert[AssertUser].toString());
-            return true;
-        }
-    } cmdAsserts;
-
     class PingCommand : public Command {
     public:
         PingCommand() : Command( "ping" ){}

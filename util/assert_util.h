@@ -27,51 +27,6 @@ namespace mongo {
         StaleConfigInContextCode = 13388
     };
 
-	/* these are manipulated outside of mutexes, so be careful */
-    struct Assertion {
-        Assertion() {
-            msg[0] = msg[127] = 0;
-            context[0] = context[127] = 0;
-            file = "";
-            line = 0;
-            when = 0;
-        }
-    private:
-        static mongo::mutex *_mutex;
-        char msg[128];
-        char context[128];
-        const char *file;
-        unsigned line;
-        time_t when;
-    public:
-        void set(const char *m, const char *ctxt, const char *f, unsigned l) {
-            if( _mutex == 0 ) {
-                /* asserted during global variable initialization */
-                return;
-            }
-            scoped_lock lk(*_mutex);
-            strncpy(msg, m, 127);
-            strncpy(context, ctxt, 127);
-            file = f;
-            line = l;
-            when = time(0);
-        }
-        std::string toString();
-        bool isSet() {
-            return when != 0;
-        }
-    };
-
-    enum {
-        AssertRegular = 0,
-        AssertW = 1,
-        AssertMsg = 2,
-        AssertUser = 3
-    };
-
-    /* last assert of diff types: regular, wassert, msgassert, uassert: */
-    extern Assertion lastAssert[4];
-
     class AssertionCount {
     public:
         AssertionCount();

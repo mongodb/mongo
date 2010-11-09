@@ -141,9 +141,42 @@ namespace mongo {
         return b.obj();
     }
 
+
+    void NetworkCounter::hit( long long bytesIn , long long bytesOut ) {
+        const long long MAX = 1ULL << 60;
+
+        // don't care about the race as its just a counter
+        bool overflow = _bytesIn > MAX || _bytesOut > MAX;
+
+        if ( overflow ){
+            _lock.lock();
+            _overflows++;
+            _bytesIn = bytesIn;
+            _bytesOut = bytesOut;
+            _requests = 1;
+            _lock.unlock();
+        }
+        else {
+            _lock.lock();
+            _bytesIn += bytesIn;
+            _bytesOut += bytesOut;
+            _requests++;
+            _lock.unlock();            
+        }
+    }
+    
+    void NetworkCounter::append( BSONObjBuilder& b ) {
+        _lock.lock();
+        b.appendNumber( "bytesIn" , _bytesIn );
+        b.appendNumber( "bytesOut" , _bytesOut );
+        b.appendNumber( "numRequests" , _requests );
+        _lock.unlock();
+    }
     
 
     OpCounters globalOpCounters;
     IndexCounters globalIndexCounters;
     FlushCounters globalFlushCounters;
+    NetworkCounter networkCounter;
+    
 }
