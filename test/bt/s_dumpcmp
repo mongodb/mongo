@@ -20,7 +20,7 @@ fi
 if test $colflag -eq 0; then
 	../../db-4.8.26/build_unix/db_dump -p __wt.bdb |
 	    sed -e '1,/HEADER=END/d' \
-		-e 's/^ //' > __wt.dump_bdb
+		-e 's/^ //' > __wt.bdb_dump
 else
 	../../db-4.8.26/build_unix/db_dump -p __wt.bdb |
 	    sed -e '1,/HEADER=END/d' \
@@ -28,8 +28,8 @@ else
 	    sed -n \
 		-e '$p' \
 		-e n \
-		-e p > __wt.dump_bdb
+		-e p > __wt.bdb_dump
 fi
 
-sed -e '1,/HEADER=END/d' __wt.dump | cmp - __wt.dump_bdb > /dev/null
+sed -e '1,/HEADER=END/d' __wt.wt_dump | cmp - __wt.bdb_dump > /dev/null
 exit $?
