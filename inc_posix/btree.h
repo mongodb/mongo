@@ -354,22 +354,21 @@ struct __wt_page_hdr {
 
 	/*
 	 * WiredTiger is no-overwrite: each time a page is written, it's written
-	 * to an unused disk location so torn writes can't corrupt the database.
+	 * to an unused disk location so torn writes don't corrupt the database.
 	 * This means that writing a page requires updating the page's parent to
 	 * reference the new location.  We don't want to repeatedly write the
 	 * parent on a database flush, so we sort the pages for writing based on
 	 * their level in the tree.
 	 *
 	 * We don't need the tree level on disk and we could move this field to
-	 * the WT_PAGE structure -- that said, it's only a byte, we are going to
-	 * have unused bytes in this structure anyway, and it's a lot harder to
-	 * figure out a tree level whenever we bring a page into memory than to
-	 * just set it once when the page is created.
+	 * the WT_PAGE structure -- that said, it's only a byte, and it's a lot
+	 * harder to figure out the tree level when reading a page into memory
+	 * than to set it once when the page is created.
 	 *
 	 * Leaf pages are level 1, each higher level of the tree increases by 1.
 	 * The maximum tree level is 255, larger than any practical fan-out.
 	 */
-#define	WT_LDESC	0
+#define	WT_NOLEVEL	0
 #define	WT_LLEAF	1
 	uint8_t level;			/* 25: tree level */
 
@@ -531,18 +530,18 @@ struct __wt_col_expand {
  * structure and return the values.
  */
 #define	WT_COL_OFF_RECORDS(ip)						\
-	WT_RECORDS((WT_OFF *)((ip)->data))
+	WT_RECORDS((WT_OFF *)(((WT_COL *)ip)->data))
 #define	WT_COL_OFF_ADDR(ip)						\
-	(((WT_OFF *)((ip)->data))->addr)
+	(((WT_OFF *)(((WT_COL *)ip)->data))->addr)
 #define	WT_COL_OFF_SIZE(ip)						\
-	(((WT_OFF *)((ip)->data))->size)
+	(((WT_OFF *)(((WT_COL *)ip)->data))->size)
 
 #define	WT_ROW_OFF_RECORDS(ip)						\
-	WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->data))
+	WT_RECORDS((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
 #define	WT_ROW_OFF_ADDR(ip)						\
-	(((WT_OFF *)WT_ITEM_BYTE((ip)->data))->addr)
+	(((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))->addr)
 #define	WT_ROW_OFF_SIZE(ip)						\
-	(((WT_OFF *)WT_ITEM_BYTE((ip)->data))->size)
+	(((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))->size)
 
 /*
  * WT_ITEM --
