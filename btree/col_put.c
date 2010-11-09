@@ -64,7 +64,8 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int insert)
 	repl = NULL;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_bt_search_col(toc, recno, insert ? WT_INSERT : 0));
+	WT_RET(
+	    __wt_bt_search_col(toc, recno, WT_NOLEVEL, insert ? WT_INSERT : 0));
 	page = toc->srch_page;
 
 	/*
@@ -100,7 +101,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int insert)
 		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
 
 		/* workQ: schedule insert of the WT_REPL structure. */
-		__wt_bt_update_serial(toc, page, toc->srch_write_gen,
+		__wt_bt_item_update_serial(toc, page, toc->srch_write_gen,
 		    WT_COL_SLOT(page, toc->srch_ip), new_repl, repl, ret);
 		 break;
 	case WT_PAGE_COL_RCC:
