@@ -143,7 +143,7 @@ namespace mongo {
 
 
     void NetworkCounter::hit( long long bytesIn , long long bytesOut ) {
-        static const long long MAX = pow( 2 , 60 );
+        const long long MAX = 1ULL << 60;
         mongo::mutex::scoped_lock lk( _mutex );
         if ( _bytesIn > MAX || _bytesOut > MAX ){
             _overflows++;
