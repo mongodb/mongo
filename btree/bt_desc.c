@@ -134,7 +134,7 @@ __wt_bt_desc_write(WT_TOC *toc)
 	 */
 	if (fh->file_size == 0)
 		WT_RET(__wt_bt_page_alloc(
-		    toc, WT_PAGE_DESCRIPT, WT_LDESC, 512, &page));
+		    toc, WT_PAGE_DESCRIPT, WT_NOLEVEL, 512, &page));
 	else
 		WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
 

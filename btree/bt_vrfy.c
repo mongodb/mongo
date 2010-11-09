@@ -120,7 +120,7 @@ __wt_bt_verify(
 	off.addr = idb->root_addr;
 	off.size = idb->root_size;
 	WT_ERR(__wt_bt_verify_tree(
-	    toc, NULL, (uint64_t)0, WT_LDESC, &off, &vstuff));
+	    toc, NULL, (uint64_t)0, WT_NOLEVEL, &off, &vstuff));
 
 	WT_ERR(__wt_bt_verify_checkfrag(db, &vstuff));
 
@@ -180,11 +180,11 @@ __wt_bt_verify_tree(WT_TOC *toc, WT_ROW *parent_rip,
 	ret = 0;
 
 	/*
-	 * If passed a level of WT_LDESC, that is, the only level that can't
+	 * If passed a level of WT_NOLEVEL, that is, the only level that can't
 	 * possibly be a valid database page level, this is the root page of
 	 * the tree.
 	 */
-	is_root = level == WT_LDESC ? 1 : 0;
+	is_root = level == WT_NOLEVEL ? 1 : 0;
 
 	/*
 	 * Read and verify the page.
@@ -521,7 +521,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	/* Check the page level. */
 	switch (hdr->type) {
 	case WT_PAGE_DESCRIPT:
-		if (hdr->level != WT_LDESC)
+		if (hdr->level != WT_NOLEVEL)
 			goto err_level;
 		break;
 	case WT_PAGE_COL_FIX:
@@ -952,7 +952,7 @@ offpagedups:	/*
 			case WT_ITEM_OFF:
 				off = WT_ITEM_BYTE_OFF(item);
 				WT_ERR(__wt_bt_verify_tree(toc,
-				    NULL, (uint64_t)0, WT_LDESC, off, vs));
+				    NULL, (uint64_t)0, WT_NOLEVEL, off, vs));
 				break;
 			default:
 				break;
