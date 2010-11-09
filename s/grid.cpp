@@ -19,7 +19,7 @@
 #include "pch.h"
 
 #include <iomanip>
-
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include "../client/connpool.h"
 #include "../util/stringutils.h"
 
@@ -382,12 +382,11 @@ namespace mongo {
             return true;
         }
 
-        // check format
+        // check if both 'start' and 'stop' are present
         if ( ! windowElem.isABSONObj() ) {
-            log(LL_WARNING) << "'activeWindow' format is { start: \"hh:mm\" , end: ... }" << balancerDoc << endl;
+            log(LL_WARNING) << "'activeWindow' format is { start: \"hh:mm\" , stop: ... }" << balancerDoc << endl;
             return true;
         }
-
         BSONObj intervalDoc = windowElem.Obj();
         const string start = intervalDoc["start"].str();
         const string stop = intervalDoc["stop"].str();
@@ -396,22 +395,25 @@ namespace mongo {
             return true;
         }
 
-        // TODO suspend, pending windows compilation
-
-        // convert time, if the activeWindow was correctly specified
-        //struct tm startTime, endTime;
-        //const char * fmt = "%H:%M";
-        //if ( ! strptime( start.c_str() , fmt , &startTime ) || ! strptime( stop.c_str() , fmt , &endTime ) ){
-        //    log(LL_WARNING) << "cannot parse active window (use hh:mm[am|pm]) format: " << intervalDoc << endl;
-        //    return true;
-        //}
+        // check that both 'start' and 'stop' are valid time-of-day
+        boost::posix_time::ptime startTime, stopTime;
+        if ( ! toPointInTime( start , &startTime ) || ! toPointInTime( stop , &stopTime ) ) {
+            log(LL_WARNING) << "cannot parse active window (use hh:mm 24hs format): " << intervalDoc << endl;
+            return true;
+        }
         
-        // balance if during the activeWindow
-        //struct tm now;
-        //time_t_to_Struct( time(0) , &now, true /* local time */ );
-        //if ( ( compareTimeOfDay( now , startTime ) >= 0 ) && ( compareTimeOfDay( now, endTime ) <=0 ) ){
-        //    return true;
-        //}
+        // allow balancing if during the activeWindow
+        // note that a window may be open during the night
+        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+        if ( stopTime > startTime ) {
+            if ( ( now >= startTime ) && ( now <= stopTime ) ) {
+                return true;
+            }
+        } else if ( startTime > stopTime ) {
+            if ( ( now >=startTime ) || ( now <= stopTime ) ) {
+                return true;
+            }
+        }
 
         return false;
     }
