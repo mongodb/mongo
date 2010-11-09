@@ -118,7 +118,7 @@ wts_startup(int logfile)
 		break;
 	}
 
-	p = fname("wtdb");
+	p = fname("wt");
 	if ((ret = db->open(db, p, 0660, WT_CREATE)) != 0) {
 		db->err(db, ret, "Db.open: %s", p);
 		return (1);
@@ -182,33 +182,25 @@ wts_dump()
 
 	/* Dump the WiredTiger database. */
 	track("dump", (u_int64_t)0);
-	p = fname("dump");
+	p = fname("wt_dump");
 	if ((fp = fopen(p, "w")) == NULL) {
 		db->err(db, errno, "fopen: %s", p);
 		return (1);
 	}
-	if ((ret = db->dump(db, fp, track,
-	    g.dump == DUMP_DEBUG ? WT_DEBUG : WT_PRINTABLES)) != 0) {
+	if ((ret = db->dump(db, fp, track, WT_PRINTABLES)) != 0) {
 		db->err(db, ret, "Db.dump");
 		return (1);
 	}
 	(void)fclose(fp);
 
-	/*
-	 * If we dumped a printable version of the database, compare it against
-	 * BDB's dump.
-	 */
-	if (g.dump == DUMP_DEBUG)
-		return (0);
-
 	track("dump comparison", (u_int64_t)0);
 	switch (g.c_database_type) {
 	case FIX:
 	case VAR:
-		p = "./s_dumpcmp -c";
+		p = "sh ./s_dumpcmp -c";
 		break;
 	case ROW:
-		p = "./s_dumpcmp";
+		p = "sh ./s_dumpcmp";
 		break;
 	}
 	if (system(p) != 0) {
@@ -390,7 +382,7 @@ wts_ops()
 			break;
 		}
 
-		if (cnt % 1000 == 0)
+		if (cnt % 10 == 0)
 			track("read/write ops", (u_int64_t)cnt);
 	}
 	return (0);
