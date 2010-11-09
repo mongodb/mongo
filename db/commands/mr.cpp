@@ -510,12 +510,34 @@ namespace mongo {
                     BSONObj sortKey = BSON( "0" << 1 );
                     db.ensureIndex( mr.incLong , sortKey );
                     
-                    {
+                    { // create temp output collection
                         writelock lock( mr.tempLong.c_str() );
                         Client::Context ctx( mr.tempLong.c_str() );
                         assert( userCreateNS( mr.tempLong.c_str() , BSONObj() , errmsg , mr.replicate ) );
                     }
+                    
+                    { // copy indexes 
+                        assert( db.count( mr.tempLong ) == 0 );
+                        auto_ptr<DBClientCursor> idx = db.getIndexes( mr.finalLong );
+                        while ( idx->more() ){
+                            BSONObj i = idx->next();
 
+                            BSONObjBuilder b( i.objsize() + 16 );
+                            b.append( "ns" , mr.tempLong );
+                            BSONObjIterator j( i );
+                            while ( j.more() ){
+                                BSONElement e = j.next();
+                                if ( str::equals( e.fieldName() , "_id" ) || 
+                                     str::equals( e.fieldName() , "ns" ) )
+                                    continue;
+                                
+                                b.append( e );
+                            }
+                            
+                            db.insert( Namespace( mr.tempLong.c_str() ).getSisterNS( "system.indexes" ).c_str() , b.obj() );
+                        }
+                        
+                    }
 
                     {
                         readlock rl(mr.incLong.c_str());
