@@ -453,6 +453,11 @@ namespace mongo {
 
                         Timer mt;
                         while ( cursor->ok() ){
+
+                            if ( cursor->currentIsDup() ){
+                                cursor->advance();
+                                continue;
+                            }
                             
                             if ( ! cursor->currentMatches() ){
                                 cursor->advance();

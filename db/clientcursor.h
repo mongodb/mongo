@@ -223,6 +223,8 @@ namespace mongo {
         DiskLoc currLoc() { return _c->currLoc(); }
         BSONObj currKey() { return _c->currKey(); }
 
+        bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
+
         bool currentMatches(){
             if ( ! _c->matcher() )
                 return true;
