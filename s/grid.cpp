@@ -398,11 +398,12 @@ namespace mongo {
 
         // convert time, if the activeWindow was correctly specified
         struct tm startTime, endTime;
-        const char * fmt = "%H:%M";
-        if ( ! strptime( start.c_str() , fmt , &startTime ) || ! strptime( stop.c_str() , fmt , &endTime ) ){
-            log(LL_WARNING) << "cannot parse active window (use hh:mm[am|pm]) format: " << intervalDoc << endl;
-            return true;
-        }
+        //const char * fmt = "%H:%M";
+        // TODO suspend, pending windows compilation
+        //if ( ! strptime( start.c_str() , fmt , &startTime ) || ! strptime( stop.c_str() , fmt , &endTime ) ){
+        //    log(LL_WARNING) << "cannot parse active window (use hh:mm[am|pm]) format: " << intervalDoc << endl;
+        //    return true;
+        //}
         
         // balance if during the activeWindow
         struct tm now;
