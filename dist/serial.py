@@ -30,20 +30,14 @@ serial['bt_rcc_expand_repl'] = Serial(
 	 'WT_COL_EXPAND */exp',
 	 'WT_REPL */repl'])
 
-serial['bt_update'] = Serial(
-	'bt_update',
+serial['bt_item_update'] = Serial(
+	'bt_item_update',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'uint16_t/write_gen',
 	 'int/slot',
 	 'WT_REPL **/new_repl',
 	 'WT_REPL */repl'])
-
-serial['cache_alloc'] = Serial(
-	'cache_alloc',
-	'WT_WORKQ_READ', '1',
-	['uint32_t */addrp',
-	 'uint32_t/size'])
 
 serial['cache_read'] = Serial(
 	'cache_read',
@@ -65,7 +59,7 @@ def func_serial(f):
 		f.write('} __wt_' + entry[0] + '_args;\n')
 
 		# pack function
-		f.write('#define\t __wt_' + entry[0] + '_serial(toc')
+		f.write('#define\t__wt_' + entry[0] + '_serial(\\\n    toc')
 		for l in entry[1].args:
 			f.write(', _' + l.split('/')[1])
 		f.write(', ret) do {\\\n')
@@ -73,13 +67,13 @@ def func_serial(f):
 		for l in entry[1].args:
 			f.write('\t_args.' + l.split('/')[1] +
 			    ' = _' + l.split('/')[1] + ';\\\n')
-		f.write('\t(ret) = __wt_toc_serialize_func(\\\n')
-		f.write('\t    toc, ' + entry[1].op + ', ' + entry[1].spin +
+		f.write('\t(ret) = __wt_toc_serialize_func(toc,\\\n')
+		f.write('\t    ' + entry[1].op + ', ' + entry[1].spin +
 		    ', __wt_' + entry[1].key + '_serial_func, &_args);\\\n')
 		f.write('} while (0)\n')
 
 		# unpack function
-		f.write('#define\t__wt_' + entry[0] + '_unpack(toc')
+		f.write('#define\t__wt_' + entry[0] + '_unpack(\\\n    toc')
 		for l in entry[1].args:
 			f.write(', _' + l.split('/')[1])
 		f.write(') do {\\\n')
