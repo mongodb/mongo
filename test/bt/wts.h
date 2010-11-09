@@ -51,9 +51,6 @@ typedef struct {
 
 	FILE *rand_log;				/* Random number log */
 
-	enum                                    /* Dumps */
-	    { DUMP_DEBUG=1, DUMP_PRINT=2 } dump;
-
 	u_int32_t run_cnt;			/* Run counter */
 
 	int replay;				/* Replaying a run. */
