@@ -45,10 +45,6 @@ __wt_cache_free(WT_TOC *toc, uint32_t addr, uint32_t size)
 	cache = toc->env->ienv->cache;
 	idb = toc->db->idb;
 
-	/*
-	 * If we don't yet have a free page or the free page can't hold more
-	 * entries, get another free page and update the root page.
-	 */
 	WT_STAT_INCR(cache->stats, CACHE_FREE);
 	WT_STAT_INCR(idb->stats, DB_CACHE_FREE);
 	return (0);
