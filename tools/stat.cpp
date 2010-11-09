@@ -153,6 +153,13 @@ namespace mongo {
                 unit = "g";
                 sz /= 1024;
             }
+
+            if ( sz > 1024 ){
+                string s = str::stream() << (int)sz << unit;
+                _append( result , name , width , s );
+                return;
+            }
+
             stringstream ss;
             ss << setprecision(3) << sz << unit;
             _append( result , name , width , ss.str() );
