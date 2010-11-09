@@ -16,11 +16,12 @@ static int __wt_bt_key_build(WT_TOC *, WT_PAGE *, WT_ROW *);
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t flags)
+__wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
+	WT_PAGE_HDR *hdr;
 	WT_ROW *rip;
 	WT_REPL *repl;
 	uint32_t addr, base, indx, limit, size;
@@ -45,7 +46,10 @@ restart:
 		/* Save the write generation value before the search. */
 		write_gen = WT_PAGE_WRITE_GEN(page);
 
-		isleaf = page->hdr->type == WT_PAGE_ROW_LEAF;
+		hdr = page->hdr;
+		isleaf =
+		    hdr->type == WT_PAGE_DUP_LEAF ||
+		    hdr->type == WT_PAGE_ROW_LEAF;
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -97,13 +101,24 @@ restart:
 		if (cmp != 0)
 			rip = page->u.irow + (base == 0 ? 0 : base - 1);
 
-		/* If we've reached the leaf page, we're done. */
-		if (isleaf)
+		/*
+		 * If we've reached the leaf page, or we've reached the level
+		 * requested by our caller, we're done.
+		 */
+		if (isleaf || level == hdr->level)
 			break;
 
-		/* Get the address for the child page. */
-		addr = WT_ROW_OFF_ADDR(rip);
-		size = WT_ROW_OFF_SIZE(rip);
+		/*
+		 * rip references the subtree containing the record; check for
+		 * an update.
+		 */
+		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
+			addr = ((WT_OFF *)rip->data)->addr;
+			size = ((WT_OFF *)rip->data)->size;
+		} else {
+			addr = WT_ROW_OFF_ADDR(rip);
+			size = WT_ROW_OFF_SIZE(rip);
+		}
 
 		/* Walk down to the next page. */
 		if (page != idb->root_page)
@@ -119,21 +134,36 @@ restart:
 	}
 
 	/*
-	 * If inserting a new entry, return the smallest key on the page
-	 * less-than-or-equal-to the specified key.
+	 * We've found the right on-page WT_ROW structure, but that's only the
+	 * first step; the record may have been updated since reading the page
+	 * into the cache.
 	 */
-	if (!LF_ISSET(WT_INSERT)) {
-		if (cmp != 0) {			/* No match */
-			ret = WT_NOTFOUND;
-			goto err;
-		}
-						/* Deleted match. */
-		if ((repl = WT_ROW_REPL(page, rip)) != NULL)
-			if (WT_REPL_DELETED_ISSET(repl)) {
+	switch (hdr->type) {
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * If inserting a new entry, return the smallest key on the page
+		 * less-than-or-equal-to the specified key.
+		 */
+		if (!LF_ISSET(WT_INSERT)) {
+			if (cmp != 0) {			/* No match */
 				ret = WT_NOTFOUND;
 				goto err;
 			}
+							/* Deleted match. */
+			if ((repl = WT_ROW_REPL(page, rip)) != NULL)
+				if (WT_REPL_DELETED_ISSET(repl)) {
+					ret = WT_NOTFOUND;
+					goto err;
+				}
+		}
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+	default:
+		break;
 	}
+
 	toc->srch_page = page;
 	toc->srch_ip = rip;
 	toc->srch_repl = repl;

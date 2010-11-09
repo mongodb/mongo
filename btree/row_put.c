@@ -50,7 +50,8 @@ __wt_bt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 	repl = NULL;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_bt_search_row(toc, key, insert ? WT_INSERT : 0));
+	WT_RET(
+	    __wt_bt_search_row(toc, key, WT_NOLEVEL, insert ? WT_INSERT : 0));
 	page = toc->srch_page;
 
 	/* Allocate a page replacement array as necessary. */
@@ -58,11 +59,11 @@ __wt_bt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 		WT_ERR(__wt_calloc(
 		    env, page->indx_count, sizeof(WT_REPL *), &new_repl));
 
-	/* Allocate room for the new data item from pre-thread memory. */
+	/* Allocate room for the new data item from per-thread memory. */
 	WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
 
 	/* Schedule the workQ to insert the WT_REPL structure. */
-	__wt_bt_update_serial(toc, page, toc->srch_write_gen,
+	__wt_bt_item_update_serial(toc, page, toc->srch_write_gen,
 	    WT_ROW_SLOT(page, toc->srch_ip), new_repl, repl, ret);
 
 	if (ret != 0) {
@@ -81,18 +82,18 @@ err:		if (repl != NULL)
 }
 
 /*
- * __wt_bt_update_serial_func --
+ * __wt_bt_item_update_serial_func --
  *	Server function to update a WT_REPL entry in the modification array.
  */
 int
-__wt_bt_update_serial_func(WT_TOC *toc)
+__wt_bt_item_update_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 	WT_REPL **new_repl, *repl;
 	uint16_t write_gen;
 	int ret, slot;
 
-	__wt_bt_update_unpack(toc, page, write_gen, slot, new_repl, repl);
+	__wt_bt_item_update_unpack(toc, page, write_gen, slot, new_repl, repl);
 
 	ret = 0;
 

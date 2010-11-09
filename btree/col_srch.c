@@ -14,7 +14,7 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t flags)
+__wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -82,9 +82,21 @@ restart:
 			break;
 		}
 
-		/* cip references the subtree containing the record. */
-		addr = WT_COL_OFF_ADDR(cip);
-		size = WT_COL_OFF_SIZE(cip);
+		/* If a level was set, see if we found the asked-for page. */
+		if (level == page->hdr->level)
+			goto done;
+
+		/*
+		 * cip references the subtree containing the record; check for
+		 * an update.
+		 */
+		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
+			addr = ((WT_OFF *)cip->data)->addr;
+			size = ((WT_OFF *)cip->data)->size;
+		} else {
+			addr = WT_COL_OFF_ADDR(cip);
+			size = WT_COL_OFF_SIZE(cip);
+		}
 
 		/* Walk down to the next page. */
 		if (page != idb->root_page)
@@ -141,7 +153,6 @@ done:	/*
 			goto notfound;
 		break;
 	case WT_PAGE_COL_VAR:
-	default:
 		/* Check for a replacement entry in the page's WT_REPL array. */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
 			if (!LF_ISSET(WT_INSERT) && WT_REPL_DELETED_ISSET(repl))
@@ -153,6 +164,9 @@ done:	/*
 		if (!LF_ISSET(WT_INSERT) &&
 		    WT_ITEM_TYPE(cip->data) == WT_ITEM_DEL)
 			goto notfound;
+		break;
+	case WT_PAGE_COL_INT:
+	default:
 		break;
 	}
 
