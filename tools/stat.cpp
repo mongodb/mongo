@@ -199,10 +199,46 @@ namespace mongo {
             if ( b["opcounters"].type() == Object ){
                 BSONObj ax = a["opcounters"].embeddedObject();
                 BSONObj bx = b["opcounters"].embeddedObject();
+                
+                BSONObj ar = a["opcountersRepl"].isABSONObj() ? a["opcountersRepl"].embeddedObject() : BSONObj();
+                BSONObj br = b["opcountersRepl"].isABSONObj() ? b["opcountersRepl"].embeddedObject() : BSONObj();
+                
                 BSONObjIterator i( bx );
                 while ( i.more() ){
                     BSONElement e = i.next();
-                    _append( result , e.fieldName() , 6 , (int)diff( e.fieldName() , ax , bx ) );
+                    if ( ar.isEmpty() || br.isEmpty() ){
+                        _append( result , e.fieldName() , 6 , (int)diff( e.fieldName() , ax , bx ) );
+                    }
+                    else {
+                        string f = e.fieldName();
+                        
+                        int m = (int)diff( f , ax , bx );
+                        int r = (int)diff( f , ar , br );
+                        
+                        string myout;
+
+                        if ( f == "command" ){
+                            myout = str::stream() << m << "|" << r;
+                        }
+                        else if ( f == "getmore" ){
+                            myout = str::stream() << m;
+                        }
+                        else if ( m && r ){
+                            // this is weird...
+                            myout = str::stream() << m << "|" << r;
+                        }
+                        else if ( m ){
+                            myout = str::stream() << m;
+                        }
+                        else if ( r ){
+                            myout = str::stream() << "*" << r;
+                        }
+                        else {
+                            myout = "*0";
+                        }
+                        
+                        _append( result , f , 6 , myout );
+                    }
                 }
             }
             
