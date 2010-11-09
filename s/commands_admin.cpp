@@ -141,6 +141,13 @@ namespace mongo {
                     asserts.append( "rollovers" , assertionCount.rollovers );
                     asserts.done();
                 }
+                
+                {
+                    BSONObjBuilder bb( result.subobjStart( "network" ) );
+                    networkCounter.append( bb );
+                    bb.done();
+                }
+
 
                 return 1;
             }

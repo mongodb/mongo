@@ -21,6 +21,7 @@
 #include "../jsobj.h"
 #include "../../util/message.h"
 #include "../../util/processinfo.h"
+#include "../../util/concurrency/spin_lock.h"
 
 namespace mongo {
 
@@ -133,14 +134,17 @@ namespace mongo {
 
     class NetworkCounter {
     public:
-        NetworkCounter() : _bytesIn(0), _bytesOut(0), _overflows(0) , _mutex( "NetworkCounter" ){}
+        NetworkCounter() : _bytesIn(0), _bytesOut(0), _requests(0), _overflows(0){}
         void hit( long long bytesIn , long long bytesOut );
-        BSONObj getObj();
+        void append( BSONObjBuilder& b );
     private:
         long long _bytesIn;
         long long _bytesOut;
+        long long _requests;
+
         long long _overflows;
-        mongo::mutex _mutex;
+
+        SpinLock _lock;
     };
     
     extern NetworkCounter networkCounter;

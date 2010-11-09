@@ -128,9 +128,17 @@ namespace mongo {
         void recv( char * data , int len );
         
         int unsafe_recv( char *buf, int max );
+
+        void clearCounters() { _bytesIn = 0; _bytesOut = 0; }
+        long long getBytesIn() const { return _bytesIn; }
+        long long getBytesOut() const { return _bytesOut; }
     private:
         int sock;
         PiggyBackData * piggyBackData;
+
+        long long _bytesIn;
+        long long _bytesOut;
+
     public:
         SockAddr farEnd;
         double _timeout;

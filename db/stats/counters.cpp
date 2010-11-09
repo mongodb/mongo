@@ -144,25 +144,33 @@ namespace mongo {
 
     void NetworkCounter::hit( long long bytesIn , long long bytesOut ) {
         const long long MAX = 1ULL << 60;
-        mongo::mutex::scoped_lock lk( _mutex );
-        if ( _bytesIn > MAX || _bytesOut > MAX ){
+
+        // don't care about the race as its just a counter
+        bool overflow = _bytesIn > MAX || _bytesOut > MAX;
+
+        if ( overflow ){
+            _lock.lock();
             _overflows++;
             _bytesIn = bytesIn;
             _bytesOut = bytesOut;
+            _requests = 1;
+            _lock.unlock();
         }
         else {
+            _lock.lock();
             _bytesIn += bytesIn;
             _bytesOut += bytesOut;
-            
+            _requests++;
+            _lock.unlock();            
         }
     }
     
-    BSONObj NetworkCounter::getObj() {
-        BSONObjBuilder b( 64 );
-        mongo::mutex::scoped_lock lk( _mutex );
+    void NetworkCounter::append( BSONObjBuilder& b ) {
+        _lock.lock();
         b.appendNumber( "bytesIn" , _bytesIn );
         b.appendNumber( "bytesOut" , _bytesOut );
-        return b.obj();
+        b.appendNumber( "numRequests" , _requests );
+        _lock.unlock();
     }
     
 

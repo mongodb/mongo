@@ -23,6 +23,7 @@
 #include "message_server.h"
 
 #include "../db/cmdline.h"
+#include "../db/stats/counters.h"
 
 namespace mongo {
 
@@ -46,6 +47,7 @@ namespace mongo {
 
                 while ( 1 ){
                     m.reset();
+                    p->clearCounters();
 
                     if ( ! p->recv(m) ) {
                         if( !cmdLine.quiet )
@@ -55,6 +57,7 @@ namespace mongo {
                     }
                     
                     handler->process( m , p.get() );
+                    networkCounter.hit( p->getBytesIn() , p->getBytesOut() );
                 }
             }
             catch ( const SocketException& ){

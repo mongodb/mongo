@@ -311,12 +311,12 @@ namespace mongo {
         ports.closeAll(mask);
     }
 
-    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far), _timeout(), tag(0) {
+    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far), _timeout(), tag(0), _bytesIn(0), _bytesOut(0) {
         _logLevel = 0;
         ports.insert(this);
     }
 
-    MessagingPort::MessagingPort( double timeout, int ll ) : tag(0) {
+    MessagingPort::MessagingPort( double timeout, int ll ) : tag(0), _bytesIn(0), _bytesOut(0) {
         _logLevel = ll;
         ports.insert(this);
         sock = -1;
@@ -452,6 +452,7 @@ namespace mongo {
                 throw;
             }
             
+            _bytesIn += len;
             m.setData(md, true);
             return true;
             
@@ -519,6 +520,7 @@ namespace mongo {
 
     // sends all data or throws an exception    
     void MessagingPort::send( const char * data , int len, const char *context ) {
+        _bytesOut += len;
         while( len > 0 ) {
             int ret = ::send( sock , data , len , portSendFlags );
             if ( ret == -1 ) {

@@ -397,6 +397,13 @@ namespace mongo {
                 ClientCursor::appendStats( bb );
                 bb.done();
             }
+
+            {
+                BSONObjBuilder bb( result.subobjStart( "network" ) );
+                networkCounter.append( bb );
+                bb.done();
+            }
+
             
             timeBuilder.appendNumber( "after counters" , Listener::getElapsedTimeMillis() - start );            
 
