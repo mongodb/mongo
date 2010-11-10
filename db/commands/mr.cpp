@@ -133,7 +133,7 @@ namespace mongo {
                     stringstream ss;
                     if ( ! keeptemp )
                         ss << "tmp.";
-                    ss << "mr." << cmdObj.firstElement().fieldName() << "_" << time(0) << "_" << jobNumber++;    
+                    ss << "mr." << cmdObj.firstElement().String() << "_" << time(0) << "_" << jobNumber++;    
                     tempShort = ss.str();
                     tempLong = dbname + "." + tempShort;
                     incLong = tempLong + "_inc";
@@ -214,7 +214,18 @@ namespace mongo {
                 }
                 return db.count( finalLong );
             }
+
+            void insert( const string& ns , BSONObj& o ){
+                writelock l( ns );
+                Client::Context ctx( ns );
                 
+                if ( replicate )
+                    theDataFileMgr.insertAndLog( ns.c_str() , o , false );
+                else
+                    theDataFileMgr.insertWithObjMod( ns.c_str() , o , false );
+
+            }
+
             string dbname;
             string ns;
             
@@ -288,12 +299,7 @@ namespace mongo {
                 BSONObj key = values.begin()->firstElement().wrap( "_id" );
                 BSONObj res = reduceValues( values , scope.get() , reduce , 1 , finalize );
                 
-                writelock l( setup.tempLong );
-                Client::Context ctx( setup.incLong );
-                if ( setup.replicate )
-                    theDataFileMgr.insertAndLog( setup.tempLong.c_str() , res , false );
-                else
-                    theDataFileMgr.insertWithObjMod( setup.tempLong.c_str() , res , false );
+                setup.insert( setup.tempLong , res );
             }
 
             
@@ -539,7 +545,8 @@ namespace mongo {
                                 b.append( e );
                             }
                             
-                            db.insert( Namespace( mr.tempLong.c_str() ).getSisterNS( "system.indexes" ).c_str() , b.obj() );
+                            BSONObj indexToInsert = b.obj();
+                            mr.insert( Namespace( mr.tempLong.c_str() ).getSisterNS( "system.indexes" ).c_str() , indexToInsert );
                         }
                         
                     }
