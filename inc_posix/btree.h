@@ -84,7 +84,7 @@ extern "C" {
  */
 struct __wt_page_desc {
 #define	WT_BTREE_MAGIC		120897
-	uint32_t magic;		/* 00-03: Magic number */
+	uint32_t magic;			/* 00-03: Magic number */
 #define	WT_BTREE_MAJOR_VERSION	0
 	uint16_t majorv;		/* 04-05: Major version */
 #define	WT_BTREE_MINOR_VERSION	1
