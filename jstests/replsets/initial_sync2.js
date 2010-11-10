@@ -82,6 +82,8 @@ wait(function() {
     return config2.version == config.version &&
       (config3 && config3.version == config.version);
   });
+admin_s2.runCommand({replSetFreeze:999999});
+
 
 wait(function() {
     var status = admin_s2.runCommand({replSetGetStatus:1});
@@ -129,4 +131,20 @@ for (var i=0; i<10000; i++) {
 
 
 print("12. Everyone happy eventually");
-replTest.awaitReplication();
+wait(function() {
+    var op1 = getLatestOp(master);
+    var op2 = getLatestOp(slave1);
+    var op3 = getLatestOp(slave2);
+
+    occasionally(function() {
+        print("latest ops:");
+        printjson(op1);
+        printjson(op2);
+        printjson(op3);
+      });
+    
+    return friendlyEqual(getLatestOp(master), getLatestOp(slave1)) &&
+      friendlyEqual(getLatestOp(master), getLatestOp(slave2));
+  });
+
+replTest.stopSet();

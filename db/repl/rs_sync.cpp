@@ -369,15 +369,15 @@ namespace mongo {
             return;
         }
 
+        /* later, we can sync from up secondaries if we want. tbd. */
+        if( sp.primary == 0 ) {
+            return;
+        }
+
         /* do we have anything at all? */
         if( lastOpTimeWritten.isNull() ) {
             syncDoInitialSync();
             return; // _syncThread will be recalled, starts from top again in case sync failed.
-        }
-
-        /* later, we can sync from up secondaries if we want. tbd. */
-        if( sp.primary == 0 ) {
-            return;
         }
 
         /* we have some data.  continue tailing. */

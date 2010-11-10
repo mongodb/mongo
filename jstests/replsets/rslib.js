@@ -1,5 +1,7 @@
 
+var count = 0;
 var w = 0;
+
 var wait = function(f) {
     w++;
     var n = 0;
@@ -12,8 +14,24 @@ var wait = function(f) {
         assert(n < 200, 'tried 200 times, giving up');
         sleep(1000);
     }
-}
+};
 
+/**
+ * Use this to do something once every 4 iterations.
+ *
+ * <pre>
+ * for (i=0; i<1000; i++) {
+ *   occasionally(function() { print("4 more iterations"); });
+ * }
+ * </pre>
+ */
+var occasionally = function(f) {
+  if (count % 4 == 0) {
+    f();
+  }
+  count++;
+};
+  
 var reconnect = function(a) {
   wait(function() { 
       try {
