@@ -114,8 +114,12 @@ namespace mongo {
             q = concatQuery( q , extra );
         }
 
+        BSONObj o;
+
         ShardConnection conn( server , _ns );
-        BSONObj o = conn->findOne( _ns , Query( q ).explain() );
+        auto_ptr<DBClientCursor> cursor = conn->query( _ns , Query( q ).explain() , abs( _batchSize ) * -1 );
+        if ( cursor.get() && cursor->more() )
+            o = cursor->next();
         conn.done();
         return o;
     }
