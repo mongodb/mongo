@@ -282,8 +282,6 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
-		//cout << "TEMP AUTH " << toString() << dbname << ' ' << username << ' ' << password_text << ' ' << digestPassword << endl;
-
 		string password = password_text;
 		if( digestPassword ) 
 			password = createPasswordDigest( username , password_text );

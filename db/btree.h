@@ -377,7 +377,7 @@ namespace mongo {
              @return true if the loc has not been seen
         */
         virtual bool getsetdup(DiskLoc loc) {
-            if( multikey ) { 
+            if( _multikey ) { 
                 pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
                 return !p.second;
             }
@@ -409,7 +409,7 @@ namespace mongo {
         virtual BSONObj current()  { return BSONObj(_current()); }
         virtual string toString() {
             string s = string("BtreeCursor ") + indexDetails.indexName();
-            if ( direction < 0 ) s += " reverse";
+            if ( _direction < 0 ) s += " reverse";
             if ( _bounds.get() && _bounds->size() > 1 ) s += " multi";
             return s;
         }
@@ -463,13 +463,13 @@ namespace mongo {
         BSONObj startKey;
         BSONObj endKey;
         bool _endKeyInclusive;        
-        bool multikey; // note this must be updated every getmore batch in case someone added a multikey...
+        bool _multikey; // this must be updated every getmore batch in case someone added a multikey
         const IndexDetails& indexDetails;
         const BSONObj _order;
         const Ordering _ordering;
         DiskLoc bucket;
         int keyOfs;
-        const int direction; // 1=fwd,-1=reverse
+        const int _direction; // 1=fwd,-1=reverse
         BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
         DiskLoc locAtKeyOfs;
         const shared_ptr< FieldRangeVector > _bounds;
