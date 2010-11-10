@@ -357,7 +357,7 @@ namespace mongo {
         conn.done();
 
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-        if ( _balancerStopped( balancerDoc ) /* TODO pending tests || ! _inBalancingWindow( balancerDoc , now ) */ ) {
+        if ( _balancerStopped( balancerDoc ) || ! _inBalancingWindow( balancerDoc , now ) ) {
             return false;
         }
 
@@ -369,7 +369,7 @@ namespace mongo {
         // if present, it is a simple bool
         BSONElement stoppedElem = balancerDoc["stopped"];
         if ( ! stoppedElem.eoo() && stoppedElem.isBoolean() ) {
-            return ! stoppedElem.boolean();
+            return stoppedElem.boolean();
         }
         return false;
     }
@@ -385,21 +385,21 @@ namespace mongo {
 
         // check if both 'start' and 'stop' are present
         if ( ! windowElem.isABSONObj() ) {
-            log(LL_WARNING) << "'activeWindow' format is { start: \"hh:mm\" , stop: ... }" << balancerDoc << endl;
+            log(1) << "'activeWindow' format is { start: \"hh:mm\" , stop: ... }" << balancerDoc << endl;
             return true;
         }
         BSONObj intervalDoc = windowElem.Obj();
         const string start = intervalDoc["start"].str();
         const string stop = intervalDoc["stop"].str();
         if ( start.empty() || stop.empty() ) {
-            log(LL_WARNING) << "must specify both start and end of balancing window: " << intervalDoc << endl;
+            log(1) << "must specify both start and end of balancing window: " << intervalDoc << endl;
             return true;
         }
 
         // check that both 'start' and 'stop' are valid time-of-day
         boost::posix_time::ptime startTime, stopTime;
         if ( ! toPointInTime( start , &startTime ) || ! toPointInTime( stop , &stopTime ) ) {
-            log(LL_WARNING) << "cannot parse active window (use hh:mm 24hs format): " << intervalDoc << endl;
+            log(1) << "cannot parse active window (use hh:mm 24hs format): " << intervalDoc << endl;
             return true;
         }
         
