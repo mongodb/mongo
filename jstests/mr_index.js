@@ -4,6 +4,7 @@ t.drop()
 
 outName = "mr_index_out"
 out = db[outName]
+out.drop()
 
 t.insert( { tags : [ 1  ] } )
 t.insert( { tags : [ 1 , 2  ] } )
@@ -26,17 +27,17 @@ ex = function(){
     return out.find().sort( { value : 1 } ).explain()
 }
 
-t.mapReduce(  m , r , { out : outName } )
+res = t.mapReduce(  m , r , { out : outName } )
     
 assert.eq( "BasicCursor" , ex().cursor , "A1" )
 out.ensureIndex( { value : 1 } )
 assert.eq( "BtreeCursor value_1" , ex().cursor , "A2" )
 assert.eq( 3 , ex().n , "A3" )
 
-t.mapReduce(  m , r , { out : outName } )
+res = t.mapReduce(  m , r , { out : outName } )
     
 assert.eq( "BtreeCursor value_1" , ex().cursor , "B1" )
 assert.eq( 3 , ex().n , "B2" )
-
+res.drop()
 
 
