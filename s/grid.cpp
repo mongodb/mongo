@@ -19,9 +19,9 @@
 #include "pch.h"
 
 #include <iomanip>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include "../client/connpool.h"
 #include "../util/stringutils.h"
+#include "../util/unittest.h"
 
 #include "grid.h"
 #include "shard.h"
@@ -356,14 +356,15 @@ namespace mongo {
         BSONObj balancerDoc = conn->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
         conn.done();
 
-        if ( _balancerStopped( balancerDoc ) /* TODO pending tests || ! _inBalancingWindow( balancerDoc ) */ ) {
+        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+        if ( _balancerStopped( balancerDoc ) /* TODO pending tests || ! _inBalancingWindow( balancerDoc , now ) */ ) {
             return false;
         }
 
         return true;
     }
 
-    bool Grid::_balancerStopped( const BSONObj& balancerDoc ) const { 
+    bool Grid::_balancerStopped( const BSONObj& balancerDoc ) { 
         // check the 'stopped' marker maker
         // if present, it is a simple bool
         BSONElement stoppedElem = balancerDoc["stopped"];
@@ -373,7 +374,7 @@ namespace mongo {
         return false;
     }
 
-    bool Grid::_inBalancingWindow( const BSONObj& balancerDoc ) const { 
+    bool Grid::_inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now ) { 
         // check the 'activeWindow' marker
         // if present, it is an interval during the day when the balancer should be active
         // { start: "08:00" , stop: "19:30" }, strftime format is %H:%M 
@@ -404,7 +405,6 @@ namespace mongo {
         
         // allow balancing if during the activeWindow
         // note that a window may be open during the night
-        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         if ( stopTime > startTime ) {
             if ( ( now >= startTime ) && ( now <= stopTime ) ) {
                 return true;
@@ -433,5 +433,46 @@ namespace mongo {
     }
 
     Grid grid;
+
+    // unit tests
+
+    class BalancingWindowUnitTest : public UnitTest {
+    public:
+        void run(){
+            // T0 < T1 < now < T2 < T3 and Error
+            const string T0 = "9:00";
+            const string T1 = "11:00";
+            boost::posix_time::ptime now( currentDate(), boost::posix_time::hours( 13 ) + boost::posix_time::minutes( 48 ) );
+            const string T2 = "17:00";
+            const string T3 = "21:30";
+            const string E = "28:35";
+            
+            BSONObj w1 = BSON( "activeWindow" << BSON( "start" << T0 << "stop" << T1 ) ); // closed in the past
+            BSONObj w2 = BSON( "activeWindow" << BSON( "start" << T2 << "stop" << T3 ) ); // not opened until the future
+            BSONObj w3 = BSON( "activeWindow" << BSON( "start" << T1 << "stop" << T2 ) ); // open now
+            BSONObj w4 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << T2 ) ); // open since last day
+ 
+            assert( ! Grid::_inBalancingWindow( w1 , now ) );
+            assert( ! Grid::_inBalancingWindow( w2 , now ) );
+            assert( Grid::_inBalancingWindow( w3 , now ) );
+            assert( Grid::_inBalancingWindow( w4 , now ) );
+            
+            // bad input should not stop the balancer
+
+            BSONObj w5; // empty window
+            BSONObj w6 = BSON( "activeWindow" << BSON( "start" << 1 ) ); // missing stop
+            BSONObj w7 = BSON( "activeWindow" << BSON( "stop" << 1 ) ); // missing start
+            BSONObj w8 = BSON( "wrongMarker" << 1 << "start" << 1 << "stop" << 1 ); // active window marker missing
+            BSONObj w9 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << E ) ); // garbage in window
+ 
+            assert( Grid::_inBalancingWindow( w5 , now ) );
+            assert( Grid::_inBalancingWindow( w6 , now ) );
+            assert( Grid::_inBalancingWindow( w7 , now ) );
+            assert( Grid::_inBalancingWindow( w8 , now ) );
+            assert( Grid::_inBalancingWindow( w9 , now ) );
+
+            log(1) << "BalancingWidowObjTest passed" << endl;
+        }
+    } BalancingWindowObjTest;
 
 } 

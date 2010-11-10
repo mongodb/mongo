@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 #include "../util/time_support.h"
 #include "../util/concurrency/mutex.h"
 
@@ -82,6 +84,15 @@ namespace mongo {
 
         unsigned long long getNextOpTime() const;
 
+        // exposed methods below are for testing only
+
+        /**
+         * @param balancerDoc bson that may contain a window of time for the balancer to work
+         *        format { ... , activeWindow: { start: "8:30" , stop: "19:00" } , ... } 
+         * @return true if there is no window of time specified for the balancer or it we're currently in it
+         */
+        static bool _inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now );
+
     private:
         mongo::mutex              _lock;            // protects _databases; TODO: change to r/w lock ??
         map<string, DBConfigPtr > _databases;       // maps ns to DBConfig's
@@ -104,14 +115,7 @@ namespace mongo {
          *        format { ... , stopped: [ "true" | "false" ] , ... }
          * @return true if the marker is present and is set to true
          */
-        bool _balancerStopped( const BSONObj& balancerDoc ) const;
-
-        /**
-         * @param balancerDoc bson that may contain a window of time for the balancer to work
-         *        format { ... , activeWindow: { start: "8:30" , stop: "19:00" } , ... } 
-         * @return true if there is no window of time specified for the balancer or it we're currently in it
-         */
-        bool _inBalancingWindow( const BSONObj& balancerDoc ) const;
+        static bool _balancerStopped( const BSONObj& balancerDoc );
 
     };
 

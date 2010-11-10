@@ -64,7 +64,7 @@ namespace mongo {
         }
         
         // verify that time is well formed
-        if ( ! ( hh / 24 ) || ! ( mm / 60 ) ) {
+        if ( ( hh / 24 ) || ( mm / 60 ) ) {
             return false;
         }
 
