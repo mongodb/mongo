@@ -111,7 +111,7 @@ reconnect(master);
 wait(function() {
     var status = admin.runCommand({replSetGetStatus:1});
     printjson(status);
-    return status.members[0].state == 1;
+    return status.members && status.members[0].state == 1;
   });
 
 
