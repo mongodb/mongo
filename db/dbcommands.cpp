@@ -99,14 +99,17 @@ namespace mongo {
         CmdGetLastError() : Command("getLastError", false, "getlasterror") {}
         bool run(const string& dbnamne, BSONObj& _cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
+            
+            bool err = false;
+
             if ( le->nPrev != 1 )
-                LastError::noError.appendSelf( result );
+                err = LastError::noError.appendSelf( result , false );
             else
-                le->appendSelf( result );
+                err = le->appendSelf( result , false );
             
             Client& c = cc();
             c.appendLastOp( result );
-
+            
             BSONObj cmdObj = _cmdObj;
             { 
                 BSONObj::iterator i(_cmdObj);
@@ -123,7 +126,13 @@ namespace mongo {
                 log() << "fsync from getlasterror" << endl;
                 result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
             }
-            
+
+            if ( err ){
+                // doesn't make sense to wait for replication
+                // if there was an error
+                return true;
+            }
+
             BSONElement e = cmdObj["w"];
             if ( e.isNumber() ){
                 int timeout = cmdObj["wtimeout"].numberInt();
@@ -141,7 +150,8 @@ namespace mongo {
                         result.append( "wtimeout" , true );
                         errmsg = "timed out waiting for slaves";
                         result.append( "waited" , t.millis() );
-                        return false;
+                        result.append( "err" , "timeout" );
+                        return true;
                     }
 
                     assert( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
@@ -152,6 +162,7 @@ namespace mongo {
                 result.appendNumber( "wtime" , t.millis() );
             }
             
+            result.appendNull( "err" );
             return true;
         }
     } cmdGetLastError;

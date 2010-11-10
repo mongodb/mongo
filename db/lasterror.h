@@ -68,7 +68,11 @@ namespace mongo {
             upsertedId.clear();
             writebackId.clear();
         }
-        void appendSelf( BSONObjBuilder &b );
+
+        /**
+         * @return if there is an err
+         */
+        bool appendSelf( BSONObjBuilder &b , bool blankErr = true );
 
         struct Disabled : boost::noncopyable {
             Disabled( LastError * le ){

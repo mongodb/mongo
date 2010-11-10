@@ -46,16 +46,23 @@ namespace mongo {
         }
     }
 
-    void LastError::appendSelf( BSONObjBuilder &b ) {
+    bool LastError::appendSelf( BSONObjBuilder &b , bool blankErr ) {
         if ( !valid ) {
-            b.appendNull( "err" );
+            if ( blankErr )
+                b.appendNull( "err" );
             b.append( "n", 0 );
-            return;
+            return false;
         }
-        if ( msg.empty() )
-            b.appendNull( "err" );
-        else
+
+        if ( msg.empty() ) {
+            if ( blankErr ) {
+                b.appendNull( "err" ); 
+            } 
+        }
+        else {
             b.append( "err", msg );
+        }
+
         if ( code )
             b.append( "code" , code );
         if ( updatedExisting != NotUpdate )
@@ -65,6 +72,8 @@ namespace mongo {
         if ( writebackId.isSet() )
             b.append( "writeback" , writebackId );
         b.appendNumber( "n", nObjects );
+        
+        return ! msg.empty();
     }
 
     LastErrorHolder::~LastErrorHolder(){
