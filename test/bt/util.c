@@ -69,12 +69,11 @@ data_gen(DBT *data, int grow_ok)
 	char *p;
 
 	/*
-	 * Set buffer contents.
+	 * Set initial buffer contents to reconizable text.
 	 *
-	 * If doing repeat compression, use different data some percentage of
-	 * the time, otherwise we end up with a single chunk of repeated data.
 	 * Add a few extra bytes in order to guarantee we can always offset
-	 * into the buffer by a few bytes.
+	 * into the buffer by a few extra bytes, used to generate different
+	 * data for column-store repeat-compressed databases.
 	 */
 	if (blen < g.c_data_max + 10) {
 		if (buf != NULL) {
@@ -92,19 +91,26 @@ data_gen(DBT *data, int grow_ok)
 	}
 
 	/*
-	 * The data always starts with a 10-digit string (the specified cnt), to
-	 * ensure every data item is greater than the last data item -- if we're
-	 * bulk-loading a duplicate data item, it must be larger than previous
-	 * data items.
+	 * The data always starts with a 10-digit number.
+	 *
+	 * Change the leading number to ensure every data item sorts greater
+	 * than all previous data items -- when bulk-loading duplicate data
+	 * items, they must be loaded in sort order.
 	 */
 	sprintf(buf, "%010u", ++r);
 	buf[10] = '/';
 
 	switch (g.c_database_type) {
 	case FIX:
+		/*
+		 * If doing repeat compression on the data, use different data
+		 * some percentage of the time, otherwise we'd end up with a
+		 * single chunk of repeated data.   To do that, we just jump
+		 * forward in the buffer by a small, random number of bytes.
+		 */
 		p = buf;
-		if (g.c_repeat_comp != 0 ||
-		    (u_int)wts_rand() % 100 <= g.c_repeat_comp_pct)
+		if (g.c_repeat_comp_pct != 0 &&
+		    (u_int)wts_rand() % 100 > g.c_repeat_comp_pct)
 			p += wts_rand() % 7;
 		len = g.c_data_min;
 		break;
@@ -112,7 +118,7 @@ data_gen(DBT *data, int grow_ok)
 	case ROW:
 		p = buf;
 		len = grow_ok ?
-		    MMRAND(g.c_data_min, g.c_data_max) : 100;
+		    MMRAND(g.c_data_min, g.c_data_max) : g.c_data_max;
 		break;
 	}
 
