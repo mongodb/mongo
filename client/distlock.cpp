@@ -24,7 +24,8 @@
 
 namespace mongo {
 
-    string lockPingNS = "config.lockpings";
+    static string lockPingNS = "config.lockpings";
+    static string locksNS = "config.locks";
 
     ThreadLocalValue<string> distLockIds("");
 
@@ -87,11 +88,21 @@ namespace mongo {
                     continue;
                 }
 
-                // remove really old entries from the lockpings collection
-                BSONObjBuilder f;
-                f.appendDate( "$lt" , jsTime() - ( 4 * 86400 * 1000 ) ); // 4 days
-                BSONObj r = BSON( "ping" << f.obj() );
-                conn->remove( lockPingNS , r );
+                // remove really old entries from the lockpings collection if they're not holding a lock
+                // (this may happen if an instance of a process was taken down and no new instance came up to
+                // replace it for a quite a while)
+                // if the lock is taken, the take-over mechanism should handle the situation
+                auto_ptr<DBClientCursor> c = conn->query( locksNS , BSONObj() );
+                vector<string> pids;
+                while ( c->more() ){
+                    BSONObj lock = c->next();
+                    if ( ! lock["process"].eoo() ) {
+                        pids.push_back( lock["process"].valuestrsafe() );
+                    }
+                }                    
+
+                Date_t fourDays = jsTime() - ( 4 * 86400 * 1000 ); // 4 days
+                conn->remove( lockPingNS , BSON( "_id" << BSON( "$nin" << pids ) << "ping" << LT << fourDays ) );
                 err = conn->getLastError();
                 if ( ! err.empty() ){
                     log ( LL_WARNING ) << "dist_lock cleanup request from process: " << process << " to: " << addr 
@@ -116,7 +127,6 @@ namespace mongo {
             sleepsecs(30);
         }
     }
-        
     
     class DistributedLockPinger {
     public:
@@ -173,8 +183,11 @@ namespace mongo {
             else if ( o["state"].numberInt() > 0 ){
                 BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ){
-                    // TODO: maybe this should clear, not sure yet
-                    log() << "config.locks: " << _name << " lastPing is empty! this could be bad: " << o << endl;
+                    // if a lock is taken but there's no ping for it, we're in an inconsistent situation
+                    // if the lock holder (mongos or d)  does not exist anymore, the lock could safely be removed
+                    // but we'd require analysis of the situation before a manual intervention
+                    log(LL_ERROR) << "config.locks: " << _name << " lock is taken by old process? "
+                               << "remove the following lock if the process is not active anymore: " << o << endl;
                     conn.done();
                     return false;
                 }
