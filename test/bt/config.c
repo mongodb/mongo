@@ -11,7 +11,8 @@
 #include "config.h"
 
 static const char *config_dtype(void);
-static CONFIG *config_find(const char *);
+static CONFIG	  *config_find(const char *);
+static uint32_t	   config_translate(char *);
 
 /*
  * config_setup --
@@ -143,10 +144,10 @@ config_file(char *name)
 		exit(EXIT_FAILURE);
 	}
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
-		for (p = buf; *p != '\0'; ++p)
-			if (!isspace(*p))
-				break;
-		if (*p == '\0' || *p == '#' || *p == '\n')
+		for (p = buf; *p != '\0' && *p != '\n'; ++p)
+			;
+		*p = '\0';
+		if (p == buf)
 			continue;
 		config_single(buf);
 	}
@@ -172,7 +173,8 @@ config_single(char *s)
 
 	cp = config_find(s);
 	cp->flags |= C_FIXED;
-	*cp->v = (u_int32_t)atoi(vp);
+
+	*cp->v = config_translate(vp);
 	if (*cp->v < cp->min || *cp->v > cp->max) {
 		fprintf(stderr,
 		    "%s: %s: value of %lu outside min/max values of %lu-%lu\n",
@@ -180,6 +182,31 @@ config_single(char *s)
 		    (u_long)*cp->v, (u_long)cp->min, (u_long)cp->max);
 		exit(EXIT_FAILURE);
 	}
+}
+
+/*
+ * config_translate --
+ *	Return an integer value representing the argument.
+ */
+static uint32_t
+config_translate(char *s)
+{
+	/* If it's already a integer value, we're done. */
+	if (isdigit(s[0]))
+		return (uint32_t)atoi(s);
+
+	/* Currently, all we translate are the database type names. */
+	if (strcmp(s, "row") == 0 || strcmp(s, "row store") == 0)
+		return ((uint32_t)ROW);
+	if (strcmp(s, "vlcs") == 0 ||
+	    strcmp(s, "variable-length column store") == 0)
+		return ((uint32_t)VAR);
+	if (strcmp(s, "flcs") == 0 ||
+	    strcmp(s, "fixed-length column store") == 0)
+		return ((uint32_t)FIX);
+
+	fprintf(stderr, "%s: %s: unknown configuration value\n", g.progname, s);
+	exit(EXIT_FAILURE);
 }
 
 /*
@@ -196,8 +223,8 @@ config_find(const char *s)
 			return (cp);
 
 	fprintf(stderr,
-	    "%s: %s: unknown configuration value; use the -c option to "
-	    "display available configuration values\n",
+	    "%s: %s: unknown configuration keyword; use the -c option to "
+	    "display available configuration keywords\n",
 	    g.progname, s);
 	exit(EXIT_FAILURE);
 }
