@@ -249,9 +249,13 @@ namespace mongo {
             return _active;
         }
         
+        /**
+         * @return if row was printed
+         */
         bool hit( int n = 1 ){
             if ( ! _active ){
                 cout << "warning: hit on in-active ProgressMeter" << endl;
+                return false;
             }
 
             _done += n;
