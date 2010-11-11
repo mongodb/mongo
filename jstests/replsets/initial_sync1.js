@@ -95,7 +95,7 @@ replTest.stop(1);
 
 print("8. Eventually it should become a secondary");
 print("if initial sync has started, this will cause it to fail and sleep for 5 minutes");
-sleep(5*3600);
+sleep(5*3600*1000);
 wait(function() {
     var status = admin_s2.runCommand({replSetGetStatus:1});
     occasionally(function() { printjson(status); });
