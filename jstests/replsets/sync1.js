@@ -164,7 +164,7 @@ doTest = function (signal) {
 
     // now, let's see if rollback works
     try {
-      var result = dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: false });
+      dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: false });
     }
     catch(e) {
       print(e);
@@ -174,8 +174,6 @@ doTest = function (signal) {
     
     
     dbs[0].getMongo().setSlaveOk();
-
-    printjson(result);
     sleep(5000);
 
     // now this should resync
@@ -203,6 +201,7 @@ doTest = function (signal) {
 
         count++;
         if (count == 100) {
+            print(dbs[0].getSisterDB("admin").runCommand({replSetGetStatus:1}));
             pause("FAIL part 11");
             assert(false, "replsets/\nsync1.js fails timing out");
             replTest.stopSet(signal);
