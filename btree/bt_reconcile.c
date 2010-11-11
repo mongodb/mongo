@@ -1019,8 +1019,11 @@ __wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		case WT_ITEM_KEY_DUP:
 			if ((hdr->type == WT_PAGE_DUP_INT ?
 			    idb->huffman_data : idb->huffman_key) == NULL) {
-				WT_ERR(__wt_bt_search_row(toc, (DBT *)
-				    WT_ITEM_BYTE(item), hdr->level + 1, 0));
+				WT_CLEAR(tmp);
+				tmp.data = WT_ITEM_BYTE(item);
+				tmp.size = WT_ITEM_LEN(item);
+				WT_ERR(__wt_bt_search_row(
+				    toc, &tmp, hdr->level + 1, 0));
 				break;
 			}
 			/* FALLTHROUGH */
