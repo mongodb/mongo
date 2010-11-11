@@ -63,6 +63,30 @@ namespace mongo {
         }
     }
     
+    BSONObj& OpCounters::getObj(){
+        const unsigned MAX = 1 << 30;
+        RARELY {
+            bool wrap = 
+                _insert->get() > MAX || 
+                _query->get() > MAX || 
+                _update->get() > MAX || 
+                _delete->get() > MAX || 
+                _getmore->get() > MAX || 
+                _command->get() > MAX;
+            
+            if ( wrap ){
+                _insert->zero();
+                _query->zero();
+                _update->zero();
+                _delete->zero();
+                _getmore->zero();
+                _command->zero();
+            }
+                
+        }
+        return _obj; 
+    }
+
     IndexCounters::IndexCounters(){
         _memSupported = _pi.blockCheckSupported();
         
