@@ -27,14 +27,18 @@ namespace mongo {
     struct AtomicUInt{
         AtomicUInt() : x(0) {}
         AtomicUInt(unsigned z) : x(z) { }
-        volatile unsigned x;
-        operator unsigned() const {
-            return x;
-        }
+
+        operator unsigned() const { return x; }
+        unsigned get() const { return x; }
+
         inline AtomicUInt operator++(); // ++prefix
         inline AtomicUInt operator++(int);// postfix++
         inline AtomicUInt operator--(); // --prefix
         inline AtomicUInt operator--(int); // postfix--
+        
+        inline void zero() { x = 0; } // TODO: this isn't thread safe
+        
+        volatile unsigned x;
     };
 
 #if defined(_WIN32)
