@@ -124,6 +124,9 @@ namespace mongo {
                         //db->getChunkManager( ns , true ); // SERVER-1349
                     }
                     else {
+                        // we received a writeback object that was sent to a previous version of a shard
+                        // the actual shard may not have the object the writeback operation is for 
+                        // we need to reload the chunk manager and get the new shard versions
                         db->getChunkManager( ns , true );
                     }
                         

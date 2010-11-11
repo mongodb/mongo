@@ -67,7 +67,10 @@ namespace mongo {
             _map.erase( conn );
         }
 
-        mongo::mutex _mutex;  // protects state below
+        // protects _map
+        mongo::mutex _mutex;
+
+        // a map from a connection into ChunkManager's sequence number for each namespace
         map<DBClientBase*, map<string,unsigned long long> > _map;
 
     } connectionShardStatus;
