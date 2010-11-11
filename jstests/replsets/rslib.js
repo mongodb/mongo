@@ -25,8 +25,9 @@ var wait = function(f) {
  * }
  * </pre>
  */
-var occasionally = function(f) {
-  if (count % 4 == 0) {
+var occasionally = function(f, n) {
+  var interval = n || 4;
+  if (count % interval == 0) {
     f();
   }
   count++;

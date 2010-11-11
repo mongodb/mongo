@@ -98,10 +98,15 @@ print("7. Kill #1 in the middle of syncing");
 replTest.stop(0);
 
 
-print("8. Check that #1 doesn't make it into secondary state for a while");
+print("8. Check that #3 doesn't make it into secondary state for a while");
 for (var i=0; i<100; i++) {
   var status = admin_s2.runCommand({replSetGetStatus:1});
+  occasionally(function() { printjson(status);}, 10);
   assert(status.members[2].state != 2);
+  if (status.members[2].state == 1) {
+    print("#3 completed its initial sync, we should just stop");
+    exit(0);
+  }
   sleep(1000);
 }
 
