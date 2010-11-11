@@ -105,8 +105,6 @@ namespace mongo {
     mongo::mutex Logstream::mutex("Logstream");
     int Logstream::doneSetup = Logstream::magicNumber();
     
-    bool goingAway = false;
-
     bool isPrime(int n) {
         int z = 2;
         while ( 1 ) {

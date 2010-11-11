@@ -49,6 +49,9 @@
 #include "../util/time_support.h"
 
 namespace mongo {
+    
+    extern bool dbexitCalled;
+    
 #ifdef _WIN32
     inline int close(int fd) { return _close(fd); }
     inline int read(int fd, void* buf, size_t size) { return _read(fd, buf, size); }
@@ -281,12 +284,12 @@ namespace mongo {
 
         void goingAwaySoon() { 
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
-            mongo::goingAway = true;
+            mongo::dbexitCalled = true;
         }
 
         void writeMongoProgramOutputLine( int port, int pid, const char *line ) {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
-            if( mongo::goingAway ) throw "program is terminating";
+            if( mongo::dbexitCalled ) throw "program is terminating";
             stringstream buf;
             if ( port > 0 )
                 buf << "m" << port << "| " << line;
@@ -448,7 +451,7 @@ namespace mongo {
                     int lenToRead = ( bufSize - 1 ) - ( start - buf );
                     assert( lenToRead > 0 );
                     int ret = read( pipe_, (void *)start, lenToRead );
-                    if( mongo::goingAway )
+                    if( mongo::dbexitCalled )
                         break;
                     assert( ret != -1 );
                     start[ ret ] = '\0';

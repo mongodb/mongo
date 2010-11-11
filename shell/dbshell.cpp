@@ -55,7 +55,12 @@ bool autoKillOp = false;
 #define CTRLC_HANDLE
 #endif
 
-mongo::Scope * shellMainScope;
+namespace mongo {
+
+    Scope * shellMainScope;
+
+    extern bool dbexitCalled;
+}
 
 void generateCompletions( const string& prefix , vector<string>& all ){
     if ( prefix.find( '"' ) != string::npos )
@@ -197,7 +202,7 @@ void killOps() {
 }
 
 void quitNicely( int sig ){
-    mongo::goingAway = true;
+    mongo::dbexitCalled = true;
     if ( sig == SIGINT && inMultiLine ){
         gotInterrupted = 1;
         return;
@@ -210,7 +215,7 @@ void quitNicely( int sig ){
 }
 #else
 void quitNicely( int sig ){
-    mongo::goingAway = true;
+    mongo::dbexitCalled = true;
     //killOps();
     shellHistoryDone();
     exit(0);
@@ -702,7 +707,7 @@ int _main(int argc, char* argv[]) {
         shellHistoryDone();
     }
 
-    mongo::goingAway = true;
+    mongo::dbexitCalled = true;
     return 0;
 }
 

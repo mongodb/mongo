@@ -1093,7 +1093,6 @@ namespace mongo {
 #undef out
 
     void exitCleanly( ExitCode code ) {
-        goingAway = true;
         killCurrentOp.killAll();
         {
             dblock lk;

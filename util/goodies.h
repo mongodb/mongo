@@ -69,9 +69,6 @@ namespace mongo {
     inline void printStackTrace( ostream &o = cout ) { }
 #endif
 
-    /* set to TRUE if we are exiting */
-    extern bool goingAway;
-
     bool isPrime(int n);
     int nextPrime(int n);
 

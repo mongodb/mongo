@@ -421,7 +421,7 @@ namespace mongo {
     }
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
-        massert( 10357 ,  "shutdown in progress", !goingAway );
+        massert( 10357 ,  "shutdown in progress", ! inShutdown() );
         massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= Extent::maxSize() );
         massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
         int ExtentSize = approxSize <= header()->unusedLength ? approxSize : header()->unusedLength;
