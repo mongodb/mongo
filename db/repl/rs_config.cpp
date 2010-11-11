@@ -137,7 +137,7 @@ namespace mongo {
         uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
-        uassert(13477, "priority must be 0 when buildIndexes=false", priority == 0 || !hidden);
+        uassert(13477, "priority must be 0 when buildIndexes=false", buildIndexes || priority == 0);
     }
 
     /** @param o old config
