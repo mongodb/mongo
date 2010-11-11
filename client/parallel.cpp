@@ -119,7 +119,7 @@ namespace mongo {
         ShardConnection conn( server , _ns );
         auto_ptr<DBClientCursor> cursor = conn->query( _ns , Query( q ).explain() , abs( _batchSize ) * -1 );
         if ( cursor.get() && cursor->more() )
-            o = cursor->next();
+            o = cursor->next().getOwned();
         conn.done();
         return o;
     }
