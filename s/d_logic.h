@@ -1,4 +1,4 @@
-// d_logic.h
+// @file d_logic.h
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -33,24 +33,32 @@ namespace mongo {
 
     class ChunkMatcher {
     public:
-        bool belongsToMe( const BSONObj& key , const DiskLoc& loc ) const;
+        ChunkMatcher( ConfigVersion version , const BSONObj& key );
+        ~ChunkMatcher() {}
+
+        bool belongsToMe( const BSONObj& obj ) const;
+
+        void addRange( const BSONObj& min , const BSONObj& max );
+        void addChunk( const BSONObj& min , const BSONObj& max );
+        
+        // accessors
+
+        ConfigVersion getVersion() const { return _version; } 
 
     private:
-        // intantiated by ShardingState only
-        friend class ShardingState;
-        ChunkMatcher( ConfigVersion version );
-        
-        void addRange( const BSONObj& min , const BSONObj& max );
-        
         // highest ShardChunkVersion for which this ChunkMatcher's information is accurate
         const ConfigVersion _version;
 
         // key pattern for chunks under this range
         BSONObj _key;
 
-        // a map from a min key into a range or continguous chunks
+        // a map from a min key into the chunk boundaries
         typedef map<BSONObj,pair<BSONObj,BSONObj>,BSONObjCmp> RangeMap;
-        RangeMap _map;
+        RangeMap _chunksMap;
+
+        // a map from a min key into a range or continguous chunks
+        // redundant but we expect high chunk continguity, expecially in small installations
+        RangeMap _rangesMap;
     };
 
     typedef shared_ptr<ChunkMatcher> ChunkMatcherPtr;

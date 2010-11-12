@@ -729,7 +729,7 @@ namespace mongo {
             else {
                 _nscannedObjects++;
                 DiskLoc cl = _c->currLoc();
-                if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( _c->currKey(), _c->currLoc() ) ){
+                if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( cl.obj() ) ){
                     _nChunkSkips++;
                     // cout << "TEMP skipping un-owned chunk: " << _c->current() << endl;
                 }

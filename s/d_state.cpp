@@ -1,4 +1,4 @@
-// d_state.cpp
+// @file d_state.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -163,7 +163,7 @@ namespace mongo {
                 return ChunkMatcherPtr();
             
             ChunkMatcherPtr p = _chunks[ns];
-            if ( p && p->_version >= version ){
+            if ( p && p->getVersion() >= version ){
                 // our cached version is good, so just return
                 return p;                
             }
@@ -204,15 +204,17 @@ namespace mongo {
                 scoped->done();
             return ChunkMatcherPtr();
         }
-        
-        ChunkMatcherPtr p( new ChunkMatcher( version ) );
 
-        // coallesce the chunk's bounds in ranges if there are adjacent chunks 
+        BSONObj collection = conn->findOne( "config.collections", BSON( "_id" << ns ) );
+        assert( ! collection["key"].eoo() && collection["key"].isABSONObj() );
+        ChunkMatcherPtr p( new ChunkMatcher( version , collection["key"].Obj().getOwned() ) );
+
         BSONObj min,max;
         while ( cursor->more() ){
             BSONObj d = cursor->next();
+            p->addChunk( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() );
             
-            // first chunk
+            // coallesce the chunk's bounds in ranges if there are adjacent chunks 
             if ( min.isEmpty() ){
                 min = d["min"].Obj().getOwned();
                 max = d["max"].Obj().getOwned();
@@ -599,35 +601,34 @@ namespace mongo {
 
     // --- ChunkMatcher ---
 
-    ChunkMatcher::ChunkMatcher( ConfigVersion version ) : _version( version ) {}
+    ChunkMatcher::ChunkMatcher( ConfigVersion version , const BSONObj& key ) : _version( version ) {
+        BSONObjBuilder b;
+        BSONForEach( e , key ) {
+            b.append( e.fieldName() , 1 );
+        }
+        _key = b.obj();
+    }
+
+    void ChunkMatcher::addChunk( const BSONObj& min , const BSONObj& max ) {
+        _chunksMap[min] == make_pair( min , max );
+    }
 
     void ChunkMatcher::addRange( const BSONObj& min , const BSONObj& max ){
-        // get the key pattern if it hasn't yet
-        if (_key.isEmpty()){
-            BSONObjBuilder b;
-
-            BSONForEach(e, min) {
-                b.append(e.fieldName(), 1);
-            }
-
-            _key = b.obj();
-        }
-
         //TODO debug mode only?
         assert(min.nFields() == _key.nFields());
         assert(max.nFields() == _key.nFields());
 
-        _map[min] = make_pair(min,max);
+        _rangesMap[min] = make_pair(min,max);
     }
 
-    bool ChunkMatcher::belongsToMe( const BSONObj& key , const DiskLoc& loc ) const {
-        if ( _map.size() == 0 )
+    bool ChunkMatcher::belongsToMe( const BSONObj& obj ) const {
+        if ( _rangesMap.size() == 0 )
             return false;
         
-        BSONObj x = loc.obj().extractFields(_key);
-        
-        RangeMap::const_iterator a = _map.upper_bound( x );
-        if ( a != _map.begin() )
+        BSONObj x = obj.extractFields(_key);
+
+        RangeMap::const_iterator a = _rangesMap.upper_bound( x );
+        if ( a != _rangesMap.begin() )
             a--;
         
         bool good = x.woCompare( a->second.first ) >= 0 && x.woCompare( a->second.second ) < 0;
