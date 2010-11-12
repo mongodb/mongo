@@ -236,8 +236,8 @@ namespace mongo {
 
     bool RestAdminAccess::haveAdminUsers() const {
         readlocktryassert rl("admin.system.users", 10000);
-        Client::Context cx( "admin.system.users" );
-        return ! Helpers::isEmpty("admin.system.users");
+        Client::Context cx( "admin.system.users", dbpath, NULL, false );
+        return ! Helpers::isEmpty("admin.system.users", false);
     }
 
     BSONObj RestAdminAccess::getAdminUser( const string& username ) const {

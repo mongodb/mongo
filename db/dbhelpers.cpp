@@ -200,8 +200,8 @@ namespace mongo {
          return i.head.btree()->findSingle( i , i.head , key );
     }
 
-    bool Helpers::isEmpty(const char *ns) {
-        Client::Context context(ns);
+    bool Helpers::isEmpty(const char *ns, bool doAuth) {
+        Client::Context context(ns, dbpath, NULL, doAuth);
         shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
         return !c->ok();
     }

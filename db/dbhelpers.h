@@ -115,7 +115,7 @@ namespace mongo {
         /** You do not need to set the database before calling.
             @return true if collection is empty.
         */
-        static bool isEmpty(const char *ns);
+        static bool isEmpty(const char *ns, bool doAuth=true);
 
         // TODO: this should be somewhere else probably
         static BSONObj toKeyFormat( const BSONObj& o , BSONObj& key );
