@@ -1,4 +1,4 @@
-// collection.js - DBCollection support in the mongo shell
+// @file collection.js - DBCollection support in the mongo shell
 // db.colName is a DBCollection object
 // or db["colName"]
 

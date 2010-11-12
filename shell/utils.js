@@ -1295,10 +1295,17 @@ rs.slaveOk = function () { return db.getMongo().setSlaveOk(); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
-rs.reconfig = function(cfg) {
-  cfg.version = rs.conf().version + 1;
-
-  return db._adminCommand({ replSetReconfig: cfg });
+rs.reconfig = function (cfg) {
+    cfg.version = rs.conf().version + 1;
+    var res = null;
+    try {
+        res = db.adminCommand({ replSetReconfig: cfg });
+    }
+    catch (e) {
+        print("shell got exception during reconfig: " + e);
+        print("in some circumstances, the primary steps down and closes connections on a reconfig");
+    }
+    return res;
 }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
