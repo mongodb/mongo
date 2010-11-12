@@ -31,8 +31,9 @@ namespace mongo {
 
     class QueryPlan : boost::noncopyable {
     public:
-        QueryPlan(NamespaceDetails *_d, 
-                  int _idxNo, // -1 = no index
+
+        QueryPlan(NamespaceDetails *d, 
+                  int idxNo, // -1 = no index
                   const FieldRangeSet &fbs,
                   const FieldRangeSet &originalFrs,
                   const BSONObj &originalQuery,
@@ -42,48 +43,49 @@ namespace mongo {
                   string special="" );
 
         /* If true, no other index can do better. */
-        bool optimal() const { return optimal_; }
+        bool optimal() const { return _optimal; }
         /* ScanAndOrder processing will be required if true */
-        bool scanAndOrderRequired() const { return scanAndOrderRequired_; }
+        bool scanAndOrderRequired() const { return _scanAndOrderRequired; }
         /* When true, the index we are using has keys such that it can completely resolve the
          query expression to match by itself without ever checking the main object.
          */
-        bool exactKeyMatch() const { return exactKeyMatch_; }
+        bool exactKeyMatch() const { return _exactKeyMatch; }
         /* If true, the startKey and endKey are unhelpful and the index order doesn't match the 
            requested sort order */
-        bool unhelpful() const { return unhelpful_; }
-        int direction() const { return direction_; }
+        bool unhelpful() const { return _unhelpful; }
+        int direction() const { return _direction; }
         shared_ptr<Cursor> newCursor( const DiskLoc &startLoc = DiskLoc() , int numWanted=0 ) const;
         shared_ptr<Cursor> newReverseCursor() const;
         BSONObj indexKey() const;
-        bool willScanTable() const { return !index_ && fbs_.matchPossible(); }
-        const char *ns() const { return fbs_.ns(); }
-        NamespaceDetails *nsd() const { return d; }
+        bool willScanTable() const { return !_index && _fbs.matchPossible(); }
+        const char *ns() const { return _fbs.ns(); }
+        NamespaceDetails *nsd() const { return _d; }
         BSONObj originalQuery() const { return _originalQuery; }
-        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return fbs_.simplifiedQuery( fields ); }
-        const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
+        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return _fbs.simplifiedQuery( fields ); }
+        const FieldRange &range( const char *fieldName ) const { return _fbs.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
         shared_ptr< FieldRangeVector > originalFrv() const { return _originalFrv; }
         // just for testing
         shared_ptr< FieldRangeVector > frv() const { return _frv; }
         bool isMultiKey() const;
+
     private:
-        NamespaceDetails *d;
-        int idxNo;
-        const FieldRangeSet &fbs_;
+        NamespaceDetails * _d;
+        int _idxNo;
+        const FieldRangeSet &_fbs;
         const BSONObj &_originalQuery;
-        const BSONObj &order_;
-        const IndexDetails *index_;
-        bool optimal_;
-        bool scanAndOrderRequired_;
-        bool exactKeyMatch_;
-        int direction_;
+        const BSONObj &_order;
+        const IndexDetails * _index;
+        bool _optimal;
+        bool _scanAndOrderRequired;
+        bool _exactKeyMatch;
+        int _direction;
         shared_ptr< FieldRangeVector > _frv;
         shared_ptr< FieldRangeVector > _originalFrv;
         BSONObj _startKey;
         BSONObj _endKey;
         bool _endKeyInclusive;
-        bool unhelpful_;
+        bool _unhelpful;
         string _special;
         IndexType * _type;
         bool _startOrEndSpec;
@@ -201,7 +203,7 @@ namespace mongo {
         bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
         QueryPlanPtr getBestGuess() const;
         //for testing
-        const FieldRangeSet &fbs() const { return *fbs_; }
+        const FieldRangeSet &fbs() const { return *_fbs; }
         const FieldRangeSet &originalFrs() const { return *_originalFrs; }
         bool modifiedKeys() const;
     private:
@@ -226,13 +228,13 @@ namespace mongo {
         };
         const char *ns;
         BSONObj _originalQuery;
-        auto_ptr< FieldRangeSet > fbs_;
+        auto_ptr< FieldRangeSet > _fbs;
         auto_ptr< FieldRangeSet > _originalFrs;
         PlanSet plans_;
         bool mayRecordPlan_;
         bool usingPrerecordedPlan_;
         BSONObj hint_;
-        BSONObj order_;
+        BSONObj _order;
         long long oldNScanned_;
         bool honorRecordedPlan_;
         BSONObj min_;
