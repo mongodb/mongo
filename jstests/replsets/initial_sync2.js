@@ -18,6 +18,7 @@
 load("jstests/replsets/rslib.js");
 var basename = "jstests_initsync2";
 
+var doTest = function() {
 
 print("1. Bring up set");
 var replTest = new ReplSetTest( {name: basename, nodes: 2} );
@@ -105,7 +106,7 @@ for (var i=0; i<100; i++) {
   assert(status.members[2].state != 2);
   if (status.members[2].state == 1) {
     print("#3 completed its initial sync, we should just stop");
-    exit(0);
+    return;
   }
   sleep(1000);
 }
@@ -175,3 +176,6 @@ wait(function() {
   });
 
 replTest.stopSet();
+};
+
+doTest();
