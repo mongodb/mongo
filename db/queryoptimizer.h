@@ -193,25 +193,26 @@ namespace mongo {
                      const BSONObj &max = BSONObj(),
                      bool bestGuessOnly = false,
                      bool mayYield = false);
-        int nPlans() const { return plans_.size(); }
+        int nPlans() const { return _plans.size(); }
         shared_ptr< QueryOp > runOp( QueryOp &op );
         template< class T >
         shared_ptr< T > runOp( T &op ) {
             return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
         }
         BSONObj explain() const;
-        bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
+        bool usingPrerecordedPlan() const { return _usingPrerecordedPlan; }
         QueryPlanPtr getBestGuess() const;
         //for testing
         const FieldRangeSet &fbs() const { return *_fbs; }
         const FieldRangeSet &originalFrs() const { return *_originalFrs; }
         bool modifiedKeys() const;
+
     private:
         void addOtherPlans( bool checkFirst );
         void addPlan( QueryPlanPtr plan, bool checkFirst ) {
-            if ( checkFirst && plan->indexKey().woCompare( plans_[ 0 ]->indexKey() ) == 0 )
+            if ( checkFirst && plan->indexKey().woCompare( _plans[ 0 ]->indexKey() ) == 0 )
                 return;
-            plans_.push_back( plan );
+            _plans.push_back( plan );
         }
         void init();
         void addHint( IndexDetails &id );
@@ -219,26 +220,27 @@ namespace mongo {
             Runner( QueryPlanSet &plans, QueryOp &op );
             shared_ptr< QueryOp > run();
             void mayYield( const vector< shared_ptr< QueryOp > > &ops );
-            QueryOp &op_;
-            QueryPlanSet &plans_;
+            QueryOp &_op;
+            QueryPlanSet &_plans;
             static void initOp( QueryOp &op );
             static void nextOp( QueryOp &op );
             static bool prepareToYield( QueryOp &op );
             static void recoverFromYield( QueryOp &op );
         };
-        const char *ns;
+
+        const char *_ns;
         BSONObj _originalQuery;
         auto_ptr< FieldRangeSet > _fbs;
         auto_ptr< FieldRangeSet > _originalFrs;
-        PlanSet plans_;
-        bool mayRecordPlan_;
-        bool usingPrerecordedPlan_;
-        BSONObj hint_;
+        PlanSet _plans;
+        bool _mayRecordPlan;
+        bool _usingPrerecordedPlan;
+        BSONObj _hint;
         BSONObj _order;
-        long long oldNScanned_;
-        bool honorRecordedPlan_;
-        BSONObj min_;
-        BSONObj max_;
+        long long _oldNScanned;
+        bool _honorRecordedPlan;
+        BSONObj _min;
+        BSONObj _max;
         string _special;
         bool _bestGuessOnly;
         bool _mayYield;
