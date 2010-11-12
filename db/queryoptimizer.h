@@ -66,6 +66,7 @@ namespace mongo {
         shared_ptr< FieldRangeVector > originalFrv() const { return _originalFrv; }
         // just for testing
         shared_ptr< FieldRangeVector > frv() const { return _frv; }
+        bool isMultiKey() const;
     private:
         NamespaceDetails *d;
         int idxNo;
@@ -202,6 +203,7 @@ namespace mongo {
         //for testing
         const FieldRangeSet &fbs() const { return *fbs_; }
         const FieldRangeSet &originalFrs() const { return *_originalFrs; }
+        bool modifiedKeys() const;
     private:
         void addOtherPlans( bool checkFirst );
         void addPlan( PlanPtr plan, bool checkFirst ) {
@@ -293,6 +295,7 @@ namespace mongo {
         }
         void setBestGuessOnly() { _bestGuessOnly = true; }
         void mayYield( bool val ) { _mayYield = val; }
+        bool modifiedKeys() const { return _currentQps->modifiedKeys(); }
     private:
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
@@ -367,12 +370,16 @@ namespace mongo {
         }        
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return _c->supportYields(); }
+
         // with update we could potentially get the same document on multiple
         // indexes, but update appears to already handle this with seenObjects
         // so we don't have to do anything special here.
         virtual bool getsetdup(DiskLoc loc) {
             return _c->getsetdup( loc );   
         }
+        
+        virtual bool modifiedKeys() const { return _mps->modifiedKeys(); }
+        
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         // return -1 if we're a getmore handoff
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }

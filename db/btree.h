@@ -383,6 +383,8 @@ namespace mongo {
             }
             return false;
         }
+        
+        virtual bool modifiedKeys() const { return _multikey; }
 
         const _KeyNode& _currKeyNode() const {
             assert( !bucket.isNull() );

@@ -1063,10 +1063,11 @@ namespace mongo {
 
         virtual bool supportGetMore() { return false; }
         virtual bool supportYields() { return false; }
+        
+        virtual bool getsetdup(DiskLoc loc) { return false; }
+        virtual bool modifiedKeys() const { return true; }
 
-        virtual bool getsetdup(DiskLoc loc){
-            return false;
-        }
+        
 
         const Geo2dType * _spec;
         const IndexDetails * _id;

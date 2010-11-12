@@ -237,6 +237,10 @@ namespace mongo {
         }
     }
     
+    bool QueryPlan::isMultiKey() const { 
+        return d->isMultikey( idxNo ); 
+    }
+
     QueryPlanSet::QueryPlanSet( const char *_ns, auto_ptr< FieldRangeSet > frs, auto_ptr< FieldRangeSet > originalFrs, const BSONObj &originalQuery, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max, bool bestGuessOnly, bool mayYield ) :
     ns(_ns),
     _originalQuery( originalQuery ),
@@ -259,6 +263,13 @@ namespace mongo {
         init();
     }
     
+    bool QueryPlanSet::modifiedKeys() const {
+        for( PlanSet::const_iterator i = plans_.begin(); i != plans_.end(); ++i )
+            if ( (*i)->isMultiKey() )
+                return true;
+        return false;
+    }
+
     void QueryPlanSet::addHint( IndexDetails &id ) {
         if ( !min_.isEmpty() || !max_.isEmpty() ) {
             string errmsg;
