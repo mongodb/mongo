@@ -24,7 +24,7 @@ function p(){
 
 p()
 
-/* SERVER-1821
+
 t.update({"loc" : {"$within" : {"$center" : [[5,5], 2]}}}, {'$inc' : { 'z' : 1}}, false, true); 
 assert.isnull( db.getLastError() , "B1" )
 p()
@@ -37,4 +37,4 @@ p()
 t.update({"loc" : {"$within" : {"$center" : [[5,5], 2]}}}, {'$inc' : { 'z' : 1}}, false, true); 
 assert.isnull( db.getLastError() , "B3" )
 p()
-*/
+

@@ -67,13 +67,17 @@ namespace mongo {
         memset(&hints, 0, sizeof(addrinfo));
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
-
+        
         static string portNum = BSONObjBuilder::numStr(cmdLine.port);
 
-        int ret = getaddrinfo(iporhost.data(), portNum.c_str(), &hints, &addrs);
-        massert(13471, string("getaddrinfo(\"") + iporhost.data() + "\") failed: " + gai_strerror(ret), ret == 0);
-
         vector<string> out;
+
+        int ret = getaddrinfo(iporhost.data(), portNum.c_str(), &hints, &addrs);
+        if ( ret == 0 ){
+            warning() << "getaddrinfo(\"" << iporhost.data() << "\") failed: " << gai_strerror(ret) << endl;
+            return out;
+        }
+
         for (addrinfo* addr = addrs; addr != NULL; addr = addr->ai_next){
             int family = addr->ai_family;
             char host[NI_MAXHOST];
