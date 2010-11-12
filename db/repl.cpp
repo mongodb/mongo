@@ -897,9 +897,9 @@ namespace mongo {
             if( cmdLine.pretouch > 1 ) {
                 /* note: this is bad - should be put in ReplSource.  but this is first test... */
                 static int countdown;
+                assert( countdown >= 0 );
                 if( countdown > 0 ) {
                     countdown--; // was pretouched on a prev pass
-                    assert( countdown >= 0 );
                 } else {
                     const int m = 4;
                     if( tp.get() == 0 ) {
