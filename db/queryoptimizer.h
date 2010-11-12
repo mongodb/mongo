@@ -177,8 +177,8 @@ namespace mongo {
     class QueryPlanSet {
     public:
 
-        typedef boost::shared_ptr< QueryPlan > PlanPtr;
-        typedef vector< PlanPtr > PlanSet;
+        typedef boost::shared_ptr< QueryPlan > QueryPlanPtr;
+        typedef vector< QueryPlanPtr > PlanSet;
 
         QueryPlanSet( const char *ns,
                      auto_ptr< FieldRangeSet > frs,
@@ -199,14 +199,14 @@ namespace mongo {
         }
         BSONObj explain() const;
         bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
-        PlanPtr getBestGuess() const;
+        QueryPlanPtr getBestGuess() const;
         //for testing
         const FieldRangeSet &fbs() const { return *fbs_; }
         const FieldRangeSet &originalFrs() const { return *_originalFrs; }
         bool modifiedKeys() const;
     private:
         void addOtherPlans( bool checkFirst );
-        void addPlan( PlanPtr plan, bool checkFirst ) {
+        void addPlan( QueryPlanPtr plan, bool checkFirst ) {
             if ( checkFirst && plan->indexKey().woCompare( plans_[ 0 ]->indexKey() ) == 0 )
                 return;
             plans_.push_back( plan );
