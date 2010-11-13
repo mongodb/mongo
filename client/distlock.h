@@ -15,11 +15,6 @@
  *    limitations under the License.
  */
 
-
-/**
- * distributed locking mechanism
- */
-
 #pragma once
 
 #include "../pch.h"
@@ -30,10 +25,14 @@
 
 namespace mongo {
 
+    /**
+     * distributed locking mechanism
+     */
     class DistributedLock {
     public:
 
         /**
+       what does this do ???  what is conn? name?
          * @param takeoverMinutes how long before we steal lock in minutes
          */
         DistributedLock( const ConnectionString& conn , const string& name , unsigned takeoverMinutes = 10 );
@@ -52,31 +51,24 @@ namespace mongo {
     
     class dist_lock_try {
     public:
-
         dist_lock_try( DistributedLock * lock , string why )
             : _lock(lock){
             _got = _lock->lock_try( why , &_other );
         }
 
-        ~dist_lock_try(){
-            if ( _got ){
+        ~dist_lock_try() {
+            if ( _got ) {
                 _lock->unlock();
             }
         }
 
-        bool got() const {
-            return _got;
-        }
-
-        BSONObj other() const {
-            return _other;
-        }
+        bool got() const { return _got; }
+        BSONObj other() const { return _other; }
  
     private:
         DistributedLock * _lock;
         bool _got;
-        BSONObj _other;
-        
+        BSONObj _other;        
     };
 
 }
