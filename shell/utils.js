@@ -1326,7 +1326,15 @@ rs.add = function (hostport, arb) {
             cfg.arbiterOnly = true;
     }
     c.members.push(cfg);
-    return db._adminCommand({ replSetReconfig: c });
+    var res = null;
+    try { 
+        res = db.adminCommand({ replSetReconfig: c });
+    }
+    catch (e) {
+        print("shell got exception during reconfig: " + e);
+        print("in some circumstances, the primary steps down and closes connections on a reconfig");
+    }
+    return res;
 }
 rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:secs||60}); }
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
