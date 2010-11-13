@@ -134,30 +134,24 @@ restart:
 	}
 
 	/*
-	 * We've found the right on-page WT_ROW structure, but that's only the
-	 * first step; the record may have been updated since reading the page
-	 * into the cache.
+	 * We've got the right on-page WT_ROW structure (an exact match in the
+	 * case of a lookup, or the smallest key on the page less than or equal 
+	 * to the specified key in the case of an insert).   If it's an insert,
+	 * we're done, return the information.   Otherwise, check to see if the
+	 * item was modified/deleted.
 	 */
 	switch (hdr->type) {
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
-		/*
-		 * If inserting a new entry, return the smallest key on the page
-		 * less-than-or-equal-to the specified key.
-		 */
-		if (!LF_ISSET(WT_INSERT)) {
-			if (cmp != 0) {			/* No match */
-				ret = WT_NOTFOUND;
-				goto err;
-			}
+		if (LF_ISSET(WT_INSERT))
+			break;
+		if (cmp != 0)				/* No match */
+			goto notfound;
 							/* Deleted match. */
-			if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
-				if (WT_REPL_DELETED_ISSET(repl)) {
-					ret = WT_NOTFOUND;
-					goto err;
-				}
-				toc->srch_repl = repl;
-			}
+		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
+			if (WT_REPL_DELETED_ISSET(repl))
+				goto notfound;
+			toc->srch_repl = repl;
 		}
 		break;
 	case WT_PAGE_DUP_INT:
@@ -175,6 +169,9 @@ restart:
 	toc->srch_ip = rip;
 	toc->srch_write_gen = write_gen;
 	return (0);
+
+notfound:
+	ret = WT_NOTFOUND;
 
 err:	if (page != idb->root_page)
 		__wt_bt_page_out(toc, &page, 0);
