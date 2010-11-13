@@ -219,7 +219,7 @@ namespace mongo {
             bool changed = mem.changed(old);
             if( changed ) { 
                 if( old.hbstate != mem.hbstate ) 
-                    log() << "replSet " << h.toString() << ' ' << mem.hbstate.toString() << rsLog;
+                    log() << "replSet member " << h.toString() << ' ' << mem.hbstate.toString() << rsLog;
             }
             if( changed || now-last>4 ) {
                 last = now;
