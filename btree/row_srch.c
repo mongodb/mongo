@@ -113,8 +113,8 @@ restart:
 		 * an update.
 		 */
 		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
-			addr = ((WT_OFF *)rip->data)->addr;
-			size = ((WT_OFF *)rip->data)->size;
+			addr = ((WT_OFF *)WT_REPL_DATA(repl))->addr;
+			size = ((WT_OFF *)WT_REPL_DATA(repl))->size;
 		} else {
 			addr = WT_ROW_OFF_ADDR(rip);
 			size = WT_ROW_OFF_SIZE(rip);

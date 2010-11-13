@@ -91,8 +91,8 @@ restart:
 		 * an update.
 		 */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			addr = ((WT_OFF *)cip->data)->addr;
-			size = ((WT_OFF *)cip->data)->size;
+			addr = ((WT_OFF *)WT_REPL_DATA(repl))->addr;
+			size = ((WT_OFF *)WT_REPL_DATA(repl))->size;
 		} else {
 			addr = WT_COL_OFF_ADDR(cip);
 			size = WT_COL_OFF_SIZE(cip);
