@@ -260,6 +260,8 @@ __wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 				__wt_bt_page_out(toc, &ovfl, 0);
 			}
 			break;
+		case WT_ITEM_DEL:
+			break;
 		WT_ILLEGAL_FORMAT_ERR(db, ret);
 		}
 	}
