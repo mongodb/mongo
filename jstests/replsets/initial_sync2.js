@@ -127,8 +127,8 @@ print("10. Initial sync should succeed");
 wait(function() {
     var status = admin_s2.runCommand({replSetGetStatus:1});
     printjson(status);
-    return status.members[2].state == 2 ||
-      status.members[2].state == 1;
+    return status.members &&
+      status.members[2].state == 2 || status.members[2].state == 1;
   });
 
 
