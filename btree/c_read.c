@@ -39,7 +39,8 @@ __wt_workq_read_server(ENV *env, int force)
 	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
 		WT_VERBOSE(env, WT_VERB_SERVERS, (env,
 		    "workQ locks out reads: bytes-inuse %llu of bytes-max %llu",
-		    (u_quad)bytes_inuse, (u_quad)bytes_max));
+		    (unsigned long long)bytes_inuse,
+		    (unsigned long long)bytes_max));
 		cache->read_lockout = 1;
 	}
 
@@ -151,19 +152,27 @@ __wt_cache_read_server(void *arg)
 				    __wt_cache_alloc(
 					rr->toc, rr->addrp, rr->size) :
 				    __wt_cache_read(rr);
-				if (ret != 0)
-					break;
 
 				WT_READ_REQ_CLR(rr);
 				__wt_toc_serialize_wrapup(toc, ret);
 
 				didwork = 1;
+
+				/*
+				 * Any error terminates the request; a serious
+				 * error causes the read server to exit.
+				 */
+				if (ret != 0) {
+					if (ret != WT_RESTART)
+						goto err;
+					ret = 0;
+				}
 			}
 		} while (didwork);
 	}
 
 	if (ret != 0)
-		__wt_api_env_err(env, ret, "cache read server error");
+err:		__wt_api_env_err(env, ret, "cache read server error");
 
 	WT_VERBOSE(env, WT_VERB_SERVERS, (env, "cache read server exiting"));
 	return (NULL);
