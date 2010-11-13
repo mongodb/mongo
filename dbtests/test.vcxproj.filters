@@ -711,6 +711,9 @@
     <ClCompile Include="..\db\mongommf.cpp">
       <Filter>dur</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\d_chunk_matcher.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

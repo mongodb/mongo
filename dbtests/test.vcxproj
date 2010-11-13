@@ -554,6 +554,7 @@
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\s\chunk.cpp" />
     <ClCompile Include="..\s\config.cpp" />
+    <ClCompile Include="..\s\d_chunk_matcher.cpp" />
     <ClCompile Include="..\s\d_migrate.cpp" />
     <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />

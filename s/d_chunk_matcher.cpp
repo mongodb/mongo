@@ -16,6 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "pch.h"
 #include "d_chunk_matcher.h"
 
 namespace mongo {
