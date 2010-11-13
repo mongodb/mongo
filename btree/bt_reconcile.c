@@ -200,10 +200,10 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	hdr = new->hdr;
 	WT_INDX_FOREACH(page, cip, i) {
-		if ((repl = WT_COL_REPL(page, cip)) == NULL)
-			from = cip->data;
-		else
+		if ((repl = WT_COL_REPL(page, cip)) != NULL)
 			from = WT_REPL_DATA(repl);
+		else
+			from = cip->data;
 
 		/*
 		 * XXX
@@ -277,7 +277,7 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		p = item;
 		item = WT_ITEM_NEXT(item);
 		if ((repl = WT_ROW_REPL(page, rip)) != NULL)
-			*(WT_OFF *)WT_ITEM_BYTE(item)  =
+			*(WT_OFF *)WT_ITEM_BYTE(item) =
 			    *(WT_OFF *)WT_REPL_DATA(repl);
 		len = sizeof(WT_ITEM) * 2 + WT_ITEM_LEN(item) + sizeof(WT_OFF);
 
