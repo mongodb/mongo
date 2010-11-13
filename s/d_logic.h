@@ -19,50 +19,17 @@
 #pragma once
 
 #include "../pch.h"
+
 #include "../db/jsobj.h"
+
+#include "d_chunk_matcher.h"
 #include "util.h"
 
 namespace mongo {
     
-    class ShardingState;
-    
     typedef ShardChunkVersion ConfigVersion;
     typedef map<string,ConfigVersion> NSVersionMap;
 
-    // -----------
-
-    class ChunkMatcher {
-    public:
-        ChunkMatcher( ConfigVersion version , const BSONObj& key );
-        ~ChunkMatcher() {}
-
-        bool belongsToMe( const BSONObj& obj ) const;
-
-        void addRange( const BSONObj& min , const BSONObj& max );
-        void addChunk( const BSONObj& min , const BSONObj& max );
-        
-        // accessors
-
-        ConfigVersion getVersion() const { return _version; } 
-
-    private:
-        // highest ShardChunkVersion for which this ChunkMatcher's information is accurate
-        const ConfigVersion _version;
-
-        // key pattern for chunks under this range
-        BSONObj _key;
-
-        // a map from a min key into the chunk boundaries
-        typedef map<BSONObj,pair<BSONObj,BSONObj>,BSONObjCmp> RangeMap;
-        RangeMap _chunksMap;
-
-        // a map from a min key into a range or continguous chunks
-        // redundant but we expect high chunk continguity, expecially in small installations
-        RangeMap _rangesMap;
-    };
-
-    typedef shared_ptr<ChunkMatcher> ChunkMatcherPtr;
-    
     // --------------
     // --- global state ---
     // --------------
