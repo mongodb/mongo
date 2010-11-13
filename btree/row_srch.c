@@ -135,7 +135,7 @@ restart:
 
 	/*
 	 * We've got the right on-page WT_ROW structure (an exact match in the
-	 * case of a lookup, or the smallest key on the page less than or equal 
+	 * case of a lookup, or the smallest key on the page less than or equal
 	 * to the specified key in the case of an insert).   If it's an insert,
 	 * we're done, return the information.   Otherwise, check to see if the
 	 * item was modified/deleted.
