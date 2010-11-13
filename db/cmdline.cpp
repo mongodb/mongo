@@ -123,8 +123,9 @@ namespace mongo {
             po::notify(params);
         } 
         catch (po::error &e) {
-            cout << "ERROR: " << e.what() << endl << endl;
-            cout << visible << endl;
+            cout << "error command line: " << e.what() << endl;
+            cout << "use --help for help" << endl;
+            //cout << visible << endl;
             return false;
         }
 
