@@ -24,10 +24,12 @@
 
 namespace mongo { 
 
-    extern bool __destroyingStatics;
     class mutex;
 
-    // only used on _DEBUG builds:
+    /** only used on _DEBUG builds.
+        MutexDebugger checks that we always acquire locks for multiple mutexes in a consistant (acyclic) order.
+        If we were inconsistent we could deadlock.
+    */
     class MutexDebugger { 
         typedef const char * mid; // mid = mutex ID
         typedef map<mid,int> Preceeding;
@@ -36,6 +38,8 @@ namespace mongo {
         map< mid, set<mid> > followers;
         boost::mutex &x;
         unsigned magic;
+
+        void aBreakPoint() { } // for debugging
     public:
         // set these to create an assert that
         //   b must never be locked before a
@@ -45,9 +49,11 @@ namespace mongo {
         //   only checked on _DEBUG builds.
         string a,b;
         
-        void aBreakPoint(){}
+        /** outputs some diagnostic info on mutexes (on _DEBUG builds) */
         void programEnding();
+
         MutexDebugger();
+
         void entering(mid m) {
             if( this == 0 ) return;
             assert( magic == 0x12345678 );
@@ -121,11 +127,12 @@ namespace mongo {
     extern MutexDebugger &mutexDebugger;
     
     // If you create a local static instance of this class, that instance will be destroyed
-    // before all global static objects are destroyed, so __destroyingStatics will be set
+    // before all global static objects are destroyed, so _destroyingStatics will be set
     // to true before the global static variables are destroyed.
     class StaticObserver : boost::noncopyable {
     public:
-        ~StaticObserver() { __destroyingStatics = true; }
+        static bool _destroyingStatics;
+        ~StaticObserver() { _destroyingStatics = true; }
     };
 
     // On pthread systems, it is an error to destroy a mutex while held.  Static global
@@ -148,7 +155,7 @@ namespace mongo {
             IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
         }
         ~mutex() {
-            if( !__destroyingStatics ) {
+            if( !StaticObserver::_destroyingStatics ) {
                 UNIGNORE_OBJECT( _m );
                 delete _m;
             }

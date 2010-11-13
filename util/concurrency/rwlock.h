@@ -117,7 +117,7 @@ namespace mongo {
         }
         
         ~RWLock(){
-            if ( ! __destroyingStatics ){
+            if ( ! StaticObserver::_destroyingStatics ){
                 check( pthread_rwlock_destroy( &_lock ) );
             }
         }

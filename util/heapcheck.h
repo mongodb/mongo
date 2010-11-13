@@ -1,4 +1,4 @@
-// inline.h
+// @file heapcheck.h
 
 /**
 *    Copyright (C) 2010 10gen Inc.

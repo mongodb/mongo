@@ -192,6 +192,6 @@ namespace mongo {
         return s;
     }
 
-    bool __destroyingStatics = false;
+    bool StaticObserver::_destroyingStatics = false;
     
 } // namespace mongo
