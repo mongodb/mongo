@@ -443,7 +443,7 @@ wts_read_row(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "read {%llu}\n", (unsigned long long)keyno);
+		fprintf(g.wts_log, "read %llu\n", (unsigned long long)keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
@@ -519,7 +519,7 @@ wts_read_col(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "read {%llu}\n", (unsigned long long)keyno);
+		fprintf(g.wts_log, "read %llu\n", (unsigned long long)keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
@@ -573,7 +573,9 @@ wts_put_row(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "put {%llu}\n", (unsigned long long)keyno);
+		fprintf(g.wts_log, "put %llu {%.*s}\n",
+		    (unsigned long long)keyno,
+		    (int)data.size, (char *)data.data);
 
 	if (bdb_put(keyno, data.data, data.size, &notfound))
 		return (1);
@@ -608,7 +610,9 @@ wts_put_col(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "put {%llu}\n", (unsigned long long)keyno);
+		fprintf(g.wts_log, "put %llu {%.*s}\n",
+		    (unsigned long long)keyno,
+		    (int)data.size, (char *)data.data);
 
 	if (bdb_put(keyno, data.data, data.size, &notfound))
 		return (1);
@@ -644,7 +648,7 @@ wts_del_row(u_int64_t keyno)
 	/* Log the operation */
 	if (g.wts_log != NULL)
 		fprintf(g.wts_log,
-		    "delete {%llu}\n", (unsigned long long)keyno);
+		    "delete %llu\n", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
@@ -678,7 +682,7 @@ wts_del_col(u_int64_t keyno)
 	/* Log the operation */
 	if (g.wts_log != NULL)
 		fprintf(g.wts_log,
-		    "delete {%llu}\n", (unsigned long long)keyno);
+		    "delete %llu\n", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
