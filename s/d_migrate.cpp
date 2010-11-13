@@ -730,6 +730,10 @@ namespace mongo {
 
             // 5.
             { 
+                // TODO SERVER-2024
+                // + 5.b check opReplicatedEnough on _recvChunkCommit TO-side
+                // + 5.c kill isEmpty check by using ChunkMatcher knowledge and send the config updates on an applyOps format
+
                 // 5.a
                 // we're under the collection lock here, so no other migrate can change maxVersion
                 migrateFromStatus.setInCriticalSection( true );
