@@ -21,6 +21,7 @@ __wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	WT_COL *cip;
 	WT_COL_EXPAND *exp;
 	WT_PAGE *page;
+	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
 	uint64_t record_cnt;
 	uint32_t addr, size, i;
@@ -50,17 +51,18 @@ restart:
 		write_gen = WT_PAGE_WRITE_GEN(page);
 
 		/* Walk the page looking for the record. */
-		switch (page->hdr->type) {
+		hdr = page->hdr;
+		switch (hdr->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			cip = page->u.icol + (recno - page->hdr->start_recno);
+			cip = page->u.icol + (recno - hdr->start_recno);
 			goto done;
 		case WT_PAGE_COL_RCC:
 			/*
 			 * Walk the page, counting records -- do the record
 			 * count calculation in a funny way to avoid overflow.
 			 */
-			record_cnt = recno - page->hdr->start_recno;
+			record_cnt = recno - hdr->start_recno;
 			WT_INDX_FOREACH(page, cip, i) {
 				if (record_cnt < WT_RCC_REPEAT_COUNT(cip->data))
 					break;
@@ -73,7 +75,7 @@ restart:
 			 * Walk the page, counting records -- do the record
 			 * count calculation in a funny way to avoid overflow.
 			 */
-			record_cnt = recno - page->hdr->start_recno;
+			record_cnt = recno - hdr->start_recno;
 			WT_INDX_FOREACH(page, cip, i) {
 				if (record_cnt < WT_COL_OFF_RECORDS(cip))
 					break;
@@ -83,7 +85,7 @@ restart:
 		}
 
 		/* If a level was set, see if we found the asked-for page. */
-		if (level == page->hdr->level)
+		if (level == hdr->level)
 			goto done;
 
 		/*
@@ -116,7 +118,7 @@ done:	/*
 	 * first step; the record may have been updated since reading the page
 	 * into the cache.
 	 */
-	switch (page->hdr->type) {
+	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
 		/* Find the item's WT_REPL slot if it exists. */
 		repl = WT_COL_REPL(page, cip);
