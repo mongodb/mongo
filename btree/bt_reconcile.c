@@ -200,9 +200,10 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	hdr = new->hdr;
 	WT_INDX_FOREACH(page, cip, i) {
-		from =
-		    (WT_OFF *)((repl = WT_COL_REPL(page, cip)) == NULL ?
-		    cip->data : WT_REPL_DATA(repl));
+		if ((repl = WT_COL_REPL(page, cip)) == NULL)
+			from = cip->data;
+		else
+			from = WT_REPL_DATA(repl);
 
 		/*
 		 * XXX
@@ -1057,7 +1058,7 @@ __wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 *
 	 * Create and initialize the WT_OFF structure.
 	 */
-	WT_CLEAR(off);
+	WT_RECORDS(&off) = new->records;
 	off.addr = new->addr;
 	off.size = new->size;
 
