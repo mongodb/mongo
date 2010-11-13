@@ -139,9 +139,16 @@ struct __wt_repl {
 #define	WT_REPL_DELETED_SET(repl)	((repl)->size = UINT32_MAX)
 	uint32_t size;			/* data length */
 
-	/* The data immediately follows the repl structure. */
+	/*
+	 * The data immediately follows the repl structure, and sometimes it's
+	 * a WT_OFF structure.
+	 */
 #define	WT_REPL_DATA(repl)						\
-	(void *)((uint8_t *)repl + sizeof(WT_REPL))
+	((void *)((uint8_t *)repl + sizeof(WT_REPL)))
+#define	WT_REPL_DATA_OFF_ADDR(repl)					\
+	(((WT_OFF *)WT_REPL_DATA(repl))->addr)
+#define	WT_REPL_DATA_OFF_SIZE(repl)					\
+	(((WT_OFF *)WT_REPL_DATA(repl))->size)
 };
 
 /*
