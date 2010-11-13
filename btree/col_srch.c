@@ -124,10 +124,10 @@ done:	/*
 		repl = WT_COL_REPL(page, cip);
 
 		/*
-		 * If it's an insert, we don't care about the state of the item,
-		 * return the gathered information.
+		 * If overwriting an existing data item, we don't care if the
+		 * item was previously deleted, return the gathered information.
 		 */
-		if (LF_ISSET(WT_INSERT)) {
+		if (LF_ISSET(WT_DATA_OVERWRITE)) {
 			toc->srch_repl = repl;
 			break;
 		}
@@ -152,10 +152,10 @@ done:	/*
 				break;
 
 		/*
-		 * If it's an insert, we don't care about the state of the item,
-		 * return the gathered information.
+		 * If overwriting an existing data item, we don't care if the
+		 * item was previously deleted, return the gathered information.
 		 */
-		if (LF_ISSET(WT_INSERT)) {
+		if (LF_ISSET(WT_DATA_OVERWRITE)) {
 			if (exp != NULL) {
 				toc->srch_exp = exp;
 				toc->srch_repl = exp->repl;
@@ -181,10 +181,10 @@ done:	/*
 		repl = WT_COL_REPL(page, cip);
 
 		/*
-		 * If it's an insert, we don't care about the state of the item,
-		 * return the gathered information.
+		 * If overwriting an existing data item, we don't care if the
+		 * item was previously deleted, return the gathered information.
 		 */
-		if (LF_ISSET(WT_INSERT)) {
+		if (LF_ISSET(WT_DATA_OVERWRITE)) {
 			toc->srch_repl = repl;
 			break;
 		}

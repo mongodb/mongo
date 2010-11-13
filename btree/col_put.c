@@ -43,7 +43,7 @@ __wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data)
  *	Column store delete and update.
  */
 static int
-__wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int insert)
+__wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 {
 	DB *db;
 	ENV *env;
@@ -64,8 +64,8 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int insert)
 	repl = NULL;
 
 	/* Search the btree for the key. */
-	WT_RET(
-	    __wt_bt_search_col(toc, recno, WT_NOLEVEL, insert ? WT_INSERT : 0));
+	WT_RET(__wt_bt_search_col(
+	    toc, recno, WT_NOLEVEL, data_overwrite ? WT_DATA_OVERWRITE : 0));
 	page = toc->srch_page;
 
 	/*

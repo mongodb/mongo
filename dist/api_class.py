@@ -616,7 +616,7 @@ flags['bt_page_out'] = [
 	'DISCARD',
 	'MODIFIED' ]
 flags['bt_search_col'] = [
-	'INSERT' ]
+	'DATA_OVERWRITE' ]
 flags['bt_search_key_row'] = [
 	'INSERT' ]
 flags['wt_page_in'] = [

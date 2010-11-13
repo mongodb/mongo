@@ -527,6 +527,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_CACHE_ONLY					0x00000001
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
+#define	WT_DATA_OVERWRITE				0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DISCARD					0x00000002
 #define	WT_DUPLICATES					0x00000001
