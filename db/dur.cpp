@@ -45,6 +45,7 @@
 #else
 
 #include "dur.h"
+#include "dur_journal.h"
 #include "../util/mongoutils/hash.h"
 
 namespace mongo { 
@@ -105,7 +106,47 @@ namespace mongo {
             return x;
         }
 
+        void _PREPLOGBUFFER(BufBuilder& bb) { 
+            bb.reset();
+
+            JSectHeader h;
+            bb.appendStruct(h);
+
+            for( vector<WriteIntent>::iterator i = writes.begin(); i != writes.end(); i++ ) {
+                JEntry e;
+                e.len = i->len;
+                e.file;
+            }
+
+            JSectFooter f;
+            bb.appendStruct(f);
+        }
+
+        void PREPLOGBUFFER(BufBuilder& bb) {
+            {
+                readlocktry lk("", 1000);
+                if( lk.got() ) {
+                    _PREPLOGBUFFER(bb);
+                    return;
+                }
+            }
+            // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a 
+            // write lock instead.  otherwise writes could use too much RAM.
+            writelock lk;
+            _PREPLOGBUFFER(bb);
+        }
+
         void durThread() { 
+            BufBuilder bb(1024 * 1024 * 16);
+            while( 1 ) { 
+                try {
+                    sleepmillis(100);
+                    PREPLOGBUFFER(bb);
+                }
+                catch(...) { 
+                    log() << "exception in durThread" << endl;
+                }
+            }
         }
 
         void startup() {

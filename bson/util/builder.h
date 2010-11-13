@@ -123,6 +123,11 @@ namespace mongo {
             memcpy(grow((int) len), src, len);
         }
 
+        template<class T>
+        void appendStruct(const T& s) { 
+            appendBuf(&s, sizeof(T));
+        }
+
         void appendStr(const StringData &str , bool includeEOO = true ) {
             const int len = str.size() + ( includeEOO ? 1 : 0 );
             memcpy(grow(len), str.data(), len);

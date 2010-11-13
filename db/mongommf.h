@@ -64,6 +64,7 @@ namespace mongo {
         */
         static void* switchToPrivateView(void *debug_readonly_ptr);
 
+        //void* view_readonly() { return _view_readonly; }
     private:
         void *_view_write;
         void *_view_private;

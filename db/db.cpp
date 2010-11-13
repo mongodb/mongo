@@ -39,7 +39,7 @@
 #include "client.h"
 #include "restapi.h"
 #include "dbwebserver.h"
-#include "dur_journal.h"
+#include "dur.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -565,9 +565,9 @@ sendmore:
             globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
         }
 
-        repairDatabasesAndCheckVersion();
+        dur::startup();
 
-        dur::openJournal();
+        repairDatabasesAndCheckVersion();
 
         /* we didn't want to pre-open all fiels for the repair check above. for regular
            operation we do for read/write lock concurrency reasons.

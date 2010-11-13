@@ -17,30 +17,21 @@
 */
 
 #include "pch.h"
+
+#if defined(_DURABLE)
+
 #include "dur_journal.h"
-
-#if !defined(_DURABLE)
-
-namespace mongo {
-    namespace dur {
-    void openJournal() { }
-    }
-}
-
-#else
-
 #include "../util/logfile.h"
+#include <boost/static_assert.hpp>
+#undef assert
+#define assert MONGO_assert
+
 
 namespace mongo {
     namespace dur {
-
-        /* temp - this will become more elaborate and probably a class. */
-
-
-        /** call at init.  uasserts on failure.  if fails, you likely want to terminate. */
-        void openJournal() { 
-
-        }
+        BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 8 );
+        BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 8 );
+        BOOST_STATIC_ASSERT( sizeof(JEntry) == 6 );
 
     }
 }

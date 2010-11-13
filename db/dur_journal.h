@@ -21,8 +21,25 @@
 namespace mongo {
     namespace dur {
 
-        /** call at init.  uasserts on failure.  if fails, you likely want to terminate. */
-        void openJournal();
+#pragma pack(1)
+        struct JSectHeader { 
+            unsigned long long reserved;
+        };
+
+        struct JSectFooter { 
+            unsigned long long reserved;
+        };
+
+        struct JDbContext { 
+            unsigned zero;
+            char dbname[1];
+        };
+
+        struct JEntry {
+            unsigned len;
+            short file;
+        };
+#pragma pack()
 
     }
 }
