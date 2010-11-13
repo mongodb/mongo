@@ -342,15 +342,16 @@ struct __wt_page_hdr {
 
 #define	WT_PAGE_INVALID		 0	/* Invalid page */
 #define	WT_PAGE_DESCRIPT	 1	/* Database description page */
-#define	WT_PAGE_COL_FIX		 2	/* Col store fixed-len leaf */
-#define	WT_PAGE_COL_INT		 3	/* Col store internal page */
-#define	WT_PAGE_COL_RCC	 	 4	/* Col store repeat-compressed leaf */
-#define	WT_PAGE_COL_VAR		 5	/* Col store var-length leaf page */
-#define	WT_PAGE_DUP_INT		 6	/* Duplicate tree internal page */
-#define	WT_PAGE_DUP_LEAF	 7	/* Duplicate tree leaf page */
-#define	WT_PAGE_OVFL		 8	/* Overflow page */
-#define	WT_PAGE_ROW_INT		 9	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	10	/* Row-store leaf page */
+#define	WT_PAGE_FREE	 	 2	/* Page on the free list */
+#define	WT_PAGE_COL_FIX		 3	/* Col store fixed-len leaf */
+#define	WT_PAGE_COL_INT		 4	/* Col store internal page */
+#define	WT_PAGE_COL_RCC	 	 5	/* Col store repeat-compressed leaf */
+#define	WT_PAGE_COL_VAR		 6	/* Col store var-length leaf page */
+#define	WT_PAGE_DUP_INT		 7	/* Duplicate tree internal page */
+#define	WT_PAGE_DUP_LEAF	 8	/* Duplicate tree leaf page */
+#define	WT_PAGE_OVFL		 9	/* Overflow page */
+#define	WT_PAGE_ROW_INT		10	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	11	/* Row-store leaf page */
 	uint8_t type;			/* 24: page type */
 
 	/*

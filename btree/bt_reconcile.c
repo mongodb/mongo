@@ -158,8 +158,13 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	/*
 	 * The original page is no longer referenced, and can be free'd, even
 	 * though the in-memory version continues to be in-use.  Update the
-	 * page's address and size.
+	 * page's address and size.   If we're running in diagnostic mode, kill
+	 * the page on disk so we catch any future reader doing something bad.
 	 */
+#ifdef HAVE_DIAGNOSTIC
+	hdr->type = WT_PAGE_FREE;
+	WT_ERR(__wt_page_write(db, page));
+#endif
 	WT_ERR(__wt_cache_free(toc, page->addr, page->size));
 	page->addr = new->addr;
 	page->size = new->size;
