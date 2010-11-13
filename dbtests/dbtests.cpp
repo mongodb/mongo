@@ -1,4 +1,4 @@
-// dbtests.cpp : Runs db unit tests.
+// #file dbtests.cpp : Runs db unit tests.
 //
 
 /**
@@ -18,11 +18,9 @@
  */
 
 #include "pch.h"
-
 #include "dbtests.h"
 
 int main( int argc, char** argv ) {
     static StaticObserver StaticObserver;
     return Suite::run(argc, argv, "/tmp/unittest");
 }
-

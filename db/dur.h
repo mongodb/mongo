@@ -10,6 +10,7 @@ namespace mongo {
     namespace dur { 
 
 #if !defined(_DURABLE)
+        inline void startup() { }
         inline void* writingPtr(void *x, size_t len) { return x; }
         inline DiskLoc& writingDiskLoc(DiskLoc& d) { return d; }
         inline int& writingInt(int& d) { return d; }
@@ -17,6 +18,9 @@ namespace mongo {
         inline void assertReading(void *p) { }
         template <typename T> inline T* writingNoLog(T *x) { return x; }
 #else
+
+        /** call during startup so durability module can initialize */
+        void startup();
 
         /** Declarations of write intent.
             
@@ -44,12 +48,13 @@ namespace mongo {
         }
 
         /** declare our intent to write, but it doesn't have to be journaled, as this write is 
-            something 'unimportant'.
+            something 'unimportant'.  depending on our implementation, we may or may not be able 
+            to take advantage of this versus doing the normal work we do.
         */
         template <typename T> 
         inline 
         T* writingNoLog(T *x) { 
-            log() << "todo dur nolog not yet optimized" << endl;
+            DEV RARELY log() << "todo dur nolog not yet optimized" << endl;
             return (T*) writingPtr(x, sizeof(T));
         }
 

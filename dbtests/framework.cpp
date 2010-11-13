@@ -25,6 +25,7 @@
 
 #include "framework.h"
 #include "../util/file_allocator.h"
+#include "../db/dur.h"
 
 #ifndef _WIN32
 #include <cxxabi.h>
@@ -249,6 +250,8 @@ namespace mongo {
             if ( params.count( "filter" ) ){
                 filter = params["filter"].as<string>();
             }
+
+            dur::startup();
 
             int ret = run(suites,filter);
 

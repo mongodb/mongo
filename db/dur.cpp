@@ -22,7 +22,7 @@
      PREPLOGBUFFER 
        we will build an output buffer ourself and then use O_DIRECT
        we could be in read lock for this
-       for very large objects write directly to redo log in situ?  will be faster.
+       for very large objects write directly to redo log in situ?
      WRITETOREDOLOG 
        we could be unlocked (the main db lock that is...) for this, with sufficient care, but there is some complexity
          have to handle falling behind which would use too much ram (going back into a read lock would suffice to stop that).
@@ -58,8 +58,8 @@ namespace mongo {
         struct WriteIntent { 
             WriteIntent() : p(0) { }
             WriteIntent(void *a, unsigned b) : p(a), len(b) { }
-            void *p;
-            unsigned len;
+            void *p; // where we will write
+            unsigned len; // up to this len
         };
 
         /* try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
@@ -72,19 +72,24 @@ namespace mongo {
         public:
             Already() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
+
+            /* see if we have Already recorded/indicated our write intent for this region of memory.
+               @return true if already indicated.
+            */
             bool checkAndSet(const WriteIntent& w) {
-                mongoutils::hash(123);
                 unsigned x = mongoutils::hashPointer(w.p);
-                WriteIntent& n = nodes[x % N];
-                if( n.p != w.p || n.len < w.len ) {
-                    n = w;
+                WriteIntent& nd = nodes[x % N];
+                if( nd.p != w.p || nd.len < w.len ) {
+                    nd = w;
                     return false;
                 }
-                return true; // already done
+                return true;
             }
         };
 
         static Already<127> alreadyNoted;
+
+        /* our record of pending/uncommitted write intents */
         static vector<WriteIntent> writes;
 
         void* writingPtr(void *x, size_t len) { 
@@ -98,6 +103,13 @@ namespace mongo {
             }
             DEV return MongoMMF::switchToPrivateView(x);
             return x;
+        }
+
+        void durThread() { 
+        }
+
+        void startup() {
+            boost::thread t(durThread);
         }
 
     } // namespace dur
