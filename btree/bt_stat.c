@@ -27,6 +27,7 @@ __wt_bt_tree_walk(WT_TOC *toc, uint32_t addr,
 	DB *db;
 	WT_COL *cip;
 	WT_PAGE *page;
+	WT_REPL *repl;
 	WT_ROW *rip;
 	uint32_t i;
 	int ret;
@@ -63,17 +64,39 @@ __wt_bt_tree_walk(WT_TOC *toc, uint32_t addr,
 	 */
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(page, cip, i)
-			WT_ERR_RESTART(__wt_bt_tree_walk(toc,
-			    WT_COL_OFF_ADDR(cip),
-			    WT_COL_OFF_SIZE(cip), work, arg));
+		WT_INDX_FOREACH(page, cip, i) {
+			/*
+			 * cip references the subtree containing the record;
+			 * check for an update.
+			 */
+			if ((repl = WT_COL_REPL(page, cip)) != NULL) {
+				addr = ((WT_OFF *)WT_REPL_DATA(repl))->addr;
+				size = ((WT_OFF *)WT_REPL_DATA(repl))->size;
+			} else {
+				addr = WT_COL_OFF_ADDR(cip);
+				size = WT_COL_OFF_SIZE(cip);
+			}
+			WT_ERR_RESTART(
+			    __wt_bt_tree_walk(toc, addr, size, work, arg));
+		}
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(page, rip, i)
-			WT_ERR_RESTART(__wt_bt_tree_walk(toc,
-			    WT_ROW_OFF_ADDR(rip),
-			    WT_ROW_OFF_SIZE(rip), work, arg));
+		WT_INDX_FOREACH(page, rip, i) {
+			/*
+			 * rip references the subtree containing the record;
+			 * check for an update.
+			 */
+			if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
+				addr = ((WT_OFF *)WT_REPL_DATA(repl))->addr;
+				size = ((WT_OFF *)WT_REPL_DATA(repl))->size;
+			} else {
+				addr = WT_ROW_OFF_ADDR(rip);
+				size = WT_ROW_OFF_SIZE(rip);
+			}
+			WT_ERR_RESTART(
+			    __wt_bt_tree_walk(toc, addr, size, work, arg));
+		}
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RCC:
