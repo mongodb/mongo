@@ -394,6 +394,10 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		 * If the item was ever replaced, we're done: it can't be an
 		 * off-page tree, and we don't care what kind of item it was
 		 * originally.  Dump the data from the replacement entry.
+		 *
+		 * XXX
+		 * This is wrong -- if an off-page dup tree is reconciled,
+		 * the off-page reference will change underfoot.
 		 */
 		if (repl != NULL) {
 			dp->p(key->data, key->size, dp->stream);
@@ -430,6 +434,11 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			break;
 		case WT_ITEM_OFF:
 			dp->dupkey = key;
+			/* 
+			 * XXX
+			 * If an off-page dup tree is reconciled, then this
+			 * might change underfoot and we could race.
+			 */
 			WT_RET_RESTART(__wt_bt_tree_walk(toc,
 			    WT_ROW_OFF_ADDR(rip), WT_ROW_OFF_SIZE(rip),
 			    __wt_bt_dump_page, dp));
