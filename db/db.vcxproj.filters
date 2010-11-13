@@ -417,6 +417,9 @@
     <ClCompile Include="dur_journal.cpp">
       <Filter>db\storage engine</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\d_chunk_matcher.cpp">
+      <Filter>sharding</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

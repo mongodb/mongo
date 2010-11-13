@@ -192,6 +192,7 @@
     <ClCompile Include="..\db\dbwebserver.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
+    <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
