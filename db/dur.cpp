@@ -40,9 +40,7 @@
 
 #include "pch.h"
 
-#if !defined(_DURABLE)
-
-#else
+#if defined(_DURABLE)
 
 #include "dur.h"
 #include "dur_journal.h"
@@ -55,6 +53,8 @@ namespace mongo {
     }
 
     namespace dur { 
+
+        MongoMMF* pointerToMMF(void *p, size_t& ofs);
 
         struct WriteIntent { 
             WriteIntent() : p(0) { }
@@ -106,6 +106,15 @@ namespace mongo {
             return x;
         }
 
+        void journalingFailure(const char *msg) { 
+            /** todo:
+                (1) don't log too much
+                (2) make an indicator in the journal dir that something bad happened. 
+                (2b) refuse to do a recovery startup if that is there without manual override.
+            */ 
+            log() << "journaling error " << msg << endl;
+        }
+
         void _PREPLOGBUFFER(BufBuilder& bb) { 
             bb.reset();
 
@@ -115,7 +124,13 @@ namespace mongo {
             for( vector<WriteIntent>::iterator i = writes.begin(); i != writes.end(); i++ ) {
                 JEntry e;
                 e.len = i->len;
-                e.file;
+                size_t ofs;
+                MongoMMF *mmf = pointerToMMF(i->p, ofs);
+                if( mmf == 0 ) {
+                    journalingFailure("view pointer cannot be resolved");
+                }
+                else {
+                }
             }
 
             JSectFooter f;

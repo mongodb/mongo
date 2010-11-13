@@ -78,6 +78,12 @@ namespace mongo {
     static PointerToMMF ourPrivateViews;
     static PointerToMMF ourReadViews; /// _DEBUG build use only (other than existance)
 
+    namespace dur { 
+        MongoMMF* pointerToMMF(void *p, size_t& ofs) { 
+            return ourPrivateViews.find(p, ofs);
+        }
+    }
+
     /*static*/ void* MongoMMF::switchToPrivateView(void *readonly_ptr) { 
         assert( durable );
         assert( debug );
@@ -85,7 +91,7 @@ namespace mongo {
         void *p = readonly_ptr;
 
         {
-            size_t ofs;
+            size_t ofs=0;
             MongoMMF *mmf = ourReadViews.find(p, ofs);
             if( mmf ) {
                 return ((char *)mmf->_view_private) + ofs;
@@ -93,8 +99,8 @@ namespace mongo {
         }
 
         {
-            size_t ofs;
-            MongoMMF *mmf = ourPrivateViews.find(readonly_ptr, ofs);
+            size_t ofs=0;
+            MongoMMF *mmf = ourPrivateViews.find(p, ofs);
             if( mmf ) {
                 log() << "dur: perf warning p=" << p << " is already in the writable view of " << mmf->filename() << endl;
                 return p;
