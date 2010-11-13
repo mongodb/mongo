@@ -29,8 +29,8 @@ __wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
-	toc->srch_repl = repl = NULL;
-	toc->srch_exp = exp = NULL;
+	toc->srch_repl = NULL;
+	toc->srch_exp = NULL;
 	toc->srch_write_gen = 0;
 
 	db = toc->db;
@@ -46,7 +46,7 @@ restart:
 
 	/* Search the tree. */
 	for (;;) {
-		/* Save the write generation value before the search. */
+		/* Save the write generation value before the read. */
 		write_gen = WT_PAGE_WRITE_GEN(page);
 
 		/* Walk the page looking for the record. */
@@ -118,62 +118,100 @@ done:	/*
 	 */
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_FIX:
+		/* Find the item's WT_REPL slot if it exists. */
+		repl = WT_COL_REPL(page, cip);
+
 		/*
-		 * Check for a replacement in the page's WT_REPL array.  If
-		 * found, check for deletion.   If not found, check for
-		 * deletion in the original index.
+		 * If it's an insert, we don't care about the state of the item,
+		 * return the gathered information.
 		 */
-		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (!LF_ISSET(WT_INSERT) && WT_REPL_DELETED_ISSET(repl))
-				goto notfound;
-			break;
-		}
-		if (!LF_ISSET(WT_INSERT) && WT_FIX_DELETE_ISSET(cip->data))
-			goto notfound;
-		break;
-	case WT_PAGE_COL_RCC:
-		/*
-		 * Search for an individual record in the page's WT_COL_EXPAND
-		 * array.  If found, the record has been modified before: check
-		 * for deletion, and return its WT_COL_EXPAND entry.  If not
-		 * found, check for deletion in the original index, and return
-		 * the original index.
-		 */
-		for (exp =
-		    WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next)
-			if (exp->recno == recno) {
-				repl = exp->repl;
-				if (!LF_ISSET(WT_INSERT) &&
-				    WT_REPL_DELETED_ISSET(repl))
-					goto notfound;
-				break;
-			}
-		if (exp == NULL && !LF_ISSET(WT_INSERT) &&
-		    WT_FIX_DELETE_ISSET(WT_RCC_REPEAT_DATA(cip->data)))
-			goto notfound;
-		break;
-	case WT_PAGE_COL_VAR:
-		/* Check for a replacement entry in the page's WT_REPL array. */
-		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (!LF_ISSET(WT_INSERT) && WT_REPL_DELETED_ISSET(repl))
-				goto notfound;
+		if (LF_ISSET(WT_INSERT)) {
+			toc->srch_repl = repl;
 			break;
 		}
 
-		/* Otherwise, check to see if the item is deleted. */
-		if (!LF_ISSET(WT_INSERT) &&
-		    WT_ITEM_TYPE(cip->data) == WT_ITEM_DEL)
-			goto notfound;
+		/*
+		 * Otherwise, check for deletion, in either the WT_REPL slot
+		 * or in the original data.
+		 */
+		if (repl != NULL) {
+			if (WT_REPL_DELETED_ISSET(repl))
+				goto notfound;
+			toc->srch_repl = repl;
+		} else
+			if (WT_FIX_DELETE_ISSET(cip->data))
+				goto notfound;
+		break;
+	case WT_PAGE_COL_RCC:
+		/* Find the item's WT_COL_EXP slot if it exists. */
+		for (exp =
+		    WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next)
+			if (exp->recno == recno)
+				break;
+
+		/*
+		 * If it's an insert, we don't care about the state of the item,
+		 * return the gathered information.
+		 */
+		if (LF_ISSET(WT_INSERT)) {
+			if (exp != NULL) {
+				toc->srch_exp = exp;
+				toc->srch_repl = exp->repl;
+			}
+			break;
+		}
+
+		/*
+		 * Otherwise, check for deletion, in either the WT_REPL slot
+		 * (referenced by the WT_COL_EXP slot), or in the original data.
+		 */
+		if (exp != NULL) {
+			if (WT_REPL_DELETED_ISSET(exp->repl))
+				goto notfound;
+			toc->srch_exp = exp;
+			toc->srch_repl = exp->repl;
+		} else
+			if (WT_FIX_DELETE_ISSET(WT_RCC_REPEAT_DATA(cip->data)))
+				goto notfound;
+		break;
+	case WT_PAGE_COL_VAR:
+		/* Find the item's WT_REPL slot if it exists. */
+		repl = WT_COL_REPL(page, cip);
+
+		/*
+		 * If it's an insert, we don't care about the state of the item,
+		 * return the gathered information.
+		 */
+		if (LF_ISSET(WT_INSERT)) {
+			toc->srch_repl = repl;
+			break;
+		}
+
+		/*
+		 * Otherwise, check for deletion, in either the WT_REPL slot
+		 * or in the original data.
+		 */
+		if (repl != NULL) {
+			if (WT_REPL_DELETED_ISSET(repl))
+				goto notfound;
+			toc->srch_repl = repl;
+			break;
+		} else
+			if (WT_ITEM_TYPE(cip->data) == WT_ITEM_DEL)
+				goto notfound;
 		break;
 	case WT_PAGE_COL_INT:
-	default:
+		/*
+		 * When returning internal pages, set the item's WT_REPL slot
+		 * if it exists, otherwise we're done.
+		 */
+		toc->srch_repl = WT_COL_REPL(page, cip);
 		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	toc->srch_page = page;
 	toc->srch_ip = cip;
-	toc->srch_repl = repl;
-	toc->srch_exp = exp;
 	toc->srch_write_gen = write_gen;
 	return (0);
 
