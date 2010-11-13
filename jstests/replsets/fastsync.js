@@ -51,6 +51,8 @@ var local = p.getDB("local");
 var config = {_id : basename, members : [{_id : 0, host : hostname+":"+ports[0]}]};
 printjson(config);
 var result = admin.runCommand({replSetInitiate : config});
+print("result:");
+printjson(result);
 assert(result.ok, "initiate failed");
 assert.soon(function() { return admin.runCommand({isMaster:1}).ismaster; });
 
