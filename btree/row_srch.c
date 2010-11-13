@@ -30,7 +30,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
-	toc->srch_repl = repl = NULL;
+	toc->srch_repl = NULL;
 	toc->srch_exp = NULL;
 	toc->srch_write_gen = 0;
 
@@ -43,7 +43,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 restart:
 	/* Search the tree. */
 	for (page = idb->root_page;;) {
-		/* Save the write generation value before the search. */
+		/* Copy the write generation value before the read. */
 		write_gen = WT_PAGE_WRITE_GEN(page);
 
 		hdr = page->hdr;
@@ -151,22 +151,28 @@ restart:
 				goto err;
 			}
 							/* Deleted match. */
-			if ((repl = WT_ROW_REPL(page, rip)) != NULL)
+			if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
 				if (WT_REPL_DELETED_ISSET(repl)) {
 					ret = WT_NOTFOUND;
 					goto err;
 				}
+				toc->srch_repl = repl;
+			}
 		}
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-	default:
+		/*
+		 * When returning internal pages, set the item's WT_REPL slot
+		 * if it exists, otherwise we're done.
+		 */
+		toc->srch_repl = WT_ROW_REPL(page, rip);
 		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	toc->srch_page = page;
 	toc->srch_ip = rip;
-	toc->srch_repl = repl;
 	toc->srch_write_gen = write_gen;
 	return (0);
 
