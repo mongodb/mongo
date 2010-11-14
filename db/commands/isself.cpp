@@ -73,7 +73,7 @@ namespace mongo {
         vector<string> out;
 
         int ret = getaddrinfo(iporhost.data(), portNum.c_str(), &hints, &addrs);
-        if ( ret == 0 ){
+        if ( ret ){
             warning() << "getaddrinfo(\"" << iporhost.data() << "\") failed: " << gai_strerror(ret) << endl;
             return out;
         }
