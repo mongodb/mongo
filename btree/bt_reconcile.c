@@ -280,7 +280,7 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			memcpy(WT_ITEM_BYTE(data_item),
 			    WT_REPL_DATA(repl), sizeof(WT_OFF));
 		next = WT_ITEM_NEXT(data_item);
-		len = (u_int8_t *)next - (u_int8_t *)key_item;
+		len = (u_int32_t)((u_int8_t *)next - (u_int8_t *)key_item);
 
 		/*
 		 * XXX
