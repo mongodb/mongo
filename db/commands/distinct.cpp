@@ -47,8 +47,9 @@ namespace mongo {
             BSONArrayBuilder arr( bb );
             BSONElementSet values;
             
-            long long nscanned = 0;
-            long long n = 0;
+            long long nscanned = 0; // locations looked at
+            long long nscannedObjects = 0; // full objects looked at
+            long long n = 0; // matches
             MatchDetails md;
 
             shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
@@ -59,11 +60,10 @@ namespace mongo {
                 bool loadedObject = false;
                 
                 if ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() , &md ) ){
-                    loadedObject = true;
-                    BSONObj o = cursor->current();
+                    n++;
 
                     BSONElementSet temp;
-                    o.getFieldsDotted( key, temp );
+                    loadedObject = ! cc->getFieldsDotted( key , temp );
                     
                     for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ){
                         BSONElement e = *i;
@@ -82,7 +82,7 @@ namespace mongo {
                 }
 
                 if ( loadedObject || md.loadedObject ) 
-                    n++;
+                    nscannedObjects++;
 
                 cursor->advance();
 
@@ -100,6 +100,7 @@ namespace mongo {
                 BSONObjBuilder b;
                 b.appendNumber( "n" , n );
                 b.appendNumber( "nscanned" , nscanned );
+                b.appendNumber( "nscannedObjects" , nscannedObjects );
                 result.append( "stats" , b.obj() );
             }
             

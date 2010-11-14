@@ -221,7 +221,15 @@ namespace mongo {
         bool advance(){ return _c->advance(); }
         BSONObj current() { return _c->current(); }
         DiskLoc currLoc() { return _c->currLoc(); }
-        BSONObj currKey() { return _c->currKey(); }
+        BSONObj currKey() const { return _c->currKey(); }
+        
+
+        /**
+         * same as BSONObj::getFieldsDotted
+         * if it can be retrieved from key, it is
+         * @return if this was retrieved from key
+         */
+        bool getFieldsDotted( const string& name, BSONElementSet &ret );
 
         bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
         
