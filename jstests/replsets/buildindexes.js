@@ -20,8 +20,11 @@ doTest = function( signal ) {
     slaveConns[i].setSlaveOk();
     slave.push(slaveConns[i].getDB(name));
   }
-      
+  replTest.awaitReplication();
+
+  print("creating an index on x");
   master.x.ensureIndex({y : 1});
+  printjson(master.x.stats());
 
   for (var i=0; i<100; i++) {
     master.x.insert({x:1,y:"abc",c:1});
@@ -34,11 +37,14 @@ doTest = function( signal ) {
   print("namespace: "+ns);
 
   // can't query system.indexes from slave, so we'll look at coll.stats()
-  printjson(slave[0].runCommand({replSetGetStatus:1}));
+  printjson(slave[0].adminCommand({replSetGetStatus:1}));
   printjson(slave[0].getSisterDB("local").system.replset.findOne());
+  printjson(master.stats());
   printjson(slave[0].stats());
   printjson(slave[1].stats());
-  printjson(master.stats());
+  printjson(master.x.stats());
+  printjson(slave[0].x.stats());
+  printjson(slave[1].x.stats());
   print("sleeping");  
   sleep(20000);
   var indexes = slave[0].stats().indexes;
