@@ -79,22 +79,22 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	uint32_t * addrp;
+	uint32_t addr;
 	uint32_t size;
 	WT_PAGE ** pagep;
 } __wt_cache_read_args;
 #define	__wt_cache_read_serial(\
-    toc, _addrp, _size, _pagep, ret) do {\
+    toc, _addr, _size, _pagep, ret) do {\
 	__wt_cache_read_args _args;\
-	_args.addrp = _addrp;\
+	_args.addr = _addr;\
 	_args.size = _size;\
 	_args.pagep = _pagep;\
 	(ret) = __wt_toc_serialize_func(toc,\
 	    WT_WORKQ_READ, 0, __wt_cache_read_serial_func, &_args);\
 } while (0)
 #define	__wt_cache_read_unpack(\
-    toc, _addrp, _size, _pagep) do {\
-	_addrp = ((__wt_cache_read_args *)(toc)->wq_args)->addrp;\
+    toc, _addr, _size, _pagep) do {\
+	_addr = ((__wt_cache_read_args *)(toc)->wq_args)->addr;\
 	_size = ((__wt_cache_read_args *)(toc)->wq_args)->size;\
 	_pagep = ((__wt_cache_read_args *)(toc)->wq_args)->pagep;\
 } while (0)

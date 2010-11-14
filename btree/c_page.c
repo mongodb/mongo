@@ -12,27 +12,6 @@
 static int __wt_cache_read_serial_func(WT_TOC *);
 
 /*
- * __wt_page_alloc --
- *	Allocate bytes from a file and associate it with a WT_PAGE structure.
- */
-int
-__wt_page_alloc(WT_TOC *toc, uint32_t size, WT_PAGE **pagep)
-{
-	ENV *env;
-	uint32_t addr;
-	int ret;
-
-	*pagep = NULL;
-	env = toc->env;
-
-	WT_ASSERT(env, size % WT_FRAGMENT == 0);
-
-	addr = WT_ADDR_INVALID;
-	__wt_cache_read_serial(toc, &addr, size, pagep, ret);
-	return (ret);
-}
-
-/*
  * __wt_page_in --
  *	Return a database page, reading as necessary.
  */
@@ -93,7 +72,7 @@ __wt_page_in(WT_TOC *toc,
 	 * to get it for us and go to sleep.  The read server is expensive, but
 	 * serializes all the hard cases.
 	 */
-	__wt_cache_read_serial(toc, &addr, size, pagep, ret);
+	__wt_cache_read_serial(toc, addr, size, pagep, ret);
 	if (ret == WT_RESTART)
 		WT_STAT_INCR(cache->stats, CACHE_READ_RESTARTS);
 	return (ret);
@@ -108,11 +87,11 @@ static int
 __wt_cache_read_serial_func(WT_TOC *toc)
 {
 	WT_PAGE **pagep;
-	uint32_t *addrp, size;
+	uint32_t addr, size;
 
-	__wt_cache_read_unpack(toc, addrp, size, pagep);
+	__wt_cache_read_unpack(toc, addr, size, pagep);
 
-	return (__wt_cache_read_queue(toc, addrp, size, pagep));
+	return (__wt_cache_read_queue(toc, addr, size, pagep));
 }
 
 /*
@@ -150,7 +129,8 @@ __wt_page_read(DB *db, WT_PAGE *page)
 	if (checksum != __wt_cksum(hdr, page->size)) {
 		__wt_api_env_errx(env,
 		    "read checksum error: addr/size %lu/%lu at offset %llu",
-		    (u_long)page->addr, (u_long)page->size, (u_quad)offset);
+		    (u_long)page->addr,
+		    (u_long)page->size, (unsigned long long)offset);
 		return (WT_ERROR);
 	}
 

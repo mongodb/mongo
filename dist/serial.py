@@ -42,7 +42,7 @@ serial['bt_item_update'] = Serial(
 serial['cache_read'] = Serial(
 	'cache_read',
 	'WT_WORKQ_READ', '0',
-	['uint32_t */addrp',
+	['uint32_t/addr',
 	 'uint32_t/size',
 	 'WT_PAGE **/pagep'])
 

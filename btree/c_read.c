@@ -66,7 +66,7 @@ __wt_workq_read_server(ENV *env, int force)
  */
 int
 __wt_cache_read_queue(
-    WT_TOC *toc, uint32_t *addrp, uint32_t size, WT_PAGE **pagep)
+    WT_TOC *toc, uint32_t addr, uint32_t size, WT_PAGE **pagep)
 {
 	ENV *env;
 	WT_CACHE *cache;
@@ -80,7 +80,7 @@ __wt_cache_read_queue(
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
 	for (; rr < rr_end; ++rr)
 		if (WT_READ_REQ_ISEMPTY(rr)) {
-			WT_READ_REQ_SET(rr, toc, addrp, size, pagep);
+			WT_READ_REQ_SET(rr, toc, addr, size, pagep);
 			return (0);
 		}
 	__wt_api_env_errx(env, "read server request table full");
@@ -148,10 +148,7 @@ __wt_cache_read_server(void *arg)
 				 * a file allocation, there's no pagep field in
 				 * in which to return a page.
 				 */
-				ret = rr->pagep == NULL ?
-				    __wt_cache_alloc(
-					rr->toc, rr->addrp, rr->size) :
-				    __wt_cache_read(rr);
+				ret = __wt_cache_read(rr);
 
 				WT_READ_REQ_CLR(rr);
 				__wt_toc_serialize_wrapup(toc, ret);
@@ -180,7 +177,7 @@ err:		__wt_api_env_err(env, ret, "cache read server error");
 
 /*
  * __wt_cache_read --
- *	Read or allocate a new page for the cache.
+ *	Read a page into the cache.
  */
 static int
 __wt_cache_read(WT_READ_REQ *rr)
@@ -194,7 +191,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_PAGE *page;
 	WT_TOC *toc;
 	uint32_t addr, addr_hash, size, i;
-	int newpage, ret;
+	int ret;
 
 	toc = rr->toc;
 	db = toc->db;
@@ -204,9 +201,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 	fh = idb->fh;
 	ret = 0;
 
-	addr = *rr->addrp;
+	addr = rr->addr;
 	size = rr->size;
-	newpage = addr == WT_ADDR_INVALID ? 1 : 0;
 
 	/*
 	 * Read a page from the file -- allocations end up here too, because
@@ -224,19 +220,17 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * we find, we may need one.
 	 */
 	empty = NULL;
-	if (!newpage) {
-		for (i = WT_CACHE_ENTRY_CHUNK,
-		    e = cache->hb[WT_ADDR_HASH(cache, addr)];;) {
-			if (e->state == WT_EMPTY)
-				empty = e;
-			else if (e->db == db && e->addr == addr)
-				return (WT_RESTART);
+	for (i = WT_CACHE_ENTRY_CHUNK,
+	    e = cache->hb[WT_ADDR_HASH(cache, addr)];;) {
+		if (e->state == WT_EMPTY)
+			empty = e;
+		else if (e->db == db && e->addr == addr)
+			return (WT_RESTART);
 
-			WT_CACHE_ENTRY_NEXT(e, i);
-		}
-		WT_STAT_INCR(cache->stats, CACHE_MISS);
-		WT_STAT_INCR(idb->stats, DB_CACHE_MISS);
+		WT_CACHE_ENTRY_NEXT(e, i);
 	}
+	WT_STAT_INCR(cache->stats, CACHE_MISS);
+	WT_STAT_INCR(idb->stats, DB_CACHE_MISS);
 
 	/*
 	 * The page isn't in the cache, and since we're the only path for the
@@ -250,14 +244,11 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
 	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &page->hdr));
 
-	/* If it's an allocation, extend the file; otherwise read the page. */
-	if (newpage)
-		WT_ERR(__wt_cache_alloc(toc, &addr, size));
+	/* Read the page. */
 	page->addr = addr;
 	page->size = size;
 	page->lru = ++cache->lru;
-	if (!newpage)
-		WT_ERR(__wt_page_read(db, page));
+	WT_ERR(__wt_page_read(db, page));
 
 	/*
 	 * If we found an empty slot in our original hash bucket walk, use it;
@@ -286,8 +277,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_CACHE_ENTRY_SET(empty, db, addr, page, WT_OK);
 
 	WT_VERBOSE(env,
-	    WT_VERB_CACHE, (env, "cache %s addr %lu (element %p, page %p)",
-	    newpage ? "allocated" : "read", (u_long)addr, empty, empty->page));
+	    WT_VERB_CACHE, (env, "cache read addr %lu (element %p, page %p)",
+	    (u_long)addr, empty, empty->page));
 
 	WT_CACHE_PAGE_IN(cache, size);
 
