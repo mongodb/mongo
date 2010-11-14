@@ -24,20 +24,16 @@ typedef struct {
 	u_int size;				/* stack size */
 } WT_STACK;
 
-static int  __wt_bt_bulk_fix(WT_TOC *,
-	void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bt_bulk_fix(WT_TOC *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
 static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, uint32_t *);
 static int __wt_bt_bulk_stack_put(WT_TOC *, WT_STACK *);
-static int  __wt_bt_bulk_var(WT_TOC *, uint32_t,
-	void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bt_bulk_var(WT_TOC *, uint32_t, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
+static int __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **, DBT *, WT_ITEM *, uint32_t, int (*cb)(DB *, DBT **, DBT **));
+static int __wt_bt_promote(WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
+static int __wt_bt_scratch_page(WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
 static inline int __wt_bt_bulk_write(WT_TOC *, WT_PAGE *);
-static int  __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
-static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
-	DBT *, WT_ITEM *, uint32_t, int (*cb)(DB *, DBT **, DBT **));
-static int  __wt_bt_promote(
-	WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
-static int __wt_bt_scratch_page(
-	WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
 
 /*
  * __wt_db_bulk_load --
@@ -862,7 +858,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 			 * are larger than leaf nodes), but that's unlikely.
 			 */
 			WT_CLEAR(tmp_ovfl);
-			WT_RET(__wt_bt_ovfl_copy(toc,
+			WT_RET(__wt_bt_bulk_ovfl_copy(toc,
 			    WT_ITEM_BYTE_OVFL(key_item), &tmp_ovfl));
 			key->data = &tmp_ovfl;
 			key->size = sizeof(tmp_ovfl);
@@ -1270,6 +1266,54 @@ __wt_bt_build_data_item(
 
 	WT_ITEM_SET_LEN(item, dbt->size);
 	return (0);
+}
+
+/*
+ * __wt_bt_bulk_ovfl_copy --
+ *	Copy bulk-loaded overflow items in the database, returning the WT_OVFL
+ *	structure, filled in.
+ */
+static int
+__wt_bt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
+{
+	DB *db;
+	DBT *tmp;
+	WT_PAGE *page;
+	u_int32_t size;
+	int ret;
+
+	db = toc->db;
+	tmp = NULL;
+
+	/* Get a scratch buffer and make it look like an overflow page. */
+	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + from->size, db->allocsize);
+	WT_ERR(__wt_bt_scratch_page(
+	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
+	page->hdr->u.datalen = from->size;
+
+	/* Fill in the return information. */
+	to->addr = page->addr;
+	to->size = from->size;
+
+	/*
+	 * Re-set the page's address and read the page into our scratch buffer.
+	 * This is sleazy, but this way we can still use the underlying cache
+	 * page-read functions, without allocating two chunks of memory.
+	 */
+	page->addr = from->addr;
+	WT_ERR(__wt_page_read(db, page));
+
+	/*
+	 * Move back to the new address, and write our copy of the page to a
+	 * new location.
+	 */
+	page->addr = to->addr;
+	ret = __wt_bt_bulk_write(toc, page);
+
+err:	if (tmp != NULL)
+		__wt_scr_release(&tmp);
+
+	return (ret);
 }
 
 /*

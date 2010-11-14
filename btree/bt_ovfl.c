@@ -69,32 +69,3 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp)
 	__wt_bt_page_out(toc, &page, WT_MODIFIED);
 	return (0);
 }
-
-/*
- * __wt_bt_ovfl_copy --
- *	Copy an overflow item in the database, returning the starting
- *	addr; used when an overflow item is promoted to an internal page.
- */
-int
-__wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy)
-{
-	DBT dbt;
-	WT_PAGE *ovfl_page;
-	int ret;
-
-	/* Read in the overflow record. */
-	WT_RET(__wt_bt_ovfl_in(toc, from, &ovfl_page));
-
-	/*
-	 * Copy the overflow record to a new location, and set our return
-	 * information.
-	 */
-	WT_CLEAR(dbt);
-	dbt.data = WT_PAGE_BYTE(ovfl_page);
-	dbt.size = from->size;
-	ret = __wt_bt_ovfl_write(toc, &dbt, &copy->addr);
-	copy->size = from->size;
-
-	__wt_bt_page_out(toc, &ovfl_page, 0);
-	return (ret);
-}
