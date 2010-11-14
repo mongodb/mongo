@@ -16,28 +16,35 @@ for ( i=0; i<1000; i++ ){
 }
 
 x = d( "a" );
-assert.eq( 1000 , x.stats.n , "A1" )
-assert.eq( 1000 , x.stats.nscanned , "A2" )
-assert.eq( 1000 , x.stats.nscannedObjects , "A3" )
+assert.eq( 1000 , x.stats.n , "AA1" )
+assert.eq( 1000 , x.stats.nscanned , "AA2" )
+assert.eq( 1000 , x.stats.nscannedObjects , "AA3" )
 
 x = d( "a" , { a : { $gt : 5 } } );
-assert.eq( 398 , x.stats.n , "B1" )
-assert.eq( 1000 , x.stats.nscanned , "B2" )
-assert.eq( 1000 , x.stats.nscannedObjects , "B3" )
+assert.eq( 398 , x.stats.n , "AB1" )
+assert.eq( 1000 , x.stats.nscanned , "AB2" )
+assert.eq( 1000 , x.stats.nscannedObjects , "AB3" )
+
+x = d( "b" , { a : { $gt : 5 } } );
+assert.eq( 398 , x.stats.n , "AC1" )
+assert.eq( 1000 , x.stats.nscanned , "AC2" )
+assert.eq( 1000 , x.stats.nscannedObjects , "AC3" )
+
+
 
 t.ensureIndex( { a : 1 } )
 
 x = d( "a" );
-assert.eq( 1000 , x.stats.n , "C1" )
-assert.eq( 1000 , x.stats.nscanned , "C2" )
-assert.eq( 1000 , x.stats.nscannedObjects , "C3" )
+assert.eq( 1000 , x.stats.n , "BA1" )
+assert.eq( 1000 , x.stats.nscanned , "BA2" )
+assert.eq( 0 , x.stats.nscannedObjects , "BA3" )
 
 x = d( "a" , { a : { $gt : 5 } } );
-assert.eq( 398 , x.stats.n , "D1" )
-assert.eq( 398 , x.stats.nscanned , "D2" )
-assert.eq( 0 , x.stats.nscannedObjects , "D3" )
+assert.eq( 398 , x.stats.n , "BB1" )
+assert.eq( 398 , x.stats.nscanned , "BB2" )
+assert.eq( 0 , x.stats.nscannedObjects , "BB3" )
 
-
-
-
-
+x = d( "b" , { a : { $gt : 5 } } );
+assert.eq( 398 , x.stats.n , "BC1" )
+assert.eq( 398 , x.stats.nscanned , "BC2" )
+assert.eq( 398 , x.stats.nscannedObjects , "BC3" )

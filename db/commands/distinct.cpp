@@ -52,7 +52,36 @@ namespace mongo {
             long long n = 0; // matches
             MatchDetails md;
 
-            shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
+            shared_ptr<Cursor> cursor;
+            if ( ! query.isEmpty() ) {
+                cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
+            }
+            else {
+
+                // query is empty, so lets see if we can find an index
+                // with the key so we don't have to hit the raw data
+                NamespaceDetails * d = nsdetails( ns.c_str() );
+                NamespaceDetails::IndexIterator ii = d->ii();
+                while ( ii.more() ){
+                    IndexDetails& idx = ii.next();
+
+                    if ( d->isMultikey( ii.pos() - 1 ) )
+                        continue;
+
+                    if ( idx.inKeyPattern( key ) ) {
+                        cursor = bestGuessCursor( ns.c_str() , BSONObj() , idx.keyPattern() );
+                        break;
+                    }
+                        
+                }
+                
+                if ( ! cursor.get() )
+                    cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
+                
+            }
+            
+
+
             scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
             
             while ( cursor->ok() ){
