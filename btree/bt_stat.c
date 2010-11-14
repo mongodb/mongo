@@ -99,7 +99,7 @@ __wt_bt_tree_walk(WT_TOC *toc, uint32_t addr,
 					size = WT_ROW_OFF_SIZE(rip);
 				}
 			} while ((ret = __wt_bt_tree_walk(
-			    toc, addr, size, work, arg)) != WT_RESTART);
+			    toc, addr, size, work, arg)) == WT_RESTART);
 			if (ret != 0)
 				break;
 		}
