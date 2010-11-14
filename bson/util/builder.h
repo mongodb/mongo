@@ -133,13 +133,9 @@ namespace mongo {
             memcpy(grow(len), str.data(), len);
         }
 
-        int len() const {
-            return l;
-        }
-
-        void setlen( int newLen ){
-            l = newLen;
-        }
+        int len() const { return l; }
+        void setlen( int newLen ) { l = newLen; }
+        int getSize() const { return size; }
 
         /* returns the pre-grow write position */
         inline char* grow(int by) {
@@ -150,8 +146,6 @@ namespace mongo {
             }
             return data + oldlen;
         }
-
-        int getSize() const { return size; }
 
     private:
         /* "slow" portion of 'grow()'  */
