@@ -237,12 +237,11 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 static int
 __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	WT_ITEM *item;
+	WT_ITEM *key_item, *data_item, *next;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
 	WT_ROW *rip;
 	uint32_t i, len;
-	void *p;
 
 	/*
 	 * We have to walk both the WT_ROW structures as well as the original
@@ -264,7 +263,7 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * when reconciling the page so we can find the original WT_ITEM.
 	 */
 	hdr = new->hdr;
-	item = (WT_ITEM *)WT_PAGE_BYTE(page);
+	key_item = WT_PAGE_BYTE(page);
 	WT_INDX_FOREACH(page, rip, i) {
 		/*
 		 * Copy the paired items off the old page into the new page; if
@@ -276,12 +275,12 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * will have to split the internal pages, and they'll be able to
 		 * grow.
 		 */
-		p = item;
-		item = WT_ITEM_NEXT(item);
+		data_item = WT_ITEM_NEXT(key_item);
 		if ((repl = WT_ROW_REPL(page, rip)) != NULL)
-			*(WT_OFF *)WT_ITEM_BYTE(item) =
-			    *(WT_OFF *)WT_REPL_DATA(repl);
-		len = sizeof(WT_ITEM) * 2 + WT_ITEM_LEN(item) + sizeof(WT_OFF);
+			memcpy(WT_ITEM_BYTE(data_item),
+			    WT_REPL_DATA(repl), sizeof(WT_OFF));
+		next = WT_ITEM_NEXT(data_item);
+		len = (u_int8_t *)next - (u_int8_t *)key_item;
 
 		/*
 		 * XXX
@@ -296,10 +295,12 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			__wt_abort(toc->env);
 		}
 
-		memcpy(new->first_free, p, len);
+		memcpy(new->first_free, key_item, len);
 		new->first_free += len;
 		new->space_avail -= len;
 		++hdr->u.entries;
+
+		key_item = next;
 	}
 	new->records = page->records;
 
