@@ -258,7 +258,7 @@ __wt_bt_bulk_var(WT_TOC *toc, uint32_t flags,
 	WT_CLEAR(key_copy);
 	WT_CLEAR(key_item);
 	WT_CLEAR(lastkey_std);
-	WT_ERR(__wt_scr_alloc(toc, &lastkey_copy));
+	WT_ERR(__wt_scr_alloc(toc, 0, &lastkey_copy));
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bt_scratch_page(
@@ -1368,10 +1368,8 @@ __wt_bt_scratch_page(WT_TOC *toc, uint32_t page_size,
 	 * WT_PAGE structure plus the page itself, and clear the memory so
 	 * it's never random bytes.
 	 */
-	WT_ERR(__wt_scr_alloc(toc, &tmp));
 	size = page_size + sizeof(WT_PAGE);
-	if (tmp->mem_size < size)
-		WT_ERR(__wt_realloc(env, &tmp->mem_size, size, &tmp->data));
+	WT_ERR(__wt_scr_alloc(toc, size, &tmp));
 	memset(tmp->data, 0, size);
 
 	/*

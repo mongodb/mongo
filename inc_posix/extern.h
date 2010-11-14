@@ -392,7 +392,7 @@ __wt_prime(uint32_t n);
 void
 __wt_progress(const char *s, uint64_t v);
 int
-__wt_scr_alloc(WT_TOC *toc, DBT **dbtp);
+__wt_scr_alloc(WT_TOC *toc, uint32_t size, DBT **dbtp);
 void
 __wt_scr_release(DBT **dbt);
 void

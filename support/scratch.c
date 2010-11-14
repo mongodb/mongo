@@ -14,7 +14,7 @@
  *	Scratch buffer allocation function.
  */
 int
-__wt_scr_alloc(WT_TOC *toc, DBT **dbtp)
+__wt_scr_alloc(WT_TOC *toc, uint32_t size, DBT **dbtp)
 {
 	DBT *scratch;
 	ENV *env;
@@ -38,14 +38,23 @@ __wt_scr_alloc(WT_TOC *toc, DBT **dbtp)
 		if (!F_ISSET(scratch, WT_SCRATCH_INUSE)) {
 			*dbtp = scratch;
 			F_SET(scratch, WT_SCRATCH_INUSE);
+
+			/*
+			 * If the caller has a minimum size, grow the scratch
+			 * buffer as necessary.
+			 */
+			if (size != 0 && scratch->mem_size < size)
+				WT_RET(__wt_realloc(env,
+				    &scratch->mem_size, size, &scratch->data));
 			return (0);
 		}
 
+	/* Resize the array, we need more scratch buffers. */
 	allocated = toc->scratch_alloc * sizeof(DBT);
 	WT_ERR(__wt_realloc(env, &allocated,
 	    (toc->scratch_alloc + 10) * sizeof(DBT), &toc->scratch));
 	toc->scratch_alloc += 10;
-	return (__wt_scr_alloc(toc, dbtp));
+	return (__wt_scr_alloc(toc, size, dbtp));
 
 err:	__wt_api_env_errx(env,
 	    "WT_TOC unable to allocate more scratch buffers");

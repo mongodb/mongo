@@ -230,7 +230,7 @@ __wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	huffman = db->idb->huffman_data;
 	ret = 0;
 
-	WT_ERR(__wt_scr_alloc(toc, &tmp));
+	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 	WT_INDX_FOREACH(page, cip, i) {
 		/* Check for replace or deletion. */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
@@ -292,7 +292,7 @@ __wt_bt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	huffman = db->idb->huffman_data;
 	ret = 0;
 
-	WT_ERR(__wt_scr_alloc(toc, &tmp));
+	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 	WT_INDX_FOREACH(page, rip, i) {
 		/* Check for deletion. */
 		if ((repl = WT_ROW_REPL(
@@ -359,8 +359,8 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	huffman = db->idb->huffman_data;
 	ret = 0;
 
-	WT_ERR(__wt_scr_alloc(toc, &key_tmp));
-	WT_ERR(__wt_scr_alloc(toc, &data_tmp));
+	WT_ERR(__wt_scr_alloc(toc, 0, &key_tmp));
+	WT_ERR(__wt_scr_alloc(toc, 0, &data_tmp));
 	WT_CLEAR(key_local);
 	WT_CLEAR(data_local);
 

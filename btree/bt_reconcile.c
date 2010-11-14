@@ -113,10 +113,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	}
 
 	/* Make sure the TOC's scratch buffer is big enough. */
-	WT_ERR(__wt_scr_alloc(toc, &tmp));
-	if (tmp->mem_size < sizeof(WT_PAGE) + max)
-		WT_ERR(__wt_realloc(env, &tmp->mem_size,
-		    sizeof(WT_PAGE) + max, &tmp->data));
+	WT_ERR(__wt_scr_alloc(toc, sizeof(WT_PAGE) + max, &tmp));
 	memset(tmp->data, 0, sizeof(WT_PAGE) + max);
 
 	/* Initialize the reconciliation buffer as a replacement page. */
@@ -339,9 +336,7 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * and set the delete flag.
 	 */
 	len = db->fixed_len;
-	WT_ERR(__wt_scr_alloc(toc, &tmp));
-	if (tmp->mem_size < len)
-		WT_ERR(__wt_realloc(env, &tmp->mem_size, len, &tmp->data));
+	WT_ERR(__wt_scr_alloc(toc, len, &tmp));
 	memset(tmp->data, 0, len);
 	WT_FIX_DELETE_SET(tmp->data);
 
@@ -414,9 +409,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * and set the delete flag.
 	 */
 	len = db->fixed_len + sizeof(uint16_t);
-	WT_ERR(__wt_scr_alloc(toc, &tmp));
-	if (tmp->mem_size < len)
-		WT_ERR(__wt_realloc(env, &tmp->mem_size, len, &tmp->data));
+	WT_ERR(__wt_scr_alloc(toc, len, &tmp));
 	memset(tmp->data, 0, len);
 	WT_RCC_REPEAT_COUNT(tmp->data) = 1;
 	WT_FIX_DELETE_SET(WT_RCC_REPEAT_DATA(tmp->data));
@@ -1035,7 +1028,7 @@ __wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_KEY_DUP_OVFL:
-			WT_ERR(__wt_scr_alloc(toc, &key_scratch));
+			WT_ERR(__wt_scr_alloc(toc, 0, &key_scratch));
 			WT_ERR(__wt_bt_item_process(
 			    toc, item, &ovfl_page, key_scratch));
 			if (ovfl_page != NULL) {

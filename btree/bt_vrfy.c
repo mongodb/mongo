@@ -399,7 +399,7 @@ __wt_bt_verify_cmp(
 	child_rip = first_entry ?
 	    child->u.irow : child->u.irow + (child->indx_count - 1);
 	if (WT_KEY_PROCESS(child_rip)) {
-		WT_ERR(__wt_scr_alloc(toc, &scratch1));
+		WT_ERR(__wt_scr_alloc(toc, 0, &scratch1));
 		WT_ERR(__wt_bt_item_process(
 		    toc, child_rip->key, &child_ovfl_page, scratch1));
 		if (child_ovfl_page != NULL) {
@@ -412,7 +412,7 @@ __wt_bt_verify_cmp(
 	} else
 		cd_ref = (DBT *)child_rip;
 	if (WT_KEY_PROCESS(parent_rip)) {
-		WT_ERR(__wt_scr_alloc(toc, &scratch2));
+		WT_ERR(__wt_scr_alloc(toc, 0, &scratch2));
 		WT_RET(__wt_bt_item_process(
 		    toc, parent_rip->key, &parent_ovfl_page, scratch2));
 		if (parent_ovfl_page != NULL) {
@@ -638,13 +638,13 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_CLEAR(_c);
 	current = &_a;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
-		WT_ERR(__wt_scr_alloc(toc, &_a.item_comp));
+		WT_ERR(__wt_scr_alloc(toc, 0, &_a.item_comp));
 	last_data = &_b;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
-		WT_ERR(__wt_scr_alloc(toc, &_b.item_comp));
+		WT_ERR(__wt_scr_alloc(toc, 0, &_b.item_comp));
 	last_key = &_c;
 	if (idb->huffman_key != NULL || idb->huffman_data != NULL)
-		WT_ERR(__wt_scr_alloc(toc, &_c.item_comp));
+		WT_ERR(__wt_scr_alloc(toc, 0, &_c.item_comp));
 
 	/* Set the comparison function. */
 	switch (hdr->type) {

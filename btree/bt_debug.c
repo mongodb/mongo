@@ -590,7 +590,7 @@ onpage:		p = WT_ITEM_BYTE(item);
 	case WT_ITEM_KEY_DUP_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DATA_DUP_OVFL:
-process:	WT_ERR(__wt_scr_alloc(toc, &tmp));
+process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 		WT_ERR(__wt_bt_item_process(toc, item, &ovfl, tmp));
 		if (ovfl == NULL) {
 			p = tmp->data;
