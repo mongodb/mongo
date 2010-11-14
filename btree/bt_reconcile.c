@@ -162,7 +162,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	hdr->type = WT_PAGE_FREE;
 	WT_ERR(__wt_page_write(db, page));
 #endif
-	WT_ERR(__wt_cache_free(toc, page->addr, page->size));
+	WT_ERR(__wt_bt_table_free(toc, page->addr, page->size));
 	page->addr = new->addr;
 	page->size = new->size;
 
@@ -908,7 +908,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * relocate the reconciled page for the cache drain code --
 		 * this page was LRU-selected because no thread wanted it.
 		 */
-		WT_RET(__wt_cache_alloc(toc, &new->addr, new->size));
+		WT_RET(__wt_bt_table_alloc(toc, &new->addr, new->size));
 
 		/*
 		 * Write the page.
@@ -930,7 +930,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	/* Update the page's parent. */
 	if ((ret = __wt_bt_rec_parent_update(toc, page, new)) != 0) {
-		(void)__wt_cache_free(toc, new->addr, new->size);
+		(void)__wt_bt_table_free(toc, new->addr, new->size);
 		return (ret);
 	}
 

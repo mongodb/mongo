@@ -171,7 +171,8 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			hdr->u.entries = 0;
 			page->records = 0;
 			hdr->start_recno = insert_cnt;
-			WT_ERR(__wt_cache_alloc(toc, &page->addr, db->leafmin));
+			WT_ERR(__wt_bt_table_alloc(
+			    toc, &page->addr, db->leafmin));
 			__wt_bt_set_ff_and_sa_from_offset(
 			    page, WT_PAGE_BYTE(page));
 		}
@@ -1380,7 +1381,7 @@ __wt_bt_scratch_page(WT_TOC *toc, uint32_t page_size,
 	page = tmp->data;
 	page->hdr = hdr =
 	    (WT_PAGE_HDR *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
-	WT_ERR(__wt_cache_alloc(toc, &page->addr, page_size));
+	WT_ERR(__wt_bt_table_alloc(toc, &page->addr, page_size));
 	page->size = page_size;
 	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
 	hdr->type = (uint8_t)page_type;

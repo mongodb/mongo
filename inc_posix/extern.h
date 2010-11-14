@@ -9,6 +9,10 @@ int
 __wt_bt_scratch_page(WT_TOC *toc, uint32_t page_size,
     uint32_t page_type, uint32_t page_level, WT_PAGE **page_ret, DBT **tmp_ret);
 int
+__wt_bt_table_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
+int
+__wt_bt_table_free(WT_TOC *toc, uint32_t addr, uint32_t size);
+int
 __wt_bt_close(WT_TOC *toc);
 int
 __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
@@ -115,10 +119,6 @@ void
 __wt_bt_repl_free(WT_TOC *toc, WT_REPL *repl);
 int
 __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags);
-int
-__wt_cache_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
-int
-__wt_cache_free(WT_TOC *toc, uint32_t addr, uint32_t size);
 void
 __wt_workq_drain_server(ENV *env, int force);
 void *
