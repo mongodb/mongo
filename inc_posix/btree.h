@@ -401,7 +401,8 @@ struct __wt_page_hdr {
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.
  */
-#define	WT_PAGE_BYTE(page)	(((uint8_t *)(page)->hdr) + WT_PAGE_HDR_SIZE)
+#define	WT_PAGE_BYTE(page)						\
+	((void *)(((uint8_t *)(page)->hdr) + WT_PAGE_HDR_SIZE))
 
 /*
  * WT_ROW --
