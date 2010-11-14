@@ -434,7 +434,7 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			break;
 		case WT_ITEM_OFF:
 			dp->dupkey = key;
-			/* 
+			/*
 			 * XXX
 			 * If an off-page dup tree is reconciled, then this
 			 * might change underfoot and we could race.
