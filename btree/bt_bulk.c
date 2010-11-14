@@ -27,7 +27,7 @@ typedef struct {
 static int __wt_bt_build_key_item(WT_TOC *, DBT *, WT_ITEM *, WT_OVFL *);
 static int __wt_bt_bulk_fix(WT_TOC *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_bt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
-static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, uint32_t *);
+static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, WT_OVFL *);
 static int __wt_bt_bulk_stack_put(WT_TOC *, WT_STACK *);
 static int __wt_bt_bulk_var(WT_TOC *, uint32_t, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
 static inline int __wt_bt_bulk_write(WT_TOC *, WT_PAGE *);
@@ -1179,9 +1179,7 @@ __wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	if (dbt->size > db->leafitemsize) {
 		WT_STAT_INCR(stats, OVERFLOW_KEY);
 
-		WT_CLEAR(*ovfl);
-		ovfl->size = dbt->size;
-		WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
+		WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, ovfl));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
@@ -1247,9 +1245,7 @@ __wt_bt_build_data_item(
 
 	/* Create an overflow object if the data won't fit. */
 	if (dbt->size > db->leafitemsize) {
-		WT_CLEAR(*ovfl);
-		ovfl->size = dbt->size;
-		WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
+		WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, ovfl));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
@@ -1316,7 +1312,7 @@ err:	if (tmp != NULL)
  *	addr.
  */
 static int
-__wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp)
+__wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 {
 	DB *db;
 	DBT *tmp;
@@ -1332,7 +1328,10 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp)
 	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + dbt->size, db->allocsize);
 	WT_ERR(__wt_bt_scratch_page(
 	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
-	*addrp = page->addr;
+
+	/* Fill in the return information. */
+	to->addr = page->addr;
+	to->size = dbt->size;
 
 	/* Initialize the page header and copy the record into place. */
 	hdr = page->hdr;
