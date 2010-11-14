@@ -18,34 +18,6 @@ static int  __wt_bt_page_inmem_row_int(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
 
 /*
- * __wt_bt_page_alloc --
- *	Allocate a new btree page from the cache.
- */
-int
-__wt_bt_page_alloc(
-    WT_TOC *toc, u_int type, u_int level, uint32_t size, WT_PAGE **pagep)
-{
-	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
-
-	WT_RET((__wt_page_alloc(toc, size, &page)));
-
-	/* In-memory page structure: the space-available and first-free byte. */
-	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
-
-	/*
-	 * Generally, the default values of 0 on page are correct; set the type
-	 * and the level.
-	 */
-	hdr = page->hdr;
-	hdr->type = (uint8_t)type;
-	hdr->level = (uint8_t)level;
-
-	*pagep = page;
-	return (0);
-}
-
-/*
  * __wt_bt_page_in --
  *	Get a btree page from the cache.
  */

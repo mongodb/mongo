@@ -6,6 +6,9 @@ int
 __wt_bt_build_data_item(
     WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, u_int flags);
 int
+__wt_bt_scratch_page(WT_TOC *toc, uint32_t page_size,
+    uint32_t page_type, uint32_t page_level, WT_PAGE **page_ret, DBT **tmp_ret);
+int
 __wt_bt_close(WT_TOC *toc);
 int
 __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
@@ -55,9 +58,6 @@ int
 __wt_bt_root_pin(WT_TOC *toc, int pin);
 int
 __wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep);
-int
-__wt_bt_page_alloc(
-    WT_TOC *toc, u_int type, u_int level, uint32_t size, WT_PAGE **pagep);
 int
 __wt_bt_page_in(
     WT_TOC *toc, uint32_t addr, uint32_t size, int inmem, WT_PAGE **pagep);

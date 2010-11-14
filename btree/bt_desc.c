@@ -118,23 +118,31 @@ int
 __wt_bt_desc_write(WT_TOC *toc)
 {
 	DB *db;
+	DBT *tmp;
 	IDB *idb;
 	WT_FH *fh;
 	WT_PAGE *page;
 	WT_PAGE_DESC *desc;
+	int ret;
 
 	db = toc->db;
 	idb = db->idb;
 	fh = idb->fh;
+	ret = 0;
 
 	/*
 	 * If the file size is 0, allocate a new page, else read the database's
 	 * description page.  The description page doesn't move, so simply retry
 	 * any WT_RESTART return.
+	 *
+	 * XXX
+	 * I'm not currently serializing updates to this page, and I'm pretty
+	 * sure that's a bug -- review this when we start working btree splits.
 	 */
+	tmp = NULL;
 	if (fh->file_size == 0)
-		WT_RET(__wt_bt_page_alloc(
-		    toc, WT_PAGE_DESCRIPT, WT_NOLEVEL, 512, &page));
+		WT_ERR(__wt_bt_scratch_page(
+		    toc, 512, WT_PAGE_DESCRIPT, WT_NOLEVEL, &page, &tmp));
 	else
 		WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
 
@@ -156,14 +164,13 @@ __wt_bt_desc_write(WT_TOC *toc)
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		F_SET(desc, WT_PAGE_DESC_REPEAT);
 
-	/*
-	 * Update the page.
-	 *
-	 * XXX
-	 * I'm not currently serializing updates to this page, and I'm pretty
-	 * sure that's a bug -- review this when we start working btree splits.
-	 */
-	__wt_bt_page_out(toc, &page, WT_MODIFIED);
+	if (tmp == NULL)
+		__wt_bt_page_out(toc, &page, WT_MODIFIED);
+	else
+		ret = __wt_page_write(db, page);
 
-	return (0);
+err:	if (tmp != NULL)
+		__wt_scr_release(&tmp);
+
+	return (ret);
 }

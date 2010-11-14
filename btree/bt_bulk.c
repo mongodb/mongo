@@ -34,7 +34,6 @@ static inline int __wt_bt_bulk_write(WT_TOC *, WT_PAGE *);
 static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **, DBT *, WT_ITEM *, uint32_t, int (*cb)(DB *, DBT **, DBT **));
 static int __wt_bt_promote(WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
-static int __wt_bt_scratch_page(WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
 
 /*
  * __wt_db_bulk_load --
@@ -1350,10 +1349,9 @@ err:	if (tmp != NULL)
  * __wt_bt_bulk_scratch_page --
  *	Allocate a scratch buffer and make it look like a database page.
  */
-static int
-__wt_bt_scratch_page(WT_TOC *toc,
-    uint32_t page_size, uint32_t page_type, uint32_t page_level,
-    WT_PAGE **page_ret, DBT **tmp_ret)
+int
+__wt_bt_scratch_page(WT_TOC *toc, uint32_t page_size,
+    uint32_t page_type, uint32_t page_level, WT_PAGE **page_ret, DBT **tmp_ret)
 {
 	ENV *env;
 	DBT *tmp;
