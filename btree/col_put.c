@@ -48,8 +48,8 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	DB *db;
 	ENV *env;
 	IDB *idb;
-	WT_COL_EXPAND *exp, **new_expcol;
 	WT_PAGE *page;
+	WT_RCC_EXPAND *exp, **new_rccexp;
 	WT_REPL **new_repl, *repl;
 	int ret;
 
@@ -59,7 +59,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 
 	page = NULL;
 	exp = NULL;
-	new_expcol = NULL;
+	new_rccexp = NULL;
 	new_repl = NULL;
 	repl = NULL;
 
@@ -72,7 +72,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	 * Repeat-count compressed (RCC) column store operations are difficult
 	 * because each original on-disk index for an RCC can represent large
 	 * numbers of records, and we're only deleting a single one of those
-	 * records, which means working in the WT_COL_EXPAND array.  All other
+	 * records, which means working in the WT_RCC_EXPAND array.  All other
 	 * column store deletes are simple changes where a new WT_REPL entry is
 	 * entered into the page's modification array.  There are three code
 	 * paths:
@@ -82,11 +82,11 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	 * into the WT_REPL array.
 	 *
 	 * 2: an RCC column store delete of an already modified record: create
-	 * a new WT_REPL entry, and link it to the WT_COL_EXPAND entry's WT_REPL
+	 * a new WT_REPL entry, and link it to the WT_RCC_EXPAND entry's WT_REPL
 	 * list.
 	 *
 	 * 3: an RCC column store delete of a record not yet modified: create
-	 * a new WT_COL_EXPAND/WT_REPL pair, and link it into the WT_COL_EXPAND
+	 * a new WT_RCC_EXPAND/WT_REPL pair, and link it into the WT_RCC_EXPAND
 	 * array.
 	 */
 	switch (page->hdr->type) {
@@ -116,36 +116,36 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 		}
 							/* #3 */
 		/* Allocate a page expansion array as necessary. */
-		if (page->expcol == NULL)
+		if (page->rccexp == NULL)
 			WT_ERR(__wt_calloc(env, page->indx_count,
-			    sizeof(WT_COL_EXPAND *), &new_expcol));
+			    sizeof(WT_RCC_EXPAND *), &new_rccexp));
 
 		/* Allocate a WT_REPL structure and fill it in. */
 		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
 
-		/* Allocate a WT_COL_EXPAND structure and fill it in. */
-		WT_ERR(__wt_calloc(env, 1, sizeof(WT_COL_EXPAND), &exp));
+		/* Allocate a WT_RCC_EXPAND structure and fill it in. */
+		WT_ERR(__wt_calloc(env, 1, sizeof(WT_RCC_EXPAND), &exp));
 		exp->recno = recno;
 		exp->repl = repl;
 
-		/* Schedule the workQ to link in the WT_COL_EXPAND structure. */
+		/* Schedule the workQ to link in the WT_RCC_EXPAND structure. */
 		__wt_bt_rcc_expand_serial(toc, page, toc->srch_write_gen,
-		    WT_COL_SLOT(page, toc->srch_ip), new_expcol, exp, ret);
+		    WT_COL_SLOT(page, toc->srch_ip), new_rccexp, exp, ret);
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
 	if (ret != 0) {
 err:		if (exp != NULL)
-			__wt_free(env, exp, sizeof(WT_COL_EXPAND));
+			__wt_free(env, exp, sizeof(WT_RCC_EXPAND));
 		if (repl != NULL)
 			__wt_bt_repl_free(toc, repl);
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */
-	if (new_expcol != NULL && new_expcol != page->expcol)
+	if (new_rccexp != NULL && new_rccexp != page->rccexp)
 		__wt_free(env,
-		    new_expcol, page->indx_count * sizeof(WT_COL_EXPAND *));
+		    new_rccexp, page->indx_count * sizeof(WT_RCC_EXPAND *));
 
 	/* Free any page replacement array unless the workQ used it. */
 	if (new_repl != NULL && new_repl != page->repl)
@@ -166,11 +166,11 @@ int
 __wt_bt_rcc_expand_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
-	WT_COL_EXPAND **new_exp, *exp;
+	WT_RCC_EXPAND **new_rccexp, *exp;
 	int ret, slot;
 	uint16_t write_gen;
 
-	__wt_bt_rcc_expand_unpack(toc, page, write_gen, slot, new_exp, exp);
+	__wt_bt_rcc_expand_unpack(toc, page, write_gen, slot, new_rccexp, exp);
 
 	ret = 0;
 
@@ -182,17 +182,17 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc)
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->expcol == NULL)
-		page->expcol = new_exp;
+	if (page->rccexp == NULL)
+		page->rccexp = new_rccexp;
 
 	/*
-	 * Insert the new WT_COL_EXPAND as the first item in the forward-linked
+	 * Insert the new WT_RCC_EXPAND as the first item in the forward-linked
 	 * list of expansion structures.  Flush memory to ensure the list is
 	 * never broken.
 	 */
-	exp->next = page->expcol[slot];
+	exp->next = page->rccexp[slot];
 	WT_MEMORY_FLUSH;
-	page->expcol[slot] = exp;
+	page->rccexp[slot] = exp;
 	WT_PAGE_MODIFY_SET(page);
 	/*
 	 * Depend on the memory flush in __wt_toc_serialize_wrapup before the
@@ -212,7 +212,7 @@ int
 __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
-	WT_COL_EXPAND *exp;
+	WT_RCC_EXPAND *exp;
 	WT_REPL *repl;
 	uint16_t write_gen;
 	int ret;
@@ -226,7 +226,7 @@ __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
 
 	/*
 	 * Insert the new WT_REPL as the first item in the forward-linked list
-	 * of replacement structures from the WT_COL_EXPAND structure.  Flush
+	 * of replacement structures from the WT_RCC_EXPAND structure.  Flush
 	 * memory to ensure the list is never broken.
 	 */
 	repl->next = exp->repl;

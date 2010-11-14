@@ -64,7 +64,6 @@ struct __ienv;			typedef struct __ienv IENV;
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_col;		typedef struct __wt_col WT_COL;
-struct __wt_col_expand;		typedef struct __wt_col_expand WT_COL_EXPAND;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
 struct __wt_flist;		typedef struct __wt_flist WT_FLIST;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
@@ -76,6 +75,7 @@ struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_entry;		typedef struct __wt_page_entry WT_PAGE_ENTRY;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
+struct __wt_rcc_expand;		typedef struct __wt_rcc_expand WT_RCC_EXPAND;
 struct __wt_repl;		typedef struct __wt_repl WT_REPL;
 struct __wt_row;		typedef struct __wt_row WT_ROW;
 struct __wt_row_insert;		typedef struct __wt_row_insert WT_ROW_INSERT;
@@ -161,8 +161,7 @@ struct __wt_toc {
 	void	 *srch_ip;		/*    WT_{COL,ROW} index */
 	WT_REPL	 *srch_repl;		/*    WT_REPL array index */
 					/* Repeat-compress column store only: */
-	WT_COL_EXPAND *srch_exp;	/*    WT_COL_EXPAND array index */
-	uint16_t srch_rcc_offset;	/*    WT_COL index record offset */
+	WT_RCC_EXPAND *srch_exp;	/*    WT_RCC_EXPAND array index */
 
 
 	/*

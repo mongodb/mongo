@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static void __wt_bt_page_discard_expcol(ENV *, WT_PAGE *);
+static void __wt_bt_page_discard_rccexp(ENV *, WT_PAGE *);
 static void __wt_bt_page_discard_repl(ENV *, WT_PAGE *);
 static void __wt_bt_page_discard_repl_list(ENV *, WT_REPL *);
 
@@ -73,8 +73,8 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 		__wt_bt_page_discard_repl(env, page);
 
 	/* Free the repeat-count compressed column store expansion array. */
-	if (page->expcol != NULL)
-		__wt_bt_page_discard_expcol(env, page);
+	if (page->rccexp != NULL)
+		__wt_bt_page_discard_rccexp(env, page);
 
 	__wt_free(env, page->hdr, page->size);
 	__wt_free(env, page, sizeof(WT_PAGE));
@@ -103,37 +103,37 @@ __wt_bt_page_discard_repl(ENV *env, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_discard_expcol --
+ * __wt_bt_page_discard_rccexp --
  *	Discard the repeat-count compressed column store expansion array.
  */
 static void
-__wt_bt_page_discard_expcol(ENV *env, WT_PAGE *page)
+__wt_bt_page_discard_rccexp(ENV *env, WT_PAGE *page)
 {
-	WT_COL_EXPAND **expp, *exp, *a;
+	WT_RCC_EXPAND **expp, *exp, *a;
 	u_int i;
 
 	/*
 	 * For each non-NULL slot in the page's repeat-count compressed column
-	 * store expansion array, free the linked list of WT_COL_EXPAND
+	 * store expansion array, free the linked list of WT_RCC_EXPAND
 	 * structures anchored in that slot.
 	 */
-	WT_EXPCOL_FOREACH(page, expp, i) {
+	WT_RCC_EXPAND_FOREACH(page, expp, i) {
 		if ((exp = *expp) == NULL)
 			continue;
 		/*
 		 * Free the linked list of WT_REPL structures anchored in the
-		 * WT_COL_EXPAND entry.
+		 * WT_RCC_EXPAND entry.
 		 */
 		__wt_bt_page_discard_repl_list(env, exp->repl);
 		do {
 			a = exp->next;
-			__wt_free(env, exp, sizeof(WT_COL_EXPAND));
+			__wt_free(env, exp, sizeof(WT_RCC_EXPAND));
 		} while ((exp = a) != NULL);
 	}
 
 	/* Free the page's expansion array. */
 	__wt_free(
-	    env, page->expcol, page->indx_count * sizeof(WT_COL_EXPAND *));
+	    env, page->rccexp, page->indx_count * sizeof(WT_RCC_EXPAND *));
 }
 
 /*

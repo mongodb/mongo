@@ -11,7 +11,7 @@
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
-static void __wt_bt_debug_expcol(WT_COL_EXPAND *, FILE *);
+static void __wt_bt_debug_rccexp(WT_RCC_EXPAND *, FILE *);
 static void __wt_bt_debug_inmem_col_fix(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
 static void __wt_bt_debug_inmem_col_rcc(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
 static int  __wt_bt_debug_inmem_col_var(WT_TOC *, WT_PAGE *, WT_COL *, FILE *);
@@ -329,7 +329,7 @@ static void
 __wt_bt_debug_inmem_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
 {
 	DB *db;
-	WT_COL_EXPAND *exp;
+	WT_RCC_EXPAND *exp;
 
 	db = toc->db;
 
@@ -343,8 +343,8 @@ __wt_bt_debug_inmem_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_COL *cip, FILE *fp)
 		__wt_bt_print(WT_RCC_REPEAT_DATA(cip->data), db->fixed_len, fp);
 	fprintf(fp, "}\n");
 
-	if ((exp = WT_COL_EXPCOL(page, cip)) != NULL)
-		__wt_bt_debug_expcol(exp, fp);
+	if ((exp = WT_COL_RCCEXP(page, cip)) != NULL)
+		__wt_bt_debug_rccexp(exp, fp);
 }
 
 /*
@@ -393,11 +393,11 @@ __wt_bt_debug_repl(WT_REPL *repl, FILE *fp)
 }
 
 /*
- * __wt_bt_debug_expcol --
+ * __wt_bt_debug_rccexp --
  *	Dump a column store expansion array.
  */
 static void
-__wt_bt_debug_expcol(WT_COL_EXPAND *exp, FILE *fp)
+__wt_bt_debug_rccexp(WT_RCC_EXPAND *exp, FILE *fp)
 {
 	WT_REPL *repl;
 

@@ -390,8 +390,8 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	DBT *tmp;
 	ENV *env;
 	WT_COL *cip;
-	WT_COL_EXPAND *exp, **expsort, **expp;
 	WT_PAGE_HDR *hdr;
+	WT_RCC_EXPAND *exp, **expsort, **expp;
 	WT_REPL *repl;
 	uint64_t recno;
 	uint32_t i, len, n_expsort;
@@ -427,7 +427,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
-		 * terminated array of references to WT_COL_EXPAND structures,
+		 * terminated array of references to WT_RCC_EXPAND structures,
 		 * sorted by record number.
 		 */
 		WT_ERR(__wt_bt_rcc_expand_sort(
@@ -436,7 +436,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		/*
 		 *
 		 * Generate entries for the new page: loop through the repeat
-		 * records, checking for WT_COL_EXPAND entries that match the
+		 * records, checking for WT_RCC_EXPAND entries that match the
 		 * current record number.
 		 */
 		nrepeat = WT_RCC_REPEAT_COUNT(cip->data);
@@ -446,7 +446,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			if ((exp = *expp) != NULL && recno == exp->recno) {
 				++expp;
 
-				/* Use the WT_COL_EXPAND's WT_REPL field. */
+				/* Use the WT_RCC_EXPAND's WT_REPL field. */
 				repl = exp->repl;
 				if (WT_REPL_DELETED_ISSET(repl))
 					data = tmp->data;
@@ -462,9 +462,9 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 					data = cip->data;
 				/*
 				 * The repeat count is the number of records
-				 * up to the next WT_COL_EXPAND record, or
+				 * up to the next WT_RCC_EXPAND record, or
 				 * up to the end of this entry if we have no
-				 * more WT_COL_EXPAND records.
+				 * more WT_RCC_EXPAND records.
 				 */
 				if (exp == NULL)
 					repeat_count = (nrepeat - n) + 1;
@@ -522,7 +522,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	/* Free the sort array. */
 err:	if (expsort != NULL)
-		__wt_free(env, expsort, n_expsort * sizeof(WT_COL_EXPAND *));
+		__wt_free(env, expsort, n_expsort * sizeof(WT_RCC_EXPAND *));
 
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -532,35 +532,35 @@ err:	if (expsort != NULL)
 
 /*
  * __wt_bt_rcc_expand_compare --
- *	Qsort function: sort WT_COL_EXPAND structures based on the record
+ *	Qsort function: sort WT_RCC_EXPAND structures based on the record
  *	offset, in ascending order.
  */
 static int
 __wt_bt_rcc_expand_compare(const void *a, const void *b)
 {
-	WT_COL_EXPAND *a_exp, *b_exp;
+	WT_RCC_EXPAND *a_exp, *b_exp;
 
-	a_exp = *(WT_COL_EXPAND **)a;
-	b_exp = *(WT_COL_EXPAND **)b;
+	a_exp = *(WT_RCC_EXPAND **)a;
+	b_exp = *(WT_RCC_EXPAND **)b;
 
 	return (a_exp->recno > b_exp->recno ? 1 : 0);
 }
 
 /*
  * __wt_bt_rcc_expand_sort --
- *	Return the current on-page index's array of WT_COL_EXPAND structures,
+ *	Return the current on-page index's array of WT_RCC_EXPAND structures,
  *	sorted by record offset.
  */
 int
 __wt_bt_rcc_expand_sort(ENV *env,
-    WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, uint32_t *np)
+    WT_PAGE *page, WT_COL *cip, WT_RCC_EXPAND ***expsortp, uint32_t *np)
 {
-	WT_COL_EXPAND *exp;
+	WT_RCC_EXPAND *exp;
 	uint16_t n;
 
 	/* Figure out how big the array needs to be. */
 	for (n = 0,
-	    exp = WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next, ++n)
+	    exp = WT_COL_RCCEXP(page, cip); exp != NULL; exp = exp->next, ++n)
 		;
 
 	/*
@@ -570,21 +570,21 @@ __wt_bt_rcc_expand_sort(ENV *env,
 	if (n >= *np) {
 		if (*expsortp != NULL)
 			__wt_free(
-			    env, *expsortp, *np * sizeof(WT_COL_EXPAND *));
+			    env, *expsortp, *np * sizeof(WT_RCC_EXPAND *));
 		WT_RET(__wt_calloc(
-		    env, n + 10, sizeof(WT_COL_EXPAND *), expsortp));
+		    env, n + 10, sizeof(WT_RCC_EXPAND *), expsortp));
 		*np = n + 10;
 	}
 
-	/* Enter the WT_COL_EXPAND structures into the array. */
+	/* Enter the WT_RCC_EXPAND structures into the array. */
 	for (n = 0,
-	    exp = WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next, ++n)
+	    exp = WT_COL_RCCEXP(page, cip); exp != NULL; exp = exp->next, ++n)
 		(*expsortp)[n] = exp;
 
 	/* Sort the entries. */
 	if (n != 0)
 		qsort(*expsortp, (size_t)n,
-		    sizeof(WT_COL_EXPAND *), __wt_bt_rcc_expand_compare);
+		    sizeof(WT_RCC_EXPAND *), __wt_bt_rcc_expand_compare);
 
 	/* NULL-terminate the array. */
 	(*expsortp)[n] = NULL;

@@ -19,15 +19,15 @@ serial['bt_rcc_expand'] = Serial(
 	['WT_PAGE */page',
 	 'uint16_t/write_gen',
 	 'int/slot',
-	 'WT_COL_EXPAND **/new_expcol',
-	 'WT_COL_EXPAND */exp'])
+	 'WT_RCC_EXPAND **/new_rccexp',
+	 'WT_RCC_EXPAND */exp'])
 
 serial['bt_rcc_expand_repl'] = Serial(
 	'bt_rcc_expand_repl',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'uint16_t/write_gen',
-	 'WT_COL_EXPAND */exp',
+	 'WT_RCC_EXPAND */exp',
 	 'WT_REPL */repl'])
 
 serial['bt_item_update'] = Serial(

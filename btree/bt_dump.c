@@ -162,7 +162,7 @@ __wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DB *db;
 	ENV *env;
 	WT_COL *cip;
-	WT_COL_EXPAND *exp, **expsort, **expp;
+	WT_RCC_EXPAND *exp, **expsort, **expp;
 	WT_REPL *repl;
 	uint64_t recno;
 	uint32_t i, n_expsort;
@@ -178,7 +178,7 @@ __wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
-		 * terminated array of references to WT_COL_EXPAND structures,
+		 * terminated array of references to WT_RCC_EXPAND structures,
 		 * sorted by record number.
 		 */
 		WT_RET(__wt_bt_rcc_expand_sort(
@@ -186,7 +186,7 @@ __wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 		/*
 		 * Dump the records.   We use the WT_REPL entry for records in
-		 * in the WT_COL_EXPAND array, and original data otherwise.
+		 * in the WT_RCC_EXPAND array, and original data otherwise.
 		 */
 		for (expp = expsort,
 		    n_repeat = WT_RCC_REPEAT_COUNT(cip->data);
@@ -204,7 +204,7 @@ __wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	}
 	/* Free the sort array. */
 	if (expsort != NULL)
-		__wt_free(env, expsort, n_expsort * sizeof(WT_COL_EXPAND *));
+		__wt_free(env, expsort, n_expsort * sizeof(WT_RCC_EXPAND *));
 
 	return (0);
 }

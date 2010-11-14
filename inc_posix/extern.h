@@ -79,7 +79,7 @@ int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_bt_rcc_expand_sort(ENV *env,
-    WT_PAGE *page, WT_COL *cip, WT_COL_EXPAND ***expsortp, uint32_t *np);
+    WT_PAGE *page, WT_COL *cip, WT_RCC_EXPAND ***expsortp, uint32_t *np);
 int
 __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int

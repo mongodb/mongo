@@ -289,7 +289,7 @@ struct __wt_page {
 	 * functionality, but it never performed well and it isn't useful enough
 	 * to re-implement, IMNSHO.)
 	 */
-	WT_COL_EXPAND **expcol;
+	WT_RCC_EXPAND **rccexp;
 
 	uint32_t flags;
 };
@@ -297,7 +297,7 @@ struct __wt_page {
 /*
  * WT_{COL,ROW}_SLOT --
  * There are 3 different arrays which map one-to-one to the original on-disk
- * index: repl, insrow and expcol.  WT_{COL,ROW}_SLOT returns the offset.
+ * index: repl, insrow and rccexp.  WT_{COL,ROW}_SLOT returns the offset.
  *
  * WT_{COL,ROW}_ARRAY --
  * Return the the appropriate entry for one of the three arrays, or NULL if
@@ -307,7 +307,7 @@ struct __wt_page {
 #define	WT_COL_ARRAY(page, ip, array)					\
 	((page)->array == NULL ? NULL : page->array[WT_COL_SLOT(page, ip)])
 #define	WT_COL_REPL(page, ip)	WT_COL_ARRAY(page, ip, repl)
-#define	WT_COL_EXPCOL(page, ip)	WT_COL_ARRAY(page, ip, expcol)
+#define	WT_COL_RCCEXP(page, ip)	WT_COL_ARRAY(page, ip, rccexp)
 
 #define	WT_ROW_SLOT(page, ip)	((WT_ROW *)(ip) - (page)->u.irow)
 #define	WT_ROW_ARRAY(page, ip, array)					\
@@ -444,6 +444,7 @@ struct __wt_row {
  * are a lot of these structures.
  */
 #define	WT_ROW_SIZE	(2 * sizeof(void *) + sizeof(uint32_t))
+
 /*
  * WT_ROW_INSERT --
  * The WT_ROW_INSERT structure describes the in-memory information about an
@@ -476,26 +477,18 @@ struct __wt_col {
  * are a lot of these structures.
  */
 #define	WT_COL_SIZE	(sizeof(void *))
+
 /*
- * WT_COL_EXPAND --
- * The WT_COL_EXPAND structure describes the in-memory information about a
+ * WT_RCC_EXPAND --
+ * The WT_RCC_EXPAND structure describes the in-memory information about a
  * replaced key/data pair on a repeat-compressed, column store database page.
  */
-struct __wt_col_expand {
-	/*
-	 * The stored "key" in the WT_COL_EXPAND structure isn't a record
-	 * number: it's the offset in the set of records maintained for the
-	 * index, that is, it's an offset from the starting record number
-	 * for the original, on-disk page index.
-	 *
-	 * We know we can store the offset in 16-bits because that's the
-	 * maximum number of records in a single compressed group.
-	 */
-	uint64_t recno;		/* recno */
+struct __wt_rcc_expand {
+	uint64_t recno;			/* recno */
 
 	WT_REPL *repl;                  /* modifications/deletions */
 
-	WT_COL_EXPAND *next;		/* forward-linked list */
+	WT_RCC_EXPAND *next;		/* forward-linked list */
 };
 
 /*
@@ -524,13 +517,13 @@ struct __wt_col_expand {
 	    (replp) = (page)->repl; (i) > 0; ++(replp), --(i))
 
 /*
- * WT_EXPCOL_FOREACH --
+ * WT_RCC_EXPAND_FOREACH --
  * Macro to walk the repeat-count compressed column store expansion  array of
  * an in-memory page.
  */
-#define	WT_EXPCOL_FOREACH(page, exp, i)					\
+#define	WT_RCC_EXPAND_FOREACH(page, exp, i)				\
 	for ((i) = (page)->indx_count,					\
-	    (exp) = (page)->expcol; (i) > 0; ++(exp), --(i))
+	    (exp) = (page)->rccexp; (i) > 0; ++(exp), --(i))
 
 /*
  * On both row- and column-store internal pages, the on-page data referenced

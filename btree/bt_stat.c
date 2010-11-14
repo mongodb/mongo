@@ -219,7 +219,7 @@ static int
 __wt_bt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_COL_EXPAND *exp;
+	WT_RCC_EXPAND *exp;
 	WT_REPL *repl;
 	WT_STATS *stats;
 	uint32_t i;
@@ -243,11 +243,11 @@ __wt_bt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 		 * records, or updates a deleted record two times in a row --
 		 * we'll incorrectly count the records as unique, when they are
 		 * changes to the same record.  I'm not fixing it as I don't
-		 * expect the WT_COL_EXPCOL data structure to be permanent, it's
+		 * expect the WT_COL_RCCEXP data structure to be permanent, it's
 		 * too likely to become a linked list in bad cases.
 		 */
 		for (exp =
-		    WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next) {
+		    WT_COL_RCCEXP(page, cip); exp != NULL; exp = exp->next) {
 			repl = exp->repl;
 			if (WT_REPL_DELETED_ISSET(repl))
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);

@@ -19,9 +19,9 @@ __wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	DB *db;
 	IDB *idb;
 	WT_COL *cip;
-	WT_COL_EXPAND *exp;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
+	WT_RCC_EXPAND *exp;
 	WT_REPL *repl;
 	uint64_t record_cnt;
 	uint32_t addr, size, i;
@@ -147,7 +147,7 @@ done:	/*
 	case WT_PAGE_COL_RCC:
 		/* Find the item's WT_COL_EXP slot if it exists. */
 		for (exp =
-		    WT_COL_EXPCOL(page, cip); exp != NULL; exp = exp->next)
+		    WT_COL_RCCEXP(page, cip); exp != NULL; exp = exp->next)
 			if (exp->recno == recno)
 				break;
 
