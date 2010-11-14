@@ -3,9 +3,6 @@ int
 __wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **));
 int
-__wt_bt_build_key_item(
-    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load);
-int
 __wt_bt_build_data_item(
     WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, u_int flags);
 int
@@ -58,8 +55,6 @@ int
 __wt_bt_root_pin(WT_TOC *toc, int pin);
 int
 __wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep);
-int
-__wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp);
 int
 __wt_bt_page_alloc(
     WT_TOC *toc, u_int type, u_int level, uint32_t size, WT_PAGE **pagep);

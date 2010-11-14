@@ -36,36 +36,3 @@ __wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep)
 	*pagep = page;
 	return (0);
 }
-
-/*
- * __wt_bt_ovfl_write --
- *	Store overflow items in the database, returning the page addr.
- */
-int
-__wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp)
-{
-	DB *db;
-	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
-
-	db = toc->db;
-
-	/* Allocate a chunk of file space. */
-	WT_RET(__wt_page_alloc(
-	    toc, WT_HDR_BYTES_TO_ALLOC(db, dbt->size), &page));
-
-	/* Initialize the page and copy the overflow item in. */
-	hdr = page->hdr;
-	hdr->type = WT_PAGE_OVFL;
-	hdr->level = WT_LLEAF;
-	hdr->u.datalen = dbt->size;
-
-	/* Return the page address to the caller. */
-	*addrp = page->addr;
-
-	/* Copy the record into place. */
-	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
-
-	__wt_bt_page_out(toc, &page, WT_MODIFIED);
-	return (0);
-}

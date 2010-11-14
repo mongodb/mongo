@@ -24,16 +24,17 @@ typedef struct {
 	u_int size;				/* stack size */
 } WT_STACK;
 
+static int __wt_bt_build_key_item(WT_TOC *, DBT *, WT_ITEM *, WT_OVFL *);
 static int __wt_bt_bulk_fix(WT_TOC *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_bt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
 static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, uint32_t *);
 static int __wt_bt_bulk_stack_put(WT_TOC *, WT_STACK *);
 static int __wt_bt_bulk_var(WT_TOC *, uint32_t, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static inline int __wt_bt_bulk_write(WT_TOC *, WT_PAGE *);
 static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **, DBT *, WT_ITEM *, uint32_t, int (*cb)(DB *, DBT **, DBT **));
 static int __wt_bt_promote(WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
 static int __wt_bt_scratch_page(WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
-static inline int __wt_bt_bulk_write(WT_TOC *, WT_PAGE *);
 
 /*
  * __wt_db_bulk_load --
@@ -331,7 +332,7 @@ skip_read:	/*
 
 		/* Build the data item we're going to store on the page. */
 		WT_ERR(__wt_bt_build_data_item(
-		    toc, data, &data_item, &data_ovfl, WT_IS_BULK));
+		    toc, data, &data_item, &data_ovfl, 0));
 
 		/*
 		 * Check for duplicate keys; we don't store the key on the page
@@ -389,7 +390,7 @@ skip_read:	/*
 		/* Build the key item we're going to store on the page. */
 		if (key != NULL)
 			WT_ERR(__wt_bt_build_key_item(
-			    toc, key, &key_item, &key_ovfl, 1));
+			    toc, key, &key_item, &key_ovfl));
 
 		/*
 		 * We now have the key/data items to store on the page.  If
@@ -713,7 +714,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 
 		/* Build the data item we're going to store on the page. */
 		WT_ERR(__wt_bt_build_data_item(
-		    toc, data, &data_item, &data_ovfl, WT_IS_BULK | WT_IS_DUP));
+		    toc, data, &data_item, &data_ovfl, WT_IS_DUP));
 
 		/*
 		 * If there's insufficient space available, allocate a new
@@ -1141,9 +1142,8 @@ err:	if (next_tmp != NULL)
  *	Process an inserted key item and return an WT_ITEM structure and byte
  *	string to be stored on the page.
  */
-int
-__wt_bt_build_key_item(
-    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, int bulk_load)
+static int
+__wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 {
 	DB *db;
 	IDB *idb;
@@ -1181,10 +1181,7 @@ __wt_bt_build_key_item(
 
 		WT_CLEAR(*ovfl);
 		ovfl->size = dbt->size;
-		if (bulk_load)
-			WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
-		else
-			WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
+		WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
@@ -1252,10 +1249,7 @@ __wt_bt_build_data_item(
 	if (dbt->size > db->leafitemsize) {
 		WT_CLEAR(*ovfl);
 		ovfl->size = dbt->size;
-		if (LF_ISSET(WT_IS_BULK))
-			WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
-		else
-			WT_RET(__wt_bt_ovfl_write(toc, dbt, &ovfl->addr));
+		WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, &ovfl->addr));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
@@ -1279,7 +1273,7 @@ __wt_bt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 	DB *db;
 	DBT *tmp;
 	WT_PAGE *page;
-	u_int32_t size;
+	uint32_t size;
 	int ret;
 
 	db = toc->db;
