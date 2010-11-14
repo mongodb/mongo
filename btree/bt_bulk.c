@@ -1292,14 +1292,12 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, uint32_t *addrp)
 
 	/* Get a scratch buffer and make it look like our work page. */
 	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + dbt->size, db->allocsize);
-	WT_ERR(__wt_bt_scratch_page(toc,
-	    size, WT_PAGE_DUP_LEAF, WT_LLEAF, &page, &tmp));
+	WT_ERR(__wt_bt_scratch_page(
+	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
 	*addrp = page->addr;
 
 	/* Initialize the page header and copy the record into place. */
 	hdr = page->hdr;
-	hdr->type = WT_PAGE_OVFL;
-	hdr->level = WT_LLEAF;
 	hdr->u.datalen = dbt->size;
 	memcpy((uint8_t *)hdr + sizeof(WT_PAGE_HDR), dbt->data, dbt->size);
 
