@@ -1353,14 +1353,12 @@ int
 __wt_bt_scratch_page(WT_TOC *toc, uint32_t page_size,
     uint32_t page_type, uint32_t page_level, WT_PAGE **page_ret, DBT **tmp_ret)
 {
-	ENV *env;
 	DBT *tmp;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	uint32_t size;
 	int ret;
 
-	env = toc->env;
 	ret = 0;
 
 	/*
