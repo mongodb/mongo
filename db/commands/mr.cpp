@@ -720,7 +720,11 @@ namespace mongo {
                 }
                 
 
-                long long finalCount = mr.renameIfNeeded( db , &state );
+                long long finalCount;
+                {
+                    dblock lk;
+                    finalCount = mr.renameIfNeeded( db , &state );
+                }
                 log(0) << " mapreducefinishcommand " << mr.finalLong << " " << finalCount << endl;
 
                 for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ){
