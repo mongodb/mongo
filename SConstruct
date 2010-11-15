@@ -126,12 +126,12 @@ AddOption( "--dd",
            action="store",
            help="debug build no optimization, additional debug logging, etc..." )
 
-AddOption( "--recstore",
-           dest="recstore",
+AddOption( "--durable",
+           dest="durable",
            type="string",
            nargs=0,
            action="store",
-           help="use new recstore" )
+           help="durability build" )
 
 AddOption( "--noshell",
            dest="noshell",
@@ -330,8 +330,9 @@ if GetOption( "libpath" ) is not None:
 if GetOption( "cpppath" ) is not None:
     env["CPPPATH"] = [GetOption( "cpppath" )]
 
-if GetOption( "recstore" ) != None:
-    env.Append( CPPDEFINES=[ "_RECSTORE" ] )
+if GetOption( "durable" ) != None:
+    env.Append( CPPDEFINES=[ "_DURABLE" ] )
+
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
 env.Append( CPPPATH=[ "." ] )
 
