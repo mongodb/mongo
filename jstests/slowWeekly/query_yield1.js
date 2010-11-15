@@ -2,10 +2,10 @@
 t = db.query_yield1;
 t.drop()
 
-N = 10000;
+N = 20000;
 i = 0;
 
-q = function(){ var x=this.n; for ( var i=0; i<500; i++ ){ x = x * 2; } return false; }
+q = function(){ var x=this.n; for ( var i=0; i<250; i++ ){ x = x * 2; } return false; }
 
 while ( true ){
     function fill(){
@@ -59,7 +59,7 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
         assert.eq( 1 , x.inprog.length , "nothing in prog" );
     }
     
-    assert.gt( 50 , me );
+    assert.gt( 200 , me , "took too long for me to run" );
 
     if ( x.inprog.length == 0 )
         break;

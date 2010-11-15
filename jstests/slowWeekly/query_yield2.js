@@ -2,10 +2,10 @@
 t = db.query_yield2;
 t.drop()
 
-N = 100;
+N = 200;
 i = 0;
 
-q = function(){ var x=this.n; for ( var i=0; i<50000; i++ ){ x = x * 2; } return false; }
+q = function(){ var x=this.n; for ( var i=0; i<25000; i++ ){ x = x * 2; } return false; }
 
 while ( true ){
     function fill(){
