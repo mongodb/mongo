@@ -18,6 +18,29 @@ static int __wt_bt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_parent_update(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static inline void __wt_bt_rec_set_size(WT_TOC *, WT_PAGE *, uint8_t *);
+
+/*
+ * __wt_bt_rec_set_size --
+ *	Set the page's size to the minimum number of allocation units.
+ */
+static inline void
+__wt_bt_rec_set_size(WT_TOC *toc, WT_PAGE *page, uint8_t *first_free)
+{
+	DB *db;
+
+	db = toc->db;
+
+	/*
+	 * Set the page's size to the minimum number of allocation units needed
+	 * (note the page size can either grow or shrink).
+	 *
+	 * Set the page size before verifying the page, the verification code
+	 * checks for entries that extend past the end of the page, and expects
+	 * the WT_PAGE->size field to be valid.
+	 */
+	page->size = WT_ALIGN(first_free - (uint8_t *)page->hdr, db->allocsize);
+}
 
 /*
  * __wt_bt_rec_page --
@@ -121,7 +144,6 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	new->addr = page->addr;
 	new->size = max;
 	new->hdr = (WT_PAGE_HDR *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
-	__wt_bt_set_ff_and_sa_from_offset(new, WT_PAGE_BYTE(new));
 	new->hdr->start_recno = page->hdr->start_recno;
 	new->hdr->type = page->hdr->type;
 	new->hdr->level = page->hdr->level;
@@ -198,9 +220,13 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_OFF *from;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
-	uint32_t i;
+	uint32_t i, space_avail;
+	uint8_t *first_free;
 
 	hdr = new->hdr;
+	__wt_bt_set_ff_and_sa_from_offset(
+	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
+
 	WT_INDX_FOREACH(page, cip, i) {
 		if ((repl = WT_COL_REPL(page, cip)) != NULL)
 			from = WT_REPL_DATA(repl);
@@ -213,20 +239,22 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * size, but it still wasn't enough.  We must allocate another
 		 * page and split the parent.
 		 */
-		if (sizeof(WT_OFF) > new->space_avail) {
+		if (sizeof(WT_OFF) > space_avail) {
 			fprintf(stderr,
 			   "__wt_bt_rec_col_int: page %lu split\n",
 			   (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
 
-		memcpy(new->first_free, from, sizeof(WT_OFF));
-		new->first_free += sizeof(WT_OFF);
-		new->space_avail -= sizeof(WT_OFF);
+		memcpy(first_free, from, sizeof(WT_OFF));
+		first_free += sizeof(WT_OFF);
+		space_avail -= sizeof(WT_OFF);
 		++hdr->u.entries;
 	}
 
+	__wt_bt_rec_set_size(toc, new, first_free);
 	new->records = page->records;
+
 	return (0);
 }
 
@@ -241,7 +269,12 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
 	WT_ROW *rip;
-	uint32_t i, len;
+	uint32_t i, len, space_avail;
+	uint8_t *first_free;
+
+	hdr = new->hdr;
+	__wt_bt_set_ff_and_sa_from_offset(
+	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	/*
 	 * We have to walk both the WT_ROW structures as well as the original
@@ -262,7 +295,6 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * walk the original page at the same time we walk the WT_PAGE array
 	 * when reconciling the page so we can find the original WT_ITEM.
 	 */
-	hdr = new->hdr;
 	key_item = WT_PAGE_BYTE(page);
 	WT_INDX_FOREACH(page, rip, i) {
 		/*
@@ -280,7 +312,7 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			memcpy(WT_ITEM_BYTE(data_item),
 			    WT_REPL_DATA(repl), sizeof(WT_OFF));
 		next = WT_ITEM_NEXT(data_item);
-		len = (u_int32_t)((u_int8_t *)next - (u_int8_t *)key_item);
+		len = (uint32_t)((uint8_t *)next - (uint8_t *)key_item);
 
 		/*
 		 * XXX
@@ -288,20 +320,22 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * size, but it still wasn't enough.  We must allocate another
 		 * page and split the parent.
 		 */
-		if (len > new->space_avail) {
+		if (len > space_avail) {
 			fprintf(stderr,
 			    "__wt_bt_rec_row_int: page %lu split\n",
 			    (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
 
-		memcpy(new->first_free, key_item, len);
-		new->first_free += len;
-		new->space_avail -= len;
+		memcpy(first_free, key_item, len);
+		first_free += len;
+		space_avail -= len;
 		++hdr->u.entries;
 
 		key_item = next;
 	}
+
+	__wt_bt_rec_set_size(toc, new, first_free);
 	new->records = page->records;
 
 	return (0);
@@ -321,8 +355,8 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
-	uint32_t i, len;
-	uint8_t *data;
+	uint32_t i, len, space_avail;
+	uint8_t *data, *first_free;
 	int ret;
 
 	db = toc->db;
@@ -330,6 +364,9 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	env = toc->env;
 	hdr = new->hdr;
 	ret = 0;
+
+	__wt_bt_set_ff_and_sa_from_offset(
+	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	/*
 	 * We need a "deleted" data item to store on the page.  Make sure the
@@ -361,13 +398,15 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * repeat count compression, the on-page information cannot
 		 * change size -- there's no reason to ever split such a page.
 		 */
-		WT_ASSERT(env, len <= new->space_avail);
+		WT_ASSERT(env, len <= space_avail);
 
-		memcpy(new->first_free, data, len);
-		new->first_free += len;
-		new->space_avail -= len;
+		memcpy(first_free, data, len);
+		first_free += len;
+		space_avail -= len;
 		++hdr->u.entries;
 	}
+
+	__wt_bt_rec_set_size(toc, new, first_free);
 	new->records = page->records;
 
 err:	if (tmp != NULL)
@@ -390,9 +429,9 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_RCC_EXPAND *exp, **expsort, **expp;
 	WT_REPL *repl;
 	uint64_t recno;
-	uint32_t i, len, n_expsort;
+	uint32_t i, len, n_expsort, space_avail;
 	uint16_t n, nrepeat, repeat_count;
-	uint8_t *data, *last_data;
+	uint8_t *data, *first_free, *last_data;
 	int from_repl, ret;
 
 	db = toc->db;
@@ -403,6 +442,9 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	n_expsort = 0;			/* Necessary for the sort function */
 	last_data = NULL;
 	ret = 0;
+
+	__wt_bt_set_ff_and_sa_from_offset(
+	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	/*
 	 * We need a "deleted" data item to store on the page.  Make sure the
@@ -486,7 +528,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 * leaf page size, but it still wasn't enough.  We must
 			 * allocate another leaf page and split the parent.
 			 */
-			if (len > new->space_avail) {
+			if (len > space_avail) {
 				fprintf(stderr,
 				    "__wt_bt_rec_col_rcc: page %lu split\n",
 				    (u_long)page->addr);
@@ -500,18 +542,20 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 * that were deleted or replaced are read from a WT_REPL
 			 * structure, which has no repeat count.
 			 */
-			last_data = new->first_free;
+			last_data = first_free;
 			if (from_repl) {
 				WT_RCC_REPEAT_COUNT(last_data) = repeat_count;
 				memcpy(WT_RCC_REPEAT_DATA(
 				    last_data), data, db->fixed_len);
 			} else
 				memcpy(last_data, data, len);
-			new->first_free += len;
-			new->space_avail -= len;
+			first_free += len;
+			space_avail -= len;
 			++hdr->u.entries;
 		}
 	}
+
+	__wt_bt_rec_set_size(toc, new, first_free);
 	new->records = page->records;
 
 	/* Free the sort array. */
@@ -600,13 +644,15 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_OVFL data_ovfl;
 	WT_PAGE_HDR *hdr;
 	WT_REPL *repl;
-	uint32_t i, len;
+	uint32_t i, len, space_avail;
+	uint8_t *first_free;
 
 	hdr = new->hdr;
+	__wt_bt_set_ff_and_sa_from_offset(
+	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	WT_CLEAR(data_dbt);
 	WT_CLEAR(data_item);
-
 	data = &data_dbt;
 
 	WT_INDX_FOREACH(page, cip, i) {
@@ -644,7 +690,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * page size, but it still wasn't enough.  We must allocate
 		 * another leaf page and split the parent.
 		 */
-		if (len > new->space_avail) {
+		if (len > space_avail) {
 			fprintf(stderr,
 			    "__wt_bt_rec_col_var: page %lu split\n",
 			    (u_long)page->addr);
@@ -653,19 +699,21 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 		switch (data_loc) {
 		case DATA_ON_PAGE:
-			memcpy(new->first_free, data->data, data->size);
-			new->first_free += data->size;
-			new->space_avail -= data->size;
+			memcpy(first_free, data->data, data->size);
+			first_free += data->size;
+			space_avail -= data->size;
 			break;
 		case DATA_OFF_PAGE:
-			memcpy(new->first_free, &data_item, sizeof(data_item));
-			memcpy(new->first_free +
+			memcpy(first_free, &data_item, sizeof(data_item));
+			memcpy(first_free +
 			    sizeof(data_item), data->data, data->size);
-			new->first_free += len;
-			new->space_avail -= len;
+			first_free += len;
+			space_avail -= len;
 		}
 		++hdr->u.entries;
 	}
+
+	__wt_bt_rec_set_size(toc, new, first_free);
 	new->records = page->records;
 
 	return (0);
@@ -687,10 +735,13 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_PAGE_HDR *hdr;
 	WT_ROW *rip;
 	WT_REPL *repl;
-	uint32_t i, len, type;
+	uint32_t i, len, space_avail, type;
+	uint8_t *first_free;
 
 	db = toc->db;
 	hdr = new->hdr;
+	__wt_bt_set_ff_and_sa_from_offset(
+	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	WT_CLEAR(data_dbt);
 	WT_CLEAR(key_dbt);
@@ -812,7 +863,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * page size, but it still wasn't enough.  We must allocate
 		 * another leaf page and split the parent.
 		 */
-		if (len > new->space_avail) {
+		if (len > space_avail) {
 			fprintf(stderr, "__wt_bt_rec_row: page %lu split\n",
 			    (u_long)page->addr);
 			__wt_abort(toc->env);
@@ -820,9 +871,9 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 		switch (key_loc) {
 		case KEY_ON_PAGE:
-			memcpy(new->first_free, key->data, key->size);
-			new->first_free += key->size;
-			new->space_avail -= key->size;
+			memcpy(first_free, key->data, key->size);
+			first_free += key->size;
+			space_avail -= key->size;
 			++hdr->u.entries;
 			break;
 		case KEY_NONE:
@@ -830,21 +881,24 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 		switch (data_loc) {
 		case DATA_ON_PAGE:
-			memcpy(new->first_free, data->data, data->size);
-			new->first_free += data->size;
-			new->space_avail -= data->size;
+			memcpy(first_free, data->data, data->size);
+			first_free += data->size;
+			space_avail -= data->size;
 			++hdr->u.entries;
 			break;
 		case DATA_OFF_PAGE:
-			memcpy(new->first_free, &data_item, sizeof(data_item));
-			memcpy(new->first_free +
+			memcpy(first_free, &data_item, sizeof(data_item));
+			memcpy(first_free +
 			    sizeof(WT_ITEM), data->data, data->size);
-			new->first_free += WT_ITEM_SPACE_REQ(data->size);
-			new->space_avail -= WT_ITEM_SPACE_REQ(data->size);
+			first_free += WT_ITEM_SPACE_REQ(data->size);
+			space_avail -= WT_ITEM_SPACE_REQ(data->size);
 			++hdr->u.entries;
 			break;
 		}
 	}
+
+	__wt_bt_rec_set_size(toc, new, first_free);
+
 	return (0);
 }
 
@@ -869,17 +923,6 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		fprintf(stderr, "PAGE %lu EMPTIED\n", (u_long)page->addr);
 		__wt_abort(env);
 	} else {
-		/*
-		 * Set the page's size to the minimum number of allocation units
-		 * needed (note the page size can either grow or shrink).
-		 *
-		 * Set the page size before verifying the page, the verification
-		 * code checks for entries that extend past the end of the page,
-		 * and expects the WT_PAGE->size field to be valid.
-		 */
-		new->size = WT_ALIGN(
-		    new->first_free - (uint8_t *)new->hdr, db->allocsize);
-
 		/* Verify the page to catch reconciliation errors early on. */
 		WT_ASSERT(env, __wt_bt_verify_page(toc, new, NULL) == 0);
 
@@ -939,7 +982,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 }
 
 /*
- * __wt_bt_rec_srch_first --
+ * __wt_bt_rec_parent_update --
  *	Return a parent page and WT_ROW reference for the first key on the
  *	argument page.
  */

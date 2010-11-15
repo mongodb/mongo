@@ -48,7 +48,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 28, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 27, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_DUP_TREE].desc = "duplicate data off-page trees";
@@ -76,7 +76,6 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 	    "column-store variable-size leaf pages";
 	stats[WT_STAT_PAGE_DUP_INTERNAL].desc = "duplicate internal pages";
 	stats[WT_STAT_PAGE_DUP_LEAF].desc = "duplicate leaf pages";
-	stats[WT_STAT_PAGE_FREE].desc = "unused on-page space in bytes";
 	stats[WT_STAT_PAGE_OVERFLOW].desc = "overflow pages";
 	stats[WT_STAT_PAGE_ROW_INTERNAL].desc = "row-store internal pages";
 	stats[WT_STAT_PAGE_ROW_LEAF].desc = "row-store leaf pages";
@@ -111,7 +110,6 @@ __wt_stat_clear_database_stats(WT_STATS *stats)
 	stats[WT_STAT_PAGE_COL_VARIABLE].v = 0;
 	stats[WT_STAT_PAGE_DUP_INTERNAL].v = 0;
 	stats[WT_STAT_PAGE_DUP_LEAF].v = 0;
-	stats[WT_STAT_PAGE_FREE].v = 0;
 	stats[WT_STAT_PAGE_OVERFLOW].v = 0;
 	stats[WT_STAT_PAGE_ROW_INTERNAL].v = 0;
 	stats[WT_STAT_PAGE_ROW_LEAF].v = 0;

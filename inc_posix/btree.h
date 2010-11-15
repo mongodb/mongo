@@ -167,9 +167,6 @@ struct __wt_page {
 
 	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
 
-	uint8_t *first_free;		/* Page's first free byte address */
-	uint32_t space_avail;		/* Page's available memory */
-
 	uint64_t records;		/* Records in this subtree */
 
 	/*

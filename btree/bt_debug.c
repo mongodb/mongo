@@ -133,15 +133,11 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_COL_INT:
 		fprintf(fp,
 		    "\trecords %llu, starting recno %llu, level %lu, "
-		    "entries %lu, lsn %lu/%lu\n"
-		    "\tfirst-free %p (offset: %lu), space avail %lu\n",
+		    "entries %lu, lsn %lu/%lu\n",
 		    (unsigned long long)page->records,
 		    (unsigned long long)hdr->start_recno,
 		    (u_long)hdr->level, (u_long)hdr->u.entries,
-		    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1],
-		    page->first_free,
-		    (u_long)(page->first_free - (uint8_t *)page->hdr),
-		    (u_long)page->space_avail);
+		    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1]);
 		break;
 	case WT_PAGE_OVFL:
 		fprintf(fp, "size %lu\n", (u_long)hdr->u.datalen);

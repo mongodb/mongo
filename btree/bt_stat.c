@@ -136,9 +136,6 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	hdr = page->hdr;
 	stats = idb->dstats;
 
-	/* Count the free space. */
-	WT_STAT_INCRV(stats, PAGE_FREE, page->space_avail);
-
 	/*
 	 * All internal pages and overflow pages are trivial, all we track is
 	 * a count of the page type.

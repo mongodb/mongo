@@ -13,43 +13,47 @@ _
 --- Module:   ../btree/bt_bulk.c (C)
                                                                           _
 			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  150  Warning 530: Symbol 'last_repeat' (line 84) not
+../btree/bt_bulk.c  154  Warning 530: Symbol 'last_repeat' (line 87) not
     initialized
-../btree/bt_bulk.c  84  Info 830: Location cited in prior message
+../btree/bt_bulk.c  87  Info 830: Location cited in prior message
                                                                           _
 			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  150  Warning 530: Symbol 'last_data' (line 85) not
+../btree/bt_bulk.c  154  Warning 530: Symbol 'last_data' (line 88) not
     initialized
-../btree/bt_bulk.c  85  Info 830: Location cited in prior message
+../btree/bt_bulk.c  88  Info 830: Location cited in prior message
                                                                             _
 				    WT_ITEM_DATA_DUP : WT_ITEM_DATA_DUP_OVFL);
-../btree/bt_bulk.c  359  Warning 530: Symbol 'dup_data' (line 237) not
+../btree/bt_bulk.c  366  Warning 530: Symbol 'dup_data' (line 241) not
     initialized
-../btree/bt_bulk.c  237  Info 830: Location cited in prior message
-                                                                           _
-				    (page->first_free - (uint8_t *)dup_key);
-../btree/bt_bulk.c  442  Warning 530: Symbol 'dup_key' (line 237) not
+../btree/bt_bulk.c  241  Info 830: Location cited in prior message
+                                                                               _
+				    (uint32_t)(first_free - (uint8_t *)dup_key);
+../btree/bt_bulk.c  452  Warning 530: Symbol 'dup_key' (line 241) not
     initialized
-../btree/bt_bulk.c  237  Info 830: Location cited in prior message
-                       _
-	WT_RECORDS(&off) = dup_count;
-../btree/bt_bulk.c  773  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  241  Info 830: Location cited in prior message
+                                                        _
+			page->records += WT_RECORDS(&off);
+../btree/bt_bulk.c  592  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+                      _
+	WT_RECORDS(off) = dup_count;
+../btree/bt_bulk.c  790  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1053  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1075  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1083  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1105  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                _
 				WT_RECORDS((WT_OFF *)elem->data) += incr;
-../btree/bt_bulk.c  1121  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1143  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                       _
 				    (WT_OFF *)WT_ITEM_BYTE(elem->data)) += incr;
-../btree/bt_bulk.c  1126  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1148  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_close.c (C)
@@ -59,11 +63,11 @@ _
 --- Module:   ../btree/bt_debug.c (C)
                                                       _
 		    (unsigned long long)WT_RECORDS(off));
-../btree/bt_debug.c  475  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  471  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                          _
 		    (u_long)off->size, (unsigned long long)WT_RECORDS(off));
-../btree/bt_debug.c  502  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  498  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
@@ -90,17 +94,17 @@ _
                                                          _
 #... ECORDS((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)rip)->data))
 			records += WT_ROW_OFF_RECORDS(rip);
-../btree/bt_page.c  305  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  303  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                          _
 		records += WT_RECORDS(off);
-../btree/bt_page.c  341  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  337  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_reconcile.c (C)
                        _
 	WT_RECORDS(&off) = new->records;
-../btree/bt_reconcile.c  1060  Info 740: Unusual pointer cast (incompatible
+../btree/bt_reconcile.c  1103  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/bt_ret.c (C)

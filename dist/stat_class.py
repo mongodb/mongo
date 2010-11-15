@@ -84,7 +84,6 @@ idb_dstats['PAGE_COL_RCC'] = Stat([], 'column-store repeat-count compressed fixe
 idb_dstats['PAGE_COL_VARIABLE'] = Stat([], 'column-store variable-size leaf pages')
 idb_dstats['PAGE_DUP_INTERNAL'] = Stat([], 'duplicate internal pages')
 idb_dstats['PAGE_DUP_LEAF'] = Stat([], 'duplicate leaf pages')
-idb_dstats['PAGE_FREE'] = Stat([], 'unused on-page space in bytes')
 idb_dstats['PAGE_OVERFLOW'] = Stat([], 'overflow pages')
 idb_dstats['PAGE_ROW_INTERNAL'] = Stat([], 'row-store internal pages')
 idb_dstats['PAGE_ROW_LEAF'] = Stat([], 'row-store leaf pages')

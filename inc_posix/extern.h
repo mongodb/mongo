@@ -49,7 +49,8 @@ __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, uint8_t *data, size_t size, DBT *copy);
 inline void
-__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, uint8_t *p);
+__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page,
+    void *p, uint8_t **first_freep, uint32_t *space_availp);
 inline int
 __wt_page_write_gen_update(WT_PAGE *page, uint32_t write_gen);
 const char *

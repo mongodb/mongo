@@ -79,11 +79,10 @@ struct __wt_stats {
 #define	WT_STAT_PAGE_COL_VARIABLE		   19
 #define	WT_STAT_PAGE_DUP_INTERNAL		   20
 #define	WT_STAT_PAGE_DUP_LEAF			   21
-#define	WT_STAT_PAGE_FREE			   22
-#define	WT_STAT_PAGE_OVERFLOW			   23
-#define	WT_STAT_PAGE_ROW_INTERNAL		   24
-#define	WT_STAT_PAGE_ROW_LEAF			   25
-#define	WT_STAT_TREE_LEVEL			   26
+#define	WT_STAT_PAGE_OVERFLOW			   22
+#define	WT_STAT_PAGE_ROW_INTERNAL		   23
+#define	WT_STAT_PAGE_ROW_LEAF			   24
+#define	WT_STAT_TREE_LEVEL			   25
 
 /*
  * Statistics entries for DB/IDB handle.

@@ -233,8 +233,6 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 
 	page->indx_count = hdr->u.entries / 2;
 	page->records = records;
-
-	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)item);
 	return (0);
 }
 
@@ -309,8 +307,6 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 
 	page->indx_count = indx_count;
 	page->records = records;
-
-	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)item);
 	return (0);
 }
 
@@ -343,8 +339,6 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 
 	page->indx_count = hdr->u.entries;
 	page->records = records;
-
-	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)off);
 }
 
 /*
@@ -375,8 +369,6 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 	}
 
 	page->indx_count = page->records = hdr->u.entries;
-
-	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)item);
 }
 
 /*
@@ -420,8 +412,6 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 
 	page->indx_count = hdr->u.entries;
 	page->records = hdr->u.entries;
-
-	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)item);
 	return (0);
 }
 
@@ -450,8 +440,6 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	}
 
 	page->indx_count = page->records = hdr->u.entries;
-
-	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)p);
 }
 
 /*
@@ -484,8 +472,6 @@ __wt_bt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
 
 	page->indx_count = hdr->u.entries;
 	page->records = records;
-
-	__wt_bt_set_ff_and_sa_from_offset(page, (uint8_t *)p);
 }
 
 /*
