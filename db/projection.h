@@ -44,11 +44,9 @@ namespace mongo {
          * @return the spec init was called with
          */
         BSONObj getSpec() const { return _source; }
-
+        
         /**
          * transforms in according to spec
-         * NOTE: this will stricy obey _id, which is not true 
-         *       for normal queries
          */
         BSONObj transform( const BSONObj& in ) const;
 
@@ -57,7 +55,15 @@ namespace mongo {
          * transforms in according to spec
          */
         void transform( const BSONObj& in , BSONObjBuilder& b ) const;
+        
 
+        /**
+         * @return if the key has all the information needed to return
+         *         NOTE: a key may have modified the actual data
+         *               which has to be handled above this
+         */
+        bool keyEnough( const BSONObj& keyPattern ) const;
+        
     private:
 
         /**
