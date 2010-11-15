@@ -1115,13 +1115,13 @@ namespace QueryTests {
         }
     };
 
-    namespace fm { // FieldMatcher tests
+    namespace proj { // Projection tests
 
         class T1 {
         public:
             void run(){
                 
-                FieldMatcher m;
+                Projection m;
                 m.init( BSON( "a" << 1 ) );
                 ASSERT_EQUALS( BSON( "a" << 5 ) , m.transform( BSON( "x" << 1 << "a" << 5 ) ) );
             }
@@ -1185,7 +1185,7 @@ namespace QueryTests {
 
             add< OrderingTest >();
 
-            add< fm::T1 >();
+            add< proj::T1 >();
         }
     } myall;
     

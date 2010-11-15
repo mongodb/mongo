@@ -355,7 +355,7 @@ namespace mongo {
 
     public:
         shared_ptr< ParsedQuery > pq;
-        shared_ptr< FieldMatcher > fields; // which fields query wants returned
+        shared_ptr< Projection > fields; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
 
 

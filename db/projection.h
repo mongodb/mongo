@@ -25,9 +25,9 @@ namespace mongo {
     /**
        used for doing field limiting
      */
-    class FieldMatcher {
+    class Projection {
     public:
-        FieldMatcher()
+        Projection()
             : _include(true)
             , _special(false)
             , _includeID(true)
@@ -74,7 +74,7 @@ namespace mongo {
         bool _special; // true if this level can't be skipped or included without recursing
 
         //TODO: benchmark vector<pair> vs map
-        typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
+        typedef map<string, boost::shared_ptr<Projection> > FieldMap;
         FieldMap _fields;
         BSONObj _source;
         bool _includeID;

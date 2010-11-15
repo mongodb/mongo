@@ -20,8 +20,8 @@
 
 namespace mongo {
 
-    void FieldMatcher::init( const BSONObj& o ){
-        massert( 10371 , "can only add to FieldMatcher once", _source.isEmpty());
+    void Projection::init( const BSONObj& o ){
+        massert( 10371 , "can only add to Projection once", _source.isEmpty());
         _source = o;
 
         BSONObjIterator i( o );
@@ -77,7 +77,7 @@ namespace mongo {
         }
     }
 
-    void FieldMatcher::add(const string& field, bool include){
+    void Projection::add(const string& field, bool include){
         if (field.empty()){ // this is the field the user referred to
             _include = include;
         } 
@@ -88,15 +88,15 @@ namespace mongo {
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos)); 
 
-            boost::shared_ptr<FieldMatcher>& fm = _fields[subfield];
+            boost::shared_ptr<Projection>& fm = _fields[subfield];
             if (!fm)
-                fm.reset(new FieldMatcher());
+                fm.reset(new Projection());
 
             fm->add(rest, include);
         }
     }
 
-    void FieldMatcher::add(const string& field, int skip, int limit){
+    void Projection::add(const string& field, int skip, int limit){
         _special = true; // can't include or exclude whole object
 
         if (field.empty()){ // this is the field the user referred to
@@ -107,15 +107,15 @@ namespace mongo {
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos));
 
-            boost::shared_ptr<FieldMatcher>& fm = _fields[subfield];
+            boost::shared_ptr<Projection>& fm = _fields[subfield];
             if (!fm)
-                fm.reset(new FieldMatcher());
+                fm.reset(new Projection());
 
             fm->add(rest, skip, limit);
         }
     }
 
-    BSONObj FieldMatcher::transform( const BSONObj& in ) const {
+    BSONObj Projection::transform( const BSONObj& in ) const {
         BSONObjBuilder b;
         BSONObjIterator i(in);
         while ( i.more() )
@@ -125,7 +125,7 @@ namespace mongo {
     
 
     //b will be the value part of an array-typed BSONElement
-    void FieldMatcher::appendArray( BSONObjBuilder& b , const BSONObj& a , bool nested) const {
+    void Projection::appendArray( BSONObjBuilder& b , const BSONObj& a , bool nested) const {
         int skip  = nested ?  0 : _skip;
         int limit = nested ? -1 : _limit;
 
@@ -170,7 +170,7 @@ namespace mongo {
         }
     }
 
-    void FieldMatcher::append( BSONObjBuilder& b , const BSONElement& e ) const {
+    void Projection::append( BSONObjBuilder& b , const BSONElement& e ) const {
         FieldMap::const_iterator field = _fields.find( e.fieldName() );
         
         if (field == _fields.end()){
@@ -178,7 +178,7 @@ namespace mongo {
                 b.append(e);
         } 
         else {
-            FieldMatcher& subfm = *field->second;
+            Projection& subfm = *field->second;
             
             if ((subfm._fields.empty() && !subfm._special) || !(e.type()==Object || e.type()==Array) ){
                 if (subfm._include)

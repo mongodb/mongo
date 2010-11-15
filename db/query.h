@@ -161,8 +161,8 @@ namespace mongo {
         bool isLocalDB() const { return strncmp(_ns, "local.", 6) == 0; }
 
         const BSONObj& getFilter() const { return _filter; }
-        FieldMatcher* getFields() const { return _fields.get(); }
-        shared_ptr<FieldMatcher> getFieldPtr() const { return _fields; }
+        Projection* getFields() const { return _fields.get(); }
+        shared_ptr<Projection> getFieldPtr() const { return _fields; }
 
         int getSkip() const { return _ntoskip; }
         int getNumToReturn() const { return _ntoreturn; }
@@ -293,7 +293,7 @@ namespace mongo {
         void initFields( const BSONObj& fields ){
             if ( fields.isEmpty() )
                 return;
-            _fields.reset( new FieldMatcher() );
+            _fields.reset( new Projection() );
             _fields->init( fields );
         }
 
@@ -307,7 +307,7 @@ namespace mongo {
         int _options;
         
         BSONObj _filter;
-        shared_ptr< FieldMatcher > _fields;
+        shared_ptr< Projection > _fields;
         
         bool _wantMore;
 
