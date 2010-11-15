@@ -23,6 +23,18 @@ namespace mongo {
     
     namespace mr {
 
+        class MRReduceState {
+        public:
+
+            MRReduceState() : reduce(), finalize(){}
+
+            scoped_ptr<Scope> scope;
+            
+            ScriptingFunction reduce;
+            ScriptingFunction finalize;
+        };
+
+
         typedef vector<BSONObj> BSONList;
 
         class MyCmp {
@@ -50,7 +62,7 @@ namespace mongo {
             /**
                @return number objects in collection
              */
-            long long renameIfNeeded( DBDirectClient& db );
+            long long renameIfNeeded( DBDirectClient& db , MRReduceState * state );
             
             void insert( const string& ns , BSONObj& o );
 
@@ -91,24 +103,20 @@ namespace mongo {
             static AtomicUInt JOB_NUMBER;
         }; // end MRsetup
         
-
         /**
          * container for all stack based map/reduce state
          */
-        class MRState {
+        class MRState : public MRReduceState {
         public:
             MRState( MRSetup& s );
-
+            void init();
+            
             void finalReduce( BSONList& values );
             
             MRSetup& setup;
-            auto_ptr<Scope> scope;
             DBDirectClient db;
 
             ScriptingFunction map;
-            ScriptingFunction reduce;
-            ScriptingFunction finalize;
-            
         };
         
         /**
