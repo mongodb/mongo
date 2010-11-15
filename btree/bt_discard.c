@@ -69,11 +69,11 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 		__wt_free(env, page->u.indx, 0);
 
 	/* Free the modified/deletion replacements array. */
-	if (page->repl != NULL)
+	if (page->ur.repl != NULL)
 		__wt_bt_page_discard_repl(env, page);
 
 	/* Free the repeat-count compressed column store expansion array. */
-	if (page->rccexp != NULL)
+	if (page->ur.rccexp != NULL)
 		__wt_bt_page_discard_rccexp(env, page);
 
 	__wt_free(env, page->hdr, page->size);
@@ -99,7 +99,7 @@ __wt_bt_page_discard_repl(ENV *env, WT_PAGE *page)
 			__wt_bt_page_discard_repl_list(env, *replp);
 
 	/* Free the page's array of replacements. */
-	__wt_free(env, page->repl, page->indx_count * sizeof(WT_REPL *));
+	__wt_free(env, page->ur.repl, page->indx_count * sizeof(WT_REPL *));
 }
 
 /*
@@ -133,7 +133,7 @@ __wt_bt_page_discard_rccexp(ENV *env, WT_PAGE *page)
 
 	/* Free the page's expansion array. */
 	__wt_free(
-	    env, page->rccexp, page->indx_count * sizeof(WT_RCC_EXPAND *));
+	    env, page->ur.rccexp, page->indx_count * sizeof(WT_RCC_EXPAND *));
 }
 
 /*

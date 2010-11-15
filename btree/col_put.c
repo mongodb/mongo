@@ -93,7 +93,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	case WT_PAGE_COL_FIX:				/* #1 */
 	case WT_PAGE_COL_VAR:
 		/* Allocate a page replacement array if necessary. */
-		if (page->repl == NULL)
+		if (page->ur.repl == NULL)
 			WT_ERR(__wt_calloc(env,
 			    page->indx_count, sizeof(WT_REPL *), &new_repl));
 
@@ -116,7 +116,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 		}
 							/* #3 */
 		/* Allocate a page expansion array as necessary. */
-		if (page->rccexp == NULL)
+		if (page->ur.rccexp == NULL)
 			WT_ERR(__wt_calloc(env, page->indx_count,
 			    sizeof(WT_RCC_EXPAND *), &new_rccexp));
 
@@ -143,12 +143,12 @@ err:		if (exp != NULL)
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */
-	if (new_rccexp != NULL && new_rccexp != page->rccexp)
+	if (new_rccexp != NULL && new_rccexp != page->ur.rccexp)
 		__wt_free(env,
 		    new_rccexp, page->indx_count * sizeof(WT_RCC_EXPAND *));
 
 	/* Free any page replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != page->repl)
+	if (new_repl != NULL && new_repl != page->ur.repl)
 		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 
 	if (page != NULL && page != idb->root_page)
@@ -182,17 +182,17 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc)
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->rccexp == NULL)
-		page->rccexp = new_rccexp;
+	if (page->ur.rccexp == NULL)
+		page->ur.rccexp = new_rccexp;
 
 	/*
 	 * Insert the new WT_RCC_EXPAND as the first item in the forward-linked
 	 * list of expansion structures.  Flush memory to ensure the list is
 	 * never broken.
 	 */
-	exp->next = page->rccexp[slot];
+	exp->next = page->ur.rccexp[slot];
 	WT_MEMORY_FLUSH;
-	page->rccexp[slot] = exp;
+	page->ur.rccexp[slot] = exp;
 	WT_PAGE_MODIFY_SET(page);
 	/*
 	 * Depend on the memory flush in __wt_toc_serialize_wrapup before the

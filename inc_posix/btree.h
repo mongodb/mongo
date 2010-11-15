@@ -261,21 +261,7 @@ struct __wt_page {
 	 * to a WT_REPL structure; if more than one modification is done to a
 	 * single entry, the WT_REPL structures are formed into a forward-linked
 	 * list.
-	 */
-	WT_REPL **repl;			/* Modification index */
-
-	/*
-	 * Row store page insertions are stored in the insrow array.  When the
-	 * first insertion is done to a row store page, the array is allocated,
-	 * with one slot for every existing element in the page.  Each slot is
-	 * a forward-linked list of new entries sorting greater than or equal to
-	 * the entry with the same array offset in the original index.  Sorting
-	 * is key, if you'll pardon the phrase: it has to be sorted or we can't
-	 * search it efficiently.  Slots point to WT_ROW_INSERT structures.
-	 */
-	WT_ROW_INSERT **insrow;
-
-	/*
+	 *
 	 * Modifying (or deleting) repeat-count compressed column store records
 	 * is problematical, because the index entry would no longer reference
 	 * a set of identical items.  We handle this by "inserting" a new entry
@@ -286,7 +272,11 @@ struct __wt_page {
 	 * functionality, but it never performed well and it isn't useful enough
 	 * to re-implement, IMNSHO.)
 	 */
-	WT_RCC_EXPAND **rccexp;
+	union {
+		WT_REPL **repl;		/* Modification/deletion index */
+					/* RCC expansion index */
+		WT_RCC_EXPAND **rccexp;
+	} ur;
 
 	uint32_t flags;
 };
@@ -303,14 +293,13 @@ struct __wt_page {
 #define	WT_COL_SLOT(page, ip)	((WT_COL *)(ip) - (page)->u.icol)
 #define	WT_COL_ARRAY(page, ip, array)					\
 	((page)->array == NULL ? NULL : page->array[WT_COL_SLOT(page, ip)])
-#define	WT_COL_REPL(page, ip)	WT_COL_ARRAY(page, ip, repl)
-#define	WT_COL_RCCEXP(page, ip)	WT_COL_ARRAY(page, ip, rccexp)
+#define	WT_COL_REPL(page, ip)	WT_COL_ARRAY(page, ip, ur.repl)
+#define	WT_COL_RCCEXP(page, ip)	WT_COL_ARRAY(page, ip, ur.rccexp)
 
 #define	WT_ROW_SLOT(page, ip)	((WT_ROW *)(ip) - (page)->u.irow)
 #define	WT_ROW_ARRAY(page, ip, array)					\
 	((page)->array == NULL ? NULL : page->array[WT_ROW_SLOT(page, ip)])
-#define	WT_ROW_REPL(page, ip)	WT_ROW_ARRAY(page, ip, repl)
-#define	WT_ROW_INSROW(page, ip)	WT_ROW_ARRAY(page, ip, insrow)
+#define	WT_ROW_REPL(page, ip)	WT_ROW_ARRAY(page, ip, ur.repl)
 
 /*
  * WT_PAGE_HDR --
@@ -512,7 +501,7 @@ struct __wt_rcc_expand {
  */
 #define	WT_REPL_FOREACH(page, replp, i)					\
 	for ((i) = (page)->indx_count,					\
-	    (replp) = (page)->repl; (i) > 0; ++(replp), --(i))
+	    (replp) = (page)->ur.repl; (i) > 0; ++(replp), --(i))
 
 /*
  * WT_RCC_EXPAND_FOREACH --
@@ -521,7 +510,7 @@ struct __wt_rcc_expand {
  */
 #define	WT_RCC_EXPAND_FOREACH(page, exp, i)				\
 	for ((i) = (page)->indx_count,					\
-	    (exp) = (page)->rccexp; (i) > 0; ++(exp), --(i))
+	    (exp) = (page)->ur.rccexp; (i) > 0; ++(exp), --(i))
 
 /*
  * On both row- and column-store internal pages, the on-page data referenced

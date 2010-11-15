@@ -1110,7 +1110,7 @@ __wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	off_dbt.size = sizeof(WT_OFF);
 
 	/* Allocate the parent's page replacement array as necessary. */
-	if (parent->repl == NULL)
+	if (parent->ur.repl == NULL)
 		WT_ERR(__wt_calloc(
 		    env, parent->indx_count, sizeof(WT_REPL *), &new_repl));
 
@@ -1127,7 +1127,7 @@ err:           if (repl != NULL)
 	}
 
 	/* Free any replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != parent->repl)
+	if (new_repl != NULL && new_repl != parent->ur.repl)
 		__wt_free(
 		    env, new_repl, parent->indx_count * sizeof(WT_REPL *));
 
