@@ -34,7 +34,7 @@ namespace mongo {
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
-            
+
             string key = cmdObj["key"].valuestrsafe();
             BSONObj keyPattern = BSON( key << 1 );
 
@@ -51,6 +51,14 @@ namespace mongo {
             long long nscannedObjects = 0; // full objects looked at
             long long n = 0; // matches
             MatchDetails md;
+            
+            NamespaceDetails * d = nsdetails( ns.c_str() );
+
+            if ( ! d ){
+                result.appendArray( "values" , BSONObj() );
+                result.append( "stats" , BSON( "n" << 0 << "nscanned" << 0 << "nscannedObjects" << 0 ) );
+                return true;
+            }
 
             shared_ptr<Cursor> cursor;
             if ( ! query.isEmpty() ) {
@@ -60,7 +68,6 @@ namespace mongo {
 
                 // query is empty, so lets see if we can find an index
                 // with the key so we don't have to hit the raw data
-                NamespaceDetails * d = nsdetails( ns.c_str() );
                 NamespaceDetails::IndexIterator ii = d->ii();
                 while ( ii.more() ){
                     IndexDetails& idx = ii.next();
