@@ -258,8 +258,7 @@ namespace mongo {
         _cursorid = allocCursorId_inlock();
         clientCursorsById.insert( make_pair(_cursorid, this) );
         
-#if 0  
-        { 
+        if ( ! _c->modifiedKeys() ) { 
             // store index information so we can decide if we can 
             // get something out of the index key rather than full object
             
@@ -274,7 +273,7 @@ namespace mongo {
                 x++;
             }
         }
-#endif
+
     }
     
 
@@ -290,6 +289,24 @@ namespace mongo {
             (CursorId&)_cursorid = -1;
             _pos = -2;
         }
+    }
+
+    bool ClientCursor::getFieldsDotted( const string& name, BSONElementSet &ret ) {
+        
+        map<string,int>::const_iterator i = _indexedFields.find( name );
+        if ( i == _indexedFields.end() ){
+            current().getFieldsDotted( name , ret );
+            return false;
+        }
+
+        int x = i->second;
+        
+        BSONObjIterator it( currKey() );
+        while ( x && it.more() )
+            it.next();
+        assert( x == 0 );
+        ret.insert( it.next() );
+        return true;
     }
 
     /* call when cursor's location changes so that we can update the

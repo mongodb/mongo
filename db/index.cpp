@@ -53,6 +53,18 @@ namespace mongo {
         }
     }
 
+    int IndexDetails::keyPatternOffset( const string& key ) const {
+        BSONObjIterator i( keyPattern() );
+        int n = 0;
+        while ( i.more() ){
+            BSONElement e = i.next();
+            if ( key == e.fieldName() )
+                return n;
+            n++;
+        }
+        return -1;
+    }
+
     const IndexSpec& IndexDetails::getSpec() const {
         scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         return NamespaceDetailsTransient::get_inlock( info.obj()["ns"].valuestr() ).getIndexSpec( this );

@@ -2,6 +2,8 @@
 t = db.distinct1;
 t.drop();
 
+assert.eq( 0 , t.distinct( "a" ).length , "test empty" );
+
 t.save( { a : 1 } )
 t.save( { a : 2 } )
 t.save( { a : 2 } )

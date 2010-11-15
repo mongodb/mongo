@@ -34,7 +34,7 @@ namespace mongo {
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
-            
+
             string key = cmdObj["key"].valuestrsafe();
             BSONObj keyPattern = BSON( key << 1 );
 
@@ -47,15 +47,59 @@ namespace mongo {
             BSONArrayBuilder arr( bb );
             BSONElementSet values;
             
-            shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
-            scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
+            long long nscanned = 0; // locations looked at
+            long long nscannedObjects = 0; // full objects looked at
+            long long n = 0; // matches
+            MatchDetails md;
+            
+            NamespaceDetails * d = nsdetails( ns.c_str() );
 
+            if ( ! d ){
+                result.appendArray( "values" , BSONObj() );
+                result.append( "stats" , BSON( "n" << 0 << "nscanned" << 0 << "nscannedObjects" << 0 ) );
+                return true;
+            }
+
+            shared_ptr<Cursor> cursor;
+            if ( ! query.isEmpty() ) {
+                cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
+            }
+            else {
+
+                // query is empty, so lets see if we can find an index
+                // with the key so we don't have to hit the raw data
+                NamespaceDetails::IndexIterator ii = d->ii();
+                while ( ii.more() ){
+                    IndexDetails& idx = ii.next();
+
+                    if ( d->isMultikey( ii.pos() - 1 ) )
+                        continue;
+
+                    if ( idx.inKeyPattern( key ) ) {
+                        cursor = bestGuessCursor( ns.c_str() , BSONObj() , idx.keyPattern() );
+                        break;
+                    }
+                        
+                }
+                
+                if ( ! cursor.get() )
+                    cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
+                
+            }
+            
+
+
+            scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
+            
             while ( cursor->ok() ){
-                if ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() ) ){
-                    BSONObj o = cursor->current();
+                nscanned++;
+                bool loadedObject = false;
+                
+                if ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() , &md ) ){
+                    n++;
 
                     BSONElementSet temp;
-                    o.getFieldsDotted( key, temp );
+                    loadedObject = ! cc->getFieldsDotted( key , temp );
                     
                     for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ){
                         BSONElement e = *i;
@@ -73,6 +117,9 @@ namespace mongo {
                     }
                 }
 
+                if ( loadedObject || md.loadedObject ) 
+                    nscannedObjects++;
+
                 cursor->advance();
 
                 if (!cc->yieldSometimes())
@@ -84,7 +131,15 @@ namespace mongo {
             assert( start == bb.buf() );
             
             result.appendArray( "values" , arr.done() );
-
+            
+            {
+                BSONObjBuilder b;
+                b.appendNumber( "n" , n );
+                b.appendNumber( "nscanned" , nscanned );
+                b.appendNumber( "nscannedObjects" , nscannedObjects );
+                result.append( "stats" , b.obj() );
+            }
+            
             return true;
         }
 

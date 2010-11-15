@@ -77,6 +77,13 @@ namespace mongo {
             return info.obj().getObjectField("key");
         }
 
+        /**
+         * @return offset into keyPattern for key
+                   -1 if doesn't exist
+         */
+        int keyPatternOffset( const string& key ) const;
+        bool inKeyPattern( const string& key ) const { return keyPatternOffset( key ) >= 0; }
+        
         /* true if the specified key is in the index */
         bool hasKey(const BSONObj& key);
         bool wouldCreateDup(const BSONObj& key, DiskLoc self);
