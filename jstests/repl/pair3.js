@@ -12,32 +12,40 @@ ismaster = function( n ) {
 // bring up node connections before arbiter connections so that arb can forward to node when expected
 connect = function() {
     if ( lp == null ) {
+        print("connecting lp");
         lp = startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
     }
     if ( rp == null ) {
+        print("connecting rp");
         rp = startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
     }
     if ( al == null ) {
+        print("connecting al");
         al = startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
     }
     if ( ar == null ) {
+        print("connecting ar");
         ar = startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
     }
 }
 
-disconnectNode = function( mongo ) {
+disconnectNode = function( mongo ) {    
     if ( lp ) {
+        print("disconnecting lp: "+lpPort);
         stopMongoProgram( lpPort );
         lp = null;
     }
     if ( rp ) {
+        print("disconnecting rp: "+rpPort);
         stopMongoProgram( rpPort );
         rp = null;
     }
     if ( mongo.host.match( new RegExp( "^127.0.0.1:" + lPort + "$" ) ) ) {
+        print("disconnecting al: "+alPort);
         stopMongoProgram( alPort );
         al = null;
     } else if ( mongo.host.match( new RegExp( "^127.0.0.1:" + rPort + "$" ) ) ) {
+        print("disconnecting ar: "+arPort);
         stopMongoProgram( arPort );
         ar = null;
     } else {
@@ -64,47 +72,47 @@ doTest1 = function() {
 
     pair = new ReplPair( l, r, a );
 
-    // normal startup
+    print("normal startup");
     pair.start();
     pair.waitForSteadyState();
     
-    // disconnect slave
+    print("disconnect slave");
     disconnectNode( pair.slave() );
     pair.waitForSteadyState( [ 1, -3 ], pair.master().host );
     
-    // disconnect master
+    print("disconnect master");
     disconnectNode( pair.master() );
     pair.waitForSteadyState( [ -3, -3 ] );
     
-    // reconnect
+    print("reconnect");
     connect();
     pair.waitForSteadyState();
 
-    // disconnect master
+    print("disconnect master");
     disconnectNode( pair.master() );
     pair.waitForSteadyState( [ 1, -3 ], pair.slave().host, true );
     
-    // disconnect new master
+    print("disconnect new master");
     disconnectNode( pair.master() );
     pair.waitForSteadyState( [ -3, -3 ] );
     
-    // reconnect
+    print("reconnect");
     connect();
     pair.waitForSteadyState();
     
-    // disconnect slave
+    print("disconnect slave");
     disconnectNode( pair.slave() );
     pair.waitForSteadyState( [ 1, -3 ], pair.master().host );
     
-    // reconnect slave
+    print("reconnect slave");
     connect();
     pair.waitForSteadyState( [ 1, 0 ], pair.master().host );
     
-    // disconnect master
+    print("disconnect master");
     disconnectNode( pair.master() );
     pair.waitForSteadyState( [ 1, -3 ], pair.slave().host, true );
     
-    // reconnect old master
+    print("reconnect old master");
     connect();
     pair.waitForSteadyState( [ 1, 0 ], pair.master().host );
 

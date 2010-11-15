@@ -20,9 +20,11 @@ rdb = right.getDB( "test" )
 print( "check 2" )
 
 ldb.foo.insert( { _id : 1 , x : "eliot" } )
-ldb.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 20000 } )
+var result = ldb.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 20000 } );
+printjson(result);
 rdb.foo.insert( { _id : 2 , x : "sara" } )
-rdb.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 20000 } )
+result = rdb.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 20000 } )
+printjson(result);
 
 print( "check 3" )
 
