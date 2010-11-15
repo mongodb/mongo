@@ -22,7 +22,7 @@ namespace mongo {
 
     class LogFile { 
     public:
-        /** open. create if DNE. 
+        /** create the file and open.  must not already exist. 
             throws UserAssertion on i/o error
         */
         LogFile(string name);

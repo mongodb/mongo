@@ -62,7 +62,7 @@ namespace mongo {
             GENERIC_WRITE,
             FILE_SHARE_READ,
             NULL, 
-            OPEN_ALWAYS,
+            CREATE_NEW, //OPEN_ALWAYS,
             FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH,
             NULL);
         if( _fd == INVALID_HANDLE_VALUE ) {
@@ -82,7 +82,10 @@ namespace mongo {
         DWORD written;
         if( !WriteFile(_fd, buf, len, &written, NULL) ) { 
             DWORD e = GetLastError();
-            uasserted(13517, str::stream() << "error appending to file " << errnoWithDescription(e));
+            if( e == 87 )
+                massert(13519, "error appending to file - misaligned direct write?", false);
+            else
+                uasserted(13517, str::stream() << "error appending to file " << errnoWithDescription(e));
         }
         else { 
             dassert( written == len );
@@ -102,7 +105,8 @@ namespace mongo {
     LogFile::LogFile(string name) {
         _fd = open(name.c_str(), 
                      O_APPEND 
-                   | O_CREAT | O_RDWR
+                   | O_CREAT | O_EXCL
+                   | O_RDWR
 #if defined(O_DIRECT)
                    | O_DIRECT
 #endif

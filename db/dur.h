@@ -19,7 +19,9 @@ namespace mongo {
         template <typename T> inline T* writingNoLog(T *x) { return x; }
 #else
 
-        /** call during startup so durability module can initialize */
+        /** call during startup so durability module can initialize 
+            throws if fatal error
+        */
         void startup();
 
         /** Declarations of write intent.

@@ -85,6 +85,7 @@ namespace mongoutils {
             const char *p = strchr(s.c_str(), x);
             return (p != 0) ? string(p+1) : ""; }
 
+        /** find string x, and return rest of string thereafter, or "" if not found */
         inline const char * after(const char *s, const char *x) {
             const char *p = strstr(s, x);
             return (p != 0) ? p+strlen(x) : ""; }
@@ -92,6 +93,7 @@ namespace mongoutils {
             const char *p = strstr(s.c_str(), x.c_str());
             return (p != 0) ? string(p+x.size()) : ""; }
 
+        /** @return true if s contains x */
         inline bool contains(string s, string x) { 
             return strstr(s.c_str(), x.c_str()) != 0; }
 
@@ -126,6 +128,37 @@ namespace mongoutils {
                 p++;
             }
             return x;
+        }
+
+        /** split a string on a specific char.  We don't split N times, just once 
+            on the first occurrence.  If char not present entire string is in L
+            and R is empty.
+            @return true if char found
+        */
+        inline bool splitOn(const string &s, char c, string& L, string& R) {
+            dassert(c);
+            const char *start = s.c_str();
+            const char *p = strchr(start, c);
+            if( p == 0 ) { 
+                L = s; R.clear();
+                return false;
+            }
+            L = string(start, p-start);
+            R = string(p+1);
+            return true;
+        }
+        /** split scanning reverse direction */
+        inline bool rSplitOn(const string &s, char c, string& L, string& R) {
+            dassert(c);
+            const char *start = s.c_str();
+            const char *p = strrchr(start, c);
+            if( p == 0 ) { 
+                L = s; R.clear();
+                return false;
+            }
+            L = string(start, p-start);
+            R = string(p+1);
+            return true;
         }
 
     }

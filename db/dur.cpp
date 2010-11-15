@@ -23,11 +23,11 @@
        we will build an output buffer ourself and then use O_DIRECT
        we could be in read lock for this
        for very large objects write directly to redo log in situ?
-     WRITETOREDOLOG 
+     WRITETOJOURNAL
        we could be unlocked (the main db lock that is...) for this, with sufficient care, but there is some complexity
          have to handle falling behind which would use too much ram (going back into a read lock would suffice to stop that).
          downgrading to (a perhaps upgradable) read lock would be a good start
-     CHECKPOINT
+     WRITETODATAFILES
        apply the writes back to the non-private MMF after they are for certain in redo log
      REMAPPRIVATEVIEW
        we could in a write lock quickly flip readers back to the main view, then stay in read lock and do our real 
@@ -42,9 +42,11 @@
 
 #if defined(_DURABLE)
 
+#include "client.h"
 #include "dur.h"
 #include "dur_journal.h"
 #include "../util/mongoutils/hash.h"
+#include "../util/timer.h"
 
 namespace mongo { 
 
@@ -54,7 +56,7 @@ namespace mongo {
 
     namespace dur { 
 
-        MongoMMF* pointerToMMF(void *p, size_t& ofs);
+        //MongoMMF* pointerToMMF(void *p, size_t& ofs);
 
         struct WriteIntent { 
             WriteIntent() : p(0) { }
@@ -71,8 +73,8 @@ namespace mongo {
             enum { N = Prime }; // this should be small the idea is that it fits in the cpu cache easily
             WriteIntent nodes[N];
         public:
-            Already() { reset(); }
-            void reset() { memset(this, 0, sizeof(*this)); }
+            Already() { clear(); }
+            void clear() { memset(this, 0, sizeof(*this)); }
 
             /* see if we have Already recorded/indicated our write intent for this region of memory.
                @return true if already indicated.
@@ -95,76 +97,128 @@ namespace mongo {
 
         void* writingPtr(void *x, size_t len) { 
             //log() << "TEMP writing " << x << ' ' << len << endl;
-            WriteIntent w(x, len);
+            void *p = x;
+            DEV p = MongoMMF::switchToPrivateView(x);
+            WriteIntent w(p, len);
             if( !alreadyNoted.checkAndSet(w) ) {
-                // remember, we will journal it in a bit
+                // remember intent. we will journal it in a bit
                 writes.push_back(w);
                 wassert( writes.size() <  2000000 );
                 assert(  writes.size() < 20000000 );
             }
-            DEV return MongoMMF::switchToPrivateView(x);
-            return x;
+            return p;
         }
 
-        void journalingFailure(const char *msg) { 
-            /** todo:
-                (1) don't log too much
-                (2) make an indicator in the journal dir that something bad happened. 
-                (2b) refuse to do a recovery startup if that is there without manual override.
-            */ 
-            log() << "journaling error " << msg << endl;
-        }
+        /** caller handles locking */
+        static bool PREPLOGBUFFER(BufBuilder& bb) { 
+            if( writes.empty() )
+                return false;
 
-        void _PREPLOGBUFFER(BufBuilder& bb) { 
             bb.reset();
 
-            JSectHeader h;
-            bb.appendStruct(h);
+            unsigned *lenInBlockHeader;
+            {
+                // JSectHeader
+                bb.appendStr("\nHH\n", false);
+                lenInBlockHeader = (unsigned *) bb.skip(4);
+            }
 
-            for( vector<WriteIntent>::iterator i = writes.begin(); i != writes.end(); i++ ) {
-                JEntry e;
-                e.len = i->len;
-                size_t ofs;
-                MongoMMF *mmf = pointerToMMF(i->p, ofs);
-                if( mmf == 0 ) {
-                    journalingFailure("view pointer cannot be resolved");
-                }
-                else {
+            string lastFilePath;
+
+            {
+                scoped_lock lk(privateViews._mutex());
+                for( vector<WriteIntent>::iterator i = writes.begin(); i != writes.end(); i++ ) {
+                    size_t ofs;
+                    MongoMMF *mmf = privateViews._find(i->p, ofs);
+                    if( mmf == 0 ) {
+                        journalingFailure("view pointer cannot be resolved");
+                    }
+                    else {
+                        if( mmf->filePath() != lastFilePath ) { 
+                            lastFilePath = mmf->filePath();
+                            JDbContext c;
+                            bb.appendStruct(c);
+                            bb.appendStr(lastFilePath);
+                        }
+                        JEntry e;
+                        e.len = i->len;
+                        e.fileNo = mmf->fileSuffixNo();
+                        bb.appendStruct(e);
+                        bb.appendBuf(i->p, i->len);
+                    }
                 }
             }
 
-            JSectFooter f;
-            bb.appendStruct(f);
+            {
+                JSectFooter f;
+                f.hash = 0;
+                bb.appendStruct(f);
+            }
+
+            {
+                unsigned L = (bb.len() + 8191) & 0xffffe000; // fill to alignment
+                dassert( L >= (unsigned) bb.len() );
+                *lenInBlockHeader = L;
+                unsigned padding = L - bb.len();
+                bb.skip(padding);
+                dassert( bb.len() % 8192 == 0 );
+            }
+
+            writes.clear();
+            alreadyNoted.clear();
+            return true;
         }
 
-        void PREPLOGBUFFER(BufBuilder& bb) {
+        static void WRITETOJOURNAL(const BufBuilder& bb) { 
+            journal(bb);
+        }
+
+        static void _go(BufBuilder& bb) {
+            PREPLOGBUFFER(bb);
+
+            // todo: add double buffering so we can be (not even read locked) during WRITETOJOURNAL
+            WRITETOJOURNAL(bb);
+        }
+
+        static void go(BufBuilder& bb) {
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
-                    _PREPLOGBUFFER(bb);
+                    _go(bb);
                     return;
                 }
             }
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a 
             // write lock instead.  otherwise writes could use too much RAM.
             writelock lk;
-            _PREPLOGBUFFER(bb);
+            _go(bb);
         }
 
-        void durThread() { 
-            BufBuilder bb(1024 * 1024 * 16);
+        static void durThread() { 
+            Client::initThread("dur");
+            const int HowOftenToGroupCommitMs = 100;
+            BufBuilder bb(1024 * 1024 * 16); // reuse to avoid any heap fragmentation
             while( 1 ) { 
                 try {
-                    sleepmillis(100);
-                    PREPLOGBUFFER(bb);
+                    int millis = HowOftenToGroupCommitMs;
+                    {
+                        Timer t;
+                        journalRotate(); // note we do this part outside of mongomutex
+                        millis -= t.millis();
+                        if( millis < 5 || millis > HowOftenToGroupCommitMs )
+                            millis = 5;
+                    }
+                    sleepmillis(millis);
+                    go(bb);
                 }
-                catch(...) { 
-                    log() << "exception in durThread" << endl;
+                catch(std::exception& e) { 
+                    log() << "exception in durThread " << e.what() << endl;
                 }
             }
         }
 
         void startup() {
+            journalMakeDir();
             boost::thread t(durThread);
         }
 

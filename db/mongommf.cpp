@@ -22,67 +22,41 @@
 
 #include "pch.h"
 #include "mongommf.h"
+#include "../util/mongoutils/str.h"
+
+using namespace mongoutils;
 
 namespace mongo {
 
-    /** for durability support we want to be able to map pointers to specific MongoMMF objects. 
-    */
-    class PointerToMMF { 
-    public:
-        PointerToMMF() : _m("PointerFinder") { }
+    MongoMMF* PointerToMMF::_find(void *p, /*out*/ size_t& ofs) {
+        std::map< void*, MongoMMF* >::iterator i = _views.upper_bound(((char *)p)+1);
+        i--;
 
-        /** register view. threadsafe */
-        void add(void *view, MongoMMF *f) {
-            mutex::scoped_lock lk(_m);
-            _views[view] = f;
-        }
-
-        /** de-register view. threadsafe */
-        void remove(void *view) {
-            mutex::scoped_lock lk(_m);
-            _views.erase(view);
-        }
-
-        MongoMMF* _find(void *p, /*out*/ size_t& ofs) {
-            std::map< void*, MongoMMF* >::iterator i = _views.upper_bound(((char *)p)+1);
-            i--;
-
-            bool ok = i != _views.end();
-            if( ok ) {
-                MongoMMF *mmf = i->second;
-                assert( mmf );
-                size_t o = ((char *)p) - ((char*)i->first);
-                if( o < mmf->length() ) { 
-                    ofs = o;
-                    return mmf;
-                }
+        bool ok = i != _views.end();
+        if( ok ) {
+            MongoMMF *mmf = i->second;
+            assert( mmf );
+            size_t o = ((char *)p) - ((char*)i->first);
+            if( o < mmf->length() ) { 
+                ofs = o;
+                return mmf;
             }
-            return 0;
         }
-
-        /** find associated MMF object for a given pointer.
-            threadsafe
-            @param ofs out returns offset into the view of the pointer, if found.
-            @return the MongoMMF to which this pointer belongs. null if not found.
-        */
-        MongoMMF* find(void *p, /*out*/ size_t& ofs) {
-            mutex::scoped_lock lk(_m);
-            return _find(p, ofs);
-        }
-
-    private:
-        map<void*, MongoMMF*> _views;
-        mutex _m;
-    };
-
-    static PointerToMMF ourPrivateViews;
-    static PointerToMMF ourReadViews; /// _DEBUG build use only (other than existance)
-
-    namespace dur { 
-        MongoMMF* pointerToMMF(void *p, size_t& ofs) { 
-            return ourPrivateViews.find(p, ofs);
-        }
+        return 0;
     }
+
+    /** find associated MMF object for a given pointer.
+        threadsafe
+        @param ofs out returns offset into the view of the pointer, if found.
+        @return the MongoMMF to which this pointer belongs. null if not found.
+    */
+    MongoMMF* PointerToMMF::find(void *p, /*out*/ size_t& ofs) {
+        mutex::scoped_lock lk(_m);
+        return _find(p, ofs);
+    }
+
+    PointerToMMF privateViews;
+    static PointerToMMF ourReadViews; /// _DEBUG build use only (other than existance)
 
     /*static*/ void* MongoMMF::switchToPrivateView(void *readonly_ptr) { 
         assert( durable );
@@ -100,7 +74,7 @@ namespace mongo {
 
         {
             size_t ofs=0;
-            MongoMMF *mmf = ourPrivateViews.find(p, ofs);
+            MongoMMF *mmf = privateViews.find(p, ofs);
             if( mmf ) {
                 log() << "dur: perf warning p=" << p << " is already in the writable view of " << mmf->filename() << endl;
                 return p;
@@ -124,13 +98,24 @@ namespace mongo {
         return p;
     }
 
+    void MongoMMF::setPath(string f) {
+        string suffix;
+        bool ok = str::rSplitOn(f, '.', _filePath, suffix);
+        uassert(13520, str::stream() << "MongoMMF only supports filenames in a certain format " << f, ok);
+        if( suffix == "ns" )
+            _fileSuffixNo = -1;
+        else 
+            _fileSuffixNo = (int) str::toUnsigned(suffix);
+    }
+
     bool MongoMMF::open(string fname, bool sequentialHint) {
+        setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         // temp : _view_private pending more work!
         _view_private = _view_write;
         if( _view_write ) { 
              if( durable ) {
-                 ourPrivateViews.add(_view_private, this);
+                 privateViews.add(_view_private, this);
                  if( debug ) {
                      _view_readonly = MemoryMappedFile::createReadOnlyMap();
                      ourReadViews.add(_view_readonly, this);
@@ -142,12 +127,13 @@ namespace mongo {
     }
 
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) { 
+        setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         // temp : _view_private pending more work! not implemented yet.
         _view_private = _view_write;
         if( _view_write ) {
             if( durable ) {
-                ourPrivateViews.add(_view_private, this);
+                privateViews.add(_view_private, this);
                 if( debug )  {
                     _view_readonly = MemoryMappedFile::createReadOnlyMap();
                     ourReadViews.add(_view_readonly, this);
@@ -175,7 +161,7 @@ namespace mongo {
 
     /*virtual*/ void MongoMMF::close() {
         if( durable ) {
-            ourPrivateViews.remove(_view_private);
+            privateViews.remove(_view_private);
             if( debug ) {
                 ourReadViews.remove(_view_readonly);
             }
