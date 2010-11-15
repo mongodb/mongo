@@ -108,20 +108,18 @@ namespace mongo {
         }
 
         static MVar<path> toUnlink;
-        static void _unlinkThread() { 
-            path p = toUnlink.take();
-            Client::initThread("unlink"); // we intentionally deferred initThread call so we know initialization of globals is complete
+        void unlinkThread() { 
+            Client::initThread("unlink");
             while( 1 ) {
+                path p = toUnlink.take();
                 try {
                     remove(p);
                 }
                 catch(std::exception& e) { 
                     log() << "error unlink of journal file " << p.string() << " failed " << e.what() << endl;
                 }
-                p = toUnlink.take();
             }
         }
-        boost::thread unlinkThread(_unlinkThread);
 
         /** check if time to rotate files.  assure a file is open. 
             done separately from the journal() call as we can do this part

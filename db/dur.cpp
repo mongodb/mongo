@@ -217,9 +217,12 @@ namespace mongo {
             }
         }
 
+        void unlinkThread();
+
         void startup() {
             journalMakeDir();
             boost::thread t(durThread);
+            boost::thread t2(unlinkThread);
         }
 
     } // namespace dur
