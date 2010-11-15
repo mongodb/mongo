@@ -47,22 +47,23 @@ namespace mongo {
 
     void CoveredIndexMatcher::init( bool alwaysUseRecord ) {
         _needRecord = 
-        alwaysUseRecord || 
-        ! ( _docMatcher->keyMatch() && 
-           _keyMatcher.sameCriteriaCount( *_docMatcher ) );
-        ;        
-        _useRecordOnly = _keyMatcher.hasType( BSONObj::opEXISTS );
+            alwaysUseRecord || 
+            ! ( _docMatcher->keyMatch() && 
+                _keyMatcher.sameCriteriaCount( *_docMatcher ) );
+        
+        _needRecordReject = _keyMatcher.hasType( BSONObj::opEXISTS );
     }
     
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ){
-        return matches( cursor->currKey() , cursor->currLoc() , details );
+        // bool keyUsable = ! cursor->isMultiKey() && check for $orish like conditions in matcher SERVER-1264
+        return matches( cursor->currKey() , cursor->currLoc() , details  );
     }
     
-    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details ) {
+    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details , bool keyUsable ) {
         if ( details )
             details->reset();
         
-        if ( !_useRecordOnly ) {
+        if ( _needRecordReject == false && keyUsable ) {
             
             if ( !_keyMatcher.matches(key, details ) ){
                 return false;
