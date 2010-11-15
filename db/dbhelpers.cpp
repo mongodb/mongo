@@ -28,39 +28,6 @@
 
 namespace mongo {
 
-    CursorIterator::CursorIterator( shared_ptr<Cursor> c , BSONObj filter )
-        : _cursor( c ){
-            if ( ! filter.isEmpty() )
-                _matcher.reset( new CoveredIndexMatcher( filter , BSONObj() ) );
-            _advance();
-    }
-
-    BSONObj CursorIterator::next(){
-        BSONObj o = _o;
-        _advance();
-        return o;
-    }
-    
-    bool CursorIterator::hasNext(){
-        return ! _o.isEmpty();
-    }
-
-    void CursorIterator::_advance(){
-        if ( ! _cursor->ok() ){
-            _o = BSONObj();
-            return;
-        }
-        
-        while ( _cursor->ok() ){
-            _o = _cursor->current();
-            _cursor->advance();
-            if ( _matcher.get() == 0 || _matcher->matches( _o ) )
-                return;
-        }
-
-        _o = BSONObj();
-    }
-
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
         NamespaceDetails *d = nsdetails(ns);
         if( d == 0 )
@@ -157,13 +124,6 @@ namespace mongo {
         return res->loc();
     }
 
-    auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
-        uassert( 10047 ,  "requireIndex not supported in Helpers::find yet" , ! requireIndex );
-        auto_ptr<CursorIterator> i;
-        i.reset( new CursorIterator( DataFileMgr::findAll( ns ) , query ) );
-        return i;
-    }
-    
     bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
                            bool * nsFound , bool * indexFound ){
         dbMutex.assertAtLeastReadLocked();

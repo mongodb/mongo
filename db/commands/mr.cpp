@@ -27,25 +27,15 @@
 #include "../matcher.h"
 #include "../clientcursor.h"
 
+#include "mr.h"
+
 namespace mongo {
 
     namespace mr {
 
-        typedef vector<BSONObj> BSONList;
+        AtomicUInt MRSetup::JOB_NUMBER;
 
-        class MyCmp {
-        public:
-            MyCmp(){}
-            bool operator()( const BSONObj &l, const BSONObj &r ) const {
-                return l.firstElement().woCompare( r.firstElement() ) < 0;
-            }
-        };
-
-        typedef pair<BSONObj,BSONObj> Data;
-        //typedef list< Data > InMemory;
-        typedef map< BSONObj,BSONList,MyCmp > InMemory;
-
-        BSONObj reduceValues( BSONList& values , Scope * s , ScriptingFunction reduce , bool final , ScriptingFunction finalize ){
+        BSONObj reduceValues( BSONList& values , MRReduceState * state , bool final ){
             uassert( 10074 ,  "need values" , values.size() );
             
             int sizeEstimate = ( values.size() * values.begin()->getField( "value" ).size() ) + 128;
@@ -82,8 +72,8 @@ namespace mongo {
             valueBuilder->done();
             BSONObj args = reduceArgs.obj();
 
-            s->invokeSafe( reduce , args );
-            if ( s->type( "return" ) == Array ){
+            state->scope->invokeSafe( state->reduce , args );
+            if ( state->scope->type( "return" ) == Array ){
                 uassert( 10075 , "reduce -> multiple not supported yet",0);                
                 return BSONObj();
             }
@@ -97,305 +87,301 @@ namespace mongo {
                 }
                 BSONObjBuilder temp( endSizeEstimate );
                 temp.append( key.firstElement() );
-                s->append( temp , "1" , "return" );
+                state->scope->append( temp , "1" , "return" );
                 x.push_back( temp.obj() );
-                return reduceValues( x , s , reduce , final , finalize );
+                return reduceValues( x , state , final );
             }
             
 
 
-            if ( finalize ){
-                Scope::NoDBAccess no = s->disableDBAccess( "can't access db inside finalize" );
+            if ( state->finalize ){
+                Scope::NoDBAccess no = state->scope->disableDBAccess( "can't access db inside finalize" );
                 BSONObjBuilder b(endSizeEstimate);
                 b.appendAs( key.firstElement() , "_id" );
-                s->append( b , "value" , "return" );
-                s->invokeSafe( finalize , b.obj() );
+                state->scope->append( b , "value" , "return" );
+                state->scope->invokeSafe( state->finalize , b.obj() );
             }
             
             BSONObjBuilder b(endSizeEstimate);
             b.appendAs( key.firstElement() , final ? "_id" : "0" );
-            s->append( b , final ? "value" : "1" , "return" );
+            state->scope->append( b , final ? "value" : "1" , "return" );
             return b.obj();
         }
         
-        class MRSetup {
-        public:
-            MRSetup( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp = true ){
-                static int jobNumber = 1;
+        MRSetup::MRSetup( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp ){
+            
+            dbname = _dbname;
+            ns = dbname + "." + cmdObj.firstElement().valuestr();
+            
+            verbose = cmdObj["verbose"].trueValue();
+            keeptemp = cmdObj["keeptemp"].trueValue();
+            
+            { // setup names
+                stringstream ss;
+                if ( ! keeptemp )
+                    ss << "tmp.";
+                ss << "mr." << cmdObj.firstElement().String() << "_" << time(0) << "_" << JOB_NUMBER++;    
+                tempShort = ss.str();
+                tempLong = dbname + "." + tempShort;
+                incLong = tempLong + "_inc";
                 
-                dbname = _dbname;
-                ns = dbname + "." + cmdObj.firstElement().valuestr();
+                if ( ! keeptemp && markAsTemp )
+                    cc().addTempCollection( tempLong );
 
-                verbose = cmdObj["verbose"].trueValue();
-                keeptemp = cmdObj["keeptemp"].trueValue();
+                replicate = keeptemp;
+
+                if ( cmdObj["out"].type() == String ){
+                    finalShort = cmdObj["out"].valuestr();
+                    replicate = true;
+                }
+                else
+                    finalShort = tempShort;
+                    
+                finalLong = dbname + "." + finalShort;
+                    
+            }
                 
-                { // setup names
-                    stringstream ss;
-                    if ( ! keeptemp )
-                        ss << "tmp.";
-                    ss << "mr." << cmdObj.firstElement().String() << "_" << time(0) << "_" << jobNumber++;    
-                    tempShort = ss.str();
-                    tempLong = dbname + "." + tempShort;
-                    incLong = tempLong + "_inc";
-
-                    if ( ! keeptemp && markAsTemp )
-                        cc().addTempCollection( tempLong );
-
-                    replicate = keeptemp;
-
-                    if ( cmdObj["out"].type() == String ){
-                        finalShort = cmdObj["out"].valuestr();
-                        replicate = true;
-                    }
-                    else
-                        finalShort = tempShort;
-                    
-                    finalLong = dbname + "." + finalShort;
-                    
-                }
-             
-                { // scope and code
-                    // NOTE: function scopes are merged with m/r scope, not nested like they should be
-                    BSONObjBuilder scopeBuilder;
-
-                    if ( cmdObj["scope"].type() == Object ){
-                        scopeBuilder.appendElements( cmdObj["scope"].embeddedObjectUserCheck() );
-                    }
-
-                    mapCode = scopeAndCode( scopeBuilder, cmdObj["map"] );
-                    reduceCode = scopeAndCode( scopeBuilder, cmdObj["reduce"] );
-                    if ( cmdObj["finalize"].type() ){
-                        finalizeCode = scopeAndCode( scopeBuilder, cmdObj["finalize"] );
-                    }
-                    
-                    scopeSetup = scopeBuilder.obj();
-
-                    if ( cmdObj["mapparams"].type() == Array ){
-                        mapparams = cmdObj["mapparams"].embeddedObjectUserCheck();
-                    }
-                    
-                }
-                
-                { // query options
-                    if ( cmdObj["query"].type() == Object ){
-                        filter = cmdObj["query"].embeddedObjectUserCheck();
-                    }
-                    
-                    if ( cmdObj["sort"].type() == Object ){
-                        sort = cmdObj["sort"].embeddedObjectUserCheck();
-                    }
-
-                    if ( cmdObj["limit"].isNumber() )
-                        limit = cmdObj["limit"].numberLong();
-                    else 
-                        limit = 0;
-                }
+            if ( cmdObj["outType"].type() == String ){
+                uassert( 13521 , "need 'out' if using 'outType'" , cmdObj["out"].type() == String );
+                string t = cmdObj["outType"].String();
+                if ( t == "normal" )
+                    outType = NORMAL;
+                else if ( t == "merge" )
+                    outType = MERGE;
+                else if ( t == "reduce" )
+                    outType = REDUCE;
+                else 
+                    uasserted( 13522 , str::stream() << "unknown outType [" << t << "]" );
+            }
+            else {
+                outType = NORMAL;
             }
 
-            /** Field expected to be a Code or CodeWScope.
-             * Add its scope, if any, to scopeBuilder, and return its code.
-             * Scopes added later will shadow those added earlier. */
-            static string scopeAndCode (BSONObjBuilder& scopeBuilder, const BSONElement& field) {
-                if ( field.type() == CodeWScope )
-                    scopeBuilder.appendElements( field.codeWScopeObject() );
-                return field._asCode();
-            }
+            { // scope and code
+                // NOTE: function scopes are merged with m/r scope, not nested like they should be
+                BSONObjBuilder scopeBuilder;
 
-            /**
-               @return number objects in collection
-             */
-            long long renameIfNeeded( DBDirectClient& db ){
-                if ( finalLong != tempLong ){
+                if ( cmdObj["scope"].type() == Object ){
+                    scopeBuilder.appendElements( cmdObj["scope"].embeddedObjectUserCheck() );
+                }
+
+                mapCode = scopeAndCode( scopeBuilder, cmdObj["map"] );
+                reduceCode = scopeAndCode( scopeBuilder, cmdObj["reduce"] );
+                if ( cmdObj["finalize"].type() ){
+                    finalizeCode = scopeAndCode( scopeBuilder, cmdObj["finalize"] );
+                }
+                    
+                scopeSetup = scopeBuilder.obj();
+
+                if ( cmdObj["mapparams"].type() == Array ){
+                    mapparams = cmdObj["mapparams"].embeddedObjectUserCheck();
+                }
+                    
+            }
+                
+            { // query options
+                if ( cmdObj["query"].type() == Object ){
+                    filter = cmdObj["query"].embeddedObjectUserCheck();
+                }
+                    
+                if ( cmdObj["sort"].type() == Object ){
+                    sort = cmdObj["sort"].embeddedObjectUserCheck();
+                }
+
+                if ( cmdObj["limit"].isNumber() )
+                    limit = cmdObj["limit"].numberLong();
+                else 
+                    limit = 0;
+            }
+        }
+
+        string MRSetup::scopeAndCode (BSONObjBuilder& scopeBuilder, const BSONElement& field) {
+            if ( field.type() == CodeWScope )
+                scopeBuilder.appendElements( field.codeWScopeObject() );
+            return field._asCode();
+        }
+
+        long long MRSetup::renameIfNeeded( DBDirectClient& db , MRReduceState * state ){
+            assertInWriteLock();
+            if ( finalLong != tempLong ){
+                    
+                if ( outType == NORMAL ){
                     db.dropCollection( finalLong );
                     if ( db.count( tempLong ) ){
                         BSONObj info;
-                        uassert( 10076 ,  "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
+                        uassert( 10076 ,  "rename failed" , 
+                                 db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
                     }
                 }
-                return db.count( finalLong );
+                else if ( outType == MERGE ){
+                    auto_ptr<DBClientCursor> cursor = db.query( tempLong , BSONObj() );
+                    while ( cursor->more() ){
+                        BSONObj o = cursor->next();
+                        Helpers::upsert( finalLong , o );
+                    }
+                    db.dropCollection( tempLong );
+                }
+                else if ( outType == REDUCE ){
+                    BSONList values;
+                    
+                    auto_ptr<DBClientCursor> cursor = db.query( tempLong , BSONObj() );
+                    while ( cursor->more() ){
+                        BSONObj temp = cursor->next();
+                        BSONObj old;
+
+                        bool found;
+                        {
+                            Client::Context tx( finalLong );
+                            found = Helpers::findOne( finalLong.c_str() , temp["_id"].wrap() , old , true );
+                        }
+                        
+                        if ( found ){
+                            // need to reduce
+                            values.clear();
+                            values.push_back( temp );
+                            values.push_back( old );
+                            Helpers::upsert( finalLong , reduceValues( values , state , true ) );
+                        }
+                        else {
+                            Helpers::upsert( finalLong , temp );
+                        }
+                    }
+                    db.dropCollection( tempLong );
+                }
+                else {
+                    assert(0);
+                }
             }
-
-            void insert( const string& ns , BSONObj& o ){
-                writelock l( ns );
-                Client::Context ctx( ns );
-                
-                if ( replicate )
-                    theDataFileMgr.insertAndLog( ns.c_str() , o , false );
-                else
-                    theDataFileMgr.insertWithObjMod( ns.c_str() , o , false );
-
-            }
-
-            string dbname;
-            string ns;
-            
-            // options
-            bool verbose;            
-            bool keeptemp;
-            bool replicate;
-
-            // query options
-            
-            BSONObj filter;
-            BSONObj sort;
-            long long limit;
-
-            // functions
-            
-            string mapCode;
-            string reduceCode;
-            string finalizeCode;
-            
-            BSONObj mapparams;
-            BSONObj scopeSetup;
-            
-            // output tables
-            string incLong;
-            
-            string tempShort;
-            string tempLong;
-            
-            string finalShort;
-            string finalLong;
-            
-        }; // end MRsetup
-
-        class MRState {
-        public:
-            MRState( MRSetup& s ) : setup(s){
-                scope = globalScriptEngine->getPooledScope( setup.dbname );
-                scope->localConnect( setup.dbname.c_str() );
-                
-                map = scope->createFunction( setup.mapCode.c_str() );
-                if ( ! map )
-                    throw UserException( 9012, (string)"map compile failed: " + scope->getError() );
-
-                reduce = scope->createFunction( setup.reduceCode.c_str() );
-                if ( ! reduce )
-                    throw UserException( 9013, (string)"reduce compile failed: " + scope->getError() );
-
-                if ( setup.finalizeCode.size() )
-                    finalize  = scope->createFunction( setup.finalizeCode.c_str() );
-                else
-                    finalize = 0;
-                
-                if ( ! setup.scopeSetup.isEmpty() )
-                    scope->init( &setup.scopeSetup );
-
-                db.dropCollection( setup.tempLong );
-                db.dropCollection( setup.incLong );
-                
-                writelock l( setup.incLong );
-                Client::Context ctx( setup.incLong );
-                string err;
-                assert( userCreateNS( setup.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
-
-            }
-
-            void finalReduce( BSONList& values ){
-                if ( values.size() == 0 )
-                    return;
-
-                BSONObj key = values.begin()->firstElement().wrap( "_id" );
-                BSONObj res = reduceValues( values , scope.get() , reduce , 1 , finalize );
-                
-                setup.insert( setup.tempLong , res );
-            }
-
-            
-            MRSetup& setup;
-            auto_ptr<Scope> scope;
-            DBDirectClient db;
-
-            ScriptingFunction map;
-            ScriptingFunction reduce;
-            ScriptingFunction finalize;
-            
-        };
+            return db.count( finalLong );
+        }
         
-        class MRTL {
-        public:
-            MRTL( MRState& state ) 
-                : _state( state )
-                , _temp(new InMemory())
-            {
-                _size = 0;
-                numEmits = 0;
-            }
-            
-            void reduceInMemory(){
-                boost::shared_ptr<InMemory> old = _temp;
-                _temp.reset(new InMemory());
-                _size = 0;
+        void MRSetup::insert( const string& ns , BSONObj& o ){
+            writelock l( ns );
+            Client::Context ctx( ns );
                 
-                for ( InMemory::iterator i=old->begin(); i!=old->end(); i++ ){
-                    BSONObj key = i->first;
-                    BSONList& all = i->second;
-                    
-                    if ( all.size() == 1 ){
-                        // this key has low cardinality, so just write to db
-                        writelock l(_state.setup.incLong);
-                        Client::Context ctx(_state.setup.incLong.c_str());
-                        write( *(all.begin()) );
-                    }
-                    else if ( all.size() > 1 ){
-                        BSONObj res = reduceValues( all , _state.scope.get() , _state.reduce , false , 0 );
-                        insert( res );
-                    }
-                }
-            }
+            if ( replicate )
+                theDataFileMgr.insertAndLog( ns.c_str() , o , false );
+            else
+                theDataFileMgr.insertWithObjMod( ns.c_str() , o , false );
 
-            void dump(){
-                writelock l(_state.setup.incLong);
-                Client::Context ctx(_state.setup.incLong);
-                    
-                for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
-                    BSONList& all = i->second;
-                    if ( all.size() < 1 )
-                        continue;
-                    
-                    for ( BSONList::iterator j=all.begin(); j!=all.end(); j++ )
-                        write( *j );
-                }
-                _temp->clear();
-                _size = 0;
+        }
 
-            }
+
+        MRState::MRState( MRSetup& s ) 
+            : setup(s){
+        }
+
+        void MRState::init(){
+            scope.reset(globalScriptEngine->getPooledScope( setup.dbname ).release() );
+            scope->localConnect( setup.dbname.c_str() );
             
-            void insert( const BSONObj& a ){
-                BSONList& all = (*_temp)[a];
-                all.push_back( a );
-                _size += a.objsize() + 16;
-            }
-
-            void checkSize(){
-                if ( _size < 1024 * 5 )
-                    return;
-
-                long before = _size;
-                reduceInMemory();
-                log(1) << "  mr: did reduceInMemory  " << before << " -->> " << _size << endl;
-
-                if ( _size < 1024 * 15 )
-                    return;
-                
-                dump();
-                log(1) << "  mr: dumping to db" << endl;
-            }
-
-        private:
-            void write( BSONObj& o ){
-                theDataFileMgr.insertWithObjMod( _state.setup.incLong.c_str() , o , true );
-            }
+            map = scope->createFunction( setup.mapCode.c_str() );
+            if ( ! map )
+                throw UserException( 9012, (string)"map compile failed: " + scope->getError() );
             
-            MRState& _state;
+            reduce = scope->createFunction( setup.reduceCode.c_str() );
+            if ( ! reduce )
+                throw UserException( 9013, (string)"reduce compile failed: " + scope->getError() );
+            
+            if ( setup.finalizeCode.size() )
+                finalize  = scope->createFunction( setup.finalizeCode.c_str() );
+            else
+                finalize = 0;
+            
+            if ( ! setup.scopeSetup.isEmpty() )
+                scope->init( &setup.scopeSetup );
+            
+            db.dropCollection( setup.tempLong );
+            db.dropCollection( setup.incLong );
+            
+            writelock l( setup.incLong );
+            Client::Context ctx( setup.incLong );
+            string err;
+            assert( userCreateNS( setup.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+            
+        }
         
-            boost::shared_ptr<InMemory> _temp;
-            long _size;
+        void MRState::finalReduce( BSONList& values ){
+            if ( values.size() == 0 )
+                return;
             
-        public:
-            long long numEmits;
-        };
+            BSONObj key = values.begin()->firstElement().wrap( "_id" );
+            BSONObj res = reduceValues( values , this , true );
+            
+            setup.insert( setup.tempLong , res );
+        }
+
+        MRTL::MRTL( MRState& state ) 
+            : _state( state )
+            , _temp(new InMemory())
+        {
+            _size = 0;
+            numEmits = 0;
+        }
+            
+        void MRTL::reduceInMemory(){
+            boost::shared_ptr<InMemory> old = _temp;
+            _temp.reset(new InMemory());
+            _size = 0;
+            
+            for ( InMemory::iterator i=old->begin(); i!=old->end(); i++ ){
+                BSONObj key = i->first;
+                BSONList& all = i->second;
+                
+                if ( all.size() == 1 ){
+                    // this key has low cardinality, so just write to db
+                    writelock l(_state.setup.incLong);
+                    Client::Context ctx(_state.setup.incLong.c_str());
+                    write( *(all.begin()) );
+                }
+                else if ( all.size() > 1 ){
+                    BSONObj res = reduceValues( all , &_state , false );
+                    insert( res );
+                }
+            }
+        }
+        
+        void MRTL::dump(){
+            writelock l(_state.setup.incLong);
+            Client::Context ctx(_state.setup.incLong);
+                    
+            for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
+                BSONList& all = i->second;
+                if ( all.size() < 1 )
+                    continue;
+                    
+                for ( BSONList::iterator j=all.begin(); j!=all.end(); j++ )
+                    write( *j );
+            }
+            _temp->clear();
+            _size = 0;
+
+        }
+            
+        void MRTL::insert( const BSONObj& a ){
+            BSONList& all = (*_temp)[a];
+            all.push_back( a );
+            _size += a.objsize() + 16;
+        }
+
+        void MRTL::checkSize(){
+            if ( _size < 1024 * 5 )
+                return;
+
+            long before = _size;
+            reduceInMemory();
+            log(1) << "  mr: did reduceInMemory  " << before << " -->> " << _size << endl;
+
+            if ( _size < 1024 * 15 )
+                return;
+                
+            dump();
+            log(1) << "  mr: dumping to db" << endl;
+        }
+
+        void MRTL::write( BSONObj& o ){
+            theDataFileMgr.insertWithObjMod( _state.setup.incLong.c_str() , o , true );
+        }
 
         boost::thread_specific_ptr<MRTL> _tlmr;
 
@@ -440,9 +426,11 @@ namespace mongo {
                 
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
+                MRState state( mr );
+                
                 try {
-                    
-                    MRState state( mr );
+                    state.init();
+
                     state.scope->injectNative( "emit" , fast_emit );
                     
                     MRTL * mrtl = new MRTL( state );
@@ -620,7 +608,7 @@ namespace mongo {
                     dblock lock;
                     db.dropCollection( mr.incLong );
                 
-                    finalCount = mr.renameIfNeeded( db );
+                    finalCount = mr.renameIfNeeded( db , &state );
                 }
 
                 timingBuilder.append( "total" , t.millis() );
@@ -686,6 +674,8 @@ namespace mongo {
                     
                 }
                 
+                MRReduceState state;
+
                 DBDirectClient db;
                     
                 { // reduce from each stream
@@ -696,12 +686,11 @@ namespace mongo {
                                                         Query().sort( sortKey ) );
                     cursor.init();
                     
-                    auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbname );
-                    s->localConnect( dbname.c_str() );
-                    ScriptingFunction reduceFunction = s->createFunction( mr.reduceCode.c_str() );
-                    ScriptingFunction finalizeFunction = 0;
+                    state.scope.reset( globalScriptEngine->getPooledScope( dbname ).release() );
+                    state.scope->localConnect( dbname.c_str() );
+                    state.reduce = state.scope->createFunction( mr.reduceCode.c_str() );
                     if ( mr.finalizeCode.size() )
-                        finalizeFunction = s->createFunction( mr.finalizeCode.c_str() );
+                        state.finalize = state.scope->createFunction( mr.finalizeCode.c_str() );
                     
                     BSONList values;
                     
@@ -721,16 +710,17 @@ namespace mongo {
                         }
                         
                         
-                        db.insert( mr.tempLong , reduceValues( values , s.get() , reduceFunction , 1 , finalizeFunction ) );
+                        db.insert( mr.tempLong , reduceValues( values , &state , true ) );
                         values.clear();
                         values.push_back( t );
                     }
                     
                     if ( values.size() )
-                        db.insert( mr.tempLong , reduceValues( values , s.get() , reduceFunction , 1 , finalizeFunction ) );
+                        db.insert( mr.tempLong , reduceValues( values , &state , true ) );
                 }
                 
-                long long finalCount = mr.renameIfNeeded( db );
+
+                long long finalCount = mr.renameIfNeeded( db , &state );
                 log(0) << " mapreducefinishcommand " << mr.finalLong << " " << finalCount << endl;
 
                 for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ){
