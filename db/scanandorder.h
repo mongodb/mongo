@@ -53,18 +53,7 @@ namespace mongo {
     inline void fillQueryResultFromObj(BufBuilder& bb, Projection *filter, BSONObj& js, DiskLoc* loc=NULL) {
         if ( filter ) {
             BSONObjBuilder b( bb );
-            BSONObjIterator i( js );
-            while ( i.more() ){
-                BSONElement e = i.next();
-                const char * fname = e.fieldName();
-                
-                if ( strcmp( fname , "_id" ) == 0 ){
-                    if (filter->includeID())
-                        b.append( e );
-                } else {
-                    filter->append( b , e );
-                }
-            }
+            filter->transform( js , b );
             if (loc)
                 b.append("$diskLoc", loc->toBSONObj());
             b.done();

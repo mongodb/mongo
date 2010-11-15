@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "projection.h"
+#include "../util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -114,12 +115,24 @@ namespace mongo {
             fm->add(rest, skip, limit);
         }
     }
+    
+    void Projection::transform( const BSONObj& in , BSONObjBuilder& b ) const {
+        BSONObjIterator i(in);
+        while ( i.more() ){
+            BSONElement e = i.next();
+            if ( mongoutils::str::equals( "_id" , e.fieldName() ) ){
+                if ( _includeID )
+                    b.append( e );
+            }
+            else {
+                append( b , e );
+            }
+        }
+    }
 
     BSONObj Projection::transform( const BSONObj& in ) const {
         BSONObjBuilder b;
-        BSONObjIterator i(in);
-        while ( i.more() )
-            append( b , i.next() );
+        transform( in , b );
         return b.obj();
     }
     

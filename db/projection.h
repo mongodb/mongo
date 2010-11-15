@@ -46,25 +46,26 @@ namespace mongo {
         BSONObj getSpec() const { return _source; }
 
         /**
-         * appends e to b if user wants it
-         * will descend into e if needed
-         */
-        void append( BSONObjBuilder& b , const BSONElement& e ) const;
-
-
-        /**
          * transforms in according to spec
          * NOTE: this will stricy obey _id, which is not true 
          *       for normal queries
          */
         BSONObj transform( const BSONObj& in ) const;
 
+        
         /**
-         * @return if _id should be returned
+         * transforms in according to spec
          */
-        bool includeID() { return _includeID; }
+        void transform( const BSONObj& in , BSONObjBuilder& b ) const;
 
     private:
+
+        /**
+         * appends e to b if user wants it
+         * will descend into e if needed
+         */
+        void append( BSONObjBuilder& b , const BSONElement& e ) const;
+
 
         void add( const string& field, bool include );
         void add( const string& field, int skip, int limit );
