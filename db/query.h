@@ -293,7 +293,7 @@ namespace mongo {
             if ( fields.isEmpty() )
                 return;
             _fields.reset( new FieldMatcher() );
-            _fields->add( fields );
+            _fields->init( fields );
         }
 
         ParsedQuery( const ParsedQuery& other ){

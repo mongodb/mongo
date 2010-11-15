@@ -794,7 +794,7 @@ namespace mongo {
     // FieldMatcher //
     ///////////////////
     
-    void FieldMatcher::add( const BSONObj& o ){
+    void FieldMatcher::init( const BSONObj& o ){
         massert( 10371 , "can only add to FieldMatcher once", _source.isEmpty());
         _source = o;
 
@@ -854,7 +854,8 @@ namespace mongo {
     void FieldMatcher::add(const string& field, bool include){
         if (field.empty()){ // this is the field the user referred to
             _include = include;
-        } else {
+        } 
+        else {
             _include = !include;
 
             const size_t dot = field.find('.');
@@ -891,6 +892,15 @@ namespace mongo {
     BSONObj FieldMatcher::getSpec() const{
         return _source;
     }
+
+    BSONObj FieldMatcher::transform( const BSONObj& in ) const {
+        BSONObjBuilder b;
+        BSONObjIterator i(in);
+        while ( i.more() )
+            append( b , i.next() );
+        return b.obj();
+    }
+    
 
     //b will be the value part of an array-typed BSONElement
     void FieldMatcher::appendArray( BSONObjBuilder& b , const BSONObj& a , bool nested) const {

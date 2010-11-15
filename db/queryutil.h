@@ -553,12 +553,35 @@ namespace mongo {
             , _limit(-1)
         {}
         
-        void add( const BSONObj& o );
+        /**
+         * called once per lifetime
+         */
+        void init( const BSONObj& spec );
+        
+        /**
+         * @return the spec init was called with
+         */
+        BSONObj getSpec() const;
 
+        /**
+         * appends e to b if user wants it
+         * will descend into e if needed
+         */
         void append( BSONObjBuilder& b , const BSONElement& e ) const;
 
-        BSONObj getSpec() const;
+
+        /**
+         * transforms in according to spec
+         * NOTE: this will stricy obey _id, which is not true 
+         *       for normal queries
+         */
+        BSONObj transform( const BSONObj& in ) const;
+
+        /**
+         * @return if _id should be returned
+         */
         bool includeID() { return _includeID; }
+
     private:
 
         void add( const string& field, bool include );
@@ -567,6 +590,7 @@ namespace mongo {
 
         bool _include; // true if default at this level is to include
         bool _special; // true if this level can't be skipped or included without recursing
+
         //TODO: benchmark vector<pair> vs map
         typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
         FieldMap _fields;
