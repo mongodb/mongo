@@ -153,7 +153,23 @@ namespace mongo {
                     finalLong = dbname + "." + finalShort;
                     
                 }
-             
+                
+                if ( cmdObj["outType"].type() == String ){
+                    uassert( 13521 , "need 'out' if using 'outType'" , cmdObj["out"].type() == String );
+                    string t = cmdObj["outType"].String();
+                    if ( t == "normal" )
+                        outType = NORMAL;
+                    else if ( t == "merge" )
+                        outType = MERGE;
+                    else if ( t == "reduce" )
+                        outType = REDUCE;
+                    else 
+                        uasserted( 13522 , str::stream() << "unknown outType [" << t << "]" );
+                }
+                else {
+                    outType = NORMAL;
+                }
+
                 { // scope and code
                     // NOTE: function scopes are merged with m/r scope, not nested like they should be
                     BSONObjBuilder scopeBuilder;
@@ -205,16 +221,35 @@ namespace mongo {
                @return number objects in collection
              */
             long long renameIfNeeded( DBDirectClient& db ){
+                assertInWriteLock();
                 if ( finalLong != tempLong ){
-                    db.dropCollection( finalLong );
-                    if ( db.count( tempLong ) ){
-                        BSONObj info;
-                        uassert( 10076 ,  "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
+                    
+                    if ( outType == NORMAL ){
+                        db.dropCollection( finalLong );
+                        if ( db.count( tempLong ) ){
+                            BSONObj info;
+                            uassert( 10076 ,  "rename failed" , 
+                                     db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
+                        }
+                    }
+                    else if ( outType == MERGE ){
+                        auto_ptr<DBClientCursor> cursor = db.query( tempLong , BSONObj() );
+                        while ( cursor->more() ){
+                            BSONObj o = cursor->next();
+                            Helpers::upsert( finalLong , o );
+                        }
+                        db.dropCollection( tempLong );
+                    }
+                    else if ( outType == REDUCE ){
+                        assert(0);
+                    }
+                    else {
+                        assert(0);
                     }
                 }
                 return db.count( finalLong );
             }
-
+            
             void insert( const string& ns , BSONObj& o ){
                 writelock l( ns );
                 Client::Context ctx( ns );
@@ -257,6 +292,8 @@ namespace mongo {
             
             string finalShort;
             string finalLong;
+
+            enum { NORMAL , MERGE , REDUCE } outType;
             
         }; // end MRsetup
 
