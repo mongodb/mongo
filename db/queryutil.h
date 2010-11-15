@@ -540,68 +540,6 @@ namespace mongo {
         bool _orFound;
     };
     
-    /**
-       used for doing field limiting
-     */
-    class FieldMatcher {
-    public:
-        FieldMatcher()
-            : _include(true)
-            , _special(false)
-            , _includeID(true)
-            , _skip(0)
-            , _limit(-1)
-        {}
-        
-        /**
-         * called once per lifetime
-         */
-        void init( const BSONObj& spec );
-        
-        /**
-         * @return the spec init was called with
-         */
-        BSONObj getSpec() const;
-
-        /**
-         * appends e to b if user wants it
-         * will descend into e if needed
-         */
-        void append( BSONObjBuilder& b , const BSONElement& e ) const;
-
-
-        /**
-         * transforms in according to spec
-         * NOTE: this will stricy obey _id, which is not true 
-         *       for normal queries
-         */
-        BSONObj transform( const BSONObj& in ) const;
-
-        /**
-         * @return if _id should be returned
-         */
-        bool includeID() { return _includeID; }
-
-    private:
-
-        void add( const string& field, bool include );
-        void add( const string& field, int skip, int limit );
-        void appendArray( BSONObjBuilder& b , const BSONObj& a , bool nested=false) const;
-
-        bool _include; // true if default at this level is to include
-        bool _special; // true if this level can't be skipped or included without recursing
-
-        //TODO: benchmark vector<pair> vs map
-        typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
-        FieldMap _fields;
-        BSONObj _source;
-        bool _includeID;
-
-        // used for $slice operator
-        int _skip;
-        int _limit;
-    };
-
     /** returns a string that when used as a matcher, would match a super set of regex()
         returns "" for complex regular expressions
         used to optimize queries in some simple regex cases that start with '^'

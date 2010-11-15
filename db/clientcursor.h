@@ -33,6 +33,7 @@
 #include "dbhelpers.h"
 #include "matcher.h"
 #include "../client/dbclient.h"
+#include "projection.h"
 
 namespace mongo {
 

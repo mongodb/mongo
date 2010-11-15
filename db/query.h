@@ -23,6 +23,7 @@
 #include "dbmessage.h"
 #include "jsobj.h"
 #include "diskloc.h"
+#include "projection.h"
 
 /* db request message format
 
