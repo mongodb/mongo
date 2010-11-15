@@ -569,6 +569,7 @@ namespace mongo {
             
             *_b << "nYields" << nYields;
             *_b << "nChunkSkips" << nChunkSkips;
+            *_b << "isMultiKey" << c->isMultiKey();
 
             *_b << "indexBounds" << c->prettyIndexBounds();
 

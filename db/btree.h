@@ -385,6 +385,7 @@ namespace mongo {
         }
         
         virtual bool modifiedKeys() const { return _multikey; }
+        virtual bool isMultiKey() const { return _multikey; }
 
         const _KeyNode& _currKeyNode() const {
             assert( !bucket.isNull() );

@@ -93,6 +93,8 @@ namespace mongo {
         */
         virtual bool getsetdup(DiskLoc loc) = 0;
         
+        virtual bool isMultiKey() const = 0;
+
         /**
          * return true if the keys in the index have been modified from the main doc
          * if you have { a : 1 , b : [ 1 , 2 ] } 
@@ -161,6 +163,7 @@ namespace mongo {
         }
         virtual bool tailable() { return tailable_; }
         virtual bool getsetdup(DiskLoc loc) { return false; }
+        virtual bool isMultiKey() const { return false; }
         virtual bool modifiedKeys() const { return false; }
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return true; }

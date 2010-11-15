@@ -273,6 +273,14 @@ namespace mongo {
         return false;
     }
 
+    bool QueryPlanSet::hasMultiKey() const {
+        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i )
+            if ( (*i)->isMultiKey() )
+                return true;
+        return false;
+    }
+
+
     void QueryPlanSet::addHint( IndexDetails &id ) {
         if ( !_min.isEmpty() || !_max.isEmpty() ) {
             string errmsg;

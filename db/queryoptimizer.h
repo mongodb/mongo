@@ -206,6 +206,7 @@ namespace mongo {
         const FieldRangeSet &fbs() const { return *_fbs; }
         const FieldRangeSet &originalFrs() const { return *_originalFrs; }
         bool modifiedKeys() const;
+        bool hasMultiKey() const;
 
     private:
         void addOtherPlans( bool checkFirst );
@@ -300,6 +301,8 @@ namespace mongo {
         void setBestGuessOnly() { _bestGuessOnly = true; }
         void mayYield( bool val ) { _mayYield = val; }
         bool modifiedKeys() const { return _currentQps->modifiedKeys(); }
+        bool hasMultiKey() const { return _currentQps->hasMultiKey(); }
+
     private:
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
@@ -384,6 +387,8 @@ namespace mongo {
         
         virtual bool modifiedKeys() const { return _mps->modifiedKeys(); }
         
+        virtual bool isMultiKey() const { return _mps->hasMultiKey(); }
+
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         // return -1 if we're a getmore handoff
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }

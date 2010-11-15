@@ -1066,6 +1066,7 @@ namespace mongo {
         
         virtual bool getsetdup(DiskLoc loc) { return false; }
         virtual bool modifiedKeys() const { return true; }
+        virtual bool isMultiKey() const { return false; }
 
         
 
