@@ -16,9 +16,13 @@ ldb = left.getDB( "test" )
 rdb = right.getDB( "test" )
 
 ldb.foo.insert( { _id : 1 , x : "eliot" } )
-ldb.runCommand( { getlasterror : 1 , w : 2 } )
+var result = ldb.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 20000 } );
+printjson(result);
 rdb.foo.insert( { _id : 2 , x : "sara" } )
-rdb.runCommand( { getlasterror : 1 , w : 2 } )
+result = rdb.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 20000 } )
+printjson(result);
+
+print( "check 3" )
 
 assert.eq( 2 , ldb.foo.count() , "B1" )
 assert.eq( 2 , rdb.foo.count() , "B2" )
