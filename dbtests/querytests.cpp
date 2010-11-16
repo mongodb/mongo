@@ -1115,6 +1115,19 @@ namespace QueryTests {
         }
     };
 
+    namespace proj { // Projection tests
+
+        class T1 {
+        public:
+            void run(){
+                
+                Projection m;
+                m.init( BSON( "a" << 1 ) );
+                ASSERT_EQUALS( BSON( "a" << 5 ) , m.transform( BSON( "x" << 1 << "a" << 5 ) ) );
+            }
+        };
+    }
+
     class All : public Suite {
     public:
         All() : Suite( "query" ) {
@@ -1171,6 +1184,8 @@ namespace QueryTests {
             add< queryobjecttests::names1 >();
 
             add< OrderingTest >();
+
+            add< proj::T1 >();
         }
     } myall;
     

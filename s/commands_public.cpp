@@ -844,6 +844,7 @@ namespace mongo {
                     }
                     else if ( fn == "keeptemp" ||
                               fn == "out" ||
+                              fn == "outType" ||
                               fn == "finalize" ){
                         // we don't want to copy these
                     }
