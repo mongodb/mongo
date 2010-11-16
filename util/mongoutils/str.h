@@ -34,7 +34,7 @@ namespace mongoutils {
 
     namespace str {
 
-        using namespace std;
+        typedef std::string string;
 
         /** the idea here is to make one liners easy.  e.g.: 
 
@@ -46,7 +46,7 @@ namespace mongoutils {
         */
         class stream {
         public:
-            stringstream ss;
+            std::stringstream ss;
 
             template<class T>
             stream& operator<<(const T& v) {
@@ -136,7 +136,6 @@ namespace mongoutils {
             @return true if char found
         */
         inline bool splitOn(const string &s, char c, string& L, string& R) {
-            dassert(c);
             const char *start = s.c_str();
             const char *p = strchr(start, c);
             if( p == 0 ) { 
@@ -149,7 +148,6 @@ namespace mongoutils {
         }
         /** split scanning reverse direction */
         inline bool rSplitOn(const string &s, char c, string& L, string& R) {
-            dassert(c);
             const char *start = s.c_str();
             const char *p = strrchr(start, c);
             if( p == 0 ) { 
