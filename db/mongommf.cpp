@@ -111,25 +111,16 @@ namespace mongo {
     bool MongoMMF::open(string fname, bool sequentialHint) {
         setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
-        // temp : _view_private pending more work!
-        _view_private = _view_write;
-        if( _view_write ) { 
-             if( durable ) {
-                 privateViews.add(_view_private, this);
-                 if( debug ) {
-                     _view_readonly = MemoryMappedFile::createReadOnlyMap();
-                     ourReadViews.add(_view_readonly, this);
-                 }
-             }
-            return true;
-        }
-        return false;
+        return finishOpening();
     }
 
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) { 
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
-        // temp : _view_private pending more work! not implemented yet.
+        return finishOpening();
+    }
+
+    bool MongoMMF::finishOpening() {
         _view_private = _view_write;
         if( _view_write ) {
             if( durable ) {

@@ -80,6 +80,7 @@ namespace mongo {
         string _filePath;
         int _fileSuffixNo;
         void setPath(string fn);
+        bool finishOpening();
     };
 
     /** for durability support we want to be able to map pointers to specific MongoMMF objects. 
