@@ -106,8 +106,8 @@ namespace mongo {
             nextFileNumber++;
             {
                 JHeader h(fname);
-		AlignedBuilder b(8192);
-		b.appendStruct(&h);
+                AlignedBuilder b(8192);
+                b.appendStruct(h);
                 lf->synchronousAppend(b.buf(), b.len());
             }
         }
