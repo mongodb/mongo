@@ -59,8 +59,10 @@ namespace mongo {
             unsigned nextFileNumber;
             LogFile *lf;
             string dir;
+            MVar<path> &toUnlink;
 
-            Journal()
+            Journal() : 
+              toUnlink(*(new MVar<path>)) /* freeing MVar at program termination would be problematic */
             { 
                 written = 0;
                 nextFileNumber = 0;
@@ -112,11 +114,10 @@ namespace mongo {
             }
         }
 
-        static MVar<path> toUnlink;
         void unlinkThread() { 
             Client::initThread("unlink");
             while( 1 ) {
-                path p = toUnlink.take();
+                path p = j.toUnlink.take();
                 try {
                     remove(p);
                 }
@@ -148,13 +149,13 @@ namespace mongo {
                     // we do unlinks asynchronously - unless they are falling behind.
                     // (unlinking big files can be slow on some operating systems; we don't want to stop world)
                     path p = j.getFilePathFor(fn);
-                    if( !toUnlink.tryPut(p) ) {
+                    if( !j.toUnlink.tryPut(p) ) {
                         /* DR___ for durability error and warning codes 
                            Compare to RS___ for replica sets
                         */
                         log() << "DR100 latency warning on journal unlink" << endl;
                         Timer t;
-                        toUnlink.put(p);
+                        j.toUnlink.put(p);
                         log() << "toUnlink.put() " << t.millis() << "ms" << endl;
                     }
                 }
