@@ -653,13 +653,9 @@ namespace mongo {
                 _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
                 _capped = _c->capped();
                 
-                cout << "ELIOT : " << _pq.getFields() << endl;
-
                 // setup check for if we can only use index to extract
                 if ( _c->modifiedKeys() == false && _c->isMultiKey() == false && _pq.getFields() ){
-                    cout << "\t YO" << endl;
                     _keyFieldsOnly.reset( _pq.getFields()->checkKey( _c->indexKeyPattern() ) );
-                    cout << "\t " << _keyFieldsOnly.get() << endl;
                 }
             }
 
