@@ -128,7 +128,8 @@ namespace mongo {
         DiskLoc deletedList[Buckets];
         // ofs 168 (8 byte aligned)
         struct Stats {
-            long long datasize; //datasize and nrecords MUST Be adjacent code assumes!
+            // datasize and nrecords MUST Be adjacent code assumes!
+            long long datasize; // this includes padding, but not record headers
             long long nrecords;
         } stats;
         int lastExtentSize;
