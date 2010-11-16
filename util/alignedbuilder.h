@@ -26,7 +26,7 @@ namespace mongo {
         AlignedBuilder(unsigned init_size) : _size(init_size) {
             _data = (char *) _malloc(_size);
             if( _data == 0 )
-                msgasserted(10000, "out of memory AlignedBuilder");
+	        msgasserted(13523, "out of memory AlignedBuilder");
             _len = 0;
         }
         ~AlignedBuilder() { kill(); }
@@ -118,16 +118,16 @@ namespace mongo {
         static void* _malloc(unsigned sz) { 
 #if defined(_WIN32)
             void *p = VirtualAlloc(0, sz, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-            return p;
-#elif defined(posix_memalign)
+#elif defined(_POSIX_VERSION)
             void *p = 0;
             int res = posix_memalign(&p, Alignment, sz);
-            msgasserted(10000, "out of memory AlignedBuilder", res == 0);
+            massert(13524, "out of memory AlignedBuilder", res == 0);
+	    cout << "temp: _malloc " << p << ' ' << sz << endl;
 #else
             void *p = malloc(sz);
             assert( ((size_t) p) % Alignment == 0 );
-            return p;
 #endif
+	    return p;
         }
         static void* _realloc(void *ptr, unsigned newSize, unsigned oldSize) { 
             void *p = _malloc(newSize);

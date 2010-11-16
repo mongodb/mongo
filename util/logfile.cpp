@@ -131,11 +131,14 @@ namespace mongo {
 	_fd = -1;
     }
 
-    void LogFile::synchronousAppend(void *b, size_t len) {
-        char *buf = (char *) b;
+    void LogFile::synchronousAppend(const void *b, size_t len) {
+        const char *buf = (char *) b;
         assert(_fd);
 	assert(((size_t)buf)%4096==0); // aligned
-	assert(len % 4096 == 0);
+	if( len % 4096 != 0 ) { 
+	    log() << len << ' ' << len % 4096 << endl;
+	    assert(false);
+	}
         ssize_t written = write(_fd, buf, len);
         if( written != (ssize_t) len ) { 
   	    log() << "write fails written:" << written << " len:" << len << " errno:" << errno << endl;
