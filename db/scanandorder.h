@@ -50,7 +50,7 @@ namespace mongo {
        _ response size limit from runquery; push it up a bit.
     */
 
-    inline void fillQueryResultFromObj(BufBuilder& bb, Projection *filter, BSONObj& js, DiskLoc* loc=NULL) {
+    inline void fillQueryResultFromObj(BufBuilder& bb, Projection *filter, const BSONObj& js, DiskLoc* loc=NULL) {
         if ( filter ) {
             BSONObjBuilder b( bb );
             filter->transform( js , b );
