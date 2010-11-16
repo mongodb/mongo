@@ -290,7 +290,7 @@ namespace mongo {
         int resultFlags = ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
-
+        
         if ( !cc ) {
             log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
@@ -311,6 +311,10 @@ namespace mongo {
             Cursor *c = cc->c();
             c->checkLocation();
             DiskLoc last;
+
+            scoped_ptr<Projection::KeyOnly> keyFieldsOnly;
+            if ( cc->modifiedKeys() == false && cc->isMultiKey() == false && cc->fields )
+                keyFieldsOnly.reset( cc->fields->checkKey( cc->indexKeyPattern() ) );
 
             while ( 1 ) {
                 if ( !c->ok() ) {
@@ -350,11 +354,17 @@ namespace mongo {
                     }
                     else {
                         last = c->currLoc();
-                        BSONObj js = c->current();
-
-                        // show disk loc should be part of the main query, not in an $or clause, so this should be ok
-                        fillQueryResultFromObj(b, cc->fields.get(), js, ( cc->pq.get() && cc->pq->showDiskLoc() ? &last : 0));
                         n++;
+                        
+                        if ( keyFieldsOnly ){
+                            fillQueryResultFromObj(b, 0, keyFieldsOnly->hydrate( c->currKey() ) );
+                        }
+                        else {
+                            BSONObj js = c->current();
+                            // show disk loc should be part of the main query, not in an $or clause, so this should be ok
+                            fillQueryResultFromObj(b, cc->fields.get(), js, ( cc->pq.get() && cc->pq->showDiskLoc() ? &last : 0));
+                        }
+
                         if ( ( ntoreturn && n >= ntoreturn ) || b.len() > MaxBytesToReturnToClientAtOnce ){
                             c->advance();
                             cc->incPos( n );
@@ -547,7 +557,8 @@ namespace mongo {
             b << "cursor" << c->toString() << "indexBounds" << c->prettyIndexBounds();
             b.done();
         }
-        void noteScan( Cursor *c, long long nscanned, long long nscannedObjects, int n, bool scanAndOrder, int millis, bool hint, int nYields , int nChunkSkips ) {
+        void noteScan( Cursor *c, long long nscanned, long long nscannedObjects, int n, bool scanAndOrder, 
+                       int millis, bool hint, int nYields , int nChunkSkips , bool indexOnly ) {
             if ( _i == 1 ) {
                 _c.reset( new BSONArrayBuilder() );
                 *_c << _b->obj();
@@ -570,6 +581,7 @@ namespace mongo {
             *_b << "nYields" << nYields;
             *_b << "nChunkSkips" << nChunkSkips;
             *_b << "isMultiKey" << c->isMultiKey();
+            *_b << "indexOnly" << indexOnly;
 
             *_b << "indexBounds" << c->prettyIndexBounds();
 
@@ -640,6 +652,11 @@ namespace mongo {
             } else {
                 _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
                 _capped = _c->capped();
+                
+                // setup check for if we can only use index to extract
+                if ( _c->modifiedKeys() == false && _c->isMultiKey() == false && _pq.getFields() ){
+                    _keyFieldsOnly.reset( _pq.getFields()->checkKey( _c->indexKeyPattern() ) );
+                }
             }
 
             if ( qp().scanAndOrderRequired() ) {
@@ -763,6 +780,9 @@ namespace mongo {
                                 bb.appendKeys( _c->indexKeyPattern() , _c->currKey() );
                                 bb.done();
                             }
+                            else if ( _keyFieldsOnly ){
+                                fillQueryResultFromObj( _buf , 0 , _keyFieldsOnly->hydrate( _c->currKey() ) );
+                            }
                             else {
                                 BSONObj js = _c->current();
                                 assert( js.isValid() );
@@ -824,7 +844,9 @@ namespace mongo {
             }
 
             if ( _pq.isExplain() ) {
-                _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(), _curop.elapsedMillis(), useHints && !_pq.getHint().eoo(), _nYields , _nChunkSkips);
+                _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(), 
+                              _curop.elapsedMillis(), useHints && !_pq.getHint().eoo(), _nYields , 
+                              _nChunkSkips, _keyFieldsOnly.get() > 0 );
             } 
             else {
                 if ( _buf.len() ) {
@@ -883,6 +905,7 @@ namespace mongo {
     private:
         BufBuilder _buf;
         const ParsedQuery& _pq;
+        scoped_ptr<Projection::KeyOnly> _keyFieldsOnly;
 
         long long _ntoskip;
         long long _nscanned;
