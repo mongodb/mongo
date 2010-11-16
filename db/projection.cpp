@@ -238,8 +238,15 @@ namespace mongo {
         BSONObjIterator i( keyPattern );
         while ( i.more() ){
             BSONElement k = i.next();
-            
+
             if ( _source[k.fieldName()].type() ){
+
+                if ( strchr( k.fieldName() , '.' ) ){
+                    // TODO we currently don't support dotted fields
+                    //      SERVER-2104
+                    return 0;
+                }
+
                 if ( ! _includeID && mongoutils::str::equals( k.fieldName() , "_id" ) ){
                     p->addNo();
                 }

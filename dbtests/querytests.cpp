@@ -1174,6 +1174,33 @@ namespace QueryTests {
             }
         };
 
+
+        class K3 {
+        public:
+            void run(){
+                
+                {
+                    Projection m;
+                    m.init( BSON( "a" << 1 << "_id" << 0 ) );
+                    
+                    scoped_ptr<Projection::KeyOnly> x( m.checkKey( BSON( "a" << 1 << "x.a" << 1 ) ) );                
+                    ASSERT( x );
+                }
+
+
+                {
+                    // TODO: this is temporary SERVER-2104
+                    Projection m;
+                    m.init( BSON( "x.a" << 1 << "_id" << 0 ) );
+                    
+                    scoped_ptr<Projection::KeyOnly> x( m.checkKey( BSON( "a" << 1 << "x.a" << 1 ) ) );                
+                    ASSERT( ! x );
+                }
+
+            }
+        };
+
+
     }
 
     class All : public Suite {
@@ -1236,6 +1263,7 @@ namespace QueryTests {
             add< proj::T1 >();
             add< proj::K1 >();
             add< proj::K2 >();
+            add< proj::K3 >();
         }
     } myall;
     
