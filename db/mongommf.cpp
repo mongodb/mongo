@@ -121,14 +121,17 @@ namespace mongo {
     }
 
     bool MongoMMF::finishOpening() {
-        _view_private = _view_write;
         if( _view_write ) {
             if( durable ) {
+                _view_private = createPrivateMap();
                 privateViews.add(_view_private, this);
                 if( debug )  {
                     _view_readonly = MemoryMappedFile::createReadOnlyMap();
                     ourReadViews.add(_view_readonly, this);
                 }
+            }
+            else { 
+                _view_private = _view_write;
             }
             return true;
         }

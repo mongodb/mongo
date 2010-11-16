@@ -112,10 +112,11 @@ namespace mongo {
         unsigned long long length() const { return len; }
         string filename() const           { return _filename; }
 
+        /** create a new view with the specified properties. 
+            automatically cleaned up upon close/destruction of the MemoryMappedFile object. 
+            */
         void* createReadOnlyMap();
-
-        void* testGetCopyOnWriteView();
-        void  testCloseCopyOnWriteView(void *);
+        void* createPrivateMap();
 
     private:
         static void updateLength( const char *filename, unsigned long long &length );
