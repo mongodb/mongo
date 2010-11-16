@@ -23,7 +23,9 @@
 namespace mongo {
 
     /**
-       used for doing field limiting
+     * given a document and a projection specification
+     * can transform the document
+     * currently supports specifying which fields and $slice
      */
     class Projection {
     public:
@@ -63,6 +65,7 @@ namespace mongo {
         
         /**
          * called once per lifetime
+         * e.g. { "x" : 1 , "a.y" : 1 }
          */
         void init( const BSONObj& spec );
         
@@ -84,9 +87,8 @@ namespace mongo {
         
 
         /**
-         * @return if the key has all the information needed to return
-         *         return a new KeyOnly 
-         *         otherwise null
+         * @return if the keyPattern has all the information needed to return then
+         *         return a new KeyOnly otherwise null
          *         NOTE: a key may have modified the actual data
          *               which has to be handled above this (arrays, geo)
          */
