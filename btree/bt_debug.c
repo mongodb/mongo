@@ -15,7 +15,7 @@ static void __wt_bt_debug_inmem_col_fix(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_inmem_col_int(WT_PAGE *, FILE *);
 static void __wt_bt_debug_inmem_col_rcc(WT_TOC *, WT_PAGE *, FILE *);
 static int  __wt_bt_debug_inmem_col_var(WT_TOC *, WT_PAGE *, FILE *);
-static int  __wt_bt_debug_inmem_row_int(WT_PAGE *, FILE *);
+static void __wt_bt_debug_inmem_row_int(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_inmem_row_leaf(WT_TOC *, WT_PAGE *, FILE *);
 static int  __wt_bt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
@@ -404,7 +404,7 @@ __wt_bt_debug_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
  * __wt_bt_debug_inmem_row_int --
  *	Dump an in-memory WT_PAGE_DUP_INT or WT_PAGE_ROW_INT page.
  */
-static int
+static void
 __wt_bt_debug_inmem_row_int(WT_PAGE *page, FILE *fp)
 {
 	WT_ROW *rip;
@@ -421,8 +421,6 @@ __wt_bt_debug_inmem_row_int(WT_PAGE *page, FILE *fp)
 
 		__wt_bt_debug_off(rip->data, "\t", fp);
 	}
-
-	return (0);
 }
 
 /*
