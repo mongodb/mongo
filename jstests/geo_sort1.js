@@ -17,6 +17,6 @@ a = q.clone().map( m );
 b = q.clone().sort( { foo : 1 } ).map( m );
 
 assert.neq( a , b , "A" );
-a = Array.sort( a );
-b = Array.sort( b );
+a.sort();
+b.sort();
 assert.eq( a , b , "B" );

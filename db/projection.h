@@ -27,13 +27,39 @@ namespace mongo {
      */
     class Projection {
     public:
-        Projection()
-            : _include(true)
-            , _special(false)
-            , _includeID(true)
-            , _skip(0)
-            , _limit(-1)
-        {}
+
+        class KeyOnly {
+        public:
+            
+            KeyOnly() : _stringSize(0){}
+
+            BSONObj hydrate( const BSONObj& key ) const;
+            
+            void addNo() { _add( false , "" ); }
+            void addYes( const string& name ) { _add( true , name ); }
+
+        private:
+            
+            void _add( bool b , const string& name ) { 
+                _include.push_back( b ); 
+                _names.push_back( name ); 
+                _stringSize += name.size(); 
+            }
+
+            vector<bool> _include; // one entry per field in key.  true iff should be in output
+            vector<string> _names; // name of field since key doesn't have names
+            
+            int _stringSize;
+        };
+
+        Projection() :
+            _include(true) ,
+            _special(false) ,
+            _includeID(true) ,
+            _skip(0) ,
+            _limit(-1) ,
+            _hasNonSimple(false){
+        }
         
         /**
          * called once per lifetime
@@ -59,10 +85,12 @@ namespace mongo {
 
         /**
          * @return if the key has all the information needed to return
+         *         return a new KeyOnly 
+         *         otherwise null
          *         NOTE: a key may have modified the actual data
-         *               which has to be handled above this
+         *               which has to be handled above this (arrays, geo)
          */
-        bool keyEnough( const BSONObj& keyPattern ) const;
+        KeyOnly* checkKey( const BSONObj& keyPattern ) const;
         
     private:
 
@@ -89,6 +117,8 @@ namespace mongo {
         // used for $slice operator
         int _skip;
         int _limit;
+
+        bool _hasNonSimple;
     };
 
 

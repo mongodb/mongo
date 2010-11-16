@@ -30,6 +30,9 @@ namespace mongo {
         while ( i.more() ){
             BSONElement e = i.next();
 
+            if ( ! e.isNumber() )
+                _hasNonSimple = true;
+
             if (e.type() == Object){
                 BSONObj obj = e.embeddedObject();
                 BSONElement e2 = obj.firstElement();
@@ -212,5 +215,74 @@ namespace mongo {
                 b.appendArray(e.fieldName(), subb.obj());
             }
         }
+    }
+
+    Projection::KeyOnly* Projection::checkKey( const BSONObj& keyPattern ) const {
+        if ( _include ){
+            // if we default to including then we can't
+            // use an index because we don't know what we're missing
+            return 0;
+        }
+        
+        if ( _hasNonSimple )
+            return 0;
+        
+        if ( _includeID && keyPattern["_id"].eoo() )
+            return 0;
+
+        // at this point we know its all { x : 1 } style
+        
+        auto_ptr<KeyOnly> p( new KeyOnly() );
+
+        int got = 0;
+        BSONObjIterator i( keyPattern );
+        while ( i.more() ){
+            BSONElement k = i.next();
+            
+            if ( _source[k.fieldName()].type() ){
+                if ( ! _includeID && mongoutils::str::equals( k.fieldName() , "_id" ) ){
+                    p->addNo();
+                }
+                else {
+                    p->addYes( k.fieldName() );
+                    got++;
+                }
+            }
+            else if ( mongoutils::str::equals( "_id" , k.fieldName() ) && _includeID ){
+                p->addYes( "_id" );
+            }
+            else {
+                p->addNo();
+            }
+
+        }
+        
+        int need = _source.nFields();
+        if ( ! _includeID )
+            need--;
+
+        if ( got == need )
+            return p.release();
+
+        return 0;
+    }
+
+    BSONObj Projection::KeyOnly::hydrate( const BSONObj& key ) const {
+        assert( _include.size() == _names.size() );
+
+        BSONObjBuilder b( key.objsize() + _stringSize + 16 );
+
+        BSONObjIterator i(key);
+        unsigned n=0;
+        while ( i.more() ){
+            assert( n < _include.size() );
+            BSONElement e = i.next();
+            if ( _include[n] ){
+                b.appendAs( e , _names[n] );
+            }
+            n++;
+        }
+        
+        return b.obj();
     }
 }
