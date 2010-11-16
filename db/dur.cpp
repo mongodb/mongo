@@ -47,6 +47,7 @@
 #include "dur_journal.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/timer.h"
+#include "../util/alignedbuilder.h"
 
 namespace mongo { 
 
@@ -110,7 +111,7 @@ namespace mongo {
         }
 
         /** caller handles locking */
-        static bool PREPLOGBUFFER(BufBuilder& bb) { 
+        static bool PREPLOGBUFFER(AlignedBuilder& bb) { 
             if( writes.empty() )
                 return false;
 
@@ -169,18 +170,18 @@ namespace mongo {
             return true;
         }
 
-        static void WRITETOJOURNAL(const BufBuilder& bb) { 
+        static void WRITETOJOURNAL(const AlignedBuilder& bb) { 
             journal(bb);
         }
 
-        static void _go(BufBuilder& bb) {
+        static void _go(AlignedBuilder& bb) {
             PREPLOGBUFFER(bb);
 
             // todo: add double buffering so we can be (not even read locked) during WRITETOJOURNAL
             WRITETOJOURNAL(bb);
         }
 
-        static void go(BufBuilder& bb) {
+        static void go(AlignedBuilder& bb) {
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
@@ -197,7 +198,7 @@ namespace mongo {
         static void durThread() { 
             Client::initThread("dur");
             const int HowOftenToGroupCommitMs = 100;
-            BufBuilder bb(1024 * 1024 * 16); // reuse to avoid any heap fragmentation
+            AlignedBuilder bb(1024 * 1024 * 16); // reuse to avoid any heap fragmentation
             while( 1 ) { 
                 try {
                     int millis = HowOftenToGroupCommitMs;

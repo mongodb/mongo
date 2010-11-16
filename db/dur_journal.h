@@ -19,6 +19,8 @@
 #pragma once
 
 namespace mongo {
+    class AlignedBuilder;
+
     namespace dur {
 
         /** assure journal/ dir exists. throws */
@@ -31,7 +33,7 @@ namespace mongo {
         void journalRotate();
 
         /** write/append to journal */
-        void journal(const BufBuilder& b);
+        void journal(const AlignedBuilder& b);
 
         /** flag that something has gone wrong */
         void journalingFailure(const char *msg);

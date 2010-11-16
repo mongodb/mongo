@@ -25,6 +25,7 @@
 #include "dur_journal.h"
 #include "../util/logfile.h"
 #include "../util/timer.h"
+#include "../util/alignedbuilder.h"
 #include <boost/static_assert.hpp>
 #undef assert
 #define assert MONGO_assert
@@ -33,6 +34,8 @@
 
 namespace mongo {
     using namespace mongoutils;
+
+    class AlignedBuilder;
 
     namespace dur {
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
@@ -66,7 +69,7 @@ namespace mongo {
 
             void open();
             void rotate();
-            void journal(const BufBuilder& b);
+            void journal(const AlignedBuilder& b);
 
             path getFilePathFor(int filenumber) const;
         };
@@ -170,10 +173,10 @@ namespace mongo {
 
         /** write to journal             
         */
-        void journal(const BufBuilder& b) {
+        void journal(const AlignedBuilder& b) {
             j.journal(b);
         }
-        void Journal::journal(const BufBuilder& b) {
+        void Journal::journal(const AlignedBuilder& b) {
             try {
                 /* todo: roll if too big */
                 if( lf == 0 )
