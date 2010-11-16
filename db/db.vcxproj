@@ -479,6 +479,7 @@
     <ClCompile Include="geo\haystack.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
+    <ClCompile Include="projection.cpp" />
     <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
     <ClCompile Include="repl\heartbeat.cpp" />
@@ -630,6 +631,7 @@
     <ClInclude Include="mongomutex.h" />
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="oplogreader.h" />
+    <ClInclude Include="projection.h" />
     <ClInclude Include="repl.h" />
     <ClInclude Include="replpair.h" />
     <ClInclude Include="repl\connections.h" />

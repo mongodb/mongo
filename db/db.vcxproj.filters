@@ -420,6 +420,7 @@
     <ClCompile Include="..\s\d_chunk_matcher.cpp">
       <Filter>sharding</Filter>
     </ClCompile>
+    <ClCompile Include="projection.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -797,6 +798,7 @@
     <ClInclude Include="dur_journal.h">
       <Filter>db\storage engine</Filter>
     </ClInclude>
+    <ClInclude Include="projection.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
