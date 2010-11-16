@@ -273,7 +273,7 @@ namespace mongo {
         BSONObjBuilder b( key.objsize() + _stringSize + 16 );
 
         BSONObjIterator i(key);
-        int n=0;
+        unsigned n=0;
         while ( i.more() ){
             assert( n < _include.size() );
             BSONElement e = i.next();
