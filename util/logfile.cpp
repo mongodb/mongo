@@ -77,7 +77,7 @@ namespace mongo {
             CloseHandle(_fd);
     }
 
-    void LogFile::synchronousAppend(void *buf, size_t len) { 
+    void LogFile::synchronousAppend(const void *buf, size_t len) { 
         assert(_fd);
         DWORD written;
         if( !WriteFile(_fd, buf, len, &written, NULL) ) { 
