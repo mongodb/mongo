@@ -592,21 +592,6 @@ namespace mongo {
         }
     }
 
-    class JniMessagingPort : public AbstractMessagingPort {
-    public:
-        JniMessagingPort(Message& _container) : container(_container) { }
-        void reply(Message& received, Message& response, MSGID) {
-            container = response;
-        }
-        void reply(Message& received, Message& response) {
-            container = response;
-        }
-        unsigned remotePort(){
-            return 1;
-        }
-        Message & container;
-    };
-    
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
         boost::filesystem::path path( usePath );
         for ( boost::filesystem::directory_iterator i( path );
