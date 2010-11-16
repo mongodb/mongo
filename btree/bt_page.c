@@ -159,12 +159,12 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	case WT_PAGE_COL_VAR:
 		__wt_bt_page_inmem_col_var(page);
 		break;
+	case WT_PAGE_DUP_LEAF:
+		ret = __wt_bt_page_inmem_dup_leaf(db, page);
+		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		ret = __wt_bt_page_inmem_row_int(db, page);
-		break;
-	case WT_PAGE_DUP_LEAF:
-		ret = __wt_bt_page_inmem_dup_leaf(db, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		ret = __wt_bt_page_inmem_row_leaf(db, page);
@@ -172,6 +172,170 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	WT_ILLEGAL_FORMAT(db);
 	}
 	return (ret);
+}
+
+/*
+ * __wt_bt_page_inmem_col_fix --
+ *	Build in-memory index for fixed-length column-store leaf pages.
+ */
+static void
+__wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
+{
+	WT_COL *cip;
+	WT_PAGE_HDR *hdr;
+	uint32_t i;
+	uint8_t *p;
+
+	hdr = page->hdr;
+	cip = page->u.icol;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains fixed-length objects.
+	 */
+	WT_FIX_FOREACH(db, page, p, i) {
+		cip->data = p;
+		++cip;
+	}
+
+	page->indx_count = page->records = hdr->u.entries;
+}
+
+/*
+ * __wt_bt_page_inmem_col_int --
+ *	Build in-memory index for column-store internal pages.
+ */
+static void
+__wt_bt_page_inmem_col_int(WT_PAGE *page)
+{
+	WT_COL *cip;
+	WT_OFF *off;
+	WT_PAGE_HDR *hdr;
+	uint64_t records;
+	uint32_t i;
+
+	hdr = page->hdr;
+	cip = page->u.icol;
+	records = 0;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains WT_OFF structures.
+	 */
+	WT_OFF_FOREACH(page, off, i) {
+		cip->data = off;
+		++cip;
+		records += WT_RECORDS(off);
+	}
+
+	page->indx_count = hdr->u.entries;
+	page->records = records;
+}
+
+/*
+ * __wt_bt_page_inmem_col_rcc --
+ *	Build in-memory index for repeat-compressed, fixed-length column-store
+ *	leaf pages.
+ */
+static void
+__wt_bt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
+{
+	WT_COL *cip;
+	WT_PAGE_HDR *hdr;
+	uint64_t records;
+	uint32_t i;
+	uint8_t *p;
+
+	hdr = page->hdr;
+	cip = page->u.icol;
+	records = 0;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains fixed-length objects.
+	 */
+	WT_RCC_REPEAT_FOREACH(db, page, p, i) {
+		records += WT_RCC_REPEAT_COUNT(p);
+		cip->data = p;
+		++cip;
+	}
+
+	page->indx_count = hdr->u.entries;
+	page->records = records;
+}
+
+/*
+ * __wt_bt_page_inmem_col_var --
+ *	Build in-memory index for variable-length, data-only leaf pages in
+ *	column-store trees.
+ */
+static void
+__wt_bt_page_inmem_col_var(WT_PAGE *page)
+{
+	WT_COL *cip;
+	WT_ITEM *item;
+	WT_PAGE_HDR *hdr;
+	uint32_t i;
+
+	hdr = page->hdr;
+	cip = page->u.icol;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains unsorted data items.  The data items are on-page
+	 * data (WT_ITEM_DATA), overflow (WT_ITEM_DATA_OVFL) or deleted
+	 * (WT_ITEM_DEL) items.
+	 */
+	WT_ITEM_FOREACH(page, item, i) {
+		cip->data = item;
+		++cip;
+	}
+
+	page->indx_count = page->records = hdr->u.entries;
+}
+
+/*
+ * __wt_bt_page_inmem_dup_leaf --
+ *	Build in-memory index for variable-length, data-only leaf pages in
+ *	duplicate trees.
+ */
+static int
+__wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
+{
+	WT_ROW *rip;
+	WT_ITEM *item;
+	WT_PAGE_HDR *hdr;
+	uint32_t i;
+
+	hdr = page->hdr;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains sorted data items.  The data items are on-page
+	 * (WT_ITEM_DATA_DUP) or overflow (WT_ITEM_DUP_OVFL) items.
+	 *
+	 * These data values are sorted, so we want to treat them as keys, and
+	 * we return them as on-page WT_ITEM values, so we want to tream them
+	 * as data.  Set both the WT_ROW key and data fields.
+	 */
+	rip = page->u.irow;
+	WT_ITEM_FOREACH(page, item, i) {
+		switch (WT_ITEM_TYPE(item)) {
+		case WT_ITEM_DATA_DUP:
+			WT_KEY_SET(rip, WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
+			break;
+		case WT_ITEM_DATA_DUP_OVFL:
+			WT_KEY_SET_PROCESS(rip, item);
+			break;
+		WT_ILLEGAL_FORMAT(db);
+		}
+		rip->data = item;
+		++rip;
+	}
+
+	page->indx_count = hdr->u.entries;
+	page->records = hdr->u.entries;
+	return (0);
 }
 
 /*
@@ -308,170 +472,6 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	page->indx_count = indx_count;
 	page->records = records;
 	return (0);
-}
-
-/*
- * __wt_bt_page_inmem_col_int --
- *	Build in-memory index for column-store internal pages.
- */
-static void
-__wt_bt_page_inmem_col_int(WT_PAGE *page)
-{
-	WT_COL *cip;
-	WT_OFF *off;
-	WT_PAGE_HDR *hdr;
-	uint64_t records;
-	uint32_t i;
-
-	hdr = page->hdr;
-	cip = page->u.icol;
-	records = 0;
-
-	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains WT_OFF structures.
-	 */
-	WT_OFF_FOREACH(page, off, i) {
-		cip->data = off;
-		++cip;
-		records += WT_RECORDS(off);
-	}
-
-	page->indx_count = hdr->u.entries;
-	page->records = records;
-}
-
-/*
- * __wt_bt_page_inmem_col_var --
- *	Build in-memory index for variable-length, data-only leaf pages in
- *	column-store trees.
- */
-static void
-__wt_bt_page_inmem_col_var(WT_PAGE *page)
-{
-	WT_COL *cip;
-	WT_ITEM *item;
-	WT_PAGE_HDR *hdr;
-	uint32_t i;
-
-	hdr = page->hdr;
-	cip = page->u.icol;
-
-	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains unsorted data items.  The data items are on-page
-	 * data (WT_ITEM_DATA), overflow (WT_ITEM_DATA_OVFL) or deleted
-	 * (WT_ITEM_DEL) items.
-	 */
-	WT_ITEM_FOREACH(page, item, i) {
-		cip->data = item;
-		++cip;
-	}
-
-	page->indx_count = page->records = hdr->u.entries;
-}
-
-/*
- * __wt_bt_page_inmem_dup_leaf --
- *	Build in-memory index for variable-length, data-only leaf pages in
- *	duplicate trees.
- */
-static int
-__wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
-{
-	WT_ROW *rip;
-	WT_ITEM *item;
-	WT_PAGE_HDR *hdr;
-	uint32_t i;
-
-	hdr = page->hdr;
-
-	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains sorted data items.  The data items are on-page
-	 * (WT_ITEM_DATA_DUP) or overflow (WT_ITEM_DUP_OVFL) items.
-	 *
-	 * These data values are sorted, so we want to treat them as keys, and
-	 * we return them as on-page WT_ITEM values, so we want to tream them
-	 * as data.  Set both the WT_ROW key and data fields.
-	 */
-	rip = page->u.irow;
-	WT_ITEM_FOREACH(page, item, i) {
-		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_DATA_DUP:
-			WT_KEY_SET(rip, WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
-			break;
-		case WT_ITEM_DATA_DUP_OVFL:
-			WT_KEY_SET_PROCESS(rip, item);
-			break;
-		WT_ILLEGAL_FORMAT(db);
-		}
-		rip->data = item;
-		++rip;
-	}
-
-	page->indx_count = hdr->u.entries;
-	page->records = hdr->u.entries;
-	return (0);
-}
-
-/*
- * __wt_bt_page_inmem_col_fix --
- *	Build in-memory index for fixed-length column-store leaf pages.
- */
-static void
-__wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
-{
-	WT_COL *cip;
-	WT_PAGE_HDR *hdr;
-	uint32_t i;
-	uint8_t *p;
-
-	hdr = page->hdr;
-	cip = page->u.icol;
-
-	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains fixed-length objects.
-	 */
-	WT_FIX_FOREACH(db, page, p, i) {
-		cip->data = p;
-		++cip;
-	}
-
-	page->indx_count = page->records = hdr->u.entries;
-}
-
-/*
- * __wt_bt_page_inmem_col_rcc --
- *	Build in-memory index for repeat-compressed, fixed-length column-store
- *	leaf pages.
- */
-static void
-__wt_bt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
-{
-	WT_COL *cip;
-	WT_PAGE_HDR *hdr;
-	uint64_t records;
-	uint32_t i;
-	uint8_t *p;
-
-	hdr = page->hdr;
-	cip = page->u.icol;
-	records = 0;
-
-	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains fixed-length objects.
-	 */
-	WT_RCC_REPEAT_FOREACH(db, page, p, i) {
-		records += WT_RCC_REPEAT_COUNT(p);
-		cip->data = p;
-		++cip;
-	}
-
-	page->indx_count = hdr->u.entries;
-	page->records = records;
 }
 
 /*
