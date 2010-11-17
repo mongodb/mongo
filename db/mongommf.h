@@ -73,13 +73,16 @@ namespace mongo {
         int fileSuffixNo() const { return _fileSuffixNo; }
         void* view_write() { return _view_write; }
 
+        bool& dirty() { return _dirty; }
+
     private:
         void *_view_write;
         void *_view_private;
         void *_view_readonly; // for _DEBUG build
+        bool _dirty; // we wrote to the private view
 
-        string _filePath;
-        int _fileSuffixNo;
+        string _filePath;   // e.g. "somepath/dbname"
+        int _fileSuffixNo;  // e.g. 3.  -1="ns"
         void setPath(string fn);
         bool finishOpening();
     };

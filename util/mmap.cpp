@@ -98,6 +98,13 @@ namespace mongo {
         --closingAllFiles;
     }
 
+    /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
+    /*static*/ void MongoFile::forEach( void (*p)(MongoFile*) ) { 
+        rwlock lk( mmmutex , false );
+        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+            p(*i);
+    }
+
     /*static*/ long long MongoFile::totalMappedLength(){
         unsigned long long total = 0;
         

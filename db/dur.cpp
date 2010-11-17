@@ -117,9 +117,6 @@ namespace mongo {
 
         /** caller handles locking */
         static bool PREPLOGBUFFER(AlignedBuilder& bb) { 
-            if( wi._writes.empty() )
-                return false;
-
             bb.reset();
 
             unsigned *lenInBlockHeader;
@@ -140,6 +137,7 @@ namespace mongo {
                         journalingFailure("view pointer cannot be resolved");
                     }
                     else {
+                        mmf->dirty() = true;
                         {
                             size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
                             i->w_ptr = ((char*)mmf->view_write()) + ofs;
@@ -188,26 +186,48 @@ namespace mongo {
             views.
 
             (2) todo should we do this using N threads?  would be quite easy
+
+            locking: in read lock when called
         */
         static void WRITETODATAFILES() { 
-            for( vector<WriteIntent>::iterator i = wi._writes.begin(); i != wi._writes.end(); i++ ) {
-                char *dst = (char *) (i->w_ptr);
-                memcpy(dst, i->p, i->len);
+            /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
+            for( int i = wi._writes.size() - 1; i >= 0; i-- ) {
+                WriteIntent& intent = wi._writes[i];
+                char *dst = (char *) (intent.w_ptr);
+                memcpy(dst, intent.p, intent.len);
             }
         }
 
+        /** we need to remap the private view periodically. otherwise it would become very large. 
+            locking: in read lock when called
+        */
+        static void remap(MongoFile *f) { 
+            MongoMMF *mmf = dynamic_cast<MongoMMF*>(f);
+            if( mmf && mmf->dirty() ) {
+                mmf->dirty() = false;
+                log() << "finish remap " << endl;
+            }
+        }
+        static void REMAPPRIVATEVIEW() { 
+            MongoFile::forEach( remap );
+        }
+
+        /** locking in read lock when called */
         static void _go(AlignedBuilder& bb) {
+            if( wi._writes.empty() )
+                return;
+
             PREPLOGBUFFER(bb);
 
             // todo: add double buffering so we can be (not even read locked) during WRITETOJOURNAL
             WRITETOJOURNAL(bb);
 
-            // write the wi entries to the data files
+            // write the noted write intent entries to the data files
             WRITETODATAFILES();
 
             wi.clear();
 
-            //REMAPPRIVATEVIEW();
+            REMAPPRIVATEVIEW();
         }
 
         static void go(AlignedBuilder& bb) {

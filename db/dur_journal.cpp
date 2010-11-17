@@ -170,7 +170,7 @@ namespace mongo {
                 }
             }
             catch(std::exception& e) { 
-                log() << "warning exception in Journal::rotate" << e.what() << endl;
+                log() << "warning exception opening journal file " << e.what() << endl;
             }
         }
 

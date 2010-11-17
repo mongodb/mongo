@@ -145,7 +145,7 @@ namespace mongo {
         return _view_private;
     }
 
-    MongoMMF::MongoMMF() {
+    MongoMMF::MongoMMF() : _dirty(false) {
         _view_write = _view_private = _view_readonly = 0; 
     }
 
