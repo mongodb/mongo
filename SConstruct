@@ -1224,6 +1224,7 @@ if windows:
     testEnv.Alias( "test" , "test.exe" )
 perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "gridFSTest" , [ "client/examples/gridFSTest.cpp" ] ) ]
 
 # --- sniffer ---
 mongosniff_built = False

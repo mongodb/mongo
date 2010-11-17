@@ -65,7 +65,7 @@ namespace mongo {
         _chunkSize = size;
     }
 
-    BSONObj GridFS::storeFile( const char* data , size_t length , const string& remoteName , const string& contentType){
+  BSONObj GridFS::storeFile( const char* data , size_t length , const string& remoteName , const string& contentType, bool removeOld){
         char const * const end = data + length;
 
         OID id;
@@ -82,11 +82,11 @@ namespace mongo {
             data += chunkLen;
         }
 
-        return insertFile(remoteName, id, length, contentType);
+        return insertFile(remoteName, id, length, contentType, removeOld);
     }
 
 
-    BSONObj GridFS::storeFile( const string& fileName , const string& remoteName , const string& contentType){
+  BSONObj GridFS::storeFile( const string& fileName , const string& remoteName , const string& contentType, bool removeOld){
         uassert( 10012 ,  "file doesn't exist" , fileName == "-" || boost::filesystem::exists( fileName ) );
 
         FILE* fd;
@@ -126,10 +126,10 @@ namespace mongo {
         if (fd != stdin)
             fclose( fd );
         
-        return insertFile((remoteName.empty() ? fileName : remoteName), id, length, contentType);
+        return insertFile((remoteName.empty() ? fileName : remoteName), id, length, contentType, removeOld);
     }
 
-    BSONObj GridFS::insertFile(const string& name, const OID& id, gridfs_offset length, const string& contentType){
+  BSONObj GridFS::insertFile(const string& name, const OID& id, gridfs_offset length, const string& contentType, bool removeOld){
 
         BSONObj res;
         if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id << "root" << _prefix ) , res ) )
@@ -154,18 +154,38 @@ namespace mongo {
 
         BSONObj ret = file.obj();
         _client.insert(_filesNS.c_str(), ret);
-
+	
+	if(removeOld) {
+	  BSONObj query = BSON("filename" << name << "_id" << NE << ret["_id"]);
+	  removeFiles(query);
+	}
         return ret;
     }
 
+
     void GridFS::removeFile( const string& fileName ){
-        auto_ptr<DBClientCursor> files = _client.query( _filesNS , BSON( "filename" << fileName ) );
+      auto_ptr<DBClientCursor> files = _client.query( _filesNS , BSON( "filename" << fileName ) );
         while (files->more()){
             BSONObj file = files->next();
             BSONElement id = file["_id"];
             _client.remove( _filesNS.c_str() , BSON( "_id" << id ) );
             _client.remove( _chunksNS.c_str() , BSON( "files_id" << id ) );
         }
+    }
+
+    int GridFS::removeFiles( BSONObj query ){
+        int numRemoved = 0;
+        query = BSON("query" << query);
+        auto_ptr<DBClientCursor> files = _client.query( _filesNS , query);
+        while (files->more()){
+            BSONObj file = files->next();
+            BSONElement id = file["_id"];
+            _client.remove( _filesNS.c_str() , BSON( "_id" << id ) );
+            _client.remove( _chunksNS.c_str() , BSON( "files_id" << id ) );
+	    numRemoved++;
+        }
+
+	return numRemoved;
     }
 
     GridFile::GridFile( GridFS * grid , BSONObj obj ){

@@ -73,9 +73,11 @@ namespace mongo {
          *                   (default is to use fileName parameter)
          * @param contentType optional MIME type for this object.
          *                    (default is to omit)
+	 * @param removeOld optional boolean flag to remove old entries
+	 *                  that share this filename (default is false)
          * @return the file object
          */
-        BSONObj storeFile( const string& fileName , const string& remoteName="" , const string& contentType="");
+        BSONObj storeFile( const string& fileName , const string& remoteName="" , const string& contentType="", bool removeOld=false );
 
         /**
          * puts the file represented by data into the db
@@ -85,15 +87,25 @@ namespace mongo {
          *                   (default is to use fileName parameter)
          * @param contentType optional MIME type for this object.
          *                    (default is to omit)
+	 * @param removeOld optional boolean flag to remove old entries
+	 *                  that share this filename (default is false)
          * @return the file object
          */
-        BSONObj storeFile( const char* data , size_t length , const string& remoteName , const string& contentType="");
+        BSONObj storeFile( const char* data , size_t length , const string& remoteName , const string& contentType="", bool removeOld=false );
         /**
          * removes file referenced by fileName from the db
          * @param fileName filename (in GridFS) of the file to remove
          * @return the file object
          */
         void removeFile( const string& fileName );
+
+        /**
+         * removes files matching the query
+         * @param query a BSONObj query to match files
+	 * @return number of files removed
+         */
+        int removeFiles( BSONObj query );
+
 
         /**
          * returns a file object matching the query
@@ -124,7 +136,7 @@ namespace mongo {
         unsigned int _chunkSize;
 
         // insert fileobject. All chunks must be in DB.
-        BSONObj insertFile(const string& name, const OID& id, gridfs_offset length, const string& contentType);
+        BSONObj insertFile(const string& name, const OID& id, gridfs_offset length, const string& contentType, bool removeOld);
 
         friend class GridFile;
     };

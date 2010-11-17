@@ -50,7 +50,7 @@ public:
     virtual void printExtraHelp( ostream & out ){
         out << "usage: " << _name << " [options] command [gridfs filename]" << endl;
         out << "command:" << endl;
-        out << "  one of (list|search|put|get)" << endl;
+        out << "  one of (list|search|put|get|delete)" << endl;
         out << "  list - list all files.  'gridfs filename' is an optional prefix " << endl;
         out << "         which listed filenames must begin with." << endl;
         out << "  search - search all files. 'gridfs filename' is a substring " << endl;
@@ -124,10 +124,14 @@ public:
         if ( cmd == "put" ){
             const string& infile = getParam("local", filename);
             const string& type = getParam("type", "");
+	    bool removeOld = false;
+	    if(hasParam("replace"))
+	      removeOld = true;
 
-            BSONObj file = g.storeFile(infile, filename, type);
+            BSONObj file = g.storeFile(infile, filename, type, removeOld);
             cout << "added file: " << file << endl;
 
+	    /*
             if (hasParam("replace")){
                 auto_ptr<DBClientCursor> cursor = conn().query(_db+".fs.files", BSON("filename" << filename << "_id" << NE << file["_id"] ));
                 while (cursor->more()){
@@ -138,7 +142,7 @@ public:
                 }
 
             }
-
+	    */
             conn().getLastError();
             cout << "done!" << endl;
             return 0;
