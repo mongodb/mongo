@@ -594,22 +594,35 @@ DB.prototype.getReplicationInfo = function() {
     var db = this.getSisterDB("local");
 
     var result = { };
-    var ol = db.system.namespaces.findOne({name:"local.oplog.$main"});
-    if( ol && ol.options ) {
-	result.logSizeMB = ol.options.size / ( 1024 * 1024 );
-    } else {
-	result.errmsg  = "local.oplog.$main, or its options, not found in system.namespaces collection (not --master?)";
-	return result;
+    var oplog;
+    if (db.system.namespaces.findOne({name:"local.oplog.rs"}) != null) {
+        oplog = 'oplog.rs';
     }
+    else if (db.system.namespaces.findOne({name:"local.oplog.$main"}) != null) {
+        oplog = 'oplog.$main';
+    }
+    else {
+        result.errmsg = "neither master/slave nor replica set replication detected";
+        return result;
+    }
+    
+    var ol_entry = db.system.namespaces.findOne({name:"local."+oplog});
+    if( ol_entry && ol_entry.options ) {
+	result.logSizeMB = ol_entry.options.size / ( 1024 * 1024 );
+    } else {
+        result.errmsg  = "local."+oplog+", or its options, not found in system.namespaces collection";
+        return result;
+    }
+    ol = db.getCollection(oplog);
 
-    result.usedMB = db.oplog.$main.stats().size / ( 1024 * 1024 );
+    result.usedMB = ol.stats().size / ( 1024 * 1024 );
     result.usedMB = Math.ceil( result.usedMB * 100 ) / 100;
     
-    var firstc = db.oplog.$main.find().sort({$natural:1}).limit(1);
-    var lastc = db.oplog.$main.find().sort({$natural:-1}).limit(1);
+    var firstc = ol.find().sort({$natural:1}).limit(1);
+    var lastc = ol.find().sort({$natural:-1}).limit(1);
     if( !firstc.hasNext() || !lastc.hasNext() ) { 
 	result.errmsg = "objects not found in local.oplog.$main -- is this a new and empty db instance?";
-	result.oplogMainRowCount = db.oplog.$main.count();
+	result.oplogMainRowCount = ol.count();
 	return result;
     }
 
@@ -634,7 +647,8 @@ DB.prototype.getReplicationInfo = function() {
     }
 
     return result;
-}
+};
+
 DB.prototype.printReplicationInfo = function() {
     var result = this.getReplicationInfo();
     if( result.errmsg ) { 
@@ -649,27 +663,53 @@ DB.prototype.printReplicationInfo = function() {
 }
 
 DB.prototype.printSlaveReplicationInfo = function() {
+    function getReplLag(st) {
+        var now = new Date();
+        print("\t syncedTo: " + st.toString() );
+        var ago = (now-st)/1000;
+        var hrs = Math.round(ago/36)/100;
+        print("\t\t = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+    };
+    
     function g(x) {
         assert( x , "how could this be null (printSlaveReplicationInfo gx)" )
         print("source:   " + x.host);
         if ( x.syncedTo ){
             var st = new Date( DB.tsToSeconds( x.syncedTo ) * 1000 );
-            var now = new Date();
-            print("\t syncedTo: " + st.toString() );
-            var ago = (now-st)/1000;
-            var hrs = Math.round(ago/36)/100;
-            print("\t\t = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+            getReplLag(st);
         }
         else {
             print( "\t doing initial sync" );
         }
-    }
+    };
+
+    function r(x) {
+        assert( x , "how could this be null (printSlaveReplicationInfo rx)" );
+        if ( x.state == 1 ) {
+            return;
+        }
+        
+        print("source:   " + x.name);
+        if ( x.optime ) {
+            getReplLag(x.optimeDate);
+        }
+        else {
+            print( "\t no replication info, yet.  State: " + x.stateStr );
+        }
+    };
+    
     var L = this.getSisterDB("local");
-    if( L.sources.count() == 0 ) { 
+    if( L.sources.count() != 0 ) { 
+        L.sources.find().forEach(g);
+    }
+    else if (L.system.replset.count() != 0) {
+        var status = this.adminCommand({'replSetGetStatus' : 1});
+        status.members.forEach(r);
+    }
+    else {
         print("local.sources is empty; is this db a --slave?");
         return;
     }
-    L.sources.find().forEach(g);
 }
 
 DB.prototype.serverBuildInfo = function(){
