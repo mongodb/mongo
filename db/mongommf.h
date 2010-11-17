@@ -71,6 +71,7 @@ namespace mongo {
         */
         string filePath() const { return _filePath; }
         int fileSuffixNo() const { return _fileSuffixNo; }
+        void* view_write() { return _view_write; }
 
     private:
         void *_view_write;
