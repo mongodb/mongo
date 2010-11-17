@@ -11,6 +11,7 @@ struct WIREDTIGER_CONNECTION;	  typedef struct WIREDTIGER_CONNECTION WIREDTIGER_
 struct WIREDTIGER_COLUMN_INFO;	  typedef struct WIREDTIGER_COLUMN_INFO WIREDTIGER_COLUMN_INFO;
 struct WIREDTIGER_CURSOR;	  typedef struct WIREDTIGER_CURSOR WIREDTIGER_CURSOR;
 struct WIREDTIGER_CURSOR_FACTORY; typedef struct WIREDTIGER_CURSOR_FACTORY WIREDTIGER_CURSOR_FACTORY;
+struct WIREDTIGER_INDEX_INFO;	  typedef struct WIREDTIGER_INDEX_INFO WIREDTIGER_INDEX_INFO;
 struct WIREDTIGER_ITEM;		  typedef struct WIREDTIGER_ITEM WIREDTIGER_ITEM;
 struct WIREDTIGER_SCHEMA;	  typedef struct WIREDTIGER_SCHEMA WIREDTIGER_SCHEMA;
 struct WIREDTIGER_SESSION;	  typedef struct WIREDTIGER_SESSION WIREDTIGER_SESSION;
@@ -117,30 +118,6 @@ struct WIREDTIGER_CURSOR {
 };
 
 /*!
- * Applications can extend WTDS by providing new implementation of the WIREDTIGER_CURSOR
- * interface.  This is done by implementing the WIREDTIGER_CURSOR_FACTORY interface, then
- * calling WIREDTIGER_CONNECTION#add_cursor_factory.
- *
- * Thread safety: WTDS may invoke methods on the WIREDTIGER_CURSOR_FACTORY interface from
- * multiple threads concurrently.  It is the responsibility of the implementation
- * to protect any shared data.
- */
-struct WIREDTIGER_CURSOR_FACTORY {
-	/*! Callback to determine how much space to allocate for a cursor.
-	 *
-	 * If the callback is NULL, no additional space is allocated in the
-	 * WIREDTIGER_CURSOR implementation.
-	 */
-	int (*cursor_size)(WIREDTIGER_CURSOR_FACTORY *factory, const char *obj, size_t *sizep);
-
-	/*! Callback to initialize a cursor. */
-	int (*init_cursor)(WIREDTIGER_CURSOR_FACTORY *factory, WIREDTIGER_SESSION *session, const char *obj, WIREDTIGER_CURSOR *cursor);
-
-	/*! Callback to duplicate a cursor. */
-	int (*dup_cursor)(WIREDTIGER_CURSOR_FACTORY *factory, WIREDTIGER_SESSION *session, WIREDTIGER_CURSOR *old_cursor, WIREDTIGER_CURSOR *new_cursor);
-};
-
-/*!
  * All data operations are performed in the context of a WIREDTIGER_SESSION.  This
  * encapsulates the thread and transactional context of the operation.
  *
@@ -191,7 +168,7 @@ struct WIREDTIGER_SESSION {
 	int __F(open_cursor)(WIREDTIGER_SESSION *session, const char *uri, const char *config, WIREDTIGER_CURSOR **cursorp);
 
 	/*! Duplicate a cursor. */
-	int __F(dup_dursor)(WIREDTIGER_SESSION *, WIREDTIGER_CURSOR *cursor, const char *config, WIREDTIGER_CURSOR *dupp);
+	int __F(dup_cursor)(WIREDTIGER_SESSION *, WIREDTIGER_CURSOR *cursor, const char *config, WIREDTIGER_CURSOR *dupp);
 	/*! @} */
 
 	/*! \name Table operations
@@ -262,44 +239,6 @@ struct WIREDTIGER_SESSION {
 	/*! @} */
 };
 
-
-/*!
- * Description of a column returned by the WIREDTIGER_SCHEMA.get_column_info method.
- */
-struct WIREDTIGER_COLUMN_INFO {
-	const char *name;	/*! The name of the column. */
-	int index;		/*! Put this column into an index. */
-
-	/*! Callback to compare column keys. */
-	int (*cmp)(WIREDTIGER_SESSION *session, WIREDTIGER_SCHEMA *schema, const WIREDTIGER_ITEM *key1, const WIREDTIGER_ITEM *key2);
-
-	/*! Callback to extra one or more column keys. */
-	int (*get_key)(WIREDTIGER_SESSION *session, WIREDTIGER_SCHEMA *schema, const WIREDTIGER_ITEM *key, const WIREDTIGER_ITEM *value, WIREDTIGER_ITEM *column_key, int *more);
-};
-
-/*!
- * Applications implement the WIREDTIGER_SCHEMA interface to manage tables with columns.
- */
-struct WIREDTIGER_SCHEMA {
-	const char *keyfmt;
-	const char *datafmt;
-
-	/*! The number of columns in a table (zero for pure row-oriented tables). */
-	int num_columns;
-
-	/*! Description of the columns in a table, an array of WIREDTIGER_SCHEMA::num_columns elements. */
-	WIREDTIGER_COLUMN_INFO *column_info;
-
-	/*! Space to allocate for this schema in every WIREDTIGER_SESSION handle */
-	size_t cookie_size;
-
-	/*! Callback to compare keys in a table. */
-	int (*cmp)(WIREDTIGER_SESSION *session, WIREDTIGER_SCHEMA *schema, const WIREDTIGER_ITEM *key1, const WIREDTIGER_ITEM *key2);
-
-	/*! Callback to compare duplicate values in a table. */
-	int (*dup_cmp)(WIREDTIGER_SESSION *session, WIREDTIGER_SCHEMA *schema, const WIREDTIGER_ITEM *value1, const WIREDTIGER_ITEM *value2);
-};
-
 /*!
  * A connection to a WTDS database.  The datastore may be opened within the
  * same address space as the caller or accessed over a socket or named pipe.
@@ -327,6 +266,82 @@ struct WIREDTIGER_CONNECTION {
 
 	/*! Register a new schema. */
 	int __F(add_schema)(WIREDTIGER_CONNECTION *connection, const char *name, WIREDTIGER_SCHEMA *schema, const char *config);
+};
+
+/*!
+ * Applications can extend WTDS by providing new implementation of the WIREDTIGER_CURSOR
+ * interface.  This is done by implementing the WIREDTIGER_CURSOR_FACTORY interface, then
+ * calling WIREDTIGER_CONNECTION#add_cursor_factory.
+ *
+ * Thread safety: WTDS may invoke methods on the WIREDTIGER_CURSOR_FACTORY interface from
+ * multiple threads concurrently.  It is the responsibility of the implementation
+ * to protect any shared data.
+ */
+struct WIREDTIGER_CURSOR_FACTORY {
+	/*! Callback to determine how much space to allocate for a cursor.
+	 *
+	 * If the callback is NULL, no additional space is allocated in the
+	 * WIREDTIGER_CURSOR implementation.
+	 */
+	int (*cursor_size)(WIREDTIGER_CURSOR_FACTORY *factory, const char *obj, size_t *sizep);
+
+	/*! Callback to initialize a cursor. */
+	int (*init_cursor)(WIREDTIGER_CURSOR_FACTORY *factory, WIREDTIGER_SESSION *session, const char *obj, WIREDTIGER_CURSOR *cursor);
+
+	/*! Callback to duplicate a cursor. */
+	int (*dup_cursor)(WIREDTIGER_CURSOR_FACTORY *factory, WIREDTIGER_SESSION *session, WIREDTIGER_CURSOR *old_cursor, WIREDTIGER_CURSOR *new_cursor);
+};
+
+/*!
+ * Description of a column returned in WIREDTIGER_SCHEMA::column_info.
+ */
+struct WIREDTIGER_COLUMN_INFO {
+	const char *name;	/*!< The name of the column. */
+	int in_row;		/*!< Is this column stored in the row store? */
+
+	/*! Callback to compare column keys. */
+	int (*cmp)(WIREDTIGER_SESSION *session, WIREDTIGER_SCHEMA *schema, const WIREDTIGER_ITEM *key1, const WIREDTIGER_ITEM *key2);
+
+	/*! Callback to extract one or more column keys. */
+	int (*get_key)(WIREDTIGER_SESSION *session, WIREDTIGER_SCHEMA *schema, const WIREDTIGER_ITEM *key, const WIREDTIGER_ITEM *value, WIREDTIGER_ITEM *column_key, int *more);
+};
+
+/*!
+ * Description of an index in WIREDTIGER_SCHEMA::index_info.
+ */
+struct WIREDTIGER_INDEX_INFO {
+	const char *name;	/*!< The name of the index. */
+	const char **columns;	/*!< The columns making up the index. */
+	int num_columns;	/*!< The number of columns. */
+};
+
+/*!
+ * Applications implement the WIREDTIGER_SCHEMA interface to manage tables containing structured data.
+ */
+struct WIREDTIGER_SCHEMA {
+	const char *keyfmt;
+	const char *datafmt;
+
+	/*! Description of the columns in a table, an array of WIREDTIGER_SCHEMA::num_columns elements. */
+	WIREDTIGER_COLUMN_INFO *column_info;
+
+	/*! The number of columns in a table (zero for pure row-oriented tables). */
+	int num_columns;
+
+	/*! Description of the indices for a table, an array of WIREDTIGER_SCHEMA::num_indices elements. */
+	WIREDTIGER_INDEX_INFO *index_info;
+
+	/*! The number of indices for a table (zero for pure row-oriented tables). */
+	int num_indices;
+
+	/*! Space to allocate for this schema in every WIREDTIGER_SESSION handle */
+	size_t cookie_size;
+
+	/*! Callback to compare keys in a table. */
+	int (*cmp)(WIREDTIGER_SESSION *session, WIREDTIGER_SCHEMA *schema, const WIREDTIGER_ITEM *key1, const WIREDTIGER_ITEM *key2);
+
+	/*! Callback to compare duplicate values in a table. */
+	int (*dup_cmp)(WIREDTIGER_SESSION *session, WIREDTIGER_SCHEMA *schema, const WIREDTIGER_ITEM *value1, const WIREDTIGER_ITEM *value2);
 };
 
 /*! Open a connection to a database. */

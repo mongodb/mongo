@@ -1,0 +1,32 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \section rowscolums Storing data in rows and columns
+ *
+ * \subsection intro Introduction
+ *
+ * Lifted from http://en.wikipedia.org/wiki/Column-oriented_DBMS.
+ *
+A database program must show its data as two-dimensional tables, of columns and rows, but store it as one-dimensional strings. For example, a database might have this table.
+
+<table>
+<tr><th>EmpId</th><th>Lastname</th><th>Firstname</th><th>Salary</th></tr>
+<tr><td>1</td><td>Smith</td><td>Joe</td><td>40000</td></tr>
+<tr><td>2</td><td>Jones</td><td>Mary</td><td>50000</td></tr>
+<tr><td>3</td><td>Johnson</td><td>Cathy</td><td>44000</td></tr>
+</table>
+
+This simple table includes an employee identifier (EmpId), name fields (Lastname and Firstname) and a salary (Salary).
+
+A row-oriented database serializes all of the values in a row together, then the values in the next row, and so on.
+
+      1,Smith,Joe,40000;
+      2,Jones,Mary,50000;
+      3,Johnson,Cathy,44000;
+A column-oriented database serializes all of the values of a column together, then the values of the next column, and so on.
+
+      1,2,3;
+      Smith,Jones,Johnson;
+      Joe,Mary,Cathy;
+      40000,50000,44000;
+ * 
+ */

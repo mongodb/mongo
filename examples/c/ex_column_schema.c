@@ -8,22 +8,31 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ex_column.h"
+#include <wiredtiger.h>
 
 static WIREDTIGER_COLUMN_INFO pop_columns[] = {
-	{ "country", NULL, NULL },
-	{ "year", NULL, NULL },
-	{ "population", NULL, NULL }
+	{ "country", 0, NULL, NULL },
+	{ "year", 0, NULL, NULL },
+	{ "population", 1, NULL, NULL }
+};
+
+static const char *country_year_cols[] = { "country", "year" };
+static WIREDTIGER_INDEX_INFO pop_indices[] = {
+	{ "country_year",  country_year_cols,
+	    sizeof(country_year_cols) / sizeof(country_year_cols[0]) }
 };
 
 static WIREDTIGER_SCHEMA pop_schema = {
 	"r",		/* Format string for keys (recno). */
 	"5sHQ",		/*
 			 * Format string for data items:
-			 * (5-byte string, short, quad.
+			 * (5-byte string, short, quad).
+			 * See ::wiredtiger_struct_pack
 			 */
-	sizeof(pop_columns) / sizeof(pop_columns[0]), /* Number of columns. */
 	pop_columns,	/* Column descriptions. */
+	sizeof(pop_columns) / sizeof(pop_columns[0]), /* Number of columns. */
+	pop_indices,	/* Index descriptions. */
+	sizeof(pop_indices) / sizeof(pop_indices[0]), /* Number of columns. */
 	0,		/* Session cookie size. */
 	NULL,		/* Key comparator. */
 	NULL,		/* Duplicate comparator. */

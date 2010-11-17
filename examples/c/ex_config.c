@@ -8,9 +8,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <wt/wtds.h>
+#include <wiredtiger.h>
 
-const char *home = "WIREDTIGER_TEST";
+const char *home = "WT_TEST";
 
 int main()
 {

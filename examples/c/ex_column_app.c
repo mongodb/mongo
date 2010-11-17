@@ -8,9 +8,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ex_column.h"
+#include <inttypes.h>
+#include <wiredtiger.h>
 
-const char *home = "WIREDTIGER_TEST";
+typedef struct {
+	char country[5];
+	uint16_t year;
+	uint64_t population;
+} POP_RECORD;
 
 POP_RECORD pop_data[] = {
 	{ "USA", 1980, 226542250 },
@@ -19,6 +24,8 @@ POP_RECORD pop_data[] = {
 	{ "CAN", 2008, 33311400 },
 	{ "AU", 2008, 21431800 }
 };
+
+const char *home = "WT_TEST";
 
 int main()
 {
@@ -72,4 +79,3 @@ int main()
 
 	return (ret);
 }
-
