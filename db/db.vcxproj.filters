@@ -421,6 +421,9 @@
       <Filter>sharding</Filter>
     </ClCompile>
     <ClCompile Include="projection.cpp" />
+    <ClCompile Include="..\util\logfile.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -799,6 +802,9 @@
       <Filter>db\storage engine</Filter>
     </ClInclude>
     <ClInclude Include="projection.h" />
+    <ClInclude Include="..\util\logfile.h">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
