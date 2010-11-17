@@ -178,7 +178,7 @@ namespace mongo {
     void ReplSetImpl::_getTargets(list<Target>& L, int& configVersion) {
         configVersion = config().version;
         for( Member *m = head(); m; m=m->next() )
-            if( m->hbinfo().up() )
+            if( m->hbinfo().maybeUp() )
                 L.push_back( Target(m->fullName()) );
     }
 
