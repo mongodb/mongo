@@ -209,6 +209,12 @@ namespace mongo {
                "cfgver" << rs._cfg->version );
         list<Target> L;
         int ver;
+        /* the following queries arbiters, even though they are never fresh.  wonder if that makes sense. 
+           it doesn't, but it could, if they "know" what freshness it one day.  so consider removing 
+           arbiters from getTargets() here.  although getTargets is used elsewhere for elections; there 
+           arbiters are certainly targets - so a "includeArbs" bool would be necessary if we want to make 
+           not fetching them herein happen.
+           */
         rs.getTargets(L, ver);
         multiCommand(cmd, L);
         int nok = 0;
