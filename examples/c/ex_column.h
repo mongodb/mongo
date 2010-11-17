@@ -9,6 +9,6 @@
 
 typedef struct {
 	char country[5];
-	int16_t year;
-	int64_t population;
+	uint16_t year;
+	uint64_t population;
 } POP_RECORD;

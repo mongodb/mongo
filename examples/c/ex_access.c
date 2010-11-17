@@ -9,35 +9,37 @@
 
 #include <wt/wtds.h>
 
-const char *home = "WT_TEST";
+const char *home = "WIREDTIGER_TEST";
 
 int main()
 {
 	int ret;
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	WT_CURSOR *cursor;
-	WT_ITEM key, value;
+	WIREDTIGER_CONNECTION *conn;
+	WIREDTIGER_SESSION *session;
+	WIREDTIGER_CURSOR *cursor;
+	const char *key, *value;
 
-	if ((ret = wt_open(home, "create", &conn)) != 0 ||
+	if ((ret = wiredtiger_open(home, "create", &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, &session)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wt_strerror(ret));
+		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
-	/* The config string is only needed if the table might not exist. */
-	ret = session->open_cursor(session, "table:access",
-	    "create,keytype=string,valuetype=string", &cursor);
+	if (conn->is_new)
+		session->create_table(session, "access",
+		    "keystruct=s,valuestruct=s");
 
-	key.data = (void *)"1";
-	value.data = (void *)"one";
-	ret = cursor->insert(cursor, &key, &value);
+	ret = session->open_cursor(session, "table:access", NULL, &cursor);
 
-	for (ret = cursor->get(cursor, &key, &value, WT_FIRST);
-	    ret == 0;
-	    ret = cursor->get(cursor, &key, &value, WT_NEXT)) {
-		printf("Got record: %s : %s\n",
-		    (const char *)key.data, (const char *)value.data);
+	cursor->set_key(cursor, "1");
+	cursor->set_value(cursor, "one");
+	ret = cursor->insert(cursor);
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		cursor->get_key(cursor, &key);
+		cursor->get_value(cursor, &value);
+
+		printf("Got record: %s : %s\n", key, value);
 	}
 
 	ret = conn->close(conn, NULL);

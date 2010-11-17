@@ -183,10 +183,12 @@ body {
 }
 
 div.contents {
+	/*
 	background-image: url(../images/LogoFace-watermark.png);
 	background-repeat: no-repeat;
 	background-attachment: fixed;
 	background-position: center top; 
+	*/
 
 	margin-top: 10px;
 	margin-left: 10px;
@@ -426,7 +428,7 @@ table.memberdecls {
         -webkit-border-top-left-radius: 8px;
         background-image:url('nav_f.png');
         background-repeat:repeat-x;
-        background-color: #E2E8F2;
+        background-color: #EEE7DD;
 
 }
 

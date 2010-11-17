@@ -1,14 +1,14 @@
-CC = gcc -W -Wall -Wno-unused -I../../include -x c++
-OBJS = ex_access.o ex_config.o ex_hello.o ex_stat.o \
+CC = gcc -W -Wall -Wno-unused -I../../include # -x c++
+OBJS = ex_access.o ex_config.o ex_hello.o ex_sequence.o ex_stat.o \
        ex_column_app.o ex_column_schema.o \
-       ex_columnmod_app.o ex_columnmod_schema.o
+       ex_columnmod_app.o ex_columnmod_schema.o \
 
 all: $(OBJS)
 
 clean:
 	rm -f $(OBJS)
 
-.c.o:
+%.o:	%.c ../../include/wt/wtds.h
 	$(CC) -o $@ -c $<
 
 ex_columnmod_app.o:	ex_column_app.c

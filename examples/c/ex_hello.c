@@ -9,30 +9,30 @@
 
 #include <wt/wtds.h>
 
-const char *home = "WT_TEST";
+const char *home = "WIREDTIGER_TEST";
 
 int main()
 {
 	int ret;
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
+	WIREDTIGER_CONNECTION *conn;
+	WIREDTIGER_SESSION *session;
 
 	/* Open a connection to the database, creating it if necessary. */
-	if ((ret = wt_open(home, "create", &conn)) != 0)
+	if ((ret = wiredtiger_open(home, "create", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wt_strerror(ret));
+		    home, wiredtiger_strerror(ret));
 
 	/* Open a session for the current thread's work. */
 	if ((ret = conn->open_session(conn, NULL, &session)) != 0)
 		fprintf(stderr, "Error opening a session on %s: %s\n",
-		    home, wt_strerror(ret));
+		    home, wiredtiger_strerror(ret));
 
 	/* Do some work... */
 
 	/* Note: closing the connection implicitly closes open session(s). */
 	if ((ret = conn->close(conn, NULL)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wt_strerror(ret));
+		    home, wiredtiger_strerror(ret));
 
 	return (ret);
 }
