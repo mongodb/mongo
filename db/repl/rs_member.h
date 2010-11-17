@@ -80,7 +80,7 @@ namespace mongo {
         bool up() const { return health > 0; }
 
         /** health is set to -1 on startup.  that means we haven't even checked yet.  0 means we checked and it failed. */
-        bool maybeUp() const { return health >= 0; }
+        bool maybeUp() const { return health != 0; }
 
         long long timeDown() const; // ms
 
