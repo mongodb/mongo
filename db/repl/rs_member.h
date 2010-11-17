@@ -67,7 +67,6 @@ namespace mongo {
     public:
         HeartbeatInfo() : _id(0xffffffff),hbstate(MemberState::RS_UNKNOWN),health(-1.0),downSince(0),skew(INT_MIN) { }
         HeartbeatInfo(unsigned id);
-        bool up() const { return health > 0; }
         unsigned id() const { return _id; }
         MemberState hbstate;
         double health;
@@ -77,6 +76,11 @@ namespace mongo {
         string lastHeartbeatMsg;
         OpTime opTime;
         int skew;
+
+        bool up() const { return health > 0; }
+
+        /** health is set to -1 on startup.  that means we haven't even checked yet.  0 means we checked and it failed. */
+        bool maybeUp() const { return health >= 0; }
 
         long long timeDown() const; // ms
 
