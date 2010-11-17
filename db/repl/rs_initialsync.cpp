@@ -148,7 +148,7 @@ namespace mongo {
                 name = (char*)sync["name"].valuestr();
             }
             if (sync.hasElement("_id")) {
-                id = sync["_id"].Number();
+                id = (int)sync["_id"].Number();
             }
             if (sync.hasElement("optime")) {
                 isOpTime = true;
