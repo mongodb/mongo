@@ -503,7 +503,7 @@ namespace mongo {
             
             responseCode = 200;
             
-            string j = result.done().jsonString(JS, text );
+            string j = result.done().jsonString(Strict, text );
             responseMsg = j;
             
             if( text ){

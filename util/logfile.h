@@ -34,7 +34,7 @@ namespace mongo {
             throws UserAssertion on an i/o error
             note direct i/o may have alignment requirements
         */
-        void synchronousAppend(void *buf, size_t len);
+        void synchronousAppend(const void *buf, size_t len);
 
     private:
 #if defined(_WIN32)

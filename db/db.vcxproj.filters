@@ -420,6 +420,13 @@
     <ClCompile Include="..\s\d_chunk_matcher.cpp">
       <Filter>sharding</Filter>
     </ClCompile>
+    <ClCompile Include="projection.cpp" />
+    <ClCompile Include="..\util\logfile.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="dur_recover.cpp">
+      <Filter>db\storage engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -796,6 +803,10 @@
     </ClInclude>
     <ClInclude Include="dur_journal.h">
       <Filter>db\storage engine</Filter>
+    </ClInclude>
+    <ClInclude Include="projection.h" />
+    <ClInclude Include="..\util\logfile.h">
+      <Filter>util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

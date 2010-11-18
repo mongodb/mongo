@@ -141,7 +141,7 @@ namespace mongo {
     class mutex : boost::noncopyable {
     public:
 #if defined(_DEBUG)
-        const char *_name;
+        const char * const _name;
 #endif
 
 #if defined(_DEBUG)
@@ -151,7 +151,7 @@ namespace mongo {
         mutex(const char *) 
 #endif
         { 
-            _m = new boost::mutex(); 
+            _m = new boost::timed_mutex(); 
             IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
         }
         ~mutex() {
@@ -160,6 +160,28 @@ namespace mongo {
                 delete _m;
             }
         }
+
+    private:
+        void unlock() { _m->unlock(); }
+        bool lock_try( int millis = 0 ) {
+            boost::system_time until = boost::get_system_time();
+            until += boost::posix_time::milliseconds(millis);
+            return _m->timed_lock(until);
+        }
+
+    public:
+
+        class try_lock : boost::noncopyable {
+            mongo::mutex& _m;
+        public:
+            const bool ok;
+            try_lock(mongo::mutex &m, int millis = 0) : _m(m), ok(m.lock_try(millis)) { }
+            ~try_lock() { 
+                if( ok ) 
+                    _m.unlock();
+            }
+        };
+
         class scoped_lock : boost::noncopyable {
 #if defined(_DEBUG)
             mongo::mutex *mut;
@@ -176,13 +198,13 @@ namespace mongo {
                 mutexDebugger.leaving(mut->_name);
 #endif
             }
-            boost::mutex::scoped_lock &boost() { return _l; }
+            boost::timed_mutex::scoped_lock &boost() { return _l; }
         private:
-            boost::mutex::scoped_lock _l;
+            boost::timed_mutex::scoped_lock _l;
         };
     private:
-        boost::mutex &boost() { return *_m; }
-        boost::mutex *_m;
+        boost::timed_mutex &boost() { return *_m; }
+        boost::timed_mutex *_m;
     };
     
     typedef mutex::scoped_lock scoped_lock;

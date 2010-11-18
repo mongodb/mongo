@@ -47,21 +47,19 @@
 #include "dur_journal.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/timer.h"
+#include "../util/alignedbuilder.h"
 
 namespace mongo { 
-
-    void dbunlocking_write() {
-        // pending ...
-    }
 
     namespace dur { 
 
         //MongoMMF* pointerToMMF(void *p, size_t& ofs);
 
-        struct WriteIntent { 
-            WriteIntent() : p(0) { }
-            WriteIntent(void *a, unsigned b) : p(a), len(b) { }
-            void *p; // where we will write
+        struct WriteIntent /* copyable */ { 
+            WriteIntent() : w_ptr(0), p(0) { }
+            WriteIntent(void *a, unsigned b) : w_ptr(0), p(a), len(b) { }
+            void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap
+            void *p;      // intent to write at p
             unsigned len; // up to this len
         };
 
@@ -90,30 +88,35 @@ namespace mongo {
             }
         };
 
-        static Already<127> alreadyNoted;
-
         /* our record of pending/uncommitted write intents */
-        static vector<WriteIntent> writes;
+        struct Writes {
+            Already<127> _alreadyNoted;
+            vector<WriteIntent> _writes;
+
+            void clear() { 
+                _alreadyNoted.clear();
+                _writes.clear();
+            }
+        };
+
+        static Writes wi;
 
         void* writingPtr(void *x, size_t len) { 
             //log() << "TEMP writing " << x << ' ' << len << endl;
             void *p = x;
             DEV p = MongoMMF::switchToPrivateView(x);
             WriteIntent w(p, len);
-            if( !alreadyNoted.checkAndSet(w) ) {
+            if( !wi._alreadyNoted.checkAndSet(w) ) {
                 // remember intent. we will journal it in a bit
-                writes.push_back(w);
-                wassert( writes.size() <  2000000 );
-                assert(  writes.size() < 20000000 );
+                wi._writes.push_back(w);
+                wassert( wi._writes.size() <  2000000 );
+                assert(  wi._writes.size() < 20000000 );
             }
             return p;
         }
 
         /** caller handles locking */
-        static bool PREPLOGBUFFER(BufBuilder& bb) { 
-            if( writes.empty() )
-                return false;
-
+        static bool PREPLOGBUFFER(AlignedBuilder& bb) { 
             bb.reset();
 
             unsigned *lenInBlockHeader;
@@ -127,13 +130,19 @@ namespace mongo {
 
             {
                 scoped_lock lk(privateViews._mutex());
-                for( vector<WriteIntent>::iterator i = writes.begin(); i != writes.end(); i++ ) {
+                for( vector<WriteIntent>::iterator i = wi._writes.begin(); i != wi._writes.end(); i++ ) {
                     size_t ofs;
                     MongoMMF *mmf = privateViews._find(i->p, ofs);
                     if( mmf == 0 ) {
                         journalingFailure("view pointer cannot be resolved");
                     }
                     else {
+                        if( !mmf->dirty() )
+                            mmf->dirty() = true; // usually it will already be dirty so don't bother writing then
+                        {
+                            size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
+                            i->w_ptr = ((char*)mmf->view_write()) + ofs;
+                        }
                         if( mmf->filePath() != lastFilePath ) { 
                             lastFilePath = mmf->filePath();
                             JDbContext c;
@@ -164,23 +173,66 @@ namespace mongo {
                 dassert( bb.len() % 8192 == 0 );
             }
 
-            writes.clear();
-            alreadyNoted.clear();
             return true;
         }
 
-        static void WRITETOJOURNAL(const BufBuilder& bb) { 
+        static void WRITETOJOURNAL(const AlignedBuilder& bb) { 
             journal(bb);
         }
 
-        static void _go(BufBuilder& bb) {
+        /** apply the writes back to the non-private MMF after they are for certain in redo log 
+
+            (1) todo we don't need to write back everything every group commit.  we MUST write back
+            that which is going to be a remapped on its private view - but that might not be all 
+            views.
+
+            (2) todo should we do this using N threads?  would be quite easy
+                see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
+
+            locking: in read lock when called
+        */
+        static void WRITETODATAFILES() { 
+            /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
+            for( int i = wi._writes.size() - 1; i >= 0; i-- ) {
+                WriteIntent& intent = wi._writes[i];
+                char *dst = (char *) (intent.w_ptr);
+                memcpy(dst, intent.p, intent.len);
+            }
+        }
+
+        /** we need to remap the private view periodically. otherwise it would become very large. 
+            locking: in read lock when called
+        */
+        static void remap(MongoFile *f) { 
+            MongoMMF *mmf = dynamic_cast<MongoMMF*>(f);
+            if( mmf && mmf->dirty() ) {
+                mmf->dirty() = false;
+                log() << "finish remap " << endl;
+            }
+        }
+        static void REMAPPRIVATEVIEW() { 
+            MongoFile::forEach( remap );
+        }
+
+        /** locking in read lock when called */
+        static void _go(AlignedBuilder& bb) {
+            if( wi._writes.empty() )
+                return;
+
             PREPLOGBUFFER(bb);
 
             // todo: add double buffering so we can be (not even read locked) during WRITETOJOURNAL
             WRITETOJOURNAL(bb);
+
+            // write the noted write intent entries to the data files
+            WRITETODATAFILES();
+
+            wi.clear();
+
+            REMAPPRIVATEVIEW();
         }
 
-        static void go(BufBuilder& bb) {
+        static void go(AlignedBuilder& bb) {
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
@@ -197,7 +249,7 @@ namespace mongo {
         static void durThread() { 
             Client::initThread("dur");
             const int HowOftenToGroupCommitMs = 100;
-            BufBuilder bb(1024 * 1024 * 16); // reuse to avoid any heap fragmentation
+            AlignedBuilder bb(1024 * 1024 * 16);
             while( 1 ) { 
                 try {
                     int millis = HowOftenToGroupCommitMs;

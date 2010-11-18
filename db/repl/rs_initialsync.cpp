@@ -104,32 +104,80 @@ namespace mongo {
     }
 
     /**
-     * Choose a member to sync from. Prefers a secondary, if available.
+     * Choose a member to sync from. 
      *
-     * TODO: make a config setting like "cloneFromPrimary" or something to force
-     * machines to clone from the primary.  We might want to integrate this with
-     * tags functionality, if we only want it to be able to clone from certain
-     * machines.
+     * The initalSync option is an object with 1 k/v pair:
+     * 
+     * "state" : 1|2
+     * "name" : "host"
+     * "_id" : N
+     * "optime" : t
+     *
+     * All except optime are exact matches.  "optime" will find a secondary with
+     * an optime >= to the optime given.
      */
     const Member* ReplSetImpl::getMemberToSyncTo() {
-        for( Member *m = head(); m; m = m->next() ) {
-            if (m->hbinfo().up() && m->state() == MemberState::RS_SECONDARY) {
-                sethbmsg( str::stream() << "syncing to secondary: " << m->fullName(), 0);
-                return const_cast<Member*>(m);
-            }
-        }
+        BSONObj sync = myConfig().initialSync;
+        bool secondaryOnly = false, isOpTime = false;
+        char *name = 0;
+        int id = -1;
+        OpTime optime;
 
-        // can't find secondary, try primary
         StateBox::SP sp = box.get();
         assert( !sp.state.primary() ); // wouldn't make sense if we were.
 
-        // we just checked in _syncDoInitialSync, but we could have lost a
-        // primary since then
-        if (!sp.primary) {
-            return 0;
+        // if it exists, we've already checked that these fields are valid in
+        // rs_config.cpp
+        if ( !sync.isEmpty() ) {
+            if (sync.hasElement("state")) {
+                if (sync["state"].Number() == 1) {
+                    if (sp.primary) {
+                        sethbmsg( str::stream() << "syncing to primary: " << sp.primary->fullName(), 0);
+                        return const_cast<Member*>(sp.primary);
+                    }
+                    else {
+                        sethbmsg("couldn't clone from primary");
+                        return NULL;
+                    }
+                }
+                else {
+                    secondaryOnly = true;
+                }
+            }
+            if (sync.hasElement("name")) {
+                name = (char*)sync["name"].valuestr();
+            }
+            if (sync.hasElement("_id")) {
+                id = (int)sync["_id"].Number();
+            }
+            if (sync.hasElement("optime")) {
+                isOpTime = true;
+                optime = sync["optime"]._opTime();
+            }
         }
-        sethbmsg( str::stream() << "syncing to primary: " << sp.primary->fullName(), 0);
-        return const_cast<Member*>(sp.primary);
+        
+        for( Member *m = head(); m; m = m->next() ) {
+            if (!m->hbinfo().up() ||
+                (m->state() != MemberState::RS_SECONDARY &&
+                 m->state() != MemberState::RS_PRIMARY) ||
+                (secondaryOnly && m->state() != MemberState::RS_SECONDARY) ||
+                (id != -1 && (int)m->id() != id) ||
+                (name != 0 && strcmp(name, m->fullName().c_str()) != 0) ||
+                (isOpTime && optime >= m->hbinfo().opTime)) {
+                continue;
+            }
+
+            sethbmsg( str::stream() << "syncing to: " << m->fullName(), 0);
+            return const_cast<Member*>(m);
+        }
+        
+        sethbmsg( str::stream() << "couldn't find a member matching the sync criteria: " <<
+                  "\nstate? " << (secondaryOnly ? "2" : "none") <<
+                  "\nname? " << (name ? name : "none") <<
+                  "\n_id? " << id <<
+                  "\noptime? " << optime.toStringPretty() );
+        
+        return NULL;
     }
     
     /**
