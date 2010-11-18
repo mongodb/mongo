@@ -107,12 +107,6 @@ namespace mongo {
         assert( _wasSize == BucketSize );
         return BucketSize;
     }
-    inline void BucketBasics::setNotPacked() {
-        flags &= ~Packed;
-    }
-    inline void BucketBasics::setPacked() {
-        flags |= Packed;
-    }
 
     void BucketBasics::_shape(int level, stringstream& ss) const {
         for ( int i = 0; i < level; i++ ) ss << ' ';

@@ -200,8 +200,8 @@ namespace mongo {
          * call pack().
          */
         int packedDataSize( int refPos ) const;
-        void setNotPacked();
-        void setPacked();
+        void setNotPacked() { flags &= ~Packed; }
+        void setPacked() { flags |= Packed; }
         int _alloc(int bytes);
         void _unalloc(int bytes);
         void truncateTo(int N, const Ordering &order, int &refPos);
