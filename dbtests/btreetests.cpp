@@ -551,7 +551,8 @@ namespace BtreeTests {
                 return spec;
             }
             char *endPtr;
-            unsigned long long num = strtoll( spec + 1, &endPtr, 16 );
+            // parsing a long long is a pain, so just allow shorter keys for now
+            unsigned long long num = strtol( spec + 1, &endPtr, 16 );
             int len = 800;
             if( *endPtr == '$' ) {
                 len = strtol( endPtr + 1, 0, 16 );
