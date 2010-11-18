@@ -141,7 +141,7 @@ namespace mongo {
     class mutex : boost::noncopyable {
     public:
 #if defined(_DEBUG)
-        const char *_name;
+        const char * const _name;
 #endif
 
 #if defined(_DEBUG)
@@ -160,6 +160,28 @@ namespace mongo {
                 delete _m;
             }
         }
+
+    private:
+        void unlock() { _m->unlock(); }
+        bool lock_try( int millis = 0 ) {
+            boost::system_time until = boost::get_system_time();
+            until += boost::posix_time::milliseconds(millis);
+            return _m->timed_lock(until);
+        }
+
+    public:
+
+        class try_lock : boost::noncopyable {
+            mongo::mutex& _m;
+        public:
+            const bool ok;
+            try_lock(mongo::mutex &m, int millis = 0) : _m(m), ok(m.lock_try(millis)) { }
+            ~try_lock() { 
+                if( ok ) 
+                    _m.unlock();
+            }
+        };
+
         class scoped_lock : boost::noncopyable {
 #if defined(_DEBUG)
             mongo::mutex *mut;
