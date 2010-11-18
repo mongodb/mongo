@@ -52,6 +52,7 @@ namespace mongo {
         
         void appendInfo( BSONObjBuilder& b );
         
+        bool needChunkMatcher( const string& ns ) const;
         ChunkMatcherPtr getChunkMatcher( const string& ns );
         
         bool inCriticalMigrateSection();

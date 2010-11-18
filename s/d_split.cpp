@@ -335,6 +335,7 @@ namespace mongo {
             // 4MB work of 'result' size. This should be okay for now.
 
             result.append( "splitKeys" , splitKeys );
+
             return true;
 
         }

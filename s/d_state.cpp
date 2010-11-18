@@ -167,13 +167,17 @@ namespace mongo {
 
     }
 
-    ChunkMatcherPtr ShardingState::getChunkMatcher( const string& ns ){
+    bool ShardingState::needChunkMatcher( const string& ns ) const {
         if ( ! _enabled )
-            return ChunkMatcherPtr();
+            return false;
         
         if ( ! ShardedConnectionInfo::get( false ) )
-            return ChunkMatcherPtr();
-        
+            return false;
+
+        return true;
+    }
+
+    ChunkMatcherPtr ShardingState::getChunkMatcher( const string& ns ){
         ConfigVersion version;
         { 
             // check cache
@@ -193,75 +197,13 @@ namespace mongo {
             }
         }
 
-        // have to get a connection to the config db
-        // special case if i'm the configdb since i'm locked and if i connect to myself
-        // its a deadlock
-        auto_ptr<ScopedDbConnection> scoped;
-        auto_ptr<DBDirectClient> direct;
-        
-        DBClientBase * conn;
+        // load the chunk information for this shard from the config database
+        // a reminder: ChunkMatcher may throw on construction
+        const string c = (_configServer == _shardHost) ? "" /* local */ : _configServer;
+        ChunkMatcherPtr p( new ChunkMatcher( c , ns , _shardName ) );
 
-        if ( _configServer == _shardHost ){
-            direct.reset( new DBDirectClient() );
-            conn = direct.get();
-        }
-        else {
-            scoped.reset( new ScopedDbConnection( _configServer ) );
-            conn = scoped->get();
-        }
-
-        // actually query all the chunks for 'ns' that live in this shard
-        // sorting so we can efficiently bucket them
-        BSONObj q;
-        {
-            BSONObjBuilder b;
-            b.append( "ns" , ns.c_str() );
-            b.append( "shard" , BSON( "$in" << BSON_ARRAY( _shardHost << _shardName ) ) );
-            q = b.obj();
-        }
-        auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
-
-        assert( cursor.get() );
-        if ( ! cursor->more() ){
-            // TODO: should we update the local version or cache this result?
-            if ( scoped.get() )
-                scoped->done();
-            return ChunkMatcherPtr();
-        }
-
-        BSONObj collection = conn->findOne( "config.collections", BSON( "_id" << ns ) );
-        assert( ! collection["key"].eoo() && collection["key"].isABSONObj() );
-        ChunkMatcherPtr p( new ChunkMatcher( version , collection["key"].Obj().getOwned() ) );
-
-        BSONObj min,max;
-        while ( cursor->more() ){
-            BSONObj d = cursor->next();
-            p->addChunk( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() );
-            
-            // coallesce the chunk's bounds in ranges if there are adjacent chunks 
-            if ( min.isEmpty() ){
-                min = d["min"].Obj().getOwned();
-                max = d["max"].Obj().getOwned();
-                continue;
-            }
-
-            // chunk is adjacent to last chunk
-            if ( max == d["min"].Obj() ){
-                max = d["max"].Obj().getOwned();
-                continue;
-            }
-
-            // discontinuity; register range and reset min/max
-            p->addRange( min.getOwned() , max.getOwned() );
-            min = d["min"].Obj().getOwned();
-            max = d["max"].Obj().getOwned();
-        }
-        assert( ! min.isEmpty() );
-        p->addRange( min.getOwned() , max.getOwned() );
-        
-        if ( scoped.get() )
-            scoped->done();
-
+        // TODO 11-18-2010 verify that the version in _versions is compatible with _checks[ns]
+        // Eventually, the version that will be authoritative is the ChunkMatcher's
         { 
             scoped_lock lk( _mutex );
             _chunks[ns] = p;

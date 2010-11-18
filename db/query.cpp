@@ -629,7 +629,7 @@ namespace mongo {
             _oldN(0),
             _nYields(),
             _nChunkSkips(),
-            _chunkMatcher(shardingState.getChunkMatcher(pq.ns())),
+            _chunkMatcher( shardingState.needChunkMatcher(pq.ns()) ? shardingState.getChunkMatcher(pq.ns()) : ChunkMatcherPtr() ),
             _inMemSort(false),
             _capped(false),
             _saveClientCursor(false),
@@ -749,7 +749,7 @@ namespace mongo {
                 DiskLoc cl = _c->currLoc();
                 if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( cl.obj() ) ){
                     _nChunkSkips++;
-                    // cout << "TEMP skipping un-owned chunk: " << _c->current() << endl;
+                    // log() << "TEMP skipping un-owned chunk: " << _c->current() << endl;
                 }
                 else if( _c->getsetdup(cl) ) { 
                     // dup
