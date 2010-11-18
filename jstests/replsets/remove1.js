@@ -87,19 +87,26 @@ sleep(10000);
 stopMongod(ports[1]);
 
 replTest.restart(2);
+sleep(10000);
 
 
 print("Add them back as slaves");
-config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
-config.members.push({_id:2, host : host+":"+replTest.getPort(2)});
-config.version = 4;
-try {
-  master.getDB("admin").runCommand({replSetReconfig:config});
-}
-catch(e) {
-  print(e);
-}
-reconnect(master);
+wait(function() {
+    config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
+    config.members.push({_id:2, host : host+":"+replTest.getPort(2)});
+    config.version = 4;
+    try {
+      master.getDB("admin").runCommand({replSetReconfig:config});
+    }
+    catch(e) {
+      print(e);
+    }
+    reconnect(master);
+
+    master.setSlaveOk();
+    var newConfig = master.getDB("local").system.replset.findOne();
+    return newConfig.version == 4;
+  });
 
 
 print("Make sure everyone's secondary");
@@ -109,10 +116,16 @@ wait(function() {
         printjson(status);
       });
     
-    return status.members &&
-      (status.members[0].state == 1 || status.members[0].state == 2) &&
-      (status.members[1].state == 1 || status.members[1].state == 2) &&
-      (status.members[2].state == 1 || status.members[2].state == 2);
+    if (!status.members || status.members.length != 3) {
+      return false;
+    }
+
+    for (var i = 0; i<3; i++) {
+      if (status.members[i].state != 1 && status.members[i].state != 2) {
+        return false;
+      }
+    }
+    return true;
   });
 
 replTest.stopSet();

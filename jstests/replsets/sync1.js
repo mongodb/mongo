@@ -127,12 +127,14 @@ doTest = function (signal) {
                 try {
                     printjson(dbs[1].isMaster());
                     printjson(dbs[1].bar.count());
+                    printjson(dbs[1].adminCommand({replSetGetStatus : 1}));
                 }
                 catch (e) { print(e); }
                 print("dbs[2]:");
                 try {
                     printjson(dbs[2].isMaster());
                     printjson(dbs[2].bar.count());
+                    printjson(dbs[2].adminCommand({replSetGetStatus : 1}));
                 }
                 catch (e) { print(e); }
                 assert(false, "sync1.js too many exceptions, failing");
