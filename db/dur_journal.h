@@ -23,6 +23,9 @@ namespace mongo {
 
     namespace dur {
 
+        /** at termination after db files closed & fsynced */
+        void journalCleanup();
+
         /** assure journal/ dir exists. throws */
         void journalMakeDir();
 
@@ -39,6 +42,9 @@ namespace mongo {
         void journalingFailure(const char *msg);
 
 #pragma pack(1)
+        /** Journal file format stuff */
+
+        /** header for a journal/j._<n> file */
         struct JHeader {
             JHeader(string fname) { 
                 txt[0] = 'j'; txt[1] = '\n';
@@ -65,6 +71,7 @@ namespace mongo {
             char txt2[2];
         };
 
+        /** "Section" header.  A section corresponds to a group commit. */
         struct JSectHeader {
             char txt[4];
             unsigned len;
@@ -90,6 +97,7 @@ namespace mongo {
             //char dbname[];
         };
 
+        /** an individual operation within section.  Either the entire section should be applied, or nothing. */
         struct JEntry {
             unsigned len;
             int fileNo;

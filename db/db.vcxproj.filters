@@ -424,6 +424,9 @@
     <ClCompile Include="..\util\logfile.cpp">
       <Filter>util</Filter>
     </ClCompile>
+    <ClCompile Include="dur_recover.cpp">
+      <Filter>db\storage engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

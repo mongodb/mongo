@@ -137,7 +137,8 @@ namespace mongo {
                         journalingFailure("view pointer cannot be resolved");
                     }
                     else {
-                        mmf->dirty() = true;
+                        if( !mmf->dirty() )
+                            mmf->dirty() = true; // usually it will already be dirty so don't bother writing then
                         {
                             size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
                             i->w_ptr = ((char*)mmf->view_write()) + ofs;
@@ -186,6 +187,7 @@ namespace mongo {
             views.
 
             (2) todo should we do this using N threads?  would be quite easy
+                see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
 
             locking: in read lock when called
         */
@@ -247,7 +249,7 @@ namespace mongo {
         static void durThread() { 
             Client::initThread("dur");
             const int HowOftenToGroupCommitMs = 100;
-            AlignedBuilder bb(1024 * 1024 * 16); // reuse to avoid any heap fragmentation
+            AlignedBuilder bb(1024 * 1024 * 16);
             while( 1 ) { 
                 try {
                     int millis = HowOftenToGroupCommitMs;
