@@ -100,12 +100,14 @@ namespace mongo {
     
     bool ShardingState::hasVersion( const string& ns ){
         scoped_lock lk(_mutex);
+
         NSVersionMap::const_iterator i = _versions.find(ns);
         return i != _versions.end();
     }
     
     bool ShardingState::hasVersion( const string& ns , ConfigVersion& version ){
         scoped_lock lk(_mutex);
+
         NSVersionMap::const_iterator i = _versions.find(ns);
         if ( i == _versions.end() )
             return false;
@@ -126,9 +128,13 @@ namespace mongo {
     
     void ShardingState::setVersion( const string& ns , const ConfigVersion& version ){
         scoped_lock lk(_mutex);
-        ConfigVersion& me = _versions[ns];
-        assert( version == 0 || version > me );
-        me = version;
+
+        if ( version != 0 ) {
+            NSVersionMap::const_iterator it = _versions.find( ns );
+            assert( it == _versions.end() || version > it->second );
+        }
+
+        _versions[ns] = version;
     }
 
     void ShardingState::appendInfo( BSONObjBuilder& b ){
@@ -144,6 +150,7 @@ namespace mongo {
             BSONObjBuilder bb( b.subobjStart( "versions" ) );
             
             scoped_lock lk(_mutex);
+
             for ( NSVersionMap::iterator i=_versions.begin(); i!=_versions.end(); ++i ){
                 bb.appendTimestamp( i->first , i->second );
             }
@@ -163,10 +170,13 @@ namespace mongo {
         { 
             // check cache
             scoped_lock lk( _mutex );
-            version = _versions[ns];
-            
-            if ( ! version )
+
+            NSVersionMap::const_iterator it = _versions.find( ns );
+            if ( it == _versions.end() ) {
                 return ChunkMatcherPtr();
+            }
+
+            version = it->second;
             
             ChunkMatcherPtr p = _chunks[ns];
             if ( p && p->getVersion() >= version ){
