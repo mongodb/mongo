@@ -16,7 +16,7 @@
  */
 
 /**
- * some simple tests of the gridfs c++ api
+ * some simple tests of the gridfs c++ API
  */
 
 #include "client/dbclient.h"
@@ -37,8 +37,10 @@ using namespace std;
 using namespace mongo;
 
 int create_tmp_file(char *fname);
-void test_simple(GridFS &gfs);
-void test_removeFiles(GridFS &gfs);
+
+void test_simple(DBClientConnection &c, GridFS &gfs);
+void test_storeFile(DBClientConnection &c, GridFS &gfs);
+void test_removeFiles(DBClientConnection &c, GridFS &gfs);
 
 int main( int argc, const char **argv ) {
 
@@ -58,8 +60,9 @@ int main( int argc, const char **argv ) {
 
     GridFS gfs(conn, "gfstest");
 
-    test_simple(gfs);
-    test_removeFiles(gfs);
+    test_simple(conn, gfs);
+    test_storeFile(conn, gfs);
+    test_removeFiles(conn, gfs);
 
 }
 
@@ -77,14 +80,14 @@ int create_tmp_file(char *fname) {
  * test some basic api usage
  *
  */
-void test_simple(GridFS &gfs) {
+void test_simple(DBClientConnection &c, GridFS &gfs) {
 
   // create a temporary file on the filesystem to store in gridfs
   char filename[] = TMP_FILE;
   int fd = create_tmp_file(filename);
 
   // write a small string to the file
-  ssize_t written = write(fd, "foo", 4);
+  ssize_t written = write(fd, "fifteen", 8);
   
   BSONObj foo = gfs.storeFile(filename);
   assert(written == foo.getIntField("length"));
@@ -112,10 +115,52 @@ void test_simple(GridFS &gfs) {
   unlink(filename);
 }
 
+void test_storeFile(DBClientConnection &c, GridFS &gfs) {
+
+    char filename[] = TMP_FILE;
+    int fd = create_tmp_file(filename);
+    ssize_t written = write(fd, "three", 6);
+    
+    BSONObj obj1 = gfs.storeFile(filename, "remotename1", "text/plain", false); 
+    assert(written == obj1.getIntField("length"));
+    
+    GridFile f1 = gfs.findFile("remotename1");
+    assert(f1.exists());
+    assert(f1.getMD5() == obj1.getStringField("md5"));
+    assert((int)f1.getContentLength() == obj1.getIntField("length"));
+    assert(f1.getFilename() == obj1.getStringField("filename"));
+    assert(f1.getUploadDate() == obj1["uploadDate"].date());
+
+    // set remove old to false, which should leave the "old" entry in 
+    // fs.files
+    BSONObj obj2 = gfs.storeFile(filename, "remotename1", "text/plain", false);
+    
+    auto_ptr<DBClientCursor> cursor1 = 
+      c.query("gfstest.fs.files", 
+	      QUERY( "filename" << "remotename1" ) );
+
+    // there should be two entries with the same filename now
+    assert(cursor1->itcount() == 2);
+
+    // now create the file again but set removeOld to true. this should 
+    // make our entry the only one in fs.files
+    BSONObj obj3 = gfs.storeFile(filename, "remotename1", "text/plain", true);
+
+    auto_ptr<DBClientCursor> cursor2 = 
+      c.query("gfstest.fs.files", 
+	      QUERY( "filename" << "remotename1" ) );
+
+    assert(cursor2->itcount() == 1);
+
+    gfs.removeFile("remotename1");
+    
+    close(fd);
+    unlink(filename);
+}
 /*
  * test removeFiles
  */
-void test_removeFiles(GridFS &gfs) {
+void test_removeFiles(DBClientConnection &c, GridFS &gfs) {
 
   char filename1[] = TMP_FILE;
   char filename2[] = TMP_FILE;
@@ -131,5 +176,4 @@ void test_removeFiles(GridFS &gfs) {
 
   close(fd1);  close(fd2);
   unlink(filename1);  unlink(filename2);
-
 }
