@@ -131,6 +131,12 @@ namespace mongo {
             return KeyNode(*this, k(i));
         }
         
+        static int headerSize() {
+            const BucketBasics *d = 0;
+            return (char*)&(d->data) - (char*)&(d->parent);
+        }
+        static int bodySize() { return BucketSize - headerSize(); }
+        
         // for testing
         int nKeys() const { return n; }
         const DiskLoc getNextChild() const { return nextChild; }
@@ -142,7 +148,7 @@ namespace mongo {
 
         /**
          * @return false if node is full and must be split
-         * @keypos is where to insert -- inserted after that key #.  so keypos=0 is the leftmost one.
+         * @keypos is where to insert -- inserted before that key #.  so keypos=0 is the leftmost one.
          *  keypos will be updated if keys are moved as a result of pack()
         */
         bool basicInsert(const DiskLoc thisLoc, int &keypos, const DiskLoc recordLoc, const BSONObj& key, const Ordering &order);
@@ -164,7 +170,7 @@ namespace mongo {
          *
          * TODO Maybe this could be replaced with two functions, one which
          * returns the last key without deleting it and another which simply
-         * deletes the last key.  Then the caller would enough control to
+         * deletes the last key.  Then the caller would have enough control to
          * ensure proper memory integrity.
          */
         void popBack(DiskLoc& recLoc, BSONObj& key);
@@ -181,9 +187,6 @@ namespace mongo {
         DiskLoc& childForPos(int p) { return p == n ? nextChild : k(p).prevChildBucket; }
 
         int totalDataSize() const;
-        int headerSize() const {
-            return (char*)&data - (char*)&parent;
-        }
         // @return true if the key may be dropped by pack()
         bool mayDropKey( int index, int refPos ) const;
         /**
@@ -202,6 +205,8 @@ namespace mongo {
         int _alloc(int bytes);
         void _unalloc(int bytes);
         void truncateTo(int N, const Ordering &order, int &refPos);
+        // drop specified number of keys from beginning of key array, and pack
+        void dropFront(int nDrop, const Ordering &order, int &refPos);
         void markUnused(int keypos);
 
         /* BtreeBuilder uses the parent var as a temp place to maintain a linked list chain. 
@@ -217,6 +222,19 @@ namespace mongo {
         
         // @return the key position where a split should occur on insert
         int splitPos( int keypos ) const;
+        
+        /**
+         * Adds new entries to beginning of key array, shifting existing
+         * entries to the right.  After this is called, setKey() must be called
+         * on all the newly created entries in the key array.
+         */
+        void addKeysFront( int nAdd );
+        
+        /**
+         * Sets an existing key using the given parameters.
+         * @i index of key to set
+         */
+        void setKey( int i, const DiskLoc recordLoc, const BSONObj &key, const DiskLoc prevChildBucket );
     };
 
     /**
@@ -252,7 +270,7 @@ namespace mongo {
     public:
         bool isHead() const { return parent.isNull(); }
         void dumpTree(const DiskLoc &thisLoc, const BSONObj &order) const;
-        int fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount = 0) const; /* traverses everything */
+        int fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount = 0, bool strict = false) const; /* traverses everything */
 
         bool isUsed( int i ) const { return k(i).isUsed(); }
         string bucketSummary() const;
@@ -315,8 +333,16 @@ namespace mongo {
 
         static void a_test(IndexDetails&);
 
+        static int getLowWaterMark();
+        static int getKeyMax();
+        
     protected:
-        void fixParentPtrs(const DiskLoc thisLoc, int startIndex = 0) const;
+        /**
+         * Fix parent pointers for children
+         * @firstIndex first index to modify
+         * @lastIndex last index to modify (-1 means last index is n)
+         */
+        void fixParentPtrs(const DiskLoc thisLoc, int firstIndex = 0, int lastIndex = -1) const;
 
         // invalidates this and thisLoc
         void delBucket(const DiskLoc thisLoc, const IndexDetails&);
@@ -324,14 +350,40 @@ namespace mongo {
         void delKeyAtPos(const DiskLoc thisLoc, IndexDetails& id, int p, const Ordering &order);
 
         // may invalidate this and thisLoc
-        void balanceWithNeighbors(const DiskLoc thisLoc, IndexDetails &id, const Ordering &order) const;
-        // returns true if merge succeeded, may invalidate this and thisLoc
-        bool tryMergeNeighbors( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order) const;
+        void balanceWithNeighbors(const DiskLoc thisLoc, IndexDetails &id, const Ordering &order) const;        
+
+        // @return true if balance succeeded
+        bool tryBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) const;
+        void doBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order );
+        void doBalanceLeftToRight( const DiskLoc thisLoc, int leftIndex, int split,
+                                  BtreeBucket *l, const DiskLoc lchild,
+                                  BtreeBucket *r, const DiskLoc rchild,
+                                  IndexDetails &id, const Ordering &order );
+        void doBalanceRightToLeft( const DiskLoc thisLoc, int leftIndex, int split,
+                                  BtreeBucket *l, const DiskLoc lchild,
+                                  BtreeBucket *r, const DiskLoc rchild,
+                                  IndexDetails &id, const Ordering &order );
+
         // may invalidate this and thisLoc
-        void doMergeNeighbors( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order);
+        void doMergeChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order);
+
         // will invalidate this and thisLoc
         void replaceWithNextChild( const DiskLoc thisLoc, IndexDetails &id );
 
+        // @return true iff left and right child can be merged into one node
+        bool mayMergeChildren( const DiskLoc &thisLoc, int leftIndex ) const;
+        
+        /**
+         * @return index of the rebalanced separator; the index value is
+         * determined as if we had an array
+         * <left bucket keys array>.push( <old separator> ).concat( <right bucket keys array> )
+         * This is only expected to be called if the left and right child
+         * cannot be merged.
+         * This function is expected to be called on packed buckets, see also
+         * comments for splitPos().
+         */
+        int rebalancedSeparatorPos( const DiskLoc &thisLoc, int leftIndex ) const;
+        
         int indexInParent( const DiskLoc &thisLoc ) const;
         BSONObj keyAt(int keyOfs) const {
             return keyOfs >= n ? BSONObj() : keyNode(keyOfs).key;
@@ -353,6 +405,11 @@ namespace mongo {
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
         static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, bool rSup, const vector< const BSONElement * > &rEnd, const vector< bool > &rEndInclusive, const Ordering &o, int direction );
         static void fix(const DiskLoc thisLoc, const DiskLoc child);
+        
+        // Replaces an existing key with the new specified key, splitting if necessary
+        void setInternalKey( DiskLoc thisLoc, int keypos,
+                            DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
+                            DiskLoc lchild, DiskLoc rchild, IndexDetails &idx);
     public:
         // simply builds and returns a dup key error message string
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );
