@@ -151,7 +151,7 @@ namespace mongo {
         mutex(const char *) 
 #endif
         { 
-            _m = new boost::mutex(); 
+            _m = new boost::timed_mutex(); 
             IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
         }
         ~mutex() {
@@ -198,13 +198,13 @@ namespace mongo {
                 mutexDebugger.leaving(mut->_name);
 #endif
             }
-            boost::mutex::scoped_lock &boost() { return _l; }
+            boost::timed_mutex::scoped_lock &boost() { return _l; }
         private:
-            boost::mutex::scoped_lock _l;
+            boost::timed_mutex::scoped_lock _l;
         };
     private:
-        boost::mutex &boost() { return *_m; }
-        boost::mutex *_m;
+        boost::timed_mutex &boost() { return *_m; }
+        boost::timed_mutex *_m;
     };
     
     typedef mutex::scoped_lock scoped_lock;
