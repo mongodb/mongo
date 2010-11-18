@@ -106,7 +106,6 @@ namespace mongo {
          */
         int removeFiles( BSONObj query );
 
-
         /**
          * returns a file object matching the query
          */
