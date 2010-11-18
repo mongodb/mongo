@@ -113,9 +113,15 @@ namespace mongo {
         return true;
     }
     
-    ConfigVersion& ShardingState::getVersion( const string& ns ){
+    const ConfigVersion ShardingState::getVersion( const string& ns ) const {
         scoped_lock lk(_mutex);
-        return _versions[ns];
+
+        NSVersionMap::const_iterator it = _versions.find( ns );
+        if ( it != _versions.end() ) {
+            return it->second;
+        } else {
+            return 0;
+        }
     }
     
     void ShardingState::setVersion( const string& ns , const ConfigVersion& version ){
@@ -273,8 +279,13 @@ namespace mongo {
         _tl.reset();
     }
 
-    ConfigVersion& ShardedConnectionInfo::getVersion( const string& ns ){
-        return _versions[ns];
+    const ConfigVersion ShardedConnectionInfo::getVersion( const string& ns ) const {
+        NSVersionMap::const_iterator it = _versions.find( ns );
+        if ( it != _versions.end() ) {
+            return it->second;
+        } else {
+            return 0;
+        }
     }
     
     void ShardedConnectionInfo::setVersion( const string& ns , const ConfigVersion& version ){
@@ -421,18 +432,18 @@ namespace mongo {
                 return false;
             }
             
-            ConfigVersion& oldVersion = info->getVersion(ns);
-            ConfigVersion& globalVersion = shardingState.getVersion(ns);
+            const ConfigVersion oldVersion = info->getVersion(ns);
+            const ConfigVersion globalVersion = shardingState.getVersion(ns);
             
             if ( oldVersion > 0 && globalVersion == 0 ){
                 // this had been reset
-                oldVersion = 0;
+                info->setVersion( ns , 0 );
             }
 
             if ( version == 0 && globalVersion == 0 ){
                 // this connection is cleaning itself
-                oldVersion = 0;
-                return 1;
+                info->setVersion( ns , 0 );
+                return true;
             }
 
             if ( version == 0 && globalVersion > 0 ){
@@ -441,15 +452,15 @@ namespace mongo {
                     result.appendTimestamp( "globalVersion" , globalVersion );
                     result.appendTimestamp( "oldVersion" , oldVersion );
                     errmsg = "dropping needs to be authoritative";
-                    return 0;
+                    return false;
                 }
                 log() << "wiping data for: " << ns << endl;
                 result.appendTimestamp( "beforeDrop" , globalVersion );
                 // only setting global version on purpose
                 // need clients to re-find meta-data
-                globalVersion = 0;
-                oldVersion = 0;
-                return 1;
+                shardingState.setVersion( ns , 0 );
+                info->setVersion( ns , 0 );
+                return true;
             }
 
             if ( version < oldVersion ){
@@ -480,17 +491,18 @@ namespace mongo {
                 return false;
             }
 
+            result.appendTimestamp( "oldVersion" , oldVersion );
+            result.append( "ok" , 1 );
+
+            info->setVersion( ns , version );
+            shardingState.setVersion( ns , version );
+
             {
                 dbtemprelease unlock;
                 shardingState.getChunkMatcher( ns );
             }
 
-            result.appendTimestamp( "oldVersion" , oldVersion );
-            oldVersion = version;
-            globalVersion = version;
-
-            result.append( "ok" , 1 );
-            return 1;
+            return true;
         }
         
     } setShardVersionCmd;

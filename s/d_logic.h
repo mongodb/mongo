@@ -47,7 +47,7 @@ namespace mongo {
         
         bool hasVersion( const string& ns );
         bool hasVersion( const string& ns , ConfigVersion& version );
-        ConfigVersion& getVersion( const string& ns ); // TODO: this is dangeroues
+        const ConfigVersion getVersion( const string& ns ) const;
         void setVersion( const string& ns , const ConfigVersion& version );
         
         void appendInfo( BSONObjBuilder& b );
@@ -65,7 +65,7 @@ namespace mongo {
         string _shardHost;
 
         // protects state below
-        mongo::mutex _mutex;
+        mutable mongo::mutex _mutex;
 
         // map from a namespace into the highest ShardChunkVersion for that collection
         NSVersionMap _versions;
@@ -88,7 +88,7 @@ namespace mongo {
         bool hasID() const { return _id.isSet(); }
         void setID( const OID& id );
         
-        ConfigVersion& getVersion( const string& ns ); // TODO: this is dangeroues
+        const ConfigVersion getVersion( const string& ns ) const;
         void setVersion( const string& ns , const ConfigVersion& version );
         
         static ShardedConnectionInfo* get( bool create );
