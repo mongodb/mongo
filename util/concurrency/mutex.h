@@ -26,6 +26,13 @@ namespace mongo {
 
     class mutex;
 
+    inline boost::xtime incxtimemillis( long long millis ){
+        boost::xtime xt; 
+        boost::xtime_get(&xt, boost::TIME_UTC); 
+        xt.nsec += millis * 1000000;
+        return xt;
+    }
+
     /** only used on _DEBUG builds.
         MutexDebugger checks that we always acquire locks for multiple mutexes in a consistant (acyclic) order.
         If we were inconsistent we could deadlock.
@@ -160,27 +167,29 @@ namespace mongo {
                 delete _m;
             }
         }
-
-    private:
-        void unlock() { _m->unlock(); }
-        bool lock_try( int millis = 0 ) {
-            boost::system_time until = boost::get_system_time();
-            until += boost::posix_time::milliseconds(millis);
-            return _m->timed_lock(until);
-        }
-
-    public:
-
+        
         class try_lock : boost::noncopyable {
-            mongo::mutex& _m;
+        public:
+            try_lock( mongo::mutex &m , int millis = 0 ) 
+                : _l( m.boost() , incxtimemillis( millis ) ) , 
+#if BOOST_VERSION >= 103500
+                  ok( _l.owns_lock() ) 
+#else
+                  ok( _l.locked() )
+#endif
+            {
+            }
+
+            ~try_lock() { 
+            }
+            
+        private:
+            boost::timed_mutex::scoped_timed_lock _l;
+
         public:
             const bool ok;
-            try_lock(mongo::mutex &m, int millis = 0) : _m(m), ok(m.lock_try(millis)) { }
-            ~try_lock() { 
-                if( ok ) 
-                    _m.unlock();
-            }
         };
+
 
         class scoped_lock : boost::noncopyable {
 #if defined(_DEBUG)
@@ -202,7 +211,10 @@ namespace mongo {
         private:
             boost::timed_mutex::scoped_lock _l;
         };
+
+
     private:
+
         boost::timed_mutex &boost() { return *_m; }
         boost::timed_mutex *_m;
     };
