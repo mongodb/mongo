@@ -18,18 +18,33 @@ var fields = [ 'a', 'b', 'c', 'd', 'e' ];
 n = Random.randInt( 5 ) + 1;
 var idx = sort();
 
+var chars = "abcdefghijklmnopqrstuvwxyz";
+var alphas = []
+for( var i = 0; i < n; ++i ) {
+    alphas.push( Random.rand() > 0.5 );
+}
+    
 t.ensureIndex( idx );
 
 function obj() {
     var ret = {};
     for( var i = 0; i < n; ++i ) {
-        ret[ fields[ i ] ] = r();
+        ret[ fields[ i ] ] = r( alphas[ i ] );
     }
     return ret;
 }
 
-function r() {
-    return Random.randInt( 10 );
+function r( alpha ) {
+    if ( !alpha ) {
+        return Random.randInt( 10 );
+    } else {
+        var len = Random.randInt( 10 );
+        buf = "";
+        for( var i = 0; i < len; ++i ) {
+            buf += chars.charAt( Random.randInt( chars.length ) );
+        }
+        return buf;
+    }
 }
 
 function check() {
@@ -41,8 +56,10 @@ function check() {
     var spec = {};
     for( var i = 0; i < n; ++i ) {
         if ( Random.rand() > 0.5 ) {
-            var bounds = [ r(), r() ];
-            bounds.sort();
+            var bounds = [ r( alphas[ i ] ), r( alphas[ i ] ) ];
+            if ( bounds[ 0 ] > bounds[ 1 ] ) {
+                bounds.reverse();
+            }
 	    var s = {};
 	    if ( Random.rand() > 0.5 ) {
 		s[ "$gte" ] = bounds[ 0 ];
@@ -58,7 +75,7 @@ function check() {
         } else {
             var vals = []
             for( var j = 0; j < Random.randInt( 15 ); ++j ) {
-                vals.push( r() );
+                vals.push( r( alphas[ i ] ) );
             }
             spec[ fields[ i ] ] = { $in: vals };
         }

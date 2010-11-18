@@ -56,6 +56,26 @@ namespace mongo {
 
     /* largest key size we allow.  note we very much need to support bigger keys (somehow) in the future. */
     static const int KeyMax = BucketSize / 10;
+    
+    /**
+     * We define this value as the maximum number of bytes such that, if we have
+     * fewer than this many bytes, we must be able to either merge with or receive
+     * keys from any neighboring node.  If our utilization goes below this value we
+     * know we can bring up the utilization with a simple operation.  Ignoring the
+     * 90/10 split policy which is sometimes employed and our 'unused' nodes, this
+     * is a lower bound on bucket utilization for non root buckets.
+     *
+     * Note that the exact value here depends on the implementation of
+     * rebalancedSeparatorPos().  The conditions for lowWaterMark - 1 are as
+     * follows:  We know we cannot merge with the neighbor, so the total data size
+     * for us, the neighbor, and the separator must be at least
+     * BtreeBucket::bodySize() + 1.  We must be able to accept one key of any
+     * allowed size, so our size plus storage for that additional key must be
+     * <= BtreeBucket::bodySize() / 2.  This way, with the extra key we'll have a
+     * new bucket data size <= half the total data size and by the implementation
+     * of rebalancedSeparatorPos() the key must be added.
+     */
+    static const int lowWaterMark = BtreeBucket::bodySize() / 2 - KeyMax - sizeof( _KeyNode ) + 1;
 
     static const int split_debug = 0;
     static const int insert_debug = 0;
@@ -113,7 +133,7 @@ namespace mongo {
         bt_dmp=0;
     }
 
-    int BtreeBucket::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount) const {
+    int BtreeBucket::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount, bool strict) const {
         {
             bool f = false;
             assert( f = true );
@@ -146,14 +166,22 @@ namespace mongo {
             if ( !kn.prevChildBucket.isNull() ) {
                 DiskLoc left = kn.prevChildBucket;
                 const BtreeBucket *b = left.btree();
-                wassert( b->parent == thisLoc );
-                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount);
+                if ( strict ) {
+                    assert( b->parent == thisLoc );                    
+                } else {
+                    wassert( b->parent == thisLoc );
+                }
+                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount, strict);
             }
         }
         if ( !nextChild.isNull() ) {
             const BtreeBucket *b = nextChild.btree();
-            wassert( b->parent == thisLoc );
-            kc += b->fullValidate(nextChild, order, unusedCount);
+            if ( strict ) {
+                assert( b->parent == thisLoc );                    
+            } else {
+                wassert( b->parent == thisLoc );
+            }
+            kc += b->fullValidate(nextChild, order, unusedCount, strict);
         }
 
         return kc;
@@ -410,6 +438,18 @@ namespace mongo {
      * In the standard btree algorithm, we would split based on the
      * existing keys _and_ the new key.  But that's more work to
      * implement, so we split the existing keys and then add the new key.
+     *
+     * There are several published heuristic algorithms for doing splits,
+     * but basically what you want are (1) even balancing between the two
+     * sides and (2) a small split key so the parent can have a larger
+     * branching factor.
+     *
+     * We just have a simple algorithm right now: if a key includes the
+     * halfway point (or 10% way point) in terms of bytes, split on that key;
+     * otherwise split on the key immediately to the left of the halfway
+     * point.
+     *
+     * This function is expected to be called on a packed bucket.
      */
     int BucketBasics::splitPos( int keypos ) const {
         assert( n > 2 );
@@ -417,14 +457,15 @@ namespace mongo {
         int rightSize = 0;
         // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split. 
         // see SERVER-983
-        int rightSizeLimit = topSize / ( keypos == n ? 10 : 2 );
+        int rightSizeLimit = ( topSize + sizeof( _KeyNode ) * n ) / ( keypos == n ? 10 : 2 );
         for( int i = n - 1; i > -1; --i ) {
-            rightSize += keyNode( i ).key.objsize();
+            rightSize += keyNode( i ).key.objsize() + sizeof( _KeyNode );
             if ( rightSize > rightSizeLimit ) {
                 split = i;
                 break;
             }
         }
+        // safeguards - we must not create an empty bucket
         if ( split < 1 ) {
             split = 1;
         } else if ( split > n - 2 ) {
@@ -432,6 +473,34 @@ namespace mongo {
         }
         
         return split;
+    }
+    
+    void BucketBasics::addKeysFront( int nAdd ) {
+        assert( emptySize >= int( sizeof( _KeyNode ) * nAdd ) );
+        emptySize -= sizeof( _KeyNode ) * nAdd;
+        for( int i = n - 1; i > -1; --i ) {
+            k( i + nAdd ) = k( i );
+        }
+        n += nAdd;        
+    }
+    
+    void BucketBasics::setKey( int i, const DiskLoc recordLoc, const BSONObj &key, const DiskLoc prevChildBucket ) {
+        _KeyNode &kn = k( i );
+        kn.recordLoc = recordLoc;
+        kn.prevChildBucket = prevChildBucket;
+        short ofs = (short) _alloc( key.objsize() );
+        kn.setKeyDataOfs( ofs );
+        char *p = dataAt( ofs );
+        memcpy( p, key.objdata(), key.objsize() );
+    }
+    
+    void BucketBasics::dropFront( int nDrop, const Ordering &order, int &refpos ) {
+        for( int i = nDrop; i < n; ++i ) {
+            k( i - nDrop ) = k( i );
+        }
+        n -= nDrop;
+        setNotPacked();
+        pack( order, refpos );        
     }
         
     /* - BtreeBucket --------------------------------------------------- */
@@ -704,7 +773,7 @@ namespace mongo {
         deallocBucket( thisLoc, id );
     }
     
-    bool BtreeBucket::tryMergeNeighbors( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) const {
+    bool BtreeBucket::mayMergeChildren( const DiskLoc &thisLoc, int leftIndex ) const {
         assert( leftIndex >= 0 && leftIndex < n );
         DiskLoc leftNodeLoc = childForPos( leftIndex );
         DiskLoc rightNodeLoc = childForPos( leftIndex + 1 );
@@ -720,11 +789,59 @@ namespace mongo {
                 return false;
             }
         }
-        thisLoc.btreemod()->doMergeNeighbors( thisLoc, leftIndex, id, order );
         return true;
     }
+    
+    /**
+     * This implementation must respect the meaning and value of lowWaterMark.
+     * Also see comments in splitPos().
+     */
+    int BtreeBucket::rebalancedSeparatorPos( const DiskLoc &thisLoc, int leftIndex ) const {
+        int split = -1;
+        int rightSize = 0;
+        const BtreeBucket *l = childForPos( leftIndex ).btree();
+        const BtreeBucket *r = childForPos( leftIndex + 1 ).btree();
 
-    void BtreeBucket::doMergeNeighbors( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) {
+        int KNS = sizeof( _KeyNode );
+        int rightSizeLimit = ( l->topSize + l->n * KNS + keyNode( leftIndex ).key.objsize() + KNS + r->topSize + r->n * KNS ) / 2;
+        /**
+         * This constraint should be ensured by only calling this function
+         * if we go below the low water mark.
+         */
+        assert( rightSizeLimit < BtreeBucket::bodySize() );
+        for( int i = r->n - 1; i > -1; --i ) {
+            rightSize += r->keyNode( i ).key.objsize() + KNS;
+            if ( rightSize > rightSizeLimit ) {
+                split = l->n + 1 + i;
+                break;
+            }
+        }
+        if ( split == -1 ) {
+            rightSize += keyNode( leftIndex ).key.objsize() + KNS;
+            if ( rightSize > rightSizeLimit ) {
+                split = l->n;
+            }
+        }
+        if ( split == -1 ) {
+            for( int i = l->n - 1; i > -1; --i ) {
+                rightSize += l->keyNode( i ).key.objsize() + KNS;
+                if ( rightSize > rightSizeLimit ) {
+                    split = i;
+                    break;
+                }
+            }
+        }
+        // safeguards - we must not create an empty bucket
+        if ( split < 1 ) {
+            split = 1;
+        } else if ( split > l->n + 1 + r->n - 2 ) {
+            split = l->n + 1 + r->n - 2;
+        }
+        
+        return split;        
+    }
+    
+    void BtreeBucket::doMergeChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) {
         DiskLoc leftNodeLoc = childForPos( leftIndex );
         DiskLoc rightNodeLoc = childForPos( leftIndex + 1 );
         BtreeBucket *l = leftNodeLoc.btreemod();
@@ -778,19 +895,123 @@ namespace mongo {
         return -1; // just to compile
     }
     
+    bool BtreeBucket::tryBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) const {
+        /**
+         * If we can merge, then we must merge rather than balance to preserve
+         * bucket utilization constraints.
+         */
+        if ( mayMergeChildren( thisLoc, leftIndex ) ) {
+            return false;
+        }
+        thisLoc.btreemod()->doBalanceChildren( thisLoc, leftIndex, id, order );
+        return true;
+    }
+    
+    void BtreeBucket::doBalanceLeftToRight( const DiskLoc thisLoc, int leftIndex, int split,
+                                           BtreeBucket *l, const DiskLoc lchild,
+                                           BtreeBucket *r, const DiskLoc rchild,
+                                           IndexDetails &id, const Ordering &order ) {
+        // TODO maybe do some audits the same way pushBack() does?
+        int rAdd = l->n - split;
+        r->addKeysFront( rAdd );
+        for( int i = split + 1, j = 0; i < l->n; ++i, ++j ) {
+            KeyNode kn = l->keyNode( i );
+            r->setKey( j, kn.recordLoc, kn.key, kn.prevChildBucket );
+        }
+        {
+            KeyNode kn = keyNode( leftIndex );
+            r->setKey( rAdd - 1, kn.recordLoc, kn.key, l->nextChild ); // left child's right child becomes old parent key's left child
+        }
+        r->fixParentPtrs( rchild, 0, rAdd - 1 );
+        {
+            KeyNode kn = l->keyNode( split );
+            l->nextChild = kn.prevChildBucket;
+            setInternalKey( thisLoc, leftIndex, kn.recordLoc, kn.key, order, lchild, rchild, id );        
+        }        
+        int zeropos = 0;
+        l->truncateTo( split, order, zeropos );
+    }
+
+    void BtreeBucket::doBalanceRightToLeft( const DiskLoc thisLoc, int leftIndex, int split,
+                                           BtreeBucket *l, const DiskLoc lchild,
+                                           BtreeBucket *r, const DiskLoc rchild,
+                                           IndexDetails &id, const Ordering &order ) {
+        int lN = l->n;
+        {
+            KeyNode kn = keyNode( leftIndex );
+            l->pushBack( kn.recordLoc, kn.key, order, l->nextChild ); // left child's right child becomes old parent key's left child
+        }
+        for( int i = 0; i < split - lN - 1; ++i ) {
+            KeyNode kn = r->keyNode( i );
+            l->pushBack( kn.recordLoc, kn.key, order, kn.prevChildBucket );
+        }
+        {
+            KeyNode kn = r->keyNode( split - lN - 1 );
+            l->nextChild = kn.prevChildBucket;
+            l->fixParentPtrs( lchild, lN + 1, l->n );
+            setInternalKey( thisLoc, leftIndex, kn.recordLoc, kn.key, order, lchild, rchild, id );
+        }
+        int zeropos = 0;
+        r->dropFront( split - lN, order, zeropos );
+    }
+        
+    void BtreeBucket::doBalanceChildren( DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) {
+        DiskLoc lchild = childForPos( leftIndex );
+        DiskLoc rchild = childForPos( leftIndex + 1 );
+        int zeropos = 0;
+        BtreeBucket *l = lchild.btreemod();
+        l->pack( order, zeropos );
+        BtreeBucket *r = rchild.btreemod();
+        r->pack( order, zeropos );
+        int split = rebalancedSeparatorPos( thisLoc, leftIndex );
+        
+        /**
+         * By definition, if we are below the low water mark and cannot merge
+         * then we must actively balance.
+         */
+        assert( split != l->n );
+        if ( split < l->n ) {
+            doBalanceLeftToRight( thisLoc, leftIndex, split, l, lchild, r, rchild, id, order );
+        } else {
+            doBalanceRightToLeft( thisLoc, leftIndex, split, l, lchild, r, rchild, id, order );            
+        }
+    }
+    
     void BtreeBucket::balanceWithNeighbors( const DiskLoc thisLoc, IndexDetails &id, const Ordering &order ) const {
         if ( parent.isNull() ) { // we are root, there are no neighbors
             return;
         }
+        
+        if ( packedDataSize( 0 ) >= lowWaterMark ) {
+            return;
+        }
+        
         const BtreeBucket *p = parent.btree();
         int parentIdx = indexInParent( thisLoc );
-        if ( parentIdx < p->n ) {
-            if ( p->tryMergeNeighbors( parent, parentIdx, id, order ) ) {
-                return;
-            }
+        
+        // TODO will missing neighbor case be possible long term?  Should we try to merge/balance somehow in that case if so?
+        bool mayBalanceRight = ( ( parentIdx < p->n ) && !p->childForPos( parentIdx + 1 ).isNull() );
+        bool mayBalanceLeft = ( ( parentIdx > 0 ) && !p->childForPos( parentIdx - 1 ).isNull() );
+        
+        /** 
+         * Balance if possible on one side - we merge only if absolutely necessary
+         * to preserve btree bucket utilization constraints since that's a more
+         * heavy duty operation (especially if we must re-split later).
+         */
+        if ( mayBalanceRight && 
+            p->tryBalanceChildren( parent, parentIdx, id, order ) ) {
+            return;
         }
-        if ( parentIdx > 0 ) {
-            p->tryMergeNeighbors( parent, parentIdx - 1, id, order );
+        if ( mayBalanceLeft && 
+            p->tryBalanceChildren( parent, parentIdx - 1, id, order ) ) {
+            return;
+        }
+
+        BtreeBucket *pm = parent.btreemod();
+        if ( mayBalanceRight ) {
+            pm->doMergeChildren( parent, parentIdx, id, order );
+        } else if ( mayBalanceLeft ) {
+            pm->doMergeChildren( parent, parentIdx - 1, id, order );
         }
     }
     
@@ -826,13 +1047,35 @@ namespace mongo {
     }
 
     /* this sucks.  maybe get rid of parent ptrs. */
-    void BtreeBucket::fixParentPtrs(const DiskLoc thisLoc, int startIndex) const {
+    void BtreeBucket::fixParentPtrs(const DiskLoc thisLoc, int firstIndex, int lastIndex) const {
         VERIFYTHISLOC
-        fix(thisLoc, nextChild);
-        for ( int i = startIndex; i < n; i++ )
-            fix(thisLoc, k(i).prevChildBucket);
+        if ( lastIndex == -1 ) {
+            lastIndex = n;
+        }
+        for ( int i = firstIndex; i <= lastIndex; i++ ) {
+            fix(thisLoc, childForPos(i));
+        }
     }
 
+    void BtreeBucket::setInternalKey( DiskLoc thisLoc, int keypos,
+                                     DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
+                                     DiskLoc lchild, DiskLoc rchild, IndexDetails &idx ) {
+        childForPos( keypos ).Null();
+        /**
+         * This may leave the bucket empty (n == 0) which is ok only as a
+         * transient state.  In the instant case, the implementation of
+         * _insertHere behaves correctly when n == 0 and as a side effect
+         * increments n.
+         */
+        _delKeyAtPos( keypos, true );
+        
+        // just set temporarily, required to pass validation in _insertHere()
+        childForPos( keypos ) = lchild;
+        
+        _insertHere( thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx );        
+    }
+    
+    
     void BtreeBucket::_insertHere(DiskLoc thisLoc, int keypos,
                                  DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
                                  DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
@@ -894,7 +1137,7 @@ namespace mongo {
         }
 
         /* ---------- split ---------------- */
-
+        
         if ( split_debug )
             out() << "    " << thisLoc.toString() << ".split" << endl;
 
@@ -1288,6 +1531,14 @@ namespace mongo {
 
     void BtreeBucket::shape(stringstream& ss) const {
         _shape(0, ss);
+    }
+    
+    int BtreeBucket::getLowWaterMark() {
+        return lowWaterMark;
+    }
+
+    int BtreeBucket::getKeyMax() {
+        return KeyMax;
     }
     
     DiskLoc BtreeBucket::findSingle( const IndexDetails& indexdetails , const DiskLoc& thisLoc, const BSONObj& key ) const {
