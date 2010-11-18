@@ -59,7 +59,7 @@ namespace BtreeTests {
         }
         virtual ~Base() {}
         static string bigNumString( long long n, int len = 800 ) {
-            char sub[16];
+            char sub[17];
             sprintf( sub, "%.16llx", n );
             string val( len, ' ' );
             for( int i = 0; i < len; i += 16 ) {
