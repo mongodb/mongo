@@ -72,7 +72,7 @@ namespace mongo {
      * BtreeBucket::bodySize() + 1.  We must be able to accept one key of any
      * allowed size, so our size plus storage for that additional key must be
      * <= BtreeBucket::bodySize() / 2.  This way, with the extra key we'll have a
-     * new bucket data size <= half the total data size and by the implementation
+     * new bucket data size < half the total data size and by the implementation
      * of rebalancedSeparatorPos() the key must be added.
      */
     static const int lowWaterMark = BtreeBucket::bodySize() / 2 - KeyMax - sizeof( _KeyNode ) + 1;
