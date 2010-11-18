@@ -203,7 +203,10 @@ doTest = function (signal) {
 
         count++;
         if (count == 100) {
-            print(dbs[0].getSisterDB("admin").runCommand({replSetGetStatus:1}));
+            printjson(dbs[0].isMaster());
+            printjson(dbs[0].adminCommand({replSetGetStatus:1}));
+            printjson(dbs[1].isMaster());
+            printjson(dbs[1].adminCommand({replSetGetStatus:1}));
             pause("FAIL part 11");
             assert(false, "replsets/\nsync1.js fails timing out");
             replTest.stopSet(signal);

@@ -91,10 +91,10 @@ sleep(10000);
 
 
 print("Add them back as slaves");
+config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
+config.members.push({_id:2, host : host+":"+replTest.getPort(2)});
+config.version = 4;
 wait(function() {
-    config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
-    config.members.push({_id:2, host : host+":"+replTest.getPort(2)});
-    config.version = 4;
     try {
       master.getDB("admin").runCommand({replSetReconfig:config});
     }
