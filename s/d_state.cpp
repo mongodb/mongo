@@ -131,7 +131,15 @@ namespace mongo {
 
         if ( version != 0 ) {
             NSVersionMap::const_iterator it = _versions.find( ns );
-            assert( it == _versions.end() || version > it->second );
+
+            // TODO 11-18-2010 as we're bringing chunk boundary information to mongod, it may happen that
+            // we're setting a version for the ns that the shard knows about already (e.g because it set
+            // it itself in a chunk migration)
+            // eventually, the only cases to issue a setVersion would be 
+            // 1) First chunk of a collection, for version 1|0
+            // 2) Drop of a collection, for version 0|0
+            // 3) Load of the shard's chunk state, in a primary-secondary failover
+            assert( it == _versions.end() || version >= it->second );
         }
 
         _versions[ns] = version;
