@@ -66,7 +66,8 @@ namespace mongo {
         struct X { 
             mutex z;
             DBClientConnection cc;
-            X() : z("X"), cc(/*reconnect*/true, 0, /*timeout*/10) { 
+            X() : z("X"), cc(/*reconnect*/ true, 0, 
+                             /*timeout*/ theReplSet ? theReplSet->config().ho.heartbeatTimeoutMillis/1000.0 : 10.0) { 
                 cc._logLevel = 2;
             }
         } *x;
