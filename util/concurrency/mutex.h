@@ -26,10 +26,15 @@ namespace mongo {
 
     class mutex;
 
-    inline boost::xtime incxtimemillis( long long millis ){
-        boost::xtime xt; 
-        boost::xtime_get(&xt, boost::TIME_UTC); 
-        xt.nsec += millis * 1000000;
+    inline boost::xtime incxtimemillis( long long s ){
+        boost::xtime xt;
+        boost::xtime_get(&xt, boost::TIME_UTC);
+        xt.sec += (int)( s / 1000 );
+        xt.nsec += (int)(( s % 1000 ) * 1000000);
+        if ( xt.nsec >= 1000000000 ) {
+            xt.nsec -= 1000000000;
+            xt.sec++;
+        }        
         return xt;
     }
 
