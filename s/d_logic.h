@@ -52,8 +52,8 @@ namespace mongo {
         
         void appendInfo( BSONObjBuilder& b );
         
-        bool needChunkManager( const string& ns ) const;
-        ShardChunkManagerPtr getChunkManager( const string& ns );
+        bool needShardChunkManager( const string& ns ) const;
+        ShardChunkManagerPtr getShardChunkManager( const string& ns );
         
         bool inCriticalMigrateSection();
     private:

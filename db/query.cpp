@@ -629,8 +629,8 @@ namespace mongo {
             _oldN(0),
             _nYields(),
             _nChunkSkips(),
-            _chunkManager( shardingState.needChunkManager(pq.ns()) ? 
-                           shardingState.getChunkManager(pq.ns()) : ShardChunkManagerPtr() ),
+            _chunkManager( shardingState.needShardChunkManager(pq.ns()) ? 
+                           shardingState.getShardChunkManager(pq.ns()) : ShardChunkManagerPtr() ),
             _inMemSort(false),
             _capped(false),
             _saveClientCursor(false),

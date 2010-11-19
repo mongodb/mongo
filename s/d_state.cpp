@@ -167,7 +167,7 @@ namespace mongo {
 
     }
 
-    bool ShardingState::needChunkManager( const string& ns ) const {
+    bool ShardingState::needShardChunkManager( const string& ns ) const {
         if ( ! _enabled )
             return false;
         
@@ -177,7 +177,7 @@ namespace mongo {
         return true;
     }
 
-    ShardChunkManagerPtr ShardingState::getChunkManager( const string& ns ){
+    ShardChunkManagerPtr ShardingState::getShardChunkManager( const string& ns ){
         ConfigVersion version;
         { 
             // check cache
@@ -459,7 +459,7 @@ namespace mongo {
 
             {
                 dbtemprelease unlock;
-                shardingState.getChunkManager( ns );
+                shardingState.getShardChunkManager( ns );
             }
 
             return true;
