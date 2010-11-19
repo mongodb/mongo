@@ -1,3 +1,9 @@
+mongodb (1.6.5-rc0) unstable; urgency=low
+
+  * full change log http://jira.mongodb.org/browse/SERVER/fixforversion/10207
+
+  -- Richard Kreuter <richard@10gen.com>  Fri, 19 Nov 2010 16:56:28 -0500
+
 mongodb (1.6.4) unstable; urgency=low
 
   * replica_sets shell helpers

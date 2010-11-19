@@ -14,7 +14,7 @@ namespace mongo {
     // mongo processes version support
     //
 
-    const char versionString[] = "1.6.5-pre-";
+    const char versionString[] = "1.6.5-rc0";
 
     string mongodVersion() {
         stringstream ss;
