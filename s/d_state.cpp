@@ -167,7 +167,7 @@ namespace mongo {
 
     }
 
-    bool ShardingState::needChunkMatcher( const string& ns ) const {
+    bool ShardingState::needChunkManager( const string& ns ) const {
         if ( ! _enabled )
             return false;
         
@@ -177,7 +177,7 @@ namespace mongo {
         return true;
     }
 
-    ChunkMatcherPtr ShardingState::getChunkMatcher( const string& ns ){
+    ShardChunkManagerPtr ShardingState::getChunkManager( const string& ns ){
         ConfigVersion version;
         { 
             // check cache
@@ -185,12 +185,12 @@ namespace mongo {
 
             NSVersionMap::const_iterator it = _versions.find( ns );
             if ( it == _versions.end() ) {
-                return ChunkMatcherPtr();
+                return ShardChunkManagerPtr();
             }
 
             version = it->second;
             
-            ChunkMatcherPtr p = _chunks[ns];
+            ShardChunkManagerPtr p = _chunks[ns];
             if ( p && p->getVersion() >= version ){
                 // our cached version is good, so just return
                 return p;                
@@ -198,12 +198,12 @@ namespace mongo {
         }
 
         // load the chunk information for this shard from the config database
-        // a reminder: ChunkMatcher may throw on construction
+        // a reminder: ShardChunkManager may throw on construction
         const string c = (_configServer == _shardHost) ? "" /* local */ : _configServer;
-        ChunkMatcherPtr p( new ChunkMatcher( c , ns , _shardName ) );
+        ShardChunkManagerPtr p( new ShardChunkManager( c , ns , _shardName ) );
 
         // TODO 11-18-2010 verify that the version in _versions is compatible with _checks[ns]
-        // Eventually, the version that will be authoritative is the ChunkMatcher's
+        // Eventually, the version that will be authoritative is the ShardChunkManager's
         { 
             scoped_lock lk( _mutex );
             _chunks[ns] = p;
@@ -459,7 +459,7 @@ namespace mongo {
 
             {
                 dbtemprelease unlock;
-                shardingState.getChunkMatcher( ns );
+                shardingState.getChunkManager( ns );
             }
 
             return true;

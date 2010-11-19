@@ -1,4 +1,4 @@
-// @file d_chunk_matcher.h
+// @file d_chunk_manager.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -27,11 +27,11 @@ namespace mongo {
     /**
      * Controls the boundaries of all the chunks for a given collection that live in this shard.
      */
-    class ChunkMatcher {
+    class ShardChunkManager {
     public:
 
         /**
-         * Loads the ChunkMatcher with all boundaries for chunks of a given collection that live in an given
+         * Loads the ShardChunkManager with all boundaries for chunks of a given collection that live in an given
          * shard
          *
          * @param configServer name of the server where the configDB currently is. Can be empty to indicate
@@ -41,9 +41,9 @@ namespace mongo {
          *
          * This constructor throws on connectivity errors
          */
-        ChunkMatcher( const string& configServer , const string& ns , const string& shardName );
+        ShardChunkManager( const string& configServer , const string& ns , const string& shardName );
 
-        ~ChunkMatcher() {}
+        ~ShardChunkManager() {}
 
         bool belongsToMe( const BSONObj& obj ) const;
 
@@ -55,7 +55,7 @@ namespace mongo {
         ShardChunkVersion getVersion() const { return _version; } 
 
     private:
-        // highest ShardChunkVersion for which this ChunkMatcher's information is accurate
+        // highest ShardChunkVersion for which this ShardChunkManager's information is accurate
         ShardChunkVersion _version;
 
         // key pattern for chunks under this range
@@ -70,6 +70,6 @@ namespace mongo {
         RangeMap _rangesMap;
     };
 
-    typedef shared_ptr<ChunkMatcher> ChunkMatcherPtr;
+    typedef shared_ptr<ShardChunkManager> ShardChunkManagerPtr;
     
 }  // namespace mongo

@@ -22,7 +22,7 @@
 
 #include "../db/jsobj.h"
 
-#include "d_chunk_matcher.h"
+#include "d_chunk_manager.h"
 #include "util.h"
 
 namespace mongo {
@@ -52,8 +52,8 @@ namespace mongo {
         
         void appendInfo( BSONObjBuilder& b );
         
-        bool needChunkMatcher( const string& ns ) const;
-        ChunkMatcherPtr getChunkMatcher( const string& ns );
+        bool needChunkManager( const string& ns ) const;
+        ShardChunkManagerPtr getChunkManager( const string& ns );
         
         bool inCriticalMigrateSection();
     private:
@@ -72,7 +72,7 @@ namespace mongo {
         NSVersionMap _versions;
 
         // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
-        map<string,ChunkMatcherPtr> _chunks;
+        map<string,ShardChunkManagerPtr> _chunks;
     };
     
     extern ShardingState shardingState;

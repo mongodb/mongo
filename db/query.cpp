@@ -629,7 +629,8 @@ namespace mongo {
             _oldN(0),
             _nYields(),
             _nChunkSkips(),
-            _chunkMatcher( shardingState.needChunkMatcher(pq.ns()) ? shardingState.getChunkMatcher(pq.ns()) : ChunkMatcherPtr() ),
+            _chunkManager( shardingState.needChunkManager(pq.ns()) ? 
+                           shardingState.getChunkManager(pq.ns()) : ShardChunkManagerPtr() ),
             _inMemSort(false),
             _capped(false),
             _saveClientCursor(false),
@@ -747,7 +748,7 @@ namespace mongo {
             else {
                 _nscannedObjects++;
                 DiskLoc cl = _c->currLoc();
-                if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( cl.obj() ) ){
+                if ( _chunkManager && ! _chunkManager->belongsToMe( cl.obj() ) ){
                     _nChunkSkips++;
                     // log() << "TEMP skipping un-owned chunk: " << _c->current() << endl;
                 }
@@ -920,7 +921,7 @@ namespace mongo {
         
         MatchDetails _details;
 
-        ChunkMatcherPtr _chunkMatcher;
+        ShardChunkManagerPtr _chunkManager;
         
         bool _inMemSort;
         auto_ptr< ScanAndOrder > _so;

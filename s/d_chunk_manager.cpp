@@ -1,4 +1,4 @@
-// @file d_chunk_matcher.cpp
+// @file d_chunk_manager.cpp
 
 /**
 *    Copyright (C) 2010 10gen Inc.
@@ -21,11 +21,11 @@
 #include "../client/connpool.h"
 #include "../db/instance.h"
 
-#include "d_chunk_matcher.h"
+#include "d_chunk_manager.h"
 
 namespace mongo {
 
-    ChunkMatcher::ChunkMatcher( const string& configServer , const string& ns , const string& shardName ) { 
+    ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName ) { 
 
         // have to get a connection to the config db
         // special case if i'm the configdb since i'm locked and if i connect to myself
@@ -109,7 +109,7 @@ namespace mongo {
             scoped->done();
     }
 
-    bool ChunkMatcher::belongsToMe( const BSONObj& obj ) const {
+    bool ShardChunkManager::belongsToMe( const BSONObj& obj ) const {
         if ( _rangesMap.size() == 0 )
             return false;
 
