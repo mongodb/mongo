@@ -391,8 +391,11 @@ namespace mongo {
             if ( hasJSReturn( code ) )
                 return false;
 
-            if ( code.find( ";" ) != string::npos &&
-                 code.find( ";" ) != code.rfind( ";" ) )
+            if ( code.find( ';' ) != string::npos &&
+                 code.find( ';' ) != code.rfind( ';' ) )
+                return false;
+            
+            if ( code.find( '\n') != string::npos )
                 return false;
 
             if ( code.find( "for(" ) != string::npos ||
@@ -420,6 +423,8 @@ namespace mongo {
             while (isspace(*raw)) {
                 raw++;
             }
+
+            //cout << "RAW\n---\n" << raw << "\n---" << endl;
 
             stringstream fname;
             fname << "cf_";
