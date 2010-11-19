@@ -699,10 +699,13 @@ namespace mongo {
     int getClientId(){
         return clientId.get();
     }
+
+    const int DEFAULT_MAX_CONN = 20000;
+    const int MAX_MAX_CONN = 20000;
     
     int getMaxConnections(){
 #ifdef _WIN32
-        return 20000;
+        return DEFAULT_MAX_CONN;
 #else
         struct rlimit limit;
         assert( getrlimit(RLIMIT_NOFILE,&limit) == 0 );
@@ -715,17 +718,30 @@ namespace mongo {
                << " max conn: " << max
                << endl;
         
-        if ( max > 20000 )
-            max = 20000;
+        if ( max > MAX_MAX_CONN )
+            max = MAX_MAX_CONN;
 
         return max;
 #endif
     }
 
     void checkTicketNumbers(){
-        connTicketHolder.resize( getMaxConnections() );
+        int want = getMaxConnections();
+        int current = connTicketHolder.outof();
+        if ( current != DEFAULT_MAX_CONN ){
+            if ( current < want ) {
+                // they want fewer than they can handle
+                // which is fine
+                log(1) << " only allowing " << current << " connections" << endl;
+                return;
+            }
+            if ( current > want ) {
+                log() << " --maxConns too high, can only handle " << want << endl;
+            }
+        }
+        connTicketHolder.resize( want );
     }
 
-    TicketHolder connTicketHolder(20000);
+    TicketHolder connTicketHolder(DEFAULT_MAX_CONN);
 
 } // namespace mongo
