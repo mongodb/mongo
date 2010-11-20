@@ -1,4 +1,4 @@
-mongodb (1.6.5-rc0) unstable; urgency=low
+mongodb (1.6.5-rc1) unstable; urgency=low
 
   * full change log http://jira.mongodb.org/browse/SERVER/fixforversion/10207
 
