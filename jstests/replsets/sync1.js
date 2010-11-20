@@ -165,14 +165,19 @@ doTest = function (signal) {
     print("\nsync1.js ********************************************************************** part 10");
 
     // now, let's see if rollback works
-    try {
-      dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: false });
-    }
-    catch(e) {
-      print(e);
-    }
-    reconnect(dbs[0]);
-    reconnect(dbs[1]);
+    wait(function() {
+        try {
+          dbs[0].adminCommand({ replSetTest: 1, blind: false });
+        }
+        catch(e) {
+          print(e);
+        }
+        reconnect(dbs[0]);
+        reconnect(dbs[1]);
+
+        var status = dbs[1].adminCommand({replSetGetStatus:1});
+        return status.members[0].health == 1;
+      });
     
     
     dbs[0].getMongo().setSlaveOk();
