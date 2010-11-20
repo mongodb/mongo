@@ -174,6 +174,9 @@ namespace mongo {
         BSONObj _nullObj; // only used for _nullElt
         BSONElement _nullElt; // jstNull
         
+        int _nFields; // number of fields in the index
+        bool _sparse; // if the index is sparse
+
         shared_ptr<IndexType> _indexType;
 
         const IndexDetails * _details;

@@ -527,7 +527,7 @@ namespace mongo {
             return -1;
         }
         BSONObj query = cmd.getObjectField("query");
-        
+
         // count of all objects
         if ( query.isEmpty() ){
             return applySkipLimit( d->stats.nrecords , cmd );

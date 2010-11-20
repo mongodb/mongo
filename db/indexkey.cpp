@@ -70,6 +70,12 @@ namespace mongo {
     void IndexSpec::_init(){
         assert( keyPattern.objsize() );
 
+        // some basics
+        _nFields = keyPattern.nFields();
+        _sparse = info["sparse"].trueValue();
+        uassert( 13529 , "sparse only works for single field keys" , ! _sparse || _nFields );
+        
+        
         {
             // build _nullKey 
             
@@ -119,27 +125,37 @@ namespace mongo {
         vector<const char*> fieldNames( _fieldNames );
         vector<BSONElement> fixed( _fixed );
         _getKeys( fieldNames , fixed , obj, keys );
-        if ( keys.empty() )
+        if ( keys.empty() && ! _sparse )
             keys.insert( _nullKey );
     }
 
     void IndexSpec::_getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
         BSONElement arrElt;
         unsigned arrIdx = ~0;
+        int numNotFound = 0;
+
         for( unsigned i = 0; i < fieldNames.size(); ++i ) {
             if ( *fieldNames[ i ] == '\0' )
                 continue;
+
             BSONElement e = obj.getFieldDottedOrArray( fieldNames[ i ] );
-            if ( e.eoo() )
+            
+            if ( e.eoo() ){
                 e = _nullElt; // no matching field
+                numNotFound++;
+            }
+            
             if ( e.type() != Array )
                 fieldNames[ i ] = ""; // no matching field or non-array match
+
             if ( *fieldNames[ i ] == '\0' )
                 fixed[ i ] = e; // no need for further object expansion (though array expansion still possible)
+
             if ( e.type() == Array && arrElt.eoo() ) { // we only expand arrays on a single path -- track the path here
                 arrIdx = i;
                 arrElt = e;
             }
+
             // enforce single array path here
             if ( e.type() == Array && e.rawdata() != arrElt.rawdata() ){
                 stringstream ss;
@@ -147,13 +163,19 @@ namespace mongo {
                 uasserted( 10088 ,  ss.str() );
             }
         }
-
+        
         bool allFound = true; // have we found elements for all field names in the key spec?
         for( vector<const char*>::const_iterator i = fieldNames.begin(); i != fieldNames.end(); ++i ){
             if ( **i != '\0' ){
                 allFound = false;
                 break;
             }
+        }
+
+        if ( _sparse && numNotFound == _nFields ){
+            // we didn't find any fields
+            // so we're not going to index this document
+            return;
         }
         
         bool insertArrayNull = false;
