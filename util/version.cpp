@@ -1,18 +1,29 @@
-#include "pch.h"
+// @file version.cpp
 
+/*    Copyright 2009 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+#include "pch.h"
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <string>
-
 #include "version.h"
 
 namespace mongo {
-
-    //
-    // mongo processes version support
-    //
 
     const char versionString[] = "1.7.4-pre-";
 
@@ -22,20 +33,12 @@ namespace mongo {
         return ss.str();
     }
 
-    //
-    // git version support
-    //
-
 #ifndef _SCONS
     // only works in scons
     const char * gitVersion(){ return "not-scons"; }
 #endif
 
     void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
-
-    //
-    // sys info support
-    //
 
 #ifndef _SCONS
 #if defined(_WIN32)
@@ -60,12 +63,14 @@ namespace mongo {
 #if defined(_DURABLE)
         log() << "_DURABLE defined, but durable is not finished" << endl;
 #endif
+#if defined(_TESTINTENT)
+        log() << "_TESTINTENT defined - this mode is for qa purposes" << endl;
+#endif
     }
 
     //
     // 32 bit systems warning
     //
-
     void show_warnings(){
         // each message adds a leading but not a trailing newline
 

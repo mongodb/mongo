@@ -1,7 +1,7 @@
-// pch.h : include file for standard system include files,
-// or project specific include files that are used frequently, but
-// are changed infrequently
-//
+/** @file pch.h : include file for standard system include files,
+ *  or project specific include files that are used frequently, but
+ *  are changed infrequently
+ */
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -93,14 +93,27 @@
 
 namespace mongo {
 
-    /* this likely goes away later. to facilitate testing for a while without impacting other things. */
+/** _DURABLE define - this likely goes away later. to facilitate testing for a while without impacting other things. */
 #if defined(_DURABLE)
     const bool durable = true;
+
+/** Use _TESTINTENT to test write intent declarations by using a read only view for non-declared operations. 
+    We don't do journalling when _TESTINTENT is enabled.
+*/
+#if defined(_TESTINTENT)
+    const bool testIntent = true;
+#else
+    const bool testIntent = false;
+#endif
 #if !defined(_DEBUG)
 #error not done - do not use this yet
 #endif
 #else
     const bool durable = false;
+#if defined(_TESTINTENT)
+#error _TESTINTENT requires _DURABLE
+#endif
+    const bool testIntent = false;
 #endif
 
     using namespace std;
