@@ -69,35 +69,44 @@ namespace mongo {
 
     void IndexSpec::_init(){
         assert( keyPattern.objsize() );
-        
-        string pluginName = IndexPlugin::findPluginName( keyPattern );
-        
-        BSONObjBuilder nullKeyB;
-        BSONObjIterator i( keyPattern );
-        
-        while( i.more() ) {
-            BSONElement e = i.next();
-            _fieldNames.push_back( e.fieldName() );
-            _fixed.push_back( BSONElement() );
-            nullKeyB.appendNull( "" );            
-        }
-        
-        _nullKey = nullKeyB.obj();
 
-        BSONObjBuilder b;
-        b.appendNull( "" );
-        _nullObj = b.obj();
-        _nullElt = _nullObj.firstElement();
+        {
+            // build _nullKey 
+            
+            BSONObjBuilder b;
+            BSONObjIterator i( keyPattern );
         
-        if ( pluginName.size() ){
-            IndexPlugin * plugin = IndexPlugin::get( pluginName );
-            if ( ! plugin ){
-                log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+            while( i.more() ) {
+                BSONElement e = i.next();
+                _fieldNames.push_back( e.fieldName() );
+                _fixed.push_back( BSONElement() );
+                b.appendNull( "" );            
             }
-            else {
+            _nullKey = b.obj();
+        }
+        
+        {
+            // _nullElt
+            BSONObjBuilder b;
+            b.appendNull( "" );
+            _nullObj = b.obj();
+            _nullElt = _nullObj.firstElement();
+        }
+
+        { 
+            // handle plugins
+            string pluginName = IndexPlugin::findPluginName( keyPattern );        
+            if ( pluginName.size() ){
+                IndexPlugin * plugin = IndexPlugin::get( pluginName );
+                if ( ! plugin ){
+                    log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+                }
+                else {
                 _indexType.reset( plugin->generate( this ) );
+                }
             }
         }
+        
         _finishedInit = true;
     }
 
@@ -146,7 +155,7 @@ namespace mongo {
                 break;
             }
         }
-
+        
         bool insertArrayNull = false;
 
         if ( allFound ) {
