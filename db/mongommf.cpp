@@ -56,11 +56,11 @@ namespace mongo {
     }
 
     PointerToMMF privateViews;
-    static PointerToMMF ourReadViews; /// _DEBUG build use only (other than existance)
+    static PointerToMMF ourReadViews; /// _TESTINTENT (testIntent) build use only (other than existance)
 
     /*static*/ void* MongoMMF::switchToPrivateView(void *readonly_ptr) { 
         assert( durable );
-        assert( debug );
+        assert( testIntent );
 
         void *p = readonly_ptr;
 
@@ -123,11 +123,14 @@ namespace mongo {
     bool MongoMMF::finishOpening() {
         if( _view_write ) {
             if( durable ) {
-                _view_private = createPrivateMap();
-                privateViews.add(_view_private, this);
-                if( debug )  {
+                if( testIntent ) { 
+                    _view_private = _view_write;
                     _view_readonly = MemoryMappedFile::createReadOnlyMap();
                     ourReadViews.add(_view_readonly, this);
+                }
+                else {
+                    _view_private = createPrivateMap();
+                    privateViews.add(_view_private, this);
                 }
             }
             else { 
@@ -140,7 +143,7 @@ namespace mongo {
     
     /* we will re-map the private few frequently, thus the use of MoveableBuffer */
     MoveableBuffer MongoMMF::getView() { 
-        if( durable && debug )
+        if( testIntent )
             return _view_readonly;
         return _view_private;
     }
