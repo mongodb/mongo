@@ -15,7 +15,6 @@ res = db.runCommand(
       out: "mr_comments_out"
     });
 printjson( res );
-db[res.results].drop()
 
 res = db.runCommand(
     { mapreduce : "mr_comments",
@@ -26,5 +25,4 @@ res = db.runCommand(
       out: "mr_comments_out"
     });
 printjson( res );
-db[res.results].drop()
 
