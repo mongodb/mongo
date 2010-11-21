@@ -58,7 +58,7 @@ namespace mongo {
         */
         static void* _switchToWritableView(void *private_ptr);
 
-        /** for _DEBUG build.
+        /** for _TESTINTENT build.
             translates the read view pointer into a pointer to the corresponding 
             place in the private view.
         */
@@ -89,21 +89,15 @@ namespace mongo {
 
     /** for durability support we want to be able to map pointers to specific MongoMMF objects. 
     */
-    class PointerToMMF { 
+    class PointerToMMF : boost::noncopyable { 
     public:
-        PointerToMMF() : _m("PointerToMMF") { }
+        PointerToMMF();
 
         /** register view. threadsafe */
-        void add(void *view, MongoMMF *f) {
-            mutex::scoped_lock lk(_m);
-            _views[view] = f;
-        }
+        void add(void *view, MongoMMF *f);
 
         /** de-register view. threadsafe */
-        void remove(void *view) {
-            mutex::scoped_lock lk(_m);
-            _views.erase(view);
-        }
+        void remove(void *view);
 
         /** find associated MMF object for a given pointer.
             threadsafe

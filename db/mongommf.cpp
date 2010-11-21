@@ -28,15 +28,49 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    MongoMMF* PointerToMMF::_find(void *p, /*out*/ size_t& ofs) {
-        std::map< void*, MongoMMF* >::iterator i = _views.upper_bound(((char *)p)+1);
-        i--;
+    /** register view. threadsafe */
+    void PointerToMMF::add(void *view, MongoMMF *f) {
+        mutex::scoped_lock lk(_m);
+        _views.insert( pair<void*,MongoMMF*>(view,f) );
+    }
 
-        bool ok = i != _views.end();
-        if( ok ) {
-            MongoMMF *mmf = i->second;
-            assert( mmf );
-            size_t o = ((char *)p) - ((char*)i->first);
+    /** de-register view. threadsafe */
+    void PointerToMMF::remove(void *view) {
+        if( view ) {
+            mutex::scoped_lock lk(_m);
+            _views.erase(view);
+        }
+    }
+        
+    PointerToMMF::PointerToMMF() : _m("PointerToMMF") { 
+#if defined(SIZE_MAX)
+        size_t max = SIZE_MAX;
+#else
+        size_t max = ~((size_t)0);
+#endif
+        assert( max > (size_t) this ); // just checking that no one redef'd SIZE_MAX and that it is sane
+
+        // this way we don't need any boundary checking in _find()
+        _views.insert( pair<void*,MongoMMF*>((void*)0,(MongoMMF*)0) );
+        _views.insert( pair<void*,MongoMMF*>((void*)max,(MongoMMF*)0) );
+    }
+
+    /** underscore version of find is for when you are already locked
+        @param ofs out return our offset in the view
+        @return the MongoMMF to which this pointer belongs 
+    */
+    MongoMMF* PointerToMMF::_find(void *p, /*out*/ size_t& ofs) {
+        //
+        // .................memory..........................
+        //    v1       p                      v2
+        //    [--------------------]          [-------]
+        //
+        // e.g., _find(p) == v1
+        //
+        const pair<void*,MongoMMF*> x = *(--_views.upper_bound(p));
+        MongoMMF *mmf = x.second;
+        if( mmf ) {
+            size_t o = ((char *)p) - ((char*)x.first);
             if( o < mmf->length() ) { 
                 ofs = o;
                 return mmf;
@@ -68,7 +102,8 @@ namespace mongo {
             size_t ofs=0;
             MongoMMF *mmf = ourReadViews.find(p, ofs);
             if( mmf ) {
-                return ((char *)mmf->_view_private) + ofs;
+                void *res = ((char *)mmf->_view_private) + ofs;
+                return res;
             }
         }
 
@@ -82,7 +117,7 @@ namespace mongo {
         }
 
         // did you call writing() with a pointer that isn't into a datafile?
-        log() << "error switchToPrivateView " << p << endl;
+        log() << "dur error switchToPrivateView " << p << endl;
         return p;
     }
 
