@@ -136,8 +136,6 @@ namespace mongo {
 
         killCurrentOp.checkForInterrupt();
         assertValid(order, true);
-//	if( bt_fv==0 )
-//		return;
 
         if ( bt_dmp ) {
             out() << thisLoc.toString() << ' ';
@@ -334,27 +332,46 @@ namespace mongo {
         childForPos(n) = nextChild;
     }*/
 
-    /* insert a key in a bucket with no complexity -- no splits required */
-    bool BucketBasics::basicInsert(const DiskLoc thisLoc, int &keypos, const DiskLoc recordLoc, const BSONObj& key, const Ordering &order) {
+    /** insert a key in a bucket with no complexity -- no splits required 
+        @return false if a split is required.
+    */
+    bool BucketBasics::basicInsert(const DiskLoc thisLoc, int &keypos, const DiskLoc recordLoc, const BSONObj& key, const Ordering &order) const {
         assert( keypos >= 0 && keypos <= n );
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
         if ( bytesNeeded > emptySize ) {
-            pack( order, keypos );
+            _pack(thisLoc, order, keypos);
             if ( bytesNeeded > emptySize )
                 return false;
         }
-        for ( int j = n; j > keypos; j-- ) // make room
-            k(j) = k(j-1);
 
-        BucketBasics *b = this;
+        BucketBasics *b;
+        {
+            const char *p = (const char *) &k(keypos);
+            const char *q = (const char *) &k(n+1);
+            // declare that we will write to [k(keypos),k(n)]
+            // todo: this writes a medium amount to the journal.  we may want to add a verb "shift" to the redo log so  
+            //       we can log a very small amount.
+            b = (BucketBasics*) dur::writingAtOffset((void *) this, p-(char*)this, q-p);
 
-        b->n++;
+            /* e.g. n==3, keypos==2
+               1 4 9
+                ->
+               1 4 _ 9
+            */
+            for ( int j = n; j > keypos; j-- ) // make room
+                b->k(j) = b->k(j-1);
+        }
+
+        dur::declareWriteIntent(&b->emptySize, 12);
         b->emptySize -= sizeof(_KeyNode);
+        b->n++;
+
         _KeyNode& kn = b->k(keypos);
         kn.prevChildBucket.Null();
         kn.recordLoc = recordLoc;
         kn.setKeyDataOfs((short) b->_alloc(key.objsize()) );
         char *p = b->dataAt(kn.keyDataOfs());
+        dur::declareWriteIntent(p, key.objsize());
         memcpy(p, key.objdata(), key.objsize());
         return true;
     }
@@ -381,7 +398,12 @@ namespace mongo {
     /* when we delete things we just leave empty space until the node is
        full and then we repack it.
     */
-    void BucketBasics::pack( const Ordering &order, int &refPos ) {
+    void BucketBasics::_pack(const DiskLoc thisLoc, const Ordering &order, int &refPos) const {
+        if ( flags & Packed )
+            return;
+        thisLoc.btreemod()->_packReadyForMod(order, refPos);
+    }
+    void BucketBasics::_packReadyForMod( const Ordering &order, int &refPos ) {
         if ( flags & Packed )
             return;
 
@@ -425,7 +447,7 @@ namespace mongo {
     inline void BucketBasics::truncateTo(int N, const Ordering &order, int &refPos) {
         n = N;
         setNotPacked();
-        pack( order, refPos );
+        _packReadyForMod( order, refPos );
     }
 
     /**
@@ -494,7 +516,7 @@ namespace mongo {
         }
         n -= nDrop;
         setNotPacked();
-        pack( order, refpos );        
+        _packReadyForMod( order, refpos );        
     }
         
     /* - BtreeBucket --------------------------------------------------- */
@@ -841,8 +863,8 @@ namespace mongo {
         BtreeBucket *l = leftNodeLoc.btreemod();
         BtreeBucket *r = rightNodeLoc.btreemod();
         int pos = 0;
-        l->pack( order, pos );
-        r->pack( order, pos ); // pack r in case there are droppable keys
+        l->_packReadyForMod( order, pos );
+        r->_packReadyForMod( order, pos ); // pack r in case there are droppable keys
         
         int oldLNum = l->n;
         {
@@ -954,9 +976,9 @@ namespace mongo {
         DiskLoc rchild = childForPos( leftIndex + 1 );
         int zeropos = 0;
         BtreeBucket *l = lchild.btreemod();
-        l->pack( order, zeropos );
+        l->_packReadyForMod( order, zeropos );
         BtreeBucket *r = rchild.btreemod();
-        r->pack( order, zeropos );
+        r->_packReadyForMod( order, zeropos );
         int split = rebalancedSeparatorPos( thisLoc, leftIndex );
         
         /**
@@ -1072,7 +1094,7 @@ namespace mongo {
     
     void BtreeBucket::_insertHere(DiskLoc thisLoc, int keypos,
                                  DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
-                                 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
+                                 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) const
     {
         if ( insert_debug )
             out() << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' '
@@ -1080,8 +1102,14 @@ namespace mongo {
 
         DiskLoc oldLoc = thisLoc;
 
-        if ( basicInsert(thisLoc, keypos, recordLoc, key, order) ) {
-            _KeyNode& kn = k(keypos);
+        if ( !basicInsert(thisLoc, keypos, recordLoc, key, order) ) {
+            thisLoc.btreemod()->split(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
+            return;
+        }
+
+        {
+            const _KeyNode *_kn = &k(keypos);
+            _KeyNode *kn = (_KeyNode *) dur::alreadyDeclared((_KeyNode*) _kn); // already declared intent in basicInsert()
             if ( keypos+1 == n ) { // last key
                 if ( nextChild != lchild ) {
                     out() << "ERROR nextChild != lchild" << endl;
@@ -1091,22 +1119,16 @@ namespace mongo {
                     out() << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
                     out() << "  key: " << key.toString() << endl;
                     dump();
-#if 0
-                    out() << "\n\nDUMPING FULL INDEX" << endl;
-                    bt_dmp=1;
-                    bt_fv=1;
-                    idx.head.btree()->fullValidate(idx.head);
-#endif
                     assert(false);
                 }
-                kn.prevChildBucket = nextChild;
-                assert( kn.prevChildBucket == lchild );
-                nextChild = rchild;
+                kn->prevChildBucket = nextChild;
+                assert( kn->prevChildBucket == lchild );
+                nextChild.writing() = rchild;
                 if ( !rchild.isNull() )
                     rchild.btree()->parent.writing() = thisLoc;
             }
             else {
-                k(keypos).prevChildBucket = lchild;
+                kn->prevChildBucket = lchild;
                 if ( k(keypos+1).prevChildBucket != lchild ) {
                     out() << "ERROR k(keypos+1).prevChildBucket != lchild" << endl;
                     out() << "  thisLoc: " << thisLoc.toString() << ' ' << idx.indexNamespace() << endl;
@@ -1115,21 +1137,19 @@ namespace mongo {
                     out() << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
                     out() << "  key: " << key.toString() << endl;
                     dump();
-#if 0
-                    out() << "\n\nDUMPING FULL INDEX" << endl;
-                    bt_dmp=1;
-                    bt_fv=1;
-                    idx.head.btree()->fullValidate(idx.head);
-#endif
                     assert(false);
                 }
-                k(keypos+1).prevChildBucket = rchild;
+                const DiskLoc *pc = &k(keypos+1).prevChildBucket;
+                *dur::alreadyDeclared((DiskLoc*) pc) = rchild; // declared in basicInsert()
                 if ( !rchild.isNull() )
                     rchild.btree()->parent.writing() = thisLoc;
             }
             return;
         }
+    }
 
+    void BtreeBucket::split(DiskLoc thisLoc, int keypos, DiskLoc recordLoc, const BSONObj& key, const Ordering& order, DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
+    {
         /* ---------- split ---------------- */
         
         if ( split_debug )
@@ -1212,7 +1232,7 @@ namespace mongo {
                                  DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
                                  DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) const
     {
-        thisLoc.btreemod()->_insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
+        /*thisLoc.btreemod()->*/_insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
     }
 
     /* start a new index off, empty */

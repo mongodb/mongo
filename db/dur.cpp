@@ -55,12 +55,31 @@ namespace mongo {
 
         static CommitJob cj;
 
-        void* writingPtr(void *x, size_t len) { 
-            //log() << "TEMP writing " << x << ' ' << len << endl;
-            void *p = x;
-            DEV p = MongoMMF::switchToPrivateView(x);
+        /** declare write intent.  when already in the write view if testIntent is true. */
+        void declareWriteIntent(void *p, unsigned len) {
+            log() << "TEMP dur writing " << p << ' ' << len << endl;
             WriteIntent w(p, len);
             cj.note(w);
+        }
+
+        void* writingPtr(void *x, unsigned len) { 
+            void *p = x;
+            if( testIntent )
+                p = MongoMMF::switchToPrivateView(x);
+            declareWriteIntent(p, len);
+            return p;
+        }
+
+        /** declare intent to write
+            @param ofs offset within buf at which we will write
+            @param len the length at ofs we will write
+            @return new buffer pointer.  this is modified when testIntent is true.
+        */
+        void* writingAtOffset(void *buf, unsigned ofs, unsigned len) {
+            char *p = (char *) buf;
+            if( testIntent )
+                p = (char *) MongoMMF::switchToPrivateView(buf);
+            declareWriteIntent(p+ofs, len);
             return p;
         }
 

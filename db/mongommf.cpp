@@ -165,8 +165,8 @@ namespace mongo {
                 }
                 else {
                     _view_private = createPrivateMap();
-                    privateViews.add(_view_private, this);
                 }
+                privateViews.add(_view_private, this); // note that testIntent builds use this, even though it points to view_write then...
             }
             else { 
                 _view_private = _view_write;

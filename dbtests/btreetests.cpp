@@ -1087,7 +1087,7 @@ namespace BtreeTests {
                 ASSERT( !( t->flags & Packed ) );
                 Ordering o = Ordering::make( id.keyPattern() );
                 int zero = 0;
-                t->pack( o, zero );
+                t->_packReadyForMod( o, zero );
                 ASSERT_EQUALS( 0, t->n );
                 ASSERT_EQUALS( 0, t->topSize );
                 ASSERT_EQUALS( BtreeBucket::bodySize(), t->emptySize );
