@@ -29,7 +29,7 @@ namespace mongo {
 
 #pragma pack(1)
     struct _KeyNode {
-        // Signals that we are writing this _KeyNode and casts away const
+        /** Signals that we are writing this _KeyNode and casts away const */
         _KeyNode& writing() const;
         DiskLoc prevChildBucket; // the lchild
         DiskLoc recordLoc; // location of the record associated with the key
@@ -47,11 +47,10 @@ namespace mongo {
         }
         void setUsed() { recordLoc.GETOFS() &= ~1; }
         void setUnused() {
-            /* Setting ofs to odd is the sentinel for unused, as real recordLoc's are always
-               even numbers.
-               Note we need to keep its value basically the same as we use the recordLoc
-               as part of the key in the index (to handle duplicate keys efficiently).
-            */
+            // Setting ofs to odd is the sentinel for unused, as real recordLoc's are always
+            //  even numbers.
+            // Note we need to keep its value basically the same as we use the recordLoc
+            // as part of the key in the index (to handle duplicate keys efficiently).
             recordLoc.GETOFS() |= 1;
         }
         int isUnused() const {
@@ -153,12 +152,10 @@ namespace mongo {
          * @return false if node is full and must be split
          * @keypos is where to insert -- inserted before that key #.  so keypos=0 is the leftmost one.
          *  keypos will be updated if keys are moved as a result of pack()
-        */
+         */
         bool basicInsert(const DiskLoc thisLoc, int &keypos, const DiskLoc recordLoc, const BSONObj& key, const Ordering &order) const;
         
-        /**
-         * @return true if works, false if not enough space
-         */
+        /** @return true if works, false if not enough space */
         bool _pushBack(const DiskLoc recordLoc, const BSONObj& key, const Ordering &order, const DiskLoc prevChild);
         void pushBack(const DiskLoc recordLoc, const BSONObj& key, const Ordering &order, const DiskLoc prevChild){
             bool ok = _pushBack( recordLoc , key , order , prevChild );
@@ -190,7 +187,7 @@ namespace mongo {
         DiskLoc& childForPos(int p) { return p == n ? nextChild : k(p).prevChildBucket; }
 
         int totalDataSize() const;
-        // @return true if the key may be dropped by pack()
+        /** @return true if the key may be dropped by pack() */
         bool mayDropKey( int index, int refPos ) const;
 
         /**
@@ -199,6 +196,7 @@ namespace mongo {
          *  delete keys from the bucket
          */
         void _pack(const DiskLoc thisLoc, const Ordering &order, int &refPos) const;
+        /** Pack when already writable */
         void _packReadyForMod(const Ordering &order, int &refPos);
 
         /**
@@ -211,13 +209,14 @@ namespace mongo {
         int _alloc(int bytes);
         void _unalloc(int bytes);
         void truncateTo(int N, const Ordering &order, int &refPos);
-        // drop specified number of keys from beginning of key array, and pack
+        /** drop specified number of keys from beginning of key array, and pack */
         void dropFront(int nDrop, const Ordering &order, int &refPos);
         void markUnused(int keypos);
 
-        /* BtreeBuilder uses the parent var as a temp place to maintain a linked list chain. 
-           we use tempNext() when we do that to be less confusing. (one might have written a union in C)
-           */
+        /**
+         * BtreeBuilder uses the parent var as a temp place to maintain a linked list chain. 
+         *   we use tempNext() when we do that to be less confusing. (one might have written a union in C)
+         */
         const DiskLoc& tempNext() const { return parent; }
         DiskLoc& tempNext() { return parent; }
 
@@ -226,7 +225,7 @@ namespace mongo {
         const _KeyNode& k(int i) const { return ((const _KeyNode*)data)[i]; }
         _KeyNode& k(int i) { return ((_KeyNode*)data)[i]; }
         
-        // @return the key position where a split should occur on insert
+        /** @return the key position where a split should occur on insert */
         int splitPos( int keypos ) const;
         
         /**
@@ -282,12 +281,13 @@ namespace mongo {
         string bucketSummary() const;
         void dump() const;
 
-        /* @return true if key exists in index 
-
-           order - indicates order of keys in the index.  this is basically the index's key pattern, e.g.:
-             BSONObj order = ((IndexDetails&)idx).keyPattern();
-           likewise below in bt_insert() etc.
-        */
+        /**
+         * @return true if key exists in index 
+         *
+         * @order - indicates order of keys in the index.  this is basically the index's key pattern, e.g.:
+         *    BSONObj order = ((IndexDetails&)idx).keyPattern();
+         * likewise below in bt_insert() etc.
+         */
         bool exists(const IndexDetails& idx, const DiskLoc &thisLoc, const BSONObj& key, const Ordering& order) const;
 
         bool wouldCreateDup(
@@ -296,25 +296,26 @@ namespace mongo {
             const DiskLoc &self) const; 
 
         static DiskLoc addBucket(const IndexDetails&); /* start a new index off, empty */
-        // invalidates 'this' and thisLoc
+        /** invalidates 'this' and thisLoc */
         void deallocBucket(const DiskLoc thisLoc, const IndexDetails &id);
         
         static void renameIndexNamespace(const char *oldNs, const char *newNs);
 
-        // This function may change the btree root
+        /** This function may change the btree root */
         int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                    const BSONObj& key, const Ordering &order, bool dupsAllowed,
                    IndexDetails& idx, bool toplevel = true) const;
 
-        // This function may change the btree root
+        /** This function may change the btree root */
         bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const;
 
-        /* locate may return an "unused" key that is just a marker.  so be careful.
-             looks for a key:recordloc pair.
-
-           found - returns true if exact match found.  note you can get back a position 
-                   result even if found is false.
-        */
+        /**
+         * locate may return an "unused" key that is just a marker.  so be careful.
+         *   looks for a key:recordloc pair.
+         *
+         * @found - returns true if exact match found.  note you can get back a position 
+         *          result even if found is false.
+         */
         DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order, 
                        int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) const;
         
@@ -326,7 +327,7 @@ namespace mongo {
          */
         DiskLoc findSingle( const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key ) const;
 
-        /* advance one key position in the index: */
+        /** advance one key position in the index: */
         DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) const;
         
         void advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) const;
@@ -334,7 +335,7 @@ namespace mongo {
         
         const DiskLoc getHead(const DiskLoc& thisLoc) const;
 
-        /* get tree shape */
+        /** get tree shape */
         void shape(stringstream&) const;
 
         static void a_test(IndexDetails&);
@@ -350,15 +351,15 @@ namespace mongo {
          */
         void fixParentPtrs(const DiskLoc thisLoc, int firstIndex = 0, int lastIndex = -1) const;
 
-        // invalidates this and thisLoc
+        /** invalidates this and thisLoc */
         void delBucket(const DiskLoc thisLoc, const IndexDetails&);
-        // may invalidate this and thisLoc
+        /** may invalidate this and thisLoc */
         void delKeyAtPos(const DiskLoc thisLoc, IndexDetails& id, int p, const Ordering &order);
 
-        // may invalidate this and thisLoc
+        /** may invalidate this and thisLoc */
         void balanceWithNeighbors(const DiskLoc thisLoc, IndexDetails &id, const Ordering &order) const;        
 
-        // @return true if balance succeeded
+        /** @return true if balance succeeded */
         bool tryBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) const;
         void doBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order );
         void doBalanceLeftToRight( const DiskLoc thisLoc, int leftIndex, int split,
@@ -370,13 +371,13 @@ namespace mongo {
                                   BtreeBucket *r, const DiskLoc rchild,
                                   IndexDetails &id, const Ordering &order );
 
-        // may invalidate this and thisLoc
+        /** may invalidate this and thisLoc */
         void doMergeChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order);
 
-        // will invalidate this and thisLoc
+        /** will invalidate this and thisLoc */
         void replaceWithNextChild( const DiskLoc thisLoc, IndexDetails &id );
 
-        // @return true iff left and right child can be merged into one node
+        /** @return true iff left and right child can be merged into one node */
         bool mayMergeChildren( const DiskLoc &thisLoc, int leftIndex ) const;
         
         /**
@@ -414,12 +415,12 @@ namespace mongo {
         static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, bool rSup, const vector< const BSONElement * > &rEnd, const vector< bool > &rEndInclusive, const Ordering &o, int direction );
         static void fix(const DiskLoc thisLoc, const DiskLoc child);
         
-        // Replaces an existing key with the new specified key, splitting if necessary
+        /** Replaces an existing key with the new specified key, splitting if necessary */
         void setInternalKey( const DiskLoc thisLoc, int keypos,
                             const DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
                             const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx);
     public:
-        // simply builds and returns a dup key error message string
+        /** simply builds and returns a dup key error message string */
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );
     };
 #pragma pack()
@@ -435,12 +436,13 @@ namespace mongo {
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return true; }
 
-        /* used for multikey index traversal to avoid sending back dups. see Matcher::matches().
-           if a multikey index traversal:
-             if loc has already been sent, returns true.
-             otherwise, marks loc as sent.
-             @return true if the loc has not been seen
-        */
+        /**
+         * used for multikey index traversal to avoid sending back dups. see Matcher::matches().
+         * if a multikey index traversal:
+         *   if loc has already been sent, returns true.
+         *   otherwise, marks loc as sent.
+         * @return true if the loc has not been seen
+         */
         virtual bool getsetdup(DiskLoc loc) {
             if( _multikey ) { 
                 pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
@@ -502,25 +504,26 @@ namespace mongo {
 
         virtual long long nscanned() { return _nscanned; }
         
-        // for debugging only
+        /** for debugging only */
         const DiskLoc getBucket() const { return bucket; }
         
     private:
-        /* Our btrees may (rarely) have "unused" keys when items are deleted.
-           Skip past them.
-        */
+        /**
+         * Our btrees may (rarely) have "unused" keys when items are deleted.
+         * Skip past them.
+         */
         bool skipUnusedKeys( bool mayJump );
         bool skipOutOfRangeKeysAndCheckEnd();
         void skipAndCheck();
         void checkEnd();
 
-        // selective audits on construction
+        /** selective audits on construction */
         void audit();
 
-        // set initial bucket
+        /** set initial bucket */
         void init();
 
-        // if afterKey is true, we want the first key with values of the keyBegin fields greater than keyBegin
+        /** if afterKey is true, we want the first key with values of the keyBegin fields greater than keyBegin */
         void advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive );
         
         friend class BtreeBucket;
@@ -556,8 +559,10 @@ namespace mongo {
         return head.btree()->wouldCreateDup(*this, head, key, Ordering::make(keyPattern()), self);
     }
 
-    /* build btree from the bottom up */
-    /* _ TODO dropDups */
+    /**
+     * build btree from the bottom up
+     * _ TODO dropDups
+     */
     class BtreeBuilder {
         bool dupsAllowed; 
         IndexDetails& idx;
@@ -578,12 +583,13 @@ namespace mongo {
 
         BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx);
 
-        /* keys must be added in order */
+        /** keys must be added in order */
         void addKey(BSONObj& key, DiskLoc loc);
 
-        /* commit work.  if not called, destructor will clean up partially completed work 
-           (in case exception has happened).
-        */
+        /**
+         * commit work.  if not called, destructor will clean up partially completed work 
+         *  (in case exception has happened).
+         */
         void commit();
 
         unsigned long long getn() { return n; }
