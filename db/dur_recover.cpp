@@ -28,7 +28,7 @@ namespace mongo {
     namespace dur { 
 
         void recover() { 
-            log() << "recovery not yet implemented" << endl;
+            log() << "dur recovery not yet implemented" << endl;
         }
 
     } // namespace dur

@@ -248,8 +248,10 @@ namespace mongo {
         }
 
         void unlinkThread();
+        void recover();
 
         void startup() {
+            recover();
             if( testIntent )
                 return;
             journalMakeDir();
