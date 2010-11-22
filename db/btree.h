@@ -102,12 +102,15 @@ namespace mongo {
      * Const member functions of this class are those which may be called on
      * an object for which writing has not been signaled.  Non const member
      * functions may only be called on objects for which writing has been
-     * signaled.
+     * signaled.  Note that currently some const functions write to the
+     * underlying memory representation of this bucket using optimized methods
+     * to signal write operations.
      *
      * DiskLoc parameters that may shadow references within the btree should
      * be passed by value rather than by reference to non const member
-     * functions.  This way a callee need not worry that write operations will
-     * change or invalidate its arguments.
+     * functions or const member functions which may perform writes.  This way
+     * a callee need not worry that write operations will change or invalidate
+     * its arguments.
      *
      * The current policy for dealing with bson arguments is the opposite of
      * what is described above for DiskLoc arguments.  We do
@@ -152,6 +155,8 @@ namespace mongo {
          * @return false if node is full and must be split
          * @keypos is where to insert -- inserted before that key #.  so keypos=0 is the leftmost one.
          *  keypos will be updated if keys are moved as a result of pack()
+         * This function will modify the btree bucket memory representation even
+         * though it is marked const.
          */
         bool basicInsert(const DiskLoc thisLoc, int &keypos, const DiskLoc recordLoc, const BSONObj& key, const Ordering &order) const;
         
@@ -194,6 +199,7 @@ namespace mongo {
          * Pack the bucket to reclaim space from invalidated memory.
          * @refPos is an index in the bucket which will may be updated if we
          *  delete keys from the bucket
+         * This function may cast away const and perform a write.
          */
         void _pack(const DiskLoc thisLoc, const Ordering &order, int &refPos) const;
         /** Pack when already writable */
