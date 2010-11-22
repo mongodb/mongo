@@ -491,7 +491,7 @@ namespace mongo {
         return split;
     }
     
-    void BucketBasics::addKeysFront( int nAdd ) {
+    void BucketBasics::reserveKeysFront( int nAdd ) {
         assert( emptySize >= int( sizeof( _KeyNode ) * nAdd ) );
         emptySize -= sizeof( _KeyNode ) * nAdd;
         for( int i = n - 1; i > -1; --i ) {
@@ -929,7 +929,7 @@ namespace mongo {
                                            IndexDetails &id, const Ordering &order ) {
         // TODO maybe do some audits the same way pushBack() does?
         int rAdd = l->n - split;
-        r->addKeysFront( rAdd );
+        r->reserveKeysFront( rAdd );
         for( int i = split + 1, j = 0; i < l->n; ++i, ++j ) {
             KeyNode kn = l->keyNode( i );
             r->setKey( j, kn.recordLoc, kn.key, kn.prevChildBucket );

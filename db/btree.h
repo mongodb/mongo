@@ -234,7 +234,7 @@ namespace mongo {
          * entries to the right.  After this is called, setKey() must be called
          * on all the newly created entries in the key array.
          */
-        void addKeysFront( int nAdd );
+        void reserveKeysFront( int nAdd );
         
         /**
          * Sets an existing key using the given parameters.
