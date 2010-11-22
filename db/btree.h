@@ -401,9 +401,6 @@ namespace mongo {
                    const DiskLoc recordLoc, const BSONObj& key,
                    const Ordering& order, const DiskLoc lchild, const DiskLoc rchild, IndexDetails& idx);
 
-        void _insertHere(const DiskLoc thisLoc, int keypos,
-                        const DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
-                        const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx) const;
         void insertHere(const DiskLoc thisLoc, int keypos,
                         const DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
                         const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx) const;

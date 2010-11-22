@@ -1080,19 +1080,23 @@ namespace mongo {
         /**
          * This may leave the bucket empty (n == 0) which is ok only as a
          * transient state.  In the instant case, the implementation of
-         * _insertHere behaves correctly when n == 0 and as a side effect
+         * insertHere behaves correctly when n == 0 and as a side effect
          * increments n.
          */
         _delKeyAtPos( keypos, true );
         
-        // just set temporarily, required to pass validation in _insertHere()
+        // just set temporarily, required to pass validation in insertHere()
         childForPos( keypos ) = lchild;
         
-        _insertHere( thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx );        
+        insertHere( thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx );        
     }
     
-    
-    void BtreeBucket::_insertHere( const DiskLoc thisLoc, int keypos,
+    /* insert a key in this bucket, splitting if necessary.
+     keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
+     NOTE this function may free some data, and as a result the value passed for keypos may
+     be invalid after calling insertHere()
+     */    
+    void BtreeBucket::insertHere( const DiskLoc thisLoc, int keypos,
                                  const DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
                                  const DiskLoc lchild, const DiskLoc rchild, IndexDetails& idx) const
     {
@@ -1221,18 +1225,6 @@ namespace mongo {
 
         if ( split_debug )
             out() << "     split end " << hex << thisLoc.getOfs() << dec << endl;
-    }
-
-    /* insert a key in this bucket, splitting if necessary.
-       keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
-       NOTE this function may free some data, and as a result the value passed for keypos may
-       be invalid after calling insertHere()
-    */
-    void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
-                                 DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
-                                 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) const
-    {
-        /*thisLoc.btreemod()->*/_insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
     }
 
     /* start a new index off, empty */
