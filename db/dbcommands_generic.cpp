@@ -76,15 +76,28 @@ namespace mongo {
             help << "get administrative option(s)\nexample:\n";
             help << "{ get:1, notablescan:1 }\n";
             help << "supported so far:\n";
+            help << "  quiet\n";
             help << "  notablescan\n";
+            help << "  logLevel\n";
             help << "{ get:'*' } to get everything\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             bool all = cmdObj.firstElement().valuestrsafe();
+            
+            int before = result.len();
+            
+            if( all || cmdObj.hasElement("quiet") ) {
+                result.append("quiet", cmdLine.quiet );
+            }
             if( all || cmdObj.hasElement("notablescan") ) {
                 result.append("notablescan", cmdLine.noTableScan);
             }
-            else {
+            if( all || cmdObj.hasElement("logLevel") ) {
+                result.append("logLevel", logLevel);
+            }
+            
+
+            if ( before == result.len() ) {
                 errmsg = "no option found to get";
                 return false;
             }
@@ -103,11 +116,22 @@ namespace mongo {
             help << "{ set:1, notablescan:true }\n";
             help << "supported so far:\n";
             help << "  notablescan\n";
+            help << "  logLevel\n";
+            help << "  quiet\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            
             if( cmdObj.hasElement("notablescan") ) {
                 result.append("was", cmdLine.noTableScan);
                 cmdLine.noTableScan = cmdObj["notablescan"].Bool();
+            }
+            else if( cmdObj.hasElement("quiet") ) {
+                result.append("was", cmdLine.quiet );
+                cmdLine.quiet = cmdObj["quiet"].Bool();
+            }
+            else if( cmdObj.hasElement( "logLevel" ) ) {
+                result.append("was", logLevel );
+                logLevel = cmdObj["logLevel"].numberInt();
             }
             else {
                 errmsg = "no option found to set";
