@@ -79,6 +79,7 @@ namespace mongo {
             help << "  quiet\n";
             help << "  notablescan\n";
             help << "  logLevel\n";
+            help << "  syncdelay\n";
             help << "{ get:'*' } to get everything\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
@@ -94,6 +95,9 @@ namespace mongo {
             }
             if( all || cmdObj.hasElement("logLevel") ) {
                 result.append("logLevel", logLevel);
+            }
+            if( all || cmdObj.hasElement("syncdelay") ) {
+                result.append("syncdelay", cmdLine.syncdelay);
             }
             
 
@@ -128,6 +132,10 @@ namespace mongo {
             else if( cmdObj.hasElement("quiet") ) {
                 result.append("was", cmdLine.quiet );
                 cmdLine.quiet = cmdObj["quiet"].Bool();
+            }
+            else if( cmdObj.hasElement("syncdelay") ) {
+                result.append("was", cmdLine.syncdelay );
+                cmdLine.syncdelay = cmdObj["syncdelay"].Number();
             }
             else if( cmdObj.hasElement( "logLevel" ) ) {
                 result.append("was", logLevel );
