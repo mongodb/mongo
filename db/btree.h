@@ -332,7 +332,7 @@ namespace mongo {
         void advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) const;
         void customLocate(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) const;
         
-        DiskLoc getHead(const DiskLoc& thisLoc) const;
+        const DiskLoc getHead(const DiskLoc& thisLoc) const;
 
         /* get tree shape */
         void shape(stringstream&) const;
@@ -397,20 +397,20 @@ namespace mongo {
         static BtreeBucket* allocTemp(); /* caller must release with free() */
 
         /** split bucket */
-        void split(DiskLoc thisLoc, int keypos, 
-                   DiskLoc recordLoc, const BSONObj& key,
-                   const Ordering& order, DiskLoc lchild, DiskLoc rchild, IndexDetails& idx);
+        void split(const DiskLoc thisLoc, int keypos, 
+                   const DiskLoc recordLoc, const BSONObj& key,
+                   const Ordering& order, const DiskLoc lchild, const DiskLoc rchild, IndexDetails& idx);
 
-        void _insertHere(DiskLoc thisLoc, int keypos,
-                        DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
-                        DiskLoc lchild, DiskLoc rchild, IndexDetails &idx) const;
-        void insertHere(DiskLoc thisLoc, int keypos,
-                        DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
-                        DiskLoc lchild, DiskLoc rchild, IndexDetails &idx) const;
+        void _insertHere(const DiskLoc thisLoc, int keypos,
+                        const DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
+                        const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx) const;
+        void insertHere(const DiskLoc thisLoc, int keypos,
+                        const DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
+                        const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx) const;
 
-        int _insert(DiskLoc thisLoc, DiskLoc recordLoc,
+        int _insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                     const BSONObj& key, const Ordering &order, bool dupsAllowed,
-                    DiskLoc lChild, DiskLoc rChild, IndexDetails &idx) const;
+                    const DiskLoc lChild, const DiskLoc rChild, IndexDetails &idx) const;
         bool find(const IndexDetails& idx, const BSONObj& key, const DiskLoc &recordLoc, const Ordering &order, int& pos, bool assertIfDup) const;
         bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) const;
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
@@ -418,9 +418,9 @@ namespace mongo {
         static void fix(const DiskLoc thisLoc, const DiskLoc child);
         
         // Replaces an existing key with the new specified key, splitting if necessary
-        void setInternalKey( DiskLoc thisLoc, int keypos,
-                            DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
-                            DiskLoc lchild, DiskLoc rchild, IndexDetails &idx);
+        void setInternalKey( const DiskLoc thisLoc, int keypos,
+                            const DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
+                            const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx);
     public:
         // simply builds and returns a dup key error message string
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );

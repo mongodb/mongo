@@ -1073,9 +1073,9 @@ namespace mongo {
         }
     }
 
-    void BtreeBucket::setInternalKey( DiskLoc thisLoc, int keypos,
-                                     DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
-                                     DiskLoc lchild, DiskLoc rchild, IndexDetails &idx ) {
+    void BtreeBucket::setInternalKey( const DiskLoc thisLoc, int keypos,
+                                     const DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
+                                     const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx ) {
         childForPos( keypos ).Null();
         /**
          * This may leave the bucket empty (n == 0) which is ok only as a
@@ -1092,9 +1092,9 @@ namespace mongo {
     }
     
     
-    void BtreeBucket::_insertHere(DiskLoc thisLoc, int keypos,
-                                 DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
-                                 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) const
+    void BtreeBucket::_insertHere( const DiskLoc thisLoc, int keypos,
+                                 const DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
+                                 const DiskLoc lchild, const DiskLoc rchild, IndexDetails& idx) const
     {
         if ( insert_debug )
             out() << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' '
@@ -1148,7 +1148,7 @@ namespace mongo {
         }
     }
 
-    void BtreeBucket::split(DiskLoc thisLoc, int keypos, DiskLoc recordLoc, const BSONObj& key, const Ordering& order, DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
+    void BtreeBucket::split(const DiskLoc thisLoc, int keypos, const DiskLoc recordLoc, const BSONObj& key, const Ordering& order, const DiskLoc lchild, const DiskLoc rchild, IndexDetails& idx)
     {
         /* ---------- split ---------------- */
         
@@ -1248,7 +1248,7 @@ namespace mongo {
         renameNamespace( oldNs, newNs );
     }
 
-    DiskLoc BtreeBucket::getHead(const DiskLoc& thisLoc) const {
+    const DiskLoc BtreeBucket::getHead(const DiskLoc& thisLoc) const {
         DiskLoc p = thisLoc;
         while ( !p.btree()->isHead() )
             p = p.btree()->parent;
@@ -1421,7 +1421,7 @@ namespace mongo {
                     keyOfs = h;
                 }
                 if ( !next.isNull() ) {
-                    bestParent = make_pair( thisLoc, keyOfs );
+                    bestParent = pair< DiskLoc, int >( thisLoc, keyOfs );
                     thisLoc = next;
                     continue;
                 } else {
@@ -1460,9 +1460,9 @@ namespace mongo {
     
     /* @thisLoc disk location of *this
     */
-    int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc,
+    int BtreeBucket::_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                              const BSONObj& key, const Ordering &order, bool dupsAllowed,
-                             DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) const {
+                             const DiskLoc lChild, const DiskLoc rChild, IndexDetails& idx) const {
         if ( key.objsize() > KeyMax ) {
             problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << key.objsize() << ' ' << idx.indexNamespace() << endl;
             return 2;
