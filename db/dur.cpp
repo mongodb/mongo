@@ -57,7 +57,7 @@ namespace mongo {
 
         /** declare write intent.  when already in the write view if testIntent is true. */
         void declareWriteIntent(void *p, unsigned len) {
-            log() << "TEMP dur writing " << p << ' ' << len << endl;
+//            log() << "TEMP dur writing " << p << ' ' << len << endl;
             WriteIntent w(p, len);
             cj.note(w);
         }

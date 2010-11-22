@@ -17,9 +17,8 @@ namespace mongo {
         template <typename T> inline T* writing(T *x) { return x; }
         inline void assertReading(void *p) { }
         template <typename T> inline T* writingNoLog(T *x) { return x; }
-        void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
-        template <typename T>
-        inline T* alreadyDeclared(T *x) { return x; }
+        inline void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
+        template <typename T> inline T* alreadyDeclared(T *x) { return x; }
         inline void declareWriteIntent(void *, unsigned) { }
 #else
 
