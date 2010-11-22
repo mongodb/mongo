@@ -419,9 +419,17 @@ namespace mongo {
         JSFunction * _compileFunction( const char * raw , JSObject * assoc , const char *& gcName ){
             if ( ! assoc )
                 assoc = JS_GetGlobalObject( _context );
+            
+            while ( raw[0] ){
+                while (isspace(*raw)) {
+                    raw++;
+                }
 
-            while (isspace(*raw)) {
-                raw++;
+                if ( raw[0] != '/' || raw[1] != '/' )
+                    break;
+                
+                while ( raw[0] && raw[0] != '\n' )
+                    raw++;
             }
 
             //cout << "RAW\n---\n" << raw << "\n---" << endl;

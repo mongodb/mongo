@@ -14,7 +14,7 @@ res = db.runCommand(
       },
       out: "mr_comments_out"
     });
-printjson( res );
+assert.eq( 3 , res.counts.emit )
 
 res = db.runCommand(
     { mapreduce : "mr_comments",
@@ -24,5 +24,5 @@ res = db.runCommand(
       },
       out: "mr_comments_out"
     });
-printjson( res );
 
+assert.eq( 3 , res.counts.emit )
