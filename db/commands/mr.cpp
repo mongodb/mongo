@@ -207,11 +207,10 @@ namespace mongo {
                     
                 if ( outType == NORMAL ){
                     db.dropCollection( finalLong );
-                    if ( db.count( tempLong ) ){
-                        BSONObj info;
-                        uassert( 10076 ,  "rename failed" , 
-                                 db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
-                    }
+                    BSONObj info;
+                    uassert( 10076 ,  "rename failed" , 
+                             db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
+                    db.dropCollection( tempLong );
                 }
                 else if ( outType == MERGE ){
                     auto_ptr<DBClientCursor> cursor = db.query( tempLong , BSONObj() );
@@ -520,7 +519,7 @@ namespace mongo {
                         auto_ptr<DBClientCursor> idx = db.getIndexes( mr.finalLong );
                         while ( idx->more() ){
                             BSONObj i = idx->next();
-
+                            
                             BSONObjBuilder b( i.objsize() + 16 );
                             b.append( "ns" , mr.tempLong );
                             BSONObjIterator j( i );
