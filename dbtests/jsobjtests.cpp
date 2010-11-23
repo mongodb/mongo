@@ -1800,10 +1800,6 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelishOr >();
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
-            add< SubObjectBuilder >();
-            add< DateBuilder >();
-            add< DateNowBuilder >();
-            add< TimeTBuilder >();
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
