@@ -987,7 +987,7 @@ namespace mongo {
                 result.setData( qr.release(), true );
             }
             else { 
-                uasserted(10000, "bad or malformed command request?");
+                uasserted(13530, "bad or malformed command request?");
             }
             return 0;
         }

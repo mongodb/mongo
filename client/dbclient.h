@@ -564,8 +564,8 @@ namespace mongo {
         */
         bool eval(const string &dbname, const string &jscode, BSONObj& info, BSONElement& retValue, BSONObj *args = 0);
 
-        /**
-           
+        /** validate a collection, checking for errors and reporting back statistics.
+            this operation is slow and blocking.
          */
         bool validate( const string &ns , bool scandata=true ){
             BSONObj cmd = BSON( "validate" << nsGetCollection( ns ) << "scandata" << scandata );

@@ -68,19 +68,19 @@ namespace mongo {
 
     class CmdGet : public Command {
     public:
-        CmdGet() : Command( "get" ) { }
+        CmdGet() : Command( "getParameter" ) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; } 
         virtual void help( stringstream &help ) const {
             help << "get administrative option(s)\nexample:\n";
-            help << "{ get:1, notablescan:1 }\n";
+            help << "{ getParameter:1, notablescan:1 }\n";
             help << "supported so far:\n";
             help << "  quiet\n";
             help << "  notablescan\n";
             help << "  logLevel\n";
             help << "  syncdelay\n";
-            help << "{ get:'*' } to get everything\n";
+            help << "{ getParameter:'*' } to get everything\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             bool all = cmdObj.firstElement().valuestrsafe();
@@ -111,13 +111,13 @@ namespace mongo {
 
     class CmdSet : public Command {
     public:
-        CmdSet() : Command( "set" ) { }
+        CmdSet() : Command( "setParameter" ) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; } 
         virtual void help( stringstream &help ) const {
             help << "set administrative option(s)\nexample:\n";
-            help << "{ set:1, notablescan:true }\n";
+            help << "{ setParameter:1, notablescan:true }\n";
             help << "supported so far:\n";
             help << "  notablescan\n";
             help << "  logLevel\n";

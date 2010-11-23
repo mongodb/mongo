@@ -1392,7 +1392,6 @@ namespace mongo {
             return _interrupt( cx );
         }
 
-
         void installInterrupt( int timeoutMs ) {
             if ( timeoutMs != 0 || ScriptEngine::haveCheckInterruptCallback() ) {
                 TimeoutSpec *spec = new TimeoutSpec;

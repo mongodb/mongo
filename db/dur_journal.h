@@ -46,6 +46,7 @@ namespace mongo {
 
         /** header for a journal/j._<n> file */
         struct JHeader {
+            JHeader() { }
             JHeader(string fname) { 
                 txt[0] = 'j'; txt[1] = '\n';
                 version = 0x4141;
@@ -77,14 +78,25 @@ namespace mongo {
             unsigned len; // length in bytes of the whole section
         };
 
+        /** an individual operation within section.  Either the entire section should be applied, or nothing. */
+        struct JEntry {
+            static const unsigned Sentinel_Footer  = 0xffffffff;
+            static const unsigned Sentinel_Context = 0xfffffffe;
+            static const unsigned Sentinel_Min     = 0xfffffffe;
+
+            unsigned len;
+            int fileNo;
+            // char data[]
+        };
+
         struct JSectFooter { 
             JSectFooter() { 
-                txt[0] = '\n';
-                txt[1] = 'f'; txt[2] = 't'; txt[3] = 'r';
+                sentinel = JEntry::Sentinel_Footer;
+                hash = 0;
                 reserved = 0;
                 txt2[0] = txt2[1] = txt2[2] = txt2[3] = '\n';
             }
-            char txt[4];
+            unsigned sentinel;
             unsigned hash;
             unsigned long long reserved;
             char txt2[4];
@@ -92,17 +104,12 @@ namespace mongo {
 
         /** declares "the next entry(s) are for this database / file path prefix" */
         struct JDbContext { 
-            JDbContext() : zero(0) { }
-            const unsigned zero;   // compare to JEntry::len -- zero is our sentinel
+            JDbContext() : sentinel(JEntry::Sentinel_Context) { }
+            const unsigned sentinel;   // compare to JEntry::len -- zero is our sentinel
             //char dbname[];
         };
 
-        /** an individual operation within section.  Either the entire section should be applied, or nothing. */
-        struct JEntry {
-            unsigned len;
-            int fileNo;
-            // char data[]
-        };
+
 #pragma pack()
 
     }

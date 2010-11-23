@@ -50,6 +50,7 @@
 
 namespace mongo {
     
+    DBClientWithCommands *latestConn = 0;
     extern bool dbexitCalled;
     
 #ifdef _WIN32
@@ -903,6 +904,7 @@ namespace mongo {
         mongo::mutex _allMyUrisMutex("_allMyUrisMutex");
         bool _nokillop = false;
         void onConnect( DBClientWithCommands &c ) {
+            latestConn = &c;
             if ( _nokillop ) {
                 return;
             }

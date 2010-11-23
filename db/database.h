@@ -81,7 +81,7 @@ namespace mongo {
                 files.pop_back();
             }
         }
-
+        
         MongoDataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false ) {
             assert(this);
 

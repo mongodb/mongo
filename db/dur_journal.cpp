@@ -43,6 +43,14 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 20 );
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 8 );
 
+        filesystem::path getJournalDir() { 
+            filesystem::path p(dbpath);
+            p /= "journal";
+            return p;
+        }
+
+        /** this should be called when something really bad happens so that we can flag appropriately
+        */
         void journalingFailure(const char *msg) { 
             /** todo:
                 (1) don't log too much
@@ -98,17 +106,24 @@ namespace mongo {
 
         /** throws */
         void removeJournalFiles() { 
-            for ( boost::filesystem::directory_iterator i( j.dir );
-                    i != boost::filesystem::directory_iterator(); ++i ) {
-                string fileName = boost::filesystem::path(*i).leaf();
-                if( str::startsWith(fileName, "j._") ) {
-                    try {
-                        boost::filesystem::remove(*i);
-                    }
-                    catch(std::exception& e) {
-                        log() << "couldn't remove " << fileName << ' ' << e.what() << endl;
+            try {
+                for ( boost::filesystem::directory_iterator i( getJournalDir() );
+                      i != boost::filesystem::directory_iterator(); 
+                      ++i ) {
+                    string fileName = boost::filesystem::path(*i).leaf();
+                    if( str::startsWith(fileName, "j._") ) {
+                        try {
+                            boost::filesystem::remove(*i);
+                        }
+                        catch(std::exception& e) {
+                            log() << "couldn't remove " << fileName << ' ' << e.what() << endl;
+                        }
                     }
                 }
+            }
+            catch( std::exception& e ) { 
+                log() << "error removing journal files " << e.what() << endl;
+                throw;
             }
         }
 
@@ -123,12 +138,6 @@ namespace mongo {
             catch(std::exception& e) {
                 log() << "error couldn't remove journal file during shutdown " << e.what() << endl;
             }
-        }
-
-        filesystem::path getJournalDir() { 
-            filesystem::path p(dbpath);
-            p /= "journal";
-            return p;
         }
 
         /** assure journal/ dir exists. throws */
