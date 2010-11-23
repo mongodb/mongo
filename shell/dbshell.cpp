@@ -456,7 +456,7 @@ void sayReplSetMemberState() {
             if( latestConn->simpleCommand("admin", &info, "replSetGetStatus") ) { 
                 stringstream ss;
                 ss << info["set"].String() << ':';
-                int s = info["myState"].Number();
+                int s = info["myState"].Int();
                 MemberState ms(s);
                 ss << stateToString(ms);
                 cout << ss.str();
