@@ -305,7 +305,10 @@ namespace mongo {
                 if ( ! cc->yieldSometimes() ){
                     // we were near and and got pushed to the end
                     // i think returning the splits we've already found is fine
-                    bc = NULL; // defensive
+
+                    // don't use the btree cursor pointer to acces keys beyond this point but ok
+                    // to use it for format the keys we've got already
+
                     break;
                 }
             }
