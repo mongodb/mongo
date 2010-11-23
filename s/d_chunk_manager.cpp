@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include "../client/connpool.h"
+#include "../client/dbclientmockcursor.h"
 #include "../db/instance.h"
 
 #include "d_chunk_manager.h"
@@ -41,34 +42,45 @@ namespace mongo {
             conn = scoped->get();
         }
 
-        // get this collection's key
-        BSONObj collection = conn->findOne( "config.collections", BSON( "_id" << ns ) );
-        assert( ! collection["key"].eoo() && collection["key"].isABSONObj() );
-        BSONObj key = collection["key"].Obj().getOwned();
+        // get this collection's sharding key 
+        BSONObj collectionDoc = conn->findOne( "config.collections", BSON( "_id" << ns ) );
+       _fillCollectionKey( collectionDoc );
+
+        // query for all the chunks for 'ns' that live in this shard, sorting so we can efficiently bucket them
+        BSONObj q = BSON( "ns" << ns << "shard" << shardName );
+        auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
+        _fillChunkState( cursor.get() );
+
+        if ( scoped.get() )
+            scoped->done();
+
+        if ( _chunksMap.empty() )
+            log() << "no chunk for collection " << ns << " on shard " << shardName << endl;
+    }
+
+    ShardChunkManager::ShardChunkManager( const BSONObj& collectionDoc , const BSONArray& chunksArr ) {
+        _fillCollectionKey( collectionDoc );
+
+        scoped_ptr<DBClientMockCursor> c ( new DBClientMockCursor( chunksArr ) );
+        _fillChunkState( c.get() );
+    }
+
+    void ShardChunkManager::_fillCollectionKey( const BSONObj& collectionDoc ) {
+        BSONElement e = collectionDoc["key"];
+        assert( ! e.eoo() && e.isABSONObj() );
+
+        BSONObj keys = e.Obj().getOwned();
         BSONObjBuilder b;
-        BSONForEach( e , key ) {
-            b.append( e.fieldName() , 1 );
+        BSONForEach( key , keys ) {
+            b.append( key.fieldName() , 1 );
         }
         _key = b.obj();
+    }        
 
-        // actually query all the chunks for 'ns' that live in this shard, sorting so we can efficiently bucket them
-        BSONObj q;
-        {
-            BSONObjBuilder b;
-            b.append( "ns" , ns.c_str() );
-            b.append( "shard" , shardName );
-            q = b.obj();
-        }
-        auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
-
-        assert( cursor.get() );
-        if ( ! cursor->more() ){
-            log() << "No chunks for collection " << ns << " on shard " << shardName << endl;
-            if ( scoped.get() )
-                scoped->done();
-
+    void ShardChunkManager::_fillChunkState( DBClientCursorInterface* cursor ) {
+        assert( cursor );
+        if ( ! cursor->more() )
             return;
-        }
 
         // load the tablet information, coallesceing the ranges
         // the version for this shard would be the highest version for any of the chunks
@@ -77,7 +89,7 @@ namespace mongo {
         while ( cursor->more() ){
             BSONObj d = cursor->next();
 
-            _chunksMap[min] == make_pair( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() );
+            _chunksMap.insert( make_pair( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() ) );
 
             ShardChunkVersion currVersion( d["lastmod"] );
             if ( currVersion > version ) {
@@ -95,18 +107,16 @@ namespace mongo {
                 continue;
             }
 
-            _rangesMap[min] = make_pair( min.getOwned() , max.getOwned() );
+            _rangesMap.insert( make_pair( min.getOwned() , max.getOwned() ) );
 
             min = d["min"].Obj().getOwned();
             max = d["max"].Obj().getOwned();
         }
         assert( ! min.isEmpty() );
 
-        _rangesMap[min] = make_pair( min.getOwned() , max.getOwned() );
+        _rangesMap.insert( make_pair( min.getOwned() , max.getOwned() ) );
+
         _version = version;
-        
-        if ( scoped.get() )
-            scoped->done();
     }
 
     bool ShardChunkManager::belongsToMe( const BSONObj& obj ) const {
@@ -119,12 +129,12 @@ namespace mongo {
         if ( a != _rangesMap.begin() )
             a--;
         
-        bool good = x.woCompare( a->second.first ) >= 0 && x.woCompare( a->second.second ) < 0;
+        bool good = x.woCompare( a->first ) >= 0 && x.woCompare( a->second ) < 0;
 #if 0
         if ( ! good ){
-            cout << "bad: " << x << "\t" << a->second.first << "\t" << x.woCompare( a->second.first ) << "\t" << x.woCompare( a->second.second ) << endl;
-            for ( MyMap::const_iterator i=_map.begin(); i!=_map.end(); ++i ){
-                cout << "\t" << i->first << "\t" << i->second.first << "\t" << i->second.second << endl;
+            log() << "bad: " << x << "\t" << a->first << "\t" << x.woCompare( a->first ) << "\t" << x.woCompare( a->second ) << endl;
+            for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ){
+                log() << "\t" << i->first << "\t" << i->second << "\t" << endl;
             }
         }
 #endif
