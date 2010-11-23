@@ -88,6 +88,13 @@ namespace mongo {
     */
     extern struct DateNowLabeler { } DATENOW;
 
+    /* Utility class to add the minKey (minus infinity) to a given attribute
+       Example:
+         cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } } 
+    */
+    extern struct MinKeyLabeler { } MINKEY;
+    extern struct MaxKeyLabeler { } MAXKEY;
+
     // Utility class to implement GT, GTE, etc as described above.
     class Labeler {
     public:
@@ -139,6 +146,9 @@ namespace mongo {
         BSONObjBuilder& operator<<( T value );
 
         BSONObjBuilder& operator<<(DateNowLabeler& id);
+
+        BSONObjBuilder& operator<<(MinKeyLabeler& id);
+        BSONObjBuilder& operator<<(MaxKeyLabeler& id);
         
         Labeler operator<<( const Labeler::Label &l );
 
