@@ -22,6 +22,7 @@
 
 #include "dur.h"
 #include "dur_journal.h"
+#include "bufreader.h"
 
 namespace mongo { 
 
