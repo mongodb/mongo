@@ -105,6 +105,14 @@ assert.eq( 2 , b.foo4.getIndexes().length , "ub2" );
 assert( a.foo4.getIndexes()[1].unique , "ua3" );
 assert( b.foo4.getIndexes()[1].unique , "ub3" );
 
+assert.eq( 2 , db.foo4.count() , "uc1" )
+db.foo4.save( { num : 7 } )
+assert.eq( 3 , db.foo4.count() , "uc2" )
+db.foo4.save( { num : 7 } )
+gle = db.getLastErrorObj();
+assert( gle.err , "uc3" )
+assert.eq( 3 , db.foo4.count() , "uc4" )
+
 // --- don't let you convertToCapped ----
 assert( ! db.foo4.isCapped() , "ca1" );
 assert( ! a.foo4.isCapped() , "ca2" );
