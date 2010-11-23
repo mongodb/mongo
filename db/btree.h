@@ -362,8 +362,13 @@ namespace mongo {
         /** may invalidate this and thisLoc */
         void delKeyAtPos(const DiskLoc thisLoc, IndexDetails& id, int p, const Ordering &order);
 
-        /** may invalidate this and thisLoc */
-        void balanceWithNeighbors(const DiskLoc thisLoc, IndexDetails &id, const Ordering &order) const;        
+        /**
+         * May balance utilization of this bucket with a neighbor, either by
+         * merging the buckets or shifting nodes.
+         * @return true iff balancing was performed.
+         * NOTE This function may invalidate thisLoc.
+         */
+        bool mayBalanceWithNeighbors(const DiskLoc thisLoc, IndexDetails &id, const Ordering &order) const;        
 
         /** @return true if balance succeeded */
         bool tryBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) const;
@@ -384,7 +389,7 @@ namespace mongo {
         void replaceWithNextChild( const DiskLoc thisLoc, IndexDetails &id );
 
         /** @return true iff left and right child can be merged into one node */
-        bool mayMergeChildren( const DiskLoc &thisLoc, int leftIndex ) const;
+        bool canMergeChildren( const DiskLoc &thisLoc, int leftIndex ) const;
         
         /**
          * @return index of the rebalanced separator; the index value is

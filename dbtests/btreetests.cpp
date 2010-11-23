@@ -870,11 +870,21 @@ namespace BtreeTests {
             ASSERT_EQUALS( bigSize(), bigSize() / 2 * 2 );
             fillToExactSize( l, leftSize(), 'a' );
             fillToExactSize( r, rightSize(), 'n' );
-            l->push( bigKey( 'k' ), DiskLoc() );
-            l->push( bigKey( 'l' ), DiskLoc() );
-            r->push( bigKey( 'y' ), DiskLoc() );
-            r->push( bigKey( 'z' ), DiskLoc() );
-            _count += 4;
+            ASSERT( leftAdditional() <= 2 );
+            if ( leftAdditional() >= 2 ) {
+                l->push( bigKey( 'k' ), DiskLoc() );
+            }
+            if ( leftAdditional() >= 1 ) {
+                l->push( bigKey( 'l' ), DiskLoc() );
+            }
+            ASSERT( rightAdditional() <= 2 );
+            if ( rightAdditional() >= 2 ) {
+                r->push( bigKey( 'y' ), DiskLoc() );
+            }
+            if ( rightAdditional() >= 1 ) {
+                r->push( bigKey( 'z' ), DiskLoc() );
+            }
+            _count += leftAdditional() + rightAdditional();
 
 //            dump();
             
@@ -882,13 +892,21 @@ namespace BtreeTests {
             string ns = id().indexNamespace();
             const char *keys = delKeys();
             for( const char *i = keys; *i; ++i ) {
-                ASSERT_EQUALS( _count, bt()->fullValidate( dl(), order(), 0, true ) );
+                int unused = 0;
+                ASSERT_EQUALS( _count, bt()->fullValidate( dl(), order(), &unused, true ) );
+                ASSERT_EQUALS( 0, unused );
                 ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
                 BSONObj k = bigKey( *i );
                 unindex( k );
+//                dump();
                 --_count;
             }
-            ASSERT_EQUALS( _count, bt()->fullValidate( dl(), order(), 0, true ) );
+            
+//            dump();
+            
+            int unused = 0;
+            ASSERT_EQUALS( _count, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
             validate();
             if ( !merge() ) {
                 ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );                
@@ -897,6 +915,8 @@ namespace BtreeTests {
             }            
         }
     protected:
+        virtual int leftAdditional() const { return 2; }
+        virtual int rightAdditional() const { return 2; }
         virtual void initCheck() {}
         virtual void validate() {}
         virtual int leftSize() const = 0;
@@ -1096,6 +1116,30 @@ namespace BtreeTests {
         };
     };
     
+    class PackedDataSizeEmpty : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null}", id() );
+            BSONObj k = BSON( "" << "a" );
+            ASSERT( unindex( k ) );
+            ArtificialTree *t = ArtificialTree::is( dl() );
+            t->forcePack();
+            Tester::checkEmpty( t, id() );
+        }
+        class Tester : public ArtificialTree {
+        public:
+            static void checkEmpty( ArtificialTree *a, const IndexDetails &id ) {
+                Tester *t = static_cast< Tester * >( a );
+                ASSERT_EQUALS( 0, t->n );
+                ASSERT( !( t->flags & Packed ) );
+                int zero = 0;
+                ASSERT_EQUALS( 0, t->packedDataSize( zero ) );
+                ASSERT( !( t->flags & Packed ) );
+            }
+        };        
+    };
+    
     class BalanceSingleParentKeyPackParent : public Base {
     public:
         void run() {
@@ -1136,10 +1180,12 @@ namespace BtreeTests {
     public:
         void run() {
             ArtificialTree::setTree( treeSpec(), id() );
+            modTree();
             Tester::checkSeparator( id(), expectedSeparator() );
         }
         virtual string treeSpec() const = 0;
         virtual int expectedSeparator() const = 0;
+        virtual void modTree() {}
         struct Tester : public ArtificialTree {
             static void checkSeparator( const IndexDetails& id, int expected ) {
                 ASSERT_EQUALS( expected, static_cast< Tester * >( id.head.btreemod() )->rebalancedSeparatorPos( id.head, 0 ) );
@@ -1186,7 +1232,25 @@ namespace BtreeTests {
         virtual string treeSpec() const { return "{$5:{$1:null,$2:null,$3:null,$4:null},_:{$6:null,$7:null,$8:null,$9:null,$10$31f:null}}"; }
         virtual int expectedSeparator() const { return 4; }
     };
+    
+    class RebalanceEmptyRight : public RebalancedSeparatorBase {
+        virtual string treeSpec() const { return "{$a:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null,$7:null,$8:null,$9:null},_:{$b:null}}"; }
+        virtual void modTree() {
+            BSONObj k = BSON( "" << bigNumString( 0xb ) );
+            ASSERT( unindex( k ) );
+        }
+        virtual int expectedSeparator() const { return 4; }
+    };
 
+    class RebalanceEmptyLeft : public RebalancedSeparatorBase {
+        virtual string treeSpec() const { return "{$a:{$1:null},_:{$11:null,$12:null,$13:null,$14:null,$15:null,$16:null,$17:null,$18:null,$19:null}}"; }
+        virtual void modTree() {
+            BSONObj k = BSON( "" << bigNumString( 0x1 ) );
+            ASSERT( unindex( k ) );
+        }
+        virtual int expectedSeparator() const { return 4; }
+    };
+    
     class NoMoveAtLowWaterMarkRight : public MergeSizeJustRightRight {
         virtual int rightSize() const { return MergeSizeJustRightRight::rightSize() + 1; }
         virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key; }
@@ -1270,6 +1334,96 @@ namespace BtreeTests {
         }
     };
     
+    class MergeRightEmpty : public MergeSizeBase {
+    protected:
+        virtual int rightAdditional() const { return 1; }
+        virtual int leftAdditional() const { return 1; }
+        virtual const char * delKeys() const { return "lz"; }
+        virtual int rightSize() const { return 0; }
+        virtual int leftSize() const { return BtreeBucket::bodySize() - biggestSize() - sizeof( _KeyNode ); }
+    };    
+
+    class MergeMinRightEmpty : public MergeSizeBase {
+    protected:
+        virtual int rightAdditional() const { return 1; }
+        virtual int leftAdditional() const { return 0; }
+        virtual const char * delKeys() const { return "z"; }
+        virtual int rightSize() const { return 0; }
+        virtual int leftSize() const { return bigSize() + sizeof( _KeyNode ); }
+    };    
+    
+    class MergeLeftEmpty : public MergeSizeBase {
+    protected:
+        virtual int rightAdditional() const { return 1; }
+        virtual int leftAdditional() const { return 1; }
+        virtual const char * delKeys() const { return "zl"; }
+        virtual int leftSize() const { return 0; }
+        virtual int rightSize() const { return BtreeBucket::bodySize() - biggestSize() - sizeof( _KeyNode ); }
+    };    
+
+    class MergeMinLeftEmpty : public MergeSizeBase {
+    protected:
+        virtual int leftAdditional() const { return 1; }
+        virtual int rightAdditional() const { return 0; }
+        virtual const char * delKeys() const { return "l"; }
+        virtual int leftSize() const { return 0; }
+        virtual int rightSize() const { return bigSize() + sizeof( _KeyNode ); }
+    };    
+    
+    class BalanceRightEmpty : public MergeRightEmpty {
+    protected:
+        virtual int leftSize() const { return BtreeBucket::bodySize() - biggestSize() - sizeof( _KeyNode ) + 1; }
+        virtual bool merge() const { return false; }
+        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key; }
+        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key ) ); }
+    private:
+        BSONObj _oldTop;
+    };
+
+    class BalanceLeftEmpty : public MergeLeftEmpty {
+    protected:
+        virtual int rightSize() const { return BtreeBucket::bodySize() - biggestSize() - sizeof( _KeyNode ) + 1; }
+        virtual bool merge() const { return false; }
+        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key; }
+        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key ) ); }
+    private:
+        BSONObj _oldTop;
+    };
+
+    class DelEmptyNoNeighbors : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{b:{a:null}}", id() );
+            ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), 0, true ) );
+            ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "a" );
+            //            dump();
+            ASSERT( unindex( k ) );
+            //            dump();
+            ASSERT_EQUALS( 1, bt()->fullValidate( dl(), order(), 0, true ) );
+            ASSERT_EQUALS( 1, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{b:null}", id() );                        
+        }
+    };
+
+    class DelEmptyEmptyNeighbors : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null,c:{b:null},d:null}", id() );
+            ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
+            ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "b" );
+            //            dump();
+            ASSERT( unindex( k ) );
+            //            dump();
+            ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), 0, true ) );
+            ASSERT_EQUALS( 1, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{a:null,c:null,d:null}", id() );                        
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "btree" ){
@@ -1317,6 +1471,7 @@ namespace BtreeTests {
             add< BalanceThreeRightToLeft >();
             add< BalanceSingleParentKey >();
             add< PackEmpty >();
+            add< PackedDataSizeEmpty >();
             add< BalanceSingleParentKeyPackParent >();
             add< BalanceSplitParent >();
             add< EvenRebalanceLeft >();
@@ -1327,6 +1482,8 @@ namespace BtreeTests {
             add< OddRebalanceLeft >();
             add< OddRebalanceRight >();
             add< OddRebalanceCenter >();
+            add< RebalanceEmptyRight >();
+            add< RebalanceEmptyLeft >();
             add< NoMoveAtLowWaterMarkRight >();
             add< MoveBelowLowWaterMarkRight >();
             add< NoMoveAtLowWaterMarkLeft >();
@@ -1334,6 +1491,14 @@ namespace BtreeTests {
             add< PreferBalanceLeft >();
             add< PreferBalanceRight >();
             add< RecursiveMergeThenBalance >();
+            add< MergeRightEmpty >();
+            add< MergeMinRightEmpty >();
+            add< MergeLeftEmpty >();
+            add< MergeMinLeftEmpty >();
+            add< BalanceRightEmpty >();
+            add< BalanceLeftEmpty >();
+            add< DelEmptyNoNeighbors >();
+            add< DelEmptyEmptyNeighbors >();
         }
     } myall;
 }

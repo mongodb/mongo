@@ -761,10 +761,15 @@ namespace mongo {
 
         if ( n == 1 ) {
             if ( left.isNull() && nextChild.isNull() ) {
+                _delKeyAtPos(p);
                 if ( isHead() ) {
-                    _delKeyAtPos(p); // we don't delete the top bucket ever
+                    // we don't delete the top bucket ever
                 } else {
-                    delBucket(thisLoc, id);
+                    // An empty bucket is only allowed as a transient state.  If
+                    // there are no neighbors to balance with, we delete ourself.
+                    if ( !mayBalanceWithNeighbors( thisLoc, id, order ) ) {
+                        delBucket(thisLoc, id);
+                    }
                 }
                 return;
             }
@@ -774,7 +779,7 @@ namespace mongo {
 
         if ( left.isNull() ) {
             _delKeyAtPos(p);
-            balanceWithNeighbors( thisLoc, id, order );
+            mayBalanceWithNeighbors( thisLoc, id, order );
         } else {
             markUnused(p);
         }
@@ -793,7 +798,7 @@ namespace mongo {
         deallocBucket( thisLoc, id );
     }
     
-    bool BtreeBucket::mayMergeChildren( const DiskLoc &thisLoc, int leftIndex ) const {
+    bool BtreeBucket::canMergeChildren( const DiskLoc &thisLoc, int leftIndex ) const {
         assert( leftIndex >= 0 && leftIndex < n );
         DiskLoc leftNodeLoc = childForPos( leftIndex );
         DiskLoc rightNodeLoc = childForPos( leftIndex + 1 );
@@ -888,7 +893,7 @@ namespace mongo {
             replaceWithNextChild( thisLoc, id );
         } else {
             // balance recursively - maybe we should do this even when n == 0?
-            balanceWithNeighbors( thisLoc, id, order );
+            mayBalanceWithNeighbors( thisLoc, id, order );
         }
     }
     
@@ -916,7 +921,7 @@ namespace mongo {
     bool BtreeBucket::tryBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) const {
         // If we can merge, then we must merge rather than balance to preserve
         // bucket utilization constraints.
-        if ( mayMergeChildren( thisLoc, leftIndex ) ) {
+        if ( canMergeChildren( thisLoc, leftIndex ) ) {
             return false;
         }
         thisLoc.btreemod()->doBalanceChildren( thisLoc, leftIndex, id, order );
@@ -971,7 +976,7 @@ namespace mongo {
         r->dropFront( split - lN, order, zeropos );
     }
         
-    void BtreeBucket::doBalanceChildren( DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) {
+    void BtreeBucket::doBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) {
         DiskLoc lchild = childForPos( leftIndex );
         DiskLoc rchild = childForPos( leftIndex + 1 );
         int zeropos = 0;
@@ -991,13 +996,13 @@ namespace mongo {
         }
     }
     
-    void BtreeBucket::balanceWithNeighbors( const DiskLoc thisLoc, IndexDetails &id, const Ordering &order ) const {
+    bool BtreeBucket::mayBalanceWithNeighbors( const DiskLoc thisLoc, IndexDetails &id, const Ordering &order ) const {
         if ( parent.isNull() ) { // we are root, there are no neighbors
-            return;
+            return false;
         }
         
         if ( packedDataSize( 0 ) >= lowWaterMark ) {
-            return;
+            return false;
         }
         
         const BtreeBucket *p = parent.btree();
@@ -1012,19 +1017,23 @@ namespace mongo {
         // heavy duty operation (especially if we must re-split later).
         if ( mayBalanceRight && 
             p->tryBalanceChildren( parent, parentIdx, id, order ) ) {
-            return;
+            return true;
         }
         if ( mayBalanceLeft && 
             p->tryBalanceChildren( parent, parentIdx - 1, id, order ) ) {
-            return;
+            return true;
         }
 
         BtreeBucket *pm = parent.btreemod();
         if ( mayBalanceRight ) {
             pm->doMergeChildren( parent, parentIdx, id, order );
+            return true;
         } else if ( mayBalanceLeft ) {
             pm->doMergeChildren( parent, parentIdx - 1, id, order );
+            return true;
         }
+        
+        return false;
     }
     
     /** remove a key from the index */
