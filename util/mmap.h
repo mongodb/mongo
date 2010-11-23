@@ -25,7 +25,7 @@ namespace mongo {
         /** Flushable has to fail nicely if the underlying object gets killed */
         class Flushable {
         public:
-            virtual ~Flushable(){}
+            virtual ~Flushable() {}
             virtual void flush() = 0;
         };
         

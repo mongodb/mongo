@@ -74,7 +74,7 @@ namespace mongo {
         /** "Section" header.  A section corresponds to a group commit. */
         struct JSectHeader {
             char txt[4];
-            unsigned len;
+            unsigned len; // length in bytes of the whole section
         };
 
         struct JSectFooter { 

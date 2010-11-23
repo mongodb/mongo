@@ -57,7 +57,7 @@ namespace mongo {
 
             unsigned long long written;
             unsigned nextFileNumber;
-            string dir;
+            string dir; // set by journalMakeDir() during initialization
             MVar<path> &toUnlink;
 
             Journal() : 
@@ -96,10 +96,8 @@ namespace mongo {
             return p;
         }
 
-        void journalCleanup() { 
-            if( !j.tryToCloseLogFile() ) {
-                return;
-            }
+        /** throws */
+        void removeJournalFiles() { 
             for ( boost::filesystem::directory_iterator i( j.dir );
                     i != boost::filesystem::directory_iterator(); ++i ) {
                 string fileName = boost::filesystem::path(*i).leaf();
@@ -114,10 +112,28 @@ namespace mongo {
             }
         }
 
-        /** assure journal/ dir exists. throws */
-        void journalMakeDir() {
+        /** at clean shutdown */
+        void journalCleanup() { 
+            if( !j.tryToCloseLogFile() ) {
+                return;
+            }
+            try { 
+                removeJournalFiles(); 
+            }
+            catch(std::exception& e) {
+                log() << "error couldn't remove journal file during shutdown " << e.what() << endl;
+            }
+        }
+
+        filesystem::path getJournalDir() { 
             filesystem::path p(dbpath);
             p /= "journal";
+            return p;
+        }
+
+        /** assure journal/ dir exists. throws */
+        void journalMakeDir() {
+            filesystem::path p = getJournalDir();
             j.dir = p.string();
             if( !exists(j.dir) ) {
                 try {

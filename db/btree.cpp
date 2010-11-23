@@ -332,6 +332,11 @@ namespace mongo {
         childForPos(n) = nextChild;
     }*/
 
+    /* durability note
+       we do separate intent declarations herein.  arguably one could just declare 
+       the whole bucket given we do group commits. this is something we could investigate 
+       later as to what is faster under what situations.
+       */
     /** insert a key in a bucket with no complexity -- no splits required 
         @return false if a split is required.
     */

@@ -251,6 +251,9 @@ namespace mongo {
         void recover();
 
         void startup() {
+            if( !durable )
+                return;
+                
             recover();
             if( testIntent )
                 return;
