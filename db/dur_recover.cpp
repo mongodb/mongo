@@ -96,6 +96,8 @@ namespace mongo {
 
                 JHeader h;
                 _br.read(h); // read/skip file header
+                uassert(13536, str::stream() << "journal version number mismatch " << h.version, h.versionOk());
+                uassert(13537, "journal header invalid", h.valid());
             }
 
             bool atEof() const { return _br.atEof(); }

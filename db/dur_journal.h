@@ -70,6 +70,9 @@ namespace mongo {
 
             char reserved3[8192 - 68 - 96 + 10 -4]; // 8KB total for the file header
             char txt2[2];
+
+            bool versionOk() const { return version == 0x4141; }
+            bool valid() const { return txt[0] == 'j' && txt2[1] == '\n'; }
         };
 
         /** "Section" header.  A section corresponds to a group commit. */
@@ -84,7 +87,7 @@ namespace mongo {
             static const unsigned Sentinel_Context = 0xfffffffe;
             static const unsigned Sentinel_Min     = 0xfffffffe;
 
-            unsigned len;
+            unsigned len; // or sentinel, see structs below
             int fileNo;
             // char data[]
         };
