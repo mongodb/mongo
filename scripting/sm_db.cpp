@@ -301,8 +301,7 @@ namespace mongo {
         
         DBClientWithCommands * conn = getConnection( cx, obj );
         uassert( 10248 ,  "no connection!" , conn );
-        
-        
+                
         string ns = c.toString( argv[0] );
         BSONObj o = c.toObject( argv[1] );
 

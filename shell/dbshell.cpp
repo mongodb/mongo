@@ -39,6 +39,7 @@ jmp_buf jbuf;
 #include "../util/password.h"
 #include "../util/version.h"
 #include "../util/goodies.h"
+#include "../db/repl/rs_member.h"
 
 using namespace std;
 using namespace boost::filesystem;
@@ -223,6 +224,7 @@ void quitNicely( int sig ){
 #endif
 
 char * shellReadline( const char * prompt , int handlesigint = 0 ){
+
     atPrompt = true;
 #ifdef USE_READLINE
 
@@ -432,6 +434,35 @@ bool fileExists( string file ){
 
 namespace mongo {
     extern bool isShell;
+    extern DBClientWithCommands *latestConn;
+}
+
+string stateToString(MemberState s) { 
+    if( s.s == MemberState::RS_STARTUP ) return "STARTUP";
+    if( s.s == MemberState::RS_PRIMARY ) return "PRIMARY";
+    if( s.s == MemberState::RS_SECONDARY ) return "SECONDARY";
+    if( s.s == MemberState::RS_RECOVERING ) return "RECOVERING";
+    if( s.s == MemberState::RS_FATAL ) return "FATAL";
+    if( s.s == MemberState::RS_STARTUP2 ) return "STARTUP2";
+    if( s.s == MemberState::RS_ARBITER ) return "ARBITER";
+    if( s.s == MemberState::RS_DOWN ) return "DOWN";
+    if( s.s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
+    return "";
+}
+void sayReplSetMemberState() { 
+    try {
+        if( latestConn ) { 
+            BSONObj info;
+            if( latestConn->simpleCommand("admin", &info, "replSetGetStatus") ) { 
+                stringstream ss;
+                ss << info["set"].String() << ':';
+                int s = info["myState"].Number();
+                MemberState ms(s);
+                ss << stateToString(ms);
+                cout << ss.str();
+            }
+        }
+    } catch(...) { }
 }
 
 int _main(int argc, char* argv[]) {
@@ -637,6 +668,11 @@ int _main(int argc, char* argv[]) {
         while ( 1 ){
             inMultiLine = 0;
             gotInterrupted = 0;
+//            shellMainScope->localConnect;
+            //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
+
+            sayReplSetMemberState();
+
             char * line = shellReadline( "> " );
 
             if ( line ){
@@ -699,7 +735,6 @@ int _main(int argc, char* argv[]) {
                     cout << "error:" << e.what() << endl;
                 }
             }
-
 
             shellHistoryAdd( line );
         }
