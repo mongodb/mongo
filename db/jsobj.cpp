@@ -48,6 +48,9 @@ namespace mongo {
 
     DateNowLabeler DATENOW;
 
+    MinKeyLabeler MINKEY;
+    MaxKeyLabeler MAXKEY;
+
     string escape( string s , bool escape_slash=false) {
         StringBuilder ret;
         for ( string::iterator i = s.begin(); i != s.end(); ++i ) {

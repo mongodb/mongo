@@ -67,5 +67,16 @@ namespace mongo {
         return *_builder;
     }
 
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(MinKeyLabeler& id){
+        _builder->appendMinKey(_fieldName);
+        _fieldName = 0;
+        return *_builder;
+    }
+
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(MaxKeyLabeler& id){
+        _builder->appendMaxKey(_fieldName);
+        _fieldName = 0;
+        return *_builder;
+    }
 
 }

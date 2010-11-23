@@ -27,8 +27,22 @@ namespace mongo {
     
     class AScopedConnection;
     
+    /** for mock purposes only -- do not create variants of DBClientCursor, nor hang code here */
+    class DBClientCursorInterface {
+    public:
+        virtual ~DBClientCursorInterface() {}
+
+        virtual bool more() = 0;
+        virtual BSONObj next() = 0;
+
+        // TODO bring more of the DBClientCursor interface to here
+
+    protected:
+        DBClientCursorInterface() {}
+    };
+
 	/** Queries return a cursor object */
-    class DBClientCursor : boost::noncopyable {
+    class DBClientCursor : public DBClientCursorInterface {
     public:
 		/** If true, safe to call next().  Requests more from server if necessary. */
         bool more();
@@ -180,6 +194,10 @@ namespace mongo {
 
         // Don't call from a virtual function
         void _assertIfNull() const { uassert(13348, "connection died", this); }
+
+        // non-copyable , non-assignable
+        DBClientCursor( const DBClientCursor& );
+        DBClientCursor& operator=( const DBClientCursor& );
     };
     
     /** iterate over objects in current batch only - will not cause a network call
@@ -198,7 +216,7 @@ namespace mongo {
         DBClientCursor &_c;
         int _n;
     };
-    
+
 } // namespace mongo
 
 #include "undef_macros.h"

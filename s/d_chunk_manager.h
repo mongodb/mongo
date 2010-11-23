@@ -43,13 +43,18 @@ namespace mongo {
          */
         ShardChunkManager( const string& configServer , const string& ns , const string& shardName );
 
+        /**
+         * Same as the regular constructor but used in unittest (no access to configDB required)
+         *
+         * @param collectionDoc simulates config.collection's entry for one colleciton
+         * @param chunksDocs simulates config.chunks' entries for one collection's shard
+         */
+        ShardChunkManager( const BSONObj& collectionDoc , const BSONArray& chunksDoc );
+        
         ~ShardChunkManager() {}
 
         bool belongsToMe( const BSONObj& obj ) const;
 
-        //void splitChunk( const BSONObj& min , const BSONObj& max , const BSONObj& middle );
-        //void removeChunk( const BSONObj& min , const BSONObj& max );
-        
         // accessors
 
         ShardChunkVersion getVersion() const { return _version; } 
@@ -61,13 +66,17 @@ namespace mongo {
         // key pattern for chunks under this range
         BSONObj _key;
 
-        // a map from a min key into the chunk boundaries
-        typedef map<BSONObj,pair<BSONObj,BSONObj>,BSONObjCmp> RangeMap;
+        // a map from a min key into the chunk's (or range's) max boundary
+        typedef map< BSONObj, BSONObj , BSONObjCmp > RangeMap;
         RangeMap _chunksMap;
 
         // a map from a min key into a range or continguous chunks
         // redundant but we expect high chunk continguity, expecially in small installations
         RangeMap _rangesMap;
+
+        /** constructors helpers */
+        void _fillCollectionKey( const BSONObj& collectionDoc );
+        void _fillChunkState( DBClientCursorInterface* cursor );
     };
 
     typedef shared_ptr<ShardChunkManager> ShardChunkManagerPtr;
