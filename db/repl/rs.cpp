@@ -599,9 +599,13 @@ namespace mongo {
             initFromConfig(newConfig, true);
             log() << "replSet replSetReconfig new config saved locally" << rsLog;
         }
-        catch(DBException& e) { 
-            if( e.getCode() != 13497 /* removed from set */ ) 
-                log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
+        catch(DBException& e) {
+            if( e.getCode() == 13497 /* removed from set */ ) {
+                cc().shutdown();
+                dbexit( EXIT_CLEAN , "removed from replica set" ); // never returns
+                assert(0);
+            }
+            log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
             _fatal();
         }
         catch(...) { 

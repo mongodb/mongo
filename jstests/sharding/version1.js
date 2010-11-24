@@ -2,6 +2,9 @@
 
 s = new ShardingTest( "version1" , 1 , 2 )
 
+s.adminCommand( { enablesharding : "alleyinsider" } );
+s.adminCommand( { shardcollection : "alleyinsider.foo" , key : { num : 1 } } );
+
 a = s._connections[0].getDB( "admin" );
 
 assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).ok == 0 );

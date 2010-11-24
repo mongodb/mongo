@@ -40,15 +40,19 @@ namespace mongo {
     void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
         int failures = 0;
         int me = 0;
+        stringstream selfs;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             if( i->h.isSelf() ) {
                 me++;
+                if( me > 1 ) 
+                    selfs << ',';
+                selfs << i->h.toString();
                 if( !i->potentiallyHot() ) { 
                     uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
                 }
             }
         }
-        uassert(13278, "bad config - dups?", me <= 1); // dups?
+        uassert(13278, "bad config: isSelf is true for multiple hosts: " + selfs.str(), me <= 1); // dups?
         if( me != 1 ) {
             stringstream ss;
             ss << "can't find self in the replset config";

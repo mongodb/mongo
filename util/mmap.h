@@ -25,7 +25,7 @@ namespace mongo {
         /** Flushable has to fail nicely if the underlying object gets killed */
         class Flushable {
         public:
-            virtual ~Flushable(){}
+            virtual ~Flushable() {}
             virtual void flush() = 0;
         };
         
@@ -35,6 +35,9 @@ namespace mongo {
             SEQUENTIAL = 1, // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
             READONLY = 2    // not contractually guaranteed, but if specified the impl has option to fault writes
         };
+
+        /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
+        static void forEach( void (*p)(MongoFile*) );
 
         static int flushAll( bool sync ); // returns n flushed
         static long long totalMappedLength();
@@ -112,10 +115,11 @@ namespace mongo {
         unsigned long long length() const { return len; }
         string filename() const           { return _filename; }
 
+        /** create a new view with the specified properties. 
+            automatically cleaned up upon close/destruction of the MemoryMappedFile object. 
+            */
         void* createReadOnlyMap();
-
-        void* testGetCopyOnWriteView();
-        void  testCloseCopyOnWriteView(void *);
+        void* createPrivateMap();
 
     private:
         static void updateLength( const char *filename, unsigned long long &length );

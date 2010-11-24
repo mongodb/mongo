@@ -22,7 +22,7 @@
 
 #include "../db/jsobj.h"
 
-#include "d_chunk_matcher.h"
+#include "d_chunk_manager.h"
 #include "util.h"
 
 namespace mongo {
@@ -47,12 +47,13 @@ namespace mongo {
         
         bool hasVersion( const string& ns );
         bool hasVersion( const string& ns , ConfigVersion& version );
-        ConfigVersion& getVersion( const string& ns ); // TODO: this is dangeroues
+        const ConfigVersion getVersion( const string& ns ) const;
         void setVersion( const string& ns , const ConfigVersion& version );
         
         void appendInfo( BSONObjBuilder& b );
         
-        ChunkMatcherPtr getChunkMatcher( const string& ns );
+        bool needShardChunkManager( const string& ns ) const;
+        ShardChunkManagerPtr getShardChunkManager( const string& ns );
         
         bool inCriticalMigrateSection();
     private:
@@ -65,13 +66,13 @@ namespace mongo {
         string _shardHost;
 
         // protects state below
-        mongo::mutex _mutex;
+        mutable mongo::mutex _mutex;
 
         // map from a namespace into the highest ShardChunkVersion for that collection
         NSVersionMap _versions;
 
         // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
-        map<string,ChunkMatcherPtr> _chunks;
+        map<string,ShardChunkManagerPtr> _chunks;
     };
     
     extern ShardingState shardingState;
@@ -88,7 +89,7 @@ namespace mongo {
         bool hasID() const { return _id.isSet(); }
         void setID( const OID& id );
         
-        ConfigVersion& getVersion( const string& ns ); // TODO: this is dangeroues
+        const ConfigVersion getVersion( const string& ns ) const;
         void setVersion( const string& ns , const ConfigVersion& version );
         
         static ShardedConnectionInfo* get( bool create );

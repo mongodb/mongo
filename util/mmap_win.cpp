@@ -46,17 +46,15 @@ namespace mongo {
     
     unsigned long long mapped = 0;
 
-    void MemoryMappedFile::testCloseCopyOnWriteView(void *p) { 
-        UnmapViewOfFile(p);
-    }
-
-    void* MemoryMappedFile::testGetCopyOnWriteView() { 
-        assert(false); // todo: not added to views array yet...
+    void* MemoryMappedFile::createPrivateMap() { 
         assert( maphandle );
         void *p = MapViewOfFile(maphandle, FILE_MAP_COPY, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
             log() << "FILE_MAP_COPY MapViewOfFile failed " << _filename << " " << errnoWithDescription(e) << endl;
+        }
+        else { 
+            views.push_back(p);
         }
         return p;
     }

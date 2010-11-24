@@ -37,10 +37,10 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".drop() drop the collection");
     print("\tdb." + shortName + ".dropIndex(name)");
     print("\tdb." + shortName + ".dropIndexes()");
-    print("\tdb." + shortName + ".ensureIndex(keypattern,options) - options should be an object with these possible fields: name, unique, dropDups");
+    print("\tdb." + shortName + ".ensureIndex(keypattern[,options]) - options is an object with these possible fields: name, unique, dropDups");
     print("\tdb." + shortName + ".reIndex()");
-    print("\tdb." + shortName + ".find( [query] , [fields]) - first parameter is an optional query filter. second parameter is optional set of fields to return.");
-    print("\t                                   e.g. db." + shortName + ".find( { x : 77 } , { name : 1 , x : 1 } )");
+    print("\tdb." + shortName + ".find([query],[fields]) - query is an optional query filter. fields is optional set of fields to return.");
+    print("\t                                              e.g. db." + shortName + ".find( {x:77} , {name:1, x:1} )");
     print("\tdb." + shortName + ".find(...).count()");
     print("\tdb." + shortName + ".find(...).limit(n)");
     print("\tdb." + shortName + ".find(...).skip(n)");
@@ -321,6 +321,8 @@ DBCollection.prototype.dropIndexes = function(){
 
 
 DBCollection.prototype.drop = function(){
+    if ( arguments.length > 0 )
+        throw "drop takes no argument";
     this.resetIndexCache();
     var ret = this._db.runCommand( { drop: this.getName() } );
     if ( ! ret.ok ){

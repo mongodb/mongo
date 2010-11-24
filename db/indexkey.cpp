@@ -69,35 +69,50 @@ namespace mongo {
 
     void IndexSpec::_init(){
         assert( keyPattern.objsize() );
-        
-        string pluginName = IndexPlugin::findPluginName( keyPattern );
-        
-        BSONObjBuilder nullKeyB;
-        BSONObjIterator i( keyPattern );
-        
-        while( i.more() ) {
-            BSONElement e = i.next();
-            _fieldNames.push_back( e.fieldName() );
-            _fixed.push_back( BSONElement() );
-            nullKeyB.appendNull( "" );            
-        }
-        
-        _nullKey = nullKeyB.obj();
 
-        BSONObjBuilder b;
-        b.appendNull( "" );
-        _nullObj = b.obj();
-        _nullElt = _nullObj.firstElement();
+        // some basics
+        _nFields = keyPattern.nFields();
+        _sparse = info["sparse"].trueValue();
+        uassert( 13529 , "sparse only works for single field keys" , ! _sparse || _nFields );
         
-        if ( pluginName.size() ){
-            IndexPlugin * plugin = IndexPlugin::get( pluginName );
-            if ( ! plugin ){
-                log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+        
+        {
+            // build _nullKey 
+            
+            BSONObjBuilder b;
+            BSONObjIterator i( keyPattern );
+        
+            while( i.more() ) {
+                BSONElement e = i.next();
+                _fieldNames.push_back( e.fieldName() );
+                _fixed.push_back( BSONElement() );
+                b.appendNull( "" );            
             }
-            else {
+            _nullKey = b.obj();
+        }
+        
+        {
+            // _nullElt
+            BSONObjBuilder b;
+            b.appendNull( "" );
+            _nullObj = b.obj();
+            _nullElt = _nullObj.firstElement();
+        }
+
+        { 
+            // handle plugins
+            string pluginName = IndexPlugin::findPluginName( keyPattern );        
+            if ( pluginName.size() ){
+                IndexPlugin * plugin = IndexPlugin::get( pluginName );
+                if ( ! plugin ){
+                    log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+                }
+                else {
                 _indexType.reset( plugin->generate( this ) );
+                }
             }
         }
+        
         _finishedInit = true;
     }
 
@@ -110,27 +125,37 @@ namespace mongo {
         vector<const char*> fieldNames( _fieldNames );
         vector<BSONElement> fixed( _fixed );
         _getKeys( fieldNames , fixed , obj, keys );
-        if ( keys.empty() )
+        if ( keys.empty() && ! _sparse )
             keys.insert( _nullKey );
     }
 
     void IndexSpec::_getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
         BSONElement arrElt;
         unsigned arrIdx = ~0;
+        int numNotFound = 0;
+
         for( unsigned i = 0; i < fieldNames.size(); ++i ) {
             if ( *fieldNames[ i ] == '\0' )
                 continue;
+
             BSONElement e = obj.getFieldDottedOrArray( fieldNames[ i ] );
-            if ( e.eoo() )
+            
+            if ( e.eoo() ){
                 e = _nullElt; // no matching field
+                numNotFound++;
+            }
+            
             if ( e.type() != Array )
                 fieldNames[ i ] = ""; // no matching field or non-array match
+
             if ( *fieldNames[ i ] == '\0' )
                 fixed[ i ] = e; // no need for further object expansion (though array expansion still possible)
+
             if ( e.type() == Array && arrElt.eoo() ) { // we only expand arrays on a single path -- track the path here
                 arrIdx = i;
                 arrElt = e;
             }
+
             // enforce single array path here
             if ( e.type() == Array && e.rawdata() != arrElt.rawdata() ){
                 stringstream ss;
@@ -138,7 +163,7 @@ namespace mongo {
                 uasserted( 10088 ,  ss.str() );
             }
         }
-
+        
         bool allFound = true; // have we found elements for all field names in the key spec?
         for( vector<const char*>::const_iterator i = fieldNames.begin(); i != fieldNames.end(); ++i ){
             if ( **i != '\0' ){
@@ -147,6 +172,12 @@ namespace mongo {
             }
         }
 
+        if ( _sparse && numNotFound == _nFields ){
+            // we didn't find any fields
+            // so we're not going to index this document
+            return;
+        }
+        
         bool insertArrayNull = false;
 
         if ( allFound ) {

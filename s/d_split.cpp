@@ -238,14 +238,15 @@ namespace mongo {
                 return true;
             }
 
+            log() << "request split points lookup for chunk " << ns << " " << min << " -->> " << max << endl;
+ 
             // We'll use the average object size and number of object to find approximately how many keys
             // each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects, if 
             // provided.
             const long long avgRecSize = dataSize / recCount;
             long long keyCount = maxChunkSize / (2 * avgRecSize);
             if ( maxChunkObjects && ( maxChunkObjects < keyCount ) ) {
-                log() << "limiting split vector to " << maxChunkObjects << " (from " << keyCount << ") objects for chunk "
-                      << ns << " " << min << "-->>" << max << endl;
+                log() << "limiting split vector to " << maxChunkObjects << " (from " << keyCount << ") objects " << endl;
                 keyCount = maxChunkObjects;
             }
 
@@ -295,8 +296,8 @@ namespace mongo {
 
                 // Stop if we have enough split points.
                 if ( maxSplitPoints && ( numChunks >= maxSplitPoints ) ){
-                    log(1) << "max number of requested split points reached (" << numChunks 
-                           << ") before the end of chunk " << ns << " " << min << "-->>" << max 
+                    log() << "max number of requested split points reached (" << numChunks 
+                           << ") before the end of chunk " << ns << " " << min << " -->> " << max 
                            << endl;
                     break;
                 }
@@ -304,7 +305,10 @@ namespace mongo {
                 if ( ! cc->yieldSometimes() ){
                     // we were near and and got pushed to the end
                     // i think returning the splits we've already found is fine
-                    bc = NULL; // defensive
+
+                    // don't use the btree cursor pointer to acces keys beyond this point but ok
+                    // to use it for format the keys we've got already
+
                     break;
                 }
             }
@@ -335,6 +339,7 @@ namespace mongo {
             // 4MB work of 'result' size. This should be okay for now.
 
             result.append( "splitKeys" , splitKeys );
+
             return true;
 
         }

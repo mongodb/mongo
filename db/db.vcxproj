@@ -98,7 +98,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\js\src;..\pcre-7.4;c:\boost;\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DURABLE,_UNICODE;UNICODE;SUPPORT_UCP;SUPPORT_UTF8;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DURABLE;_UNICODE;UNICODE;SUPPORT_UCP;SUPPORT_UTF8;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>No</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -448,7 +448,7 @@
     </ClCompile>
     <ClCompile Include="..\s\chunk.cpp" />
     <ClCompile Include="..\s\config.cpp" />
-    <ClCompile Include="..\s\d_chunk_matcher.cpp" />
+    <ClCompile Include="..\s\d_chunk_manager.cpp" />
     <ClCompile Include="..\s\d_migrate.cpp" />
     <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />
@@ -462,6 +462,7 @@
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\log.cpp" />
+    <ClCompile Include="..\util\logfile.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
@@ -475,6 +476,7 @@
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="dur.cpp" />
     <ClCompile Include="dur_journal.cpp" />
+    <ClCompile Include="dur_recover.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
     <ClCompile Include="mongommf.cpp" />
@@ -618,11 +620,14 @@
     <ClInclude Include="..\util\concurrency\mvar.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\thread_pool.h" />
+    <ClInclude Include="..\util\logfile.h" />
     <ClInclude Include="..\util\mongoutils\checksum.h" />
     <ClInclude Include="..\util\mongoutils\html.h" />
     <ClInclude Include="..\util\mongoutils\str.h" />
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="..\util\text.h" />
+    <ClInclude Include="..\util\time_support.h" />
+    <ClInclude Include="dur_commitjob.h" />
     <ClInclude Include="dur_journal.h" />
     <ClInclude Include="geo\core.h" />
     <ClInclude Include="helpers\dblogger.h" />

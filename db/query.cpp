@@ -527,7 +527,7 @@ namespace mongo {
             return -1;
         }
         BSONObj query = cmd.getObjectField("query");
-        
+
         // count of all objects
         if ( query.isEmpty() ){
             return applySkipLimit( d->stats.nrecords , cmd );
@@ -629,7 +629,8 @@ namespace mongo {
             _oldN(0),
             _nYields(),
             _nChunkSkips(),
-            _chunkMatcher(shardingState.getChunkMatcher(pq.ns())),
+            _chunkManager( shardingState.needShardChunkManager(pq.ns()) ? 
+                           shardingState.getShardChunkManager(pq.ns()) : ShardChunkManagerPtr() ),
             _inMemSort(false),
             _capped(false),
             _saveClientCursor(false),
@@ -653,13 +654,9 @@ namespace mongo {
                 _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
                 _capped = _c->capped();
                 
-                cout << "ELIOT : " << _pq.getFields() << endl;
-
                 // setup check for if we can only use index to extract
                 if ( _c->modifiedKeys() == false && _c->isMultiKey() == false && _pq.getFields() ){
-                    cout << "\t YO" << endl;
                     _keyFieldsOnly.reset( _pq.getFields()->checkKey( _c->indexKeyPattern() ) );
-                    cout << "\t " << _keyFieldsOnly.get() << endl;
                 }
             }
 
@@ -751,9 +748,9 @@ namespace mongo {
             else {
                 _nscannedObjects++;
                 DiskLoc cl = _c->currLoc();
-                if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( cl.obj() ) ){
+                if ( _chunkManager && ! _chunkManager->belongsToMe( cl.obj() ) ){
                     _nChunkSkips++;
-                    // cout << "TEMP skipping un-owned chunk: " << _c->current() << endl;
+                    // log() << "TEMP skipping un-owned chunk: " << _c->current() << endl;
                 }
                 else if( _c->getsetdup(cl) ) { 
                     // dup
@@ -924,7 +921,7 @@ namespace mongo {
         
         MatchDetails _details;
 
-        ChunkMatcherPtr _chunkMatcher;
+        ShardChunkManagerPtr _chunkManager;
         
         bool _inMemSort;
         auto_ptr< ScanAndOrder > _so;
@@ -990,7 +987,7 @@ namespace mongo {
                 result.setData( qr.release(), true );
             }
             else { 
-                uasserted(10000, "bad or malformed command request?");
+                uasserted(13530, "bad or malformed command request?");
             }
             return 0;
         }

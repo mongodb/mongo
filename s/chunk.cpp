@@ -103,7 +103,7 @@ namespace mongo {
             
             q.sort( r.obj() );
         }
-        
+
         // find the extreme key
         BSONObj end = conn->findOne( _manager->getns() , q );
         conn.done();

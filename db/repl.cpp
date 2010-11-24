@@ -1560,6 +1560,7 @@ namespace mongo {
             /* replication is not configured yet (for --slave) in local.sources.  Poll for config it
             every 20 seconds.
             */
+            log() << "no source given, add a master to local.sources to start replication" << endl;
             return 20;
         }
 

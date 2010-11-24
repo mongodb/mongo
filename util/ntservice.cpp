@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-	void shutdown();
+	void shutdownServer();
 
 	SERVICE_STATUS_HANDLE ServiceController::_statusHandle = NULL;
 	std::wstring ServiceController::_serviceName;
@@ -337,7 +337,7 @@ namespace mongo {
 		switch ( ctrlCode ) {
 			case SERVICE_CONTROL_STOP:
 			case SERVICE_CONTROL_SHUTDOWN:
-				shutdown();
+				shutdownServer();
 				reportStatus( SERVICE_STOPPED );
 				return;
 		}

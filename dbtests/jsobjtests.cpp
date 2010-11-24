@@ -1025,6 +1025,22 @@ namespace JsobjTests {
         }
     };
 
+    class MinMaxKeyBuilder {
+    public:
+        void run() {
+            BSONObj min = BSON( "a" << MINKEY );
+            BSONObj max = BSON( "b" << MAXKEY );
+
+            ASSERT( min.valid() );
+            ASSERT( max.valid() );
+
+            BSONElement minElement = min["a"];
+            BSONElement maxElement = max["b"];
+            ASSERT( minElement.type() == MinKey );
+            ASSERT( maxElement.type() == MaxKey );
+        }
+    };
+
     class MinMaxElementTest {
     public:
 
@@ -1052,9 +1068,6 @@ namespace JsobjTests {
                 massert( 10407 ,  s , abs( min( t ).firstElement().canonicalType() - max( t ).firstElement().canonicalType() ) <= 10 );
             }
         }
-
-
-
     };
 
     class ExtractFieldsTest {
@@ -1800,16 +1813,13 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelishOr >();
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
-            add< SubObjectBuilder >();
-            add< DateBuilder >();
-            add< DateNowBuilder >();
-            add< TimeTBuilder >();
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
             add< DateBuilder >();
             add< DateNowBuilder >();
             add< TimeTBuilder >();
+            add< MinMaxKeyBuilder >();
             add< MinMaxElementTest >();
             add< ComparatorTest >();
             add< ExtractFieldsTest >();

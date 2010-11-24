@@ -27,7 +27,6 @@
 #include "lasterror.h"
 #include "security.h"
 #include "json.h"
-//#include "reccache.h"
 #include "replpair.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
@@ -38,6 +37,7 @@
 #endif
 #include "stats/counters.h"
 #include "background.h"
+#include "dur_journal.h"
 
 namespace mongo {
 
@@ -667,11 +667,8 @@ namespace mongo {
         return new DBDirectClient();
     }
 
-    //void recCacheCloseAll();
-
     mongo::mutex exitMutex("exit");
     int numExitCalls = 0;
-    void shutdown();
 
     bool inShutdown(){
         return numExitCalls > 0;
@@ -691,6 +688,54 @@ namespace mongo {
         catch ( ... ){}
         
         // uh - oh, not sure there is anything else we can do...
+    }
+
+    /** also called by ntservice.cpp */
+    void shutdownServer() {
+
+        log() << "shutdown: going to close listening sockets..." << endl;        
+        ListeningSockets::get()->closeAll();
+
+        log() << "shutdown: going to flush oplog..." << endl;
+        flushDiagLog();
+
+        /* must do this before unmapping mem or you may get a seg fault */
+        log() << "shutdown: going to close sockets..." << endl;
+        boost::thread close_socket_thread( boost::bind(MessagingPort::closeAllSockets, 0) );
+
+        // wait until file preallocation finishes
+        // we would only hang here if the file_allocator code generates a
+        // synchronous signal, which we don't expect
+        log() << "shutdown: waiting for fs preallocator..." << endl;
+        theFileAllocator().waitUntilFinished();
+        
+        log() << "shutdown: closing all files..." << endl;
+        if( durable ) {
+            /* is this useful?  needed?  helpful? perhaps even without _DURABLE.  ifdef'd for now just to avoid behavior change short term */
+            MemoryMappedFile::flushAll(true);
+        }
+        stringstream ss3;
+        MemoryMappedFile::closeAllFiles( ss3 );
+        rawOut( ss3.str() );
+
+#if defined(_DURABLE)
+        if( durable ) {
+            log() << "shutdown: journalCleanup..." << endl;
+            dur::journalCleanup();
+        }
+#endif
+
+#if !defined(_WIN32) && !defined(__sunos__)
+        if ( lockFile ){
+            log() << "shutdown: removing fs lock..." << endl;
+            /* This ought to be an unlink(), but Eliot says the last
+               time that was attempted, there was a race condition
+               with acquirePathLock().  */
+            if( ftruncate( lockFile , 0 ) ) 
+                log() << "couldn't remove fs lock " << errnoWithDescription() << endl;
+            flock( lockFile, LOCK_UN );
+        }
+#endif
     }
 
     /* not using log() herein in case we are already locked */
@@ -725,7 +770,7 @@ namespace mongo {
         }
         
         try {
-            shutdown(); // gracefully shutdown instance
+            shutdownServer(); // gracefully shutdown instance
         }
         catch ( ... ){
             tryToOutputFatal( "shutdown failed with exception" );
@@ -741,45 +786,6 @@ namespace mongo {
         ::exit(rc);
     }
     
-    void shutdown() {
-
-        log() << "shutdown: going to close listening sockets..." << endl;        
-        ListeningSockets::get()->closeAll();
-
-        log() << "shutdown: going to flush oplog..." << endl;
-        flushDiagLog();
-
-        /* must do this before unmapping mem or you may get a seg fault */
-        log() << "shutdown: going to close sockets..." << endl;
-        boost::thread close_socket_thread( boost::bind(MessagingPort::closeAllSockets, 0) );
-
-        // wait until file preallocation finishes
-        // we would only hang here if the file_allocator code generates a
-        // synchronous signal, which we don't expect
-        log() << "shutdown: waiting for fs preallocator..." << endl;
-        theFileAllocator().waitUntilFinished();
-        
-        log() << "shutdown: closing all files..." << endl;
-        stringstream ss3;
-        MemoryMappedFile::closeAllFiles( ss3 );
-        rawOut( ss3.str() );
-
-        // should we be locked here?  we aren't. might be ok as-is.
-        //recCacheCloseAll();
-        
-#if !defined(_WIN32) && !defined(__sunos__)
-        if ( lockFile ){
-            log() << "shutdown: removing fs lock..." << endl;
-            /* This ought to be an unlink(), but Eliot says the last
-               time that was attempted, there was a race condition
-               with acquirePathLock().  */
-            if( ftruncate( lockFile , 0 ) ) 
-                log() << "couldn't remove fs lock " << errnoWithDescription() << endl;
-            flock( lockFile, LOCK_UN );
-        }
-#endif
-    }
-
 #if !defined(_WIN32) && !defined(__sunos__)
     void writePid(int fd) {
         stringstream ss;

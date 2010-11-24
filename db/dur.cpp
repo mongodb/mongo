@@ -45,76 +45,50 @@
 #include "client.h"
 #include "dur.h"
 #include "dur_journal.h"
+#include "dur_commitjob.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/timer.h"
-#include "../util/alignedbuilder.h"
 
 namespace mongo { 
 
-    void dbunlocking_write() {
-        // pending ...
-    }
-
     namespace dur { 
 
-        //MongoMMF* pointerToMMF(void *p, size_t& ofs);
+        static CommitJob cj;
 
-        struct WriteIntent { 
-            WriteIntent() : p(0) { }
-            WriteIntent(void *a, unsigned b) : p(a), len(b) { }
-            void *p; // where we will write
-            unsigned len; // up to this len
-        };
-
-        /* try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
-           we will just log them twice.
-           */
-        template<int Prime>
-        class Already {
-            enum { N = Prime }; // this should be small the idea is that it fits in the cpu cache easily
-            WriteIntent nodes[N];
-        public:
-            Already() { clear(); }
-            void clear() { memset(this, 0, sizeof(*this)); }
-
-            /* see if we have Already recorded/indicated our write intent for this region of memory.
-               @return true if already indicated.
-            */
-            bool checkAndSet(const WriteIntent& w) {
-                unsigned x = mongoutils::hashPointer(w.p);
-                WriteIntent& nd = nodes[x % N];
-                if( nd.p != w.p || nd.len < w.len ) {
-                    nd = w;
-                    return false;
-                }
-                return true;
-            }
-        };
-
-        static Already<127> alreadyNoted;
-
-        /* our record of pending/uncommitted write intents */
-        static vector<WriteIntent> writes;
-
-        void* writingPtr(void *x, size_t len) { 
-            //log() << "TEMP writing " << x << ' ' << len << endl;
-            void *p = x;
-            DEV p = MongoMMF::switchToPrivateView(x);
+        /** declare write intent.  when already in the write view if testIntent is true. */
+        void declareWriteIntent(void *p, unsigned len) {
+//            log() << "TEMP dur writing " << p << ' ' << len << endl;
             WriteIntent w(p, len);
-            if( !alreadyNoted.checkAndSet(w) ) {
-                // remember intent. we will journal it in a bit
-                writes.push_back(w);
-                wassert( writes.size() <  2000000 );
-                assert(  writes.size() < 20000000 );
-            }
+            cj.note(w);
+        }
+
+        void* writingPtr(void *x, unsigned len) { 
+            void *p = x;
+            if( testIntent )
+                p = MongoMMF::switchToPrivateView(x);
+            declareWriteIntent(p, len);
             return p;
         }
 
-        /** caller handles locking */
-        static bool PREPLOGBUFFER(AlignedBuilder& bb) { 
-            if( writes.empty() )
-                return false;
+        /** declare intent to write
+            @param ofs offset within buf at which we will write
+            @param len the length at ofs we will write
+            @return new buffer pointer.  this is modified when testIntent is true.
+        */
+        void* writingAtOffset(void *buf, unsigned ofs, unsigned len) {
+            char *p = (char *) buf;
+            if( testIntent )
+                p = (char *) MongoMMF::switchToPrivateView(buf);
+            declareWriteIntent(p+ofs, len);
+            return p;
+        }
 
+        /** we will build an output buffer ourself and then use O_DIRECT
+            we could be in read lock for this
+            caller handles locking 
+            */
+        static bool PREPLOGBUFFER() { 
+            AlignedBuilder& bb = cj._ab;
             bb.reset();
 
             unsigned *lenInBlockHeader;
@@ -128,13 +102,19 @@ namespace mongo {
 
             {
                 scoped_lock lk(privateViews._mutex());
-                for( vector<WriteIntent>::iterator i = writes.begin(); i != writes.end(); i++ ) {
+                for( vector<WriteIntent>::iterator i = cj.writes().begin(); i != cj.writes().end(); i++ ) {
                     size_t ofs;
                     MongoMMF *mmf = privateViews._find(i->p, ofs);
                     if( mmf == 0 ) {
                         journalingFailure("view pointer cannot be resolved");
                     }
                     else {
+                        if( !mmf->dirty() )
+                            mmf->dirty() = true; // usually it will already be dirty so don't bother writing then
+                        {
+                            size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
+                            i->w_ptr = ((char*)mmf->view_write()) + ofs;
+                        }
                         if( mmf->filePath() != lastFilePath ) { 
                             lastFilePath = mmf->filePath();
                             JDbContext c;
@@ -165,40 +145,89 @@ namespace mongo {
                 dassert( bb.len() % 8192 == 0 );
             }
 
-            writes.clear();
-            alreadyNoted.clear();
             return true;
         }
 
-        static void WRITETOJOURNAL(const AlignedBuilder& bb) { 
-            journal(bb);
+        /** write the buffer we have built to the journal and fsync it.
+            outside of lock as that could be slow.
+         */
+         static void WRITETOJOURNAL(AlignedBuilder& ab) { 
+            journal(ab);
         }
 
-        static void _go(AlignedBuilder& bb) {
-            PREPLOGBUFFER(bb);
+        /** apply the writes back to the non-private MMF after they are for certain in redo log 
 
-            // todo: add double buffering so we can be (not even read locked) during WRITETOJOURNAL
-            WRITETOJOURNAL(bb);
+            (1) todo we don't need to write back everything every group commit.  we MUST write back
+            that which is going to be a remapped on its private view - but that might not be all 
+            views.
+
+            (2) todo should we do this using N threads?  would be quite easy
+                see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
+
+            locking: in read lock when called
+        */
+        static void WRITETODATAFILES() { 
+            /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
+            for( int i = cj.writes().size() - 1; i >= 0; i-- ) {
+                const WriteIntent& intent = cj.writes()[i];
+                char *dst = (char *) (intent.w_ptr);
+                memcpy(dst, intent.p, intent.len);
+            }
         }
 
-        static void go(AlignedBuilder& bb) {
+        /** we need to remap the private view periodically. otherwise it would become very large. 
+            locking: in read lock when called
+        */
+        static void _remap(MongoFile *f) { 
+            MongoMMF *mmf = dynamic_cast<MongoMMF*>(f);
+            if( mmf && mmf->dirty() ) {
+                mmf->dirty() = false;
+                log() << "dur todo : finish remap " << endl;
+            }
+        }
+        static void REMAPPRIVATEVIEW() { 
+            MongoFile::forEach( _remap );
+        }
+
+        /** locking in read lock when called */
+        static void _go() {
+            if( !cj.hasWritten() )
+                return;
+
+            PREPLOGBUFFER();
+
+            WRITETOJOURNAL(cj._ab);
+
+            // write the noted write intent entries to the data files.
+            // this has to come after writing to the journal, obviously...
+            WRITETODATAFILES();
+
+            // remapping private views must occur after WRITETODATAFILES otherwise 
+            // we wouldn't see newly written data on reads.
+            REMAPPRIVATEVIEW();
+
+            cj.reset();
+        }
+
+        static void go() {
+            if( !cj.hasWritten() )
+                return;
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
-                    _go(bb);
+                    _go();
                     return;
                 }
             }
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a 
             // write lock instead.  otherwise writes could use too much RAM.
             writelock lk;
-            _go(bb);
+            _go();
         }
 
         static void durThread() { 
             Client::initThread("dur");
             const int HowOftenToGroupCommitMs = 100;
-            AlignedBuilder bb(1024 * 1024 * 16); // reuse to avoid any heap fragmentation
             while( 1 ) { 
                 try {
                     int millis = HowOftenToGroupCommitMs;
@@ -210,7 +239,7 @@ namespace mongo {
                             millis = 5;
                     }
                     sleepmillis(millis);
-                    go(bb);
+                    go();
                 }
                 catch(std::exception& e) { 
                     log() << "exception in durThread " << e.what() << endl;
@@ -219,8 +248,15 @@ namespace mongo {
         }
 
         void unlinkThread();
+        void recover();
 
         void startup() {
+            if( !durable )
+                return;
+                
+            recover();
+            if( testIntent )
+                return;
             journalMakeDir();
             boost::thread t(durThread);
             boost::thread t2(unlinkThread);

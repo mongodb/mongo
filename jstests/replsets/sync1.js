@@ -52,7 +52,7 @@ doTest = function (signal) {
     dbs[0].bar.ensureIndex({ w: 1 });
 
     var ok = false;
-    var inserts = 100000;
+    var inserts = 10000;
 
     print("\nsync1.js ********************************************************************** part 5");
 
@@ -64,7 +64,7 @@ doTest = function (signal) {
     do {
         sleep(1000);
         status = dbs[0].getSisterDB("admin").runCommand({ replSetGetStatus: 1 });
-    } while (status.members[1].state != 2 && status.members[2].state != 2);
+    } while (status.members[1].state != 2 || status.members[2].state != 2);
 
     print("\nsync1.js ********************************************************************** part 6");
     dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: true });
@@ -127,12 +127,14 @@ doTest = function (signal) {
                 try {
                     printjson(dbs[1].isMaster());
                     printjson(dbs[1].bar.count());
+                    printjson(dbs[1].adminCommand({replSetGetStatus : 1}));
                 }
                 catch (e) { print(e); }
                 print("dbs[2]:");
                 try {
                     printjson(dbs[2].isMaster());
                     printjson(dbs[2].bar.count());
+                    printjson(dbs[2].adminCommand({replSetGetStatus : 1}));
                 }
                 catch (e) { print(e); }
                 assert(false, "sync1.js too many exceptions, failing");
@@ -163,14 +165,19 @@ doTest = function (signal) {
     print("\nsync1.js ********************************************************************** part 10");
 
     // now, let's see if rollback works
-    try {
-      dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: false });
-    }
-    catch(e) {
-      print(e);
-    }
-    reconnect(dbs[0]);
-    reconnect(dbs[1]);
+    wait(function() {
+        try {
+          dbs[0].adminCommand({ replSetTest: 1, blind: false });
+        }
+        catch(e) {
+          print(e);
+        }
+        reconnect(dbs[0]);
+        reconnect(dbs[1]);
+
+        var status = dbs[1].adminCommand({replSetGetStatus:1});
+        return status.members[0].health == 1;
+      });
     
     
     dbs[0].getMongo().setSlaveOk();
@@ -201,7 +208,10 @@ doTest = function (signal) {
 
         count++;
         if (count == 100) {
-            print(dbs[0].getSisterDB("admin").runCommand({replSetGetStatus:1}));
+            printjson(dbs[0].isMaster());
+            printjson(dbs[0].adminCommand({replSetGetStatus:1}));
+            printjson(dbs[1].isMaster());
+            printjson(dbs[1].adminCommand({replSetGetStatus:1}));
             pause("FAIL part 11");
             assert(false, "replsets/\nsync1.js fails timing out");
             replTest.stopSet(signal);

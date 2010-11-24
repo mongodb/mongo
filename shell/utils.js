@@ -1359,7 +1359,27 @@ rs.remove = function (hn) {
 };
 
 help = shellHelper.help = function (x) {
-    if (x == "connect") {
+    if (x == "mr") {
+        print("\nSee also http://www.mongodb.org/display/DOCS/MapReduce");
+        print("\nfunction mapf() {");
+        print("  // 'this' holds current document to inspect");
+        print("  emit(key, value);");
+        print("}");
+        print("\nfunction reducef(key,value_array) {");
+        print("  return reduced_value;");
+        print("}");
+        print("\ndb.mycollection.mapReduce(mapf, reducef[, options])");
+        print("\noptions");
+        print("{[query : <query filter object>]");
+        print(" [, sort : <sort the query.  useful for optimization>]");
+        print(" [, limit : <number of objects to return from collection>]");
+        print(" [, out : <output-collection name>]");
+        print(" [, keeptemp: <true|false>]");
+        print(" [, finalize : <finalizefunction>]");
+        print(" [, scope : <object where fields go into javascript global scope >]");
+        print(" [, verbose : true]}\n");
+        return;
+    } else if (x == "connect") {
         print("\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
         print("Additional connections may be opened:\n");
         print("    var x = new Mongo('host[:port]');");
@@ -1369,16 +1389,22 @@ help = shellHelper.help = function (x) {
         print("\nNote: the REPL prompt only auto-reports getLastError() for the shell command line connection.\n");
         return;
     }
-    if (x == "misc") {
+    else if (x == "misc") {
         print("\tb = new BinData(subtype,base64str)  create a BSON BinData value");
         print("\tb.subtype()                         the BinData subtype (0..255)");
         print("\tb.length()                          length of the BinData data in bytes");
         print("\tb.hex()                             the data as a hex encoded string");
         print("\tb.base64()                          the data as a base 64 encoded string");
         print("\tb.toString()");
+        print();
+        print("\to = new ObjectId()                  create a new ObjectId");
+        print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
+        print("\to.isObjectId()");
+        print("\to.toString()");
+        print("\to.equals(otherid)");
         return;
     }
-    if (x == "admin") {
+    else if (x == "admin") {
         print("\tls([path])                      list files");
         print("\tpwd()                           returns current directory");
         print("\tlistFiles([path])               returns file list");
@@ -1391,7 +1417,7 @@ help = shellHelper.help = function (x) {
         print("\tgetMemInfo()                    diagnostic");
         return;
     }
-    if (x == "test") {
+    else if (x == "test") {
         print("\tstartMongodEmpty(args)        DELETES DATA DIR and then starts mongod");
         print("\t                              returns a connection to the new server");
         print("\tstartMongodTest()             DELETES DATA DIR");
@@ -1401,21 +1427,26 @@ help = shellHelper.help = function (x) {
         print("\t                              returns a connection to the new server");
         return;
     }
-    print("\t" + "db.help()                    help on db methods");
-    print("\t" + "db.mycoll.help()             help on collection methods");
-    print("\t" + "rs.help()                    help on replica set methods");
-    print("\t" + "help connect                 connecting to a db help");
-    print("\t" + "help admin                   administrative help");
-    print("\t" + "help misc                    misc things to know");
-    print();
-    print("\t" + "show dbs                     show database names");
-    print("\t" + "show collections             show collections in current database");
-    print("\t" + "show users                   show users in current database");
-    print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
-    print("\t" + "use <db_name>                set current database");
-    print("\t" + "db.foo.find()                list objects in collection foo");
-    print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
-    print("\t" + "it                           result of the last line evaluated; use to further iterate");
-    print("\t" + "DBQuery.shellBatchSize = x   set default number of items to display on shell" );
-    print("\t" + "exit                         quit the mongo shell");
+    else if (x == "") {
+        print("\t" + "db.help()                    help on db methods");
+        print("\t" + "db.mycoll.help()             help on collection methods");
+        print("\t" + "rs.help()                    help on replica set methods");
+        print("\t" + "help connect                 connecting to a db help");
+        print("\t" + "help admin                   administrative help");
+        print("\t" + "help misc                    misc things to know");
+        print("\t" + "help mr                      mapreduce help");
+        print();
+        print("\t" + "show dbs                     show database names");
+        print("\t" + "show collections             show collections in current database");
+        print("\t" + "show users                   show users in current database");
+        print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+        print("\t" + "use <db_name>                set current database");
+        print("\t" + "db.foo.find()                list objects in collection foo");
+        print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
+        print("\t" + "it                           result of the last line evaluated; use to further iterate");
+        print("\t" + "DBQuery.shellBatchSize = x   set default number of items to display on shell");
+        print("\t" + "exit                         quit the mongo shell");
+    }
+    else
+        print("unknown help option");
 }

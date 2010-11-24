@@ -267,6 +267,9 @@ namespace mongo {
             DiskLoc firstRecord;
             DiskLoc lastRecord;
         };
+        /** often we want to update just the firstRecord and lastRecord fields. 
+            this helper is for that -- for use with dur::writing() method
+        */
         FL* fl() { return (FL*) &firstRecord; }
     private:
         DiskLoc _reuse(const char *nsname);

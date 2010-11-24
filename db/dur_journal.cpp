@@ -43,6 +43,14 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 20 );
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 8 );
 
+        filesystem::path getJournalDir() { 
+            filesystem::path p(dbpath);
+            p /= "journal";
+            return p;
+        }
+
+        /** this should be called when something really bad happens so that we can flag appropriately
+        */
         void journalingFailure(const char *msg) { 
             /** todo:
                 (1) don't log too much
@@ -57,16 +65,16 @@ namespace mongo {
 
             unsigned long long written;
             unsigned nextFileNumber;
-            LogFile *lf;
-            string dir;
+            string dir; // set by journalMakeDir() during initialization
             MVar<path> &toUnlink;
 
             Journal() : 
-              toUnlink(*(new MVar<path>)) /* freeing MVar at program termination would be problematic */
+              toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
+              _lfMutex("lfMutex")
             { 
                 written = 0;
                 nextFileNumber = 0;
-                lf = 0; 
+                _lf = 0; 
             }
 
             void open();
@@ -74,6 +82,19 @@ namespace mongo {
             void journal(const AlignedBuilder& b);
 
             path getFilePathFor(int filenumber) const;
+
+            bool tryToCloseLogFile() { 
+                mutex::try_lock lk(_lfMutex, 2000);
+                if( lk.ok ) {
+                    delete _lf; 
+                    _lf = 0;
+                }
+                return lk.ok;
+            }
+        private:
+            void _open();
+            LogFile *_lf;
+            mutex _lfMutex; // lock when using _lf. 
         };
 
         static Journal j;
@@ -84,10 +105,45 @@ namespace mongo {
             return p;
         }
 
+        /** throws */
+        void removeJournalFiles() { 
+            try {
+                for ( boost::filesystem::directory_iterator i( getJournalDir() );
+                      i != boost::filesystem::directory_iterator(); 
+                      ++i ) {
+                    string fileName = boost::filesystem::path(*i).leaf();
+                    if( str::startsWith(fileName, "j._") ) {
+                        try {
+                            boost::filesystem::remove(*i);
+                        }
+                        catch(std::exception& e) {
+                            log() << "couldn't remove " << fileName << ' ' << e.what() << endl;
+                        }
+                    }
+                }
+            }
+            catch( std::exception& e ) { 
+                log() << "error removing journal files " << e.what() << endl;
+                throw;
+            }
+        }
+
+        /** at clean shutdown */
+        void journalCleanup() { 
+            if( !j.tryToCloseLogFile() ) {
+                return;
+            }
+            try { 
+                removeJournalFiles(); 
+            }
+            catch(std::exception& e) {
+                log() << "error couldn't remove journal file during shutdown " << e.what() << endl;
+            }
+        }
+
         /** assure journal/ dir exists. throws */
         void journalMakeDir() {
-            filesystem::path p(dbpath);
-            p /= "journal";
+            filesystem::path p = getJournalDir();
             j.dir = p.string();
             if( !exists(j.dir) ) {
                 try {
@@ -102,15 +158,19 @@ namespace mongo {
 
         /* threading: only durThread() calls this, thus safe. */
         void Journal::open() {
-            assert( lf == 0 );
+            mutex::scoped_lock lk(_lfMutex);
+            _open();
+        }
+        void Journal::_open() {
+            assert( _lf == 0 );
             string fname = getFilePathFor(nextFileNumber).string();
-            lf = new LogFile(fname);
+            _lf = new LogFile(fname);
             nextFileNumber++;
             {
                 JHeader h(fname);
                 AlignedBuilder b(8192);
                 b.appendStruct(h);
-                lf->synchronousAppend(b.buf(), b.len());
+                _lf->synchronousAppend(b.buf(), b.len());
             }
         }
 
@@ -130,17 +190,21 @@ namespace mongo {
         /** check if time to rotate files.  assure a file is open. 
             done separately from the journal() call as we can do this part
             outside of lock.
+            thread: durThread()
          */
         void journalRotate() { 
             j.rotate();
         }
         void Journal::rotate() {
-            if( lf && written < DataLimit ) 
+            if( _lf && written < DataLimit ) 
+                return;
+            scoped_lock lk(_lfMutex);
+            if( _lf && written < DataLimit ) 
                 return;
 
-            if( lf ) { 
-                delete lf; // close
-                lf = 0;
+            if( _lf ) { 
+                delete _lf; // close
+                _lf = 0;
                 written = 0;
 
                 /* remove an older journal file. */
@@ -163,29 +227,30 @@ namespace mongo {
 
             try {
                 Timer t;
-                open();
+                _open();
                 int ms = t.millis();
                 if( ms >= 200 ) { 
                     log() << "DR101 latency warning on journal file open " << ms << "ms" << endl;
                 }
             }
             catch(std::exception& e) { 
-                log() << "warning exception in Journal::rotate" << e.what() << endl;
+                log() << "warning exception opening journal file " << e.what() << endl;
             }
         }
 
-        /** write to journal             
+        /** write to journal
+            thread: durThread()
         */
         void journal(const AlignedBuilder& b) {
             j.journal(b);
         }
         void Journal::journal(const AlignedBuilder& b) {
             try {
-                /* todo: roll if too big */
-                if( lf == 0 )
+                mutex::scoped_lock lk(_lfMutex);
+                if( _lf == 0 )
                     open();
                 written += b.len();
-                lf->synchronousAppend((void *) b.buf(), b.len());
+                _lf->synchronousAppend((void *) b.buf(), b.len());
             }
             catch(std::exception& e) { 
                 log() << "warning exception in dur::journal " << e.what() << endl;

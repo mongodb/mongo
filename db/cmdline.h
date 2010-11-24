@@ -26,7 +26,8 @@ namespace mongo {
     struct CmdLine { 
         CmdLine() : 
             port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(false),
-            quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true )
+            quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ), 
+            syncdelay(60)
         { } 
         
         string binaryName;     // mongod or mongos
@@ -71,7 +72,8 @@ namespace mongo {
 
         int pretouch;          // --pretouch for replication application (experimental)
         bool moveParanoia;     // for move chunk paranoia 
-        
+        double syncdelay;      // seconds between fsyncs
+
         static void addGlobalOptions( boost::program_options::options_description& general , 
                                       boost::program_options::options_description& hidden );
 

@@ -391,8 +391,11 @@ namespace mongo {
             if ( hasJSReturn( code ) )
                 return false;
 
-            if ( code.find( ";" ) != string::npos &&
-                 code.find( ";" ) != code.rfind( ";" ) )
+            if ( code.find( ';' ) != string::npos &&
+                 code.find( ';' ) != code.rfind( ';' ) )
+                return false;
+            
+            if ( code.find( '\n') != string::npos )
                 return false;
 
             if ( code.find( "for(" ) != string::npos ||
@@ -416,10 +419,20 @@ namespace mongo {
         JSFunction * _compileFunction( const char * raw , JSObject * assoc , const char *& gcName ){
             if ( ! assoc )
                 assoc = JS_GetGlobalObject( _context );
+            
+            while ( raw[0] ){
+                while (isspace(*raw)) {
+                    raw++;
+                }
 
-            while (isspace(*raw)) {
-                raw++;
+                if ( raw[0] != '/' || raw[1] != '/' )
+                    break;
+                
+                while ( raw[0] && raw[0] != '\n' )
+                    raw++;
             }
+
+            //cout << "RAW\n---\n" << raw << "\n---" << endl;
 
             stringstream fname;
             fname << "cf_";
@@ -1378,7 +1391,6 @@ namespace mongo {
         static JSBool interrupt( JSContext *cx, JSScript *script ){
             return _interrupt( cx );
         }
-
 
         void installInterrupt( int timeoutMs ) {
             if ( timeoutMs != 0 || ScriptEngine::haveCheckInterruptCallback() ) {

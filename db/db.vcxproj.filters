@@ -376,12 +376,6 @@
     <ClCompile Include="cap.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\log.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\processinfo.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
     <ClCompile Include="restapi.cpp">
       <Filter>db</Filter>
     </ClCompile>
@@ -389,7 +383,6 @@
     <ClCompile Include="..\shell\mongo_vstudio.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
     <ClCompile Include="..\scripting\bench.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -417,10 +410,25 @@
     <ClCompile Include="dur_journal.cpp">
       <Filter>db\storage engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\d_chunk_matcher.cpp">
+    <ClCompile Include="projection.cpp" />
+    <ClCompile Include="dur_recover.cpp">
+      <Filter>db\storage engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_chunk_manager.cpp">
       <Filter>sharding</Filter>
     </ClCompile>
-    <ClCompile Include="projection.cpp" />
+    <ClCompile Include="..\util\log.cpp">
+      <Filter>util\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\logfile.cpp">
+      <Filter>util\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo.cpp">
+      <Filter>util\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\spin_lock.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -799,6 +807,15 @@
       <Filter>db\storage engine</Filter>
     </ClInclude>
     <ClInclude Include="projection.h" />
+    <ClInclude Include="dur_commitjob.h">
+      <Filter>db\storage engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\time_support.h">
+      <Filter>util\core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\logfile.h">
+      <Filter>util\core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">

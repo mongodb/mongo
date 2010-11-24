@@ -168,11 +168,15 @@ namespace mongo {
 
         vector<const char*> _fieldNames;
         vector<BSONElement> _fixed;
-        BSONObj _nullKey;
+
+        BSONObj _nullKey; // a full key with all fields null
         
-        BSONObj _nullObj;
-        BSONElement _nullElt;
+        BSONObj _nullObj; // only used for _nullElt
+        BSONElement _nullElt; // jstNull
         
+        int _nFields; // number of fields in the index
+        bool _sparse; // if the index is sparse
+
         shared_ptr<IndexType> _indexType;
 
         const IndexDetails * _details;

@@ -48,6 +48,9 @@ namespace mongo {
 
     DateNowLabeler DATENOW;
 
+    MinKeyLabeler MINKEY;
+    MaxKeyLabeler MAXKEY;
+
     string escape( string s , bool escape_slash=false) {
         StringBuilder ret;
         for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
@@ -541,7 +544,6 @@ namespace mongo {
         return s.str();
     }
 
-// todo: can be a little faster if we don't use toString() here.
     bool BSONObj::valid() const {
         try{
             BSONObjIterator it(*this);

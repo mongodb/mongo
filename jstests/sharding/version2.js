@@ -2,6 +2,10 @@
 
 s = new ShardingTest( "version2" , 1 , 2 )
 
+s.adminCommand( { enablesharding : "alleyinsider" } );
+s.adminCommand( { shardcollection : "alleyinsider.foo" , key : { num : 1 } } );
+s.adminCommand( { shardcollection : "alleyinsider.bar" , key : { num : 1 } } );
+
 a = s._connections[0].getDB( "admin" );
 
 // setup from one client

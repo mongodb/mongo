@@ -321,28 +321,21 @@ sendmore:
             return;
         }
 
-        const int Loops = 1;
-        for ( int q = 0; q < Loops; q++ ) {
-            Message send;
-            Message response;
+        Message send;
+        Message response;
 
-            send.setData( dbMsg , m);
-            int len = send.header()->dataLen();
+        send.setData( dbMsg , m);
+        int len = send.header()->dataLen();
 
-            for ( int i = 0; i < extras; i++ )
-                p.say(/*db, */send);
+        for ( int i = 0; i < extras; i++ )
+            p.say(/*db, */send);
 
-            Timer t;
-            bool ok = p.call(send, response);
-            double tm = ((double) t.micros()) + 1;
-            out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms "
-                  << "len: " << len << " data: " << response.singleData()->_data << endl;
+        Timer t;
+        bool ok = p.call(send, response);
+        double tm = ((double) t.micros()) + 1;
+        log() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms "
+              << "len: " << len << " data: " << response.singleData()->_data << endl;
 
-            if (  q+1 < Loops ) {
-                out() << "\t\tSLEEP 8 then sending again as a test" << endl;
-                sleepsecs(8);
-            }
-        }
         sleepsecs(1);
 
         p.shutdown();
@@ -468,22 +461,22 @@ sendmore:
     public:
         string name() const { return "DataFileSync"; }
         void run(){
-            if( _sleepsecs == 0 )
+            if( cmdLine.syncdelay == 0 )
                 log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
-            else if( _sleepsecs == 1 ) 
+            else if( cmdLine.syncdelay == 1 ) 
                 log() << "--syncdelay 1" << endl;
-            else if( _sleepsecs != 60 )
-                log(1) << "--syncdelay " << _sleepsecs << endl;
+            else if( cmdLine.syncdelay != 60 )
+                log(1) << "--syncdelay " << cmdLine.syncdelay << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ){
                 flushDiagLog();
-                if ( _sleepsecs == 0 ){
+                if ( cmdLine.syncdelay == 0 ){
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);
                     continue;
                 }
 
-                sleepmillis( (long long) std::max(0.0, (_sleepsecs * 1000) - time_flushing) );
+                sleepmillis( (long long) std::max(0.0, (cmdLine.syncdelay * 1000) - time_flushing) );
                 
                 if ( inShutdown() ){
                     // occasional issue trying to flush during shutdown when sleep interrupted
@@ -499,8 +492,7 @@ sendmore:
                 log(1) << "flushing mmap took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
             }
         }
-        
-        double _sleepsecs; // default value controlled by program options
+
     } dataFileSync;
 
     const char * jsInterruptCallback() {
@@ -681,7 +673,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("noauth", "run without security")
         ("auth", "run with security")
         ("objcheck", "inspect client data for validity on receipt")
-        ("quota", "enable db quota management")
+        ("quota", "limits each database to a certain number of files (8 default)")
         ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
         ("appsrvpath", po::value<string>(), "root directory for the babble app server")
         ("nocursors", "diagnostic/debugging option")
@@ -698,7 +690,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("upgrade", "upgrade db if needed")
         ("repair", "run repair on all dbs")
         ("notablescan", "do not allow table scans")
-        ("syncdelay",po::value<double>(&dataFileSync._sleepsecs)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
+        ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
         ("profile",po::value<int>(), "0=off 1=slow, 2=all")
         ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
         ("maxConns",po::value<int>(), "max number of simultaneous connections")

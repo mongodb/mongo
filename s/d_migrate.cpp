@@ -254,7 +254,10 @@ namespace mongo {
 
             if ( _ns != ns )
                 return;
-            
+
+            // no need to log if this is not an insertion, an update, or an actual deletion
+            // note: opstr 'db' isn't a deletion but a mention that a database exists (for replication
+            // machinery mostly)
             char op = opstr[0];
             if ( op == 'n' || op =='c' || ( op == 'd' && opstr[1] == 'b' ) )
                 return;
@@ -731,8 +734,10 @@ namespace mongo {
             // 5.
             { 
                 // TODO SERVER-2024
-                // + 5.b check opReplicatedEnough on _recvChunkCommit TO-side
                 // + 5.c kill isEmpty check by using ChunkMatcher knowledge and send the config updates on an applyOps format
+
+                // TODO SERVER-2119
+                // + 5.b check opReplicatedEnough on _recvChunkCommit TO-side
 
                 // 5.a
                 // we're under the collection lock here, so no other migrate can change maxVersion

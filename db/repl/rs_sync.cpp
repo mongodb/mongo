@@ -214,7 +214,8 @@ namespace mongo {
 
         r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
         assert( r.haveCursor() );
-        assert( r.awaitCapable() );
+
+        uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
         {
             if( !r.more() ) {

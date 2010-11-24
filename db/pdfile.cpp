@@ -1541,29 +1541,35 @@ namespace mongo {
         }
 
         Record *r = loc.rec();
-        assert( r->lengthWithHeaders >= lenWHdr );
-        r = (Record*) dur::writingPtr(r, lenWHdr);
-        if( addID ) { 
-            /* a little effort was made here to avoid a double copy when we add an ID */
-            ((int&)*r->data) = *((int*) obuf) + newId->size();
-            memcpy(r->data+4, newId->rawdata(), newId->size());
-            memcpy(r->data+4+newId->size(), ((char *)obuf)+4, addID-4);
+        {
+            assert( r->lengthWithHeaders >= lenWHdr );
+            r = (Record*) dur::writingPtr(r, lenWHdr);
+            if( addID ) { 
+                /* a little effort was made here to avoid a double copy when we add an ID */
+                ((int&)*r->data) = *((int*) obuf) + newId->size();
+                memcpy(r->data+4, newId->rawdata(), newId->size());
+                memcpy(r->data+4+newId->size(), ((char *)obuf)+4, addID-4);
+            }
+            else {
+                if( obuf )
+                    memcpy(r->data, obuf, len);
+            }
         }
-        else {
-            if( obuf )
-                memcpy(r->data, obuf, len);
-        }
-        Extent *e = dur::writing(r->myExtent(loc));
-        if ( e->lastRecord.isNull() ) {
-            e->firstRecord = e->lastRecord = loc;
-            r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
-        }
-        else {
-            Record *oldlast = e->lastRecord.rec();
-            r->prevOfs = e->lastRecord.getOfs();
-            r->nextOfs = DiskLoc::NullOfs;
-            dur::writing(oldlast)->nextOfs = loc.getOfs();
-            e->lastRecord = loc;
+
+        {
+            Extent *e = r->myExtent(loc);
+            if ( e->lastRecord.isNull() ) {
+                Extent::FL *fl = dur::writing(e->fl());
+                fl->firstRecord = fl->lastRecord = loc;
+                r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
+            }
+            else {
+                Record *oldlast = e->lastRecord.rec();
+                r->prevOfs = e->lastRecord.getOfs();
+                r->nextOfs = DiskLoc::NullOfs;
+                dur::writingInt(oldlast->nextOfs) = loc.getOfs();
+                dur::writingDiskLoc(e->lastRecord) = loc;
+            }
         }
 
         /* durability todo : this could be a bit annoying / slow to record constantly */

@@ -711,10 +711,10 @@
     <ClCompile Include="..\db\mongommf.cpp">
       <Filter>dur</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\d_chunk_matcher.cpp">
+    <ClCompile Include="..\db\projection.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\projection.cpp">
+    <ClCompile Include="..\s\d_chunk_manager.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>
