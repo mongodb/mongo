@@ -52,7 +52,7 @@ doTest = function (signal) {
     dbs[0].bar.ensureIndex({ w: 1 });
 
     var ok = false;
-    var inserts = 100000;
+    var inserts = 10000;
 
     print("\nsync1.js ********************************************************************** part 5");
 
@@ -64,7 +64,7 @@ doTest = function (signal) {
     do {
         sleep(1000);
         status = dbs[0].getSisterDB("admin").runCommand({ replSetGetStatus: 1 });
-    } while (status.members[1].state != 2 && status.members[2].state != 2);
+    } while (status.members[1].state != 2 || status.members[2].state != 2);
 
     print("\nsync1.js ********************************************************************** part 6");
     dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: true });
