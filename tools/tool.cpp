@@ -38,7 +38,7 @@ namespace mongo {
     Tool::Tool( string name , DBAccess access , string defaultDB , 
                 string defaultCollection , bool usesstdout ) :
         _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , 
-        _usesstdout(usesstdout), _noconnection(false), _autoreconnect(false), _conn(0), _paired(false) {
+        _usesstdout(usesstdout), _noconnection(false), _autoreconnect(false), _conn(0), _slaveConn(0), _paired(false) {
         
         _options = new po::options_description( "options" );
         _options->add_options()
@@ -240,8 +240,11 @@ namespace mongo {
     }
 
     DBClientBase& Tool::conn( bool slaveIfPaired ){
-        if ( slaveIfPaired && _conn->type() == ConnectionString::SET )
-            return ((DBClientReplicaSet*)_conn)->slaveConn();
+        if ( slaveIfPaired && _conn->type() == ConnectionString::SET ){
+            if (!_slaveConn)
+                _slaveConn = &((DBClientReplicaSet*)_conn)->slaveConn();
+            return *_slaveConn;
+        }
         return *_conn;
     }
 
