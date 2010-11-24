@@ -747,7 +747,7 @@ namespace mongo {
                 myVersion.incMajor();
                 
                 {
-                    dblock lk;
+                    writelock lk( ns );
                     assert( myVersion > shardingState.getVersion( ns ) );
                     shardingState.setVersion( ns , myVersion );
                     assert( myVersion == shardingState.getVersion( ns ) );
@@ -766,7 +766,7 @@ namespace mongo {
                     log() << "moveChunk commit result: " << res << endl;
                     if ( ! ok ){
                         {
-                            dblock lk;
+                            writelock lk( ns );
                             shardingState.setVersion( ns , currVersion );
                             assert( currVersion == shardingState.getVersion( ns ) );
                         }
