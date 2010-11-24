@@ -92,6 +92,7 @@ namespace mongo {
                 return lk.ok;
             }
         private:
+            void _open();
             LogFile *_lf;
             mutex _lfMutex; // lock when using _lf. 
         };
@@ -158,6 +159,9 @@ namespace mongo {
         /* threading: only durThread() calls this, thus safe. */
         void Journal::open() {
             mutex::scoped_lock lk(_lfMutex);
+            _open();
+        }
+        void Journal::_open() {
             assert( _lf == 0 );
             string fname = getFilePathFor(nextFileNumber).string();
             _lf = new LogFile(fname);
@@ -223,7 +227,7 @@ namespace mongo {
 
             try {
                 Timer t;
-                open();
+                _open();
                 int ms = t.millis();
                 if( ms >= 200 ) { 
                     log() << "DR101 latency warning on journal file open " << ms << "ms" << endl;

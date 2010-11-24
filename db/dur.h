@@ -92,7 +92,9 @@ namespace mongo {
         }
 
         /* assert that we have not (at least so far) declared write intent for p */
-        inline void assertReading(void *p) { dassert( MongoMMF::switchToPrivateView(p) != p ); }
+        inline void assertReading(void *p) { 
+            dassert( !testIntent || MongoMMF::switchToPrivateView(p) != p ); 
+        }
 
 #endif
 
