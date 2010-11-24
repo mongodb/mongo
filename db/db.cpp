@@ -321,28 +321,21 @@ sendmore:
             return;
         }
 
-        const int Loops = 1;
-        for ( int q = 0; q < Loops; q++ ) {
-            Message send;
-            Message response;
+        Message send;
+        Message response;
 
-            send.setData( dbMsg , m);
-            int len = send.header()->dataLen();
+        send.setData( dbMsg , m);
+        int len = send.header()->dataLen();
 
-            for ( int i = 0; i < extras; i++ )
-                p.say(/*db, */send);
+        for ( int i = 0; i < extras; i++ )
+            p.say(/*db, */send);
 
-            Timer t;
-            bool ok = p.call(send, response);
-            double tm = ((double) t.micros()) + 1;
-            out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms "
-                  << "len: " << len << " data: " << response.singleData()->_data << endl;
+        Timer t;
+        bool ok = p.call(send, response);
+        double tm = ((double) t.micros()) + 1;
+        log() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms "
+              << "len: " << len << " data: " << response.singleData()->_data << endl;
 
-            if (  q+1 < Loops ) {
-                out() << "\t\tSLEEP 8 then sending again as a test" << endl;
-                sleepsecs(8);
-            }
-        }
         sleepsecs(1);
 
         p.shutdown();
