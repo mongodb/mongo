@@ -3048,6 +3048,8 @@ const StringData _jscode_raw_collection =
 "\n" 
 "\n" 
 "DBCollection.prototype.drop = function(){\n" 
+"if ( arguments.length > 0 )\n" 
+"throw \"drop takes no argument\";\n" 
 "this.resetIndexCache();\n" 
 "var ret = this._db.runCommand( { drop: this.getName() } );\n" 
 "if ( ! ret.ok ){\n" 

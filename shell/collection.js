@@ -321,6 +321,8 @@ DBCollection.prototype.dropIndexes = function(){
 
 
 DBCollection.prototype.drop = function(){
+    if ( arguments.length > 0 )
+        throw "drop takes no argument";
     this.resetIndexCache();
     var ret = this._db.runCommand( { drop: this.getName() } );
     if ( ! ret.ok ){
