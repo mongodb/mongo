@@ -181,6 +181,7 @@ namespace mongo {
 #if !defined(_WIN32)
     typedef int HANDLE;
     inline void strcpy_s(char *dst, unsigned len, const char *src) {
+        assert( strlen(src) < len );
         strcpy(dst, src);
     }
 #else

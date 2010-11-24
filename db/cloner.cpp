@@ -173,7 +173,8 @@ namespace mongo {
             DBClientConnection *remote = dynamic_cast< DBClientConnection* >( conn.get() );
             if ( remote ) {
                 remote->query( boost::function<void(DBClientCursorBatchIterator &)>( f ), from_collection, query, 0, options );
-            } else { // no exhaust mode for direct client, so we have this hack
+            } else { 
+                // there is no exhaust mode for direct client, so we have this hack
                 auto_ptr<DBClientCursor> c = conn->query( from_collection, query, 0, 0, 0, options );
                 assert( c.get() );
                 while( c->more() ) {
