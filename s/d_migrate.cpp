@@ -254,7 +254,10 @@ namespace mongo {
 
             if ( _ns != ns )
                 return;
-            
+
+            // no need to log if this is not an insertion, an update, or an actual deletion
+            // note: opstr 'db' isn't a deletion but a mention that a database exists (for replication
+            // machinery mostly)
             char op = opstr[0];
             if ( op == 'n' || op =='c' || ( op == 'd' && opstr[1] == 'b' ) )
                 return;
