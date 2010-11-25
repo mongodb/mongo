@@ -60,11 +60,21 @@ namespace mongo {
             log() << "journaling error " << msg << endl;
         }
 
+        JHeader::JHeader(string fname) { 
+            txt[0] = 'j'; txt[1] = '\n';
+            version = 0x4141;
+            memset(ts, 0, sizeof(ts));
+            strncpy(ts, time_t_to_String_short(time(0)).c_str(), sizeof(ts)-1);
+            memset(dbpath, 0, sizeof(dbpath));
+            strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
+            memset(reserved3, 0, sizeof(reserved3));
+            txt2[0] = txt2[1] = '\n';
+            n1 = n2 = n3 = n4 = '\n';
+        }
+
         struct Journal {
             static const unsigned long long DataLimit = 1 * 1024 * 1024 * 1024;
-
-            unsigned long long written;
-            unsigned nextFileNumber;
+        public:
             string dir; // set by journalMakeDir() during initialization
             MVar<path> &toUnlink;
 
@@ -72,8 +82,8 @@ namespace mongo {
               toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
               _lfMutex("lfMutex")
             { 
-                written = 0;
-                nextFileNumber = 0;
+                _written = 0;
+                _nextFileNumber = 0;
                 _lf = 0; 
             }
 
@@ -91,10 +101,15 @@ namespace mongo {
                 }
                 return lk.ok;
             }
+
         private:
             void _open();
+
+            unsigned long long _written; // bytes written so far
+            unsigned _nextFileNumber;
+
             LogFile *_lf;
-            mutex _lfMutex; // lock when using _lf. 
+            mutex _lfMutex; // lock when using _lf
         };
 
         static Journal j;
@@ -163,9 +178,9 @@ namespace mongo {
         }
         void Journal::_open() {
             assert( _lf == 0 );
-            string fname = getFilePathFor(nextFileNumber).string();
+            string fname = getFilePathFor(_nextFileNumber).string();
             _lf = new LogFile(fname);
-            nextFileNumber++;
+            _nextFileNumber++;
             {
                 JHeader h(fname);
                 AlignedBuilder b(8192);
@@ -196,20 +211,20 @@ namespace mongo {
             j.rotate();
         }
         void Journal::rotate() {
-            if( _lf && written < DataLimit ) 
+            if( _lf && _written < DataLimit ) 
                 return;
             scoped_lock lk(_lfMutex);
-            if( _lf && written < DataLimit ) 
+            if( _lf && _written < DataLimit ) 
                 return;
 
             if( _lf ) { 
                 delete _lf; // close
                 _lf = 0;
-                written = 0;
+                _written = 0;
 
                 /* remove an older journal file. */
-                if( nextFileNumber >= 3 ) {
-                    unsigned fn = nextFileNumber - 3;
+                if( _nextFileNumber >= 3 ) {
+                    unsigned fn = _nextFileNumber - 3;
                     // we do unlinks asynchronously - unless they are falling behind.
                     // (unlinking big files can be slow on some operating systems; we don't want to stop world)
                     path p = j.getFilePathFor(fn);
@@ -249,7 +264,7 @@ namespace mongo {
                 mutex::scoped_lock lk(_lfMutex);
                 if( _lf == 0 )
                     open();
-                written += b.len();
+                _written += b.len();
                 _lf->synchronousAppend((void *) b.buf(), b.len());
             }
             catch(std::exception& e) { 

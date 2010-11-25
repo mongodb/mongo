@@ -47,17 +47,8 @@ namespace mongo {
         /** header for a journal/j._<n> file */
         struct JHeader {
             JHeader() { }
-            JHeader(string fname) { 
-                txt[0] = 'j'; txt[1] = '\n';
-                version = 0x4141;
-                memset(ts, 0, sizeof(ts));
-                strncpy(ts, time_t_to_String_short(time(0)).c_str(), sizeof(ts)-1);
-                memset(dbpath, 0, sizeof(dbpath));
-                strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
-                memset(reserved3, 0, sizeof(reserved3));
-                txt2[0] = txt2[1] = '\n';
-                n1 = n2 = n3 = n4 = '\n';
-            }
+            JHeader(string fname);
+
             char txt[2];
             unsigned short version;
 
@@ -90,6 +81,20 @@ namespace mongo {
             unsigned len; // or sentinel, see structs below
             int fileNo;
             // char data[]
+        };
+
+        /** Operations we log that aren't just basic writes.  
+         *  Basic writes are logged as JEntry's. 
+         *  For each op we define a class.
+         */
+        class DurOp : boost::noncopyable { 
+        public:
+            /** @param opcode a sentinel value near max unsigned. */
+            DurOp(unsigned opcode);
+        };
+
+        class PreallocateFileOp : public DurOp { 
+        public:
         };
 
         struct JSectFooter { 
