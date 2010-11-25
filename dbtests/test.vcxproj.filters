@@ -717,6 +717,9 @@
     <ClCompile Include="..\s\d_chunk_manager.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\dur_recover.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
