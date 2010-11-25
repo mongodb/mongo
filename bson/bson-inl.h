@@ -285,11 +285,11 @@ namespace mongo {
         case Symbol:
         case mongo::String: {
             unsigned x = (unsigned) valuestrsize();
-            if ( x < BSONObjMaxInternalSize && valuestr()[x-1] == 0 )
+            if ( x < (unsigned) BSONObjMaxInternalSize && valuestr()[x-1] == 0 )
                 return;
             StringBuilder buf;
             buf <<  "Invalid dbref/code/string/symbol size: " << x;
-            if( x < BSONObjMaxInternalSize ) 
+            if( x < (unsigned) BSONObjMaxInternalSize ) 
                 buf << " strnlen:" << mongo::strnlen( valuestr() , x );
             msgasserted( 10321 , buf.str() );
             break;

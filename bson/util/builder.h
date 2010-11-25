@@ -169,6 +169,7 @@ namespace mongo {
     };
 
 #if defined(_WIN32)
+#pragma warning( push )
 #pragma warning( disable : 4996 )
 #endif
 
@@ -256,5 +257,9 @@ namespace mongo {
         StringBuilder( const StringBuilder& );
         StringBuilder& operator=( const StringBuilder& );
     };
+
+#if defined(_WIN32)
+#pragma warning( pop )
+#endif
 
 } // namespace mongo
