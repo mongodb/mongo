@@ -271,6 +271,7 @@ namespace mongo {
             log() << "recover cleaning up" << endl;
             removeJournalFiles();
             log() << "recover done" << endl;
+            okToCleanUp = true;
         }
 
         /** recover from a crash
@@ -282,6 +283,7 @@ namespace mongo {
             filesystem::path p = getJournalDir();
             if( !exists(p) ) { 
                 log() << "directory " << p.string() << " does not exist, there will be no recovery startup step" << endl;
+                okToCleanUp = true;
                 return;
             }
 
@@ -290,6 +292,7 @@ namespace mongo {
 
             if( journalFiles.empty() ) { 
                 log() << "recover : no journal files present, no recovery needed" << endl;
+                okToCleanUp = true;
                 return;
             }
 

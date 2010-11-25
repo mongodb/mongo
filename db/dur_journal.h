@@ -23,6 +23,9 @@ namespace mongo {
 
     namespace dur {
 
+        /** ok to cleanup journal files at termination?  normally yes, but if any error, no */
+        extern bool okToCleanUp;
+
         /** at termination after db files closed & fsynced */
         void journalCleanup();
 
@@ -38,7 +41,9 @@ namespace mongo {
         /** write/append to journal */
         void journal(const AlignedBuilder& b);
 
-        /** flag that something has gone wrong */
+        /** flag that something has gone wrong during writing to the journal
+            (not for recovery mode) 
+        */
         void journalingFailure(const char *msg);
 
 #pragma pack(1)
@@ -87,15 +92,16 @@ namespace mongo {
          *  Basic writes are logged as JEntry's. 
          *  For each op we define a class.
          */
+        /*
         class DurOp : boost::noncopyable { 
         public:
-            /** @param opcode a sentinel value near max unsigned. */
+            // @param opcode a sentinel value near max unsigned. 
             DurOp(unsigned opcode);
         };
-
+        
         class PreallocateFileOp : public DurOp { 
         public:
-        };
+        };*/
 
         struct JSectFooter { 
             JSectFooter() { 

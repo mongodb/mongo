@@ -111,7 +111,7 @@ namespace mongo {
 #endif
         }
         
-        static void ensureLength( int fd , long size ){
+        static void ensureLength(int fd , long size) {
 
 #if defined(_WIN32)
             // we don't zero on windows
