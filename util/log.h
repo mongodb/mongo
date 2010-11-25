@@ -174,7 +174,12 @@ namespace mongo {
         static int getLogDesc() {
             int fd = -1;
             if (logfile != NULL)
+#if defined(_WIN32)
+                // the ISO C++ conformant name is _fileno
+                fd = _fileno( logfile );
+#else
                 fd = fileno( logfile );
+#endif
             return fd;
         }
 

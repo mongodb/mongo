@@ -170,6 +170,7 @@ namespace mongo {
 
 #if defined(_WIN32)
 #pragma warning( push )
+// warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS.
 #pragma warning( disable : 4996 )
 #endif
 
@@ -228,27 +229,18 @@ namespace mongo {
             }
         }
 
-        void write( const char* buf, int len){
-            memcpy( _buf.grow( len ) , buf , len );
-        }
+        void write( const char* buf, int len) { memcpy( _buf.grow( len ) , buf , len ); }
 
-        void append( const StringData& str ){
-            memcpy( _buf.grow( str.size() ) , str.data() , str.size() );
-        }
+        void append( const StringData& str ) { memcpy( _buf.grow( str.size() ) , str.data() , str.size() ); }
+
         StringBuilder& operator<<( const StringData& str ){
             append( str );
             return *this;
         }
         
-        // access
-
-        void reset( int maxSize = 0 ){
-            _buf.reset( maxSize );
-        }
+        void reset( int maxSize = 0 ) { _buf.reset( maxSize ); }
         
-        std::string str(){
-            return std::string(_buf.data, _buf.l);
-        }
+        std::string str() { return std::string(_buf.data, _buf.l); }
 
     private:
         BufBuilder _buf;
