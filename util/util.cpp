@@ -21,46 +21,8 @@
 #include "file_allocator.h"
 #include "optime.h"
 #include "time_support.h"
-#if defined(__GNUC__) && defined(_DEBUG)
-#include <cxxabi.h>
-#endif
-#include "mongoutils/str.h"
-
-using namespace mongoutils;
 
 namespace mongo {
-
-// the following demangling is experimental : because of that will use for _DEBUG only at first
-#if defined(__GNUC__) && defined(_DEBUG)
-    // @param name e.g. "./mongod(_ZN5mongo11msgassertedEiPKc+0x102) [0x7372f0]"
-    string demangle(const char* name)
-    {
-      //cout << "\nTEMP " << name << endl;
-      string module, addr, sym, ofs;
-      {
-	  string a, symofs;
-	  str::splitOn(name, '(', module, a);
-	  str::splitOn(a, ')', symofs, addr);
-	  str::splitOn(symofs, '+', sym, ofs);
-      }
-
-      int status;
-      char* p = abi::__cxa_demangle(sym.c_str(), 0, 0, &status);
-      const char *symbol = p ? p : sym.c_str();
-
-      stringstream ss;
-      ss << left << setw(20) << module << ' ';
-      ss << setw(50) << symbol << ' ';
-      ss << (ofs.empty() ? ' ' : '+');
-      ss << setw(8) << ofs << ' ';
-      ss << addr;
-      if( p ) 
-	free(p);
-      return ss.str();
-    }
-#else
-    string demangle(const char* name) { return name; }
-#endif
 
     boost::thread_specific_ptr<string> _threadName;
     

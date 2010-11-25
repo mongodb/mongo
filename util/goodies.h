@@ -42,9 +42,9 @@ namespace mongo {
 
 namespace mongo {
 
-    inline pthread_t GetCurrentThreadId() { return pthread_self(); }
-
-    string demangle(const char *);
+    inline pthread_t GetCurrentThreadId() {
+        return pthread_self();
+    }
 
     /* use "addr2line -CFe <exe>" to parse. */
     inline void printStackTrace( ostream &o = cout ) {
@@ -61,8 +61,7 @@ namespace mongo {
 
         strings = backtrace_symbols(b, size);
         for (i = 0; i < size; i++)
-	  o << ' ' << demangle(strings[i]) << '\n';
-	  //            o << ' ' << strings[i] << '\n';
+            o << ' ' << strings[i] << '\n';
         o.flush();
         free (strings);
     }
