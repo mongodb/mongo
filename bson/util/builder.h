@@ -174,49 +174,41 @@ namespace mongo {
 #pragma warning( disable : 4996 )
 #endif
 
-    /** Stringstream deals with locale so this is a lot faster for UTF8 */
+    /** StringBuilder deals with locale so this is a lot faster than std::stringstream for UTF8 */
     class StringBuilder {
     public:
         StringBuilder( int initsize=256 )
             : _buf( initsize ){
         }
 
-#define SBNUM(val,maxSize,macro) \
-            int prev = _buf.l; \
-            int z = sprintf( _buf.grow(maxSize) , macro , (val) );  \
-            assert( z >= 0 ); \
-            _buf.l = prev + z; \
-            return *this; 
-
         StringBuilder& operator<<( double x ){
-            SBNUM( x , 25 , "%g" );
+            return SBNUM( x , 25 , "%g" );
         }
         StringBuilder& operator<<( int x ){
-            SBNUM( x , 11 , "%d" );
+            return SBNUM( x , 11 , "%d" );
         }
         StringBuilder& operator<<( unsigned x ){
-            SBNUM( x , 11 , "%u" );
+            return SBNUM( x , 11 , "%u" );
         }
         StringBuilder& operator<<( long x ){
-            SBNUM( x , 22 , "%ld" );
+            return SBNUM( x , 22 , "%ld" );
         }
         StringBuilder& operator<<( unsigned long x ){
-            SBNUM( x , 22 , "%lu" );
+            return SBNUM( x , 22 , "%lu" );
         }
         StringBuilder& operator<<( long long x ){
-            SBNUM( x , 22 , "%lld" );
+            return SBNUM( x , 22 , "%lld" );
         }
         StringBuilder& operator<<( unsigned long long x ){
-            SBNUM( x , 22 , "%llu" );
+            return SBNUM( x , 22 , "%llu" );
         }
         StringBuilder& operator<<( short x ){
-            SBNUM( x , 8 , "%hd" );
+            return SBNUM( x , 8 , "%hd" );
         }
         StringBuilder& operator<<( char c ){
             _buf.grow( 1 )[0] = c;
             return *this;
         }
-#undef SBNUM
 
         void appendDoubleNice( double x ){
             int prev = _buf.l;
@@ -248,6 +240,15 @@ namespace mongo {
         // non-copyable, non-assignable
         StringBuilder( const StringBuilder& );
         StringBuilder& operator=( const StringBuilder& );
+
+        template <typename T>
+        StringBuilder& SBNUM(T val,int maxSize,const char *macro)  {
+            int prev = _buf.l;
+            int z = sprintf( _buf.grow(maxSize) , macro , (val) );
+            assert( z >= 0 );
+            _buf.l = prev + z;
+            return *this; 
+        }
     };
 
 #if defined(_WIN32)
