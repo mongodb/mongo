@@ -22,12 +22,12 @@
 
 namespace mongo {
 
-    /*
-     * @parm signal that this hadler is called for
-     *
+    /**
      * Obtains the log file handler and writes the current thread's stack trace to 
      * it. This call issues an exit(). The function can safely be called from within a
      * signal handler.
+     *
+     * @param signal that this hadler is called for
      */
     void printStackAndExit( int signalNum );
 
