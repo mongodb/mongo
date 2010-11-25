@@ -367,7 +367,7 @@ namespace mongo {
         if ( size > maxSize() )
             size = maxSize();
 
-        assert( ( size >= 64*1024*1024 ) || cmdLine.smallfiles || ( strstr( filename, "_hudsonSmall" ) ) );
+        assert( size >= 64*1024*1024 || cmdLine.smallfiles );
         assert( size % 4096 == 0 );
 
         if ( preallocateOnly ) {
