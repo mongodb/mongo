@@ -172,6 +172,7 @@ namespace mongo {
 #pragma warning( disable : 4996 )
 #endif
 
+    /** Stringstream deals with locale so this is a lot faster for UTF8 */
     class StringBuilder {
     public:
         StringBuilder( int initsize=256 )
