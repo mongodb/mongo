@@ -44,7 +44,10 @@ namespace mongo {
 
         // get this collection's sharding key 
         BSONObj collectionDoc = conn->findOne( "config.collections", BSON( "_id" << ns ) );
-       _fillCollectionKey( collectionDoc );
+        uassert( 13539 , str::stream() << ns << " does not exist" , !collectionDoc.isEmpty() );
+        uassert( 13540 , str::stream() << ns << " collection config entry corrupted" , collectionDoc["dropped"].type() );
+        uassert( 13541 , str::stream() << ns << " dropped. Re-shard collection first." , !collectionDoc["dropped"].Bool() );
+        _fillCollectionKey( collectionDoc );
 
         // query for all the chunks for 'ns' that live in this shard, sorting so we can efficiently bucket them
         BSONObj q = BSON( "ns" << ns << "shard" << shardName );
@@ -67,9 +70,9 @@ namespace mongo {
 
     void ShardChunkManager::_fillCollectionKey( const BSONObj& collectionDoc ) {
         BSONElement e = collectionDoc["key"];
-        assert( ! e.eoo() && e.isABSONObj() );
-
+        uassert( 13542 , str::stream() << "collection doesn't have a key: " << collectionDoc , ! e.eoo() && e.isABSONObj() );
         BSONObj keys = e.Obj().getOwned();
+
         BSONObjBuilder b;
         BSONForEach( key , keys ) {
             b.append( key.fieldName() , 1 );

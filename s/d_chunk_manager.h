@@ -39,7 +39,7 @@ namespace mongo {
          * @param ns namespace for the collections whose chunks we're interested
          * @param shardName name of the shard that this chunk matcher should track
          *
-         * This constructor throws on connectivity errors
+         * This constructor throws if collection is dropped/malformed and on connectivity errors
          */
         ShardChunkManager( const string& configServer , const string& ns , const string& shardName );
 

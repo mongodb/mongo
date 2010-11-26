@@ -98,6 +98,7 @@ namespace mongo {
         uasserted( 13299 , ss.str() );
     }
     
+    // TODO we shouldn't need three ways for checking the version. Fix this.
     bool ShardingState::hasVersion( const string& ns ){
         scoped_lock lk(_mutex);
 
