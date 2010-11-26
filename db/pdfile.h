@@ -301,7 +301,7 @@ namespace mongo {
 
         enum { HeaderSize = 8192 };
 
-        bool currentVersion() const { return ( version == VERSION ) && ( versionMinor == VERSION_MINOR ); }
+        bool isCurrentVersion() const { return ( version == VERSION ) && ( versionMinor == VERSION_MINOR ); }
 
         bool uninitialized() const { return version == 0; }
 

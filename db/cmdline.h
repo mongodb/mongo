@@ -26,7 +26,7 @@ namespace mongo {
     struct CmdLine { 
         CmdLine() : 
             port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(false),
-            quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ), 
+            quota(false), quotaFiles(8), cpu(false), durTrace(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ), 
             syncdelay(60)
         { } 
         
@@ -42,7 +42,7 @@ namespace mongo {
 
         string bind_ip;        // --bind_ip
         bool rest;             // --rest
-        bool jsonp;             // --jsonp
+        bool jsonp;            // --jsonp
 
         string _replSet;       // --replSet[/<seedlist>]
         string ourSetName() const { 
@@ -54,17 +54,25 @@ namespace mongo {
         }
         bool usingReplSets() const { return !_replSet.empty(); }
 
+        // for master/slave replication
         string source;         // --source
         string only;           // --only
         
         bool quiet;            // --quiet
-        bool noTableScan;      // --notablescan
-        bool prealloc;         // --noprealloc
-        bool smallfiles;       // --smallfiles
+        bool noTableScan;      // --notablescan no table scans allowed
+        bool prealloc;         // --noprealloc no preallocation of data files
+        bool smallfiles;       // --smallfiles allocate smaller data files
         
         bool quota;            // --quota
         int quotaFiles;        // --quotaFiles
         bool cpu;              // --cpu show cpu time periodically
+
+        enum { 
+            DurDumpJournal = 1,   // dump diagnostics on the journal during recovery
+            DurScanOnly = 2,      // don't do any real work, just scan and dump if dump specified
+            DurRecoverOnly = 4    // terminate after recovery step
+        };
+        int durTrace;          // --durTrace <n> for debugging
 
         long long oplogSize;   // --oplogSize
         int defaultProfile;    // --profile

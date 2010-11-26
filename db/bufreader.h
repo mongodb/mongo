@@ -33,7 +33,9 @@ namespace mongo {
 
         BufReader(void *p, unsigned len) : _start(p), _pos(p), _end(((char *)_pos)+len) { }
 
-        /** prepare to read in the object specified, and advance buffer pointer */
+        bool atEof() const { return _pos == _end; }
+        
+        /** read in the object specified, and advance buffer pointer */
         template <typename T>
         void read(T &t) { 
             T* cur = (T*) _pos;
@@ -52,8 +54,6 @@ namespace mongo {
             t = *cur;
         }
 
-        //void advance(unsigned n) { _pos = ((char *) _pos) + n; }
-
         /** return current offset into buffer */
         unsigned offset() const { return (char*)_pos - (char*)_start; }
 
@@ -66,8 +66,25 @@ namespace mongo {
             return p;
         }
 
-        bool atEof() const { return _pos == _end; }
-        
+        void readStr(string& s) {
+            StringBuilder b;
+            while( 1 ) { 
+                char ch;
+                read(ch);
+                if( ch == 0 )
+                    break;
+                b << ch;
+            }
+            s = b.str();
+        }
+
+        /** skip ahead to our alignment boundary */
+        void align(unsigned alignment) {
+            size_t ofs = ((char*)_pos) - ((char*)_start);
+            ofs = (ofs + (alignment-1)) & (~(alignment-1));
+            _pos = ((char*)_start) + ofs;
+        }
+
     private:
         void *_start;
         void *_pos;

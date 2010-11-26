@@ -122,7 +122,6 @@ namespace mongo {
             void *p = 0;
             int res = posix_memalign(&p, Alignment, sz);
             massert(13524, "out of memory AlignedBuilder", res == 0);
-	    cout << "temp: _malloc " << p << ' ' << sz << endl;
 #else
             void *p = malloc(sz);
             assert( ((size_t) p) % Alignment == 0 );

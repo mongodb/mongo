@@ -22,6 +22,7 @@
 
 #include "pch.h"
 #include "mongommf.h"
+#include "dur.h"
 #include "../util/mongoutils/str.h"
 
 using namespace mongoutils;
@@ -152,6 +153,9 @@ namespace mongo {
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) { 
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
+        if( durable && !testIntent && _view_write ) { 
+            dur::createdFile(fname, len);
+        }
         return finishOpening();
     }
 
@@ -191,8 +195,17 @@ namespace mongo {
         close();
     }
 
+    namespace dur { 
+        void _go();
+    }
+
     /*virtual*/ void MongoMMF::close() {
         if( durable ) {
+            // we must first commit anything pending before unmapping views.
+            { 
+                dbMutex.assertAtLeastReadLocked();
+                dur::_go();
+            }
             privateViews.remove(_view_private);
             if( debug ) {
                 ourReadViews.remove(_view_readonly);

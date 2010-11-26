@@ -174,7 +174,7 @@ namespace mongo {
 #pragma warning( disable : 4996 )
 #endif
 
-    /** StringBuilder deals with locale so this is a lot faster than std::stringstream for UTF8 */
+    /** stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
     class StringBuilder {
     public:
         StringBuilder( int initsize=256 )

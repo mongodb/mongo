@@ -391,7 +391,12 @@ sendmore:
             Client::Context ctx( dbName );
             MongoDataFile *p = cc().database()->getFile( 0 );
             DataFileHeader *h = p->getHeader();
-            if ( !h->currentVersion() || forceRepair ) {
+            if ( !h->isCurrentVersion() || forceRepair ) {
+
+                if( h->version <= 0 ) {
+                    uasserted(10000, str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version << " info: " << h->versionMinor << ' ' << h->fileLength);
+                }
+
                 log() << "****" << endl;
                 log() << "****" << endl;
                 log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
@@ -558,6 +563,8 @@ sendmore:
         }
 
         dur::startup();
+        if( cmdLine.durTrace & CmdLine::DurRecoverOnly ) 
+            return;
 
         repairDatabasesAndCheckVersion();
 
@@ -689,6 +696,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("sysinfo", "print some diagnostic system information")
         ("upgrade", "upgrade db if needed")
         ("repair", "run repair on all dbs")
+        ("durTrace", po::value<int>(), "durability diagnostic options")
         ("notablescan", "do not allow table scans")
         ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
         ("profile",po::value<int>(), "0=off 1=slow, 2=all")
@@ -816,6 +824,12 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("quotaFiles")) {
             cmdLine.quota = true;
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
+        }
+        if (params.count("durTrace")) {
+            cmdLine.durTrace = params["durTrace"].as<int>();
+#if !defined(_DURABLE)
+            assert( cmdLine.durTrace == 0 );
+#endif
         }
         if (params.count("objcheck")) {
             objcheck = true;

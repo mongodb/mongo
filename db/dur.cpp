@@ -47,7 +47,10 @@
 #include "dur_journal.h"
 #include "dur_commitjob.h"
 #include "../util/mongoutils/hash.h"
+#include "../util/mongoutils/str.h"
 #include "../util/timer.h"
+
+using namespace mongoutils;
 
 namespace mongo { 
 
@@ -55,9 +58,19 @@ namespace mongo {
 
         static CommitJob cj;
 
+        /** Declare that a file has been created 
+            Normally writes are applied only after journalling, for safety.  But here the file 
+            is created first, and the journal will just replay the creation if the create didn't 
+            happen because of crashing.
+        */
+        void createdFile(string filename, unsigned long long len) { 
+            shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
+            cj.noteOp(op);
+        }
+
         /** declare write intent.  when already in the write view if testIntent is true. */
         void declareWriteIntent(void *p, unsigned len) {
-//            log() << "TEMP dur writing " << p << ' ' << len << endl;
+            // log() << "TEMP dur writing " << p << ' ' << len << endl;
             WriteIntent w(p, len);
             cj.note(w);
         }
@@ -87,46 +100,55 @@ namespace mongo {
             we could be in read lock for this
             caller handles locking 
             */
-        static bool PREPLOGBUFFER() { 
+        static void PREPLOGBUFFER() { 
             AlignedBuilder& bb = cj._ab;
             bb.reset();
 
             unsigned *lenInBlockHeader;
+            // JSectHeader
             {
-                // JSectHeader
                 bb.appendStr("\nHH\n", false);
                 lenInBlockHeader = (unsigned *) bb.skip(4);
             }
 
-            string lastFilePath;
+            // ops other than basic writes
+            {
+                for( vector< shared_ptr<DurOp> >::iterator i = cj.ops().begin(); i != cj.ops().end(); ++i ) { 
+                    (*i)->serialize(bb);
+                }
+            }
 
+            // write intents
             {
                 scoped_lock lk(privateViews._mutex());
+                string lastFilePath;
                 for( vector<WriteIntent>::iterator i = cj.writes().begin(); i != cj.writes().end(); i++ ) {
                     size_t ofs;
                     MongoMMF *mmf = privateViews._find(i->p, ofs);
                     if( mmf == 0 ) {
-                        journalingFailure("view pointer cannot be resolved");
+                        string s = str::stream() << "view pointer cannot be resolved " << i->p;
+                        journalingFailure(s.c_str()); // asserts
+                        return;
                     }
-                    else {
-                        if( !mmf->dirty() )
-                            mmf->dirty() = true; // usually it will already be dirty so don't bother writing then
-                        {
-                            size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
-                            i->w_ptr = ((char*)mmf->view_write()) + ofs;
-                        }
-                        if( mmf->filePath() != lastFilePath ) { 
-                            lastFilePath = mmf->filePath();
-                            JDbContext c;
-                            bb.appendStruct(c);
-                            bb.appendStr(lastFilePath);
-                        }
-                        JEntry e;
-                        e.len = i->len;
-                        e.fileNo = mmf->fileSuffixNo();
-                        bb.appendStruct(e);
-                        bb.appendBuf(i->p, i->len);
+
+                    if( !mmf->dirty() ) {
+                        mmf->dirty() = true; // usually it will already be dirty so don't bother writing then
                     }
+                    //size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
+                    i->w_ptr = ((char*)mmf->view_write()) + ofs;
+                    if( mmf->filePath() != lastFilePath ) { 
+                        lastFilePath = mmf->filePath();
+                        JDbContext c;
+                        bb.appendStruct(c);
+                        bb.appendStr(lastFilePath);
+                    }
+                    JEntry e;
+                    e.len = i->len;
+                    assert( ofs <= 0x80000000 );
+                    e.ofs = (unsigned) ofs;
+                    e.fileNo = mmf->fileSuffixNo();
+                    bb.appendStruct(e);
+                    bb.appendBuf(i->p, i->len);
                 }
             }
 
@@ -137,15 +159,16 @@ namespace mongo {
             }
 
             {
-                unsigned L = (bb.len() + 8191) & 0xffffe000; // fill to alignment
+                assert( 0xffffe000 == (~(Alignment-1)) );
+                unsigned L = (bb.len() + Alignment-1) & (~(Alignment-1)); // fill to alignment
                 dassert( L >= (unsigned) bb.len() );
                 *lenInBlockHeader = L;
                 unsigned padding = L - bb.len();
                 bb.skip(padding);
-                dassert( bb.len() % 8192 == 0 );
+                dassert( bb.len() % Alignment == 0 );
             }
 
-            return true;
+            return;
         }
 
         /** write the buffer we have built to the journal and fsync it.
@@ -189,8 +212,12 @@ namespace mongo {
             MongoFile::forEach( _remap );
         }
 
-        /** locking in read lock when called */
-        static void _go() {
+        /** locking in read lock when called 
+            @see MongoMMF::close()
+        */
+        void _go() {
+            dbMutex.assertAtLeastReadLocked();
+
             if( !cj.hasWritten() )
                 return;
 

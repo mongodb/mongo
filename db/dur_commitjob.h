@@ -20,6 +20,7 @@
 #pragma once
 
 #include "../util/alignedbuilder.h"
+#include "durop.h"
 
 namespace mongo { 
     namespace dur {
@@ -59,13 +60,16 @@ namespace mongo {
         };
 
         /* our record of pending/uncommitted write intents */
-        struct Writes {
+        class Writes : boost::noncopyable {
+        public:
             Already<127> _alreadyNoted;
             vector<WriteIntent> _writes;
+            vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
 
             void clear() { 
                 _alreadyNoted.clear();
                 _writes.clear();
+                _ops.clear();
             }
         };
 
@@ -93,9 +97,17 @@ namespace mongo {
                 }
             }
 
-            vector<WriteIntent>& writes() { return _wi._writes; }
+            void noteOp(shared_ptr<DurOp> p) {
+                _hasWritten = true;
+                _wi._ops.push_back(p);
+            }
 
-            /** this method is safe to call outside of locks */
+            vector<WriteIntent>& writes() { return _wi._writes; }
+            vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
+
+            /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even 
+                trying to acquire a lock, which might be helpful at times. 
+            */
             bool hasWritten() const { return _hasWritten; }
 
             /** we use the commitjob object over and over, calling reset() rather than reconstructing */

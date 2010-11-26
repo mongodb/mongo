@@ -73,13 +73,17 @@ namespace mongo {
         int fileSuffixNo() const { return _fileSuffixNo; }
         void* view_write() { return _view_write; }
 
+        /** true if we have written.  
+            set in PREPLOGBUFFER, it is NOT set immediately on write intent declaration.
+            reset to false in REMAPPRIVATEVIEW
+        */
         bool& dirty() { return _dirty; }
 
     private:
         void *_view_write;
         void *_view_private;
         void *_view_readonly; // for _DEBUG build
-        bool _dirty; // we wrote to the private view
+        bool _dirty;
 
         string _filePath;   // e.g. "somepath/dbname"
         int _fileSuffixNo;  // e.g. 3.  -1="ns"

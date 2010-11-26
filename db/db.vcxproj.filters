@@ -429,6 +429,9 @@
     <ClCompile Include="..\util\concurrency\spin_lock.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
+    <ClCompile Include="durop.cpp">
+      <Filter>db\storage engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
@@ -815,6 +818,12 @@
     </ClInclude>
     <ClInclude Include="..\util\logfile.h">
       <Filter>util\core</Filter>
+    </ClInclude>
+    <ClInclude Include="dur_journalformat.h">
+      <Filter>db\storage engine</Filter>
+    </ClInclude>
+    <ClInclude Include="durop.h">
+      <Filter>db\storage engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

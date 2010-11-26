@@ -23,6 +23,7 @@
 #include "client.h"
 #include "namespace.h"
 #include "dur_journal.h"
+#include "dur_journalformat.h"
 #include "../util/logfile.h"
 #include "../util/timer.h"
 #include "../util/alignedbuilder.h"
@@ -41,7 +42,7 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 8 );
         BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 20 );
-        BOOST_STATIC_ASSERT( sizeof(JEntry) == 8 );
+        BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
 
         filesystem::path getJournalDir() { 
             filesystem::path p(dbpath);
@@ -55,9 +56,10 @@ namespace mongo {
             /** todo:
                 (1) don't log too much
                 (2) make an indicator in the journal dir that something bad happened. 
-                (2b) refuse to do a[ recovery startup if that is there without manual override.
+                (2b) refuse to do a recovery startup if that is there without manual override.
             */ 
             log() << "journaling error " << msg << endl;
+            assert(false);
         }
 
         JHeader::JHeader(string fname) { 

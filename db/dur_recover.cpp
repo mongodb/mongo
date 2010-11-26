@@ -22,6 +22,8 @@
 
 #include "dur.h"
 #include "dur_journal.h"
+#include "dur_journalformat.h"
+#include "durop.h"
 #include "namespace.h"
 #include "../util/mongoutils/str.h"
 #include "bufreader.h"
@@ -29,6 +31,7 @@
 #include "database.h"
 #include "db.h"
 #include "../util/unittest.h"
+#include "cmdline.h"
 
 using namespace mongoutils;
 
@@ -36,19 +39,16 @@ namespace mongo {
 
     namespace dur { 
 
-        class BufReaderUnitTest : public UnitTest {
-        public:
-            void run() { 
-                BufReader r("abcdabcdabcd", 12);
-                char x;
-                struct Y { int a,b; } y;
-                r.read(x); cout << x; // a
-                assert( x == 'a' );
-                r.read(y);
-                r.read(x); 
-                assert( x == 'b' );
-            }
-        } brunittest;
+        /** todo clean up : this is messy from refactoring. */
+         struct FullyQualifiedJournalEntry { 
+             bool isBasicWrite() const { return dbName != 0; }
+
+             const char *dbName;
+             JEntry e;
+             const char *srcData;
+
+             shared_ptr<DurOp> op;
+        };
 
         void removeJournalFiles();
         path getJournalDir();
@@ -78,13 +78,6 @@ namespace mongo {
                 files.push_back(i->second);
         }
 
-         struct FullyQualifiedJournalEntry { 
-            const char *dbName;
-            unsigned len;
-            int fileNo;
-            const char *data;
-        };
-
         /** read through the memory mapped data of a journal file (journal/j._<n> file)
             throws 
         */
@@ -113,41 +106,50 @@ namespace mongo {
                     _needHeader = false;
                 }
 
-                unsigned len;
-                _br.read(len);
-                if( len >= JEntry::Sentinel_Min ) { 
-                    if( len == JEntry::Sentinel_Footer ) { 
+                unsigned lenOrOpCode;
+                _br.read(lenOrOpCode);
+                if( lenOrOpCode >= JEntry::OpCode_Min ) { 
+                    if( lenOrOpCode == JEntry::OpCode_Footer ) { 
                         _needHeader = true;
                         _br.skip(sizeof(JSectFooter) - 4);
+                        _br.align(Alignment);
                         return false;
                     }
 
-                    // JDbContext
-                    assert( len == JEntry::Sentinel_Context );
-                    char c;
-                    char *p = _lastDbName;
-                    char *end = p + Namespace::MaxNsLen;
-                    while( 1 ) { 
-                        _br.read(c);
-                        *p++ = c;
-                        if( c == 0 )
-                            break;
-                        if( p >= end ) { 
-                            /* this shouldn't happen, even if log is truncated. */
-                            log() << _br.offset() << endl;
-                            uasserted(13533, "problem processing journal file during recovery");
-                        }
+                    if( lenOrOpCode != JEntry::OpCode_DbContext ) { 
+                        e.dbName = 0;
+                        e.op = DurOp::read(lenOrOpCode, _br);
+                        return true;
                     }
 
-                    _br.read(len);
+                    // JDbContext
+                    {
+                        char c;
+                        char *p = _lastDbName;
+                        char *end = p + Namespace::MaxNsLen;
+                        while( 1 ) { 
+                            _br.read(c);
+                            *p++ = c;
+                            if( c == 0 )
+                                break;
+                            if( p >= end ) { 
+                                /* this shouldn't happen, even if log is truncated. */
+                                log() << _br.offset() << endl;
+                                uasserted(13533, "problem processing journal file during recovery");
+                            }
+                        }
+
+                        _br.read(lenOrOpCode);
+                    }
                 }
 
                 // now do JEntry
-                assert( len && len < JEntry::Sentinel_Min );
+                assert( lenOrOpCode && lenOrOpCode < JEntry::OpCode_Min );
                 e.dbName = _lastDbName;
-                e.len = len;
-                _br.read(e.fileNo);
-                e.data = (const char *) _br.skip(len);
+                e.e.len = lenOrOpCode;
+                _br.read(e.e.ofs);
+                _br.read(e.e.fileNo);
+                e.srcData = (const char *) _br.skip(lenOrOpCode);
                 return true;
             }
         private:
@@ -168,35 +170,50 @@ namespace mongo {
             bool apply(path journalfile);
             void close();
 
-            /** retrieve the mmap pointer for the specified dbName plus file number 
-                open if not yet open
+            /** retrieve the mmap pointer for the specified dbName plus file number.
+                open if not yet open.
+                @param fileNo a value of -1 indicates ".ns"
+                @param ofs offset to add to the pointer before returning
             */
-            void* ptr(const char *dbName, int fileNo);
+            void* ptr(const char *dbName, int fileNo, unsigned ofs);
 
             map< pair<int,string>, void* > _fileToPtr;
-            list< MemoryMappedFile* > _files;
+            list< shared_ptr<MemoryMappedFile> > _files;
         };
         
-        /** retrieve the mmap pointer for the specified dbName plus file number 
-            open if not yet open
+        /** retrieve the mmap pointer for the specified dbName plus file number.
+            open if not yet open.
         */
-        void* RecoveryJob::ptr(const char *dbName, int fileNo) {
+        void* RecoveryJob::ptr(const char *dbName, int fileNo, unsigned ofs) {
             void *&p = _fileToPtr[ pair<int,string>(fileNo,dbName) ];
-            if( p )
-                return p;
 
-            MemoryMappedFile *f = new MemoryMappedFile();
-            _files.push_back(f);
-            stringstream ss;
-            ss << dbName << '.';
-            if( fileNo < 0 )
-                ss << "ns";
-            else 
-                ss << fileNo;
-            /* todo: need to create file here if DNE. need to know what its length should be for that though. */
-            p = f->map(ss.str().c_str());
-            uassert(13534, str::stream() << "recovery error couldn't open " << ss.str(), p);
-            return p;
+            if( p == 0 ) {
+                MemoryMappedFile *f = new MemoryMappedFile();
+                _files.push_back( shared_ptr<MemoryMappedFile>(f) );
+                string fn;
+                {
+                    stringstream ss;
+                    ss << dbName << '.';
+                    if( fileNo < 0 )
+                        ss << "ns";
+                    else 
+                        ss << fileNo;
+                    /* todo: do we need to create file here if DNE?
+                             we need to know what its length should be for that though. 
+                             however does this happen?  FileCreatedOp should have been in the journal and 
+                             already applied if the file is new.
+                    */
+                    fn = ss.str();
+                }
+                p = f->map(fn.c_str());
+                uassert(13534, str::stream() << "recovery error couldn't open " << fn, p);
+                if( cmdLine.durTrace & CmdLine::DurDumpJournal ) 
+                    log() << "  opened " << fn << ' ' << f->length()/1024.0/1024.0 << endl;
+                uassert(10000, str::stream() << "recovery error file has length zero " << fn, f->length());
+                assert( ofs < f->length() );
+            }
+
+            return ((char*) p) + ofs;
         }
 
         RecoveryJob::~RecoveryJob() { 
@@ -208,18 +225,55 @@ namespace mongo {
             log() << "recover flush" << endl;
             MongoFile::flushAll(true);
             log() << "recover close" << endl;
-            for( list<MemoryMappedFile*>::iterator i = _files.begin(); i != _files.end(); ++i ) {
-                delete *i;
-            }
-            _files.clear();
+            _files.clear(); // closes files
             _fileToPtr.clear();
         }
-        
+
+        static string hexdump(const char *data, unsigned len) {
+            const unsigned char *p = (const unsigned char *) data;
+            stringstream ss;
+            for( unsigned i = 0; i < 4 && i < len; i++ ) {
+                ss << std::hex << setw(2) << setfill('0');
+                unsigned n = p[i];
+                ss << n;
+                ss << ' ';
+            }
+            string s = ss.str();
+            return s;
+        }
+
         void RecoveryJob::__apply(const vector<FullyQualifiedJournalEntry> &entries) { 
+            bool apply = (cmdLine.durTrace & CmdLine::DurScanOnly) == 0;
+            bool dump = cmdLine.durTrace & CmdLine::DurDumpJournal;
+            if( dump )
+                log() << "BEGIN section" << endl;
+            
             for( vector<FullyQualifiedJournalEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i ) { 
-                const FullyQualifiedJournalEntry& e = *i;
-                memcpy(ptr(e.dbName, e.fileNo), e.data, e.len);
+                const FullyQualifiedJournalEntry& fqe = *i;
+                if( fqe.isBasicWrite() ) {
+                    if( dump ) {
+                        stringstream ss;
+                        ss << "  BASICWRITE " << setw(20) << fqe.dbName << '.' 
+                              << setw(2) << fqe.e.fileNo << ' ' << setw(6) << fqe.e.len
+                              << ' ' << hex << setw(8) << (size_t) fqe.srcData << dec << "  " << hexdump(fqe.srcData, fqe.e.len);
+                        log() << ss.str() << endl;
+                    } 
+                    if( apply ) {
+                        void *p = ptr(fqe.dbName, fqe.e.fileNo, fqe.e.ofs);
+                        memcpy(p, fqe.srcData, fqe.e.len);
+                    }
+                } else {
+                    if( dump ) {
+                        log() << "  OP " << fqe.op->toString() << endl;
+                    } 
+                    if( apply ) {
+                        fqe.op->replay();
+                    }
+                }
             }            
+
+            if( dump )
+                log() << "END section" << endl;
         }
 
         /** @param p start of the memory mapped file
@@ -232,15 +286,22 @@ namespace mongo {
             try {
                 while( 1 ) { 
                     entries.clear();
+
                     FullyQualifiedJournalEntry e;
                     while( i.next(e) )
                         entries.push_back(e);
+
+                    // got all the entries for one group commit.  apply them: 
                     __apply(entries);
+
+                    // now do the next section (i.e. group commit)
                     if( i.atEof() )
                         break;
                 }
             }
             catch( BufReader::eof& ) { 
+                if( cmdLine.durTrace & CmdLine::DurDumpJournal )
+                    log() << "ABRUPT END" << endl;
                 return true; // abrupt end
             }
 
@@ -251,7 +312,7 @@ namespace mongo {
             log() << "recover " << journalfile.string() << endl;
             MemoryMappedFile f;
             void *p = f.mapWithOptions(journalfile.string().c_str(), MongoFile::READONLY | MongoFile::SEQUENTIAL);
-            assert(p);
+            massert(10000, str::stream() << "recover error couldn't open " << journalfile, p);
             return _apply(p, (unsigned) f.length());
         }
 
@@ -268,6 +329,11 @@ namespace mongo {
             }
 
             close();
+
+            if( cmdLine.durTrace & CmdLine::DurScanOnly ) {
+                uasserted(10000, str::stream() << "--durTrace " << CmdLine::DurScanOnly << " specified, terminating");
+            }
+
             log() << "recover cleaning up" << endl;
             removeJournalFiles();
             log() << "recover done" << endl;
@@ -299,6 +365,20 @@ namespace mongo {
             RecoveryJob j;
             j.go(journalFiles);
        }
+
+        class BufReaderUnitTest : public UnitTest {
+        public:
+            void run() { 
+                BufReader r("abcdabcdabcd", 12);
+                char x;
+                struct Y { int a,b; } y;
+                r.read(x); cout << x; // a
+                assert( x == 'a' );
+                r.read(y);
+                r.read(x); 
+                assert( x == 'b' );
+            }
+        } brunittest;
 
     } // namespace dur
 

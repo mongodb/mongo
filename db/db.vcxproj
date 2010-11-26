@@ -475,6 +475,7 @@
     <ClCompile Include="compact.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="dur.cpp" />
+    <ClCompile Include="durop.cpp" />
     <ClCompile Include="dur_journal.cpp" />
     <ClCompile Include="dur_recover.cpp" />
     <ClCompile Include="geo\2d.cpp" />
@@ -627,8 +628,10 @@
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="..\util\text.h" />
     <ClInclude Include="..\util\time_support.h" />
+    <ClInclude Include="durop.h" />
     <ClInclude Include="dur_commitjob.h" />
     <ClInclude Include="dur_journal.h" />
+    <ClInclude Include="dur_journalformat.h" />
     <ClInclude Include="geo\core.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />

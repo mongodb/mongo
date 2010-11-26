@@ -20,12 +20,20 @@ namespace mongo {
         inline void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
         template <typename T> inline T* alreadyDeclared(T *x) { return x; }
         inline void declareWriteIntent(void *, unsigned) { }
+        void createdFile(string filename, unsigned long long len) { }
 #else
 
         /** call during startup so durability module can initialize 
             throws if fatal error
         */
         void startup();
+
+        /** Declare that a file has been created 
+            Normally writes are applied only after journalling, for safety.  But here the file 
+            is created first, and the journal will just replay the creation if the create didn't 
+            happen because of crashing.
+        */
+        void createdFile(string filename, unsigned long long len);
 
         /** Declarations of write intent.
             

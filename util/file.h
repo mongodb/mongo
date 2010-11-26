@@ -1,4 +1,4 @@
-// file.h
+// file.h cross platform basic file class. supports 64 bit offsets and such.
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -45,6 +45,7 @@ public:
     bool bad() {return false;}
     bool is_open() {return false;}
     fileofs len() { return 0; }
+    void fsync() { assert(false); }
 };
 
 #if defined(_WIN32) 
