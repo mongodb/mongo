@@ -26,14 +26,32 @@ namespace {
     class BasicTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id" << "test.foo" << "key" << BSON( "a" << 1 ) << "unique" << false );
-            BSONArray chunks   = BSON_ARRAY( BSON("_id" << "test.foo-a_MinKey" << "ns" << "test.foo" << 
-                                                  "min" << BSON( "a" << MINKEY ) << "max" << BSON( "a" << MAXKEY ) ) );
+            BSONObj collection = BSON( "_id"     << "test.foo" <<
+                                       "dropped" << false <<
+                                       "key"     << BSON( "a" << 1 ) <<
+                                       "unique"  << false );
+
+            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKey" << 
+                                                 "ns"  << "test.foo" << 
+                                                 "min" << BSON( "a" << MINKEY ) <<
+                                                 "max" << BSON( "a" << MAXKEY ) ) );
 
             ShardChunkManager s ( collection , chunks );
             
             BSONObj k1 = BSON( "a" << 1 << "b" << 2 );
             ASSERT( s.belongsToMe( k1 ) );
+        }
+    };
+
+    class DeletedTests {
+    public:
+        void run() {
+            BSONObj collection = BSON( "_id"     << "test.foo" <<
+                                       "dropped" << "true" );
+
+            BSONArray chunks = BSONArray();
+
+            ASSERT_EXCEPTION( ShardChunkManager s ( collection , chunks ) , UserException );
         }
     };
 
@@ -43,6 +61,7 @@ namespace {
 
         void setupTests() {
             add< BasicTests >();
+            add< DeletedTests >();
         }
     } shardChunkManagerSuite;
 
