@@ -148,6 +148,8 @@ namespace mongo {
         /** at clean shutdown */
         bool okToCleanUp = false; // failed recovery would set this to false
         void journalCleanup() { 
+            if( testIntent ) 
+                return;
             if( !okToCleanUp ) 
                 return;
             if( !j.tryToCloseLogFile() ) {

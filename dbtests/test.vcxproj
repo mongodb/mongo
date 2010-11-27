@@ -197,6 +197,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp" />
     <ClInclude Include="..\db\dur.h" />
+    <ClInclude Include="..\db\durop.h" />
     <ClInclude Include="..\db\dur_journal.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\mongommf.h" />
@@ -267,6 +268,7 @@
     <ClCompile Include="..\db\commands\isself.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
     <ClCompile Include="..\db\dur.cpp" />
+    <ClCompile Include="..\db\durop.cpp" />
     <ClCompile Include="..\db\dur_journal.cpp" />
     <ClCompile Include="..\db\dur_recover.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />

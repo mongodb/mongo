@@ -236,6 +236,7 @@
     <ClInclude Include="..\db\mongommf.h">
       <Filter>dur</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\durop.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -718,6 +719,9 @@
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\dur_recover.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\durop.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>
