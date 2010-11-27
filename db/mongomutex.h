@@ -101,6 +101,7 @@ namespace mongo {
             MongoFile::unlockAll(); // _DEBUG validation
             _state.set(0);
             _minfo.leaving();
+            _releasedWriteLock();
             _m.unlock(); 
         }
 
@@ -174,6 +175,7 @@ namespace mongo {
 
     private:
         void _acquiredWriteLock();
+        void _releasedWriteLock();
 
         /* @return true if was already write locked.  increments recursive lock count. */
         bool _writeLockedAlready();
@@ -207,6 +209,13 @@ namespace mongo {
 
     namespace dur {
         void REMAPPRIVATEVIEW();
+        void debugCheckLastDeclaredWrite();
+    }
+
+    inline void MongoMutex::_releasedWriteLock() { 
+#if defined(_DURABLE) && defined(_DEBUG)
+        dur::debugCheckLastDeclaredWrite();
+#endif
     }
 
     inline void MongoMutex::_acquiredWriteLock() { 

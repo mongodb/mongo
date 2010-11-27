@@ -74,8 +74,8 @@ namespace mongo {
         };
 
         /** concurrency: assumption is caller is appropriately locking.
-            for example note() invocations are from the write lock.
-            other uses are in a read lock from a single thread (durThread)
+                         for example note() invocations are from the write lock.
+                         other uses are in a read lock from a single thread (durThread)
         */
         class CommitJob : boost::noncopyable { 
             bool _hasWritten;
@@ -97,6 +97,7 @@ namespace mongo {
                 }
             }
 
+            /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p) {
                 _hasWritten = true;
                 _wi._ops.push_back(p);

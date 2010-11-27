@@ -96,6 +96,52 @@ namespace mongo {
             return p;
         }
 
+        /** Used in _DEBUG builds to check that we didn't overwrite the last intent
+            that was declared.  called just before writelock release.  we check a few
+            bytes after the declared region to see if they changed.
+
+            As implemented so far, this doesn't really work as we don't 
+            there may have been other validly declared 
+            s to that area, but helpful for debugging.
+        */
+        void debugCheckLastDeclaredWrite() { 
+#if 0
+            assert(debug && durable);
+            vector<WriteIntent>& w = cj.writes();
+            if( w.size() == 0 ) 
+                return;
+            const WriteIntent &i = w[w.size()-1];
+            size_t ofs;
+            MongoMMF *mmf = privateViews.find(i.p, ofs);
+            if( mmf == 0 ) 
+                return;
+            size_t past = ofs + i.len;
+            if( mmf->length() < past + 8 ) 
+                return; // too close to end of view
+            char *priv = (char *) mmf->getView();
+            char *writ = (char *) mmf->view_write();
+            unsigned long long *a = (unsigned long long *) (priv+past);
+            unsigned long long *b = (unsigned long long *) (writ+past);
+            if( *a != *b ) { 
+                stringstream ss;
+                ss << "dur data after write area (@" << ((void*)a) << ") does not agree\n"
+                    << "p: " << i.p << '\n'
+                    << "now : " << setw(16) << hex << *a << '\n'
+                    << "was : " << setw(16) << hex << *b;
+                log() << ss.str() << endl;
+                for( unsigned z = 0; z < w.size() - 1; z++ ) { 
+                    const WriteIntent& wi = w[z];
+                    char *r1 = (char*) wi.p;
+                    char *r2 = r1 + wi.len;
+                    if( r1 <= (char*)a && r2 > (char*)a ) { 
+                        log() << "it's ok " << wi.p << ' ' << wi.len << endl;
+                    }
+                }
+                log() << "temp" << endl;
+            }
+#endif
+        }
+
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking 
