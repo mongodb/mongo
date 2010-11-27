@@ -319,10 +319,9 @@ namespace mongo {
         void startup() {
             if( !durable )
                 return;
-                
-            recover();
             if( testIntent )
                 return;
+            recover();
             journalMakeDir();
             boost::thread t(durThread);
             boost::thread t2(unlinkThread);
