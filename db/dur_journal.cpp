@@ -176,11 +176,6 @@ namespace mongo {
             }
         }
 
-        /* threading: only durThread() calls this, thus safe. */
-        void Journal::open() {
-            mutex::scoped_lock lk(_lfMutex);
-            _open();
-        }
         void Journal::_open() {
             assert( _lf == 0 );
             string fname = getFilePathFor(_nextFileNumber).string();
@@ -192,6 +187,11 @@ namespace mongo {
                 b.appendStruct(h);
                 _lf->synchronousAppend(b.buf(), b.len());
             }
+        }
+
+        void Journal::open() {
+            mutex::scoped_lock lk(_lfMutex);
+            _open();
         }
 
         void unlinkThread() { 

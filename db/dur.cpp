@@ -131,8 +131,8 @@ namespace mongo {
                         return;
                     }
 
-                    if( !mmf->dirty() ) {
-                        mmf->dirty() = true; // usually it will already be dirty so don't bother writing then
+                    if( !mmf->willNeedRemap() ) {
+                        mmf->willNeedRemap() = true; // usually it will already be dirty so don't bother writing then
                     }
                     //size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
                     i->w_ptr = ((char*)mmf->view_write()) + ofs;
@@ -198,18 +198,54 @@ namespace mongo {
             }
         }
 
-        /** we need to remap the private view periodically. otherwise it would become very large. 
-            locking: in read lock when called
+        /** We need to remap the private views periodically. otherwise they would become very large.
+            Call within write lock.
         */
-        static void _remap(MongoFile *f) { 
-            MongoMMF *mmf = dynamic_cast<MongoMMF*>(f);
-            if( mmf && mmf->dirty() ) {
-                mmf->dirty() = false;
-                log() << "dur todo : finish remap " << endl;
+        void REMAPPRIVATEVIEW() { 
+            static unsigned startAt;
+            static unsigned long long lastRemap;
+
+            dbMutex.assertWriteLocked();
+            dbMutex._remapPrivateViewRequested = false;
+
+            assert( !cj.hasWritten() );
+
+            // we want to remap all private views about every 2 seconds.  there could be ~1000 views so 
+            // we do a little each pass; beyond the remap time, more significantly, there will be copy on write 
+            // faults after remapping, so doing a little bit at a time will avoid big load spikes on 
+            // remapping.
+            unsigned long long now = curTimeMicros64();
+            double fraction = (now-lastRemap)/20000000.0;
+
+            set<MongoFile*>& files = MongoFile::getAllFiles();
+            unsigned sz = files.size();
+            if( sz == 0 ) 
+                return;
+
+            unsigned ntodo = (unsigned) (sz * fraction);
+            if( ntodo < 1 ) ntodo = 1;
+            if( ntodo > sz ) ntodo = sz;
+
+            const set<MongoFile*>::iterator b = files.begin();
+            const set<MongoFile*>::iterator e = files.end();
+            set<MongoFile*>::iterator i = b;
+            for( unsigned x = 0; x < startAt; x++ ) {
+                i++;
+                if( i == e ) i = b;
             }
-        }
-        static void REMAPPRIVATEVIEW() { 
-            MongoFile::forEach( _remap );
+            startAt = (startAt + ntodo) % sz;
+
+            for( unsigned x = 0; x < ntodo; x++ ) {
+                dassert( i != e );
+                MongoMMF *mmf = dynamic_cast<MongoMMF*>(*i);
+                if( mmf && mmf->willNeedRemap() ) {
+                    mmf->willNeedRemap() = false;
+                    mmf->remapThePrivateView();
+                }
+
+                i++;
+                if( i == e ) i = b;
+            }
         }
 
         /** locking in read lock when called 
@@ -229,11 +265,14 @@ namespace mongo {
             // this has to come after writing to the journal, obviously...
             WRITETODATAFILES();
 
+            cj.reset();
+
             // remapping private views must occur after WRITETODATAFILES otherwise 
             // we wouldn't see newly written data on reads.
-            REMAPPRIVATEVIEW();
-
-            cj.reset();
+            // 
+            // this needs done in a write lock thus we do it on the next acquisition of that 
+            // instead of here.
+            // REMAPPRIVATEVIEW();
         }
 
         static void go() {

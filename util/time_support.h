@@ -142,6 +142,8 @@ namespace mongo {
     inline int tdiff(unsigned told, unsigned tnew) {
         return WrappingInt::diff(tnew, told);
     }
+
+    /** curTimeMillis will overflow - use curTimeMicros64 instead if you care about that. */
     inline unsigned curTimeMillis() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
@@ -149,6 +151,7 @@ namespace mongo {
         return (xt.sec & 0xfffff) * 1000 + t;
     }
 
+    /** Date_t is milliseconds since epoch */
     inline Date_t jsTime() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
@@ -163,7 +166,7 @@ namespace mongo {
         return (((unsigned long long) xt.sec) * 1000000) + t;
     }
 
-// measures up to 1024 seconds.  or, 512 seconds with tdiff that is...
+    // measures up to 1024 seconds.  or, 512 seconds with tdiff that is...
     inline unsigned curTimeMicros() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);

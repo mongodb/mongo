@@ -24,6 +24,8 @@
 #include "../../util/mongoutils/html.h"
 #include "../../client/dbclient.h"
 
+using namespace bson;
+
 namespace mongo { 
 
     void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial);
@@ -61,6 +63,7 @@ namespace mongo {
         }
     } cmdReplSetTest;
 
+    /** get rollback id */
     class CmdReplSetGetRBID : public ReplSetCommand {
     public:
         /* todo: ideally this should only change on rollbacks NOT on mongod restarts also. fix... */
@@ -79,10 +82,12 @@ namespace mongo {
         }
     } cmdReplSetRBID;
 
-    using namespace bson;
+    /** we increment the rollback id on every rollback event. */
     void incRBID() { 
         cmdReplSetRBID.rbid++;
     }
+
+    /** helper to get rollback id from another server. */
     int getRBID(DBClientConnection *c) { 
         bo info;
         c->simpleCommand("admin", &info, "replSetGetRBID");

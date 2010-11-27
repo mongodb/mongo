@@ -61,7 +61,7 @@ namespace mongo {
         friend class DataFileMgr;
         friend class BasicCursor;
     public:
-        MongoDataFile(int fn) : fileNo(fn) { }
+        MongoDataFile(int fn) : _mb(0), fileNo(fn) { }
         void open(const char *filename, int requestedDataSize = 0, bool preallocateOnly = false);
 
         /* allocate a new extent from this datafile. 
@@ -89,11 +89,11 @@ namespace mongo {
         Record* makeRecord(DiskLoc dl, int size);
 		void grow(DiskLoc dl, int size);
 
-        char* p() { return (char *) _mb.p; }
-        DataFileHeader* header() { return (DataFileHeader*) _mb.p; }
+        char* p() { return (char *) _mb; }
+        DataFileHeader* header() { return (DataFileHeader*) _mb; }
 
         MongoMMF mmf;
-        MoveableBuffer _mb;
+        void *_mb; // the memory mapped view
         int fileNo;
     };
 

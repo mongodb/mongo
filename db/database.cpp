@@ -161,6 +161,4 @@ namespace mongo {
         return db;
     }
     
-
-
 } // namespace mongo

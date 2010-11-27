@@ -29,6 +29,20 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    void MongoMMF::remapThePrivateView()
+    { 
+        assert( durable && !testIntent );
+        privateViews.remove(_view_private);
+        _view_private = remapPrivateView(_view_private); 
+        privateViews.add(_view_private, this);
+    }
+
+    void* MongoMMF::getView() { 
+        if( testIntent )
+            return _view_readonly;
+        return _view_private;
+    }
+
     /** register view. threadsafe */
     void PointerToMMF::add(void *view, MongoMMF *f) {
         mutex::scoped_lock lk(_m);
@@ -180,14 +194,7 @@ namespace mongo {
         return false;
     }
     
-    /* we will re-map the private few frequently, thus the use of MoveableBuffer */
-    MoveableBuffer MongoMMF::getView() { 
-        if( testIntent )
-            return _view_readonly;
-        return _view_private;
-    }
-
-    MongoMMF::MongoMMF() : _dirty(false) {
+    MongoMMF::MongoMMF() : _willNeedRemap(false) {
         _view_write = _view_private = _view_readonly = 0; 
     }
 
@@ -202,7 +209,7 @@ namespace mongo {
     /*virtual*/ void MongoMMF::close() {
         if( durable ) {
             // we must first commit anything pending before unmapping views.
-            { 
+            if( !testIntent ) { 
                 dbMutex.assertAtLeastReadLocked();
                 dur::_go();
             }

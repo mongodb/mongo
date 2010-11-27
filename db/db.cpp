@@ -40,6 +40,7 @@
 #include "restapi.h"
 #include "dbwebserver.h"
 #include "dur.h"
+#include "concurrency.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"

@@ -138,7 +138,7 @@ namespace mongo {
 		unsigned long long len = 0;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
-        MoveableBuffer p;
+        void *p;
         if( MMF::exists(nsPath) ) {
             if( f.open(pathString, true) ) {
                 len = f.length();
@@ -161,7 +161,7 @@ namespace mongo {
             }
 		}
 
-        if ( p.p == 0 ) {
+        if ( p == 0 ) {
             /** TODO: this shouldn't terminate? */
             log() << "error couldn't open file " << pathString << " terminating" << endl;
             dbexit( EXIT_FS );

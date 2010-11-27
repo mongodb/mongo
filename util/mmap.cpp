@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    set<MongoFile*> MongoFile::mmfiles;
+
     /* Create. Must not exist. 
     @param zero fill file with zeros when true
     */
@@ -70,8 +72,7 @@ namespace mongo {
        this is the administrative stuff 
     */
 
-    static set<MongoFile*> mmfiles;
-    static RWLock mmmutex("rw:mmmutex");
+    RWLock MongoFile::mmmutex("rw:mmmutex");
 
     void MongoFile::destroyed() {
         rwlock lk( mmmutex , true );
@@ -96,13 +97,6 @@ namespace mongo {
         }
         message << "closeAllFiles() finished";
         --closingAllFiles;
-    }
-
-    /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
-    /*static*/ void MongoFile::forEach( void (*p)(MongoFile*) ) { 
-        rwlock lk( mmmutex , false );
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
-            p(*i);
     }
 
     /*static*/ long long MongoFile::totalMappedLength(){
@@ -160,7 +154,7 @@ namespace mongo {
         mmfiles.insert(this);
     }
 
-#ifdef _DEBUG
+#if defined(_DEBUG) && !defined(_TESTINTENT)
 
     void MongoFile::lockAll() {
         rwlock lk( mmmutex , false );

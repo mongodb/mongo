@@ -26,6 +26,8 @@ namespace mongo {
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
     MongoMutex &dbMutex( *(new MongoMutex("rw:dbMutex")) );
 
-    MongoMutex::MongoMutex(const char *name) : _m(name) { }
+    MongoMutex::MongoMutex(const char *name) : _m(name) { 
+        _remapPrivateViewRequested = false;
+    }
 
 }

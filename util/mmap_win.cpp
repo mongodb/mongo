@@ -46,6 +46,13 @@ namespace mongo {
     
     unsigned long long mapped = 0;
 
+    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+        remove(views.begin(), views.end(), oldPrivateAddr);
+        bool ok = UnmapViewOfFile(oldPrivateAddr);
+        dassert(ok);
+        return createPrivateMap();
+    }
+
     void* MemoryMappedFile::createPrivateMap() { 
         assert( maphandle );
         void *p = MapViewOfFile(maphandle, FILE_MAP_COPY, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);

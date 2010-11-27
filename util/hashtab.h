@@ -25,7 +25,6 @@
 #include "../pch.h"
 #include <map>
 #include "../db/dur.h"
-#include "moveablebuffer.h"
 
 namespace mongo {
 
@@ -54,12 +53,12 @@ namespace mongo {
                 hash = 0;
             }
         };
-        MoveableBuffer _buf;
+        void* _buf;
         int n;
         int maxChain;
 
         Node& nodes(int i) { 
-            Node *nodes = (Node *) _buf.p;
+            Node *nodes = (Node *) _buf;
             return nodes[i]; 
         }
 
@@ -100,7 +99,7 @@ namespace mongo {
 
     public:
         /* buf must be all zeroes on initialization. */
-        HashTable(MoveableBuffer buf, int buflen, const char *_name) : name(_name) {
+        HashTable(void* buf, int buflen, const char *_name) : name(_name) {
             int m = sizeof(Node);
             // out() << "hashtab init, buflen:" << buflen << " m:" << m << endl;
             n = buflen / m;

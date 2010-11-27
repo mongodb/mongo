@@ -18,7 +18,7 @@
 #pragma once
 
 #include "../util/mmap.h"
-#include "../util/moveablebuffer.h"
+//#include "../util/moveablebuffer.h"
 
 namespace mongo {
 
@@ -44,12 +44,11 @@ namespace mongo {
         bool create(string fname, unsigned long long& len, bool sequentialHint);
 
         /* Get the "standard" view (which is the private one).
-           We re-map the private view frequently, thus the use of MoveableBuffer 
-           use.
            @return the private view.
                    on _DEBUG, returns the readonly view
         */
-        MoveableBuffer getView();
+        //MoveableBuffer getView();
+        void* getView();
 
         /* switch to _view_write.  normally, this is a bad idea since your changes will not 
            show up in _view_private if there have been changes there; thus the leading underscore
@@ -63,7 +62,7 @@ namespace mongo {
             place in the private view.
         */
         static void* switchToPrivateView(void *debug_readonly_ptr);
-
+        
         /** for a filename a/b/c.3
             filePath() is "a/b/c"
             fileSuffixNo() is 3
@@ -77,16 +76,18 @@ namespace mongo {
             set in PREPLOGBUFFER, it is NOT set immediately on write intent declaration.
             reset to false in REMAPPRIVATEVIEW
         */
-        bool& dirty() { return _dirty; }
+        bool& willNeedRemap() { return _willNeedRemap; }
+
+        void remapThePrivateView();
 
     private:
         void *_view_write;
         void *_view_private;
         void *_view_readonly; // for _DEBUG build
-        bool _dirty;
-
+        bool _willNeedRemap;
         string _filePath;   // e.g. "somepath/dbname"
         int _fileSuffixNo;  // e.g. 3.  -1="ns"
+
         void setPath(string fn);
         bool finishOpening();
     };
@@ -119,5 +120,6 @@ namespace mongo {
         map<void*, MongoMMF*> _views;
     };
 
+    // allows a pointer into any private view of a MongoMMF to be resolved to the MongoMMF object
     extern PointerToMMF privateViews;
 }

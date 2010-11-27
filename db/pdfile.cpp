@@ -378,7 +378,7 @@ namespace mongo {
         }
 
         {
-            assert( _mb.p == 0 );
+            assert( _mb == 0 );
             unsigned long long sz = size;
             if( mmf.create(filename, sz, false) )
                 _mb = mmf.getView();
@@ -387,9 +387,9 @@ namespace mongo {
         }
         //header = (DataFileHeader *) _p;
         if( sizeof(char *) == 4 ) 
-            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb.p != 0);
+            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
         else
-            uassert( 10085 , "can't map file memory", _mb.p != 0);
+            uassert( 10085 , "can't map file memory", _mb != 0);
         header()->init(fileNo, size);
     }
 
