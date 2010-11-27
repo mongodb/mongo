@@ -1425,6 +1425,7 @@ help = shellHelper.help = function (x) {
         print("\t                              or you can specify the port as the first arg");
         print("\t                              dir is /data/db/<port>/ if not specified as the 2nd arg");
         print("\t                              returns a connection to the new server");
+        print("\tresetDbpath(dirpathstr)       deletes everything under the dir specified including subdirs");
         return;
     }
     else if (x == "") {
