@@ -138,7 +138,7 @@ namespace mongo {
 		unsigned long long len = 0;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
-        void *p;
+        void *p = 0;
         if( MMF::exists(nsPath) ) {
             if( f.open(pathString, true) ) {
                 len = f.length();
