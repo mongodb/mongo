@@ -40,7 +40,7 @@ namespace mongo {
                 op = shared_ptr<DurOp>( new FileCreatedOp(br) );
                 break;
             default:
-                massert(10000, str::stream() << "dur recover unrecognized opcode in journal " << hex << opcode, false);
+                massert(13546, str::stream() << "dur recover unrecognized opcode in journal " << hex << opcode, false);
             }
             return op;
         }
@@ -90,7 +90,7 @@ namespace mongo {
             log() << "recover create file " << _filename << ' ' << _len/1024.0/1024.0 << "MB" << endl;
             File f;
             f.open(_filename.c_str());
-            massert(10000, str::stream() << "recover couldn't create file " << _filename, f.is_open());
+            massert(13547, str::stream() << "recover couldn't create file " << _filename, f.is_open());
             unsigned long long left = _len;
             const unsigned blksz = 64 * 1024;
             scoped_ptr<char> v( new char[blksz] );

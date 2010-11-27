@@ -237,6 +237,7 @@
       <Filter>dur</Filter>
     </ClInclude>
     <ClInclude Include="..\db\durop.h" />
+    <ClInclude Include="..\db\mongomutex.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">

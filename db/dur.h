@@ -20,7 +20,7 @@ namespace mongo {
         inline void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
         template <typename T> inline T* alreadyDeclared(T *x) { return x; }
         inline void declareWriteIntent(void *, unsigned) { }
-        void createdFile(string filename, unsigned long long len) { }
+        inline void createdFile(string filename, unsigned long long len) { }
 #else
 
         /** call during startup so durability module can initialize 

@@ -156,7 +156,7 @@ namespace mongo {
             if ( l > a )
                 a = l + 16 * 1024;
             if ( a > BufferMaxSize )
-                msgasserted(10000, "BufBuilder grow() > 64MB");
+                msgasserted(13548, "BufBuilder grow() > 64MB");
             data = (char *) realloc(data, a);
             size= a;
         }

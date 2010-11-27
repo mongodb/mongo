@@ -209,7 +209,7 @@ namespace mongo {
                 uassert(13534, str::stream() << "recovery error couldn't open " << fn, p);
                 if( cmdLine.durTrace & CmdLine::DurDumpJournal ) 
                     log() << "  opened " << fn << ' ' << f->length()/1024.0/1024.0 << endl;
-                uassert(10000, str::stream() << "recovery error file has length zero " << fn, f->length());
+                uassert(13543, str::stream() << "recovery error file has length zero " << fn, f->length());
                 assert( ofs < f->length() );
             }
 
@@ -312,7 +312,7 @@ namespace mongo {
             log() << "recover " << journalfile.string() << endl;
             MemoryMappedFile f;
             void *p = f.mapWithOptions(journalfile.string().c_str(), MongoFile::READONLY | MongoFile::SEQUENTIAL);
-            massert(10000, str::stream() << "recover error couldn't open " << journalfile, p);
+            massert(13544, str::stream() << "recover error couldn't open " << journalfile, p);
             return _apply(p, (unsigned) f.length());
         }
 
@@ -331,7 +331,7 @@ namespace mongo {
             close();
 
             if( cmdLine.durTrace & CmdLine::DurScanOnly ) {
-                uasserted(10000, str::stream() << "--durTrace " << CmdLine::DurScanOnly << " specified, terminating");
+                uasserted(13545, str::stream() << "--durTrace " << CmdLine::DurScanOnly << " specified, terminating");
             }
 
             log() << "recover cleaning up" << endl;

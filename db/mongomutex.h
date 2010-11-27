@@ -210,10 +210,12 @@ namespace mongo {
     }
 
     inline void MongoMutex::_acquiredWriteLock() { 
+#if defined(_DURABLE)
         if( _remapPrivateViewRequested ) { 
             dur::REMAPPRIVATEVIEW();
             dassert( !_remapPrivateViewRequested );
         }
+#endif
     }
 
     /* @return true if was already write locked.  increments recursive lock count. */

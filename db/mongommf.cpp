@@ -207,7 +207,8 @@ namespace mongo {
     }
 
     /*virtual*/ void MongoMMF::close() {
-        if( durable ) {
+#if defined(_DURABLE)
+        {
             // we must first commit anything pending before unmapping views.
             if( !testIntent ) { 
                 dbMutex.assertAtLeastReadLocked();
@@ -218,6 +219,7 @@ namespace mongo {
                 ourReadViews.remove(_view_readonly);
             }
         }
+#endif
         _view_write = _view_private = _view_readonly = 0;
         MemoryMappedFile::close();
     }
