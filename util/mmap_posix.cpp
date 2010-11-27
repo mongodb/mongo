@@ -164,5 +164,10 @@ namespace mongo {
         if (! views.empty() ) assert(mprotect(views[0], len, PROT_READ) == 0);
     }
 
+    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+        assert(false);
+        return 0;
+    }
+
 } // namespace mongo
 
