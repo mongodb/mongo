@@ -195,10 +195,12 @@ namespace mongo {
             assert(false);
         }
 #endif
-        d = dur::writing(d);
         {
+            Record *r = (Record *) d;
+            r = dur::writing(r);
+            d = &r->asDeleted();
             // defensive code: try to make us notice if we reference a deleted record
-            (unsigned&) (((Record *) d)->data) = 0xeeeeeeee;
+            (unsigned&) (r->data) = 0xeeeeeeee;
         }
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
         if ( capped ) {
