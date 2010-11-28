@@ -220,12 +220,13 @@ namespace mongo {
     }
 
     string _hostNameCached;
-    void _hostNameCachedInit(){
+    static void _hostNameCachedInit(){
         _hostNameCached = getHostName();
     }
+    boost::once_flag _hostNameCachedInitFlags = BOOST_ONCE_INIT;
 
     string getHostNameCached(){
-        boost::call_once( _hostNameCachedInit , (boost::once_flag)BOOST_ONCE_INIT );
+        boost::call_once( _hostNameCachedInit , _hostNameCachedInitFlags );
         return _hostNameCached;
     }
 
