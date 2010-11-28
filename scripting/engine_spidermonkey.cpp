@@ -202,8 +202,16 @@ namespace mongo {
             // units, but experiments suggest 8bit units expected.  We allocate
             // enough memory that either will work.
 
-            if ( !JS_EncodeCharacters( _context , s , srclen , dst , &len) )
-                uasserted( 13498, str::stream() << "Not proper UTF-16: " << s);
+            if ( !JS_EncodeCharacters( _context , s , srclen , dst , &len) ){
+                StringBuilder temp;
+                temp << "Not proper UTF-16: ";
+                for ( size_t i=0; i<srclen; i++ ){
+                    if ( i > 0 )
+                        temp << ",";
+                    temp << s[i];
+                }
+                uasserted( 13498 , temp.str() );
+            }
 
             string ss( dst , len );
             free( dst );
