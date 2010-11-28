@@ -232,7 +232,7 @@ namespace mongo {
         
         void reset( int maxSize = 0 ) { _buf.reset( maxSize ); }
         
-        std::string str() { return std::string(_buf.data, _buf.l); }
+        std::string str() const { return std::string(_buf.data, _buf.l); }
 
     private:
         BufBuilder _buf;
