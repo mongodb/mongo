@@ -219,14 +219,14 @@ namespace mongo {
         return _instance;
     }
 
-    
+    string _hostNameCached;
+    void _hostNameCachedInit(){
+        _hostNameCached = getHostName();
+    }
+
     string getHostNameCached(){
-        static string host;
-        if ( host.empty() ){
-            string s = getHostName();
-            host = s;
-        }
-        return host;
+        boost::call_once( _hostNameCachedInit , (boost::once_flag)BOOST_ONCE_INIT );
+        return _hostNameCached;
     }
 
 } // namespace mongo

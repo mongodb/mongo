@@ -102,4 +102,6 @@ namespace mongo {
     extern CmdLine cmdLine;
     
     void setupCoreSignals();
+
+    string prettyHostName();
 }

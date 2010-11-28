@@ -520,14 +520,6 @@ namespace mongo {
 
     // --- external ----
 
-    string prettyHostName() { 
-        stringstream s;
-        s << getHostName();
-        if( mongo::cmdLine.port != CmdLine::DefaultDBPort ) 
-            s << ':' << mongo::cmdLine.port;
-        return s.str();
-    }
-
     void webServerThread(const AdminAccess* adminAccess) {
         boost::scoped_ptr<const AdminAccess> adminAccessPtr(adminAccess); // adminAccess is owned here 
         Client::initThread("websvr");

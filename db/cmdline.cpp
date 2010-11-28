@@ -26,6 +26,7 @@ namespace po = boost::program_options;
 namespace mongo {
 
     void setupSignals( bool inFork );
+    string getHostNameCached();
     BSONArray argvArray;
 
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general , 
@@ -255,4 +256,14 @@ namespace mongo {
         }
 
     } cmdGetCmdLineOpts;
+
+    string prettyHostName() { 
+        StringBuilder s(128);
+        s << getHostNameCached();
+        if( cmdLine.port != CmdLine::DefaultDBPort ) 
+            s << ':' << mongo::cmdLine.port;
+        return s.str();
+    }
+
+
 }
