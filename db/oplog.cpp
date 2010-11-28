@@ -604,8 +604,17 @@ namespace mongo {
                 applyOperation_inlock( e.Obj() , false );
                 num++;
             }
-
+            
             result.append( "applied" , num );
+
+            if ( ! fromRepl ){
+                // We want this applied atomically on slaves
+                // so we re-wrap without the pre-condition for speed
+                
+                string tempNS = str::stream() << dbname << ".$cmd";
+                
+                logOp( "c" , tempNS.c_str() , cmdObj.firstElement().wrap() );
+            }
 
             return true;
         }

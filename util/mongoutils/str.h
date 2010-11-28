@@ -29,6 +29,7 @@
 
 #include <string>
 #include <sstream>
+#include "../../bson/util/builder.h"
 
 namespace mongoutils {
 
@@ -46,7 +47,7 @@ namespace mongoutils {
         */
         class stream {
         public:
-            std::stringstream ss;
+            mongo::StringBuilder ss;
 
             template<class T>
             stream& operator<<(const T& v) {

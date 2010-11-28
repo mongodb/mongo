@@ -30,7 +30,7 @@ namespace mongo {
     void* MemoryMappedFile::create(string filename, unsigned long long len, bool zero) {
         uassert( 13468, string("can't create file already exists ") + filename, !exists(filename) );
         void *p = map(filename.c_str(), len);
-        if( p ) {
+        if( p && zero ) {
             size_t sz = (size_t) len;
             assert( len == sz );
             memset(p, 0, sz);

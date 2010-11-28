@@ -222,7 +222,7 @@ namespace mongo {
 
     class ProgressMeter : boost::noncopyable {
     public:
-        ProgressMeter( long long total , int secondsBetween = 3 , int checkInterval = 100 ){
+        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ){
             reset( total , secondsBetween , checkInterval );
         }
 
@@ -230,7 +230,7 @@ namespace mongo {
             _active = 0;
         }
         
-        void reset( long long total , int secondsBetween = 3 , int checkInterval = 100 ){
+        void reset( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ){
             _total = total;
             _secondsBetween = secondsBetween;
             _checkInterval = checkInterval;
@@ -276,11 +276,11 @@ namespace mongo {
             return true;
         }
 
-        long long done(){
+        unsigned long long done(){
             return _done;
         }
         
-        long long hits(){
+        unsigned long long hits(){
             return _hits;
         }
 
@@ -299,12 +299,12 @@ namespace mongo {
 
         bool _active;
         
-        long long _total;
+        unsigned long long _total;
         int _secondsBetween;
         int _checkInterval;
 
-        long long _done;
-        long long _hits;
+        unsigned long long _done;
+        unsigned long long _hits;
         int _lastTime;
     };
 

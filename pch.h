@@ -68,6 +68,7 @@
 #include "limits.h"
 
 #include <boost/any.hpp>
+#include "boost/thread/once.hpp"
 #include <boost/archive/iterators/transform_width.hpp>
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/exception.hpp>

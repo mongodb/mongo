@@ -614,6 +614,16 @@ namespace mongo {
         return s << e.toString();
     }
 
+    inline StringBuilder& operator<<( StringBuilder &s, const BSONObj &o ) {
+        o.toString( s );
+        return s;
+    }
+    inline StringBuilder& operator<<( StringBuilder &s, const BSONElement &e ) {
+        e.toString( s );
+        return s;
+    }
+
+
     inline void BSONElement::Val(BSONObj& v) const { v = Obj(); }
 
     template<typename T>

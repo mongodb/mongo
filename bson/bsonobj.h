@@ -373,8 +373,13 @@ private:
                 _assertInvalid();
         }
     };
+
     ostream& operator<<( ostream &s, const BSONObj &o );
     ostream& operator<<( ostream &s, const BSONElement &e );
+
+    StringBuilder& operator<<( StringBuilder &s, const BSONObj &o );
+    StringBuilder& operator<<( StringBuilder &s, const BSONElement &e );
+
 
     struct BSONArray : BSONObj {
         // Don't add anything other than forwarding constructors!!!
