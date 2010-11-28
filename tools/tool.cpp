@@ -357,7 +357,7 @@ namespace mongo {
     long long BSONTool::processFile( const path& root ){
         string fileString = root.string();
         
-        long long fileLength = file_size( root );
+        unsigned long long fileLength = file_size( root );
 
         if ( fileLength == 0 ) {
             out() << "file " << fileString << " empty, skipping" << endl;
@@ -377,9 +377,9 @@ namespace mongo {
 
         log(1) << "\t file size: " << fileLength << endl;
 
-        long long read = 0;
-        long long num = 0;
-        long long processed = 0;
+        unsigned long long read = 0;
+        unsigned long long num = 0;
+        unsigned long long processed = 0;
 
         const int BUF_SIZE = 1024 * 1024 * 5;
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
