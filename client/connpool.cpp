@@ -167,16 +167,27 @@ namespace mongo {
     }
 
     void DBConnectionPool::appendInfo( BSONObjBuilder& b ){
-        scoped_lock lk( _mutex );
         BSONObjBuilder bb( b.subobjStart( "hosts" ) );
-        for ( map<string,PoolForHost>::iterator i=_pools.begin(); i!=_pools.end(); ++i ){
-            string s = i->first;
-            BSONObjBuilder temp( bb.subobjStart( s ) );
-            temp.append( "available" , i->second.numAvailable() );
-            temp.appendNumber( "created" , i->second.numCreated() );
-            temp.done();
+        int avail = 0;
+        int created = 0;
+        
+        {
+            scoped_lock lk( _mutex );
+            for ( map<string,PoolForHost>::iterator i=_pools.begin(); i!=_pools.end(); ++i ){
+                string s = i->first;
+                BSONObjBuilder temp( bb.subobjStart( s ) );
+                temp.append( "available" , i->second.numAvailable() );
+                temp.appendNumber( "created" , i->second.numCreated() );
+                temp.done();
+
+                avail += i->second.numAvailable();
+                created += i->second.numCreated();
+            }
         }
         bb.done();
+
+        b.append( "totalAvailable" , avail );
+        b.append( "totalCreated" , created );
     }
 
     ScopedDbConnection * ScopedDbConnection::steal(){
@@ -228,6 +239,7 @@ namespace mongo {
         virtual bool run(const string&, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
             pool.appendInfo( result );
             result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
+            result.append( "numAScopedConnection" , AScopedConnection::getNumConnections() );
             return true;
         }
         virtual bool slaveOk() const {
@@ -236,5 +248,6 @@ namespace mongo {
 
     } poolStatsCmd;
 
+    AtomicUInt AScopedConnection::_numConnections;
 
 } // namespace mongo

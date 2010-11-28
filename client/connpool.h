@@ -134,10 +134,19 @@ namespace mongo {
 
     class AScopedConnection : boost::noncopyable {
     public:
-        virtual ~AScopedConnection(){}
+        AScopedConnection() { _numConnections++; }
+        virtual ~AScopedConnection() { _numConnections--; }
         virtual DBClientBase* get() = 0;
         virtual void done() = 0;
         virtual string getHost() const = 0;
+
+        /**
+         * @return total number of current instances of AScopedConnection
+         */
+        static int getNumConnections() { return _numConnections; }
+
+    private:
+        static AtomicUInt _numConnections;
     };
 
     /** Use to get a connection from the pool.  On exceptions things
