@@ -21,6 +21,7 @@
 */
 
 #include "pch.h"
+#include "cmdline.h"
 #include "mongommf.h"
 #include "dur.h"
 #include "../util/mongoutils/str.h"
@@ -31,7 +32,7 @@ namespace mongo {
 
     void MongoMMF::remapThePrivateView()
     { 
-        assert( durable && !testIntent );
+        assert( cmdLine.dur && !testIntent );
         privateViews.remove(_view_private);
         _view_private = remapPrivateView(_view_private); 
         privateViews.add(_view_private, this);
@@ -108,7 +109,7 @@ namespace mongo {
     static PointerToMMF ourReadViews; /// _TESTINTENT (testIntent) build use only (other than existance)
 
     /*static*/ void* MongoMMF::switchToPrivateView(void *readonly_ptr) { 
-        assert( durable );
+        assert( cmdLine.dur );
         assert( testIntent );
 
         void *p = readonly_ptr;
@@ -167,7 +168,7 @@ namespace mongo {
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) { 
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
-        if( durable && !testIntent && _view_write ) { 
+        if( cmdLine.dur && !testIntent && _view_write ) { 
             dur::createdFile(fname, len);
         }
         return finishOpening();
@@ -175,7 +176,7 @@ namespace mongo {
 
     bool MongoMMF::finishOpening() {
         if( _view_write ) {
-            if( durable ) {
+            if( cmdLine.dur ) {
                 if( testIntent ) { 
                     _view_private = _view_write;
                     _view_readonly = MemoryMappedFile::createReadOnlyMap();

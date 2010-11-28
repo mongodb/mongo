@@ -710,7 +710,7 @@ namespace mongo {
         theFileAllocator().waitUntilFinished();
         
         log() << "shutdown: closing all files..." << endl;
-        if( durable ) {
+        if( cmdLine.dur ) {
             /* is this useful?  needed?  helpful? perhaps even without _DURABLE.  ifdef'd for now just to avoid behavior change short term */
             MemoryMappedFile::flushAll(true);
         }
@@ -719,7 +719,7 @@ namespace mongo {
         rawOut( ss3.str() );
 
 #if defined(_DURABLE)
-        if( durable ) {
+        if( cmdLine.dur ) {
             log() << "shutdown: journalCleanup..." << endl;
             dur::journalCleanup();
         }

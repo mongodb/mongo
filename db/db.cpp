@@ -697,7 +697,6 @@ int main(int argc, char* argv[], char *envp[] )
         ("sysinfo", "print some diagnostic system information")
         ("upgrade", "upgrade db if needed")
         ("repair", "run repair on all dbs")
-        ("durTrace", po::value<int>(), "durability diagnostic options")
         ("notablescan", "do not allow table scans")
         ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
         ("profile",po::value<int>(), "0=off 1=slow, 2=all")
@@ -744,6 +743,9 @@ int main(int argc, char* argv[], char *envp[] )
         ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
         ("command", po::value< vector<string> >(), "command")
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
+        // these move to unhidden later:
+        ("dur", "enable journaling")
+        ("durTrace", po::value<int>(), "durability diagnostic options")
         ;
 
 
@@ -825,6 +827,13 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("quotaFiles")) {
             cmdLine.quota = true;
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
+        }
+        if( params.count("dur") ) { 
+            cmdLine.dur = true;
+#if !defined(_DURABLE)
+            log() << "--dur not yet available" << endl;
+            assert( false );
+#endif
         }
         if (params.count("durTrace")) {
             cmdLine.durTrace = params["durTrace"].as<int>();

@@ -73,7 +73,8 @@ namespace mongo {
         class FileCreatedOp : public DurOp { 
         public:
             FileCreatedOp(BufReader& log);
-            FileCreatedOp(string f, unsigned long long l) : _filename(f), _len(l), DurOp(JEntry::OpCode_FileCreated) { }
+            FileCreatedOp(string f, unsigned long long l) : 
+              DurOp(JEntry::OpCode_FileCreated), _filename(f), _len(l)  { }
 
             virtual void replay();
 

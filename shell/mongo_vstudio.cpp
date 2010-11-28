@@ -1430,6 +1430,7 @@ const StringData _jscode_raw_utils =
 "print(\"\\t                              or you can specify the port as the first arg\");\n" 
 "print(\"\\t                              dir is /data/db/<port>/ if not specified as the 2nd arg\");\n" 
 "print(\"\\t                              returns a connection to the new server\");\n" 
+"print(\"\\tresetDbpath(dirpathstr)       deletes everything under the dir specified including subdirs\");\n" 
 "return;\n" 
 "}\n" 
 "else if (x == \"\") {\n" 

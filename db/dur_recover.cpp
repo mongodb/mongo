@@ -344,7 +344,7 @@ namespace mongo {
             throws on error 
         */
         void /*dur::*/recover() { 
-            assert( durable );
+            assert( cmdLine.dur );
 
             filesystem::path p = getJournalDir();
             if( !exists(p) ) { 

@@ -42,6 +42,7 @@
 
 #if defined(_DURABLE)
 
+#include "cmdline.h"
 #include "client.h"
 #include "dur.h"
 #include "dur_journal.h"
@@ -106,7 +107,7 @@ namespace mongo {
         */
         void debugCheckLastDeclaredWrite() { 
 #if 0
-            assert(debug && durable);
+            assert(debug && cmdLine.dur);
             vector<WriteIntent>& w = cj.writes();
             if( w.size() == 0 ) 
                 return;
@@ -363,7 +364,7 @@ namespace mongo {
         void recover();
 
         void startup() {
-            if( !durable )
+            if( !cmdLine.dur )
                 return;
             if( testIntent )
                 return;

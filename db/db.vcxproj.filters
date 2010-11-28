@@ -958,6 +958,9 @@
     <None Include="..\jstests\replsets\twosets.js">
       <Filter>replSets\testing</Filter>
     </None>
+    <None Include="..\jstests\dur\dur1.js">
+      <Filter>db\storage engine</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
