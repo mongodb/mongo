@@ -312,7 +312,7 @@ namespace mongo {
             log() << "recover " << journalfile.string() << endl;
             MemoryMappedFile f;
             void *p = f.mapWithOptions(journalfile.string().c_str(), MongoFile::READONLY | MongoFile::SEQUENTIAL);
-            massert(13544, str::stream() << "recover error couldn't open " << journalfile, p);
+            massert(13544, str::stream() << "recover error couldn't open " << journalfile.string(), p);
             return _apply(p, (unsigned) f.length());
         }
 

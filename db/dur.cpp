@@ -26,7 +26,7 @@
      WRITETOJOURNAL
        we could be unlocked (the main db lock that is...) for this, with sufficient care, but there is some complexity
          have to handle falling behind which would use too much ram (going back into a read lock would suffice to stop that).
-         downgrading to (a perhaps upgradable) read lock would be a good start
+         for now we are in read lock which is not ideal.
      WRITETODATAFILES
        apply the writes back to the non-private MMF after they are for certain in redo log
      REMAPPRIVATEVIEW
@@ -173,7 +173,7 @@ namespace mongo {
                     size_t ofs;
                     MongoMMF *mmf = privateViews._find(i->p, ofs);
                     if( mmf == 0 ) {
-                        string s = str::stream() << "view pointer cannot be resolved " << i->p;
+                        string s = str::stream() << "view pointer cannot be resolved " << (size_t) i->p;
                         journalingFailure(s.c_str()); // asserts
                         return;
                     }

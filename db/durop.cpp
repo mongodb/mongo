@@ -40,7 +40,7 @@ namespace mongo {
                 op = shared_ptr<DurOp>( new FileCreatedOp(br) );
                 break;
             default:
-                massert(13546, str::stream() << "dur recover unrecognized opcode in journal " << hex << opcode, false);
+                massert(13546, str::stream() << "dur recover unrecognized opcode in journal " << opcode, false);
             }
             return op;
         }
