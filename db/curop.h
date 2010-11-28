@@ -236,7 +236,7 @@ namespace mongo {
 
         string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
 
-        ProgressMeter& setMessage( const char * msg , long long progressMeterTotal = 0 , int secondsBetween = 3 ) {
+        ProgressMeter& setMessage( const char * msg , unsigned long long progressMeterTotal = 0 , int secondsBetween = 3 ) {
             if ( progressMeterTotal ){
                 if ( _progressMeter.isActive() ){
                     cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
