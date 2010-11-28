@@ -65,7 +65,7 @@ winners = []
 losers = {}
 
 # For replication hash checking
-replicated_dbs = []
+replicated_collections = []
 lost_in_slave = []
 lost_in_master = []
 screwy_in_slave = {}
@@ -179,6 +179,9 @@ class mongod(object):
         sys.stderr.flush()
         sys.stdout.flush()
 
+    def wait_for_repl(self):
+        Connection(port=self.port).test.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
+
 class Bug(Exception):
     def __str__(self):
         return 'bug in smoke.py: ' + super(Bug, self).__str__()
@@ -208,26 +211,36 @@ def check_db_hashes(master, slave):
         raise(Bug("slave instance doesn't have slave attribute set"))
 
     print "waiting for slave to catch up"
-    Connection(port=master.port).test.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
+    master.wait_for_repl()
     print "caught up!"
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
-        mongod.dict = Connection(port=mongod.port, slave_okay=True).test.command("dbhash")["collections"]
+        print( mongod.port )
+        mongod.dbhash = Connection(port=mongod.port, slave_okay=True).test.command("dbhash")
+        mongod.dict = mongod.dbhash["collections"]
+        print( mongod.dbhash )
 
-    global lost_in_slave, lost_in_master, screwy_in_slave, replicated_dbs
+    global lost_in_slave, lost_in_master, screwy_in_slave, replicated_collections
 
-    for db in replicated_dbs:
+    replicated_collections += master.dict.keys()
+    
+    print( "a: " + str( master.dict.keys() ) )
+    print( "b: " + str( slave.dict.keys() ) )
+
+    for db in replicated_collections:
         if db not in slave.dict:
             lost_in_slave.append(db)
         mhash = master.dict[db]
         shash = slave.dict[db]
         if mhash != shash:
             screwy_in_slave[db] = mhash + "/" + shash
+
     for db in slave.dict.keys():
         if db not in master.dict:
             lost_in_master.append(db)
-    replicated_dbs += master.dict.keys()
+
+
 
 # Blech.
 def skipTest(path):
@@ -282,8 +295,14 @@ def run_tests(tests):
     # need this.  (So long as there are no conflicts with port,
     # dbpath, etc., and so long as we shut ours down properly,
     # starting this mongod shouldn't break anything, though.)
+    
+    # The reason we use with is so that we get __exit__ semantics
+
     with mongod(small_oplog=small_oplog) as master:
         with mongod(slave=True) if small_oplog else Nothing() as slave:
+            if small_oplog:
+                master.wait_for_repl()
+
             for test in tests:
                 try:
                     runTest(test)
@@ -329,7 +348,7 @@ at the end of testing:"""
         for db in screwy_in_slave.keys():
             print "%s\t %s" % (db, screwy_in_slave[db])
     if small_oplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
-        print "replication ok for %d collections" % (len(replicated_dbs))
+        print "replication ok for %d collections" % (len(replicated_collections))
     if losers or lost_in_slave or lost_in_master or screwy_in_slave:
         raise Exception("Test failures")
 
@@ -364,6 +383,8 @@ def expand_suites(suites):
             else:
                 program = 'mongos'
             tests += [(os.path.join(mongo_repo, program), False)]
+        elif os.path.exists( suite ):
+            tests += [ ( os.path.join( mongo_repo , suite ) , True ) ]
         else:
             try:
                 globstr, usedb = {"js": ("[!_]*.js", True),
@@ -387,6 +408,7 @@ def expand_suites(suites):
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
+
     return tests
 
 
