@@ -16,7 +16,6 @@
  */
 
 #include "pch.h"
-#include "boost/thread/once.hpp"
 #include "dbclient.h"
 #include "distlock.h"
 
