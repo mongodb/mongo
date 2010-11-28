@@ -881,6 +881,8 @@ namespace mongo {
         sayPiggyBack( m );
     }
 
+    AtomicUInt DBClientConnection::_numConnections;
+
     /* --- class dbclientpaired --- */
 
     string DBClientReplicaSet::toString() {

@@ -227,6 +227,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool run(const string&, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
             pool.appendInfo( result );
+            result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
             return true;
         }
         virtual bool slaveOk() const {

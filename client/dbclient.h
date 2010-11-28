@@ -787,7 +787,13 @@ namespace mongo {
            Connect timeout is fixed, but short, at 5 seconds.
          */
         DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double so_timeout=0) :
-                clientSet(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _so_timeout(so_timeout) { }
+            clientSet(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _so_timeout(so_timeout) {
+            _numConnections++;
+        }
+
+        virtual ~DBClientConnection(){
+            _numConnections--;
+        }
 
         /** Connect to a Mongo database server.
 
@@ -876,6 +882,10 @@ namespace mongo {
         virtual bool isMember( const DBConnector * conn ) const { return this == conn; };
         virtual void checkResponse( const char *data, int nReturned );
 
+        static int getNumConnections(){
+            return _numConnections;
+        }
+
     protected:
         friend class SyncClusterConnection;
         virtual void recv( Message& m );
@@ -897,6 +907,8 @@ namespace mongo {
 		map< string, pair<string,string> > authCache;
         const double _so_timeout;        
         bool _connect( string& errmsg );
+
+        static AtomicUInt _numConnections;
     };
     
     /** Use this class to connect to a replica set of servers.  The class will manage
