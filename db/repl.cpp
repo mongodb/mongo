@@ -865,7 +865,7 @@ namespace mongo {
          ...
        see logOp() comments.
     */
-    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail) {
+    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail, bool alreadyLocked) {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
             log(6) << "processing op: " << op << endl;
 
@@ -893,7 +893,8 @@ namespace mongo {
         if ( !only.empty() && only != clientName )
             return;
 
-        if( cmdLine.pretouch ) {
+        cmdLine.pretouch = 2;
+        if( cmdLine.pretouch && !alreadyLocked ) {
             if( cmdLine.pretouch > 1 ) {
                 /* note: this is bad - should be put in ReplSource.  but this is first test... */
                 static int countdown;
@@ -929,7 +930,8 @@ namespace mongo {
             }
         }
 
-        dblock lk;
+        scoped_ptr<writelock> lk( alreadyLocked ? 0 : new writelock() );
+        //dblock lk;
 
         if ( localLogTail && replPair && replPair->state == ReplPair::State_Master ) {
             updateSetsWithLocalOps( *localLogTail, true ); // allow unlocking
@@ -1203,7 +1205,7 @@ namespace mongo {
                 b.append("ns", *i + '.');
                 b.append("op", "db");
                 BSONObj op = b.done();
-                sync_pullOpLog_applyOperation(op, 0);
+                sync_pullOpLog_applyOperation(op, 0, false);
             }
         }
 
@@ -1361,41 +1363,52 @@ namespace mongo {
 					n = 0;
 				}
 
+                const unsigned BLOCK = 1;
                 BSONObj op = oplogReader.next();
-                BSONElement ts = op.getField("ts");
-                if( !( ts.type() == Date || ts.type() == Timestamp ) ) { 
-                    log() << "sync error: problem querying remote oplog record\n";
-                    log() << "op: " << op.toString() << '\n';
-                    log() << "halting replication" << endl;
-                    replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
-                    throw SyncException();
-                }
-                OpTime last = nextOpTime;
-                nextOpTime = OpTime( ts.date() );
-                if ( !( last < nextOpTime ) ) {
-                    log() << "sync error: last applied optime at slave >= nextOpTime from master" << endl;
-                    log() << " last:       " << last.toStringLong() << '\n';
-                    log() << " nextOpTime: " << nextOpTime.toStringLong() << '\n';
-                    log() << " halting replication" << endl;
-                    replInfo = replAllDead = "sync error last >= nextOpTime";
-                    uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
-                }
-                if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
-                    oplogReader.putBack( op );
-                    _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
-                    dblock lk;
-                    if ( n > 0 ) {
-                        syncedTo = last;
-                        save();
+                unsigned b = 0;
+                bool batch = BLOCK > 1;
+                scoped_ptr<writelock> lk( !batch ? 0 : new writelock() );
+                while( b++ < BLOCK ) {
+                    BSONElement ts = op.getField("ts");
+                    if( !( ts.type() == Date || ts.type() == Timestamp ) ) { 
+                        log() << "sync error: problem querying remote oplog record\n";
+                        log() << "op: " << op.toString() << '\n';
+                        log() << "halting replication" << endl;
+                        replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
+                        throw SyncException();
                     }
-                    log() << "repl:   applied " << n << " operations" << endl;
-                    log() << "repl:   syncedTo: " << syncedTo.toStringLong() << endl;
-                    log() << "waiting until: " << _sleepAdviceTime << " to continue" << endl;
-                    break;
-                }
+                    OpTime last = nextOpTime;
+                    nextOpTime = OpTime( ts.date() );
+                    if ( !( last < nextOpTime ) ) {
+                        log() << "sync error: last applied optime at slave >= nextOpTime from master" << endl;
+                        log() << " last:       " << last.toStringLong() << '\n';
+                        log() << " nextOpTime: " << nextOpTime.toStringLong() << '\n';
+                        log() << " halting replication" << endl;
+                        replInfo = replAllDead = "sync error last >= nextOpTime";
+                        uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
+                    }
+                    if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
+                        assert( !batch );
+                        oplogReader.putBack( op );
+                        _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
+                        dblock lk;
+                        if ( n > 0 ) {
+                            syncedTo = last;
+                            save();
+                        }
+                        log() << "repl:   applied " << n << " operations" << endl;
+                        log() << "repl:   syncedTo: " << syncedTo.toStringLong() << endl;
+                        log() << "waiting until: " << _sleepAdviceTime << " to continue" << endl;
+                        break;
+                    }
 
-                sync_pullOpLog_applyOperation(op, &localLogTail);
-                n++;
+                    sync_pullOpLog_applyOperation(op, &localLogTail, /*alreadyLocked*/batch);
+                    n++;
+
+                    if( !oplogReader.moreInCurrentBatch() )
+                        break;
+                    op = oplogReader.next();
+                }
             }
         }
 

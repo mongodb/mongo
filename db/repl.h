@@ -94,11 +94,13 @@ namespace mongo {
 
         bool resync(string db);
 
-        /* pull some operations from the master's oplog, and apply them. */
+        void sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail, bool alreadyLocked);
+        
+        /* pull some operations from the master's oplog, and apply them. 
+           calls sync_pullOpLog_applyOperation()
+        */
         int sync_pullOpLog(int& nApplied);
 
-        void sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail);
-        
         /* we only clone one database per pass, even if a lot need done.  This helps us
            avoid overflowing the master's transaction log by doing too much work before going
            back to read more transactions. (Imagine a scenario of slave startup where we try to

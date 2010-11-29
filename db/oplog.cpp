@@ -398,7 +398,7 @@ namespace mongo {
     void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
         DEV assert( !dbMutex.isWriteLocked() );
 
-        Client *c = &cc();
+        Client *c = currentClient.get();
         if( c == 0 ) { 
             Client::initThread("pretouchN");
             c = &cc();
