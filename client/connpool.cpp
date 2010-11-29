@@ -169,7 +169,7 @@ namespace mongo {
     void DBConnectionPool::appendInfo( BSONObjBuilder& b ){
         BSONObjBuilder bb( b.subobjStart( "hosts" ) );
         int avail = 0;
-        int created = 0;
+        long long created = 0;
         
         {
             scoped_lock lk( _mutex );
@@ -187,7 +187,7 @@ namespace mongo {
         bb.done();
 
         b.append( "totalAvailable" , avail );
-        b.append( "totalCreated" , created );
+        b.appendNumber( "totalCreated" , created );
     }
 
     ScopedDbConnection * ScopedDbConnection::steal(){
