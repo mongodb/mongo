@@ -20,6 +20,7 @@
 #pragma once
 
 #include "../util/alignedbuilder.h"
+#include "../util/mongoutils/hash.h"
 #include "durop.h"
 
 namespace mongo { 

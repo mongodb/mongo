@@ -331,7 +331,7 @@ namespace mongo {
             close();
 
             if( cmdLine.durTrace & CmdLine::DurScanOnly ) {
-                uasserted(13545, str::stream() << "--durTrace " << CmdLine::DurScanOnly << " specified, terminating");
+  			    uasserted(13545, str::stream() << "--durTrace " << (int) CmdLine::DurScanOnly << " specified, terminating");
             }
 
             log() << "recover cleaning up" << endl;
@@ -366,12 +366,13 @@ namespace mongo {
             j.go(journalFiles);
        }
 
+  	    struct BufReaderY { int a,b; };
         class BufReaderUnitTest : public UnitTest {
         public:
             void run() { 
-                BufReader r("abcdabcdabcd", 12);
+  			    BufReader r((void*) "abcdabcdabcd", 12);
                 char x;
-                struct Y { int a,b; } y;
+				BufReaderY y;
                 r.read(x); cout << x; // a
                 assert( x == 'a' );
                 r.read(y);
