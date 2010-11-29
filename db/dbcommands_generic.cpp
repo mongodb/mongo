@@ -161,7 +161,7 @@ namespace mongo {
                 }
                 // todo: should getParameters be not in dbcommands_generic?
                 assert( /*replSettings.slavedelay == 0 || */ b == 1 );
-                assert( replSettings.slave );
+                //assert( replSettings.slave );
                 replApplyBatchSize = b;
                 s++;
             }
