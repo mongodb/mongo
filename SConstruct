@@ -269,6 +269,14 @@ AddOption( "--heapcheck",
            action="store",
            help="link to heap-checking malloc-lib and look for memory leaks during tests")
 
+AddOption( "--distcc",
+           dest="distcc",
+           type="string",
+           nargs=0,
+           action="store",
+           help="use distcc for distributed builds")
+
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -545,6 +553,7 @@ if "darwin" == os.sys.platform:
     platform = "osx" # prettier than darwin
 
     if env["CXX"] is None:
+        print( "YO" )
         if os.path.exists( "/usr/bin/g++-4.2" ):
             env["CXX"] = "g++-4.2"
 
@@ -760,6 +769,10 @@ else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
 if nix:
+
+    if GetOption( "distcc" ) is not None:
+        env["CXX"] = "distcc " + env["CXX"]
+        
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     if linux:
         env.Append( CPPFLAGS=" -Werror " )
