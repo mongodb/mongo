@@ -21,6 +21,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include "unittest.h"
 #include "version.h"
 
 namespace mongo {
@@ -104,4 +105,37 @@ namespace mongo {
             cout << endl;
     }
 
+    int versionCmp(StringData rhs, StringData lhs){
+        if (strcmp(rhs.data(),lhs.data()) == 0)
+            return 0;
+
+        // handle "1.2.3-" and "1.2.3-pre"
+        if (rhs.size() < lhs.size()) {
+            if (strncmp(rhs.data(), lhs.data(), rhs.size()) == 0 && lhs.data()[rhs.size()] == '-')
+                return +1; 
+        } else if (rhs.size() > lhs.size()) {
+            if (strncmp(rhs.data(), lhs.data(), lhs.size()) == 0 && rhs.data()[lhs.size()] == '-')
+                return -1; 
+        }
+        
+        return lexNumCmp(rhs.data(), lhs.data());
+    }
+
+    class VersionCmpTest : public UnitTest {
+    public:
+        void run(){
+            assert( versionCmp("1.2.3", "1.2.3") == 0 );
+            assert( versionCmp("1.2.3", "1.2.4") < 0 );
+            assert( versionCmp("1.2.3", "1.2.20") < 0 );
+            assert( versionCmp("1.2.3", "1.20.3") < 0 );
+            assert( versionCmp("2.2.3", "10.2.3") < 0 );
+            assert( versionCmp("1.2.3", "1.2.3-") > 0 );
+            assert( versionCmp("1.2.3", "1.2.3-pre") > 0 );
+            assert( versionCmp("1.2.3", "1.2.4-") < 0 );
+            assert( versionCmp("1.2.3-", "1.2.3") < 0 );
+            assert( versionCmp("1.2.3-pre", "1.2.3") < 0 );
+
+            log(1) << "versionCmpTest passed" << endl;
+        }
+    } versionCmpTest;
 }
