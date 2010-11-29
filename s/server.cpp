@@ -171,7 +171,7 @@ using namespace mongo;
 
 namespace po = boost::program_options;
 
-int main(int argc, char* argv[], char *envp[] ) {
+int main(int argc, char* argv[]) {
     static StaticObserver staticObserver;
     mongosCommand = argv[0];
 

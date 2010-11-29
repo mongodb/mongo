@@ -653,7 +653,7 @@ string arg_error_check(int argc, char* argv[]) {
     return "";
 }
 
-int main(int argc, char* argv[], char *envp[] )
+int main(int argc, char* argv[])
 {
     static StaticObserver staticObserver;
     getcurns = ourgetns;
