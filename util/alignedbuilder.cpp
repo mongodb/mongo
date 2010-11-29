@@ -16,20 +16,15 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#if defined(_WIN32)
-#include <windows.h>
-#endif
-
+#include "pch.h"
 #include "alignedbuilder.h"
-#include "assert.h"
-#include "../bson/inline_decls.h"
 
 namespace mongo {
 
     AlignedBuilder::AlignedBuilder(unsigned init_size) : _size(init_size) {
         _data = (char *) _malloc(_size);
         if( _data == 0 )
-            throw std::exception("out of memory AlignedBuilder");
+            uasserted(13584, "out of memory AlignedBuilder");
         _len = 0;
     }
 
