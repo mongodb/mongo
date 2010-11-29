@@ -1374,8 +1374,8 @@ namespace mongo {
 
                         BSONElement ts = op.getField("ts");
                     if( !( ts.type() == Date || ts.type() == Timestamp ) ) { 
-                        log() << "sync error: problem querying remote oplog record\n";
-                        log() << "op: " << op.toString() << '\n';
+                        log() << "sync error: problem querying remote oplog record" << endl;
+                        log() << "op: " << op.toString() << endl;
                         log() << "halting replication" << endl;
                         replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
                         throw SyncException();
@@ -1384,8 +1384,8 @@ namespace mongo {
                     nextOpTime = OpTime( ts.date() );
                     if ( !( last < nextOpTime ) ) {
                         log() << "sync error: last applied optime at slave >= nextOpTime from master" << endl;
-                        log() << " last:       " << last.toStringLong() << '\n';
-                        log() << " nextOpTime: " << nextOpTime.toStringLong() << '\n';
+                        log() << " last:       " << last.toStringLong() << endl;
+                        log() << " nextOpTime: " << nextOpTime.toStringLong() << endl;
                         log() << " halting replication" << endl;
                         replInfo = replAllDead = "sync error last >= nextOpTime";
                         uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
@@ -1402,7 +1402,7 @@ namespace mongo {
                         log() << "repl:   applied " << n << " operations" << endl;
                         log() << "repl:   syncedTo: " << syncedTo.toStringLong() << endl;
                         log() << "waiting until: " << _sleepAdviceTime << " to continue" << endl;
-                        break;
+                        return okResultCode;
                     }
 
                     sync_pullOpLog_applyOperation(op, &localLogTail, !justOne);
