@@ -728,6 +728,9 @@
     <ClCompile Include="..\db\dbcommands_generic.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\alignedbuilder.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

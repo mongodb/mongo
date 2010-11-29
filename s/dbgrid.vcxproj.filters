@@ -308,6 +308,9 @@
     <ClCompile Include="..\util\concurrency\spin_lock.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\alignedbuilder.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gridconfig.h">

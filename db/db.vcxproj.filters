@@ -436,6 +436,9 @@
     <ClCompile Include="..\s\grid.cpp">
       <Filter>sharding</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\alignedbuilder.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
