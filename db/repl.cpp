@@ -864,8 +864,10 @@ namespace mongo {
          { ts: ..., op: <optype>, ns: ..., o: <obj> , o2: <extraobj>, b: <boolflag> }
          ...
        see logOp() comments.
+
+       @param alreadyLocked caller already put us in write lock if true
     */
-    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail) {
+    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail, bool alreadyLocked) {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
             log(6) << "processing op: " << op << endl;
 
@@ -893,7 +895,7 @@ namespace mongo {
         if ( !only.empty() && only != clientName )
             return;
 
-        if( cmdLine.pretouch ) {
+        if( cmdLine.pretouch && !alreadyLocked/*doesn't make sense if in write lock already*/ ) {
             if( cmdLine.pretouch > 1 ) {
                 /* note: this is bad - should be put in ReplSource.  but this is first test... */
                 static int countdown;
@@ -929,7 +931,7 @@ namespace mongo {
             }
         }
 
-        dblock lk;
+        scoped_ptr<writelock> lk( alreadyLocked ? 0 : new writelock() );
 
         if ( localLogTail && replPair && replPair->state == ReplPair::State_Master ) {
             updateSetsWithLocalOps( *localLogTail, true ); // allow unlocking
@@ -1123,6 +1125,8 @@ namespace mongo {
         return true;
     }
     
+    unsigned replApplyBatchSize = 1;
+
     /* slave: pull some data from the master's oplog
        note: not yet in db mutex at this point. 
        @return -1 error
@@ -1203,7 +1207,7 @@ namespace mongo {
                 b.append("ns", *i + '.');
                 b.append("op", "db");
                 BSONObj op = b.done();
-                sync_pullOpLog_applyOperation(op, 0);
+                sync_pullOpLog_applyOperation(op, 0, false);
             }
         }
 
@@ -1362,40 +1366,57 @@ namespace mongo {
 				}
 
                 BSONObj op = oplogReader.next();
-                BSONElement ts = op.getField("ts");
-                if( !( ts.type() == Date || ts.type() == Timestamp ) ) { 
-                    log() << "sync error: problem querying remote oplog record\n";
-                    log() << "op: " << op.toString() << '\n';
-                    log() << "halting replication" << endl;
-                    replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
-                    throw SyncException();
-                }
-                OpTime last = nextOpTime;
-                nextOpTime = OpTime( ts.date() );
-                if ( !( last < nextOpTime ) ) {
-                    log() << "sync error: last applied optime at slave >= nextOpTime from master" << endl;
-                    log() << " last:       " << last.toStringLong() << '\n';
-                    log() << " nextOpTime: " << nextOpTime.toStringLong() << '\n';
-                    log() << " halting replication" << endl;
-                    replInfo = replAllDead = "sync error last >= nextOpTime";
-                    uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
-                }
-                if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
-                    oplogReader.putBack( op );
-                    _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
-                    dblock lk;
-                    if ( n > 0 ) {
-                        syncedTo = last;
-                        save();
-                    }
-                    log() << "repl:   applied " << n << " operations" << endl;
-                    log() << "repl:   syncedTo: " << syncedTo.toStringLong() << endl;
-                    log() << "waiting until: " << _sleepAdviceTime << " to continue" << endl;
-                    break;
-                }
 
-                sync_pullOpLog_applyOperation(op, &localLogTail);
-                n++;
+                unsigned b = replApplyBatchSize;
+                bool justOne = b == 1;
+                scoped_ptr<writelock> lk( justOne ? 0 : new writelock() );
+                while( 1 ) {
+
+                        BSONElement ts = op.getField("ts");
+                    if( !( ts.type() == Date || ts.type() == Timestamp ) ) { 
+                        log() << "sync error: problem querying remote oplog record\n";
+                        log() << "op: " << op.toString() << '\n';
+                        log() << "halting replication" << endl;
+                        replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
+                        throw SyncException();
+                    }
+                    OpTime last = nextOpTime;
+                    nextOpTime = OpTime( ts.date() );
+                    if ( !( last < nextOpTime ) ) {
+                        log() << "sync error: last applied optime at slave >= nextOpTime from master" << endl;
+                        log() << " last:       " << last.toStringLong() << '\n';
+                        log() << " nextOpTime: " << nextOpTime.toStringLong() << '\n';
+                        log() << " halting replication" << endl;
+                        replInfo = replAllDead = "sync error last >= nextOpTime";
+                        uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
+                    }
+                    if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
+                        assert( justOne );
+                        oplogReader.putBack( op );
+                        _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
+                        dblock lk;
+                        if ( n > 0 ) {
+                            syncedTo = last;
+                            save();
+                        }
+                        log() << "repl:   applied " << n << " operations" << endl;
+                        log() << "repl:   syncedTo: " << syncedTo.toStringLong() << endl;
+                        log() << "waiting until: " << _sleepAdviceTime << " to continue" << endl;
+                        break;
+                    }
+
+                    sync_pullOpLog_applyOperation(op, &localLogTail, !justOne);
+                    n++;
+
+                    if( --b == 0 )
+                        break;
+                    // if to here, we are doing mulpile applications in a singel write lock acquisition
+                    if( !oplogReader.moreInCurrentBatch() ) {
+                        // break if no more in batch so we release lock while reading from the master
+                        break;
+                    }
+                    op = oplogReader.next();
+                }
             }
         }
 

@@ -66,6 +66,8 @@ namespace mongo {
         }
     } cmdBuildInfo;
 
+    extern unsigned replApplyBatchSize;
+
     class CmdGet : public Command {
     public:
         CmdGet() : Command( "getParameter" ) { }
@@ -83,7 +85,7 @@ namespace mongo {
             help << "{ getParameter:'*' } to get everything\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            bool all = cmdObj.firstElement().valuestrsafe();
+            bool all = *cmdObj.firstElement().valuestrsafe() == '*';
             
             int before = result.len();
             
@@ -99,7 +101,9 @@ namespace mongo {
             if( all || cmdObj.hasElement("syncdelay") ) {
                 result.append("syncdelay", cmdLine.syncdelay);
             }
-            
+            if( all || cmdObj.hasElement("replApplyBatchSize") ) {
+                result.append("replApplyBatchSize", replApplyBatchSize);
+            }           
 
             if ( before == result.len() ) {
                 errmsg = "no option found to get";
@@ -124,27 +128,45 @@ namespace mongo {
             help << "  quiet\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            
+            int s = 0;
             if( cmdObj.hasElement("notablescan") ) {
                 result.append("was", cmdLine.noTableScan);
                 cmdLine.noTableScan = cmdObj["notablescan"].Bool();
+                s++;
             }
-            else if( cmdObj.hasElement("quiet") ) {
+            if( cmdObj.hasElement("quiet") ) {
                 result.append("was", cmdLine.quiet );
                 cmdLine.quiet = cmdObj["quiet"].Bool();
+                s++;
             }
-            else if( cmdObj.hasElement("syncdelay") ) {
+            if( cmdObj.hasElement("syncdelay") ) {
                 result.append("was", cmdLine.syncdelay );
                 cmdLine.syncdelay = cmdObj["syncdelay"].Number();
+                s++;
             }
-            else if( cmdObj.hasElement( "logLevel" ) ) {
+            if( cmdObj.hasElement( "logLevel" ) ) {
                 result.append("was", logLevel );
                 logLevel = cmdObj["logLevel"].numberInt();
+                s++;
             }
-            else {
+            if( cmdObj.hasElement( "replApplyBatchSize" ) ) {
+                result.append("was", replApplyBatchSize );
+                int b = cmdObj["replApplyBatchSize"].numberInt();
+                if( b < 1 || b > 1024 ) { 
+                    errmsg = "bad value";
+                    return false;
+                }
+                assert( replSettings.slavedelay == 0 || b == 1 );
+                assert( replSettings.slave );
+                replApplyBatchSize = b;
+                s++;
+            }
+
+            if( s == 0 ) {
                 errmsg = "no option found to set";
                 return false;
             }
+
             return true;
         }
     } cmdSet;
