@@ -194,7 +194,7 @@ namespace mongo {
         void help(stringstream& h) const { h << "return build level feature settings"; }
         virtual bool slaveOk() const { return true; }
         virtual bool readOnly(){ return true; }
-        virtual LockType locktype() const { return READ; } 
+        virtual LockType locktype() const { return NONE; }
         virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             if ( globalScriptEngine ){
                 BSONObjBuilder bb( result.subobjStart( "js" ) );
