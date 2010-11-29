@@ -159,7 +159,8 @@ namespace mongo {
                     errmsg = "bad value";
                     return false;
                 }
-                assert( replSettings.slavedelay == 0 || b == 1 );
+                // todo: should getParameters be not in dbcommands_generic?
+                assert( /*replSettings.slavedelay == 0 || */ b == 1 );
                 assert( replSettings.slave );
                 replApplyBatchSize = b;
                 s++;
