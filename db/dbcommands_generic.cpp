@@ -69,7 +69,7 @@ namespace mongo {
     /** experimental. either remove or add support in repl sets also.  in a repl set, getting this setting from the 
         repl set config could make sense. 
         */
-    extern unsigned replApplyBatchSize;
+    unsigned replApplyBatchSize = 1;
 
     class CmdGet : public Command {
     public:

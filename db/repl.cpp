@@ -1125,7 +1125,7 @@ namespace mongo {
         return true;
     }
     
-    unsigned replApplyBatchSize = 1;
+    extern unsigned replApplyBatchSize;
 
     /* slave: pull some data from the master's oplog
        note: not yet in db mutex at this point. 
