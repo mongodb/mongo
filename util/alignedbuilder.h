@@ -18,6 +18,10 @@
 
 #pragma once
 
+#if defined(__sunos__)
+#include <sys/mman.h>
+#endif
+
 namespace mongo { 
 
     /** a page-aligned BufBuilder. */
