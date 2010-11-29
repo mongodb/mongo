@@ -258,7 +258,7 @@ namespace mongo {
     }
         
     Local< v8::Function > V8Scope::__createFunction( const char * raw ){
-        for(; isspace( *raw ); ++raw ); // skip whitespace
+        raw = jsSkipWhiteSpace( raw );
         string code = raw;
         if ( !hasFunctionIdentifier( code ) ) {
             if ( code.find( "\n" ) == string::npos && 

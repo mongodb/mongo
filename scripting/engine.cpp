@@ -457,5 +457,20 @@ namespace mongo {
             ( x == 0 || ! isalpha( code[x-1] ) ) &&
             ! isalpha( code[x+6] );
     }
+
+    const char * jsSkipWhiteSpace( const char * raw ){
+        while ( raw[0] ){
+            while (isspace(*raw)) {
+                raw++;
+            }
+            
+            if ( raw[0] != '/' || raw[1] != '/' )
+                break;
+            
+            while ( raw[0] && raw[0] != '\n' )
+                raw++;
+        }
+        return raw;
+    }
 }
     

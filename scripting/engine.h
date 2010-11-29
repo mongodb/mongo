@@ -234,5 +234,7 @@ namespace mongo {
 
     bool hasJSReturn( const string& s );
 
+    const char * jsSkipWhiteSpace( const char * raw );
+
     extern ScriptEngine * globalScriptEngine;
 }
