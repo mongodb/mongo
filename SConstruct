@@ -773,7 +773,7 @@ if nix:
     if GetOption( "distcc" ) is not None:
         env["CXX"] = "distcc " + env["CXX"]
         
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
+    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch -Wconversion" )
     if linux:
         env.Append( CPPFLAGS=" -Werror " )
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
