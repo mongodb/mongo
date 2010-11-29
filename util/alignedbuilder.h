@@ -18,9 +18,9 @@
 
 #pragma once
 
-#if defined(__sunos__)
-#include <sys/mman.h>
-#endif
+//#if defined(__sunos__)
+//#include <sys/mman.h>
+//#endif
 
 namespace mongo { 
 
@@ -122,7 +122,10 @@ namespace mongo {
         static void* _malloc(unsigned sz) { 
 #if defined(_WIN32)
             void *p = VirtualAlloc(0, sz, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-#elif defined(_POSIX_VERSION)
+// in theory _POSIX_VERSION should work, but it doesn't on OS X 10.4, and needs to be testeed on solaris.
+// so for now, linux only for this.
+//#elif defined(_POSIX_VERSION)
+#elif defined(__linux__)
             void *p = 0;
             int res = posix_memalign(&p, Alignment, sz);
             massert(13524, "out of memory AlignedBuilder", res == 0);
