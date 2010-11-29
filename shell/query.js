@@ -240,24 +240,35 @@ DBQuery.prototype.explain = function (verbose) {
     n._query.$explain = true;
     n._limit = Math.abs(n._limit) * -1;
     var e = n.next();
-    if (!verbose) {
-        delete e.allPlans;
-        delete e.oldPlan;
-        if (e.shards){
-            for (var key in e.shards){
-                var s = e.shards[key];
-                if(s.length === undefined){
-                    delete s.allPlans;
-                    delete s.oldPlan;
-                } else {
-                    for (var i=0; i < s.length; i++){
-                        delete s[i].allPlans;
-                        delete s[i].oldPlan;
-                    }
-                }
+
+    function cleanup(obj){
+        if (typeof(obj) != 'object'){
+            return;
+        }
+
+        delete obj.allPlans;
+        delete obj.oldPlan;
+
+        if (typeof(obj.length) == 'number'){
+            for (i=0; i < obj.length; i++){
+                cleanup(obj[i]);
             }
         }
+
+        if (obj.shards){
+            for (var key in obj.shards){
+                cleanup(obj.shards[key]);
+            }
+        }
+
+        if (obj.clauses){
+            cleanup(obj.clauses);
+        }
     }
+
+    if (!verbose)
+        cleanup(e);
+
     return e;
 }
 
