@@ -53,6 +53,7 @@ namespace mongo {
                 _combined = 0;
             }
             else {
+                _combined = 0;
                 log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
                 assert(0);
             }
