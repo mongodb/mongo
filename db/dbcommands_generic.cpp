@@ -167,7 +167,7 @@ namespace mongo {
             }
 
             if( s == 0 ) {
-                errmsg = "no option found to set";
+                errmsg = "no option found to set, use '*' to get all ";
                 return false;
             }
 
