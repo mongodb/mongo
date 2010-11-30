@@ -12,9 +12,11 @@ DB.prototype.getMongo = function(){
     return this._mongo;
 }
 
-DB.prototype.getSisterDB = function( name ){
+DB.prototype.getSiblingDB = function( name ){
     return this.getMongo().getDB( name );
 }
+
+DB.prototype.getSisterDB = DB.prototype.getSiblingDB;
 
 DB.prototype.getName = function(){
     return this._name;
@@ -49,7 +51,7 @@ DB.prototype._dbCommand = DB.prototype.runCommand;
 DB.prototype.adminCommand = function( obj ){
     if ( this._name == "admin" )
         return this.runCommand( obj );
-    return this.getSisterDB( "admin" ).runCommand( obj );
+    return this.getSiblingDB( "admin" ).runCommand( obj );
 }
 
 DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
@@ -289,7 +291,7 @@ DB.prototype.help = function() {
     print("\tdb.getProfilingLevel() - deprecated");
     print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold ");
     print("\tdb.getReplicationInfo()");
-    print("\tdb.getSisterDB(name) get the db at the same server as this one");
+    print("\tdb.getSiblingDB(name) get the db at the same server as this one");
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
@@ -591,7 +593,7 @@ DB.tsToSeconds = function(x){
   *                          of date than that, it can't recover without a complete resync
 */
 DB.prototype.getReplicationInfo = function() { 
-    var db = this.getSisterDB("local");
+    var db = this.getSiblingDB("local");
 
     var result = { };
     var oplog;
@@ -698,7 +700,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
         }
     };
     
-    var L = this.getSisterDB("local");
+    var L = this.getSiblingDB("local");
     if( L.sources.count() != 0 ) { 
         L.sources.find().forEach(g);
     }
@@ -754,7 +756,7 @@ DB.prototype.listCommands = function(){
 }
 
 DB.prototype.printShardingStatus = function(){
-    printShardingStatus( this.getSisterDB( "config" ) );
+    printShardingStatus( this.getSiblingDB( "config" ) );
 }
 
 DB.autocomplete = function(obj){

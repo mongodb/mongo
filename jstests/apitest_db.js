@@ -70,3 +70,8 @@ assert( asserted, "should have asserted" );
 
 dd( "g" );
 
+
+
+assert.eq( "foo" , db.getSisterDB( "foo" ).getName() )
+assert.eq( "foo" , db.getSiblingDB( "foo" ).getName() )
+
