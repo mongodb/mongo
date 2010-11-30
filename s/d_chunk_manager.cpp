@@ -52,7 +52,8 @@ namespace mongo {
         // query for all the chunks for 'ns' that live in this shard, sorting so we can efficiently bucket them
         BSONObj q = BSON( "ns" << ns << "shard" << shardName );
         auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
-        _fillChunkState( cursor.get() );
+        _fillChunks( cursor.get() );
+        _fillRanges();
 
         if ( scoped.get() )
             scoped->done();
@@ -65,14 +66,15 @@ namespace mongo {
         _fillCollectionKey( collectionDoc );
 
         scoped_ptr<DBClientMockCursor> c ( new DBClientMockCursor( chunksArr ) );
-        _fillChunkState( c.get() );
+        _fillChunks( c.get() );
+        _fillRanges();
     }
 
     void ShardChunkManager::_fillCollectionKey( const BSONObj& collectionDoc ) {
         BSONElement e = collectionDoc["key"];
         uassert( 13542 , str::stream() << "collection doesn't have a key: " << collectionDoc , ! e.eoo() && e.isABSONObj() );
-        BSONObj keys = e.Obj().getOwned();
 
+        BSONObj keys = e.Obj().getOwned();
         BSONObjBuilder b;
         BSONForEach( key , keys ) {
             b.append( key.fieldName() , 1 );
@@ -80,46 +82,54 @@ namespace mongo {
         _key = b.obj();
     }        
 
-    void ShardChunkManager::_fillChunkState( DBClientCursorInterface* cursor ) {
+    void ShardChunkManager::_fillChunks( DBClientCursorInterface* cursor ) {
         assert( cursor );
-        if ( ! cursor->more() )
-            return;
 
-        // load the tablet information, coallesceing the ranges
-        // the version for this shard would be the highest version for any of the chunks
         ShardChunkVersion version;
-        BSONObj min,max;
         while ( cursor->more() ){
             BSONObj d = cursor->next();
-
             _chunksMap.insert( make_pair( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() ) );
 
             ShardChunkVersion currVersion( d["lastmod"] );
             if ( currVersion > version ) {
                 version = currVersion;
             }
-            
+        }
+        _version = version;
+    }
+
+    void ShardChunkManager::_fillRanges() {
+        if ( _chunksMap.empty() )
+            return;
+
+        // load the chunk information, coallesceing their ranges
+        // the version for this shard would be the highest version for any of the chunks
+        RangeMap::const_iterator it = _chunksMap.begin();
+        BSONObj min,max;
+        while ( it != _chunksMap.end() ){
+            BSONObj currMin = it->first;
+            BSONObj currMax = it->second;
+            ++it;
+
             // coallesce the chunk's bounds in ranges if they are adjacent chunks 
             if ( min.isEmpty() ){
-                min = d["min"].Obj().getOwned();
-                max = d["max"].Obj().getOwned();
+                min = currMin;
+                max = currMax;
                 continue;
             }
-            if ( max == d["min"].Obj() ){
-                max = d["max"].Obj().getOwned();
+            if ( max == currMin ) {
+                max = currMax;
                 continue;
             }
 
-            _rangesMap.insert( make_pair( min.getOwned() , max.getOwned() ) );
+            _rangesMap.insert( make_pair( min , max ) );
 
-            min = d["min"].Obj().getOwned();
-            max = d["max"].Obj().getOwned();
+            min = currMin;
+            max = currMax;
         }
         assert( ! min.isEmpty() );
-
-        _rangesMap.insert( make_pair( min.getOwned() , max.getOwned() ) );
-
-        _version = version;
+        
+        _rangesMap.insert( make_pair( min , max ) );
     }
 
     bool ShardChunkManager::belongsToMe( const BSONObj& obj ) const {
@@ -133,15 +143,81 @@ namespace mongo {
             a--;
         
         bool good = x.woCompare( a->first ) >= 0 && x.woCompare( a->second ) < 0;
-#if 0
+
+        #if 0
         if ( ! good ){
-            log() << "bad: " << x << "\t" << a->first << "\t" << x.woCompare( a->first ) << "\t" << x.woCompare( a->second ) << endl;
+            log() << "bad: " << x << " " << a->first << " " << x.woCompare( a->first ) << " " << x.woCompare( a->second ) << endl;
             for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ){
                 log() << "\t" << i->first << "\t" << i->second << "\t" << endl;
             }
         }
-#endif
+        #endif
+
         return good;
     }
+
+    ShardChunkManager* ShardChunkManager::cloneMinus( const BSONObj& min, const BSONObj& max, const ShardChunkVersion& version ) {
+
+        // can't move version backwards when subtracting chunks
+        uassert( 13585 , str::stream() << "version " << version << "not greater than " << _version , version > _version ); 
+
+        // check that we have the exact chunk that'll be subtracted
+        RangeMap::const_iterator it = _chunksMap.find( min );
+        if ( it == _chunksMap.end() ) {
+            uasserted( 13586 , str::stream() << "couldn't find chunk " << min << "->" << max );
+        }
+
+        if ( it->second.woCompare( max ) != 0 ) {
+            ostringstream os;
+            os << "ranges differ, "
+               << "requested: "  << min << " -> " << max << " " 
+               << "existing: " << (it == _chunksMap.end()) ? "<empty>" : it->first.toString() + " -> " + it->second.toString();
+            uasserted( 13587 , os.str() );
+        }
+
+        auto_ptr<ShardChunkManager> p( new ShardChunkManager );
+
+        p->_key = this->_key;
+        p->_chunksMap = this->_chunksMap;
+        p->_chunksMap.erase( min );
+        p->_version = version;
+        p->_fillRanges();
+
+        // TODO handle empty state, as in when the last chunk was cloned out
+
+        return p.release();
+    }
+ 
+    static bool overlap( const BSONObj& l1 , const BSONObj& h1 , const BSONObj& l2 , const BSONObj& h2 ) {
+        return ! ( ( h1.woCompare( l2 ) <= 0 ) || ( h2.woCompare( l1 ) <= 0 ) );
+    }
     
+    ShardChunkManager* ShardChunkManager::clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ) {
+
+        // TODO handle empty state, as in when the first chunk is cloned in
+
+        // check that there isn't any chunk on the interval to be added
+        RangeMap::const_iterator it = _chunksMap.lower_bound( max );
+        if ( it != _chunksMap.begin() ) {
+            --it;
+        }
+        if ( overlap( min , max , it->first , it->second ) ) {
+            ostringstream os;
+            os << "ranges overlap, "
+               << "requested: " << min << " -> " << max << " " 
+               << "existing: " << it->first.toString() + " -> " + it->second.toString();
+            uasserted( 13588 , os.str() );
+        }
+        
+        auto_ptr<ShardChunkManager> p( new ShardChunkManager );
+
+        p->_key = this->_key;
+        p->_chunksMap = this->_chunksMap;
+        p->_chunksMap.insert( make_pair( min.getOwned() , max.getOwned() ) );
+        p->_version = version;
+        p->_fillRanges();
+
+        return p.release();
+    }
+
 }  // namespace mongo
