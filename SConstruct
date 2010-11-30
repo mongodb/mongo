@@ -27,254 +27,90 @@ from buildscripts import utils
 buildscripts.bb.checkOk()
 
 # --- options ----
-AddOption('--prefix',
-          dest='prefix',
-          type='string',
-          nargs=1,
-          action='store',
-          metavar='DIR',
-          help='installation prefix')
 
-AddOption('--distname',
-          dest='distname',
-          type='string',
-          nargs=1,
-          action='store',
-          metavar='DIR',
-          help='dist name (0.8.0)')
+def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
 
-AddOption('--distmod',
-          dest='distmod',
-          type='string',
-          nargs=1,
-          action='store',
-          metavar='DIR',
-          help='additional piece for full dist name')
+    if dest is None:
+        dest = name
 
-AddOption( "--64",
-           dest="force64",
-           type="string",
-           nargs=0,
-           action="store",
-           help="whether to force 64 bit" )
+    AddOption( "--" + name , 
+               dest=dest,
+               type="string",
+               nargs=nargs,
+               action="store",
+               help=help )
+
+def get_option( name ):
+    return GetOption( name )
+
+def has_option( name ):
+    x = get_option( name )
+    if x is None:
+        return False
+    return x
 
 
-AddOption( "--32",
-           dest="force32",
-           type="string",
-           nargs=0,
-           action="store",
-           help="whether to force 32 bit" )
+# installation/packaging
+add_option( "prefix" , "installation prefix" , 1 , False )
+add_option( "distname" , "dist name (0.8.0)" , 1 , False )
+add_option( "distmod", "additional piece for full dist name" , 1 , False )
+add_option( "nostrip", "do not strip installed binaries" , 0 , False )
+
+add_option( "sharedclient", "build a libmongoclient.so/.dll" , 0 , False )
+add_option( "full", "include client and headers when doing scons install", 0 , False )
+
+# base compile flags
+add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
+add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
+
+add_option( "cxx", "compiler to use" , 1 , True )
+
+add_option( "cpppath", "Include path if you have headers in a nonstandard directory" , 1 , True )
+add_option( "libpath", "Library path if you have libraries in a nonstandard directory" , 1 , True )
+
+add_option( "extrapath", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" , 1 , True )
+add_option( "extrapathdyn", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" , 1 , True )
+add_option( "extralib", "comma separated list of libraries  (--extralib js_static,readline" , 1 , True )
+add_option( "staticlib", "comma separated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." , 1 , True )
+add_option( "staticlibpath", "comma separated list of dirs to search for staticlib arguments" , 1 , True )
+
+add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
+add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
+
+# linking options
+add_option( "release" , "release build" , 0 , True )
+add_option( "static" , "fully static build" , 0 , True )
+
+# experimental features
+add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
+add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
+add_option( "durable", "durability build" , 0 , True )
+
+# library choices
+add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
+add_option( "usev8" , "use v8 for javascript" , 0 , True )
+
+# mongo feature options
+add_option( "noshell", "don't build shell" , 0 , True )
+add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
+
+# dev tools
+add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
+add_option( "dd", "debug build no optimization, additional debug logging, etc..." , 0 , False , "debugBuildAndLogging" )
 
 
-AddOption( "--mm",
-           dest="mm",
-           type="string",
-           nargs=0,
-           action="store",
-           help="use main memory instead of memory mapped files" )
+add_option( "pch" , "use precompiled headers to speed up the build (experimental)" , 0 , True , "usePCH" )
+add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
 
+# debugging/profiling help
 
-AddOption( "--release",
-           dest="release",
-           type="string",
-           nargs=0,
-           action="store",
-           help="relase build")
-
-
-AddOption( "--static",
-           dest="static",
-           type="string",
-           nargs=0,
-           action="store",
-           help="fully static build")
-
-
-AddOption('--usesm',
-          dest='usesm',
-          type="string",
-          nargs=0,
-          action="store",
-          help="use spider monkey for javascript" )
-
-AddOption('--usev8',
-          dest='usev8',
-          type="string",
-          nargs=0,
-          action="store",
-          help="use v8 for javascript" )
-
-AddOption('--asio',
-          dest='asio',
-          type="string",
-          nargs=0,
-          action="store",
-          help="Use Asynchronous IO (NOT READY YET)" )
-
-AddOption( "--d",
-           dest="debugBuild",
-           type="string",
-           nargs=0,
-           action="store",
-           help="debug build no optimization, etc..." )
-
-AddOption( "--dd",
-           dest="debugBuildAndLogging",
-           type="string",
-           nargs=0,
-           action="store",
-           help="debug build no optimization, additional debug logging, etc..." )
-
-AddOption( "--durable",
-           dest="durable",
-           type="string",
-           nargs=0,
-           action="store",
-           help="durability build" )
-
-AddOption( "--noshell",
-           dest="noshell",
-           type="string",
-           nargs=0,
-           action="store",
-           help="don't build shell" )
-
-AddOption( "--safeshell",
-           dest="safeshell",
-           type="string",
-           nargs=0,
-           action="store",
-           help="don't let shell scripts run programs (still, don't run untrusted scripts)" )
-
-AddOption( "--extrapath",
-           dest="extrapath",
-           type="string",
-           nargs=1,
-           action="store",
-           help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
-
-AddOption( "--extrapathdyn",
-           dest="extrapathdyn",
-           type="string",
-           nargs=1,
-           action="store",
-           help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" )
-
-
-AddOption( "--extralib",
-           dest="extralib",
-           type="string",
-           nargs=1,
-           action="store",
-           help="comma separated list of libraries  (--extralib js_static,readline" )
-
-AddOption( "--staticlib",
-           dest="staticlib",
-           type="string",
-           nargs=1,
-           action="store",
-           help="comma separated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." )
-
-AddOption( "--staticlibpath",
-           dest="staticlibpath",
-           type="string",
-           nargs=1,
-           action="store",
-           help="comma separated list of dirs to search for staticlib arguments" )
-
-AddOption( "--cxx",
-           dest="cxx",
-           type="string",
-           nargs=1,
-           action="store",
-           help="compiler to use" )
-
-
-AddOption( "--boost-compiler",
-           dest="boostCompiler",
-           type="string",
-           nargs=1,
-           action="store",
-           help="compiler used for boost (gcc41)" )
-
-AddOption( "--boost-version",
-           dest="boostVersion",
-           type="string",
-           nargs=1,
-           action="store",
-           help="boost version for linking(1_38)" )
-
-AddOption( "--cpppath",
-           dest="cpppath",
-           type="string",
-           nargs=1,
-           action="store",
-           help="Include path if you have headers in a nonstandard directory" )
-
-AddOption( "--libpath",
-           dest="libpath",
-           type="string",
-           nargs=1,
-           action="store",
-           help="Library path if you have libraries in a nonstandard directory" )
-
-# 
 # to use CPUPROFILE=/tmp/profile
 # to view pprof -gv mongod /tmp/profile
-#
-AddOption( "--pg",
-           dest="profile",
-           type="string",
-           nargs=0,
-           action="store" )
+add_option( "pg", "link against profiler" , 0 , False , "profile" )
+add_option( "gdbserver" , "build in gdb server support" , 0 , True )
+add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 
-AddOption( "--gdbserver",
-           dest="gdbserver",
-           type="string",
-           nargs=0,
-           action="store" )
-
-AddOption("--nostrip",
-          dest="nostrip",
-          action="store_true",
-          help="do not strip installed binaries")
-
-AddOption("--sharedclient",
-          dest="sharedclient",
-          action="store_true",
-          help="build a libmongoclient.so/.dll")
-
-AddOption("--full",
-          dest="full",
-          action="store_true",
-          help="include client and headers when doing scons install")
-
-AddOption("--smokedbprefix",
-          dest="smokedbprefix",
-          action="store",
-          help="prefix to dbpath et al. for smoke tests")
-
-AddOption( "--pch",
-           dest="usePCH",
-           type="string",
-           nargs=0,
-           action="store",
-           help="use precompiled headers to speed up the build (experimental)" )
-
-AddOption( "--heapcheck",
-           dest="heapcheck",
-           type="string",
-           nargs=0,
-           action="store",
-           help="link to heap-checking malloc-lib and look for memory leaks during tests")
-
-AddOption( "--distcc",
-           dest="distcc",
-           type="string",
-           nargs=0,
-           action="store",
-           help="use distcc for distributed builds")
+add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
 
 
 # --- environment setup ---
@@ -301,7 +137,7 @@ windows = False
 freebsd = False
 openbsd = False
 solaris = False
-force64 = not GetOption( "force64" ) is None
+force64 = has_option( "force64" )
 if not force64 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
@@ -309,43 +145,43 @@ msarch = None
 if force64:
     msarch = "amd64"
 
-force32 = not GetOption( "force32" ) is None
-release = not GetOption( "release" ) is None
-static = not GetOption( "static" ) is None
+force32 = has_option( "force32" ) 
+release = has_option( "release" )
+static = has_option( "static" )
 
-debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
-debugLogging = not GetOption( "debugBuildAndLogging" ) is None
-noshell = not GetOption( "noshell" ) is None
+debugBuild = has_option( "debugBuild" ) or has_option( "debugBuildAndLogging" ) 
+debugLogging = has_option( "debugBuildAndLogging" )
+noshell = has_option( "noshell" ) 
 
-usesm = not GetOption( "usesm" ) is None
-usev8 = not GetOption( "usev8" ) is None
+usesm = has_option( "usesm" )
+usev8 = has_option( "usev8" ) 
 
-asio = not GetOption( "asio" ) is None
+asio = has_option( "asio" )
 
-usePCH = not GetOption( "usePCH" ) is None
+usePCH = has_option( "usePCH" )
 
 justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
 
 env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
-if GetOption( "cxx" ) is not None:
-    env["CC"] = GetOption( "cxx" )
-    env["CXX"] = GetOption( "cxx" )
+if has_option( "cxx" ):
+    env["CC"] = get_option( "cxx" )
+    env["CXX"] = get_option( "cxx" )
 env["LIBPATH"] = []
 
-if GetOption( "libpath" ) is not None:
-    env["LIBPATH"] = [GetOption( "libpath" )]
+if has_option( "libpath" ):
+    env["LIBPATH"] = [get_option( "libpath" )]
 
-if GetOption( "cpppath" ) is not None:
-    env["CPPPATH"] = [GetOption( "cpppath" )]
+if has_option( "cpppath" ):
+    env["CPPPATH"] = [get_option( "cpppath" )]
 
-if GetOption( "durable" ) != None:
+if has_option( "durable" ):
     env.Append( CPPDEFINES=[ "_DURABLE" ] )
 
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
 env.Append( CPPPATH=[ "." ] )
 
 
-if GetOption( "safeshell" ) != None:
+if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
 
 boostCompiler = GetOption( "boostCompiler" )
@@ -374,14 +210,14 @@ def addExtraLibs( s ):
         env.Append( LIBPATH=[ x + "/lib64" ] )
         extraLibPlaces.append( x + "/lib" )
 
-if GetOption( "extrapath" ) is not None:
+if has_option( "extrapath" ):
     addExtraLibs( GetOption( "extrapath" ) )
-    release = True
+    release = True # this is so we force using .a
 
-if GetOption( "extrapathdyn" ) is not None:
+if has_option( "extrapathdyn" ):
     addExtraLibs( GetOption( "extrapathdyn" ) )
 
-if GetOption( "extralib" ) is not None:
+if has_option( "extralib" ):
     for x in GetOption( "extralib" ).split( "," ):
         env.Append( LIBS=[ x ] )
 
@@ -417,7 +253,7 @@ installSetup = InstallSetup()
 if distBuild:
     installSetup.bannerDir = "distsrc"
 
-if GetOption( "full" ):
+if has_option( "full" ):
     installSetup.headers = True
     installSetup.libraries = True
 
@@ -435,7 +271,7 @@ commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcu
 
 #mmap stuff
 
-if GetOption( "mm" ) != None:
+if has_option( "mm" ):
     commonFiles += [ "util/mmap_mm.cpp" ]
 elif os.sys.platform == "win32":
     commonFiles += [ "util/mmap_win.cpp" ]
@@ -453,7 +289,7 @@ coreServerFiles = [ "util/message_server_port.cpp" ,
                     "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
                     "db/matcher.cpp" , "db/indexkey.cpp" , "db/dbcommands_generic.cpp" ]
 
-if GetOption( "asio" ) != None:
+if has_option( "asio" ):
     coreServerFiles += [ "util/message_server_asio.cpp" ]
 
 serverOnlyFiles = Split( "util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_recover.cpp db/dur_journal.cpp db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp db/queryoptimizer.cpp db/extsort.cpp db/cmdline.cpp" )
@@ -524,7 +360,7 @@ if distBuild:
 def isDriverBuild():
     return GetOption( "prefix" ) and GetOption( "prefix" ).find( "mongo-cxx-driver" ) >= 0
 
-if GetOption( "prefix" ):
+if has_option( "prefix" ):
     installDir = GetOption( "prefix" )
     if isDriverBuild():
         installSetup.justClient()
@@ -770,7 +606,7 @@ else:
 
 if nix:
 
-    if GetOption( "distcc" ) is not None:
+    if has_option( "distcc" ):
         env["CXX"] = "distcc " + env["CXX"]
         
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
@@ -785,7 +621,7 @@ if nix:
     env['ENV']['HOME'] = os.environ['HOME']
     env['ENV']['TERM'] = os.environ['TERM']
 
-    if linux and GetOption( "sharedclient" ):
+    if linux and has_option( "sharedclient" ):
         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
     if debugBuild:
@@ -812,10 +648,10 @@ if nix:
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
-    if GetOption( "profile" ) is not None:
+    if has_option( "profile" ):
         env.Append( LIBS=[ "profiler" ] )
 
-    if GetOption( "gdbserver" ) is not None:
+    if has_option( "gdbserver" ):
         env.Append( CPPDEFINES=["USE_GDBSERVER"] )
 
     # pre-compiled headers
@@ -1057,14 +893,14 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
     # Handle staticlib,staticlibpath options.
     staticlibfiles = []
-    if GetOption( "staticlib" ) is not None:
+    if has_option( "staticlib" ):
         # FIXME: probably this loop ought to do something clever
         # depending on whether we want to use 32bit or 64bit
         # libraries.  For now, we sort of rely on the user supplying a
         # sensible staticlibpath option. (myCheckLib implements an
         # analogous search, but it also does other things I don't
         # understand, so I'm not using it.)
-        if GetOption ( "staticlibpath" ) is not None:
+        if has_option ( "staticlibpath" ):
             dirs = GetOption ( "staticlibpath" ).split( "," )
         else:
             dirs = [ "/usr/lib64", "/usr/lib" ]
