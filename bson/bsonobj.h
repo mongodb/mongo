@@ -95,10 +95,15 @@ namespace mongo {
            A BSONObj can also point to BSON data in some other data structure it does not "own" or free later.
            For example, in a memory mapped file.  In this case, it is important the original data stays in 
            scope for as long as the BSONObj is in use.  If you think the original data may go out of scope, 
-           call BSONObj::getOwned() to promote your BSONObj to having its own copy.  If you are not sure about 
-           ownership but need the buffer to last as long as the BSONObj, call getOwned().  getOwned() is a 
-           no-op if the buffer is already owned.  If not already owned, a malloc and memcpy will result.
+           call BSONObj::getOwned() to promote your BSONObj to having its own copy.  
+
+           On a BSONObj assignment, if the source is unowned, both the source and dest will have unowned 
+           pointers to the original buffer after the assignment.
            
+           If you are not sure about ownership but need the buffer to last as long as the BSONObj, call 
+           getOwned().  getOwned() is a no-op if the buffer is already owned.  If not already owned, a malloc 
+           and memcpy will result.
+
            Most ways to create BSONObj's create 'owned' variants.  Unowned versions can be created with:
            (1) specifying true for the ifree parameter in the constructor
            (2) calling BSONObjBuilder::done().  Use BSONObjBuilder::obj() to get an owned copy

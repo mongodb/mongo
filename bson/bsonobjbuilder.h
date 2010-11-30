@@ -85,6 +85,7 @@ namespace mongo {
             _b.skip(4); /*leave room for size field*/
         }
 
+        /* dm why do we have this/need this? not clear to me, comment please tx. */
         /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder */
         BSONObjBuilder( BufBuilder &baseBuilder ) : _b( baseBuilder ), _buf( 0 ), _offset( baseBuilder.len() ), _s( this ) , _tracker(0) , _doneCalled(false) {
             _b.skip( 4 );
