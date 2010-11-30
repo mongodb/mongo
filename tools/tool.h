@@ -121,6 +121,7 @@ namespace mongo {
     protected:
 
         mongo::DBClientBase * _conn;
+        mongo::DBClientBase * _slaveConn;
         bool _paired;
 
         boost::program_options::options_description * _options;

@@ -210,8 +210,8 @@ namespace mongo {
     /*virtual*/ void MongoMMF::close() {
 #if defined(_DURABLE)
         {
-            // we must first commit anything pending before unmapping views.
-            if( !testIntent ) { 
+            if( !testIntent && cmdLine.dur ) { 
+                // we must first commit anything pending before unmapping views.
                 dbMutex.assertAtLeastReadLocked();
                 dur::_go();
             }

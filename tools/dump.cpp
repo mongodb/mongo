@@ -32,6 +32,7 @@ public:
         add_options()
             ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
             ("query,q", po::value<string>() , "json query" )
+            ("oplog", "Use oplog for point-in-time snapshotting" )
             ;
     }
 
@@ -59,6 +60,10 @@ public:
         else
             q = _query;
 
+        int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
+        if (startsWith(coll.c_str(), "local.oplog."))
+            queryOptions |= QueryOption_OplogReplay;
+
         DBClientBase& connBase = conn(true);
         Writer writer(out, m);
 
@@ -66,10 +71,10 @@ public:
         if (typeid(connBase) == typeid(DBClientConnection&)){
             DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
             boost::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
-            conn.query( castedWriter, coll.c_str() , q , NULL, QueryOption_SlaveOk | QueryOption_NoCursorTimeout | QueryOption_Exhaust);
+            conn.query( castedWriter, coll.c_str() , q , NULL, queryOptions | QueryOption_Exhaust);
         } else {
             //This branch should only be taken with DBDirectClient which doesn't support exhaust mode
-            scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout ));
+            scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , 0 , 0 , 0 , queryOptions ));
             while ( cursor->more() ) {
                 writer(cursor->next());
             }
@@ -129,6 +134,40 @@ public:
                 _query = fromjson( q );
         }
 
+        string opLogName = "";
+        unsigned long long opLogStart = 0;
+        if (hasParam("oplog")) {
+            if (hasParam("query") || hasParam("db") || hasParam("collection")){
+                cout << "oplog mode is only supported on full dumps" << endl;
+                return -1;
+            }
+
+            
+            BSONObj isMaster;
+            conn("true").simpleCommand("admin", &isMaster, "isMaster");
+
+            if (isMaster.hasField("hosts")) { // if connected to replica set member
+                opLogName = "local.oplog.rs";
+            } else {
+                opLogName = "local.oplog.$main";
+                if ( ! isMaster["ismaster"].trueValue() ){
+                    cout << "oplog mode is only supported on master or replica set member" << endl;
+                    return -1;
+                }
+            }
+
+            BSONObj op = conn(true).findOne(opLogName, Query().sort("$natural", -1), 0, QueryOption_SlaveOk);
+            if (op.isEmpty()) {
+                cout << "No operations in oplog. Please ensure you are connecting to a master." << endl;
+                return -1;
+            }
+            
+            assert(op["ts"].type() == Timestamp);
+            opLogStart = op["ts"]._numberLong();
+        }
+
+            
+
         // check if we're outputting to stdout
         string out = getParam("out");
         if ( out == "-" ) {
@@ -169,6 +208,16 @@ public:
             auth( db );
             go( db , root / db );
         }
+
+        if (!opLogName.empty()){
+            BSONObjBuilder b;
+            b.appendTimestamp("$gt", opLogStart);
+
+            _query = BSON("ts" << b.obj());
+
+            writeCollectionFile( opLogName , root / "oplog.bson" );
+        }
+
         return 0;
     }
 

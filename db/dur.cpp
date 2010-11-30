@@ -148,6 +148,7 @@ namespace mongo {
             caller handles locking 
             */
         static void PREPLOGBUFFER() { 
+            assert( cmdLine.dur );
             AlignedBuilder& bb = cj._ab;
             bb.reset();
 

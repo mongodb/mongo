@@ -545,6 +545,9 @@ namespace mongo {
     }
     
     class ExplainBuilder {
+        // Note: by default we filter out allPlans and oldPlan in the shell's
+        // explain() function. If you add any recursive structures, make sure to
+        // edit the JS to make sure everything gets filtered.
     public:
         ExplainBuilder() : _i() {}
         void ensureStartScan() {

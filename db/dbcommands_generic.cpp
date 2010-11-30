@@ -69,7 +69,7 @@ namespace mongo {
     /** experimental. either remove or add support in repl sets also.  in a repl set, getting this setting from the 
         repl set config could make sense. 
         */
-    extern unsigned replApplyBatchSize;
+    unsigned replApplyBatchSize = 1;
 
     class CmdGet : public Command {
     public:
@@ -159,8 +159,9 @@ namespace mongo {
                     errmsg = "bad value";
                     return false;
                 }
-                assert( replSettings.slavedelay == 0 || b == 1 );
-                assert( replSettings.slave );
+                // todo: should getParameters be not in dbcommands_generic?
+                assert( /*replSettings.slavedelay == 0 || */ b == 1 );
+                //assert( replSettings.slave );
                 replApplyBatchSize = b;
                 s++;
             }
@@ -193,7 +194,7 @@ namespace mongo {
         void help(stringstream& h) const { h << "return build level feature settings"; }
         virtual bool slaveOk() const { return true; }
         virtual bool readOnly(){ return true; }
-        virtual LockType locktype() const { return READ; } 
+        virtual LockType locktype() const { return NONE; }
         virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             if ( globalScriptEngine ){
                 BSONObjBuilder bb( result.subobjStart( "js" ) );

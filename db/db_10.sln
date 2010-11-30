@@ -10,7 +10,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59
 	ProjectSection(SolutionItems) = preProject
 		..\tools\export.cpp = ..\tools\export.cpp
 		..\tools\sniffer.cpp = ..\tools\sniffer.cpp
-		..\tools\tool.h = ..\tools\tool.h
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "unix files", "unix files", "{2F760952-C71B-4865-998F-AABAE96D1373}"

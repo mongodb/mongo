@@ -379,7 +379,6 @@
     <ClCompile Include="restapi.cpp">
       <Filter>db</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\grid.cpp" />
     <ClCompile Include="..\shell\mongo_vstudio.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -410,7 +409,6 @@
     <ClCompile Include="dur_journal.cpp">
       <Filter>db\storage engine</Filter>
     </ClCompile>
-    <ClCompile Include="projection.cpp" />
     <ClCompile Include="dur_recover.cpp">
       <Filter>db\storage engine</Filter>
     </ClCompile>
@@ -431,6 +429,15 @@
     </ClCompile>
     <ClCompile Include="durop.cpp">
       <Filter>db\storage engine</Filter>
+    </ClCompile>
+    <ClCompile Include="projection.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\grid.cpp">
+      <Filter>sharding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\alignedbuilder.cpp">
+      <Filter>util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -809,7 +816,6 @@
     <ClInclude Include="dur_journal.h">
       <Filter>db\storage engine</Filter>
     </ClInclude>
-    <ClInclude Include="projection.h" />
     <ClInclude Include="dur_commitjob.h">
       <Filter>db\storage engine</Filter>
     </ClInclude>
@@ -824,6 +830,9 @@
     </ClInclude>
     <ClInclude Include="durop.h">
       <Filter>db\storage engine</Filter>
+    </ClInclude>
+    <ClInclude Include="projection.h">
+      <Filter>db</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
