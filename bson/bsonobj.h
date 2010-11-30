@@ -71,19 +71,42 @@ namespace mongo {
         /** Construct a BSONObj from data in the proper format. 
             @param ifree true if the BSONObj should free() the msgdata when 
             it destructs. 
-            */
+        */        
         explicit BSONObj(const char *msgdata, bool ifree = false) {
             init(msgdata, ifree);
         }
+
         BSONObj(const Record *r);
+
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj();
+
         ~BSONObj() { /*defensive:*/ _objdata = 0; }
 
-        void appendSelfToBufBuilder(BufBuilder& b) const {
-            assert( objsize() );
-            b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
-        }
+        /**
+           A BSONObj can use a buffer it "owns" or one it does not.  If the BSONObj owns the buffer, it will free() 
+           it during ~BSONObj() destruction.
+
+           You can specify ownership with the ifree parameter in the constructor.
+
+           If you are not sure about ownership but need the buffer to last as long as the BSONObj, call getOwned().
+           getOwned() is a no-op if the buffer is already owned.  If not already owned, a malloc and memcpy will result.
+
+           On assignment of a BSONObj, the buffer pointer moves to the lvalue bsonobj, and is set to null on the rvalue.
+           This is a lot like auto_ptr semantics.  The owned state transfers too.
+
+           Why would it not be owned?  To avoid a memcpy.  For example if the source data exists in say, a memory mapped file,
+           we can reference it directly.
+
+           @return true if the buffer is owned by *this.
+        */
+        bool isOwned() const { return _holder.get() != 0; }
+
+        /* make sure the data buffer is under the control of this BSONObj and not a remote buffer */
+        BSONObj getOwned() const;
+
+        /** @return a new full (and owned) copy of the object. */
+        BSONObj copy() const;
 
         /** Readable representation of a BSON object in an extended JSON-style notation. 
             This is an abbreviated representation which might be used for logging.
@@ -198,9 +221,7 @@ namespace mongo {
         bool okForStorage() const;
 
 		/** @return true if object is empty -- i.e.,  {} */
-        bool isEmpty() const {
-            return objsize() <= 5;
-        }
+        bool isEmpty() const { return objsize() <= 5; }
 
         void dump() const;
 
@@ -257,14 +278,6 @@ namespace mongo {
             @return true if found
 		*/
 		bool getObjectID(BSONElement& e) const;
-
-        /** @return a new full copy of the object. */
-        BSONObj copy() const;
-
-        /* make sure the data buffer is under the control of this BSONObj and not a remote buffer */
-        BSONObj getOwned() const;
-
-        bool isOwned() const { return _holder.get() != 0; }
 
         /** @return A hash code for the object */
         int hash() const {
@@ -345,7 +358,19 @@ namespace mongo {
 
         friend class BSONObjIterator;
         typedef BSONObjIterator iterator;
+
+        /** use something like this:
+            for( BSONObj::iterator i = myObj.begin(); i.more(); ) { 
+                BSONElement e = i.next();
+                ...
+            }
+        */
         BSONObjIterator begin();
+
+        void appendSelfToBufBuilder(BufBuilder& b) const {
+            assert( objsize() );
+            b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
+        }
 
 private:
         class Holder {

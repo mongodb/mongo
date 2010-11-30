@@ -20,6 +20,7 @@
 #include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__
 
 namespace mongo {
+
     /** iterator for a BSONObj
 
        Note each BSONObj ends with an EOO element: so you will get more() on an empty
@@ -48,12 +49,11 @@ namespace mongo {
         }
         
         /** @return true if more elements exist to be enumerated. */
-        bool moreWithEOO() {
-            return _pos < _theend;
-        }
-        bool more(){
-            return _pos < _theend && _pos[0];
-        }
+        bool more() { return _pos < _theend && _pos[0]; }
+
+        /** @return true if more elements exist to be enumerated INCLUDING the EOO element which is always at the end. */
+        bool moreWithEOO() { return _pos < _theend; }
+
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd = false ) {
             assert( _pos < _theend );
