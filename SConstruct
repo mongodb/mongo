@@ -28,6 +28,8 @@ buildscripts.bb.checkOk()
 
 # --- options ----
 
+options = {}
+
 def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
 
     if dest is None:
@@ -40,6 +42,11 @@ def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
                action="store",
                help=help )
 
+    options[name] = { "help" : help ,
+                      "nargs" : nargs , 
+                      "contibutesToVariantDir" : contibutesToVariantDir ,
+                      "dest" : dest } 
+
 def get_option( name ):
     return GetOption( name )
 
@@ -47,7 +54,36 @@ def has_option( name ):
     x = get_option( name )
     if x is None:
         return False
-    return x
+
+    if x == False:
+        return False
+
+    return True
+
+def get_variant_dir():
+    
+    a = []
+    
+    for name in options:
+        o = options[name]
+        if not has_option( o["dest"] ):
+            continue
+        if not o["contibutesToVariantDir"]:
+            continue
+        
+        if o["nargs"] == 0:
+            a.append( name )
+        else:
+            a.append( name + "-" + get_option( name ) )
+
+    s = "build/"
+
+    if len(a) > 0:
+        a.sort()
+        s += "/".join( a ) + "/"
+        
+    return s
+        
 
 
 # installation/packaging
