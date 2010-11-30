@@ -202,6 +202,15 @@ namespace mongo {
                 
                 log() << "dist_lock forcefully taking over from: " << o << " elapsed minutes: " << elapsed << endl;
                 conn->update( _ns , _id , BSON( "$set" << BSON( "state" << 0 ) ) );
+                string err = conn->getLastError();
+                if ( ! err.empty() ){
+                    log( LL_WARNING ) << "dist_lock take over from: " << o << " failed: " << err << endl;
+                    *other = o;
+                    other->getOwned();
+                    conn.done();
+                    return false;
+                }
+
             }
             else if ( o["ts"].type() ){
                 queryBuilder.append( o["ts"] );
