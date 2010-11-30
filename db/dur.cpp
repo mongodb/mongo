@@ -244,6 +244,24 @@ namespace mongo {
                 char *dst = (char *) (intent.w_ptr);
                 memcpy(dst, intent.p, intent.len);
             }
+
+            // for testing only.  if this fails, a write intent declaration was wrong or missing.
+            const bool ValidateMapsMatch = false;
+            DEV if( ValidateMapsMatch ) {
+                set<MongoFile*>& files = MongoFile::getAllFiles();
+                for( set<MongoFile*>::iterator i = files.begin(); i != files.end(); i++ ) { 
+                    MongoFile *mf = *i;
+                    if( mf->isMongoMMF() ) { 
+                        MongoMMF *mmf = (MongoMMF*) mf;
+                        void *p = mmf->getView();
+                        void *w = mmf->view_write();
+                        if( memcmp(p, w, (size_t) mmf->length()) ) { 
+                            log() << mmf->filename() << endl;
+                            assert(false);
+                        }
+                    }
+                }
+            }
         }
 
         /** We need to remap the private views periodically. otherwise they would become very large.

@@ -47,7 +47,6 @@ namespace mongo {
            @return the private view.
                    on _DEBUG, returns the readonly view
         */
-        //MoveableBuffer getView();
         void* getView();
 
         /* switch to _view_write.  normally, this is a bad idea since your changes will not 
@@ -80,7 +79,10 @@ namespace mongo {
 
         void remapThePrivateView();
 
+        virtual bool isMongoMMF() { return true; }
+
     private:
+
         void *_view_write;
         void *_view_private;
         void *_view_readonly; // for _DEBUG build
