@@ -1044,9 +1044,14 @@ shellHelper = function( command , rest , shouldPrint ){
     return res;
 }
 
-shellHelper.use = function( dbname ){
-    db = db.getMongo().getDB( dbname );
-    print( "switched to db " + db.getName() );
+shellHelper.use = function (dbname) {
+    var s = "" + dbname;
+    if (s == "") {
+        print("bad use parameter");
+        return;
+    }
+    db = db.getMongo().getDB(dbname);
+    print("switched to db " + db.getName());
 }
 
 shellHelper.it = function(){
