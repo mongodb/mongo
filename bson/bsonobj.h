@@ -107,6 +107,7 @@ namespace mongo {
            Most ways to create BSONObj's create 'owned' variants.  Unowned versions can be created with:
            (1) specifying true for the ifree parameter in the constructor
            (2) calling BSONObjBuilder::done().  Use BSONObjBuilder::obj() to get an owned copy
+           (3) retrieving a subobject retrieves an unowned pointer into the parent BSON object
 
            @return true if this is in owned mode
         */
