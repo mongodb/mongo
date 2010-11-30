@@ -529,7 +529,7 @@ namespace mongo {
 			would like the BSONObj to last longer than the builder.
         */
         BSONObj done() {
-            return BSONObj(_done());
+            return BSONObj(_done(), /*ifree*/false);
         }
 
         // Like 'done' above, but does not construct a BSONObj to return to the caller.

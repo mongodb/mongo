@@ -84,21 +84,26 @@ namespace mongo {
         ~BSONObj() { /*defensive:*/ _objdata = 0; }
 
         /**
-           A BSONObj can use a buffer it "owns" or one it does not.  If the BSONObj owns the buffer, it will free() 
-           it during ~BSONObj() destruction.
+           A BSONObj can use a buffer it "owns" or one it does not.  
+           
+           OWNED CASE
+           If the BSONObj owns the buffer, the buffer can be shared among several BSONObj's (by assignment).  
+           it during ~BSONObj() destruction.  In this case the buffer is basically implemented as a shared_ptr.
+           Since BSONObj's are typically immutable, this works well.
 
-           You can specify ownership with the ifree parameter in the constructor.
+           UNOWNED CASE
+           A BSONObj can also point to BSON data in some other data structure it does not "own" or free later.
+           For example, in a memory mapped file.  In this case, it is important the original data stays in 
+           scope for as long as the BSONObj is in use.  If you think the original data may go out of scope, 
+           call BSONObj::getOwned() to promote your BSONObj to having its own copy.  If you are not sure about 
+           ownership but need the buffer to last as long as the BSONObj, call getOwned().  getOwned() is a 
+           no-op if the buffer is already owned.  If not already owned, a malloc and memcpy will result.
+           
+           Most ways to create BSONObj's create 'owned' variants.  Unowned versions can be created with:
+           (1) specifying true for the ifree parameter in the constructor
+           (2) calling BSONObjBuilder::done().  Use BSONObjBuilder::obj() to get an owned copy
 
-           If you are not sure about ownership but need the buffer to last as long as the BSONObj, call getOwned().
-           getOwned() is a no-op if the buffer is already owned.  If not already owned, a malloc and memcpy will result.
-
-           On assignment of a BSONObj, the buffer pointer moves to the lvalue bsonobj, and is set to null on the rvalue.
-           This is a lot like auto_ptr semantics.  The owned state transfers too.
-
-           Why would it not be owned?  To avoid a memcpy.  For example if the source data exists in say, a memory mapped file,
-           we can reference it directly.
-
-           @return true if the buffer is owned by *this.
+           @return true if this is in owned mode
         */
         bool isOwned() const { return _holder.get() != 0; }
 
