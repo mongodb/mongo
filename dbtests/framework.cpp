@@ -164,6 +164,7 @@ namespace mongo {
                 ("list,l", "list available test suites")
                 ("filter,f" , po::value<string>() , "string substring filter on test name" )
                 ("verbose,v", "verbose")
+                ("dur", "enable journaling")
                 ("seed", po::value<unsigned long long>(&seed), "random number seed")
                 ;
             
@@ -195,6 +196,10 @@ namespace mongo {
             if (params.count("help")) {
                 show_help_text(argv[0], shell_options);
                 return EXIT_CLEAN;
+            }
+
+            if( params.count("dur") ) { 
+                cmdLine.dur = true;
             }
 
             if (params.count("debug") || params.count("verbose") ) {

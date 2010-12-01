@@ -55,6 +55,8 @@ namespace mongo {
         static void unlockAll();
         static bool exists(boost::filesystem::path p) { return boost::filesystem::exists(p); }
 
+        virtual bool isMongoMMF() { return false; }
+
     protected:
         virtual void close() = 0;
         virtual void flush(bool sync) = 0;

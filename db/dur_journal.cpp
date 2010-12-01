@@ -167,6 +167,7 @@ namespace mongo {
         void journalMakeDir() {
             filesystem::path p = getJournalDir();
             j.dir = p.string();
+            DEV log() << "dev journalMakeDir() " << j.dir << endl;
             if( !exists(j.dir) ) {
                 try {
                     create_directory(j.dir);
@@ -176,7 +177,7 @@ namespace mongo {
                     throw;
                 }
             }
-        }
+       }
 
         void Journal::_open() {
             assert( _lf == 0 );

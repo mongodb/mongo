@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../pch.h"
+
 #include "../db/jsobj.h"
 #include "util.h"
 
@@ -26,13 +27,16 @@ namespace mongo {
 
     /**
      * Controls the boundaries of all the chunks for a given collection that live in this shard.
+     *
+     * ShardChunkManager instances never change after construction. There are methods provided that would generate a 
+     * new manager if new chunks are added or subtracted.
      */
-    class ShardChunkManager {
+    class ShardChunkManager : public boost::noncopyable {
     public:
 
         /**
          * Loads the ShardChunkManager with all boundaries for chunks of a given collection that live in an given
-         * shard
+         * shard.
          *
          * @param configServer name of the server where the configDB currently is. Can be empty to indicate
          *        that the configDB is running locally
@@ -44,7 +48,7 @@ namespace mongo {
         ShardChunkManager( const string& configServer , const string& ns , const string& shardName );
 
         /**
-         * Same as the regular constructor but used in unittest (no access to configDB required)
+         * Same as the regular constructor but used in unittest (no access to configDB required).
          *
          * @param collectionDoc simulates config.collection's entry for one colleciton
          * @param chunksDocs simulates config.chunks' entries for one collection's shard
@@ -53,6 +57,30 @@ namespace mongo {
         
         ~ShardChunkManager() {}
 
+        /**
+         * Generates a new manager based on 'this's state minus a given chunk. 
+         *
+         * @param min max chunk boundaries for the chunk to subtract
+         * @param version that the resulting manager should be at. The version has to be higher than the current one.
+         * @return a new ShardChunkManager, to be owned by the caller
+         */
+        ShardChunkManager* cloneMinus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ); 
+
+        /**
+         * Generates a new manager based on 'this's state plus a given chunk.
+         *
+         * @param min max chunk boundaries for the chunk to add
+         * @param version that the resulting manager should be at.
+         * @return a new ShardChunkManager, to be owned by the caller
+         */
+        ShardChunkManager* clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ); 
+
+        /**
+         * Checks whether a document belongs to this chunk.
+         *
+         * @param obj document containing sharding keys (and, optionally, other attributes)
+         * @return true if shards hold the object
+         */
         bool belongsToMe( const BSONObj& obj ) const;
 
         // accessors
@@ -76,7 +104,12 @@ namespace mongo {
 
         /** constructors helpers */
         void _fillCollectionKey( const BSONObj& collectionDoc );
-        void _fillChunkState( DBClientCursorInterface* cursor );
+        void _fillChunks( DBClientCursorInterface* cursor );
+        void _fillRanges();
+
+        /** can only be used in the cloning calls */
+        ShardChunkManager() {}
+
     };
 
     typedef shared_ptr<ShardChunkManager> ShardChunkManagerPtr;
