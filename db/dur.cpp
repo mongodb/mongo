@@ -152,11 +152,11 @@ namespace mongo {
             AlignedBuilder& bb = cj._ab;
             bb.reset();
 
-            unsigned *lenInBlockHeader;
+            unsigned lenOfs;
             // JSectHeader
             {
                 bb.appendStr("\nHH\n", false);
-                lenInBlockHeader = (unsigned *) bb.skip(4);
+                lenOfs = bb.skip(4);
             }
 
             // ops other than basic writes
@@ -210,7 +210,7 @@ namespace mongo {
                 assert( 0xffffe000 == (~(Alignment-1)) );
                 unsigned L = (bb.len() + Alignment-1) & (~(Alignment-1)); // fill to alignment
                 dassert( L >= (unsigned) bb.len() );
-                *lenInBlockHeader = L;
+                *((unsigned*)bb.atOfs(lenOfs)) = L;
                 unsigned padding = L - bb.len();
                 bb.skip(padding);
                 dassert( bb.len() % Alignment == 0 );

@@ -31,11 +31,19 @@ namespace mongo {
         /** reset for a re-use */
         void reset() { _len = 0; }
 
-        /** leave room for some stuff later */
-        char* skip(unsigned n) { return grow(n); }
-
         /** note this may be deallocated (realloced) if you keep writing or reset(). */
         const char* buf() const { return _data; }
+
+        /** leave room for some stuff later 
+            @return offset in the buffer that was our current position
+        */
+        size_t skip(unsigned n) { 
+            unsigned l = len();
+            grow(n);
+            return l;
+        }
+
+        char* atOfs(unsigned ofs) { return _data + ofs; }
 
         void appendChar(char j){
             *((char*)grow(sizeof(char))) = j;
