@@ -81,7 +81,9 @@ namespace mongo {
             }            
         }
 
-        /* leave room for some stuff later */
+        /** leave room for some stuff later 
+            @return point to region that was skipped.  pointer may change later (on realloc), so for immediate use only
+        */
         char* skip(int n) { return grow(n); }
 
         /* note this may be deallocated (realloced) if you keep writing. */
