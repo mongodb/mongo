@@ -62,6 +62,7 @@ namespace mongo {
          *
          * @param min max chunk boundaries for the chunk to subtract
          * @param version that the resulting manager should be at. The version has to be higher than the current one.
+         *        When cloning away the last chunk, verstion must be 0.
          * @return a new ShardChunkManager, to be owned by the caller
          */
         ShardChunkManager* cloneMinus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ); 
@@ -70,13 +71,13 @@ namespace mongo {
          * Generates a new manager based on 'this's state plus a given chunk.
          *
          * @param min max chunk boundaries for the chunk to add
-         * @param version that the resulting manager should be at.
+         * @param version that the resulting manager should be at. It can never be 0, though (see CloneMinus).
          * @return a new ShardChunkManager, to be owned by the caller
          */
         ShardChunkManager* clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ); 
 
         /**
-         * Checks whether a document belongs to this chunk.
+         * Checks whether a document belongs to this shard.
          *
          * @param obj document containing sharding keys (and, optionally, other attributes)
          * @return true if shards hold the object
@@ -85,7 +86,8 @@ namespace mongo {
 
         // accessors
 
-        ShardChunkVersion getVersion() const { return _version; } 
+        ShardChunkVersion getVersion() const { return _version; }
+        unsigned getNumChunks() const { return _chunksMap.size(); }
 
     private:
         // highest ShardChunkVersion for which this ShardChunkManager's information is accurate

@@ -158,9 +158,6 @@ namespace mongo {
 
     ShardChunkManager* ShardChunkManager::cloneMinus( const BSONObj& min, const BSONObj& max, const ShardChunkVersion& version ) {
 
-        // can't move version backwards when subtracting chunks
-        uassert( 13585 , str::stream() << "version " << version << "not greater than " << _version , version > _version ); 
-
         // check that we have the exact chunk that'll be subtracted
         RangeMap::const_iterator it = _chunksMap.find( min );
         if ( it == _chunksMap.end() ) {
@@ -176,14 +173,24 @@ namespace mongo {
         }
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
-
         p->_key = this->_key;
-        p->_chunksMap = this->_chunksMap;
-        p->_chunksMap.erase( min );
-        p->_version = version;
-        p->_fillRanges();
 
-        // TODO handle empty state, as in when the last chunk was cloned out
+        if ( _chunksMap.size() == 1 ) {
+            // if left with no chunks, just reset version
+            uassert( 13590 , str::stream() << "setting version to " << version << " on removing last chunk", version == 0 );
+
+            p->_version = 0;
+
+        } else {
+            // can't move version backwards when subtracting chunks
+            // this is what guarantees that no read or write would be taken once we subtract data from the current shard
+            uassert( 13585 , str::stream() << "version " << version << " not greater than " << _version , version > _version ); 
+
+            p->_chunksMap = this->_chunksMap;
+            p->_chunksMap.erase( min );
+            p->_version = version;
+            p->_fillRanges();
+        }
 
         return p.release();
     }
@@ -194,21 +201,26 @@ namespace mongo {
     
     ShardChunkManager* ShardChunkManager::clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ) {
 
-        // TODO handle empty state, as in when the first chunk is cloned in
+        // it is acceptable to move version backwards (e.g., undoing a migration that went bad during commit)
+        // but only cloning away the last chunk may reset the version to 0
+        uassert( 13591 , "version can't be set to zero" , version > 0 ); 
 
-        // check that there isn't any chunk on the interval to be added
-        RangeMap::const_iterator it = _chunksMap.lower_bound( max );
-        if ( it != _chunksMap.begin() ) {
-            --it;
-        }
-        if ( overlap( min , max , it->first , it->second ) ) {
-            ostringstream os;
-            os << "ranges overlap, "
-               << "requested: " << min << " -> " << max << " " 
-               << "existing: " << it->first.toString() + " -> " + it->second.toString();
-            uasserted( 13588 , os.str() );
-        }
-        
+        if ( ! _chunksMap.empty() ) {
+
+            // check that there isn't any chunk on the interval to be added
+            RangeMap::const_iterator it = _chunksMap.lower_bound( max );
+            if ( it != _chunksMap.begin() ) {
+                --it;
+            }
+            if ( overlap( min , max , it->first , it->second ) ) {
+                ostringstream os;
+                os << "ranges overlap, "
+                   << "requested: " << min << " -> " << max << " " 
+                   << "existing: " << it->first.toString() + " -> " + it->second.toString();
+                uasserted( 13588 , os.str() );
+            }
+        }        
+
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
 
         p->_key = this->_key;

@@ -228,7 +228,7 @@ namespace {
                                        "unique"  << false );
 
             // 2-chunk collection
-            // [10->20) , <gap> , [30->40)
+            // [10,0->20,0) , <gap> , [30,0->40,0)
             BSONArray chunks = BSON_ARRAY( BSON( "_id" << "x.y-a_10b_0" << 
                                                  "ns"  << "x.y" << 
                                                  "min" << BSON( "a" << 10 << "b" << 0 ) << 
@@ -253,6 +253,63 @@ namespace {
         }
     };
 
+    class EmptyShardTests {
+    public:
+        void run() {
+            BSONObj collection = BSON( "_id"     << "test.foo" <<
+                                       "dropped" << false <<
+                                       "key"     << BSON( "a" << 1 ) <<
+                                       "unique"  << false );
+
+            // no chunks on this shard
+            BSONArray chunks;
+
+            // shard can have zero chunks for an existing collection
+            // version should be 0, though
+            ShardChunkManager s( collection , chunks );
+            ASSERT_EQUALS( s.getVersion() , ShardChunkVersion( 0 ) );
+            ASSERT_EQUALS( s.getNumChunks() , 0u );
+        }
+    };
+
+    class LastChunkTests {
+    public:
+        void run() {
+            BSONObj collection = BSON( "_id"     << "test.foo" <<
+                                       "dropped" << false <<
+                                       "key"     << BSON( "a" << 1 ) <<
+                                       "unique"  << false  );
+
+            // 1-chunk collection
+            // [10->20)
+            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_10" << 
+                                                 "ns"  << "test.foo" << 
+                                                 "min" << BSON( "a" << 10 ) <<
+                                                 "max" << BSON( "a" << 20 ) ) );
+
+            ShardChunkManager s( collection , chunks );
+            BSONObj min = BSON( "a" << 10 );
+            BSONObj max = BSON( "a" << 20 );
+
+            // if we remove the only chunk, the only version accepted is 0
+            ShardChunkVersion nonZero = 99;
+            ASSERT_EXCEPTION( s.cloneMinus( min , max , nonZero ) , UserException );
+            ShardChunkManagerPtr empty( s.cloneMinus( min , max , 0 ) );
+            ASSERT_EQUALS( empty->getVersion() , ShardChunkVersion( 0 ) );
+            ASSERT_EQUALS( empty->getNumChunks() , 0u );
+            BSONObj k = BSON( "a" << 15 << "b" << 0 );
+            ASSERT( ! empty->belongsToMe( k ) );
+
+            // we can add a chunk to an empty manager
+            // version should be provided
+            ASSERT_EXCEPTION( empty->clonePlus( min , max , 0 ) , UserException );
+            ShardChunkManagerPtr cloned( empty->clonePlus( min , max , nonZero ) );
+            ASSERT_EQUALS( cloned->getVersion(), nonZero );
+            ASSERT_EQUALS( cloned->getNumChunks() , 1u );
+            ASSERT( cloned->belongsToMe( k ) );
+        }
+    };
+
     class ShardChunkManagerSuite : public Suite {
     public:
         ShardChunkManagerSuite() : Suite ( "shard_chunk_manager" ) {}
@@ -266,6 +323,8 @@ namespace {
             add< ClonePlusExceptionTests >();
             add< CloneMinusTests >();
             add< CloneMinusExceptionTests >();
+            add< EmptyShardTests >();
+            add< LastChunkTests >();
         }
     } shardChunkManagerSuite;
 
