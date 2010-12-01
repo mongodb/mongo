@@ -14,9 +14,9 @@ const char *home = "WT_TEST";
 int main()
 {
 	int ret;
-	WIREDTIGER_CONNECTION *conn;
-	WIREDTIGER_SESSION *session;
-	WIREDTIGER_CURSOR *cursor;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	WT_CURSOR *cursor;
 	const char *key;
 	uint64_t value;
 

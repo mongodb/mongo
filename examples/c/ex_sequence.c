@@ -14,10 +14,10 @@ const char *home = "WT_TEST";
 int main()
 {
 	int ret;
-	WIREDTIGER_CONNECTION *conn;
-	WIREDTIGER_SESSION *session;
-	WIREDTIGER_CURSOR *cursor;
-	WIREDTIGER_ITEM key, value;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	WT_CURSOR *cursor;
+	WT_ITEM key, value;
 	wiredtiger_recno_t recno;
 
 	if ((ret = wiredtiger_open(home, "create", &conn)) != 0 ||

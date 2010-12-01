@@ -30,9 +30,9 @@ const char *home = "WT_TEST";
 int main()
 {
 	int is_new, ret;
-	WIREDTIGER_CONNECTION *conn;
-	WIREDTIGER_SESSION *session;
-	WIREDTIGER_CURSOR *cursor;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	WT_CURSOR *cursor;
 	POP_RECORD *p, *endp;
 	const char *country;
 	wiredtiger_recno_t recno;
@@ -47,7 +47,7 @@ int main()
 #if LOADABLE_MODULE
 		ret = conn->add_extension(conn, NULL, "ex_column_app.so", NULL);
 #else
-		extern int add_pop_schema(WIREDTIGER_CONNECTION *);
+		extern int add_pop_schema(WT_CONNECTION *);
 		ret = add_pop_schema(conn);
 #endif
 		ret = session->create_table(session,

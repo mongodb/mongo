@@ -14,8 +14,8 @@ const char *home = "WT_TEST";
 int main()
 {
 	int ret;
-	WIREDTIGER_CONNECTION *conn;
-	WIREDTIGER_SESSION *session;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
 
 	/* Open a connection to the database, creating it if necessary. */
 	if ((ret = wiredtiger_open(home, "create", &conn)) != 0)

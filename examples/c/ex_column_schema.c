@@ -10,19 +10,19 @@
 
 #include <wiredtiger.h>
 
-static WIREDTIGER_COLUMN_INFO pop_columns[] = {
+static WT_COLUMN_INFO pop_columns[] = {
 	{ "country", 0, NULL, NULL },
 	{ "year", 0, NULL, NULL },
 	{ "population", 1, NULL, NULL }
 };
 
 static const char *country_year_cols[] = { "country", "year" };
-static WIREDTIGER_INDEX_INFO pop_indices[] = {
+static WT_INDEX_INFO pop_indices[] = {
 	{ "country_year",  country_year_cols,
 	    sizeof(country_year_cols) / sizeof(country_year_cols[0]) }
 };
 
-static WIREDTIGER_SCHEMA pop_schema = {
+static WT_SCHEMA pop_schema = {
 	"r",		/* Format string for keys (recno). */
 	"5sHQ",		/*
 			 * Format string for data items:
@@ -39,9 +39,9 @@ static WIREDTIGER_SCHEMA pop_schema = {
 };
 
 #if LOADABLE_MODULE
-int wiredtiger_extension_init(WIREDTIGER_CONNECTION *conn, const char *config)
+int wiredtiger_extension_init(WT_CONNECTION *conn, const char *config)
 #else
-int add_pop_schema(WIREDTIGER_CONNECTION *conn)
+int add_pop_schema(WT_CONNECTION *conn)
 #endif
 {
 	/*
