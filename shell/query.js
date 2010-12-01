@@ -250,7 +250,7 @@ DBQuery.prototype.explain = function (verbose) {
         delete obj.oldPlan;
 
         if (typeof(obj.length) == 'number'){
-            for (i=0; i < obj.length; i++){
+            for (var i=0; i < obj.length; i++){
                 cleanup(obj[i]);
             }
         }

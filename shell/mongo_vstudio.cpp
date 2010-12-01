@@ -2680,7 +2680,7 @@ const StringData _jscode_raw_query =
 "delete obj.oldPlan;\n" 
 "\n" 
 "if (typeof(obj.length) == 'number'){\n" 
-"for (i=0; i < obj.length; i++){\n" 
+"for (var i=0; i < obj.length; i++){\n" 
 "cleanup(obj[i]);\n" 
 "}\n" 
 "}\n" 
