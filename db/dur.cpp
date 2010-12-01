@@ -57,7 +57,7 @@ namespace mongo {
 
     namespace dur { 
 
-        static CommitJob cj;
+        static CommitJob commitJob;
 
         /** Declare that a file has been created 
             Normally writes are applied only after journalling, for safety.  But here the file 
@@ -66,14 +66,14 @@ namespace mongo {
         */
         void createdFile(string filename, unsigned long long len) { 
             shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
-            cj.noteOp(op);
+            commitJob.noteOp(op);
         }
 
         /** declare write intent.  when already in the write view if testIntent is true. */
         void declareWriteIntent(void *p, unsigned len) {
             // log() << "TEMP dur writing " << p << ' ' << len << endl;
             WriteIntent w(p, len);
-            cj.note(w);
+            commitJob.note(w);
         }
 
         void* writingPtr(void *x, unsigned len) { 
@@ -108,7 +108,7 @@ namespace mongo {
         void debugCheckLastDeclaredWrite() { 
 #if 0
             assert(debug && cmdLine.dur);
-            vector<WriteIntent>& w = cj.writes();
+            vector<WriteIntent>& w = commitJob.writes();
             if( w.size() == 0 ) 
                 return;
             const WriteIntent &i = w[w.size()-1];
@@ -149,7 +149,7 @@ namespace mongo {
             */
         static void PREPLOGBUFFER() { 
             assert( cmdLine.dur );
-            AlignedBuilder& bb = cj._ab;
+            AlignedBuilder& bb = commitJob._ab;
             bb.reset();
 
             unsigned lenOfs;
@@ -161,7 +161,7 @@ namespace mongo {
 
             // ops other than basic writes
             {
-                for( vector< shared_ptr<DurOp> >::iterator i = cj.ops().begin(); i != cj.ops().end(); ++i ) { 
+                for( vector< shared_ptr<DurOp> >::iterator i = commitJob.ops().begin(); i != commitJob.ops().end(); ++i ) { 
                     (*i)->serialize(bb);
                 }
             }
@@ -170,7 +170,7 @@ namespace mongo {
             {
                 scoped_lock lk(privateViews._mutex());
                 string lastFilePath;
-                for( vector<WriteIntent>::iterator i = cj.writes().begin(); i != cj.writes().end(); i++ ) {
+                for( vector<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
                     size_t ofs;
                     MongoMMF *mmf = privateViews._find(i->p, ofs);
                     if( mmf == 0 ) {
@@ -224,7 +224,37 @@ namespace mongo {
          */
          static void WRITETOJOURNAL(AlignedBuilder& ab) { 
             journal(ab);
-        }
+         }
+
+         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
+         */
+         static void validateMapsMatch() {
+            Timer t;
+            set<MongoFile*>& files = MongoFile::getAllFiles();
+            for( set<MongoFile*>::iterator i = files.begin(); i != files.end(); i++ ) { 
+                MongoFile *mf = *i;
+                if( mf->isMongoMMF() ) { 
+                    MongoMMF *mmf = (MongoMMF*) mf;
+                    const char *p = (const char *) mmf->getView();
+                    const char *w = (const char *) mmf->view_write();
+                    unsigned low = 0xffffffff;
+                    unsigned high = 0;
+                    for( unsigned i = 0; i < mmf->length(); i++ ) {
+                        if( p[i] != w[i] ) { 
+                            if( i < low ) low = i;
+                            if( i > high ) high = i;
+                        }
+                    }
+                    if( low != 0xffffffff ) { 
+                        std::stringstream ss;
+                        ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
+                        log() << ss.str() << endl;
+                        breakpoint();
+                    }
+                }
+            }
+            log() << t.millis() << endl;
+         }
 
         /** apply the writes back to the non-private MMF after they are for certain in redo log 
 
@@ -239,28 +269,16 @@ namespace mongo {
         */
         static void WRITETODATAFILES() { 
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
-            for( int i = cj.writes().size() - 1; i >= 0; i-- ) {
-                const WriteIntent& intent = cj.writes()[i];
+            for( int i = commitJob.writes().size() - 1; i >= 0; i-- ) {
+                const WriteIntent& intent = commitJob.writes()[i];
                 char *dst = (char *) (intent.w_ptr);
                 memcpy(dst, intent.p, intent.len);
             }
 
             // for testing only.  if this fails, a write intent declaration was wrong or missing.
-            const bool ValidateMapsMatch = false;
+            const bool ValidateMapsMatch = true;
             DEV if( ValidateMapsMatch ) {
-                set<MongoFile*>& files = MongoFile::getAllFiles();
-                for( set<MongoFile*>::iterator i = files.begin(); i != files.end(); i++ ) { 
-                    MongoFile *mf = *i;
-                    if( mf->isMongoMMF() ) { 
-                        MongoMMF *mmf = (MongoMMF*) mf;
-                        void *p = mmf->getView();
-                        void *w = mmf->view_write();
-                        if( memcmp(p, w, (size_t) mmf->length()) ) { 
-                            log() << mmf->filename() << endl;
-                            assert(false);
-                        }
-                    }
-                }
+                validateMapsMatch();
             }
         }
 
@@ -274,7 +292,7 @@ namespace mongo {
             dbMutex.assertWriteLocked();
             dbMutex._remapPrivateViewRequested = false;
 
-            assert( !cj.hasWritten() );
+            assert( !commitJob.hasWritten() );
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so 
             // we do a little each pass; beyond the remap time, more significantly, there will be copy on write 
@@ -320,29 +338,30 @@ namespace mongo {
         void _go() {
             dbMutex.assertAtLeastReadLocked();
 
-            if( !cj.hasWritten() )
+            if( !commitJob.hasWritten() )
                 return;
 
             PREPLOGBUFFER();
 
-            WRITETOJOURNAL(cj._ab);
+            WRITETOJOURNAL(commitJob._ab);
 
             // write the noted write intent entries to the data files.
             // this has to come after writing to the journal, obviously...
             WRITETODATAFILES();
 
-            cj.reset();
+            commitJob.reset();
 
+            // REMAPPRIVATEVIEW
+            // 
             // remapping private views must occur after WRITETODATAFILES otherwise 
             // we wouldn't see newly written data on reads.
             // 
             // this needs done in a write lock thus we do it on the next acquisition of that 
             // instead of here.
-            // REMAPPRIVATEVIEW();
         }
 
         static void go() {
-            if( !cj.hasWritten() )
+            if( !commitJob.hasWritten() )
                 return;
             {
                 readlocktry lk("", 1000);
