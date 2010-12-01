@@ -204,16 +204,14 @@ namespace mongo {
     }
 
     namespace dur { 
-        void _go();
+        void closingFileNotification();
     }
 
     /*virtual*/ void MongoMMF::close() {
 #if defined(_DURABLE)
         {
             if( !testIntent && cmdLine.dur ) { 
-                // we must first commit anything pending before unmapping views.
-                dbMutex.assertAtLeastReadLocked();
-                dur::_go();
+                dur::closingFileNotification();
             }
             privateViews.remove(_view_private);
             if( debug ) {

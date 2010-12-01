@@ -71,7 +71,6 @@ namespace mongo {
 
         /** declare write intent.  when already in the write view if testIntent is true. */
         void declareWriteIntent(void *p, unsigned len) {
-            // log() << "TEMP dur writing " << p << ' ' << len << endl;
             WriteIntent w(p, len);
             commitJob.note(w);
         }
@@ -253,7 +252,7 @@ namespace mongo {
                     }
                 }
             }
-            log() << t.millis() << endl;
+            log() << t.millis() << "ms " << endl;
          }
 
         /** apply the writes back to the non-private MMF after they are for certain in redo log 
@@ -291,8 +290,12 @@ namespace mongo {
 
             dbMutex.assertWriteLocked();
             dbMutex._remapPrivateViewRequested = false;
-
             assert( !commitJob.hasWritten() );
+
+            if( 0 ) { 
+                log() << "TEMP remapprivateview disabled for testing - will eventually run oom in this mode if db bigger than ram" << endl;
+                return;
+            }
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so 
             // we do a little each pass; beyond the remap time, more significantly, there will be copy on write 
@@ -356,13 +359,27 @@ namespace mongo {
             // remapping private views must occur after WRITETODATAFILES otherwise 
             // we wouldn't see newly written data on reads.
             // 
-            // this needs done in a write lock thus we do it on the next acquisition of that 
-            // instead of here.
+            DEV assert( !commitJob.hasWritten() );
+            if( !dbMutex.isWriteLocked() ) { 
+                // this needs done in a write lock thus we do it on the next acquisition of that 
+                // instead of here (there is no rush if you aren't writing anyway -- but it must happen, 
+                // if it is done, before any uncommitted writes occur).
+                //
+                dbMutex._remapPrivateViewRequested = true;
+            }
+            else { 
+                // however, if we are already write locked, we must do it now -- up the call tree someone 
+                // may do a write without a new lock acquisition.  this can happen when MongoMMF::close() calls
+                // this method when a file (and its views) is about to go away.
+                //
+                REMAPPRIVATEVIEW();
+            }
         }
 
         static void go() {
             if( !commitJob.hasWritten() )
                 return;
+
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
@@ -370,10 +387,26 @@ namespace mongo {
                     return;
                 }
             }
+
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a 
             // write lock instead.  otherwise writes could use too much RAM.
             writelock lk;
             _go();
+        }
+
+        /** called when a MongoMMF is closing -- we need to go ahead and group commit in that case before its 
+            views disappear 
+        */
+        void closingFileNotification() {
+            if( dbMutex.atLeastReadLocked() ) {
+                _go(); 
+            }
+            else {
+                assert( inShutdown() );
+                if( commitJob.hasWritten() ) { 
+                    log() << "dur warning files are closing outside locks with writes pending" << endl;
+                }
+            }
         }
 
         static void durThread() { 

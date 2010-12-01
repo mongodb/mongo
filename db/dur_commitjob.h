@@ -88,9 +88,15 @@ namespace mongo {
 
             /** record/note an intent to write */
             void note(WriteIntent& w) {
+                // from the point of view of the dur module, it would be fine (i think) to only 
+                // be read locked here.  but must be at least read locked to avoid race with 
+                // remapprivateview
+                DEV dbMutex.assertWriteLocked();
                 if( !_wi._alreadyNoted.checkAndSet(w) ) {
-                    if( !_hasWritten )
+                    if( !_hasWritten ) {
+                        assert( !dbMutex._remapPrivateViewRequested );
                         _hasWritten = true;
+                    }
                     // remember intent. we will journal it in a bit
                     _wi._writes.push_back(w);
                     wassert( _wi._writes.size() <  2000000 );
@@ -100,7 +106,11 @@ namespace mongo {
 
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p) {
-                _hasWritten = true;
+                DEV dbMutex.assertWriteLocked();
+                if( !_hasWritten ) {
+                    assert( !dbMutex._remapPrivateViewRequested );
+                    _hasWritten = true;
+                }
                 _wi._ops.push_back(p);
             }
 
