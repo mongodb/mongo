@@ -1,0 +1,6 @@
+doxygen.log
+/classes/
+docs/html
+docs/latex
+\.o$
+src/server/WiredTiger_server
