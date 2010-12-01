@@ -205,7 +205,7 @@ public:
             _ignoreBlanks = true;
         }
 
-        if ( hasParam( "upsert" ) ){
+        if ( hasParam( "upsert" ) || hasParam( "upsertFields" )){
             _upsert = true;
 
             string uf = getParam("upsertFields");
