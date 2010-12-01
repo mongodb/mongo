@@ -154,15 +154,12 @@ namespace mongo {
             }
             if( cmdObj.hasElement( "replApplyBatchSize" ) ) {
                 result.append("was", replApplyBatchSize );
-                int b = cmdObj["replApplyBatchSize"].numberInt();
-                if( b < 1 || b > 1024 ) { 
-                    errmsg = "bad value";
+                BSONElement e = cmdObj["replApplyBatchSize"];
+                ParameterValidator * v = ParameterValidator::get( e.fieldName() );
+                assert( v );
+                if ( ! v->isValid( e , errmsg ) )
                     return false;
-                }
-                // todo: should getParameters be not in dbcommands_generic?
-                assert( /*replSettings.slavedelay == 0 || */ b == 1 );
-                //assert( replSettings.slave );
-                replApplyBatchSize = b;
+                replApplyBatchSize = e.numberInt();
                 s++;
             }
 

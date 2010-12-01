@@ -1846,4 +1846,28 @@ namespace mongo {
         tp.join();
     }
     
+    class ReplApplyBatchSizeValidator : public ParameterValidator {
+    public:
+        ReplApplyBatchSizeValidator() : ParameterValidator( "replApplyBatchSize" ){}
+
+        virtual bool isValid( BSONElement e , string& errmsg ){
+            int b = e.numberInt();
+            if( b < 1 || b > 1024 ) { 
+                errmsg = "replApplyBatchSize has to be >= 1 and < 1024";
+                return false;
+            }
+            
+            if ( replSettings.slavedelay != 0 && b > 1 ){
+                errmsg = "can't use a batch size > 1 with slavedelay";
+                return false;
+            }
+            if ( ! replSettings.slave ){
+                errmsg = "can't set replApplyBatchSize on a non-slave machine";
+                return false;
+            }
+
+            return true;
+        }
+    } replApplyBatchSizeValidator;
+
 } // namespace mongo

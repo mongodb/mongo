@@ -265,5 +265,18 @@ namespace mongo {
         return s.str();
     }
 
+    ParameterValidator::ParameterValidator( const string& name ) : _name( name ){
+        if ( ! _all )
+            _all = new map<string,ParameterValidator*>();
+        (*_all)[_name] = this;
+    }
+
+    ParameterValidator * ParameterValidator::get( const string& name ){
+        map<string,ParameterValidator*>::iterator i = _all->find( name );
+        if ( i == _all->end() )
+            return NULL;
+        return i->second;
+    }
+    map<string,ParameterValidator*> * ParameterValidator::_all = 0;
 
 }
