@@ -21,59 +21,64 @@
 
 namespace mongo {
 
-    AlignedBuilder::AlignedBuilder(unsigned init_size) : _size(init_size) {
-        _data = (char *) _malloc(_size);
-        if( _data == 0 )
-            uasserted(13584, "out of memory AlignedBuilder");
+    AlignedBuilder::AlignedBuilder(unsigned initSize) {
         _len = 0;
+        _malloc(initSize);
+        uassert(13584, "out of memory AlignedBuilder", _p._allocationAddress);
     }
 
-    void* AlignedBuilder::mallocSelfAligned(unsigned sz) {
+    void AlignedBuilder::mallocSelfAligned(unsigned sz) {
+        assert( sz == _p._size );
         void *p = malloc(sz + Alignment - 1);
-        _realAddr = p;
+        _p._allocationAddress = p;
         size_t s = (size_t) p;
+        size_t sold = s;
         s += Alignment - 1;
         s = (s/Alignment)*Alignment;
-        return (void*) s;
+        dassert( s >= sold );
+        _p._data = (char *) s;
     }
 
     /* "slow"/infrequent portion of 'grow()'  */
-    void NOINLINE_DECL AlignedBuilder::grow_reallocate() {
-        unsigned a = _size * 2;
+    void NOINLINE_DECL AlignedBuilder::growReallocate(unsigned oldLen) {
+        unsigned a = _p._size;
         assert( a );
-        if ( _len > a )
-            a = _len + 16 * 1024;
-        assert( a < 0x20000000 );
-        _data = (char *) _realloc(_data, a, _len);
-        _size = a;
+        while( 1 ) {
+            a *= 2;
+            assert( a < 0x20000000 );
+            if( _len < a )
+                break;
+        }
+        _realloc(a, oldLen);
     }
 
-    void* AlignedBuilder::_malloc(unsigned sz) { 
+    void AlignedBuilder::_malloc(unsigned sz) { 
+        _p._size = sz;
 #if defined(_WIN32)
         void *p = VirtualAlloc(0, sz, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        _realAddr = p;
-//#elif defined(_POSIX_VERSION)
-// in theory _POSIX_VERSION should work, but it doesn't on OS X 10.4, and needs to be testeed on solaris.
-// so for now, linux only for this.
+        _p._allocationAddress = p;
+        _p._data = (char *) p;
 #elif defined(__linux__)
+        // in theory #ifdef _POSIX_VERSION should work, but it doesn't on OS X 10.4, and needs to be testeed on solaris.
+        // so for now, linux only for this.
         void *p = 0;
         int res = posix_memalign(&p, Alignment, sz);
         massert(13524, "out of memory AlignedBuilder", res == 0);
-        _realAddr = p;
+        _p._allocationAddress = p;
+        _p._data = (char *) p;
 #else
         void *p = mallocSelfAligned(sz);
         assert( ((size_t) p) % Alignment == 0 );
 #endif
-        return p;
     }
 
-    void* AlignedBuilder::_realloc(void *ptr, unsigned newSize, unsigned oldSize) { 
-        // posix_memalign alignment is not maintained on reallocs
-        void *oldAddr = _realAddr;
-        void *p = _malloc(newSize);
-        memcpy(p, ptr, oldSize);
-        _free(oldAddr);
-        return p;
+    void AlignedBuilder::_realloc(unsigned newSize, unsigned oldLen) { 
+        // posix_memalign alignment is not maintained on reallocs, so we can't use realloc().
+        AllocationInfo old = _p;
+        _malloc(newSize);
+        assert( oldLen <= _len );
+        memcpy(_p._data, old._data, oldLen);
+        _free(old._allocationAddress);
     }
 
     void AlignedBuilder::_free(void *p) {
@@ -85,9 +90,9 @@ namespace mongo {
     }
 
     void AlignedBuilder::kill() {
-        _free(_realAddr);
-        _data = 0;
-        _realAddr = 0;
+        _free(_p._allocationAddress);
+        _p._allocationAddress = 0;
+        _p._data = 0;
     }
 
 }

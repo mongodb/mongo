@@ -32,7 +32,7 @@ namespace mongo {
         void reset() { _len = 0; }
 
         /** note this may be deallocated (realloced) if you keep writing or reset(). */
-        const char* buf() const { return _data; }
+        const char* buf() const { return _p._data; }
 
         /** leave room for some stuff later 
             @return offset in the buffer that was our current position
@@ -43,7 +43,7 @@ namespace mongo {
             return l;
         }
 
-        char* atOfs(unsigned ofs) { return _data + ofs; }
+        char* atOfs(unsigned ofs) { return _p._data + ofs; }
 
         void appendChar(char j){
             *((char*)grow(sizeof(char))) = j;
@@ -80,6 +80,7 @@ namespace mongo {
 
         void appendStr(const StringData &str , bool includeEOO = true ) {
             const unsigned len = str.size() + ( includeEOO ? 1 : 0 );
+            assert( len < BSONObjMaxUserSize );
             memcpy(grow(len), str.data(), len);
         }
 
@@ -93,23 +94,25 @@ namespace mongo {
         inline char* grow(unsigned by) {
             unsigned oldlen = _len;
             _len += by;
-            if ( _len > _size ) {
-                grow_reallocate();
+            if ( _len > _p._size ) {
+                growReallocate(oldlen);
             }
-            return _data + oldlen;
+            return _p._data + oldlen;
         }
 
-        void grow_reallocate();
+        void growReallocate(unsigned oldLenInUse);
         void kill();
-        void* mallocSelfAligned(unsigned sz);
-        void* _malloc(unsigned sz);
-        void* _realloc(void *ptr, unsigned newSize, unsigned oldSize);
+        void mallocSelfAligned(unsigned sz);
+        void _malloc(unsigned sz);
+        void _realloc(unsigned newSize, unsigned oldLenInUse);
         void _free(void*);        
 
-        char *_data;
-        unsigned _len;
-        unsigned _size;
-        void *_realAddr;
+        struct AllocationInfo {
+            char *_data;
+            void *_allocationAddress;
+            unsigned _size;
+        } _p;
+        unsigned _len;  // bytes in use
     };
 
 }
