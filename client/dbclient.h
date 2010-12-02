@@ -148,8 +148,6 @@ namespace mongo {
         }
         
         DBClientBase* connect( string& errmsg ) const;
-
-        static ConnectionString parse( const string& url , string& errmsg );
         
         string getSetName() const{
             return _setName;
@@ -158,6 +156,10 @@ namespace mongo {
         vector<HostAndPort> getServers() const {
             return _servers;
         }
+
+        static ConnectionString parse( const string& url , string& errmsg );
+        
+        static string typeToString( ConnectionType type );
         
     private:
 

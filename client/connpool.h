@@ -44,17 +44,18 @@ namespace mongo {
 
         int numAvailable() const { return (int)_pool.size(); }
 
-        void createdOne(){ _created++; }
+        void createdOne( DBClientBase * base);
         long long numCreated() const { return _created; }
 
-        
+        ConnectionString::ConnectionType type() const { assert(_created); return _type; }
+
         /** 
          * gets a connection or return NULL
          */
         DBClientBase * get();
-
+        
         void done( DBClientBase * c );
-
+        
         void flush();
     private:
         
@@ -69,6 +70,7 @@ namespace mongo {
 
         std::stack<StoredConnection> _pool;
         long long _created;
+        ConnectionString::ConnectionType _type;
     };
     
     class DBConnectionHook {
