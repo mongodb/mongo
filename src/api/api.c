@@ -109,7 +109,7 @@ static int __session_open_cursor(WT_SESSION *session, const char *uri, const cha
 	return 0;
 }
 
-static int __session_dup_cursor(WT_SESSION *, WT_CURSOR *cursor, const char *config, WT_CURSOR *dupp)
+static int __session_dup_cursor(WT_SESSION *, WT_CURSOR *cursor, const char *config, WT_CURSOR **dupp)
 {
 	return ENOTSUP;
 }

@@ -38,7 +38,7 @@ PROJECT_NUMBER         = 1.0
 # If a relative path is entered, it will be relative to the location 
 # where doxygen was started. If left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = docs
+OUTPUT_DIRECTORY       = .
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 
 # 4096 sub-directories (in 2 levels) under the output directory of each output 
@@ -133,7 +133,7 @@ STRIP_FROM_PATH        =
 # definition is used. Otherwise one should specify the include paths that 
 # are normally passed to the compiler using the -I flag.
 
-STRIP_FROM_INC_PATH    = include/
+STRIP_FROM_INC_PATH    = ../include/
 
 # If the SHORT_NAMES tag is set to YES, doxygen will generate much shorter 
 # (but less readable) file names. This can be useful if your file system 
@@ -590,8 +590,8 @@ WARN_LOGFILE           = doxygen.log
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = include \
-                         docs/src
+INPUT                  = ../include \
+                         src
 
 # This tag can be used to specify the character encoding of the source files 
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is 
@@ -651,7 +651,7 @@ RECURSIVE              = YES
 # excluded from the INPUT source files. This way you can easily exclude a 
 # subdirectory from a directory tree whose root is specified with the INPUT tag.
 
-EXCLUDE                = docs/src/bdb-map.dox
+EXCLUDE                = src/bdb-map.dox
 
 # The EXCLUDE_SYMLINKS tag can be used select whether or not files or 
 # directories that are symbolic links (a Unix filesystem feature) are excluded 
@@ -679,7 +679,7 @@ EXCLUDE_SYMBOLS        = __F
 # directories that contain example code fragments that are included (see 
 # the \include command).
 
-EXAMPLE_PATH           = examples/c
+EXAMPLE_PATH           = ../examples/c
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the 
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
@@ -829,13 +829,13 @@ HTML_FILE_EXTENSION    = .html
 # each generated HTML page. If it is left blank doxygen will generate a 
 # standard header.
 
-HTML_HEADER            = docs/style/header.html
+HTML_HEADER            = style/header.html
 
 # The HTML_FOOTER tag can be used to specify a personal HTML footer for 
 # each generated HTML page. If it is left blank doxygen will generate a 
 # standard footer.
 
-HTML_FOOTER            = docs/style/footer.html
+HTML_FOOTER            = style/footer.html
 
 # The HTML_STYLESHEET tag can be used to specify a user-defined cascading 
 # style sheet that is used by each HTML page. It can be used to 
@@ -844,7 +844,7 @@ HTML_FOOTER            = docs/style/footer.html
 # the style sheet file to the HTML output directory, so don't put your own 
 # stylesheet in the HTML output directory as well, or it will be erased!
 
-HTML_STYLESHEET        = docs/style/wiredtiger.css
+HTML_STYLESHEET        = style/wiredtiger.css
 
 # The HTML_COLORSTYLE_HUE tag controls the color of the HTML output. 
 # Doxygen will adjust the colors in the stylesheet and background images 

@@ -172,7 +172,7 @@ struct WT_SESSION {
 	int __F(open_cursor)(WT_SESSION *session, const char *uri, const char *config, WT_CURSOR **cursorp);
 
 	/*! Duplicate a cursor. */
-	int __F(dup_cursor)(WT_SESSION *, WT_CURSOR *cursor, const char *config, WT_CURSOR *dupp);
+	int __F(dup_cursor)(WT_SESSION *, WT_CURSOR *cursor, const char *config, WT_CURSOR **dupp);
 	/*! @} */
 
 	/*! \name Table operations
