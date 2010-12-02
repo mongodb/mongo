@@ -337,9 +337,18 @@ string fixHost( string url , string host , string port ){
     return newurl;
 }
 
+static string OpSymbols = "~!%^&*-+=|:,<>/?";
+
+bool isOpSymbol( char c ){
+    for ( size_t i = 0; i < OpSymbols.size(); i++ )
+        if ( OpSymbols[i] == c ) return true;
+    return false;
+}
+
 bool isBalanced( string code ){
     int brackets = 0;
     int parens = 0;
+    bool danglingOp = false;
 
     for ( size_t i=0; i<code.size(); i++ ){
         switch( code[i] ){
@@ -348,7 +357,7 @@ bool isBalanced( string code ){
                 while ( i<code.size() && code[i] != '\n' )
                     i++;
             }
-            continue;
+            break;
         case '{': brackets++; break;
         case '}': if ( brackets <= 0 ) return true; brackets--; break;
         case '(': parens++; break;
@@ -363,11 +372,21 @@ bool isBalanced( string code ){
             break;
         case '\\':
             if ( i+1 < code.size() && code[i+1] == '/') i++;
-            continue;
+            break;
+        case '+':
+        case '-':
+            if ( i+1 < code.size() && code[i+1] == code[i]) {
+                i++;
+                continue; // postfix op (++/--) can't be a dangling op
+            }
+            break;
         }
+
+        if ( isOpSymbol( code[i] )) danglingOp = true;
+        else if (! std::isspace( code[i] )) danglingOp = false;
     }
 
-    return brackets == 0 && parens == 0;
+    return brackets == 0 && parens == 0 && !danglingOp;
 }
 
 using mongo::asserted;
@@ -385,7 +404,11 @@ public:
         assert( ! isBalanced( "\"//\" {" ) );
         assert( isBalanced( "{x:/x\\//}" ) );
         assert( ! isBalanced( "{ \\/// }" ) );
-
+        assert( isBalanced( "x = 5 + y ") );
+        assert( ! isBalanced( "x = ") );
+        assert( ! isBalanced( "x = 5 +") );
+        assert( isBalanced( " x ++") );
+        assert( isBalanced( "-- x") );
     }
 } balnaced_test;
 
