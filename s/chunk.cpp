@@ -635,7 +635,7 @@ namespace mongo {
             stringstream ss;
             ss << "saving first chunk failed.  cmd: " << chunkCmd << " result: " << errmsg;
             log( LL_ERROR ) << ss.str() << endl;
-            msgasserted( 13327 , ss.str() );
+            msgasserted( 13592 , ss.str() ); // assert(13592)
         }
 
         conn.done();
