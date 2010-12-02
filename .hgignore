@@ -1,8 +1,11 @@
-doxygen.log
-/classes/
+\.o$
+\.swp$
+\.pyc$
+\.class$
+docs/doxygen.log
 docs/html
 docs/java
 docs/latex
-\.o$
+docs/python
 src/server/WiredTiger_server
 src/server/gen-py

@@ -1,5 +1,11 @@
 # WiredTiger public interface
 
+'''
+WiredTiger Python API.
+
+This module exports several functions and classes.
+'''
+
 import struct
 from urlparse import urlparse
 

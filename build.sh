@@ -1,8 +1,7 @@
 #!/bin/sh
 
 TOP=`dirname $0`
-THRIFT_HOME=$HOME/src/thrift-0.5.0/play
-SLF4J_JAR=/opt/local/share/java/slf4j-api.jar
+. $TOP/config.sh
 
 cd $TOP/src/server
 g++ -O -Igen-cpp -Iinclude -I../../include -o WiredTiger_server WiredTiger_server.cpp gen-cpp/wiredtiger_*.cpp ../api/api.c $THRIFT_HOME/lib/libthrift.a
