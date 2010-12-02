@@ -5,3 +5,4 @@ docs/java
 docs/latex
 \.o$
 src/server/WiredTiger_server
+src/server/gen-py
