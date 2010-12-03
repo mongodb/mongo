@@ -192,7 +192,9 @@ namespace mongo {
         } else {
             // can't move version backwards when subtracting chunks
             // this is what guarantees that no read or write would be taken once we subtract data from the current shard
-            uassert( 13585 , str::stream() << "version " << version << " not greater than " << _version , version > _version ); 
+            if ( version <= _version ) {
+                uasserted( 13585 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() );
+            }
 
             p->_chunksMap = this->_chunksMap;
             p->_chunksMap.erase( min );
@@ -249,7 +251,9 @@ namespace mongo {
         // than the one that this shard has been using
         //
         // TODO drop the uniqueness constraint and tigthen the check below so that only the minor portion of version changes
-        uassert( 13592 , str::stream() << "version " << version << " not greater than " << _version , version > _version ); 
+        if ( version <= _version ) {
+            uasserted( 13592 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() ); 
+        }
 
         // check that we have the exact chunk that'll be split and that the split point is valid
         _assertChunkExists( min , max );
@@ -264,6 +268,12 @@ namespace mongo {
         p->_version = version;
         p->_version.incMinor();
         p->_fillRanges();
+
+        // XXX
+        
+        for ( RangeMap::const_iterator it = _chunksMap.begin() ; it != _chunksMap.end() ; ++it ) {
+            log() << " XXX " << it->first << " - > " << it->second << endl;
+        }
 
         return p.release();
     }
