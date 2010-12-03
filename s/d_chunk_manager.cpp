@@ -269,12 +269,6 @@ namespace mongo {
         p->_version.incMinor();
         p->_fillRanges();
 
-        // XXX
-        
-        for ( RangeMap::const_iterator it = _chunksMap.begin() ; it != _chunksMap.end() ; ++it ) {
-            log() << " XXX " << it->first << " - > " << it->second << endl;
-        }
-
         return p.release();
     }
 
