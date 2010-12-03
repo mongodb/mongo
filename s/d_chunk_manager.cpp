@@ -132,21 +132,25 @@ namespace mongo {
         _rangesMap.insert( make_pair( min , max ) );
     }
 
+    static bool contains( const BSONObj& min , const BSONObj& max , const BSONObj& point ) {
+        return point.woCompare( min ) >= 0 && point.woCompare( max ) < 0;
+    }
+
     bool ShardChunkManager::belongsToMe( const BSONObj& obj ) const {
         if ( _rangesMap.size() == 0 )
             return false;
 
         BSONObj x = obj.extractFields(_key);
 
-        RangeMap::const_iterator a = _rangesMap.upper_bound( x );
-        if ( a != _rangesMap.begin() )
-            a--;
+        RangeMap::const_iterator it = _rangesMap.upper_bound( x );
+        if ( it != _rangesMap.begin() )
+            it--;
         
-        bool good = x.woCompare( a->first ) >= 0 && x.woCompare( a->second ) < 0;
+        bool good = contains( it->first , it->second , x );
 
         #if 0
         if ( ! good ){
-            log() << "bad: " << x << " " << a->first << " " << x.woCompare( a->first ) << " " << x.woCompare( a->second ) << endl;
+            log() << "bad: " << x << " " << it->first << " " << x.woCompare( it->first ) << " " << x.woCompare( it->second ) << endl;
             for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ){
                 log() << "\t" << i->first << "\t" << i->second << "\t" << endl;
             }
@@ -156,8 +160,7 @@ namespace mongo {
         return good;
     }
 
-    ShardChunkManager* ShardChunkManager::cloneMinus( const BSONObj& min, const BSONObj& max, const ShardChunkVersion& version ) {
-
+    void ShardChunkManager::_assertChunkExists( const BSONObj& min , const BSONObj max ) const {
         // check that we have the exact chunk that'll be subtracted
         RangeMap::const_iterator it = _chunksMap.find( min );
         if ( it == _chunksMap.end() ) {
@@ -171,6 +174,12 @@ namespace mongo {
                << "existing: " << (it == _chunksMap.end()) ? "<empty>" : it->first.toString() + " -> " + it->second.toString();
             uasserted( 13587 , os.str() );
         }
+    }
+
+    ShardChunkManager* ShardChunkManager::cloneMinus( const BSONObj& min, const BSONObj& max, const ShardChunkVersion& version ) {
+        
+        // check that we have the exact chunk that'll be subtracted
+        _assertChunkExists( min , max );
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
         p->_key = this->_key;
@@ -227,6 +236,34 @@ namespace mongo {
         p->_chunksMap = this->_chunksMap;
         p->_chunksMap.insert( make_pair( min.getOwned() , max.getOwned() ) );
         p->_version = version;
+        p->_fillRanges();
+
+        return p.release();
+    }
+
+    ShardChunkManager* ShardChunkManager::cloneSplit( const BSONObj& min , const BSONObj& max , const BSONObj& split , 
+                                                      const ShardChunkVersion& version ) {
+
+        // the version required in both resulting chunks could be simply an increment in the minor portion of the current version
+        // however, we are enforcing uniqueness over the attributes <ns, lastmod> of the configdb collection 'chunks' 
+        // so in practice, a migrate somewhere may force this split to pick up a version that has the major portion higher
+        // than the one that this shard has been using
+        //
+        // TODO drop the uniqueness constraint and tigthen the check below so that only the minor portion of version changes
+        uassert( 13592 , str::stream() << "version " << version << " not greater than " << _version , version > _version ); 
+
+        // check that we have the exact chunk that'll be split and that the split point is valid
+        _assertChunkExists( min , max );
+        uassert( 13593 , str::stream() << "can split " << min << " -> " << max << " on " << split, contains( min , max , split ) );
+
+        auto_ptr<ShardChunkManager> p( new ShardChunkManager );
+        
+        p->_key = this->_key;
+        p->_chunksMap = this->_chunksMap;
+        p->_chunksMap[min] = split.getOwned();
+        p->_chunksMap.insert( make_pair( split.getOwned() , max.getOwned() ) );
+        p->_version = version;
+        p->_version.incMinor();
         p->_fillRanges();
 
         return p.release();

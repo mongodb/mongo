@@ -253,6 +253,65 @@ namespace {
         }
     };
 
+    class CloneSplitTests {
+    public:
+        void run() {
+            BSONObj collection = BSON( "_id"     << "test.foo" <<
+                                       "dropped" << false <<
+                                       "key"     << BSON( "a" << 1 << "b" << 1 ) <<
+                                       "unique"  << false );
+            // 1-chunk collection
+            // [10,0-20,0)
+            BSONObj min = BSON( "a" << 10 << "b" << 0 );
+            BSONObj max = BSON( "a" << 20 << "b" << 0 );
+            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKey" 
+                                                 << "ns"  << "test.foo" 
+                                                 << "min" << min 
+                                                 << "max" << max ) );
+
+            ShardChunkManager s ( collection , chunks );
+
+            BSONObj split = BSON( "a" << 15 << "b" << 0 );
+            ShardChunkVersion version( 1 , 99 ); // first chunk 1|99 , second 1|100
+            ShardChunkManagerPtr cloned( s.cloneSplit( min , max , split , version ) );
+
+            version.incMinor(); /* 1|100 */
+            ASSERT_EQUALS( cloned->getVersion() , version /* 1|100 */ );
+            ASSERT_EQUALS( s.getNumChunks() , 1u );
+            ASSERT_EQUALS( cloned->getNumChunks() , 2u );
+            ASSERT( cloned->belongsToMe( min ) );
+            ASSERT( cloned->belongsToMe( split ) ); 
+            ASSERT( ! cloned->belongsToMe( max ) );                    
+        }
+    };
+
+    class CloneSplitExceptionTests {
+    public:
+        void run() {
+            BSONObj collection = BSON( "_id"     << "test.foo" <<
+                                       "dropped" << false <<
+                                       "key"     << BSON( "a" << 1 << "b" << 1 ) <<
+                                       "unique"  << false );
+            // 1-chunk collection
+            // [10,0-20,0)
+            BSONObj min = BSON( "a" << 10 << "b" << 0 );
+            BSONObj max = BSON( "a" << 20 << "b" << 0 );
+            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKey"
+                                                 << "ns"  << "test.foo" 
+                                                 << "min" << min 
+                                                 << "max" << max ) );
+
+            ShardChunkManager s ( collection , chunks );
+
+            BSONObj badSplit = BSON( "a" << 5 << "b" << 0 );
+            ASSERT_EXCEPTION( s.cloneSplit( min , max , badSplit , ShardChunkVersion( 1 ) ) , UserException );
+
+            BSONObj badMax = BSON( "a" << 25 << "b" << 0 );
+            BSONObj split = BSON( "a" << 15 << "b" << 0 );
+            ASSERT_EXCEPTION( s.cloneSplit( min , badMax, split , ShardChunkVersion( 1 ) ) , UserException );
+        }
+    };
+
     class EmptyShardTests {
     public:
         void run() {
@@ -323,6 +382,8 @@ namespace {
             add< ClonePlusExceptionTests >();
             add< CloneMinusTests >();
             add< CloneMinusExceptionTests >();
+            add< CloneSplitTests >();
+            add< CloneSplitExceptionTests >();
             add< EmptyShardTests >();
             add< LastChunkTests >();
         }

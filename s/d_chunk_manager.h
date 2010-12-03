@@ -29,7 +29,13 @@ namespace mongo {
      * Controls the boundaries of all the chunks for a given collection that live in this shard.
      *
      * ShardChunkManager instances never change after construction. There are methods provided that would generate a 
-     * new manager if new chunks are added or subtracted.
+     * new manager if new chunks are added, subtracted, or split.
+     *
+     * TODO
+     *   The responsibility of maintaining the version for a shard is still shared between this class and its caller. The
+     *   manager does check corner cases (e.g. cloning out the last chunk generates a manager with version 0) but ultimately
+     *   still cannot be responsible to set all versions. Currently, they are a function of the global state as opposed to 
+     *   the per-shard one.
      */
     class ShardChunkManager : public boost::noncopyable {
     public:
@@ -77,6 +83,17 @@ namespace mongo {
         ShardChunkManager* clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ); 
 
         /**
+         * Generates a new manager by splitting an existing chunk at a given point.
+         *
+         * @param min max boundaries of chunk to be split
+         * @param split point
+         * @param version to be used in first chunk. The second chunk would increment the minor version.
+         * @return a new ShardChunkManager with the chunk split, to be owned by the caller
+         */
+        ShardChunkManager* cloneSplit( const BSONObj& min , const BSONObj& max , const BSONObj& split ,
+                                       const ShardChunkVersion& version );
+
+        /**
          * Checks whether a document belongs to this shard.
          *
          * @param obj document containing sharding keys (and, optionally, other attributes)
@@ -108,6 +125,9 @@ namespace mongo {
         void _fillCollectionKey( const BSONObj& collectionDoc );
         void _fillChunks( DBClientCursorInterface* cursor );
         void _fillRanges();
+
+        /** throws if the exact chunk is not in the chunks' map */
+        void _assertChunkExists( const BSONObj& min , const BSONObj max ) const;
 
         /** can only be used in the cloning calls */
         ShardChunkManager() {}
