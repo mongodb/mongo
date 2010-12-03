@@ -160,8 +160,7 @@ namespace mongo {
         return good;
     }
 
-    void ShardChunkManager::_assertChunkExists( const BSONObj& min , const BSONObj max ) const {
-        // check that we have the exact chunk that'll be subtracted
+    void ShardChunkManager::_assertChunkExists( const BSONObj& min , const BSONObj& max ) const {
         RangeMap::const_iterator it = _chunksMap.find( min );
         if ( it == _chunksMap.end() ) {
             uasserted( 13586 , str::stream() << "couldn't find chunk " << min << "->" << max );

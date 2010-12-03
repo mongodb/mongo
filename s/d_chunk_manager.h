@@ -127,7 +127,7 @@ namespace mongo {
         void _fillRanges();
 
         /** throws if the exact chunk is not in the chunks' map */
-        void _assertChunkExists( const BSONObj& min , const BSONObj max ) const;
+        void _assertChunkExists( const BSONObj& min , const BSONObj& max ) const;
 
         /** can only be used in the cloning calls */
         ShardChunkManager() {}
