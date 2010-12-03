@@ -189,6 +189,58 @@ namespace mongo {
         _versions[ns] = version;
     }
 
+    void ShardingState::resetVersion( const string& ns ) { 
+        scoped_lock lk( _mutex );
+
+        _chunks.erase( ns );
+    }
+    
+    bool ShardingState::trySetVersion( const string& ns , ConfigVersion& version /* IN-OUT */ ) {
+
+        // fast path - requested version is at the same version as this chunk manager
+        //
+        // cases: 
+        //   + this shard updated the version for a migrate's commit (FROM side)
+        //     a client reloaded chunk state from config and picked the newest version
+        //   + two clients reloaded
+        //     one triggered the 'slow path' (below) 
+        //     when the second's request gets here, the version is already current
+        {
+            scoped_lock lk( _mutex );
+            ChunkManagersMap::const_iterator it = _chunks.find( ns );
+            if ( it != _chunks.end() && it->second->getVersion() == version )
+                return true;
+        }
+
+        // slow path - requested version is different than the current chunk manager's, if one exists, so must check for 
+        // newest version in the config server
+        //
+        // cases:
+        //   + a chunk moved TO here 
+        //     (we don't bump up the version on the TO side but the commit to config does use higher version)
+        //     a client reloads from config an issued the request
+        //   + there was a take over from a secondary
+        //     the secondary had no state (managers) at all, so every client request will fall here
+        //   + a stale client request a version that's not current anymore
+
+        const string c = (_configServer == _shardHost) ? "" /* local */ : _configServer;
+        ShardChunkManagerPtr p( new ShardChunkManager( c , ns , _shardName ) );
+        {
+            scoped_lock lk( _mutex );
+
+            // since we loaded the chunk manager unlocked, other thread may have done the same
+            // make sure we keep the freshest config info only
+            ChunkManagersMap::const_iterator it = _chunks.find( ns );
+            if ( it == _chunks.end() || p->getVersion() >= it->second->getVersion() ) {
+                _chunks[ns] = p;
+            }
+
+            ShardChunkVersion oldVersion = version;
+            version = p->getVersion();
+            return oldVersion == version;
+        }
+    }
+
     void ShardingState::appendInfo( BSONObjBuilder& b ){
         b.appendBool( "enabled" , _enabled );
         if ( ! _enabled )

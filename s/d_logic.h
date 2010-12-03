@@ -45,13 +45,44 @@ namespace mongo {
         void gotShardName( const string& name );
         void gotShardHost( string host );
         
+        // version support
+
         bool hasVersion( const string& ns );
         bool hasVersion( const string& ns , ConfigVersion& version );
         const ConfigVersion getVersion( const string& ns ) const;
-        void setVersion( const string& ns , const ConfigVersion& version );
+        void setVersion( const string& ns , const ConfigVersion& version );  // to be deprecated
+        
+        /**
+         * Uninstalls the manager for a given collection. This should be used when the collection is dropped. 
+         * 
+         * NOTE:
+         *   An existing collection with no chunks on this shard will have a manager on version 0, which is different than a
+         *   a dropped collection, which will not have a manager.
+         *
+         * TODO
+         *   When sharding state is enabled, absolutely all collections should have a manager. (The non-sharded ones are
+         *   a be degenerate case of one-chunk collections).
+         *   For now, a dropped collection and an non-sharded one are indistinguishable (SERVER-1849)
+         *
+         * @param ns the collection to be dropped
+         */
+        void resetVersion( const string& ns );
+
+        /**
+         * Requests to access a collection at a certain version. If the collection's manager is not at that version it
+         * will try to update itself to the newest version. The request is only granted if the version is the current or
+         * the newest one.
+         *
+         * @param ns collection to be accessed
+         * @param version (IN) the client belive this collection is on and (OUT) the version the manager is actually in
+         * @return true if the access can be allowed at the provided version
+         */
+        bool trySetVersion( const string& ns , ConfigVersion& version );
         
         void appendInfo( BSONObjBuilder& b );
         
+        // querying support
+
         bool needShardChunkManager( const string& ns ) const;
         ShardChunkManagerPtr getShardChunkManager( const string& ns );
         
