@@ -127,6 +127,49 @@ namespace mongo {
         }
     }
     
+    void ShardingState::donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version ) {
+        scoped_lock lk( _mutex );
+
+        ChunkManagersMap::const_iterator it = _chunks.find( ns );
+        assert( it != _chunks.end() ) ;
+        ShardChunkManagerPtr p = it->second;
+
+        // empty shards should have version 0
+        version = ( p->getNumChunks() > 1 ) ? version : ShardChunkVersion( 0 , 0 );
+
+        ShardChunkManagerPtr cloned( p->cloneMinus( min , max , version ) );
+        _chunks[ns] = cloned;
+    }
+
+    void ShardingState::undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version ) {
+        scoped_lock lk( _mutex );
+
+        ChunkManagersMap::const_iterator it = _chunks.find( ns );
+        assert( it != _chunks.end() ) ;
+        ShardChunkManagerPtr p( it->second->clonePlus( min , max , version ) );
+        _chunks[ns] = p;
+    }
+
+    void ShardingState::splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
+                                    ShardChunkVersion version ) {
+        scoped_lock lk( _mutex );
+        
+        ChunkManagersMap::const_iterator it = _chunks.find( ns );
+        assert( it != _chunks.end() ) ;
+
+        ShardChunkManagerPtr p;
+        BSONObj startKey = min;
+        for ( vector<BSONObj>::const_iterator itKeys = splitKeys.begin(); itKeys != splitKeys.end(); ++itKeys ) {
+            BSONObj splitKey = *itKeys;
+            ShardChunkManagerPtr cloned( it->second->cloneSplit( startKey , max , splitKey , version ) );
+
+            version.incMinor();
+            startKey = splitKey;
+            p = cloned;
+        }
+        _chunks[ns] = p;
+    }
+
     void ShardingState::setVersion( const string& ns , const ConfigVersion& version ){
         scoped_lock lk(_mutex);
 

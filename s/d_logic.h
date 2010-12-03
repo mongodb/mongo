@@ -55,9 +55,53 @@ namespace mongo {
         bool needShardChunkManager( const string& ns ) const;
         ShardChunkManagerPtr getShardChunkManager( const string& ns );
         
+        // chunk migrate and split support
+
+        /** 
+         * Creates and installs a new chunk manager for a given collection by "forgetting" about one of its chunks.
+         * The new manager uses the provided version, which has to be higher than the current manager's.
+         * One exception: if the forgotten chunk is the last one in this shard for the collection, version has to be 0.
+         *
+         * If it runs successfully, clients need to grab the new version to access the collection.
+         *
+         * @param ns the collection
+         * @param min max the chunk to eliminate from the current manager
+         * @param version at which the new manager should be at
+         */
+        void donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version );
+
+        /**
+         * Creates and installs a new chunk manager for a given collection by reclaiming a previously donated chunk.
+         * The previous manager's version has to be provided.
+         *
+         * If it runs successfully, clients that became stale by the previous donateChunk will be able to access the 
+         * collection again.
+         *
+         * @param ns the collection
+         * @param min max the chunk to reclaim and add to the current manager
+         * @param version at which the new manager should be at
+         */
+        void undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version );
+
+        /**
+         * Creates and installs a new chunk manager for a given collection by splitting one of its chunks in two or more.
+         * The version for the first split chunk should be provided. The subsequent chunks' version would be the latter with the
+         * minor portion incremented.
+         *
+         * The effect on clients will depend on the version used. If the major portion is the same as the current shards,
+         * clients shouldn't perceive the split.
+         *
+         * @param ns the collection
+         * @param min max the chunk that should be split
+         * @param splitKeys point in which to split 
+         * @param version at which the new manager should be at
+         */
+        void splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
+                         ShardChunkVersion version );
+
         bool inCriticalMigrateSection();
-    private:
-        
+       
+    private: 
         bool _enabled;
         
         string _configServer;
@@ -72,7 +116,8 @@ namespace mongo {
         NSVersionMap _versions;
 
         // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
-        map<string,ShardChunkManagerPtr> _chunks;
+        typedef map<string,ShardChunkManagerPtr> ChunkManagersMap;
+        ChunkManagersMap _chunks;
     };
     
     extern ShardingState shardingState;
