@@ -45,12 +45,11 @@ namespace mongo {
         void gotShardName( const string& name );
         void gotShardHost( string host );
         
-        // version support
+        // versioning support
 
         bool hasVersion( const string& ns );
         bool hasVersion( const string& ns , ConfigVersion& version );
         const ConfigVersion getVersion( const string& ns ) const;
-        void setVersion( const string& ns , const ConfigVersion& version );  // to be deprecated
         
         /**
          * Uninstalls the manager for a given collection. This should be used when the collection is dropped. 
@@ -85,7 +84,7 @@ namespace mongo {
 
         bool needShardChunkManager( const string& ns ) const;
         ShardChunkManagerPtr getShardChunkManager( const string& ns );
-        
+
         // chunk migrate and split support
 
         /** 
@@ -143,10 +142,8 @@ namespace mongo {
         // protects state below
         mutable mongo::mutex _mutex;
 
-        // map from a namespace into the highest ShardChunkVersion for that collection
-        NSVersionMap _versions;
-
         // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
+        // a ShardChunkManager carries all state we need for a collection at this shard, including its version information
         typedef map<string,ShardChunkManagerPtr> ChunkManagersMap;
         ChunkManagersMap _chunks;
     };

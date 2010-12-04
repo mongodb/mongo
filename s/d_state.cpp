@@ -102,26 +102,29 @@ namespace mongo {
     bool ShardingState::hasVersion( const string& ns ){
         scoped_lock lk(_mutex);
 
-        NSVersionMap::const_iterator i = _versions.find(ns);
-        return i != _versions.end();
+        ChunkManagersMap::const_iterator it = _chunks.find(ns);
+        return it != _chunks.end();
     }
     
     bool ShardingState::hasVersion( const string& ns , ConfigVersion& version ){
         scoped_lock lk(_mutex);
 
-        NSVersionMap::const_iterator i = _versions.find(ns);
-        if ( i == _versions.end() )
+        ChunkManagersMap::const_iterator it = _chunks.find(ns);
+        if ( it == _chunks.end() )
             return false;
-        version = i->second;
+
+        ShardChunkManagerPtr p = it->second;
+        version = p->getVersion();
         return true;
     }
     
     const ConfigVersion ShardingState::getVersion( const string& ns ) const {
         scoped_lock lk(_mutex);
 
-        NSVersionMap::const_iterator it = _versions.find( ns );
-        if ( it != _versions.end() ) {
-            return it->second;
+        ChunkManagersMap::const_iterator it = _chunks.find( ns );
+        if ( it != _chunks.end() ) {
+            ShardChunkManagerPtr p = it->second;
+            return p->getVersion();
         } else {
             return 0;
         }
@@ -158,25 +161,6 @@ namespace mongo {
         assert( it != _chunks.end() ) ;
         ShardChunkManagerPtr p( it->second->cloneSplit( min , max , splitKeys , version ) );
         _chunks[ns] = p;
-    }
-
-    void ShardingState::setVersion( const string& ns , const ConfigVersion& version ){
-        scoped_lock lk(_mutex);
-
-        if ( version != 0 ) {
-            NSVersionMap::const_iterator it = _versions.find( ns );
-
-            // TODO 11-18-2010 as we're bringing chunk boundary information to mongod, it may happen that
-            // we're setting a version for the ns that the shard knows about already (e.g because it set
-            // it itself in a chunk migration)
-            // eventually, the only cases to issue a setVersion would be 
-            // 1) First chunk of a collection, for version 1|0
-            // 2) Drop of a collection, for version 0|0
-            // 3) Load of the shard's chunk state, in a primary-secondary failover
-            assert( it == _versions.end() || version >= it->second );
-        }
-
-        _versions[ns] = version;
     }
 
     void ShardingState::resetVersion( const string& ns ) { 
@@ -245,8 +229,9 @@ namespace mongo {
             
             scoped_lock lk(_mutex);
 
-            for ( NSVersionMap::iterator i=_versions.begin(); i!=_versions.end(); ++i ){
-                bb.appendTimestamp( i->first , i->second );
+            for ( ChunkManagersMap::iterator it = _chunks.begin(); it != _chunks.end(); ++it ){
+                ShardChunkManagerPtr p = it->second;
+                bb.appendTimestamp( it->first , p->getVersion() );
             }
             bb.done();
         }
@@ -264,40 +249,14 @@ namespace mongo {
     }
 
     ShardChunkManagerPtr ShardingState::getShardChunkManager( const string& ns ){
-        ConfigVersion version;
-        { 
-            // check cache
-            scoped_lock lk( _mutex );
+        scoped_lock lk( _mutex );
 
-            NSVersionMap::const_iterator it = _versions.find( ns );
-            if ( it == _versions.end() ) {
-                return ShardChunkManagerPtr();
-            }
-
-            version = it->second;
-
-            // TODO SERVER-1849 pending drop work
-            // the manager should use the cached version only if the versions match exactly
-            ShardChunkManagerPtr p = _chunks[ns];
-            if ( p && p->getVersion() >= version ){
-                // our cached version is good, so just return
-                return p;                
-            }
+        ChunkManagersMap::const_iterator it = _chunks.find( ns );
+        if ( it == _chunks.end() ) {
+            return ShardChunkManagerPtr();
+        } else {
+            return it->second;
         }
-
-        // load the chunk information for this shard from the config database
-        // a reminder: ShardChunkManager may throw on construction
-        const string c = (_configServer == _shardHost) ? "" /* local */ : _configServer;
-        ShardChunkManagerPtr p( new ShardChunkManager( c , ns , _shardName ) );
-
-        // TODO SERVER-1849 verify that the manager's version is exactly the one requested
-        // If not, do update _chunks, but fail the request.
-        { 
-            scoped_lock lk( _mutex );
-            _chunks[ns] = p;
-        }
-
-        return p;
     }
 
     ShardingState shardingState;
@@ -402,7 +361,6 @@ namespace mongo {
         } 
     
     } unsetShardingCommand;
-
     
     class SetShardVersion : public MongodShardCommand {
     public:
@@ -506,7 +464,7 @@ namespace mongo {
                 result.appendTimestamp( "beforeDrop" , globalVersion );
                 // only setting global version on purpose
                 // need clients to re-find meta-data
-                shardingState.setVersion( ns , 0 );
+                shardingState.resetVersion( ns );
                 info->setVersion( ns , 0 );
                 return true;
             }
@@ -539,20 +497,21 @@ namespace mongo {
                 return false;
             }
 
-            result.appendTimestamp( "oldVersion" , oldVersion );
-            result.append( "ok" , 1 );
-
-            info->setVersion( ns , version );
-            shardingState.setVersion( ns , version );
-
-            // TODO SERVER-1849 pending drop work
-            // getShardChunkManager is assuming that the setVersion above were valid
-            // ideally, we'd call getShardChunkManager first, verify that 'version' is sound, and then update
-            // connection and global state
             {
                 dbtemprelease unlock;
-                shardingState.getShardChunkManager( ns );
+
+                ShardChunkVersion currVersion = version;
+                if ( ! shardingState.trySetVersion( ns , currVersion ) ){
+                    result.appendTimestamp( "version" , version );
+                    result.appendTimestamp( "globalVersion" , currVersion );
+                    errmsg = "client version differs from config's";
+                    return false;
+                }
             }
+
+            info->setVersion( ns , version );
+            result.appendTimestamp( "oldVersion" , oldVersion );
+            result.append( "ok" , 1 );
 
             return true;
         }
@@ -625,6 +584,10 @@ namespace mongo {
             return true;
         }
 
+        // TODO
+        //   all collections at some point, be sharded or not, will have a version (and a ShardChunkManager)
+        //   for now, we remove the sharding state of dropped collection
+        //   so delayed request may come in. This has to be fixed.
         ConfigVersion version;    
         if ( ! shardingState.hasVersion( ns , version ) ){
             return true;

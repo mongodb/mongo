@@ -605,7 +605,7 @@ namespace mongo {
             Shard fromShard( from );
             Shard toShard( to );
             
-            log() << "got movechunk: " << cmdObj << endl;
+            log() << "received moveChunk request: " << cmdObj << endl;
 
             timing.done(1);
             // 2. 
@@ -649,14 +649,22 @@ namespace mongo {
                     result.append( "from" , fromShard.getName() );
                     result.append( "official" , myOldShard );
                     return false;
-                }
-                
+                }                
+
                 if ( maxVersion < shardingState.getVersion( ns ) ){
                     errmsg = "official version less than mine?";
                     result.appendTimestamp( "officialVersion" , maxVersion );
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
                     return false;
                 }
+
+                // since this could be the first call that enable sharding we also make sure to have the chunk manager up to date
+                shardingState.gotShardName( myOldShard );
+                ShardChunkVersion shardVersion;
+                shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
+
+                log() << "moveChunk request accepted at version " << shardVersion << endl;
+
             }
             
             timing.done(2);
@@ -733,29 +741,30 @@ namespace mongo {
 
             // 5.
             { 
-                // TODO SERVER-2024
-                // + 5.c kill isEmpty check by using ChunkMatcher knowledge and send the config updates on an applyOps format
-
                 // TODO SERVER-2119
                 // + 5.b check opReplicatedEnough on _recvChunkCommit TO-side
 
                 // 5.a
-                // we're under the collection lock here, so no other migrate can change maxVersion
+                // we're under the collection lock here, so no other migrate can change maxVersion or ShardChunkManager state
                 migrateFromStatus.setInCriticalSection( true );
                 ShardChunkVersion currVersion = maxVersion;
                 ShardChunkVersion myVersion = currVersion;
                 myVersion.incMajor();
-                
+
                 {
                     writelock lk( ns );
                     assert( myVersion > shardingState.getVersion( ns ) );
-                    shardingState.setVersion( ns , myVersion );
-                    assert( myVersion == shardingState.getVersion( ns ) );
+
+                    // bump the chunks manager's version up and "forget" about the chunk being moved
+                    // this is not the commit point but in practice the state in this shard won't until the commit it done
+                    shardingState.donateChunk( ns , min , max , myVersion );
                 }
-                log() << "moveChunk locking myself to: " << myVersion << endl;
-                    
+
+                log() << "moveChunk setting version to: " << myVersion << endl;                    
                 
                 // 5.b
+                // we're under the collection lock here, too, so we can undo the chunk donation because no other state change
+                // could be ongoing
                 {
                     BSONObj res;
                     ScopedDbConnection connTo( to );
@@ -763,13 +772,17 @@ namespace mongo {
                                                   BSON( "_recvChunkCommit" << 1 ) ,
                                                   res );
                     connTo.done();
+
                     log() << "moveChunk commit result: " << res << endl;
+
                     if ( ! ok ){
                         {
                             writelock lk( ns );
-                            shardingState.setVersion( ns , currVersion );
-                            assert( currVersion == shardingState.getVersion( ns ) );
+
+                            // revert the chunk manager back to the state before "forgetting" about the chunk
+                            shardingState.undoDonateChunk( ns , min , max , myVersion );
                         }
+
                         log() << "_recvChunkCommit failed: " << res << " resetting shard version to: " << currVersion << endl;
 
                         errmsg = "_recvChunkCommit failed!";
@@ -777,8 +790,12 @@ namespace mongo {
                         return false;
                     }
                 }
-                
+
                 // 5.c
+
+                // TODO SERVER-2024
+                // + 5.c kill isEmpty check by using ChunkMatcher knowledge and send the config updates on an applyOps format
+
                 ScopedDbConnection conn( shardingState.getConfigServer() );
                 
                 BSONObjBuilder temp;
@@ -797,7 +814,8 @@ namespace mongo {
 
                         temp2.appendTimestamp( "lastmod" , myVersion );
                         
-                        shardingState.setVersion( ns , myVersion );
+                        // logic moved to donateChunk above, clean this up at SERVER-2024
+                        // shardingState.setVersion( ns , myVersion );
 
                         BSONObj chunkIDDoc = x["_id"].wrap();
                         conn->update( ShardNS::chunk , chunkIDDoc , BSON( "$set" << temp2.obj() ) );
@@ -806,7 +824,9 @@ namespace mongo {
                     }
                     else {
                         log() << "moveChunk: i have no chunks left for collection '" << ns << "'" << endl;
-                        shardingState.setVersion( ns , 0 );
+
+                        // logic moved to donateChunk above, clean this up at SERVER-2024
+                        // shardingState.setVersion( ns , 0 );
                     }
                 }
 
@@ -821,7 +841,6 @@ namespace mongo {
             
             migrateFromStatus.done();
             timing.done(5);
-
             
             { // 6.
                 OldDataCleanup c;
