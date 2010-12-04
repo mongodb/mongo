@@ -271,16 +271,22 @@ namespace {
 
             ShardChunkManager s ( collection , chunks );
 
-            BSONObj split = BSON( "a" << 15 << "b" << 0 );
+            BSONObj split1 = BSON( "a" << 15 << "b" << 0 );
+            BSONObj split2 = BSON( "a" << 18 << "b" << 0 );
+            vector<BSONObj> splitKeys;
+            splitKeys.push_back( split1 );
+            splitKeys.push_back( split2 );            
             ShardChunkVersion version( 1 , 99 ); // first chunk 1|99 , second 1|100
-            ShardChunkManagerPtr cloned( s.cloneSplit( min , max , split , version ) );
+            ShardChunkManagerPtr cloned( s.cloneSplit( min , max , splitKeys , version ) );
 
-            version.incMinor(); /* 1|100 */
-            ASSERT_EQUALS( cloned->getVersion() , version /* 1|100 */ );
+            version.incMinor(); /* second chunk 1|100, first split point */
+            version.incMinor(); /* third chunk 1|101, second split point */
+            ASSERT_EQUALS( cloned->getVersion() , version /* 1|101 */ );
             ASSERT_EQUALS( s.getNumChunks() , 1u );
-            ASSERT_EQUALS( cloned->getNumChunks() , 2u );
+            ASSERT_EQUALS( cloned->getNumChunks() , 3u );
             ASSERT( cloned->belongsToMe( min ) );
-            ASSERT( cloned->belongsToMe( split ) ); 
+            ASSERT( cloned->belongsToMe( split1 ) ); 
+            ASSERT( cloned->belongsToMe( split2 ) ); 
             ASSERT( ! cloned->belongsToMe( max ) );                    
         }
     };
@@ -304,11 +310,15 @@ namespace {
             ShardChunkManager s ( collection , chunks );
 
             BSONObj badSplit = BSON( "a" << 5 << "b" << 0 );
-            ASSERT_EXCEPTION( s.cloneSplit( min , max , badSplit , ShardChunkVersion( 1 ) ) , UserException );
+            vector<BSONObj> splitKeys;
+            splitKeys.push_back( badSplit );
+            ASSERT_EXCEPTION( s.cloneSplit( min , max , splitKeys , ShardChunkVersion( 1 ) ) , UserException );
 
             BSONObj badMax = BSON( "a" << 25 << "b" << 0 );
             BSONObj split = BSON( "a" << 15 << "b" << 0 );
-            ASSERT_EXCEPTION( s.cloneSplit( min , badMax, split , ShardChunkVersion( 1 ) ) , UserException );
+            splitKeys.clear();
+            splitKeys.push_back( split );
+            ASSERT_EXCEPTION( s.cloneSplit( min , badMax, splitKeys , ShardChunkVersion( 1 ) ) , UserException );
         }
     };
 

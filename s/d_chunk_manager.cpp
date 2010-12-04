@@ -242,7 +242,7 @@ namespace mongo {
         return p.release();
     }
 
-    ShardChunkManager* ShardChunkManager::cloneSplit( const BSONObj& min , const BSONObj& max , const BSONObj& split , 
+    ShardChunkManager* ShardChunkManager::cloneSplit( const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys , 
                                                       const ShardChunkVersion& version ) {
 
         // the version required in both resulting chunks could be simply an increment in the minor portion of the current version
@@ -257,16 +257,26 @@ namespace mongo {
 
         // check that we have the exact chunk that'll be split and that the split point is valid
         _assertChunkExists( min , max );
-        uassert( 13593 , str::stream() << "can split " << min << " -> " << max << " on " << split, contains( min , max , split ) );
+        for ( vector<BSONObj>::const_iterator it = splitKeys.begin() ; it != splitKeys.end() ; ++it ) {
+            if ( ! contains( min , max , *it ) ) {
+                uasserted( 13593 , str::stream() << "can split " << min << " -> " << max << " on " << *it );
+            }
+        }
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
         
         p->_key = this->_key;
         p->_chunksMap = this->_chunksMap;
-        p->_chunksMap[min] = split.getOwned();
-        p->_chunksMap.insert( make_pair( split.getOwned() , max.getOwned() ) );
-        p->_version = version;
-        p->_version.incMinor();
+        p->_version = version; // will increment second, third, ... chunks below
+
+        BSONObj startKey = min;
+        for ( vector<BSONObj>::const_iterator it = splitKeys.begin() ; it != splitKeys.end() ; ++it ) {
+            BSONObj split = *it;
+            p->_chunksMap[min] = split.getOwned();
+            p->_chunksMap.insert( make_pair( split.getOwned() , max.getOwned() ) );
+            p->_version.incMinor();
+            startKey = split;
+        }
         p->_fillRanges();
 
         return p.release();

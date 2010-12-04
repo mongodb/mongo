@@ -83,14 +83,14 @@ namespace mongo {
         ShardChunkManager* clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ); 
 
         /**
-         * Generates a new manager by splitting an existing chunk at a given point.
+         * Generates a new manager by splitting an existing chunk at one or more points.
          *
          * @param min max boundaries of chunk to be split
-         * @param split point
-         * @param version to be used in first chunk. The second chunk would increment the minor version.
+         * @param splitKeys points to split original chunk at
+         * @param version to be used in first chunk. The subsequent chunks would increment the minor version.
          * @return a new ShardChunkManager with the chunk split, to be owned by the caller
          */
-        ShardChunkManager* cloneSplit( const BSONObj& min , const BSONObj& max , const BSONObj& split ,
+        ShardChunkManager* cloneSplit( const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
                                        const ShardChunkVersion& version );
 
         /**

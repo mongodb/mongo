@@ -156,17 +156,7 @@ namespace mongo {
         
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         assert( it != _chunks.end() ) ;
-
-        ShardChunkManagerPtr p;
-        BSONObj startKey = min;
-        for ( vector<BSONObj>::const_iterator itKeys = splitKeys.begin(); itKeys != splitKeys.end(); ++itKeys ) {
-            BSONObj splitKey = *itKeys;
-            ShardChunkManagerPtr cloned( it->second->cloneSplit( startKey , max , splitKey , version ) );
-
-            version.incMinor();
-            startKey = splitKey;
-            p = cloned;
-        }
+        ShardChunkManagerPtr p( it->second->cloneSplit( min , max , splitKeys , version ) );
         _chunks[ns] = p;
     }
 
