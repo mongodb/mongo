@@ -99,13 +99,15 @@ namespace mongo {
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
             that was declared.  called just before writelock release.  we check a few
             bytes after the declared region to see if they changed.
-
-            As implemented so far, this doesn't really work as we don't 
-            there may have been other validly declared 
-            s to that area, but helpful for debugging.
+            @see MongoMutex::_releasedWriteLock
         */
         void debugCheckLastDeclaredWrite() { 
-#if 0
+            if( 1 ) 
+                return;
+
+            if( testIntent )
+                return;
+
             assert(debug && cmdLine.dur);
             vector<WriteIntent>& w = commitJob.writes();
             if( w.size() == 0 ) 
@@ -123,23 +125,22 @@ namespace mongo {
             unsigned long long *a = (unsigned long long *) (priv+past);
             unsigned long long *b = (unsigned long long *) (writ+past);
             if( *a != *b ) { 
+                for( unsigned z = 0; z < w.size() - 1; z++ ) { 
+                    const WriteIntent& wi = w[z];
+                    char *r1 = (char*) wi.p;
+                    char *r2 = r1 + wi.len;
+                    if( r1 <= (char*)a && r2 > (char*)a ) { 
+                        //log() << "it's ok " << wi.p << ' ' << wi.len << endl;
+                        return;
+                    }
+                }
                 stringstream ss;
                 ss << "dur data after write area (@" << ((void*)a) << ") does not agree\n"
                     << "p: " << i.p << '\n'
                     << "now : " << setw(16) << hex << *a << '\n'
                     << "was : " << setw(16) << hex << *b;
                 log() << ss.str() << endl;
-                for( unsigned z = 0; z < w.size() - 1; z++ ) { 
-                    const WriteIntent& wi = w[z];
-                    char *r1 = (char*) wi.p;
-                    char *r2 = r1 + wi.len;
-                    if( r1 <= (char*)a && r2 > (char*)a ) { 
-                        log() << "it's ok " << wi.p << ' ' << wi.len << endl;
-                    }
-                }
-                log() << "temp" << endl;
             }
-#endif
         }
 
         /** we will build an output buffer ourself and then use O_DIRECT
@@ -220,14 +221,18 @@ namespace mongo {
 
         /** write the buffer we have built to the journal and fsync it.
             outside of lock as that could be slow.
-         */
-         static void WRITETOJOURNAL(AlignedBuilder& ab) { 
+        */
+        static void WRITETOJOURNAL(AlignedBuilder& ab) { 
             journal(ab);
-         }
+        }
 
-         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
-         */
-         static void validateMapsMatch() {
+        /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
+        */
+        static void debugValidateMapsMatch() {
+            const bool Validate = false;
+            if( !Validate ) 
+                 return;
+
             Timer t;
             set<MongoFile*>& files = MongoFile::getAllFiles();
             for( set<MongoFile*>::iterator i = files.begin(); i != files.end(); i++ ) { 
@@ -240,6 +245,7 @@ namespace mongo {
                     unsigned high = 0;
                     for( unsigned i = 0; i < mmf->length(); i++ ) {
                         if( p[i] != w[i] ) { 
+                            log() << i << '\t' << (int) p[i] << '\t' << (int) w[i] << endl;
                             if( i < low ) low = i;
                             if( i > high ) high = i;
                         }
@@ -248,12 +254,16 @@ namespace mongo {
                         std::stringstream ss;
                         ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
+                        log() << "priv loc: " << (void*)(p+low) << endl;
+
+                        vector<WriteIntent>& w = commitJob.writes();
+
                         breakpoint();
                     }
                 }
             }
             log() << t.millis() << "ms " << endl;
-         }
+        }
 
         /** apply the writes back to the non-private MMF after they are for certain in redo log 
 
@@ -274,11 +284,7 @@ namespace mongo {
                 memcpy(dst, intent.p, intent.len);
             }
 
-            // for testing only.  if this fails, a write intent declaration was wrong or missing.
-            const bool ValidateMapsMatch = true;
-            DEV if( ValidateMapsMatch ) {
-                validateMapsMatch();
-            }
+            debugValidateMapsMatch();
         }
 
         /** We need to remap the private views periodically. otherwise they would become very large.

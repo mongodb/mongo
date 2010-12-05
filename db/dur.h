@@ -106,6 +106,8 @@ namespace mongo {
 
 #endif
 
+        void debugCheckLastDeclaredWrite();
+
     } // namespace dur
 
     /** declare that we are modifying a diskloc and this is a datafile write. */

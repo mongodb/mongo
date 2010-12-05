@@ -142,8 +142,12 @@ namespace PdfileTests {
 
         class NewCapFirst : public Base {
             virtual void prepare() {
-                dur::writing( nsd() )->capFirstNewRecord = insert( nsd()->capExtent, 0 );
+                DiskLoc x = insert( nsd()->capExtent, 0 );
+                dur::debugCheckLastDeclaredWrite();
+                dur::writing( nsd() )->capFirstNewRecord = x;
+                dur::debugCheckLastDeclaredWrite();
                 insert( nsd()->capExtent, 1 );
+                dur::debugCheckLastDeclaredWrite();
             }
             virtual int count() const {
                 return 2;
