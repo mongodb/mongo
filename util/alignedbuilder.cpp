@@ -35,7 +35,7 @@ namespace mongo {
         size_t sold = s;
         s += Alignment - 1;
         s = (s/Alignment)*Alignment;
-        dassert( s >= sold );
+        DEV assert( s >= sold );
         _p._data = (char *) s;
     }
 
@@ -67,8 +67,8 @@ namespace mongo {
         _p._allocationAddress = p;
         _p._data = (char *) p;
 #else
-        void *p = mallocSelfAligned(sz);
-        assert( ((size_t) p) % Alignment == 0 );
+        mallocSelfAligned(sz);
+        assert( ((size_t) _p.data) % Alignment == 0 );
 #endif
     }
 
