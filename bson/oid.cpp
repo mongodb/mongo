@@ -15,8 +15,6 @@
  *    limitations under the License.
  */
 
-#pragma once
-
 #include "pch.h"
 #include "oid.h"
 #include "util/atomic_int.h"
