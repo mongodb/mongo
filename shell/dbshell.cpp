@@ -357,7 +357,7 @@ bool isBalanced( string code ){
                 while ( i<code.size() && code[i] != '\n' )
                     i++;
             }
-            break;
+            continue;
         case '{': brackets++; break;
         case '}': if ( brackets <= 0 ) return true; brackets--; break;
         case '(': parens++; break;
@@ -406,6 +406,7 @@ public:
         assert( ! isBalanced( "{ \\/// }" ) );
         assert( isBalanced( "x = 5 + y ") );
         assert( ! isBalanced( "x = ") );
+        assert( ! isBalanced( "x = // hello") );
         assert( ! isBalanced( "x = 5 +") );
         assert( isBalanced( " x ++") );
         assert( isBalanced( "-- x") );
