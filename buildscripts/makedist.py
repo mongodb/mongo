@@ -143,7 +143,7 @@ class EC2InstanceConfigurator(BaseConfigurator):
                                  (("fedora", "8", "x86"), "ami-5647a33f"))),
                                ("rackspace_imgname",
                                 ((("fedora", "12", "x86_64"), "Fedora 12"),
-                                 (("fedora", "13", "x86_64"), "Fedora 13")
+                                 (("fedora", "13", "x86_64"), "Fedora 13"),
                                  (("fedora", "14", "x86_64"), "Fedora 14"))),
                                ("ec2_mtype",
                                 ((("*", "*", "x86"), "m1.small"),
