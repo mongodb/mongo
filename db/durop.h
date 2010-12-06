@@ -40,7 +40,7 @@ namespace mongo {
          */
         class DurOp /* copyable */ { 
         public:
-            // @param opcode a sentinel value near max unsigned which uniquely idenfies the operation.
+            // @param opcode a sentinel value near max unsigned which uniquely identifies the operation.
             // @see dur::JEntry
             DurOp(unsigned opcode) : _opcode(opcode) { }
 
@@ -49,7 +49,7 @@ namespace mongo {
             /** serialize the op out to a builder which will then be written (presumably) to the journal */
             void serialize(AlignedBuilder& ab);
 
-            /** read a durop from journal file referened by br.
+            /** read a durop from journal file referenced by br.
                 @param opcode the opcode which has already been written from the bufreader
             */
             static shared_ptr<DurOp> read(unsigned opcode, BufReader& br);
