@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../pch.h"
+#include "jsobj.h"
 
 namespace mongo {
     
@@ -108,4 +109,29 @@ namespace mongo {
     void setupCoreSignals();
 
     string prettyHostName();
+
+
+    /**
+     * used for setParameter
+     * so you can write validation code that lives with code using it
+     * rather than all in the command place
+     * also lets you have mongos or mongod specific code
+     * without pulling it all sorts of things
+     */
+    class ParameterValidator {
+    public:
+        ParameterValidator( const string& name );
+        virtual ~ParameterValidator(){}
+
+        virtual bool isValid( BSONElement e , string& errmsg ) = 0;
+
+        static ParameterValidator * get( const string& name );
+
+    private:
+        string _name;
+        
+        // don't need to lock since this is all done in static init
+        static map<string,ParameterValidator*> * _all; 
+    };
+    
 }

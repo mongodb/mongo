@@ -449,7 +449,7 @@ string stateToString(MemberState s) {
     if( s.s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
     return "";
 }
-void sayReplSetMemberState() { 
+string sayReplSetMemberState() { 
     try {
         if( latestConn ) { 
             BSONObj info;
@@ -459,10 +459,11 @@ void sayReplSetMemberState() {
                 int s = info["myState"].Int();
                 MemberState ms(s);
                 ss << stateToString(ms);
-                cout << ss.str();
+                return ss.str();
             }
         }
     } catch(...) { }
+    return "";
 }
 
 int _main(int argc, char* argv[]) {
@@ -671,9 +672,9 @@ int _main(int argc, char* argv[]) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
-            sayReplSetMemberState();
+            string prompt(sayReplSetMemberState()+"> ");
 
-            char * line = shellReadline( "> " );
+            char * line = shellReadline( prompt.c_str() );
 
             if ( line ){
                 while (startsWith(line, "> "))

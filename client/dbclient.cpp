@@ -95,6 +95,24 @@ namespace mongo {
         return ConnectionString(); // INVALID
     }
 
+    string ConnectionString::typeToString( ConnectionType type ){
+        switch ( type ){
+        case INVALID:
+            return "invalid";
+        case MASTER:
+            return "master";
+        case PAIR:
+            return "pair";
+        case SET:
+            return "set";
+        case SYNC:
+            return "sync";
+        }
+        assert(0);
+        return "";
+    }
+    
+
     Query& Query::where(const string &jscode, BSONObj scope) { 
         /* use where() before sort() and hint() and explain(), else this will assert. */
         assert( ! isComplex() );

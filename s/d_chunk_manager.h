@@ -29,7 +29,13 @@ namespace mongo {
      * Controls the boundaries of all the chunks for a given collection that live in this shard.
      *
      * ShardChunkManager instances never change after construction. There are methods provided that would generate a 
-     * new manager if new chunks are added or subtracted.
+     * new manager if new chunks are added, subtracted, or split.
+     *
+     * TODO
+     *   The responsibility of maintaining the version for a shard is still shared between this class and its caller. The
+     *   manager does check corner cases (e.g. cloning out the last chunk generates a manager with version 0) but ultimately
+     *   still cannot be responsible to set all versions. Currently, they are a function of the global state as opposed to 
+     *   the per-shard one.
      */
     class ShardChunkManager : public boost::noncopyable {
     public:
@@ -62,6 +68,7 @@ namespace mongo {
          *
          * @param min max chunk boundaries for the chunk to subtract
          * @param version that the resulting manager should be at. The version has to be higher than the current one.
+         *        When cloning away the last chunk, verstion must be 0.
          * @return a new ShardChunkManager, to be owned by the caller
          */
         ShardChunkManager* cloneMinus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ); 
@@ -70,13 +77,24 @@ namespace mongo {
          * Generates a new manager based on 'this's state plus a given chunk.
          *
          * @param min max chunk boundaries for the chunk to add
-         * @param version that the resulting manager should be at.
+         * @param version that the resulting manager should be at. It can never be 0, though (see CloneMinus).
          * @return a new ShardChunkManager, to be owned by the caller
          */
         ShardChunkManager* clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ); 
 
         /**
-         * Checks whether a document belongs to this chunk.
+         * Generates a new manager by splitting an existing chunk at one or more points.
+         *
+         * @param min max boundaries of chunk to be split
+         * @param splitKeys points to split original chunk at
+         * @param version to be used in first chunk. The subsequent chunks would increment the minor version.
+         * @return a new ShardChunkManager with the chunk split, to be owned by the caller
+         */
+        ShardChunkManager* cloneSplit( const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
+                                       const ShardChunkVersion& version );
+
+        /**
+         * Checks whether a document belongs to this shard.
          *
          * @param obj document containing sharding keys (and, optionally, other attributes)
          * @return true if shards hold the object
@@ -85,7 +103,8 @@ namespace mongo {
 
         // accessors
 
-        ShardChunkVersion getVersion() const { return _version; } 
+        ShardChunkVersion getVersion() const { return _version; }
+        unsigned getNumChunks() const { return _chunksMap.size(); }
 
     private:
         // highest ShardChunkVersion for which this ShardChunkManager's information is accurate
@@ -106,6 +125,9 @@ namespace mongo {
         void _fillCollectionKey( const BSONObj& collectionDoc );
         void _fillChunks( DBClientCursorInterface* cursor );
         void _fillRanges();
+
+        /** throws if the exact chunk is not in the chunks' map */
+        void _assertChunkExists( const BSONObj& min , const BSONObj& max ) const;
 
         /** can only be used in the cloning calls */
         ShardChunkManager() {}

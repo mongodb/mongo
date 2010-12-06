@@ -58,6 +58,9 @@ def has_option( name ):
     if x == False:
         return False
 
+    if x == "":
+        return False
+
     return True
 
 def get_variant_dir():
@@ -95,6 +98,10 @@ add_option( "nostrip", "do not strip installed binaries" , 0 , False )
 add_option( "sharedclient", "build a libmongoclient.so/.dll" , 0 , False )
 add_option( "full", "include client and headers when doing scons install", 0 , False )
 
+# linking options
+add_option( "release" , "release build" , 0 , True )
+add_option( "static" , "fully static build" , 0 , True )
+
 # base compile flags
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
 add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
@@ -113,9 +120,6 @@ add_option( "staticlibpath", "comma separated list of dirs to search for staticl
 add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
 add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
 
-# linking options
-add_option( "release" , "release build" , 0 , True )
-add_option( "static" , "fully static build" , 0 , True )
 
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
@@ -147,7 +151,6 @@ add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
-
 
 # --- environment setup ---
 

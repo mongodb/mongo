@@ -635,7 +635,7 @@ namespace mongo {
             stringstream ss;
             ss << "saving first chunk failed.  cmd: " << chunkCmd << " result: " << errmsg;
             log( LL_ERROR ) << ss.str() << endl;
-            msgasserted( 13327 , ss.str() );
+            msgasserted( 13592 , ss.str() ); // assert(13592)
         }
 
         conn.done();
@@ -1100,6 +1100,10 @@ namespace mongo {
 
     // ----- to be removed ---
     extern OID serverID;
+
+    // NOTE (careful when deprecating)
+    //   currently the sharding is enabled because of a write or read (as opposed to a split or migrate), the shard learns
+    //   its name and through the 'setShardVersion' command call
     bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result ){
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append( "setShardVersion" , ns.c_str() );
