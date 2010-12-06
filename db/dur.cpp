@@ -265,6 +265,8 @@ namespace mongo {
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << endl;
                         vector<WriteIntent>& w = commitJob.writes();
+                        (void)w; // mark as unused. Useful for inspection in debugger
+
                         breakpoint();
                     }
                 }
