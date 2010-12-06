@@ -68,7 +68,7 @@ namespace mongo {
         _p._data = (char *) p;
 #else
         mallocSelfAligned(sz);
-        assert( ((size_t) _p.data) % Alignment == 0 );
+        assert( ((size_t) _p._data) % Alignment == 0 );
 #endif
     }
 
