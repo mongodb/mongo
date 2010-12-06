@@ -311,6 +311,9 @@
     <ClCompile Include="..\util\alignedbuilder.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\bson\oid.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gridconfig.h">

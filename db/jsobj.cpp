@@ -18,6 +18,7 @@
  */
 
 #include "pch.h"
+#include "../bson/oid.h"
 #include "jsobj.h"
 #include "nonce.h"
 #include "../bson/util/atomic_int.h"
@@ -1184,84 +1185,6 @@ namespace mongo {
             testorder();
         }
     } bson_unittest;
-
-/*
-    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const char * value ) {
-        _builder->append( _fieldName , value );
-        return *_builder;
-    }
-
-    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const int value ) {
-        _builder->append( _fieldName , value );
-        return *_builder;
-    }
-
-    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const double value ) {
-        _builder->append( _fieldName , value );
-        return *_builder;
-    }
-*/
-
-    void OID::init() {
-        static AtomicUInt inc = getRandomNumber();
-        unsigned t = (unsigned) time(0);
-        char *T = (char *) &t;
-        data[0] = T[3];
-        data[1] = T[2];
-        data[2] = T[1];
-        data[3] = T[0];
-
-        (unsigned&) data[4] = _machine;
-
-        int new_inc = inc++;
-        T = (char *) &new_inc;
-        char * raw = (char*)&b;
-        raw[0] = T[3];
-        raw[1] = T[2];
-        raw[2] = T[1];
-        raw[3] = T[0];
-    }
-
-    unsigned OID::_machine = (unsigned) security.getNonceInitSafe();
-    void OID::newState(){
-        unsigned before = _machine;
-        // using fresh Security object to avoid buffered devrandom
-        _machine = (unsigned)security.getNonce();
-        assert( _machine != before );
-    }
-    
-    void OID::init( string s ){
-        assert( s.size() == 24 );
-        const char *p = s.c_str();
-        for( int i = 0; i < 12; i++ ) {
-            data[i] = fromHex(p);
-            p += 2;
-        }
-    }
-
-    void OID::init(Date_t date, bool max){
-        int time = (int) (date / 1000);
-        char* T = (char *) &time;
-        data[0] = T[3];
-        data[1] = T[2];
-        data[2] = T[1];
-        data[3] = T[0];
-
-        if (max)
-            *(long long*)(data + 4) = 0xFFFFFFFFFFFFFFFFll;
-        else
-            *(long long*)(data + 4) = 0x0000000000000000ll;
-    }
-
-    time_t OID::asTimeT(){
-        int time;
-        char* T = (char *) &time;
-        T[0] = data[3];
-        T[1] = data[2];
-        T[2] = data[1];
-        T[3] = data[0];
-        return time;
-    }
 
     Labeler::Label GT( "$gt" );
     Labeler::Label GTE( "$gte" );

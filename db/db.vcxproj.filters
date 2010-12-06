@@ -439,6 +439,9 @@
     <ClCompile Include="..\util\alignedbuilder.cpp">
       <Filter>util</Filter>
     </ClCompile>
+    <ClCompile Include="..\bson\oid.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

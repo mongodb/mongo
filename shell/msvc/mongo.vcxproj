@@ -87,6 +87,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\bson\oid.cpp" />
     <ClCompile Include="..\..\client\clientOnly.cpp" />
     <ClCompile Include="..\..\client\connpool.cpp" />
     <ClCompile Include="..\..\client\syncclusterconnection.cpp" />

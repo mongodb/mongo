@@ -202,10 +202,10 @@ namespace mongo {
                 bb.done();
             }
             if ( cmdObj["oidReset"].trueValue() ){
-                result.append( "oidMachineOld" , OID::staticMachine() );
-                OID::newState();
+                result.append( "oidMachineOld" , OID::getMachineId() );
+                OID::regenMachineId();
             }
-            result.append( "oidMachine" , OID::staticMachine() );
+            result.append( "oidMachine" , OID::getMachineId() );
             return true;
         }
         

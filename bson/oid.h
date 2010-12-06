@@ -30,20 +30,33 @@ namespace mongo {
         automatically in certain circumstances.
 
         Warning: You must call OID::newState() after a fork().
+
+        Typical contents of the BSON ObjectID is a 12-byte value consisting of a 4-byte timestamp (seconds since epoch), 
+        a 3-byte machine id, a 2-byte process id, and a 3-byte counter. Note that the timestamp and counter fields must 
+        be stored big endian unlike the rest of BSON. This is because they are compared byte-by-byte and we want to ensure 
+        a mostly increasing order.
     */
     class OID {
+    public:
+        struct MachineAndPid { 
+            unsigned char _machineNumber[3];
+            unsigned short _pid;
+        };
+    private:
         union {
-            struct{
+            struct {
+                // 12 bytes total
+                unsigned char _time[4];
+                MachineAndPid _machineAndPid;
+                unsigned char _inc[3];
+            };
+            struct {
                 long long a;
                 unsigned b;
             };
             unsigned char data[12];
         };
-        static unsigned _machine;
     public:
-        /** call this after a fork */
-        static void newState();
-
 		/** initialize to 'null' */
 		void clear() { a = 0; b = 0; }
 
@@ -65,8 +78,6 @@ namespace mongo {
 
         static OID gen() { OID o; o.init(); return o; }
         
-        static unsigned staticMachine(){ return _machine; }
-
         /** sets the contents to a new oid / randomized value */
         void init();
 
@@ -84,6 +95,12 @@ namespace mongo {
         int compare( const OID& other ) const { return memcmp( data , other.data , 12 ); }
         
         bool operator<( const OID& other ) const { return compare( other ) < 0; }
+
+        /** call this after a fork */
+        static void justForked();
+
+        static unsigned getMachineId();
+        static void regenMachineId();
     };
 #pragma pack()
 
