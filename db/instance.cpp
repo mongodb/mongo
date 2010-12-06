@@ -583,7 +583,7 @@ namespace mongo {
                 BSONObjIterator i( js );
                 while ( i.more() ){
                     BSONElement e = i.next();
-                    uassert( 13511 , "object to insert can't have $ mofidiers" , e.fieldName()[0] != '$' );
+                    uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
                 }
             }
             theDataFileMgr.insertWithObjMod(ns, js, false);
