@@ -20,10 +20,13 @@
 #include "util/atomic_int.h"
 #include "../db/nonce.h"
 
+BOOST_STATIC_ASSERT( sizeof(mongo::OID::MachineAndPid) == 5 );
+BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
+
 namespace mongo {
 
-    static unsigned short ourPid() { 
-        unsigned short pid;
+    static unsigned ourPid() { 
+        unsigned pid;
 #if defined(_WIN32)
         pid = (unsigned short) GetCurrentProcessId();
 #elif defined(__linux__)
@@ -37,10 +40,18 @@ namespace mongo {
     // machine # before folding in the process id
     static OID::MachineAndPid ourMachine;
 
+    static void foldInPid(OID::MachineAndPid& x) { 
+        unsigned p = ourPid();
+        x._pid ^= (unsigned short) p;
+        // when the pid is greater than 16 bits, let the high bits modulate the machine id field.
+        unsigned short& rest = (unsigned short &) x._machineNumber[1];
+        rest ^= p >> 16;
+    }
+
     static OID::MachineAndPid __gen() { 
         unsigned long long n = security.getNonce();
         OID::MachineAndPid x = ourMachine = (OID::MachineAndPid&) n;
-        x._pid = x._pid ^ ourPid();
+        foldInPid(x);
         return x;
     }
 
@@ -68,7 +79,7 @@ namespace mongo {
         MachineAndPid x = ourMachine;
         // we let the random # for machine go into all 5 bytes of MachineAndPid, and then 
         // xor in the pid into _pid.  this reduces the probability of collisions.
-        x._pid = x._pid ^ ourPid();
+        foldInPid(x);
         ourMachineAndPid = __gen();
         assert( x != ourMachineAndPid );
         ourMachineAndPid = x;
