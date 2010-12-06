@@ -192,7 +192,8 @@ def __main__():
              ("debian", "5.0"),
              ("centos", "5.4"),
              ("fedora", "12"),
-             ("fedora", "13"))
+             ("fedora", "13"),
+             ("fedora", "14"))
     arches = ("x86", "x86_64")
 #    mongos = branches.split(',')
     # Run a makedist for each distro/version/architecture tuple above.
