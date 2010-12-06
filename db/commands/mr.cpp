@@ -33,7 +33,7 @@ namespace mongo {
 
     namespace mr {
 
-        AtomicUInt MRSetup::JOB_NUMBER;
+        AtomicUInt Config::JOB_NUMBER;
 
         BSONObj reduceValues( BSONList& values , MRReduceState * state , bool final ){
             uassert( 10074 ,  "need values" , values.size() );
@@ -108,7 +108,7 @@ namespace mongo {
             return b.obj();
         }
         
-        MRSetup::MRSetup( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp ){
+        Config::Config( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp ){
             
             dbname = _dbname;
             ns = dbname + "." + cmdObj.firstElement().valuestr();
@@ -195,13 +195,13 @@ namespace mongo {
             }
         }
 
-        string MRSetup::scopeAndCode (BSONObjBuilder& scopeBuilder, const BSONElement& field) {
+        string Config::scopeAndCode (BSONObjBuilder& scopeBuilder, const BSONElement& field) {
             if ( field.type() == CodeWScope )
                 scopeBuilder.appendElements( field.codeWScopeObject() );
             return field._asCode();
         }
 
-        long long MRSetup::renameIfNeeded( DBDirectClient& db , MRReduceState * state ){
+        long long Config::renameIfNeeded( DBDirectClient& db , MRReduceState * state ){
             assertInWriteLock();
             if ( finalLong != tempLong ){
                     
@@ -254,11 +254,11 @@ namespace mongo {
             return db.count( finalLong );
         }
         
-        void MRSetup::insert( const string& ns , BSONObj& o ){
+        void MRState::insert( const string& ns , BSONObj& o ){
             writelock l( ns );
             Client::Context ctx( ns );
                 
-            if ( replicate )
+            if ( setup.replicate )
                 theDataFileMgr.insertAndLog( ns.c_str() , o , false );
             else
                 theDataFileMgr.insertWithObjMod( ns.c_str() , o , false );
@@ -266,7 +266,7 @@ namespace mongo {
         }
 
 
-        MRState::MRState( MRSetup& s ) 
+        MRState::MRState( Config& s ) 
             : setup(s){
         }
 
@@ -307,7 +307,7 @@ namespace mongo {
             BSONObj key = values.begin()->firstElement().wrap( "_id" );
             BSONObj res = reduceValues( values , this , true );
             
-            setup.insert( setup.tempLong , res );
+            insert( setup.tempLong , res );
         }
 
         MRTL::MRTL( MRState& state ) 
@@ -335,7 +335,7 @@ namespace mongo {
                 }
                 else if ( all.size() > 1 ){
                     BSONObj res = reduceValues( all , &_state , false );
-                    insert( res );
+                    emit( res );
                 }
             }
         }
@@ -357,7 +357,7 @@ namespace mongo {
 
         }
             
-        void MRTL::insert( const BSONObj& a ){
+        void MRTL::emit( const BSONObj& a ){
             BSONList& all = (*_temp)[a];
             all.push_back( a );
             _size += a.objsize() + 16;
@@ -387,7 +387,7 @@ namespace mongo {
         BSONObj fast_emit( const BSONObj& args ){
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
             uassert( 13069 , "an emit can't be more than 2mb" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
-            _tlmr->insert( args );
+            _tlmr->emit( args );
             _tlmr->numEmits++;
             return BSONObj();
         }
@@ -409,7 +409,7 @@ namespace mongo {
                 Client& client = cc();
                 CurOp * op = client.curop();
 
-                MRSetup mr( dbname , cmd );
+                Config mr( dbname , cmd );
 
                 log(1) << "mr ns: " << mr.ns << endl;
                 
@@ -533,7 +533,7 @@ namespace mongo {
                             }
                             
                             BSONObj indexToInsert = b.obj();
-                            mr.insert( Namespace( mr.tempLong.c_str() ).getSisterNS( "system.indexes" ).c_str() , indexToInsert );
+                            state.insert( Namespace( mr.tempLong.c_str() ).getSisterNS( "system.indexes" ).c_str() , indexToInsert );
                         }
                         
                     }
@@ -641,7 +641,7 @@ namespace mongo {
             bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
 
-                MRSetup mr( dbname , cmdObj.firstElement().embeddedObjectUserCheck() , false );
+                Config mr( dbname , cmdObj.firstElement().embeddedObjectUserCheck() , false );
                 
                 set<ServerAndQuery> servers;
                 

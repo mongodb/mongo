@@ -50,9 +50,9 @@ namespace mongo {
         /**
          * holds map/reduce config information
          */
-        class MRSetup {
+        class Config {
         public:
-            MRSetup( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp = true );
+            Config( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp = true );
 
             /** Field expected to be a Code or CodeWScope.
              * Add its scope, if any, to scopeBuilder, and return its code.
@@ -64,8 +64,6 @@ namespace mongo {
              */
             long long renameIfNeeded( DBDirectClient& db , MRReduceState * state );
             
-            void insert( const string& ns , BSONObj& o );
-
             string dbname;
             string ns;
             
@@ -108,12 +106,14 @@ namespace mongo {
          */
         class MRState : public MRReduceState {
         public:
-            MRState( MRSetup& s );
+            MRState( Config& s );
             void init();
             
             void finalReduce( BSONList& values );
-            
-            MRSetup& setup;
+
+            void insert( const string& ns , BSONObj& o );
+
+            Config& setup;
             DBDirectClient db;
 
             ScriptingFunction map;
@@ -131,7 +131,7 @@ namespace mongo {
 
             void dump();
             
-            void insert( const BSONObj& a );
+            void emit( const BSONObj& a );
 
             void checkSize();
 
