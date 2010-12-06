@@ -57,6 +57,9 @@ namespace mongo {
 
     namespace dur { 
 
+        const bool DebugValidateMapsMatch = false;
+        const bool DebugCheckLastDeclaredWrite = false;
+
         static CommitJob commitJob;
 
         /** Declare that a file has been created 
@@ -74,6 +77,8 @@ namespace mongo {
             WriteIntent w(p, len);
             commitJob.note(w);
         }
+
+        string hexdump(const char *data, unsigned len);
 
         void* writingPtr(void *x, unsigned len) { 
             void *p = x;
@@ -99,14 +104,20 @@ namespace mongo {
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
             that was declared.  called just before writelock release.  we check a few
             bytes after the declared region to see if they changed.
+
             @see MongoMutex::_releasedWriteLock
+
+            SLOW
         */
         void debugCheckLastDeclaredWrite() { 
-            if( 1 ) 
+            if( !DebugCheckLastDeclaredWrite )
                 return;
 
             if( testIntent )
                 return;
+
+            static int n;
+            ++n;
 
             assert(debug && cmdLine.dur);
             vector<WriteIntent>& w = commitJob.writes();
@@ -129,17 +140,16 @@ namespace mongo {
                     const WriteIntent& wi = w[z];
                     char *r1 = (char*) wi.p;
                     char *r2 = r1 + wi.len;
-                    if( r1 <= (char*)a && r2 > (char*)a ) { 
+                    if( r1 <= (((char*)a)+8) && r2 > (char*)a ) { 
                         //log() << "it's ok " << wi.p << ' ' << wi.len << endl;
                         return;
                     }
                 }
-                stringstream ss;
-                ss << "dur data after write area (@" << ((void*)a) << ") does not agree\n"
-                    << "p: " << i.p << '\n'
-                    << "now : " << setw(16) << hex << *a << '\n'
-                    << "was : " << setw(16) << hex << *b;
-                log() << ss.str() << endl;
+                log() << "dur data after write area " << i.p << " does not agree" << endl;
+                log() << " was:  " << ((void*)b) << "  " << hexdump((char*)b, 8) << endl;
+                log() << " now:  " << ((void*)a) << "  " << hexdump((char*)a, 8) << endl;
+                log() << " n:    " << n << endl;
+                log() << endl;
             }
         }
 
@@ -229,8 +239,7 @@ namespace mongo {
         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
         */
         static void debugValidateMapsMatch() {
-            const bool Validate = false;
-            if( !Validate ) 
+            if( !DebugValidateMapsMatch ) 
                  return;
 
             Timer t;
@@ -255,14 +264,12 @@ namespace mongo {
                         ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << endl;
-
                         vector<WriteIntent>& w = commitJob.writes();
-
                         breakpoint();
                     }
                 }
             }
-            log() << t.millis() << "ms " << endl;
+            log() << "debugValidateMapsMatch " << t.millis() << "ms " << endl;
         }
 
         /** apply the writes back to the non-private MMF after they are for certain in redo log 

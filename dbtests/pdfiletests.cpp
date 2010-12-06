@@ -79,7 +79,7 @@ namespace PdfileTests {
                     ofs = e->lastRecord.getOfs() + e->lastRecord.rec()->lengthWithHeaders;
                 DiskLoc dl( ext.a(), ofs );
                 Record *r = dl.rec();
-                r = dur::writing(r);
+                r = (Record*) dur::writingPtr(r, Record::HeaderSize + len);
                 r->lengthWithHeaders = Record::HeaderSize + len;
                 r->extentOfs = e->myLoc.getOfs();
                 r->nextOfs = DiskLoc::NullOfs;

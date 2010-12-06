@@ -229,7 +229,7 @@ namespace mongo {
             _fileToPtr.clear();
         }
 
-        static string hexdump(const char *data, unsigned len) {
+        string hexdump(const char *data, unsigned len) {
             const unsigned char *p = (const unsigned char *) data;
             stringstream ss;
             for( unsigned i = 0; i < 4 && i < len; i++ ) {

@@ -177,7 +177,10 @@ namespace mongo {
         int extentOfs;
         int nextOfs;
         int prevOfs;
+
+        /** be careful when referencing this that your write intent was correct */
         char data[4];
+
         int netLength() {
             return lengthWithHeaders - HeaderSize;
         }
