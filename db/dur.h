@@ -21,6 +21,7 @@ namespace mongo {
         template <typename T> inline T* alreadyDeclared(T *x) { return x; }
         inline void declareWriteIntent(void *, unsigned) { }
         inline void createdFile(string filename, unsigned long long len) { }
+        inline void debugCheckLastDeclaredWrite() { }
 #else
 
         /** call during startup so durability module can initialize 
