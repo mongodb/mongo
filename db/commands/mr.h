@@ -112,40 +112,42 @@ namespace mongo {
             void finalReduce( BSONList& values );
 
             void insert( const string& ns , BSONObj& o );
+            
+            /**
+             * run reduce on _temp
+             */
+            void reduceInMemory();
+            
+            /**
+             * transfers in memory storage to temp collection
+             */
+            void dump();
+            
+            /**
+             * stages on in in-memory storage
+             */
+            void emit( const BSONObj& a );
+
+            /**
+             * if size is big, run a reduce
+             * if its still big, dump to temp collection
+             */
+            void checkSize();
+            
+            void _insert( BSONObj& o );
+            
 
             Config& setup;
             DBDirectClient db;
 
             ScriptingFunction map;
-        };
-        
-        /**
-         * thread local map/reduce state
-         * used for access map/reduce state from inside javascript calls
-         */
-        class MRTL {
-        public:
-            MRTL( MRState& state );
-            
-            void reduceInMemory();
 
-            void dump();
-            
-            void emit( const BSONObj& a );
-
-            void checkSize();
-
-        private:
-            void write( BSONObj& o );
-            
-            MRState& _state;
-        
-            boost::shared_ptr<InMemory> _temp;
+            shared_ptr<InMemory> _temp;
             long _size;
             
-        public:
             long long numEmits;
         };
+        
 
     } // end mr namespace
 }

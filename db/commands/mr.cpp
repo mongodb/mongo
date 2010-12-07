@@ -267,7 +267,8 @@ namespace mongo {
 
 
         MRState::MRState( Config& s ) 
-            : setup(s){
+            : setup(s), _size(0), numEmits(0){
+            _temp.reset( new InMemory() );
         }
 
         void MRState::init(){
@@ -310,15 +311,7 @@ namespace mongo {
             insert( setup.tempLong , res );
         }
 
-        MRTL::MRTL( MRState& state ) 
-            : _state( state )
-            , _temp(new InMemory())
-        {
-            _size = 0;
-            numEmits = 0;
-        }
-            
-        void MRTL::reduceInMemory(){
+        void MRState::reduceInMemory(){
             boost::shared_ptr<InMemory> old = _temp;
             _temp.reset(new InMemory());
             _size = 0;
@@ -329,20 +322,20 @@ namespace mongo {
                 
                 if ( all.size() == 1 ){
                     // this key has low cardinality, so just write to db
-                    writelock l(_state.setup.incLong);
-                    Client::Context ctx(_state.setup.incLong.c_str());
-                    write( *(all.begin()) );
+                    writelock l(setup.incLong);
+                    Client::Context ctx(setup.incLong.c_str());
+                    _insert( *(all.begin()) );
                 }
                 else if ( all.size() > 1 ){
-                    BSONObj res = reduceValues( all , &_state , false );
+                    BSONObj res = reduceValues( all , this , false );
                     emit( res );
                 }
             }
         }
         
-        void MRTL::dump(){
-            writelock l(_state.setup.incLong);
-            Client::Context ctx(_state.setup.incLong);
+        void MRState::dump(){
+            writelock l(setup.incLong);
+            Client::Context ctx(setup.incLong);
                     
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
                 BSONList& all = i->second;
@@ -350,20 +343,20 @@ namespace mongo {
                     continue;
                     
                 for ( BSONList::iterator j=all.begin(); j!=all.end(); j++ )
-                    write( *j );
+                    _insert( *j );
             }
             _temp->clear();
             _size = 0;
 
         }
             
-        void MRTL::emit( const BSONObj& a ){
+        void MRState::emit( const BSONObj& a ){
             BSONList& all = (*_temp)[a];
             all.push_back( a );
             _size += a.objsize() + 16;
         }
 
-        void MRTL::checkSize(){
+        void MRState::checkSize(){
             if ( _size < 1024 * 5 )
                 return;
 
@@ -378,17 +371,23 @@ namespace mongo {
             log(1) << "  mr: dumping to db" << endl;
         }
 
-        void MRTL::write( BSONObj& o ){
-            theDataFileMgr.insertWithObjMod( _state.setup.incLong.c_str() , o , true );
+        void MRState::_insert( BSONObj& o ){
+            theDataFileMgr.insertWithObjMod( setup.incLong.c_str() , o , true );
         }
 
-        boost::thread_specific_ptr<MRTL> _tlmr;
+        class StateHolder {
+        public:
+            StateHolder( MRState * s ) : _s(s) {}
+            MRState* operator->(){ return _s; }
+            MRState * _s;
+        };
+        boost::thread_specific_ptr<StateHolder> _tl;
 
         BSONObj fast_emit( const BSONObj& args ){
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
             uassert( 13069 , "an emit can't be more than 2mb" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
-            _tlmr->emit( args );
-            _tlmr->numEmits++;
+            (*_tl)->emit( args );
+            (*_tl)->numEmits++;
             return BSONObj();
         }
 
@@ -429,11 +428,9 @@ namespace mongo {
                 
                 try {
                     state.init();
-
                     state.scope->injectNative( "emit" , fast_emit );
                     
-                    MRTL * mrtl = new MRTL( state );
-                    _tlmr.reset( mrtl );
+                    _tl.reset( new StateHolder( &state ) );
 
                     ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter , 0 , mr.limit ) ) );
                     long long mapTime = 0;
@@ -472,7 +469,7 @@ namespace mongo {
                             if ( num % 100 == 0 ){
                                 ClientCursor::YieldLock yield (cursor.get());
                                 Timer t;
-                                mrtl->checkSize();
+                                state.checkSize();
                                 inReduce += t.micros();
                                 
                                 if ( ! yield.stillOk() ){
@@ -493,8 +490,8 @@ namespace mongo {
                     killCurrentOp.checkForInterrupt();
 
                     countsBuilder.appendNumber( "input" , num );
-                    countsBuilder.appendNumber( "emit" , mrtl->numEmits );
-                    if ( mrtl->numEmits )
+                    countsBuilder.appendNumber( "emit" , state.numEmits );
+                    if ( state.numEmits )
                         shouldHaveData = true;
                     
                     timingBuilder.append( "mapTime" , mapTime / 1000 );
@@ -502,8 +499,8 @@ namespace mongo {
                     
                     // final reduce
                     op->setMessage( "m/r: (2/3) final reduce in memory" );
-                    mrtl->reduceInMemory();
-                    mrtl->dump();
+                    state.reduceInMemory();
+                    state.dump();
                     
                     BSONObj sortKey = BSON( "0" << 1 );
                     db.ensureIndex( mr.incLong , sortKey );
@@ -593,7 +590,7 @@ namespace mongo {
                         pm.finished();
                     }
 
-                    _tlmr.reset( 0 );
+                    _tl.reset();
                 }
                 catch ( ... ){
                     log() << "mr failed, removing collection" << endl;
