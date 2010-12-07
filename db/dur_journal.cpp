@@ -63,7 +63,7 @@ namespace mongo {
         }
 
         JHeader::JHeader(string fname) { 
-            txt[0] = 'j'; txt[1] = '\n';
+            magic[0] = 'j'; magic[1] = '\n';
             version = 0x4141;
             memset(ts, 0, sizeof(ts));
             strncpy(ts, time_t_to_String_short(time(0)).c_str(), sizeof(ts)-1);
