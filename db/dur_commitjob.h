@@ -47,16 +47,18 @@ namespace mongo {
             void clear() { memset(this, 0, sizeof(*this)); }
 
             /* see if we have Already recorded/indicated our write intent for this region of memory.
+               automatically upgrades the length if the length was shorter previously.
                @return true if already indicated.
             */
             bool checkAndSet(const WriteIntent& w) {
                 unsigned x = mongoutils::hashPointer(w.p);
                 WriteIntent& nd = nodes[x % N];
-                if( nd.p != w.p || nd.len < w.len ) {
-                    nd = w;
-                    return false;
+                if( nd.p == w.p ) { 
+                    if( nd.len < w.len ) 
+                        nd.len = w.len;
+                    return true;
                 }
-                return true;
+                return false;
             }
         };
 
