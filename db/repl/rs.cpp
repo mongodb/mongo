@@ -21,6 +21,7 @@
 #include "../../client/dbclient.h"
 #include "../dbhelpers.h"
 #include "rs.h"
+#include "connections.h"
 
 namespace mongo { 
 
@@ -362,6 +363,10 @@ namespace mongo {
                         newOnes.push_back(&m);
                     }
                 }
+                
+                // change timeout settings, if necessary
+                ScopedConn conn(m.h.toString());
+                conn.setTimeout(c.ho.heartbeatTimeoutMillis/1000.0);
             }
             if( me == 0 ) {
                 // log() << "replSet config : " << _cfg->toString() << rsLog;

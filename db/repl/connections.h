@@ -59,6 +59,9 @@ namespace mongo {
         BSONObj findOne(const string &ns, const Query& q, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) { 
             return conn()->findOne(ns, q, fieldsToReturn, queryOptions);
         }
+        void setTimeout(double to) {
+            conn()->setSoTimeout(to);
+        }
 
     private:
         auto_ptr<scoped_lock> connLock;
@@ -66,8 +69,7 @@ namespace mongo {
         struct X { 
             mutex z;
             DBClientConnection cc;
-            X() : z("X"), cc(/*reconnect*/ true, 0, 
-                             /*timeout*/ theReplSet ? theReplSet->config().ho.heartbeatTimeoutMillis/1000.0 : 10.0) { 
+            X() : z("X"), cc(/*reconnect*/ true, 0, /*timeout*/ 10.0) { 
                 cc._logLevel = 2;
             }
         } *x;

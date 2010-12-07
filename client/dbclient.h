@@ -883,7 +883,8 @@ namespace mongo {
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }  
         virtual bool isMember( const DBConnector * conn ) const { return this == conn; };
         virtual void checkResponse( const char *data, int nReturned );
-
+        void setSoTimeout(double to) { _so_timeout = to; }
+        
         static int getNumConnections(){
             return _numConnections;
         }
@@ -906,8 +907,8 @@ namespace mongo {
         // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
         void checkConnection() { if( failed ) _checkConnection(); }
 
-		map< string, pair<string,string> > authCache;
-        const double _so_timeout;        
+        map< string, pair<string,string> > authCache;
+        double _so_timeout;        
         bool _connect( string& errmsg );
 
         static AtomicUInt _numConnections;
