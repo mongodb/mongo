@@ -165,9 +165,9 @@ namespace mongo {
             void go(vector<path>& files);
             ~RecoveryJob();
         private:
-            void __apply(const vector<FullyQualifiedJournalEntry> &entries);
-            bool _apply(void *, unsigned len);
-            bool apply(path journalfile);
+            void applyEntries(const vector<FullyQualifiedJournalEntry> &entries);
+            bool processBuffer(void *, unsigned len);
+            bool processFile(path journalfile);
             void close();
 
             /** retrieve the mmap pointer for the specified dbName plus file number.
@@ -242,7 +242,7 @@ namespace mongo {
             return s;
         }
 
-        void RecoveryJob::__apply(const vector<FullyQualifiedJournalEntry> &entries) { 
+        void RecoveryJob::applyEntries(const vector<FullyQualifiedJournalEntry> &entries) { 
             bool apply = (cmdLine.durTrace & CmdLine::DurScanOnly) == 0;
             bool dump = cmdLine.durTrace & CmdLine::DurDumpJournal;
             if( dump )
@@ -279,7 +279,7 @@ namespace mongo {
         /** @param p start of the memory mapped file
             @return true if this is detected to be the last file (ends abruptly) 
         */
-        bool RecoveryJob::_apply(void *p, unsigned len) {
+        bool RecoveryJob::processBuffer(void *p, unsigned len) {
             JournalIterator i(p, len);
             vector<FullyQualifiedJournalEntry> entries;
 
@@ -292,7 +292,7 @@ namespace mongo {
                         entries.push_back(e);
 
                     // got all the entries for one group commit.  apply them: 
-                    __apply(entries);
+                    applyEntries(entries);
 
                     // now do the next section (i.e. group commit)
                     if( i.atEof() )
@@ -308,19 +308,19 @@ namespace mongo {
             return false; // non-abrupt end
         }
 
-        bool RecoveryJob::apply(path journalfile) {
+        bool RecoveryJob::processFile(path journalfile) {
             log() << "recover " << journalfile.string() << endl;
             MemoryMappedFile f;
             void *p = f.mapWithOptions(journalfile.string().c_str(), MongoFile::READONLY | MongoFile::SEQUENTIAL);
             massert(13544, str::stream() << "recover error couldn't open " << journalfile.string(), p);
-            return _apply(p, (unsigned) f.length());
+            return processBuffer(p, (unsigned) f.length());
         }
 
         void RecoveryJob::go(vector<path>& files) { 
             log() << "recover begin" << endl;
 
             for( unsigned i = 0; i != files.size(); ++i ) { 
-                bool abruptEnd = apply(files[i]);
+                bool abruptEnd = processFile(files[i]);
                 if( abruptEnd && i+1 < files.size() ) { 
                     log() << "recover error: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
                     close();
