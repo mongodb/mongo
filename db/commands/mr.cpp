@@ -375,13 +375,7 @@ namespace mongo {
             theDataFileMgr.insertWithObjMod( setup.incLong.c_str() , o , true );
         }
 
-        class StateHolder {
-        public:
-            StateHolder( MRState * s ) : _s(s) {}
-            MRState* operator->(){ return _s; }
-            MRState * _s;
-        };
-        boost::thread_specific_ptr<StateHolder> _tl;
+        boost::thread_specific_ptr<MRState*> _tl;
 
         BSONObj fast_emit( const BSONObj& args ){
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
@@ -430,7 +424,11 @@ namespace mongo {
                     state.init();
                     state.scope->injectNative( "emit" , fast_emit );
                     
-                    _tl.reset( new StateHolder( &state ) );
+                    {
+                        MRState** s = new MRState*[1];
+                        s[0] = &state;
+                        _tl.reset( s );
+                    }
 
                     ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter , 0 , mr.limit ) ) );
                     long long mapTime = 0;
