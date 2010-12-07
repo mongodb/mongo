@@ -343,7 +343,7 @@ namespace mongo {
         /** recover from a crash
             throws on error 
         */
-        void /*dur::*/recover() { 
+        void recover() {
             assert( cmdLine.dur );
 
             filesystem::path p = getJournalDir();
