@@ -9,11 +9,17 @@ namespace mongo {
 
     namespace dur { 
 
+        /** it's very easy to manipulate Record::data open ended.  Thus a call to writing(Record*) is suspect. 
+            this will override the templated version and yield an unresolved external
+        */
+        Record* writing(Record* r);
+
 #if !defined(_DURABLE)
         inline void startup() { }
         inline void* writingPtr(void *x, unsigned len) { return x; }
         inline DiskLoc& writingDiskLoc(DiskLoc& d) { return d; }
         inline int& writingInt(int& d) { return d; }
+        inline Record* writing(Record* r) { return r; }
         template <typename T> inline T* writing(T *x) { return x; }
         inline void assertReading(void *p) { }
         template <typename T> inline T* writingNoLog(T *x) { return x; }
@@ -21,7 +27,6 @@ namespace mongo {
         template <typename T> inline T* alreadyDeclared(T *x) { return x; }
         inline void declareWriteIntent(void *, unsigned) { }
         inline void createdFile(string filename, unsigned long long len) { }
-        inline void debugCheckLastDeclaredWrite() { }
 #else
 
         /** call during startup so durability module can initialize 

@@ -196,8 +196,7 @@ namespace mongo {
         }
 #endif
         {
-            Record *r = (Record *) d;
-            r = dur::writing(r);
+            Record *r = (Record *) dur::writingPtr(d, sizeof(Record));
             d = &r->asDeleted();
             // defensive code: try to make us notice if we reference a deleted record
             (unsigned&) (r->data) = 0xeeeeeeee;
