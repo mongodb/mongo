@@ -48,7 +48,7 @@ namespace mongo {
     }
 }
 
-#else 
+#else
 
 #include "cmdline.h"
 #include "client.h"
