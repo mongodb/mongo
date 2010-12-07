@@ -124,6 +124,9 @@ namespace mongo {
 	        }
 	        return 0;
 	    }
+        else { 
+            views.push_back(x);
+        }
 	    return x;
     }
     
@@ -162,6 +165,13 @@ namespace mongo {
 
     void MemoryMappedFile::_unlock() {
         if (! views.empty() ) assert(mprotect(views[0], len, PROT_READ) == 0);
+    }
+
+    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+        remove(views.begin(), views.end(), oldPrivateAddr);
+        bool ok = UnmapViewOfFile(oldPrivateAddr);
+        dassert(ok);
+        return createPrivateMap();
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
