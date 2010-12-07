@@ -167,8 +167,9 @@ namespace mongo {
 
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) { 
         setPath(fname);
+        bool preExisting = MemoryMappedFile::exists(fname.c_str());
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
-        if( cmdLine.dur && !testIntent && _view_write ) { 
+        if( cmdLine.dur && !testIntent && _view_write && !preExisting ) { 
             dur::createdFile(fname, len);
         }
         return finishOpening();
