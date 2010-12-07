@@ -265,6 +265,8 @@ namespace mongo {
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << endl;
                         vector<WriteIntent>& w = commitJob.writes();
+                        (void)w; // mark as unused. Useful for inspection in debugger
+
                         breakpoint();
                     }
                 }
@@ -363,7 +365,10 @@ namespace mongo {
 
             // write the noted write intent entries to the data files.
             // this has to come after writing to the journal, obviously...
+            MongoFile::lockAll();
             WRITETODATAFILES();
+            if (!dbMutex.isWriteLocked())
+                MongoFile::unlockAll();
 
             commitJob.reset();
 

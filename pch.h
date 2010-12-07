@@ -107,9 +107,6 @@ namespace mongo {
 # else
     const bool testIntent = false;
 # endif
-#if !defined(_DEBUG)
-# error not done - do not use this yet
-#endif
 #else
 # if defined(_TESTINTENT)
 #  error _TESTINTENT requires _DURABLE

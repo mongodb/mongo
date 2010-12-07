@@ -30,7 +30,7 @@ namespace mongo {
 
     namespace dur {
         
-        /** read a durop from journal file referened by br.
+        /** read a durop from journal file referenced by br.
             @param opcode the opcode which has already been written from the bufreader
         */
         shared_ptr<DurOp> DurOp::read(unsigned opcode, BufReader& br) { 
@@ -78,8 +78,8 @@ namespace mongo {
 
         void FileCreatedOp::replay() { 
             // i believe the code assumes new files are filled with zeros.  thus we have to recreate the file,
-            // or rewrite at least, even if it were the right length.  perhpas one day we should change that
-            // although easier to avoid defects if we assume it is zeroes perhaps.
+            // or rewrite at least, even if it were the right length.  perhaps one day we should change that
+            // although easier to avoid defects if we assume it is zeros perhaps.
             try { 
                 remove(_filename);
             }
