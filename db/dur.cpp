@@ -48,7 +48,7 @@ namespace mongo {
     }
 }
 
-#else defined(_DURABLE)
+#else 
 
 #include "cmdline.h"
 #include "client.h"
