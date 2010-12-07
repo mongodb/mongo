@@ -40,7 +40,15 @@
 
 #include "pch.h"
 
-#if defined(_DURABLE)
+#if !defined(_DURABLE)
+
+namespace mongo {
+    namespace dur {
+        void debugCheckLastDeclaredWrite() { }
+    }
+}
+
+#else defined(_DURABLE)
 
 #include "cmdline.h"
 #include "client.h"
