@@ -86,7 +86,7 @@ namespace mongo {
     }
     
     void OID::init() {
-        static AtomicUInt inc = security.getNonce();
+        static AtomicUInt inc = (unsigned) security.getNonce();
 
         {
             unsigned t = (unsigned) time(0);
