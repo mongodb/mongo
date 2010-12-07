@@ -169,14 +169,8 @@ namespace mongo {
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
         remove(views.begin(), views.end(), oldPrivateAddr);
-        bool ok = UnmapViewOfFile(oldPrivateAddr);
-        dassert(ok);
+	assert( munmap(oldPrivateAddr,len) == 0 );
         return createPrivateMap();
-    }
-
-    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        assert(false);
-        return 0;
     }
 
 } // namespace mongo
