@@ -56,9 +56,10 @@ namespace mongo {
                 if( nd.p == w.p ) { 
                     if( nd.len < w.len ) 
                         nd.len = w.len;
-                    return true;
+                    return true; // already indicated
                 }
-                return false;
+                nd = w;
+                return false; // a new set
             }
         };
 
@@ -99,6 +100,9 @@ namespace mongo {
                         assert( !dbMutex._remapPrivateViewRequested );
                         _hasWritten = true;
                     }
+
+                    log() << "TEMP write intent " << w.p << ' ' << w.len << endl;
+
                     // remember intent. we will journal it in a bit
                     _wi._writes.push_back(w);
                     wassert( _wi._writes.size() <  2000000 );
