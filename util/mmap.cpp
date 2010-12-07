@@ -156,7 +156,7 @@ namespace mongo {
 
 #if defined(_DEBUG) && !defined(_TESTINTENT)
 
-    void MongoFile::lockAll() {
+    void MongoFile::markAllWritable() {
         rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
             MongoFile * mmf = *i;
@@ -164,7 +164,7 @@ namespace mongo {
         }
     }
 
-    void MongoFile::unlockAll() {
+    void MongoFile::unmarkAllWritable() {
         rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
             MongoFile * mmf = *i;

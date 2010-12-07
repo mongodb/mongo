@@ -365,10 +365,10 @@ namespace mongo {
 
             // write the noted write intent entries to the data files.
             // this has to come after writing to the journal, obviously...
-            MongoFile::lockAll();
+            MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
             WRITETODATAFILES();
             if (!dbMutex.isWriteLocked())
-                MongoFile::unlockAll();
+                MongoFile::unmarkAllWritable();
 
             commitJob.reset();
 

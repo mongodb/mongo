@@ -60,7 +60,7 @@ namespace mongo {
 
             _minfo.entered();
 
-            MongoFile::lockAll(); // for _DEBUG validation -- a no op for release build
+            MongoFile::markAllWritable(); // for _DEBUG validation -- a no op for release build
 
             _acquiredWriteLock();
         }
@@ -77,7 +77,7 @@ namespace mongo {
             if ( got ) {
                 _minfo.entered();
                 _state.set(1);
-                MongoFile::lockAll(); // for _DEBUG validation -- a no op for release build
+                MongoFile::markAllWritable(); // for _DEBUG validation -- a no op for release build
                 _acquiredWriteLock();
             }                
             
@@ -98,7 +98,7 @@ namespace mongo {
                 }
                 massert( 12599, "internal error: attempt to unlock when wasn't in a write lock", false);
             }
-            MongoFile::unlockAll(); // _DEBUG validation
+            MongoFile::unmarkAllWritable(); // _DEBUG validation
             _state.set(0);
             _minfo.leaving();
             _releasedWriteLock();

@@ -51,8 +51,9 @@ namespace mongo {
         static void closeAllFiles( stringstream &message );
 
         // Locking allows writes. Reads are always allowed
-        static void lockAll();
-        static void unlockAll();
+        static void markAllWritable();
+        static void unmarkAllWritable();
+
         static bool exists(boost::filesystem::path p) { return boost::filesystem::exists(p); }
 
         virtual bool isMongoMMF() { return false; }
@@ -81,16 +82,16 @@ namespace mongo {
 
 #if !defined(_DEBUG) || defined(_TESTINTENT)
     // no-ops in production
-    inline void MongoFile::lockAll() {}
-    inline void MongoFile::unlockAll() {}
+    inline void MongoFile::markAllWritable() {}
+    inline void MongoFile::unmarkAllWritable() {}
 #endif
 
     struct MongoFileAllowWrites {
         MongoFileAllowWrites(){
-            MongoFile::lockAll();
+            MongoFile::markAllWritable();
         }
         ~MongoFileAllowWrites(){
-            MongoFile::unlockAll();
+            MongoFile::unmarkAllWritable();
         }
     };
 
