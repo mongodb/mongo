@@ -53,10 +53,12 @@ namespace mongo {
 
         /** an individual operation within section.  Either the entire section should be applied, or nothing. */
         struct JEntry {
-            static const unsigned OpCode_Footer      = 0xffffffff;
-            static const unsigned OpCode_DbContext   = 0xfffffffe;
-            static const unsigned OpCode_FileCreated = 0xfffffffd;
-            static const unsigned OpCode_Min         = 0xfffff000;
+            enum OpCodes {
+                OpCode_Footer      = 0xffffffff,
+                OpCode_DbContext   = 0xfffffffe,
+                OpCode_FileCreated = 0xfffffffd,
+                OpCode_Min         = 0xfffff000
+            };
 
             unsigned len; // or sentinel, see structs below
             unsigned ofs; // offset in file
