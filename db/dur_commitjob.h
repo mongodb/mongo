@@ -54,8 +54,10 @@ namespace mongo {
                 unsigned x = mongoutils::hashPointer(w.p);
                 WriteIntent& nd = nodes[x % N];
                 if( nd.p == w.p ) { 
-                    if( nd.len < w.len ) 
+                    if( nd.len < w.len ) {
                         nd.len = w.len;
+                        return false; // haven't indicated this len yet
+                    }
                     return true; // already indicated
                 }
                 nd = w;
