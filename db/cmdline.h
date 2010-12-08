@@ -72,6 +72,10 @@ namespace mongo {
         bool cpu;              // --cpu show cpu time periodically
 
         bool dur;              // --dur durability
+
+        /** --durTrace 7      dump journal and terminate without doing anything further 
+            --durTrace 4      recover and terminate without listening
+        */
         enum { 
             DurDumpJournal = 1,   // dump diagnostics on the journal during recovery
             DurScanOnly = 2,      // don't do any real work, just scan and dump if dump specified

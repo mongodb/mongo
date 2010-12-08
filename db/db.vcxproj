@@ -589,6 +589,7 @@
     <ClCompile Include="repl\rs_config.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\jstests\dur\basic1.sh" />
     <None Include="..\jstests\dur\dur1.js" />
     <None Include="..\jstests\replsets\replset1.js" />
     <None Include="..\jstests\replsets\replset2.js" />

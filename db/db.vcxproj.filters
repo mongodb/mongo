@@ -370,14 +370,8 @@
     <ClCompile Include="repl\rs_rollback.cpp">
       <Filter>replSets</Filter>
     </ClCompile>
-    <ClCompile Include="geo\haystack.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="cap.cpp">
       <Filter>db\core</Filter>
-    </ClCompile>
-    <ClCompile Include="restapi.cpp">
-      <Filter>db</Filter>
     </ClCompile>
     <ClCompile Include="..\shell\mongo_vstudio.cpp">
       <Filter>scripting</Filter>
@@ -395,7 +389,7 @@
       <Filter>db\commands</Filter>
     </ClCompile>
     <ClCompile Include="mongommf.cpp">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClCompile>
     <ClCompile Include="compact.cpp">
       <Filter>db\core</Filter>
@@ -404,13 +398,13 @@
       <Filter>db\commands</Filter>
     </ClCompile>
     <ClCompile Include="dur.cpp">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClCompile>
     <ClCompile Include="dur_journal.cpp">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClCompile>
     <ClCompile Include="dur_recover.cpp">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClCompile>
     <ClCompile Include="..\s\d_chunk_manager.cpp">
       <Filter>sharding</Filter>
@@ -428,10 +422,7 @@
       <Filter>util\concurrency</Filter>
     </ClCompile>
     <ClCompile Include="durop.cpp">
-      <Filter>db\storage engine</Filter>
-    </ClCompile>
-    <ClCompile Include="projection.cpp">
-      <Filter>db</Filter>
+      <Filter>_storage engine</Filter>
     </ClCompile>
     <ClCompile Include="..\s\grid.cpp">
       <Filter>sharding</Filter>
@@ -441,6 +432,15 @@
     </ClCompile>
     <ClCompile Include="..\bson\oid.cpp">
       <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\haystack.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="projection.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="restapi.cpp">
+      <Filter>db\core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -580,7 +580,7 @@
       <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="diskloc.h">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClInclude>
     <ClInclude Include="..\util\hashtab.h">
       <Filter>util\core</Filter>
@@ -655,7 +655,7 @@
       <Filter>db\core</Filter>
     </ClInclude>
     <ClInclude Include="..\util\ramstore.h">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClInclude>
     <ClInclude Include="repl.h">
       <Filter>repl_old</Filter>
@@ -739,88 +739,88 @@
       <Filter>repl_old</Filter>
     </ClInclude>
     <ClInclude Include="background.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="client.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="cmdline.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="commands.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="concurrency.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="curop.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="cursor.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="database.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="db.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="dbhelpers.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="dbinfo.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="..\pcre-7.4\config.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="dbmessage.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="helpers\dblogger.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="instance.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="indexkey.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="index.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="jsobj.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="introspect.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="json.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="lasterror.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="matcher.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="namespace-inl.h">
-      <Filter>db\core\h</Filter>
+      <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="..\util\mongoutils\checksum.h">
       <Filter>util\mongoutils</Filter>
     </ClInclude>
     <ClInclude Include="mongommf.h">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClInclude>
     <ClInclude Include="mongomutex.h">
       <Filter>db</Filter>
     </ClInclude>
     <ClInclude Include="dur_journal.h">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClInclude>
     <ClInclude Include="dur_commitjob.h">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClInclude>
     <ClInclude Include="..\util\time_support.h">
       <Filter>util\core</Filter>
@@ -829,13 +829,13 @@
       <Filter>util\core</Filter>
     </ClInclude>
     <ClInclude Include="dur_journalformat.h">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClInclude>
     <ClInclude Include="durop.h">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
     </ClInclude>
     <ClInclude Include="projection.h">
-      <Filter>db</Filter>
+      <Filter>db\geo</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -869,9 +869,6 @@
     <Filter Include="scripting">
       <UniqueIdentifier>{6b78f34f-e6b0-49e4-b04e-6478c3a3c077}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\storage engine">
-      <UniqueIdentifier>{d565a775-7a99-4860-b25f-441e1655b7c6}</UniqueIdentifier>
-    </Filter>
     <Filter Include="db\modules">
       <UniqueIdentifier>{466f15bb-4d5b-4634-ba6b-05a282e0a174}</UniqueIdentifier>
     </Filter>
@@ -902,11 +899,14 @@
     <Filter Include="replSets\testing">
       <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\core\h">
-      <UniqueIdentifier>{de119f0e-3d04-429f-b88b-69e28b1e02fd}</UniqueIdentifier>
-    </Filter>
     <Filter Include="db\commands">
       <UniqueIdentifier>{80ffe9bf-371a-44bb-9e2e-30543e97a656}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\h">
+      <UniqueIdentifier>{de119f0e-3d04-429f-b88b-69e28b1e02fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_storage engine">
+      <UniqueIdentifier>{d565a775-7a99-4860-b25f-441e1655b7c6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -971,7 +971,10 @@
       <Filter>replSets\testing</Filter>
     </None>
     <None Include="..\jstests\dur\dur1.js">
-      <Filter>db\storage engine</Filter>
+      <Filter>_storage engine</Filter>
+    </None>
+    <None Include="..\jstests\dur\basic1.sh">
+      <Filter>_storage engine</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
