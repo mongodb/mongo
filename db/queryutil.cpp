@@ -667,6 +667,33 @@ namespace mongo {
             }
         }
     }
+    
+    void FieldRangeOrSet::popOrClause( const BSONObj &indexSpec ) {
+        massert( 13274, "no or clause to pop", !orFinished() );
+        auto_ptr< FieldRangeSet > holder;
+        FieldRangeSet *toDiff = &_originalOrSets.front();
+        if ( toDiff->matchPossible() && !indexSpec.isEmpty() ) {
+            holder.reset( toDiff->subset( indexSpec ) );
+            toDiff = holder.get();
+        }
+        list< FieldRangeSet >::iterator i = _orSets.begin();
+        list< FieldRangeSet >::iterator j = _originalOrSets.begin();
+        ++i;
+        ++j;
+        while( i != _orSets.end() ) {
+            *i -= *toDiff;
+            if( !i->matchPossible() ) {
+                i = _orSets.erase( i );
+                j = _originalOrSets.erase( j );
+            } else {    
+                ++i;
+                ++j;
+            }
+        }
+        _oldOrSets.push_front( _orSets.front() );
+        _orSets.pop_front();
+        _originalOrSets.pop_front();        
+    }
 
     FieldRange *FieldRangeSet::trivialRange_ = 0;
     FieldRange &FieldRangeSet::trivialRange() {
@@ -790,7 +817,18 @@ namespace mongo {
         return ret;
     }    
     
-
+    FieldRangeSet *FieldRangeSet::subset( const BSONObj &fields ) const {
+        FieldRangeSet *ret = new FieldRangeSet( _ns, BSONObj() );
+        BSONObjIterator i( fields );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( _ranges[ e.fieldName() ].nontrivial() ) {
+                ret->_ranges[ e.fieldName() ] = _ranges[ e.fieldName() ];
+            }
+        }
+        ret->_queries = _queries;
+        return ret;
+    }
     
     bool FieldRangeVector::matchesElement( const BSONElement &e, int i, bool forward ) const {
         bool eq;

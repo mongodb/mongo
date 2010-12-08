@@ -312,6 +312,14 @@ namespace mongo {
         }
         // TODO get rid of this
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
+        
+        /**
+         * @return - A new FieldRangeSet based on this FieldRangeSet, but with only
+         * a subset of the fields.
+         * @fields - Only fields which are represented as field names in this object
+         * will be included in the returned FieldRangeSet.
+         */
+        FieldRangeSet *subset( const BSONObj &fields ) const;
     private:
         void appendQueries( const FieldRangeSet &other ) {
             for( vector< BSONObj >::const_iterator i = other._queries.begin(); i != other._queries.end(); ++i ) {
@@ -482,29 +490,17 @@ namespace mongo {
         FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
         // if there's a useless or clause, we won't use or ranges to help with scanning
         bool orFinished() const { return _orFound && _orSets.empty(); }
-        // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
-        // this could invalidate the result of the last topFrs()
-        void popOrClause() {
-            massert( 13274, "no or clause to pop", !orFinished() );
-            const FieldRangeSet &toDiff = _originalOrSets.front();
-            list< FieldRangeSet >::iterator i = _orSets.begin();
-            list< FieldRangeSet >::iterator j = _originalOrSets.begin();
-            ++i;
-            ++j;
-            while( i != _orSets.end() ) {
-                *i -= toDiff;
-                if( !i->matchPossible() ) {
-                    i = _orSets.erase( i );
-                    j = _originalOrSets.erase( j );
-                } else {    
-                    ++i;
-                    ++j;
-                }
-            }
-            _oldOrSets.push_front( _orSets.front() );
-            _orSets.pop_front();
-            _originalOrSets.pop_front();
-        }
+        /**
+         * Removes the top or clause, which would have been recently scanned, and
+         * removes the field ranges it covers from all subsequent or clauses.  As a
+         * side effect, this function may invalidate the return values of topFrs()
+         * calls made before this function was called.
+         * @indexSpec - Keys of the index that was used to satisfy the last or
+         * clause.  Used to determine the range of keys that were scanned.  If
+         * empty we do not constrain the previous clause's ranges using index keys,
+         * which may reduce opportunities for range elimination.
+         */
+        void popOrClause( const BSONObj &indexSpec = BSONObj() );
         FieldRangeSet *topFrs() const {
             FieldRangeSet *ret = new FieldRangeSet( _baseSet );
             if (_orSets.size()){
