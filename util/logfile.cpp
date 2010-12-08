@@ -31,21 +31,21 @@ namespace mongo {
             if( 0 && debug ) {
                 try { 
                     LogFile f("logfile_test");
-		    void *p = malloc(16384);
+                    void *p = malloc(16384);
                     char *buf = (char*) p;
-		    buf += 4095;
-		    buf = (char*) (((size_t)buf)&(~0xfff));
+                    buf += 4095;
+                    buf = (char*) (((size_t)buf)&(~0xfff));
                     memset(buf, 'z', 8192);
                     buf[8190] = '\n';
                     buf[8191] = 'B';
                     buf[0] = 'A';
                     f.synchronousAppend(buf, 8192);
                     f.synchronousAppend(buf, 8192);
-		    free(p);
+                    free(p);
                 }
                 catch(DBException& e ) { 
-		    log() << "logfile.cpp test failed : " << e.what() << endl;
-		    throw;
+                    log() << "logfile.cpp test failed : " << e.what() << endl;
+                    throw;
                 }
             }
         }
@@ -122,31 +122,31 @@ namespace mongo {
         if( _fd < 0 ) {
             uasserted(13516, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription());
         }
-	//	log() << "\nWRITE TEST: " << write(_fd, "abc", 3) << ' ' << errno << endl;
+        // log() << "\nWRITE TEST: " << write(_fd, "abc", 3) << ' ' << errno << endl;
     }
 
     LogFile::~LogFile() { 
         if( _fd >= 0 )
             close(_fd);
-	_fd = -1;
+        _fd = -1;
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {
         const char *buf = (char *) b;
         assert(_fd);
-	assert(((size_t)buf)%4096==0); // aligned
-	if( len % 4096 != 0 ) { 
-	    log() << len << ' ' << len % 4096 << endl;
-	    assert(false);
-	}
+        assert(((size_t)buf)%4096==0); // aligned
+        if( len % 4096 != 0 ) { 
+            log() << len << ' ' << len % 4096 << endl;
+            assert(false);
+        }
         ssize_t written = write(_fd, buf, len);
         if( written != (ssize_t) len ) { 
-  	    log() << "write fails written:" << written << " len:" << len << " errno:" << errno << endl;
-  	    uasserted(13515, str::stream() << "error appending to file " << _fd << errnoWithDescription());
+            log() << "write fails written:" << written << " len:" << len << " errno:" << errno << endl;
+            uasserted(13515, str::stream() << "error appending to file " << _fd << errnoWithDescription());
         }
 #if !defined(O_SYNC)
         if( fdatasync(_fd) < 0 ) { 
-  	    uasserted(13514, str::stream() << "error appending to file on fsync " << errnoWithDescription());
+            uasserted(13514, str::stream() << "error appending to file on fsync " << errnoWithDescription());
         }
 #endif
     }
