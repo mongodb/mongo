@@ -123,7 +123,7 @@ namespace mongo {
         const unsigned magic;
         void assertValid() { assert( magic == 0x12345677 ); }
     private:
-        mutex m;
+        mongo::mutex m;
         int _locked;
         ThreadLocalValue<bool> _lockedByMe;
     protected:
@@ -215,7 +215,7 @@ namespace mongo {
         }
         StateBox() : m("StateBox") { }
     private:
-        mutex m;
+        mongo::mutex m;
         SP sp;
     };
     
