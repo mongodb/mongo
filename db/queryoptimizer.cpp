@@ -714,7 +714,7 @@ namespace mongo {
         if ( ret->qp().willScanTable() ) {
             _tableScanned = true;
         }
-        _fros.popOrClause();
+        _fros.popOrClause( ret->qp().indexed() ? ret->qp().indexKey() : BSONObj() );
         return ret;
     }
     
