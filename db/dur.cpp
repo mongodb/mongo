@@ -339,22 +339,25 @@ namespace mongo {
             const set<MongoFile*>::iterator b = files.begin();
             const set<MongoFile*>::iterator e = files.end();
             set<MongoFile*>::iterator i = b;
+            // skip to our starting position
             for( unsigned x = 0; x < startAt; x++ ) {
                 i++;
                 if( i == e ) i = b;
             }
-            startAt = (startAt + ntodo) % sz;
+            startAt = (startAt + ntodo) % sz; // mark where to start next time
 
             for( unsigned x = 0; x < ntodo; x++ ) {
                 dassert( i != e );
-                MongoMMF *mmf = dynamic_cast<MongoMMF*>(*i);
-                if( mmf && mmf->willNeedRemap() ) {
-                    mmf->willNeedRemap() = false;
-                    mmf->remapThePrivateView();
+                if( (*i)->isMongoMMF() ) {
+                    MongoMMF *mmf = (MongoMMF*) *i;
+                    assert(mmf);
+                    if( mmf->willNeedRemap() ) {
+                        mmf->willNeedRemap() = false;
+                        mmf->remapThePrivateView();
+                    }
+                    i++;
+                    if( i == e ) i = b;
                 }
-
-                i++;
-                if( i == e ) i = b;
             }
         }
 
