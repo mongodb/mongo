@@ -780,7 +780,7 @@ namespace mongo {
                             writelock lk( ns );
 
                             // revert the chunk manager back to the state before "forgetting" about the chunk
-                            shardingState.undoDonateChunk( ns , min , max , myVersion );
+                            shardingState.undoDonateChunk( ns , min , max , currVersion );
                         }
 
                         log() << "_recvChunkCommit failed: " << res << " resetting shard version to: " << currVersion << endl;
