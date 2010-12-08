@@ -1,4 +1,4 @@
-t = db.index_sparse1
+t = db.index_sparse2;
 t.drop();
 
 t.insert( { _id : 1 , x : 1 , y : 1 } )
