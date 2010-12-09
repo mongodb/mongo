@@ -769,6 +769,7 @@ namespace mongo {
             return ret;
         }
         
+        /** stopMongoProgram(port[, signal]) */
         BSONObj StopMongoProgram( const BSONObj &a ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
             assert( a.firstElement().isNumber() );

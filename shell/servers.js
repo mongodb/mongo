@@ -94,6 +94,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
 // Start a mongod instance and return a 'Mongo' object connected to it.
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
+// var conn = startMongodEmpty("--port", 30000, "--dbpath", "asdf");
 startMongodEmpty = function () {
     var args = createMongoArgs("mongod", arguments);
 
