@@ -1238,7 +1238,7 @@ if not onlyServer and not noshell:
     addSmoketest("smokeJsSlowNightly", [add_exe("mongo")])
     addSmoketest("smokeJsSlowWeekly", [add_exe("mongo")])
     addSmoketest( "smokeQuota", [ "mongo" ] )
-    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ] )
+    addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), "tools" ] )
 
 # Note: although the test running logic has been moved to
 # buildscripts/smoke.py, the interface to running the tests has been
