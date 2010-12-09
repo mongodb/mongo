@@ -3877,7 +3877,7 @@ class move_first_result:
   """
 
   thrift_spec = (
-    (0, TType.STRUCT, 'success', (WT_RECORD, WT_RECORD.thrift_spec), None, ), # 0
+    (0, TType.STRUCT, 'success', (WT_MOVE_RESULT, WT_MOVE_RESULT.thrift_spec), None, ), # 0
     (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
   )
 
@@ -3896,7 +3896,7 @@ class move_first_result:
         break
       if fid == 0:
         if ftype == TType.STRUCT:
-          self.success = WT_RECORD()
+          self.success = WT_MOVE_RESULT()
           self.success.read(iprot)
         else:
           iprot.skip(ftype)
@@ -4008,7 +4008,7 @@ class move_last_result:
   """
 
   thrift_spec = (
-    (0, TType.STRUCT, 'success', (WT_RECORD, WT_RECORD.thrift_spec), None, ), # 0
+    (0, TType.STRUCT, 'success', (WT_MOVE_RESULT, WT_MOVE_RESULT.thrift_spec), None, ), # 0
     (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
   )
 
@@ -4027,7 +4027,7 @@ class move_last_result:
         break
       if fid == 0:
         if ftype == TType.STRUCT:
-          self.success = WT_RECORD()
+          self.success = WT_MOVE_RESULT()
           self.success.read(iprot)
         else:
           iprot.skip(ftype)
@@ -4139,7 +4139,7 @@ class move_next_result:
   """
 
   thrift_spec = (
-    (0, TType.STRUCT, 'success', (WT_RECORD, WT_RECORD.thrift_spec), None, ), # 0
+    (0, TType.STRUCT, 'success', (WT_MOVE_RESULT, WT_MOVE_RESULT.thrift_spec), None, ), # 0
     (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
   )
 
@@ -4158,7 +4158,7 @@ class move_next_result:
         break
       if fid == 0:
         if ftype == TType.STRUCT:
-          self.success = WT_RECORD()
+          self.success = WT_MOVE_RESULT()
           self.success.read(iprot)
         else:
           iprot.skip(ftype)
@@ -4270,7 +4270,7 @@ class move_prev_result:
   """
 
   thrift_spec = (
-    (0, TType.STRUCT, 'success', (WT_RECORD, WT_RECORD.thrift_spec), None, ), # 0
+    (0, TType.STRUCT, 'success', (WT_MOVE_RESULT, WT_MOVE_RESULT.thrift_spec), None, ), # 0
     (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
   )
 
@@ -4289,7 +4289,7 @@ class move_prev_result:
         break
       if fid == 0:
         if ftype == TType.STRUCT:
-          self.success = WT_RECORD()
+          self.success = WT_MOVE_RESULT()
           self.success.read(iprot)
         else:
           iprot.skip(ftype)
@@ -4414,7 +4414,7 @@ class search_result:
   """
 
   thrift_spec = (
-    (0, TType.I32, 'success', None, None, ), # 0
+    (0, TType.STRUCT, 'success', (WT_MOVE_RESULT, WT_MOVE_RESULT.thrift_spec), None, ), # 0
     (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
   )
 
@@ -4432,8 +4432,9 @@ class search_result:
       if ftype == TType.STOP:
         break
       if fid == 0:
-        if ftype == TType.I32:
-          self.success = iprot.readI32();
+        if ftype == TType.STRUCT:
+          self.success = WT_MOVE_RESULT()
+          self.success.read(iprot)
         else:
           iprot.skip(ftype)
       elif fid == 1:
@@ -4453,8 +4454,8 @@ class search_result:
       return
     oprot.writeStructBegin('search_result')
     if self.success != None:
-      oprot.writeFieldBegin('success', TType.I32, 0)
-      oprot.writeI32(self.success)
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
       oprot.writeFieldEnd()
     if self.err != None:
       oprot.writeFieldBegin('err', TType.STRUCT, 1)

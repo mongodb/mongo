@@ -70,15 +70,9 @@ hand, it is useful as only one process in the application suite has to
 be aware of the underlying configuration details of the database.
 
 <p>
-<font color="blue">Maybe </font>Automatically partition the
-database to transfer work requests to a different machine or thread of
-control.   Once the database is large enough that threads will
-reasonably not conflict, it would be best to have multiple threads of
-control to partition work on the data.  In this case, each thread which
-owns a chunk of a database should write to its own, individual, log
-file.
+<i>Maybe</i> Automatically partition the database to transfer work requests to a different machine or thread of control.   Once the database is large enough that threads will reasonably not conflict, it would be best to have multiple threads of control to partition work on the data.  In this case, each thread which owns a chunk of a database should write to its own, individual, log file.
 
-<p><li><b>Environment creation and recovery</b>:
+<li><b>Environment creation and recovery</b>:
 Berkeley DB's environment creation and recovery model is too complex.
 Applications were often unable to determine when to run recovery,
 requiring, for example, features like the DB_REGISTER flag and the
@@ -97,7 +91,7 @@ Tiger will be a "crashless" system, that is, applications will never
 know that recovery was performed, it will be performed behind the scenes
 as necessary.
 
-<p><li><b>Schema layer</b>:
+<li><b>Schema layer</b>:
 Wired Tiger database environments have a configuration which describes
 the contents of the environment.   This focuses on, but is not limited
 to, the database files.  The goal is to eliminate Berkeley DB's baroque
@@ -113,13 +107,13 @@ logical database names, things get easier: as another example, file
 striping can be done at a logical layer, where looking up a name in the
 schema database can return whatever physical file and/or offset we want.
 
-<p><li><b><font color="blue">Maybe </font>Record-level locking</b>:
+<li><b><i>Maybe</i> Record-level locking</b>:
 Record-level locking is tempting in order to increase concurrency.  It
 significantly complicates recovery, unfortunately.   However, there
 isn't any other way to increase insert rates where the keys are inserted
 in sorted order, which is a significant failing of Berkeley DB.
 
-<p><li><b><font color="blue">Maybe </font>Logical logging</b>:
+<li><b><i>Maybe </i>Logical logging</b>:
 Logical logging is tempting because of the possibility of supporting
 multi-master replication (by shipping logical operations to the replicas
 instead of shipping physical record changes).  However, logical logging
@@ -130,9 +124,9 @@ recovery), and complicating recovery is a bad idea.
 </ol>
 
 <h3>General API changes:</h3>
-<ol>
 
-<p><li><b>Per-thread handles</b>:
+<ol>
+<li><b>Per-thread handles</b>:
 Applications must allocate a per-thread object for any thread that will
 be calling a WiredTiger function.  When crossing the library API, the
 per-thread handle will be updated to reference any current environment
@@ -144,14 +138,14 @@ Each thread of control's information will include a lock ID which will
 be used for deadlock detection.  (This assumes we eventually implement
 some kind of deadlock detection...)
 
-<p><li><b>Object constructors/destructors</b>:
+<li><b>Object constructors/destructors</b>:
 There will be explicit object constructor/destructor functions which are
 used for configuration only (the DB_ENV vs. ENV split done right).  The
 application has to allocate the object, then configure it, then use it
 and then destroy it.   It may be repeatedly used, as it contains no
 internal information.
 
-<p><li><b>Error handling</b>:
+<li><b>Error handling</b>:
 Wired Tiger error messages will include a URL which can be used to look
 up detailed error information.  This makes error configuration fairly
 complicated: an error message will have two parts, a per-release URL for
@@ -166,7 +160,7 @@ release.
 Error handling (error message, prefix, stream, whatever) will be
 database name specific.
 
-<p><li><b>Configuration</b>:
+<li><b>Configuration</b>:
 There will be no general configuration functions, Wired Tiger will use
 configuration methods only; as in Berkeley DB, there will be getter
 functions in all cases.  This will also apply to many of the arguments
@@ -178,7 +172,7 @@ call.
 Configuration routines will only update specific shared memory region
 locations, to allow auto-generation of the configuration code.
 
-<p><li><b>Cursor errors</b>:
+<li><b>Cursor errors</b>:
 By default, cursors will become unusable after any error; applications
 wanting Berkeley DB behavior, where the cursor has not moved and can be
 used after error, will have a flag which duplicates the cursor before
@@ -186,16 +180,16 @@ each operation (Berkeley DB's DbCursor.dup method).  The point is that
 cursor duplication is painful and difficult, and most applications don't
 need it.
 
-<p><li><b>Secondary indices</b>:
+<li><b>Secondary indices</b>:
 Combine the Db.get and Db.pget calls into a single method.
 
-<p><li><b>Delete of non-existent entry</b>:
+<li><b>Delete of non-existent entry</b>:
 Delete of a non-existent entry should optionally not return an error.
 
-<p><li><b>File/directory permission modes</b>:
+<li><b>File/directory permission modes</b>:
 Support explicit modes for all physical files.
 
-<p><li><b>Flash support</b>:
+<li><b>Flash support</b>:
 Add high-level environment configuration which indicates no underlying
 disk support.
 
@@ -373,11 +367,10 @@ requirements.
 </table>
 
 
-
 <h3>Implementation changes:</h3>
 <ol>
 
-<p><li><b>Micro-logging</b>:
+<li><b>Micro-logging</b>:
 To the extent possible, Wired Tiger should support TimesTen's notion of
 micro-logging (where threads of control do work in ways that if they
 fail, other threads of control can clean up without interrupting the
@@ -395,12 +388,12 @@ Wired Tiger, the only shared regions will be the individual chunks used
 by threads of control to communicate with the threads running in the
 database engine, removing this problem entirely.
 
-<p><li><b>Utilities</b>:
+<li><b>Utilities</b>:
 All of the Wired Tiger utilities (except for any code generation
 utility) will be implemented as thin wrappers.  (In Berkeley DB db_dump,
 db_load and db_hotbackup have far too much program logic.)
 
-<p><li><b>Exported subsystems</b>:
+<li><b>Exported subsystems</b>:
 Wired Tiger will not export the cache, locking, logging, mutex and
 transaction APIs in a general way.  Reason: the insistence on separate
 subsystems meant we didn't pass a single object handle throughout the
@@ -408,23 +401,23 @@ entire system.  There isn't enough demand for the subsystems to make
 them available initially.  That said, we will continue to rigorously
 separate the functionality to the extent possible.
 
-<p><li><b>API layering</b>:
+<li><b>API layering</b>:
 Wired Tiger will not require mutexes to cross the API layer.  This will
 allow us to consistently use handle methods to access internal as well
 as external functions throughout the library.  The "global" thread
 cookie will contain the information we need to figure out if any locks
 are needed as we cross API layers.
 
-<p><li><b>Code Generation</b>:
+<li><b>Code Generation</b>:
 Wired Tiger will support a code-generation utility early on.   It will
 be a script that outputs a C-language program, supporting all features.
 
-<p><li><b>File types</b>:
+<li><b>File types</b>:
 Wired Tiger will use the file name space to aggressively categorize
 storage by class: optionally taking advantage of Flash vs. RAM vs.
 durable disk writes vs. standard disk, vs. network storage.
 
-<p><li><b>Hot backup</b>:
+<li><b>Hot backup</b>:
 Wired Tiger will have a hot-backup operation as part of the library.
 Hot backups can be faster if the hot backup thread writes a log record
 ("starting database copy") into the log, because recovery only has to
@@ -436,15 +429,15 @@ backup.
 Additionally, hot backup should be integrated with replication: a hot
 backup is no different from the initialization of a replica.
 
-<p><li><b>Scripting language</b>:
+<li><b>Scripting language</b>:
 Use Python or Ruby as our initial scripting language, and possibly
 Erlang to write multi-threaded tests.
 
-<p><li><b>Cursor operations</b>:
+<li><b>Cursor operations</b>:
 Split up the cursor get/pget functions into a group of methods, instead
 of the current complex set of flags.
 
-<p><li><b>Record numbers</b>:
+<li><b>Record numbers</b>:
 Support 64-bit logical record numbers.
 <p>
 Give the application a flag to specify keys are numbers, it's too common
@@ -452,7 +445,7 @@ an error.
 <p>
 Support holes in the record number space.
 
-<p><li><b>Statistics</b>:
+<li><b>Statistics</b>:
 Implement 64-bit statistics values.
 <p>
 Output statistics in XML, and provide a script to display them in text.
@@ -460,32 +453,31 @@ Output statistics in XML, and provide a script to display them in text.
 Store all statistics in a single chunk of space so it's easy to snapshot
 the engine's performance.
 
-<p><li><b>Log files</b>:
+<li><b>Log files</b>:
 Dump log files in XML and provide a script which turns them into flat text.
 
-<p><li><b>Compaction</b>:
+<li><b>Compaction</b>:
 Do compaction lazily, top-down through the tree instead of bottom-up.
 
 </ol>
 <h3>Documentation:</h3>
 <ol>
 
-<p><li>
+<li>
 Support HTML only.  Use cpp instead of m4 as our flat-text to HTML
 pre-processor.
 
-<p><li>
+<li>
 Write tutorials (booklets) around the features from day 1, don't depend
 on the man pages alone.  (Instead of having a Reference Guide, have
 booklets.)
 
-<p><li>
+<li>
 Every man page will have a code example that can be cut-and-pasted by
 programmers.
 
 </ol>
 <h3>Do it the same (mostly):</h3>
-<ol>
 
 <ul type=disc>
 <li>Bulk get
@@ -508,30 +500,30 @@ programmers.
 <li>Test suite (written in Python, Ruby, or C)
 </ul>
 
-<p><li><b>Replication Manager</b>:
+<p><b>Replication Manager</b>:
 Wired Tiger's focus needs to be on partial and cascading replication,
 there's useful features in both.
 
-</ol>
+
 <h3>Don't do it at all:</h3>
 <ol>
 
-<p><li><b>Concurrent Data Store, in-memory databases</b>:
+<li><b>Concurrent Data Store, in-memory databases</b>:
 Named, non-durable databases are the simpler solution to both problems.
 
-<p><li><b>Cryptography</b>:
+<li><b>Cryptography</b>:
 It's hard and nobody on the engineering team ever understands it.  If
 the files need to be encrypted, rely on 3rd party products that encrypt
 the entire filesystem.
 
-<p><li><b>Deadlock detection</b>:
+<li><b>Deadlock detection</b>:
 Use timeout-based deadlock detection, instead -- the graphs are
 complicated and expensive to build.
 
-<p><li><b>Java API</b>:
+<li><b>Java API</b>:
 Java: the Berkeley DB JE product is a better solution than JNI.
 
-<p><li><b>Application-specific logging</b>:
+<li><b>Application-specific logging</b>:
 Not useful enough to replace, although we should continue to allow
 applications to insert their own records into the log, just no longer
 document any interface to those records during recovery (or even when
@@ -539,7 +531,7 @@ the records will be used and/or discarded).  Application-written log
 records will only be subsequently available by reading the log from
 outside of the engine.
 
-<p><li><b>Hash access method</b>:
+<li><b>Hash access method</b>:
 The Berkeley DB Hash access method offers one feature: a hotter cache
 because fewer meta-data pages are required when the data is truly large.
 This feature is less useful for Wired Tiger, given Wired Tiger's support
@@ -547,13 +539,13 @@ for larger pages, but is still useful in some cases.   However, it isn't
 useful enough to implement a separate access method as in Berkeley DB.
 Could we do it by modifying the B+tree somehow?
 
-<p><li><b>Recno access method</b>:
+<li><b>Recno access method</b>:
 The Berkeley DB Recno access method offers two features: immutable
 record numbers and backing text files.   Immutable record numbers could
 be supported in a key-based B+tree where deleted records were replaced
 with placeholders.  Backing text files aren't useful enough to re-implement.
 
-<p><li><b>Queue access method</b>:
+<li><b>Queue access method</b>:
 The Berkeley DB Queue access method offers two features: removal of
 extent-based files as the database grows and shrinks, and record-level
 locking, at the price of fixed-sized key/data items.  These features
@@ -562,7 +554,7 @@ could be striped across multiple files (using the schema layer
 database).   The one problem is this will result in phantoms, which may
 be a problem for queue-based applications.
 
-<p><li><b>Subdatabases</b>:
+<li><b>Subdatabases</b>:
 Subdatabases (multiple databases per file) are actually useful for the
 few applications wanting to use the database name space for things like
 objects (for example, a C++ compiler writing objects into databases, or
@@ -572,11 +564,11 @@ logging and recovery.  It might be possible to do something cleaner than
 Berkeley DB in the context of a schema file, but for now I don't think
 it's worth the effort.
 
-<p><li><b>Db.feedback</b>:
+<li><b>Db.feedback</b>:
 Not useful enough to replace -- include any feedback as part of general
 event notification.
 
-<p><li>
+<li>
 List of other features/support not useful enough to replace:
 <ul type=disc>
 <li>Apache, PHP, Perl, Tcl
@@ -597,14 +589,14 @@ List of other features/support not useful enough to replace:
 </ol>
 <h3>FAQ:</h3>
 <ol>
-<p><li>
+<li>
 Why not use real database terms ("database" means environment, "table"
 means database)?
 <p>
 Even though that's desirable, since we're continuing to use the
 Berkeley DB API, it doesn't make sense to switch.
 
-<p><li>
+<li>
 Will the engine require a 64-bit type?
 <p>
 I guess so, this shouldn't be a problem, should it?

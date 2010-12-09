@@ -31,6 +31,7 @@ def unpack(fmt, s):
         return ()
     result = ()
     pfmt = tfmt
+    sizebytes = 0
     for f in fmt:
         if f.isdigit():
             sizebytes += 1
@@ -100,6 +101,7 @@ def pack(fmt, *values):
 class Cursor:
     def __init__(self, session, handle):
         self.session = session
+        self.client = session.client
         self.id = handle.id
         self.keyfmt = handle.keyfmt
         self.valuefmt = handle.valuefmt
@@ -108,31 +110,41 @@ class Cursor:
         return self.client.close_cursor(self.id, config)
 
     def get_key(self):
-        return None
+        return unpack(self.keyfmt, self.key)
 
     def get_value(self):
-        return None
+        return unpack(self.keyfmt, self.value)
 
     def set_key(self, *args):
-        pass
+        self.key = pack(self.keyfmt, *args)
 
     def set_value(self, *args):
-        pass
+        self.value = pack(self.valuefmt, *args)
 
     def first(self):
-        self.client.move_first(self.id)
+        result = self.client.move_first(self.id)
+        self.key, self.value = result.record.key, result.record.value
+        return result.exact
 
     def last(self):
-        self.client.move_last(self.id)
+        result = self.client.move_last(self.id)
+        self.key, self.value = result.record.key, result.record.value
+        return result.exact
 
     def next(self):
-        self.client.move_next(self.id)
+        result = self.client.move_next(self.id)
+        self.key, self.value = result.record.key, result.record.value
+        return result.exact
 
     def prev(self):
-        self.client.move_prev(self.id)
+        result = self.client.move_prev(self.id)
+        self.key, self.value = result.record.key, result.record.value
+        return result.exact
 
     def search(self):
-        return self.client.search(self.id, WT_RECORD(self.key, self.value))
+        result = self.client.search(self.id, WT_RECORD(self.key, self.value))
+        self.key, self.value = result.record.key, result.record.value
+        return result.exact
 
     def insert(self):
         self.key = self.client.insert_record(self.id, WT_RECORD(self.key, self.value))
@@ -155,6 +167,9 @@ class Session:
 
     def open_cursor(self, uri, config=''):
         return Cursor(self, self.client.open_cursor(self.id, uri, config))
+
+    def dup_cursor(self, c, config=''):
+        return Cursor(self, self.client.dup_cursor(self.id, c.id, config))
 
     def create_table(self, name, config=''):
         self.client.create_table(self.id, name, config)

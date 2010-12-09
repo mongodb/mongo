@@ -25,6 +25,8 @@ POP_RECORD pop_data[] = {
 	{ "AU", 2008, 21431800 }
 };
 
+#define	num_pop_data (sizeof(pop_data) / sizeof(pop_data[0]))
+
 const char *home = "WT_TEST";
 
 int main()
@@ -57,16 +59,17 @@ int main()
 	ret = conn->open_session(conn, NULL, &session);
 	ret = session->open_cursor(session, "table:population", NULL, &cursor);
 
-	endp = pop_data + (sizeof(pop_data) / sizeof(pop_data[0]));
+	endp = pop_data + num_pop_data;
 	for (p = pop_data; p < endp; p++) {
 		cursor->set_value(cursor, p->country, p->year, p->population);
 		ret = cursor->insert(cursor);
 	}
+
 	ret = cursor->close(cursor, NULL);
 
 	/* Now just read through the countries we know about */
 	ret = session->open_cursor(session, "column:population.country",
-	    NULL, &cursor);
+	    "dup=first", &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &country);

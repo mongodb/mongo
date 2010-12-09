@@ -64,7 +64,21 @@ struct WT_ITEM {
  */
 struct WT_CURSOR {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
+	
+	/*!
+	 * The format of the data packed into key items.  See
+	 * ::wiredtiger_struct_pack for details.  If not set, a default value
+	 * of "u" is assumed, and applications use the WT_ITEM struct to
+	 * manipulate raw byte arrays.
+	 */
 	const char *keyfmt;
+
+	/*!
+	 * The format of the data packed into value items.  See
+	 * ::wiredtiger_struct_pack for details.  If not set, a default value
+	 * of "u" is assumed, and applications use the WT_ITEM struct to
+	 * manipulate raw byte arrays.
+	 */
 	const char *valuefmt;
 
 	/*! \name Data access
@@ -141,6 +155,7 @@ struct WT_SESSION {
 	/*! \name Cursor handles
 	 * @{
 	 */
+
 	/*! Open a cursor.
 	 *
 	 * Cursors may be opened on ordinary tables.  A cache of recently-used
@@ -164,10 +179,13 @@ struct WT_SESSION {
 	 *   <tr><td><tt>statistics:[table:\<tablename\>]</tt></td><td>database or table statistics (key=(string)keyname, data=(int64_t)value)</td></tr>
 	 *   </table>
 	 *
+	 * \param session the session handle.
+	 * \param uri the data source on which the cursor operates.
 	 * \param config a string that configures the cursor.
 	 * 	For example, may include <tt>"isolation=read-uncommitted"</tt>
 	 * 	and/or <tt>"nodup"</tt> and/or <tt>"overwrite"</tt> to change
 	 * 	the behavior of the cursor.
+	 * \param cursorp a pointer to the newly opened cursor.
 	 */
 	int __F(open_cursor)(WT_SESSION *session, const char *uri, const char *config, WT_CURSOR **cursorp);
 
@@ -248,6 +266,7 @@ struct WT_SESSION {
  * same address space as the caller or accessed over a socket or named pipe.
 */
 struct WT_CONNECTION {
+	/*! The home directory of the connection. */
 	const char *home;
 
 	/*! Did opening this handle create the database? */
@@ -323,29 +342,47 @@ struct WT_INDEX_INFO {
  * Applications implement the WT_SCHEMA interface to manage tables containing structured data.
  */
 struct WT_SCHEMA {
+	/*!
+	 * The format of the data packed into key items.  See
+	 * ::wiredtiger_struct_pack for details.  If not set, a default value
+	 * of "u" is assumed, and applications use the WT_ITEM struct to
+	 * manipulate raw byte arrays.
+	 */
 	const char *keyfmt;
+
+	/*!
+	 * The format of the data packed into value items.  See
+	 * ::wiredtiger_struct_pack for details.  If not set, a default value
+	 * of "u" is assumed, and applications use the WT_ITEM struct to
+	 * manipulate raw byte arrays.
+	 */
 	const char *valuefmt;
 
-	/*! Description of the columns in a table, an array of WT_SCHEMA::num_columns elements. */
+	/*!
+	 * Description of the columns in a table, an array of
+	 * WT_SCHEMA::num_columns elements.
+	 */
 	WT_COLUMN_INFO *column_info;
 
-	/*! The number of columns in a table (zero for pure row-oriented tables). */
+	/*!
+	 * The number of columns in a table. The WT_SCHEMA::column_info field
+	 * must be an array of this length.  This must also match the total
+	 * number of values in WT_SCHEMA::keyfmt and WT_SCHEMA::valuefmt, if
+	 * they are set.
+	 */
 	int num_columns;
 
-	/*! Description of the indices for a table, an array of WT_SCHEMA::num_indices elements. */
+	/*!
+	 * Description of the indices for a table, an array of
+	 * WT_SCHEMA::num_indices elements.  Set to NULL for unindexed tables.
+	 */
 	WT_INDEX_INFO *index_info;
 
-	/*! The number of indices for a table (zero for pure row-oriented tables). */
+	/*! The number of indices for a table (zero for unindexed tables). */
 	int num_indices;
 
 	/*! Space to allocate for this schema in every WT_SESSION handle */
 	size_t cookie_size;
-
-	/*! Callback to compare keys in a table. */
-	int (*cmp)(WT_SESSION *session, WT_SCHEMA *schema, const WT_ITEM *key1, const WT_ITEM *key2);
-
-	/*! Callback to compare duplicate values in a table. */
-	int (*dup_cmp)(WT_SESSION *session, WT_SCHEMA *schema, const WT_ITEM *value1, const WT_ITEM *value2);
 };
 
 /*! Open a connection to a database. */
@@ -370,6 +407,46 @@ int wiredtiger_struct_size(const char *fmt, ...);
  * Uses format strings as specified in the Python struct module:
  *   http://docs.python.org/library/struct
  *
+ * The first character of the format string can be used to indicate the byte
+ * order, size and alignment of the packed data, according to the following
+ * table:
+ * 
+ * <table>
+ * <tr><th>Character</th><th>Byte order</th><th>Size</th><th>Alignment</th></tr>
+ * <tr><td><tt>\@</tt></td><td>native</td><td>native</td><td>native</td></tr>
+ * <tr><td><tt>=</tt></td><td>native</td><td>standard</td><td>none</td></tr>
+ * <tr><td><tt>&lt;</tt></td><td>little-endian</td><td>standard</td><td>none</td></tr>
+ * <tr><td><tt>&gt;</tt></td><td>big-endian</td><td>standard</td><td>none</td></tr>
+ * <tr><td><tt>!</tt></td><td>network (= big-endian)</td><td>standard</td><td>none</td></tr>
+ * </table>
+ *
+ * If the first character is not one of these, '>' (big-endian) is assumed, in
+ * part because it naturally sorts in lexicographic order.
+ *
+ * Format characters:
+ * <table>
+<tr><th>Format</th><th>C Type</th><th>Java type</th><th>Python type</th><th>Standard size</th></tr>
+<tr><td>x</td><td>pad byte</td><td>N/A</td><td>N/A</td><td>1</td></tr>
+<tr><td>c</td><td>char</td><td>char></td><td>string of length 1</td><td>1</td></tr>
+<tr><td>b</td><td>signed char</td><td>byte</td><td>integer</td><td>1</td></tr>
+<tr><td>B</td><td>unsigned char</td><td>byte</td><td>integer</td><td>1</td></tr>
+<tr><td>?</td><td>_Bool</td><td>boolean</td><td>bool</td><td>1</td></tr>
+<tr><td>h</td><td>short</td><td>short</td><td>integer</td><td>2</td></tr>
+<tr><td>H</td><td>unsigned short</td><td>short</td><td>integer</td><td>2</td></tr>
+<tr><td>i</td><td>int</td><td>int</td><td>integer</td><td>4</td></tr>
+<tr><td>I</td><td>unsigned int</td><td>int</td><td>integer</td><td>4</td></tr>
+<tr><td>l</td><td>long</td><td>int</td><td>integer</td><td>4</td></tr>
+<tr><td>L</td><td>unsigned long</td><td>int</td><td>integer</td><td>4</td></tr>
+<tr><td>q</td><td>long long</td><td>long</td><td>integer</td><td>8</td></tr>
+<tr><td>Q</td><td>unsigned long long</td><td>long</td><td>integer</td><td>8</td></tr>
+<tr><td>f</td><td>float</td><td>float</td><td>float</td><td>4</td></tr>
+<tr><td>d</td><td>double</td><td>double</td><td>float</td><td>8</td></tr>
+<tr><td>s</td><td>char[]</td><td>String</td><td>string</td><td>fixed length</td></tr>
+<tr><td>S</td><td>char[]</td><td>String</td><td>string</td><td>N/A</td></tr>
+<tr><td>r</td><td>wt_recno_t</td><td>long</td><td>integer</td><td>8</td></tr>
+<tr><td>u</td><td>WT_ITEM</td><td>byte[]</td><td>string</td><td>N/A</td></tr>
+ * </table>
+ *
  * In addition, we add the following types:
  *   - 'u' (the default for simple table cursors), which packs a WT_ITEM, and
  *     unpacks to a WT_ITEM.
@@ -387,6 +464,8 @@ int wiredtiger_struct_unpack(const void *buffer, int size, const char *fmt, ...)
 
 /*! Entry point to an extension, implemented by loadable modules. */
 extern int wiredtiger_extension_init(WT_CONNECTION *connection, const char *config);
+
+#define	WT_NOTFOUND	(-10000)
 
 /*! @} */
 
