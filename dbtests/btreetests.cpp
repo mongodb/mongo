@@ -410,8 +410,8 @@ namespace BtreeTests {
             }
             // too much work to try to make this happen through inserts and deletes
             // we are intentionally manipulating the btree bucket directly here
-            dur::writingDiskLoc( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket ) ) = DiskLoc();
-            dur::writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
+            getDur().writingDiskLoc( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket ) ) = DiskLoc();
+            getDur().writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
             BSONObj k = BSON( "a" << toInsert );
             Base::insert( k );
         }
@@ -542,7 +542,7 @@ namespace BtreeTests {
         }
         static void set( const DiskLoc &l, IndexDetails &id ) {
             ArtificialTree::is( id.head )->deallocBucket( id.head, id );
-            dur::writingDiskLoc(id.head) = l;
+            getDur().writingDiskLoc(id.head) = l;
         }
         static string expectedKey( const char *spec ) {
             if ( spec[ 0 ] != '$' ) {
@@ -1449,7 +1449,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,c:{b:null},d:null}", id() );
-            dur::writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket.btree()->keyNode( 0 ).recordLoc ).GETOFS() ) |= 1; // make unused            
+            getDur().writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket.btree()->keyNode( 0 ).recordLoc ).GETOFS() ) |= 1; // make unused
             int unused = 0;
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 1, unused );

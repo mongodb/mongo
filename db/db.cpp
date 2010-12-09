@@ -563,7 +563,10 @@ sendmore:
             globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
         }
 
-        dur::startup();
+        if (cmdLine.dur)
+            enableDurability();
+
+        getDur().startup();
         if( cmdLine.durTrace & CmdLine::DurRecoverOnly ) 
             return;
 

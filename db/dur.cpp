@@ -39,17 +39,6 @@
 */
 
 #include "pch.h"
-
-#if !defined(_DURABLE)
-
-namespace mongo {
-    namespace dur {
-        void debugCheckLastDeclaredWrite() { }
-    }
-}
-
-#else
-
 #include "cmdline.h"
 #include "client.h"
 #include "dur.h"
@@ -62,37 +51,47 @@ namespace mongo {
 using namespace mongoutils;
 
 namespace mongo { 
+    DurableInterface* DurableInterface::_impl = new NonDurableImpl();
 
-    namespace dur { 
+#if !defined(_DURABLE)
+    void enableDurability() {}
+#else
+
+
+    namespace { 
+        using namespace dur;
 
         const bool DebugValidateMapsMatch = false;
         const bool DebugCheckLastDeclaredWrite = false;
 
-        static CommitJob commitJob;
+        CommitJob commitJob;
+    }
+
+    void enableDurability() { // TODO: merge with startup() ?
+        assert(typeid(*DurableInterface::_impl) == typeid(NonDurableImpl));
+        // lets NonDurableImpl instance leak, but its tiny and only happens once
+        DurableInterface::_impl = new DurableImpl();
+    }
 
         /** Declare that a file has been created 
             Normally writes are applied only after journalling, for safety.  But here the file 
             is created first, and the journal will just replay the creation if the create didn't 
             happen because of crashing.
         */
-        void createdFile(string filename, unsigned long long len) { 
-            if( cmdLine.dur ) {
-                shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
-                commitJob.noteOp(op);
-            }
+        void DurableImpl::createdFile(string filename, unsigned long long len) { 
+            shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
+            commitJob.noteOp(op);
         }
 
         /** declare write intent.  when already in the write view if testIntent is true. */
-        void declareWriteIntent(void *p, unsigned len) {
-            if( cmdLine.dur ) {
-                WriteIntent w(p, len);
-                commitJob.note(w);
-            }
+        void DurableImpl::declareWriteIntent(void *p, unsigned len) {
+            WriteIntent w(p, len);
+            commitJob.note(w);
         }
 
         string hexdump(const char *data, unsigned len);
 
-        void* writingPtr(void *x, unsigned len) { 
+        void* DurableImpl::writingPtr(void *x, unsigned len) { 
             void *p = x;
             if( testIntent )
                 p = MongoMMF::switchToPrivateView(x);
@@ -105,7 +104,7 @@ namespace mongo {
             @param len the length at ofs we will write
             @return new buffer pointer.  this is modified when testIntent is true.
         */
-        void* writingAtOffset(void *buf, unsigned ofs, unsigned len) {
+        void* DurableImpl::writingAtOffset(void *buf, unsigned ofs, unsigned len) {
             char *p = (char *) buf;
             if( testIntent )
                 p = (char *) MongoMMF::switchToPrivateView(buf);
@@ -121,7 +120,7 @@ namespace mongo {
 
             SLOW
         */
-        void debugCheckLastDeclaredWrite() { 
+        void DurableImpl::debugCheckLastDeclaredWrite() { 
             if( !DebugCheckLastDeclaredWrite )
                 return;
 
@@ -165,6 +164,7 @@ namespace mongo {
             }
         }
 
+    namespace dur {
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking 
@@ -467,19 +467,21 @@ namespace mongo {
         void unlinkThread();
         void recover();
 
-        void startup() {
-            if( !cmdLine.dur )
-                return;
-            if( testIntent )
-                return;
-            recover();
-            journalMakeDir();
-            boost::thread t(durThread);
-            boost::thread t2(unlinkThread);
-        }
-
     } // namespace dur
+
+
+    void DurableImpl::startup() {
+        if( !cmdLine.dur )
+            return;
+        if( testIntent )
+            return;
+        recover();
+        journalMakeDir();
+        boost::thread t(durThread);
+        boost::thread t2(unlinkThread);
+    }
+
+#endif
 
 } // namespace mongo
 
-#endif

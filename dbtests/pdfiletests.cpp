@@ -71,7 +71,7 @@ namespace PdfileTests {
                 BSONObj o = b.done();
                 int len = o.objsize();
                 Extent *e = ext.ext();
-                e = dur::writing(e);
+                e = getDur().writing(e);
                 int ofs;
                 if ( e->lastRecord.isNull() )
                     ofs = ext.getOfs() + ( e->_extentData - (char *)e );
@@ -79,7 +79,7 @@ namespace PdfileTests {
                     ofs = e->lastRecord.getOfs() + e->lastRecord.rec()->lengthWithHeaders;
                 DiskLoc dl( ext.a(), ofs );
                 Record *r = dl.rec();
-                r = (Record*) dur::writingPtr(r, Record::HeaderSize + len);
+                r = (Record*) getDur().writingPtr(r, Record::HeaderSize + len);
                 r->lengthWithHeaders = Record::HeaderSize + len;
                 r->extentOfs = e->myLoc.getOfs();
                 r->nextOfs = DiskLoc::NullOfs;
@@ -88,7 +88,7 @@ namespace PdfileTests {
                 if ( e->firstRecord.isNull() )
                     e->firstRecord = dl;
                 else
-                    dur::writingInt(e->lastRecord.rec()->nextOfs) = ofs;
+                    getDur().writingInt(e->lastRecord.rec()->nextOfs) = ofs;
                 e->lastRecord = dl;
                 return dl;
             }
@@ -112,7 +112,7 @@ namespace PdfileTests {
 
         class EmptyLooped : public Base {
             virtual void prepare() {
-                dur::writing(nsd())->capFirstNewRecord = DiskLoc();
+                getDur().writing(nsd())->capFirstNewRecord = DiskLoc();
             }
             virtual int count() const {
                 return 0;
@@ -121,7 +121,7 @@ namespace PdfileTests {
 
         class EmptyMultiExtentLooped : public Base {
             virtual void prepare() {
-                dur::writing( nsd() ) ->capFirstNewRecord = DiskLoc();
+                getDur().writing( nsd() ) ->capFirstNewRecord = DiskLoc();
             }
             virtual int count() const {
                 return 0;
@@ -133,7 +133,7 @@ namespace PdfileTests {
 
         class Single : public Base {
             virtual void prepare() {
-                dur::writing( nsd() )->capFirstNewRecord = insert( nsd()->capExtent, 0 );
+                getDur().writing( nsd() )->capFirstNewRecord = insert( nsd()->capExtent, 0 );
             }
             virtual int count() const {
                 return 1;
@@ -143,11 +143,11 @@ namespace PdfileTests {
         class NewCapFirst : public Base {
             virtual void prepare() {
                 DiskLoc x = insert( nsd()->capExtent, 0 );
-                dur::debugCheckLastDeclaredWrite();
-                dur::writing( nsd() )->capFirstNewRecord = x;
-                dur::debugCheckLastDeclaredWrite();
+                getDur().debugCheckLastDeclaredWrite();
+                getDur().writing( nsd() )->capFirstNewRecord = x;
+                getDur().debugCheckLastDeclaredWrite();
                 insert( nsd()->capExtent, 1 );
-                dur::debugCheckLastDeclaredWrite();
+                getDur().debugCheckLastDeclaredWrite();
             }
             virtual int count() const {
                 return 2;

@@ -64,7 +64,7 @@ namespace mongo {
         for (; !i.isNull() && inCapExtent( i ); i = i.drec()->nextDeleted )
             drecs.push_back( i );
 
-        dur::writingDiskLoc( cappedFirstDeletedInCurExtent() ) = i;
+        getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = i;
 
         // This is the O(n^2) part.
         drecs.sort();
@@ -82,7 +82,7 @@ namespace mongo {
             DiskLoc b = *j;
             while ( a.a() == b.a() && a.getOfs() + a.drec()->lengthWithHeaders == b.getOfs() ) {
                 // a & b are adjacent.  merge.
-                dur::writingInt( a.drec()->lengthWithHeaders ) += b.drec()->lengthWithHeaders;
+                getDur().writingInt( a.drec()->lengthWithHeaders ) += b.drec()->lengthWithHeaders;
                 j++;
                 if ( j == drecs.end() ) {
                     DEBUGGING out() << "temp: compact adddelrec2\n";
@@ -146,20 +146,20 @@ namespace mongo {
         // We want cappedLastDelRecLastExtent() to be the last DeletedRecord of the prev cap extent
         // (or DiskLoc() if new capExtent == firstExtent)
         if ( capExtent == lastExtent )
-            dur::writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();
+            getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();
         else {
             DiskLoc i = cappedFirstDeletedInCurExtent();
             for (; !i.isNull() && nextIsInCapExtent( i ); i = i.drec()->nextDeleted );
-            dur::writingDiskLoc( cappedLastDelRecLastExtent() ) = i;
+            getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = i;
         }
 
-        dur::writingDiskLoc( capExtent ) = theCapExtent()->xnext.isNull() ? firstExtent : theCapExtent()->xnext;
+        getDur().writingDiskLoc( capExtent ) = theCapExtent()->xnext.isNull() ? firstExtent : theCapExtent()->xnext;
 
         /* this isn't true if a collection has been renamed...that is ok just used for diagnostics */
         //dassert( theCapExtent()->ns == ns );
 
         theCapExtent()->assertOk();
-        dur::writingDiskLoc( capFirstNewRecord ) = DiskLoc();
+        getDur().writingDiskLoc( capFirstNewRecord ) = DiskLoc();
     }
 
     DiskLoc NamespaceDetails::__capAlloc( int len ) {
@@ -191,7 +191,7 @@ namespace mongo {
     DiskLoc NamespaceDetails::cappedAlloc(const char *ns, int len) { 
         // signal done allocating new extents.
         if ( !cappedLastDelRecLastExtent().isValid() )
-            dur::writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();
+            getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();
         
         assert( len < 400000000 );
         int passes = 0;
@@ -257,7 +257,7 @@ namespace mongo {
 
         // Remember first record allocated on this iteration through capExtent.
         if ( capFirstNewRecord.isValid() && capFirstNewRecord.isNull() )
-            dur::writingDiskLoc(capFirstNewRecord) = loc;
+            getDur().writingDiskLoc(capFirstNewRecord) = loc;
 
         return loc;
     }
