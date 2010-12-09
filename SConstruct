@@ -1169,7 +1169,7 @@ elif not onlyServer:
             shell32BitFiles.append( "32bit/" + str( f ) )
         for f in scriptingFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
-        shellEnv.VariantDir( "32bit" , "." , duplicate=0 )
+        shellEnv.VariantDir( "32bit" , "." , duplicate=1 )
     else:
         shellEnv.Prepend( LIBPATH=[ "." ] )
 
