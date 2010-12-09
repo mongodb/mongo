@@ -225,6 +225,34 @@ public:
             BSONObj cmd = BSON( "applyOps" << BSON_ARRAY( obj ) );
             BSONObj out;
             conn().runCommand(db, cmd, out);
+        } else if ( endsWith( _curns, ".system.indexes" )) {
+            /* Index construction is slightly special: when restoring
+               indexes, we must ensure that the ns attribute is
+               <dbname>.<indexname>, where <dbname> might be different
+               at restore time than what was dumped.  Also, we're
+               stricter about errors for indexes than for regular
+               data. */
+            BSONObjBuilder bo;
+            BSONObjIterator i(obj);
+            while ( i.more() ){
+                BSONElement e = i.next();
+                if (strcmp(e.fieldName(), "ns") == 0) {
+                    NamespaceString n(e.String());
+                    string s = _db + "." + n.coll;
+                    bo.append("ns", s);
+                } else {
+                    bo.append(e);
+                }
+            }
+            BSONObj o = bo.obj();
+            conn().insert( _curns ,  o );
+            BSONObj err = conn().getLastErrorDetailed();
+            if ( ! ( err["err"].isNull() ) ) {
+                cerr << "Error creating index " << o["ns"].String();
+                cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
+                cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
+                abort();
+            }
         } else {
             conn().insert( _curns , obj );
         }
