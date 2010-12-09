@@ -101,6 +101,7 @@ namespace mongo {
 
         string _db;
         string _coll;
+        string _fileName;
 
         string _username;
         string _password;
