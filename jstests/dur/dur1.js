@@ -1,23 +1,68 @@
 // dur1.js
+// test durability
 
 print("dur1.js");
 
-var name = "dur1";
+// directories
+var path1 = "dur1testnodur";
+var path2 = "dur1testdur";
 
-print(1);
+var step = 1;
+function log(str) {
+    if(str)
+        print("step " + step++ + " " + str);
+    else
+        print("step " + step++);
+}
 
-var n = startMongodTest(31001, name + "-nodur", 0, {});
+//stopMongo(30000, 9);
 
-print(2);
+// non-durable version
+log();
+var conn = startMongodEmpty("--port", 30000, "--dbpath", path1);
+log();
+var d = conn.getDB("test");
+d.foo.insert({ x: 1 });
+log();
+stopMongod(30000);
 
-var d = startMongodTest(31002, name + "-dur", 0, { dur: true });
+// durable version
+log();
+var conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur");
+log();
+var d = conn.getDB("test");
+d.foo.insert({ x: 1 });
+log();
 
-print(3);
+// wait for group commit.  use getLastError(...) later when that is enhanced.
+sleep(400);
 
-//assert(n.foo.count() == 0);
+// kill the process hard
+stopMongod(30001, /*signal*/9);
 
-print(4);
+// journal file should be present, and non-empty as we killed hard
 
-//assert(d.foo.count() == 0);
+// restart and recover
+log();
+var conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur");
+log();
+var d = conn.getDB("test");
+print("count:" + d.foo.count());
+assert(d.foo.count() == 1);
+
+log("stop");
+stopMongod(30002);
+
+// at this point, after clean shutdown, there should be no journal files
+log("check no journal files");
+assert(ls(path2 + "/journal") == null);
+
+log("check data matches");
+var diff = run("diff", path1 + "/test.ns", path2 + "/test.ns");
+print(diff);
+assert(diff == "");
+var diff = run("diff", path1 + "/test.0", path2 + "/test.0");
+print(diff);
+assert(diff == "");
 
 print("SUCCESS dur1.js");
