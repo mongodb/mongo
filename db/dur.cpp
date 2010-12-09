@@ -76,14 +76,18 @@ namespace mongo {
             happen because of crashing.
         */
         void createdFile(string filename, unsigned long long len) { 
-            shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
-            commitJob.noteOp(op);
+            if( cmdLine.dur ) {
+                shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
+                commitJob.noteOp(op);
+            }
         }
 
         /** declare write intent.  when already in the write view if testIntent is true. */
         void declareWriteIntent(void *p, unsigned len) {
-            WriteIntent w(p, len);
-            commitJob.note(w);
+            if( cmdLine.dur ) {
+                WriteIntent w(p, len);
+                commitJob.note(w);
+            }
         }
 
         string hexdump(const char *data, unsigned len);

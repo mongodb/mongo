@@ -97,6 +97,7 @@ namespace mongo {
                 // be read locked here.  but must be at least read locked to avoid race with 
                 // remapprivateview
                 DEV dbMutex.assertWriteLocked();
+                dassert( cmdLine.dur );
                 if( !_wi._alreadyNoted.checkAndSet(w) ) {
                     if( !_hasWritten ) {
                         assert( !dbMutex._remapPrivateViewRequested );
@@ -115,6 +116,7 @@ namespace mongo {
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p) {
                 DEV dbMutex.assertWriteLocked();
+                dassert( cmdLine.dur );
                 if( !_hasWritten ) {
                     assert( !dbMutex._remapPrivateViewRequested );
                     _hasWritten = true;
