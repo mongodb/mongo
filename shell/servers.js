@@ -871,7 +871,7 @@ ToolTest.prototype.runTool = function(){
         a.push( "127.0.0.1:" + this.port );
     }
 
-    runMongoProgram.apply( null , a );
+    return runMongoProgram.apply( null , a );
 }
 
 
