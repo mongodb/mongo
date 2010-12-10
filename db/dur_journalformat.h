@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "../util/md5.hpp"
+
 namespace mongo {
 
     namespace dur {
@@ -67,16 +69,42 @@ namespace mongo {
         };
 
         struct JSectFooter { 
-            JSectFooter() { 
+            JSectFooter(const void* begin, int len) { // needs buffer to compute hash
                 sentinel = JEntry::OpCode_Footer;
-                hash = 0;
                 reserved = 0;
                 magic[0] = magic[1] = magic[2] = magic[3] = '\n';
+
+                // skip section header since size modified after hashing
+                (const char*&)begin += sizeof(JSectHeader);
+                len                 -= sizeof(JSectHeader);
+
+                md5(begin, len, hash);
             }
             unsigned sentinel;
-            unsigned hash;
+            md5digest hash; // unsigned char[16]
             unsigned long long reserved;
             char magic[4]; // "\n\n\n\n"
+
+            bool checkHash(const void* begin, int len) const {
+                if (*(int*)hash == 0) return true; // TODO(mathias): remove this
+
+                // skip section header since size modified after hashing
+                (const char*&)begin += sizeof(JSectHeader);
+                len                 -= sizeof(JSectHeader);
+
+                md5digest current;
+                md5(begin, len, current);
+
+                return (memcmp(hash, current, sizeof(hash)) == 0);
+            }
+
+            // TODO(mathias): remove this
+            int size() const {
+                if (*(int*)hash == 0)
+                    return (sizeof(*this) - sizeof(md5digest) + sizeof(unsigned));
+                else
+                    return sizeof(*this);
+            }
         };
 
         /** declares "the next entry(s) are for this database / file path prefix" */

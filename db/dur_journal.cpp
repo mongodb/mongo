@@ -41,7 +41,7 @@ namespace mongo {
     namespace dur {
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 8 );
-        BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 20 );
+        BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 32 );
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
 
         filesystem::path getJournalDir() { 

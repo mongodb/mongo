@@ -223,8 +223,7 @@ namespace mongo {
             }
 
             {
-                JSectFooter f;
-                f.hash = 0;
+                JSectFooter f(bb.buf(), bb.len());
                 bb.appendStruct(f);
             }
 

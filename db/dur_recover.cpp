@@ -84,7 +84,7 @@ namespace mongo {
         class JournalIterator : boost::noncopyable {
         public:
             JournalIterator(void *p, unsigned len) : _br(p, len) {
-                _needHeader = true;
+                _sectHead = NULL;
                 *_lastDbName = 0;
 
                 JHeader h;
@@ -100,19 +100,32 @@ namespace mongo {
              *  throws on premature end of section. 
              */
             bool next(FullyQualifiedJournalEntry& e) { 
-                if( _needHeader ) {
-                    JSectHeader h;
-                    _br.read(h);
-                    _needHeader = false;
+                if( !_sectHead ) {
+                    _sectHead = static_cast<const JSectHeader*>(_br.pos());
+                    _br.skip(sizeof(JSectHeader));
                 }
 
                 unsigned lenOrOpCode;
                 _br.read(lenOrOpCode);
                 if( lenOrOpCode >= JEntry::OpCode_Min ) { 
                     if( lenOrOpCode == JEntry::OpCode_Footer ) { 
-                        _needHeader = true;
-                        _br.skip(sizeof(JSectFooter) - 4);
+                        const char* pos = (const char*) _br.pos();
+                        pos -= sizeof(lenOrOpCode); // rewind to include OpCode
+                        const JSectFooter& footer = *(const JSectFooter*)pos;
+
+                        int len = pos - (char*)_sectHead;
+                        if (!footer.checkHash(_sectHead, len)){
+                            massert(13594, str::stream() << "Journal checksum doesn't match. recorded: "
+                                                         << toHex(footer.hash, sizeof(footer.hash))
+                                                         << " actual: " << md5simpledigest(_sectHead, len)
+                                    , false);
+                        }
+
+                        //_br.skip(sizeof(JSectFooter) - 4); //TODO(mathias): go back to this
+                        _br.skip(footer.size() - 4);
                         _br.align(Alignment);
+
+                        _sectHead = NULL;
                         return false;
                     }
 
@@ -153,7 +166,7 @@ namespace mongo {
                 return true;
             }
         private:
-            bool _needHeader;
+            const JSectHeader* _sectHead;
             BufReader _br;
             char _lastDbName[Namespace::MaxNsLen];
         };
