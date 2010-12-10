@@ -44,10 +44,15 @@ namespace mongo {
         return ss.str();
     }
 
-    inline std::string md5simpledigest( string s ){
+    inline std::string md5simpledigest( const void* buf, int nbytes){
         md5digest d;
-        md5( s.c_str() , d );
+        md5( buf, nbytes , d );
         return digestToString( d );
     }
+
+    inline std::string md5simpledigest( string s ){
+        return md5simpledigest(s.data(), s.size());
+    }
+
 
 } // namespace mongo
