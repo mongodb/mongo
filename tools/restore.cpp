@@ -38,7 +38,8 @@ class Restore : public BSONTool {
 public:
     
     bool _drop;
-    const char * _curns;
+    string _curns;
+    string _curdb;
 
     Restore() : BSONTool( "restore" ) , _drop(false){
         add_options()
@@ -211,6 +212,7 @@ public:
         }
         
         _curns = ns.c_str();
+        _curdb = NamespaceString(_curns).db;
         processFile( root );
     }
 
@@ -225,7 +227,8 @@ public:
             BSONObj cmd = BSON( "applyOps" << BSON_ARRAY( obj ) );
             BSONObj out;
             conn().runCommand(db, cmd, out);
-        } else if ( endsWith( _curns, ".system.indexes" )) {
+        } 
+        else if ( endsWith( _curns.c_str() , ".system.indexes" )) {
             /* Index construction is slightly special: when restoring
                indexes, we must ensure that the ns attribute is
                <dbname>.<indexname>, where <dbname> might be different
@@ -238,13 +241,14 @@ public:
                 BSONElement e = i.next();
                 if (strcmp(e.fieldName(), "ns") == 0) {
                     NamespaceString n(e.String());
-                    string s = _db + "." + n.coll;
+                    string s = _curdb + "." + n.coll;
                     bo.append("ns", s);
                 } else {
                     bo.append(e);
                 }
             }
             BSONObj o = bo.obj();
+            log(0) << o << endl;
             conn().insert( _curns ,  o );
             BSONObj err = conn().getLastErrorDetailed();
             if ( ! ( err["err"].isNull() ) ) {
@@ -253,7 +257,8 @@ public:
                 cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
                 abort();
             }
-        } else {
+        } 
+        else {
             conn().insert( _curns , obj );
         }
     }
