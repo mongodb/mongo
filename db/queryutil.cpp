@@ -782,9 +782,11 @@ namespace mongo {
                     for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i ) {
                         BSONObj first = i->first->obj();
                         BSONObj second = i->second->obj();
+
+                        const unsigned maxCombinations = 4000000;
                         if ( forward ) {
                             for( vector< FieldInterval >::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
-                                uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < 1000000 );
+                                uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
                                 newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
                                 newBuilders.back().first->appendElements( first );
                                 newBuilders.back().second->appendElements( second );
@@ -793,7 +795,7 @@ namespace mongo {
                             }
                         } else {
                             for( vector< FieldInterval >::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
-                                uassert( 13304, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < 1000000 );
+                                uassert( 13304, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
                                 newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
                                 newBuilders.back().first->appendElements( first );
                                 newBuilders.back().second->appendElements( second );
