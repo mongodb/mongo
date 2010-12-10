@@ -178,19 +178,19 @@ namespace mongo {
 
         /** get the associated connection object */
         DBClientBase* operator->(){ 
-            uassert( 11004 ,  "did you call done already" , _conn );
+            uassert( 11004 ,  "connection was returned to the pool already" , _conn );
             return _conn; 
         }
         
         /** get the associated connection object */
         DBClientBase& conn() {
-            uassert( 11005 ,  "did you call done already" , _conn );
+            uassert( 11005 ,  "connection was returned to the pool already" , _conn );
             return *_conn;
         }
 
         /** get the associated connection object */
         DBClientBase* get() {
-            uassert( 13102 ,  "did you call done already" , _conn );
+            uassert( 13102 ,  "connection was returned to the pool already" , _conn );
             return _conn;
         }
         
