@@ -46,6 +46,7 @@ for lib in boostLibs:
         conf.CheckLib("boost_%s" % lib)
 allClientFiles = []
 allClientFiles += Glob( "mongo/*.cpp" )
+allClientFiles += Glob( "mongo/bson/*.cpp" )
 allClientFiles += Glob( "mongo/client/*.cpp" )
 allClientFiles += Glob( "mongo/s/*.cpp" )
 allClientFiles += Glob( "mongo/shell/*.cpp" )
