@@ -913,7 +913,7 @@ namespace mongo {
                     stringstream ss;
                     ss << "changing chunk location failed.  cmd: " << cmd << " result: " << cmdResult;
                     error() << ss.str() << endl;
-                    msgasserted( 13594 , ss.str() ); // uassert(13594)
+                    msgasserted( 13595 , ss.str() ); // uassert(13595)
 
                 }
 
