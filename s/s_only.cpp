@@ -41,6 +41,15 @@ namespace mongo {
     Client::~Client(){}
     bool Client::shutdown(){ return true; }
 
+    Client& Client::initThread(const char *desc, MessagingPort *mp) {
+        setThreadName(desc);
+        assert( currentClient.get() == 0 );
+        Client *c = new Client(desc, mp);
+        currentClient.reset(c);
+        mongo::lastError.initThread();
+        return *c;
+    }
+
     bool execCommand( Command * c ,
                       Client& client , int queryOptions , 
                       const char *ns, BSONObj& cmdObj , 
