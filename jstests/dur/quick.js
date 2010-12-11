@@ -1,7 +1,10 @@
-// dur1.js
-// test durability
+/* quick.js
+   test durability
+   this file should always run quickly
+   other tests can be slow
+*/
 
-print("dur1.js");
+print("quick.js");
 
 // directories
 var path1 = "dur1testnodur";
@@ -60,9 +63,9 @@ assert(ls(path2 + "/journal") == null);
 log("check data matches");
 var diff = run("diff", path1 + "/test.ns", path2 + "/test.ns");
 print(diff);
-assert(diff == "");
+assert(diff == "", "error test.ns files differ");
 var diff = run("diff", path1 + "/test.0", path2 + "/test.0");
 print(diff);
-assert(diff == "");
+assert(diff == "", "error test.0 files differ");
 
 print("SUCCESS dur1.js");
