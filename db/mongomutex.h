@@ -214,7 +214,7 @@ namespace mongo {
 
     inline void MongoMutex::_releasedWriteLock() { 
 #if defined(_DURABLE) && defined(_DEBUG)
-        dur::debugCheckLastDeclaredWrite();
+        getDur().debugCheckLastDeclaredWrite();
 #endif
     }
 

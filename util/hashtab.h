@@ -129,7 +129,7 @@ namespace mongo {
             int i = _find(k, found);
             if ( i >= 0 && found ) {
                 Node* n = &nodes(i);
-                n = dur::writing(n);
+                n = getDur().writing(n);
                 n->k.kill();
                 n->setUnused();
             }
@@ -141,7 +141,7 @@ namespace mongo {
             int i = _find(k, found);
             if ( i < 0 )
                 return false;
-            Node* n = dur::writing( &nodes(i) );
+            Node* n = getDur().writing( &nodes(i) );
             if ( !found ) {
                 n->k = k;
                 n->hash = k.hash();

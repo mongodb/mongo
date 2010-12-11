@@ -85,7 +85,7 @@ namespace mongo {
 
         private:
             string _filename;
-            unsigned long long _len;
+            unsigned long long _len; // size of file, not length of name
         };
 
     }

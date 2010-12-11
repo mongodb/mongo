@@ -54,7 +54,7 @@ namespace mongo {
             unsigned long long reserved;
             log.read(reserved);
             log.read(reserved);
-            log.read(_len);
+            log.read(_len); // size of file, not length of name
             log.readStr(_filename);
         }
 

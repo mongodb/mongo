@@ -43,11 +43,11 @@ namespace mongo {
     BtreeBucket* DiskLoc::btreemod() const {
         assert( _a != -1 );
         BtreeBucket *b = const_cast< BtreeBucket * >( btree() );
-        return static_cast< BtreeBucket* >( dur::writingPtr( b, BucketSize ) );
+        return static_cast< BtreeBucket* >( getDur().writingPtr( b, BucketSize ) );
     }
 
     _KeyNode& _KeyNode::writing() const { 
-        return *dur::writing( const_cast< _KeyNode* >( this ) );
+        return *getDur().writing( const_cast< _KeyNode* >( this ) );
     }
 
     KeyNode::KeyNode(const BucketBasics& bb, const _KeyNode &k) :
@@ -354,7 +354,7 @@ namespace mongo {
             // declare that we will write to [k(keypos),k(n)]
             // todo: this writes a medium amount to the journal.  we may want to add a verb "shift" to the redo log so  
             //       we can log a very small amount.
-            b = (BucketBasics*) dur::writingAtOffset((void *) this, p-(char*)this, q-p);
+            b = (BucketBasics*) getDur().writingAtOffset((void *) this, p-(char*)this, q-p);
 
             // e.g. n==3, keypos==2
             // 1 4 9
@@ -364,7 +364,7 @@ namespace mongo {
                 b->k(j) = b->k(j-1);
         }
 
-        dur::declareWriteIntent(&b->emptySize, 12);
+        getDur().declareWriteIntent(&b->emptySize, 12);
         b->emptySize -= sizeof(_KeyNode);
         b->n++;
 
@@ -373,7 +373,7 @@ namespace mongo {
         kn.recordLoc = recordLoc;
         kn.setKeyDataOfs((short) b->_alloc(key.objsize()) );
         char *p = b->dataAt(kn.keyDataOfs());
-        dur::declareWriteIntent(p, key.objsize());
+        getDur().declareWriteIntent(p, key.objsize());
         memcpy(p, key.objdata(), key.objsize());
         return true;
     }
@@ -1164,7 +1164,7 @@ namespace mongo {
 
         {
             const _KeyNode *_kn = &k(keypos);
-            _KeyNode *kn = (_KeyNode *) dur::alreadyDeclared((_KeyNode*) _kn); // already declared intent in basicInsert()
+            _KeyNode *kn = (_KeyNode *) getDur().alreadyDeclared((_KeyNode*) _kn); // already declared intent in basicInsert()
             if ( keypos+1 == n ) { // last key
                 if ( nextChild != lchild ) {
                     out() << "ERROR nextChild != lchild" << endl;
@@ -1195,7 +1195,7 @@ namespace mongo {
                     assert(false);
                 }
                 const DiskLoc *pc = &k(keypos+1).prevChildBucket;
-                *dur::alreadyDeclared((DiskLoc*) pc) = rchild; // declared in basicInsert()
+                *getDur().alreadyDeclared((DiskLoc*) pc) = rchild; // declared in basicInsert()
                 if ( !rchild.isNull() )
                     rchild.btree()->parent.writing() = thisLoc;
             }
@@ -1726,7 +1726,7 @@ namespace mongo {
         while( 1 ) { 
             if( loc.btree()->tempNext().isNull() ) { 
                 // only 1 bucket at this level. we are done.
-                dur::writingDiskLoc(idx.head) = loc;
+                getDur().writingDiskLoc(idx.head) = loc;
                 break;
             }
             levels++;

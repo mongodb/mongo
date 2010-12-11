@@ -539,7 +539,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForNs(ns);
 
-        d = dur::writing(d);
+        d = getDur().writing(d);
         d->aboutToDeleteAnIndex();
 
         /* there may be pointers pointing at keys in the btree(s).  kill them. */

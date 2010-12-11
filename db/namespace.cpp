@@ -187,7 +187,7 @@ namespace mongo {
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
-        dur::assertReading(this);
+        getDur().assertReading(this);
 		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
 #if defined(_DEBUG) && !defined(_DURABLE)
@@ -196,7 +196,7 @@ namespace mongo {
         }
 #endif
         {
-            Record *r = (Record *) dur::writingPtr(d, sizeof(Record));
+            Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));
             d = &r->asDeleted();
             // defensive code: try to make us notice if we reference a deleted record
             (unsigned&) (r->data) = 0xeeeeeeee;
@@ -207,7 +207,7 @@ namespace mongo {
                 // Initial extent allocation.  Insert at end.
                 d->nextDeleted = DiskLoc();
                 if ( cappedListOfAllDeletedRecords().isNull() )
-                    dur::writingDiskLoc( cappedListOfAllDeletedRecords() ) = dloc;
+                    getDur().writingDiskLoc( cappedListOfAllDeletedRecords() ) = dloc;
                 else {
                     DiskLoc i = cappedListOfAllDeletedRecords();
                     for (; !i.drec()->nextDeleted.isNull(); i = i.drec()->nextDeleted )
@@ -216,14 +216,14 @@ namespace mongo {
                 }
             } else {
                 d->nextDeleted = cappedFirstDeletedInCurExtent();
-                dur::writingDiskLoc( cappedFirstDeletedInCurExtent() ) = dloc;
+                getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = dloc;
                 // always compact() after this so order doesn't matter
             }
         } else {
             int b = bucket(d->lengthWithHeaders);
             DiskLoc& list = deletedList[b];
             DiskLoc oldHead = list;
-            dur::writingDiskLoc(list) = dloc;
+            getDur().writingDiskLoc(list) = dloc;
             d->nextDeleted = oldHead;
         }
     }
@@ -236,7 +236,7 @@ namespace mongo {
             return loc;
 
         DeletedRecord *r = loc.drec();
-        r = dur::writing(r);
+        r = getDur().writing(r);
 
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
@@ -261,7 +261,7 @@ namespace mongo {
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
-        DeletedRecord *newDelW = dur::writing(newDel);
+        DeletedRecord *newDelW = getDur().writing(newDel);
         newDelW->extentOfs = r->extentOfs;
         newDelW->lengthWithHeaders = left;
         newDelW->nextDeleted.Null();
@@ -338,8 +338,8 @@ namespace mongo {
 
         /* unlink ourself from the deleted list */
         {
-            DeletedRecord *bmr = dur::writing(bestmatch.drec());
-            *dur::writing(bestprev) = bmr->nextDeleted;
+            DeletedRecord *bmr = getDur().writing(bestmatch.drec());
+            *getDur().writing(bestprev) = bmr->nextDeleted;
             bmr->nextDeleted.setInvalid(); // defensive.
             assert(bmr->extentOfs < bestmatch.getOfs());
         }
@@ -473,7 +473,7 @@ namespace mongo {
             id = &idx(nIndexes,false);
         }
 
-        (*dur::writing(&nIndexes))++;
+        (*getDur().writing(&nIndexes))++;
         if ( resetTransient )
             NamespaceDetailsTransient::get_w(thisns).addedIndex();
         return *id;

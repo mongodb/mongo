@@ -271,7 +271,7 @@ namespace mongo {
             DiskLoc lastRecord;
         };
         /** often we want to update just the firstRecord and lastRecord fields. 
-            this helper is for that -- for use with dur::writing() method
+            this helper is for that -- for use with getDur().writing() method
         */
         FL* fl() { return (FL*) &firstRecord; }
     private:
@@ -312,7 +312,7 @@ namespace mongo {
             if ( uninitialized() ) {
                 assert(filelength > 32768 );
                 assert( HeaderSize == 8192 );
-                DataFileHeader *h = dur::writing(this);
+                DataFileHeader *h = getDur().writing(this);
                 h->fileLength = filelength;
                 h->version = VERSION;
                 h->versionMinor = VERSION_MINOR;

@@ -85,6 +85,8 @@ namespace mongo {
             _pos = ((char*)_start) + ofs;
         }
 
+        void* pos() { return _pos; }
+
     private:
         void *_start;
         void *_pos;

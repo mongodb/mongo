@@ -199,6 +199,7 @@ namespace mongo {
             }
 
             if( params.count("dur") ) { 
+                enableDurability();
                 cmdLine.dur = true;
             }
 
@@ -256,7 +257,7 @@ namespace mongo {
                 filter = params["filter"].as<string>();
             }
 
-            dur::startup();
+            getDur().startup();
 
             int ret = run(suites,filter);
 

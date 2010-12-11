@@ -41,7 +41,7 @@ namespace mongo {
     namespace dur {
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 8 );
-        BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 20 );
+        BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 32 );
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
 
         filesystem::path getJournalDir() { 
@@ -63,7 +63,7 @@ namespace mongo {
         }
 
         JHeader::JHeader(string fname) { 
-            txt[0] = 'j'; txt[1] = '\n';
+            magic[0] = 'j'; magic[1] = '\n';
             version = 0x4141;
             memset(ts, 0, sizeof(ts));
             strncpy(ts, time_t_to_String_short(time(0)).c_str(), sizeof(ts)-1);

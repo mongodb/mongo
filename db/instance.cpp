@@ -815,7 +815,7 @@ namespace mongo {
             uassert( 10310 ,  "Unable to acquire lock for lockfilepath: " + name,  0 );
         }
 
-        if ( oldFile ){
+        if ( oldFile && !cmdLine.dur ){
             // we check this here because we want to see if we can get the lock
             // if we can't, then its probably just another mongod running
             cout << "************** \n" 
