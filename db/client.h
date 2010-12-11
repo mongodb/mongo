@@ -232,18 +232,6 @@ namespace mongo {
         return *c;
     }
 
-    /* each thread which does db operations has a Client object in TLS.  
-       call this when your thread starts. 
-    */
-    inline Client& Client::initThread(const char *desc, MessagingPort *mp) {
-        setThreadName(desc);
-        assert( currentClient.get() == 0 );
-        Client *c = new Client(desc, mp);
-        currentClient.reset(c);
-        mongo::lastError.initThread();
-        return *c;
-    }
-
     inline Client::GodScope::GodScope(){
         _prev = cc()._god;
         cc()._god = true;

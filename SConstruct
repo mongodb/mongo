@@ -856,6 +856,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
     for m in modules:
         m.configure( conf , myenv )
 
+    # XP_* is for spidermonkey.
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
         myenv.Append( CPPDEFINES=[ "XP_WIN" ] )
