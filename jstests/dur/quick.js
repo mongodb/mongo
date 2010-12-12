@@ -25,7 +25,7 @@ log();
 var conn = startMongodEmpty("--port", 30000, "--dbpath", path1);
 log();
 var d = conn.getDB("test");
-d.foo.insert({ x: 1 });
+d.foo.insert({ _id:123 });
 log();
 stopMongod(30000);
 
@@ -34,7 +34,7 @@ log();
 var conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur");
 log();
 var d = conn.getDB("test");
-d.foo.insert({ x: 1 });
+d.foo.insert({ _id:123 });
 log();
 
 // wait for group commit.  use getLastError(...) later when that is enhanced.

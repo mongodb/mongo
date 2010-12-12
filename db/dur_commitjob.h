@@ -104,7 +104,13 @@ namespace mongo {
                         _hasWritten = true;
                     }
 
-                    log() << "TEMP write intent " << w.p << ' ' << w.len << endl;
+                    /** tips for debugging:
+                          if you have an incorrect diff between data files in different folders 
+                          (see jstests/dur/quick.js for example),
+                          turn this on and see what is logged.  if you have a copy of its output from before the 
+                          regression, a simple diff of these lines would tell you a lot likely.
+                    */
+                    log() << "DEBUG note write intent " << w.p << ' ' << w.len << endl;
 
                     // remember intent. we will journal it in a bit
                     _wi._writes.push_back(w);
