@@ -191,7 +191,6 @@
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\db\dbwebserver.cpp" />
-    <ClCompile Include="..\db\mongommf.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
