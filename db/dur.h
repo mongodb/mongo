@@ -5,7 +5,7 @@
 #include "diskloc.h"
 #include "mongommf.h"
 
-namespace mongo { 
+namespace mongo {
 
     class DurableInterface { 
     protected:

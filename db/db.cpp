@@ -719,9 +719,6 @@ int main(int argc, char* argv[])
         ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
-        ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
-        ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
-        ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
         ;
 
         ms_options.add_options()
@@ -733,7 +730,7 @@ int main(int argc, char* argv[])
         ;
             
         rs_options.add_options()
-        ("replSet", po::value<string>(), "specify repl set seed hostnames format <set id>/<host1>,<host2>,etc...")
+        ("replSet", po::value<string>(), "arg is <setname>[/<optionalseedhostlist>]")
         ;
         
 	sharding_options.add_options()
@@ -749,6 +746,9 @@ int main(int argc, char* argv[])
         // these move to unhidden later:
         ("dur", "enable journaling")
         ("durTrace", po::value<int>(), "durability diagnostic options")
+        ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
+        ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
+        ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
         ;
 
 
