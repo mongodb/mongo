@@ -31,8 +31,8 @@ namespace mongo {
         // have to get a connection to the config db
         // special case if i'm the configdb since i'm locked and if i connect to myself
         // its a deadlock
-        auto_ptr<ScopedDbConnection> scoped;
-        auto_ptr<DBDirectClient> direct;
+        scoped_ptr<ScopedDbConnection> scoped;
+        scoped_ptr<DBDirectClient> direct;
         DBClientBase * conn;
         if ( configServer.empty() ){
             direct.reset( new DBDirectClient() );
