@@ -430,7 +430,8 @@ namespace mongo {
                         _tl.reset( s );
                     }
 
-                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter , 0 , mr.limit ) ) );
+                    wassert( mr.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
+                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter , 0 , (unsigned) mr.limit ) ) );
                     long long mapTime = 0;
                     {
                         readlock lock( mr.ns );
