@@ -242,19 +242,6 @@ namespace mongo {
             _fileToPtr.clear();
         }
 
-        string hexdump(const char *data, unsigned len) {
-            const unsigned char *p = (const unsigned char *) data;
-            stringstream ss;
-            for( unsigned i = 0; i < 4 && i < len; i++ ) {
-                ss << std::hex << setw(2) << setfill('0');
-                unsigned n = p[i];
-                ss << n;
-                ss << ' ';
-            }
-            string s = ss.str();
-            return s;
-        }
-
         void RecoveryJob::applyEntries(const vector<FullyQualifiedJournalEntry> &entries) { 
             bool apply = (cmdLine.durTrace & CmdLine::DurScanOnly) == 0;
             bool dump = cmdLine.durTrace & CmdLine::DurDumpJournal;

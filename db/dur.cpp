@@ -57,7 +57,6 @@ namespace mongo {
     void enableDurability() {}
 #else
 
-
     namespace { 
         using namespace dur;
 
@@ -88,8 +87,6 @@ namespace mongo {
             WriteIntent w(p, len);
             commitJob.note(w);
         }
-
-        string hexdump(const char *data, unsigned len);
 
         void* DurableImpl::writingPtr(void *x, unsigned len) { 
             void *p = x;
@@ -466,8 +463,9 @@ namespace mongo {
         void unlinkThread();
         void recover();
 
-    } // namespace dur
+        void _debugCheckLastDeclaredWrite() { return getDur().debugCheckLastDeclaredWrite(); }
 
+    } // namespace dur
 
     void DurableImpl::startup() {
         if( !cmdLine.dur )

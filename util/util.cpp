@@ -24,6 +24,20 @@
 
 namespace mongo {
 
+    string hexdump(const char *data, unsigned len) {
+        assert( len < 1000000 );
+        const unsigned char *p = (const unsigned char *) data;
+        stringstream ss;
+        for( unsigned i = 0; i < 4 && i < len; i++ ) {
+            ss << std::hex << setw(2) << setfill('0');
+            unsigned n = p[i];
+            ss << n;
+            ss << ' ';
+        }
+        string s = ss.str();
+        return s;
+    }
+
     boost::thread_specific_ptr<string> _threadName;
     
     void _setThreadName( const char * name ){

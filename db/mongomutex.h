@@ -209,12 +209,12 @@ namespace mongo {
 
     namespace dur {
         void REMAPPRIVATEVIEW();
-        void debugCheckLastDeclaredWrite();
+        void _debugCheckLastDeclaredWrite(); // because it's hard to include dur.h here
     }
 
     inline void MongoMutex::_releasedWriteLock() { 
 #if defined(_DURABLE) && defined(_DEBUG)
-        getDur().debugCheckLastDeclaredWrite();
+        dur::_debugCheckLastDeclaredWrite();
 #endif
     }
 
