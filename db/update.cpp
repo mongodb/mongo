@@ -982,9 +982,8 @@ namespace mongo {
             else {
                 BSONObj newObj = mss->createNewFromMods();
                 checkTooLarge(newObj);
-                bool changedId;
                 assert(nsdt);
-                DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug, changedId);                        
+                DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);                        
             }
                     
             if ( logop ) {
@@ -1012,16 +1011,10 @@ namespace mongo {
         // regular update
         BSONElementManipulator::lookForTimestamps( updateobj );
         checkNoMods( updateobj );
-        bool changedId = false;
         assert(nsdt);
-        theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, changedId);
+        theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug );
         if ( logop ) {
-            if ( !changedId ) {
-                logOp("u", ns, updateobj, &patternOrig );
-            } else {
-                logOp("d", ns, patternOrig );
-                logOp("i", ns, updateobj );                    
-            }
+            logOp("u", ns, updateobj, &patternOrig );
         }
         return UpdateResult( 1 , 0 , 1 );
     }
@@ -1182,8 +1175,7 @@ namespace mongo {
 
                     BSONObj newObj = mss->createNewFromMods();
                     checkTooLarge(newObj);
-                    bool changedId;
-                    DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug, changedId);
+                    DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
                     if ( newLoc != loc || modsIsIndexed ) {
                         // object moved, need to make sure we don' get again
                         seenObjects.insert( newLoc );
@@ -1230,22 +1222,16 @@ namespace mongo {
                 }
                 
                 continue;
-            } 
+            }
                 
             uassert( 10158 ,  "multi update only works with $ operators" , ! multi );
                 
             BSONElementManipulator::lookForTimestamps( updateobj );
             checkNoMods( updateobj );
-            bool changedId = false;
-            theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, changedId, god);
+            theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, god);
             if ( logop ) {
                 DEV if( god ) log() << "REALLY??" << endl; // god doesn't get logged, this would be bad.
-                if ( !changedId ) {
-                    logOp("u", ns, updateobj, &pattern );
-                } else {
-                    logOp("d", ns, pattern );
-                    logOp("i", ns, updateobj );                    
-                }
+                logOp("u", ns, updateobj, &pattern );
             }
             return UpdateResult( 1 , 0 , 1 );
         }
