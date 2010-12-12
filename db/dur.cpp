@@ -122,6 +122,7 @@ namespace mongo {
 
             SLOW
         */
+#if defined(_DEBUG)
         void DurableImpl::debugCheckLastDeclaredWrite() { 
             if( !DebugCheckLastDeclaredWrite )
                 return;
@@ -165,6 +166,7 @@ namespace mongo {
                 log() << endl;
             }
         }
+#endif
 
     namespace dur {
         /** we will build an output buffer ourself and then use O_DIRECT

@@ -143,11 +143,8 @@ namespace PdfileTests {
         class NewCapFirst : public Base {
             virtual void prepare() {
                 DiskLoc x = insert( nsd()->capExtent, 0 );
-                getDur().debugCheckLastDeclaredWrite();
                 getDur().writing( nsd() )->capFirstNewRecord = x;
-                getDur().debugCheckLastDeclaredWrite();
                 insert( nsd()->capExtent, 1 );
-                getDur().debugCheckLastDeclaredWrite();
             }
             virtual int count() const {
                 return 2;
