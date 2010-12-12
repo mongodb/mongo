@@ -379,37 +379,6 @@ namespace ReplTests {
             BSONObj o_, u_;            
         };
         
-        class UpdateId : public UpdateSameFieldExplicitId {
-        public:
-            UpdateId() {
-                o_ = fromjson( "{'_id':1}" );
-                u_ = fromjson( "{'_id':2}" );
-            }
-        };
-        
-        class UpdateId2 : public ReplTests::Base {
-        public:
-            UpdateId2() :
-            o_( fromjson( "{'_id':1}" ) ),
-            u_( fromjson( "{'_id':2}" ) ){}
-            void run() {
-                deleteAll( ns() );
-                insert( o_ );
-                client()->update( ns(), o_, u_ );
-                ASSERT_EQUALS( 1, count() );
-                checkOne( u_ );
-                
-                deleteAll( ns() );
-                insert( o_ );
-                insert( u_ ); // simulate non snapshot replication, then op application
-                applyAllOperations();
-                ASSERT_EQUALS( 1, count() );
-                checkOne( u_ );
-            }
-        protected:
-            BSONObj o_, u_;            
-        };
-
         class UpdateDifferentFieldExplicitId : public Base {
         public:
             UpdateDifferentFieldExplicitId() :
@@ -1172,8 +1141,6 @@ namespace ReplTests {
             add< Idempotence::UpdateSameField >();
             add< Idempotence::UpdateSameFieldWithId >();
             add< Idempotence::UpdateSameFieldExplicitId >();
-            add< Idempotence::UpdateId >();
-            add< Idempotence::UpdateId2 >();
             add< Idempotence::UpdateDifferentFieldExplicitId >();
             add< Idempotence::UpsertUpdateNoMods >();
             add< Idempotence::UpsertInsertNoMods >();
