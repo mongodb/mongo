@@ -7,8 +7,8 @@
 print("quick.js");
 
 // directories
-var path1 = "dur1testnodur";
-var path2 = "dur1testdur";
+var path1 = "quicknodur";
+var path2 = "quickdur";
 
 var step = 1;
 function log(str) {
@@ -34,11 +34,13 @@ log();
 var conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur");
 log();
 var d = conn.getDB("test");
-d.foo.insert({ _id:123 });
+d.foo.insert({ _id: 123 });
+d.getLastError(); // wait
+//assert(d.foo.count() == 1, "count is 1");
 log();
 
 // wait for group commit.  use getLastError(...) later when that is enhanced.
-sleep(400);
+sleep(500);
 
 // kill the process hard
 stopMongod(30001, /*signal*/9);
@@ -51,14 +53,14 @@ var conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur");
 log();
 var d = conn.getDB("test");
 print("count:" + d.foo.count());
-assert(d.foo.count() == 1);
+assert(d.foo.count() == 1, "count 1");
 
 log("stop");
 stopMongod(30002);
 
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files");
-assert(ls(path2 + "/journal") == null);
+assert(ls(path2 + "/journal") == null, "journal empty");
 
 log("check data matches");
 var diff = run("diff", path1 + "/test.ns", path2 + "/test.ns");
