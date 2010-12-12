@@ -93,6 +93,9 @@ namespace mongo {
 
             /** record/note an intent to write */
             void note(WriteIntent& w) {
+                // TEMP
+                DEV getDur().debugCheckLastDeclaredWrite();
+
                 // from the point of view of the dur module, it would be fine (i think) to only 
                 // be read locked here.  but must be at least read locked to avoid race with 
                 // remapprivateview
@@ -110,7 +113,18 @@ namespace mongo {
                           turn this on and see what is logged.  if you have a copy of its output from before the 
                           regression, a simple diff of these lines would tell you a lot likely.
                     */
-                    log() << "DEBUG note write intent " << w.p << ' ' << w.len << endl;
+#if 1 && defined(_DEBUG)
+                    { 
+                        size_t ofs;
+                        MongoMMF *mmf = privateViews._find(w.p, ofs);
+                        if( mmf ) {
+                            log() << "DEBUG note write intent " << w.p << ' ' << mmf->filename() << " ofs:" << hex << ofs << " len:" << w.len << endl;
+                        }
+                        else { 
+                            log() << "DEBUG note write intent " << w.p << ' ' << w.len << " NOT FOUND IN privateViews" << endl;
+                        }
+                    }
+#endif
 
                     // remember intent. we will journal it in a bit
                     _wi._writes.push_back(w);

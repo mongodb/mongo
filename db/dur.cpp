@@ -60,8 +60,13 @@ namespace mongo {
     namespace { 
         using namespace dur;
 
+#if defined(_DEBUG)
+        const bool DebugValidateMapsMatch = true;
+        const bool DebugCheckLastDeclaredWrite = true;
+#else
         const bool DebugValidateMapsMatch = false;
         const bool DebugCheckLastDeclaredWrite = false;
+#endif
 
         CommitJob commitJob;
     }

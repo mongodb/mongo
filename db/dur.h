@@ -7,12 +7,14 @@
 
 namespace mongo {
 
-    class DurableInterface { 
+    class DurableInterface : boost::noncopyable { 
     protected:
-        DurableInterface() {} // Should only be creating subclasses
+        DurableInterface() {} // Should only be creating by subclasses
 
     public:
-        /** call during startup so durability module can initialize 
+         virtual ~DurableInterface() { assert(!"don't destroy me"); }
+
+       /** call during startup so durability module can initialize 
             throws if fatal error
         */
         virtual void startup() = 0;
@@ -50,9 +52,9 @@ namespace mongo {
         */
         virtual void* writingAtOffset(void *buf, unsigned ofs, unsigned len) = 0;
 
+#if defined(_DEBUG)
         virtual void debugCheckLastDeclaredWrite() = 0;
-
-        virtual ~DurableInterface() { assert(!"don't destroy me"); }
+#endif
 
         //////////////////////////////
         // END OF VIRTUAL FUNCTIONS //
@@ -124,7 +126,9 @@ namespace mongo {
         void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
         void declareWriteIntent(void *, unsigned) { }
         void createdFile(string filename, unsigned long long len) { }
+#if defined(_DEBUG)
         void debugCheckLastDeclaredWrite() {}
+#endif
     };
 
 #ifdef _DURABLE
@@ -134,7 +138,9 @@ namespace mongo {
         void* writingAtOffset(void *buf, unsigned ofs, unsigned len);
         void declareWriteIntent(void *, unsigned);
         void createdFile(string filename, unsigned long long len);
+#if defined(_DEBUG)
         void debugCheckLastDeclaredWrite();
+#endif
     };
 #endif
 
