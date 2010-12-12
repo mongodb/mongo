@@ -93,8 +93,10 @@ namespace mongo {
 
             /** record/note an intent to write */
             void note(WriteIntent& w) {
-                // TEMP
-                DEV getDur().debugCheckLastDeclaredWrite();
+#if defined(_DEBUG)
+                // TEMP?
+                getDur().debugCheckLastDeclaredWrite();
+#endif
 
                 // from the point of view of the dur module, it would be fine (i think) to only 
                 // be read locked here.  but must be at least read locked to avoid race with 
