@@ -47,5 +47,9 @@ namespace mongo {
         */
         void journalingFailure(const char *msg);
 
+        /** never throws.  
+            @return true if there are any journal files in the journal dir. 
+        */
+        bool haveJournalFiles();
     }
 }

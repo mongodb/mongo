@@ -122,6 +122,21 @@ namespace mongo {
             return p;
         }
 
+        /** never throws */
+        bool haveJournalFiles() { 
+            try {
+                for ( boost::filesystem::directory_iterator i( getJournalDir() );
+                      i != boost::filesystem::directory_iterator(); 
+                      ++i ) {
+                    string fileName = boost::filesystem::path(*i).leaf();
+                    if( str::startsWith(fileName, "j._") )
+                        return true;
+                }
+            }
+            catch(...) { }
+            return false;
+        }
+        
         /** throws */
         void removeJournalFiles() { 
             try {

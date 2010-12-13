@@ -140,7 +140,7 @@ namespace mongo {
         void enableDurability();
 
         class NonDurableImpl : public DurableInterface {
-            void startup() { }
+            void startup();
             void* writingPtr(void *x, unsigned len) { return x; }
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
             void declareWriteIntent(void *, unsigned) { }
