@@ -29,6 +29,22 @@ namespace mongo {
     string getHostNameCached();
     BSONArray argvArray;
 
+    CmdLine::CmdLine() : 
+        port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(false),
+        quota(false), quotaFiles(8), cpu(false), durTrace(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ), 
+        syncdelay(60)
+    { 
+        // default may change for this later.
+#if defined(_DURABLEDEFAULTON)
+# if !defined(_DURABLE)
+# error define _DURABLE when using _DURABLEDEFAULTON
+# endif
+        dur = true;
+#else
+        dur = false;
+#endif
+    } 
+
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general , 
                                     boost::program_options::options_description& hidden ){
         /* support for -vv -vvvv etc. */

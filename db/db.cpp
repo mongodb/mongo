@@ -567,6 +567,7 @@ sendmore:
             dur::enableDurability();
 
         getDur().startup();
+
         if( cmdLine.durTrace & CmdLine::DurRecoverOnly ) 
             return;
 
@@ -749,6 +750,7 @@ int main(int argc, char* argv[])
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
         ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
         ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
+        ("nodur", "disable journaling (currently the default)")
         ;
 
 
@@ -830,6 +832,9 @@ int main(int argc, char* argv[])
         if (params.count("quotaFiles")) {
             cmdLine.quota = true;
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
+        }
+        if( params.count("nodur") ) { 
+            cmdLine.dur = false;
         }
         if( params.count("dur") ) { 
             cmdLine.dur = true;

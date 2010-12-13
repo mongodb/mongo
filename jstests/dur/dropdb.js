@@ -69,7 +69,7 @@ var path2 = testname + "dur";
 
 // non-durable version
 log();
-conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--smallfiles");
+conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallfiles");
 work();
 verify();
 stopMongod(30000);

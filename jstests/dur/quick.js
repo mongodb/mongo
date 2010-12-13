@@ -22,7 +22,7 @@ function log(str) {
 
 // non-durable version
 log();
-var conn = startMongodEmpty("--port", 30000, "--dbpath", path1);
+var conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur");
 log();
 var d = conn.getDB("test");
 d.foo.insert({ _id:123 });

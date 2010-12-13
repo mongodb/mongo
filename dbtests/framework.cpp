@@ -165,6 +165,7 @@ namespace mongo {
                 ("filter,f" , po::value<string>() , "string substring filter on test name" )
                 ("verbose,v", "verbose")
                 ("dur", "enable journaling")
+                ("nodur", "disable journaling (currently the default)")
                 ("seed", po::value<unsigned long long>(&seed), "random number seed")
                 ;
             
@@ -198,9 +199,12 @@ namespace mongo {
                 return EXIT_CLEAN;
             }
 
-            if( params.count("dur") ) { 
-                dur::enableDurability();
+            if( params.count("nodur") ) { 
+                cmdLine.dur = false;
+            }
+            if( params.count("dur") || cmdLine.dur ) { 
                 cmdLine.dur = true;
+                dur::enableDurability();
             }
 
             if (params.count("debug") || params.count("verbose") ) {
