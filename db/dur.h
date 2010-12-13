@@ -8,16 +8,19 @@
 namespace mongo {
 
     class DurableInterface : boost::noncopyable { 
-    protected:
-        DurableInterface() {} // Should only be creating by subclasses
-
     public:
-         virtual ~DurableInterface() { assert(!"don't destroy me"); }
+        virtual ~DurableInterface() { assert(false); /* don't destroy these objects */ }
 
-       /** call during startup so durability module can initialize 
+        /** Call during startup so durability module can initialize 
             throws if fatal error
         */
         virtual void startup() = 0;
+
+        /** Wait for acknowledgement of the next group commit. 
+            @return true if --dur is on.  There will be delay.
+            @return false if --dur is off.
+        */
+        virtual bool awaitCommit() = 0;
 
         /** Declare that a file has been created 
             Normally writes are applied only after journalling, for safety.  But here the file 
@@ -59,9 +62,7 @@ namespace mongo {
         virtual void debugCheckLastDeclaredWrite() = 0;
 #endif
 
-        //////////////////////////////
-        // END OF VIRTUAL FUNCTIONS //
-        //////////////////////////////
+        /// END OF VIRTUAL FUNCTIONS 
 
         inline DiskLoc& writingDiskLoc(DiskLoc& d) {
             return *((DiskLoc*) writingPtr(&d, sizeof(d)));
@@ -130,6 +131,7 @@ namespace mongo {
         void declareWriteIntent(void *, unsigned) { }
         void createdFile(string filename, unsigned long long len) { }
         void droppingDb(string db) { }
+        bool awaitCommit() { return false; }
 #if defined(_DEBUG)
         void debugCheckLastDeclaredWrite() {}
 #endif
@@ -143,6 +145,7 @@ namespace mongo {
         void declareWriteIntent(void *, unsigned);
         void createdFile(string filename, unsigned long long len);
         void droppingDb(string db);
+        bool awaitCommit();
 #if defined(_DEBUG)
         void debugCheckLastDeclaredWrite();
 #endif

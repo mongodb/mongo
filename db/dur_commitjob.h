@@ -21,6 +21,7 @@
 
 #include "../util/alignedbuilder.h"
 #include "../util/mongoutils/hash.h"
+#include "../util/concurrency/synchronization.h"
 #include "cmdline.h"
 #include "durop.h"
 #include "dur.h"
@@ -28,7 +29,7 @@
 namespace mongo { 
     namespace dur {
 
-        /* declaration of an intent to write to a region of a memory mapped view */
+        /** declaration of an intent to write to a region of a memory mapped view */
         struct WriteIntent /* copyable */ { 
             WriteIntent() : w_ptr(0), p(0) { }
             WriteIntent(void *a, unsigned b) : w_ptr(0), p(a), len(b) { }
@@ -37,9 +38,9 @@ namespace mongo {
             unsigned len; // up to this len
         };
 
-        /* try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
+        /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
            we will just log them twice.
-           */
+        */
         template<int Prime>
         class Already : boost::noncopyable {
         public:
@@ -68,7 +69,7 @@ namespace mongo {
             WriteIntent nodes[N];
         };
 
-        /* our record of pending/uncommitted write intents */
+        /** our record of pending/uncommitted write intents */
         class Writes : boost::noncopyable {
         public:
             Already<127> _alreadyNoted;
@@ -78,7 +79,9 @@ namespace mongo {
             void clear();
         };
 
-        /** concurrency: assumption is caller is appropriately locking.
+        /** A commit job object for a group commit.  Currently there is one instance of this object.
+
+            concurrency: assumption is caller is appropriately locking.
                          for example note() invocations are from the write lock.
                          other uses are in a read lock from a single thread (durThread)
         */
@@ -102,18 +105,25 @@ namespace mongo {
             */
             bool hasWritten() const { return _hasWritten; }
 
-            /** accelerate the group commit to immediate.  do not return until done. 
-                usually that is a bad idea and could cause lag or other issues.
-            */
-            void commitNow();
-
             /** we use the commitjob object over and over, calling reset() rather than reconstructing */
             void reset();
+
+            /** the commit code calls this when data reaches the journal (on disk) */
+            void notifyCommitted() { _notify.notifyAll(); }
+
+            /** Wait until the next group commit occurs. That is, wait until someone calls notifyCommitted. */ 
+            void awaitNextCommit() { 
+                if( hasWritten() )
+                    _notify.wait(); 
+            }
 
         private:
             bool _hasWritten;
             Writes _wi;
+            NotifyAll _notify;
         };
+
+        // inlines
 
         inline void CommitJob::note(WriteIntent& w) {
 #if defined(_DEBUG)

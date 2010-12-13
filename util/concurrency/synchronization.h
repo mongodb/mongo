@@ -59,7 +59,7 @@ namespace mongo {
         /** awaits the next notifyAll() call by another thread. notifications that preceed this 
             call are ignored -- we are looking for a fresh event. 
         */
-        void waitToBeNotified();
+        void wait();
 
         /** may be called multiple times. notifies all waiters */
         void notifyAll();

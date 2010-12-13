@@ -39,7 +39,7 @@ namespace mongo {
 
     NotifyAll::NotifyAll() : _mutex("NotifyAll"), _counter(0) { }
     
-    void NotifyAll::waitToBeNotified() {
+    void NotifyAll::wait() {
         scoped_lock lock( _mutex );
         unsigned long long old = _counter;
         while( old == _counter ) {

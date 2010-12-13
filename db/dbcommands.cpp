@@ -85,19 +85,19 @@ namespace mongo {
 
     class CmdGetLastError : public Command {
     public:
-        virtual LockType locktype() const { return NONE; } 
-        virtual bool requiresAuth() { return false; }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
+        CmdGetLastError() : Command("getLastError", false, "getlasterror") { }
+        virtual LockType locktype() const { return NONE;  } 
+        virtual bool requiresAuth()       { return false; }
+        virtual bool logTheOp()           { return false; }
+        virtual bool slaveOk() const      { return true;  }
         virtual void help( stringstream& help ) const {
-            help << "return error status of the last operation on this connection";
+            help << "return error status of the last operation on this connection\n"
+                 << "options:\n" 
+                 << "  fsync - fsync before returning, or wait for journal commit if running with --dur\n"
+                 << "  w - await replication to w servers (including self) before returning\n"
+                 << "  wtimeout - timeout for w in milliseconds";
         }
-        CmdGetLastError() : Command("getLastError", false, "getlasterror") {}
-        bool run(const string& dbnamne, BSONObj& _cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbname, BSONObj& _cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
             
             bool err = false;
@@ -122,12 +122,22 @@ namespace mongo {
                 }
             }
 
-            if ( cmdObj["fsync"].trueValue() ){
-                log() << "fsync from getlasterror" << endl;
-                result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
+            log() << cmdObj.toString() << endl;
+
+            if ( cmdObj["fsync"].trueValue() ) {
+                Timer t;
+                if( !getDur().awaitCommit() ) {
+                    // if get here, not running with --dur
+                    log() << "fsync from getlasterror" << endl;
+                    result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
+                }
+                else { 
+                    // this perhpas is temp.  how long we wait for the group commit to occur.
+                    result.append( "waited", t.millis() );
+                }
             }
 
-            if ( err ){
+            if ( err ) {
                 // doesn't make sense to wait for replication
                 // if there was an error
                 return true;
@@ -181,7 +191,7 @@ namespace mongo {
             return true;
         }
         CmdGetPrevError() : Command("getPrevError", false, "getpreverror") {}
-        bool run(const string& dbnamne, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
             le->appendSelf( result );
             if ( le->valid )

@@ -65,8 +65,8 @@ namespace mongo {
         using namespace dur;
 
 #if defined(_DEBUG)
-        const bool DebugValidateMapsMatch = true;
-        const bool DebugCheckLastDeclaredWrite = true;
+        const bool DebugValidateMapsMatch = false;
+        const bool DebugCheckLastDeclaredWrite = false;
 #else
         const bool DebugValidateMapsMatch = false;
         const bool DebugCheckLastDeclaredWrite = false;
@@ -79,6 +79,11 @@ namespace mongo {
         assert(typeid(*DurableInterface::_impl) == typeid(NonDurableImpl));
         // lets NonDurableImpl instance leak, but its tiny and only happens once
         DurableInterface::_impl = new DurableImpl();
+    }
+
+    bool DurableImpl::awaitCommit() { 
+        commitJob.awaitNextCommit();
+        return true;
     }
 
         /** Declare that a file has been created 
@@ -393,6 +398,11 @@ namespace mongo {
             PREPLOGBUFFER();
 
             WRITETOJOURNAL(commitJob._ab);
+
+            // data is now in the journal, which is sufficient for acknowledging getlasterror. 
+            // (ok to crash after that)
+            log() << "TEMP NOTIFYING COMMITTED" << endl;
+            commitJob.notifyCommitted();
 
             // write the noted write intent entries to the data files.
             // this has to come after writing to the journal, obviously...
