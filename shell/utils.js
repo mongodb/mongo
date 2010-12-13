@@ -18,7 +18,7 @@ friendlyEqual = function( a , b ){
 
 printStackTrace = function(){
     try{
-        throw new Error("Printing Stack Trace (lines are 0-based in spidermonkey)");
+        throw new Error("Printing Stack Trace");
     } catch (e) {
         print(e.stack);
     }
