@@ -740,6 +740,12 @@
     <ClCompile Include="..\bson\oid.cpp">
       <Filter>db</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\synchronization.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\dur_commitjob.cpp">
+      <Filter>dur</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

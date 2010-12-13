@@ -31,7 +31,7 @@ function work() {
     d.foo.insert({ _id: 100 });
 
     // assure writes applied in case we kill -9 on return from this function
-    d.getLastError();
+    d.runCommand({ getlasterror: 1, fsync: 1 });
 
     log("endwork");
 }
@@ -46,7 +46,9 @@ function verify() {
     printjson(conn.getDB("teste").foo.findOne());
     print();
 
-    assert(conn.getDB("teste").foo.findOne()._id == 99, "teste");
+    var teste = conn.getDB("teste");
+    print("teste count " + teste.foo.count());
+    assert(teste.foo.findOne()._id == 99, "teste");
 
 }
 
@@ -54,6 +56,7 @@ if (debugging) {
     // mongod already running in debugger
     conn = db.getMongo();
     work();
+    verify();
     sleep(30000);
     quit();
 }
@@ -68,15 +71,14 @@ var path2 = testname + "dur";
 log();
 conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--smallfiles");
 work();
+verify();
 stopMongod(30000);
 
 // durable version
 log();
 conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles");
 work();
-
-// wait for group commit.  use getLastError(...) later when that is enhanced.
-sleep(400);
+verify();
 
 // kill the process hard
 stopMongod(30001, /*signal*/9);
