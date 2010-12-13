@@ -40,8 +40,14 @@ function verify() {
     log("verify");
     var d = conn.getDB("test");
     assert(d.foo.count() == 1,"count1");
-    assert(d.foo.findOne()._id == 100,"100");
-    assert(conn.getDB("teste").foo.findOne()._id == 99,"teste");
+    assert(d.foo.findOne()._id == 100, "100");
+
+    print("\n\nteste:");
+    printjson(conn.getDB("teste").foo.findOne());
+    print();
+
+    assert(conn.getDB("teste").foo.findOne()._id == 99, "teste");
+
 }
 
 if (debugging) {
