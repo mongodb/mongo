@@ -98,11 +98,13 @@ namespace mongo {
     
 #if defined(_DEBUG)
     void NamespaceDetails::dump(const Namespace& k) {
-        static NamespaceDetails *first;
-        if( first == 0 )
-            first = this;
+        if( !cmdLine.dur ) 
+            cout << "ns offsets which follow will not display correctly with --dur disabled" << endl;
 
-        cout << "ns" << hex << setw(8) << ((size_t)this)-((size_t)first) << ' ';
+        size_t ofs = 1; // 1 is sentinel that the find call below failed
+        privateViews.find(this, ofs);
+
+        cout << "ns" << hex << setw(8) << ofs << ' ';
         cout << k.toString() << '\n';
 
         if( k.isExtra() ) { 
