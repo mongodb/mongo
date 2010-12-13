@@ -20,7 +20,6 @@ class TestPacking(unittest.TestCase):
             self.assertEqual(pack('b', b), chr(b))
         for b in (0, 10, 65, 255):
             self.assertEqual(pack('B', b), chr(b))
-        for b in (0, 10, 65, 255):
             self.assertEqual(pack('c', chr(b)), chr(b))
 
 if __name__ == '__main__':

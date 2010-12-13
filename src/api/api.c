@@ -160,14 +160,16 @@ static int __session_checkpoint(WT_SESSION *session, const char *config)
 }
 
 
-static int __conn_close(WT_CONNECTION *conn, const char *config) {
+static int __conn_close(WT_CONNECTION *conn, const char *config)
+{
 	printf("WT_CONNECTION->close\n");
 	free((char *)conn->home);
 	free(conn);
 	return 0;
 }
 
-static int __conn_open_session(WT_CONNECTION *connection, const char *config, WT_SESSION **sessionp) {
+static int __conn_open_session(WT_CONNECTION *connection, const char *config, WT_SESSION **sessionp)
+{
 	WT_SESSION stds = {
 		NULL,
 		NULL,
@@ -235,7 +237,8 @@ int wiredtiger_open(const char *home, const char *config, WT_CONNECTION **connec
 	return 0;
 }
 
-const char *wiredtiger_strerror(int err) {
+const char *wiredtiger_strerror(int err)
+{
 	return "unknown error";
 }
 
@@ -256,6 +259,7 @@ int wiredtiger_struct_pack(void *buffer, int size, const char *fmt, ...)
 	return 0;
 }
 
-int wiredtiger_struct_unpack(const void *buffer, int size, const char *fmt, ...) {
+int wiredtiger_struct_unpack(const void *buffer, int size, const char *fmt, ...)
+{
 	return 0;
 }
