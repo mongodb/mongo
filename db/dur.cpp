@@ -55,12 +55,14 @@ namespace mongo {
     namespace dur {
 
         void NonDurableImpl::startup() {
+#if defined(_DURABLE)
             if( haveJournalFiles() ) { 
                 log() << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
                 log() << "It is recommended that you start with journalling enabled so that recovery may occur." << endl;
                 log() << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
                 uasserted(13597, "can't start without --dur enabled when journal/ files are present");
             }
+#endif
         }
 
 #if defined(_DEBUG)
