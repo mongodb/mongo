@@ -40,7 +40,7 @@ namespace mongo {
         void waitToBeNotified();
 
         /*
-         * Notifies the waiter of '*this' that it can proceed.
+         * Notifies the waiter of '*this' that it can proceed.  Can only be called once.
          */
         void notifyOne();
 
