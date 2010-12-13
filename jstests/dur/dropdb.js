@@ -76,7 +76,7 @@ stopMongod(30000);
 
 // durable version
 log();
-conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles");
+conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
 work();
 verify();
 
@@ -87,7 +87,7 @@ stopMongod(30001, /*signal*/9);
 
 // restart and recover
 log();
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles");
+conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
 verify();
 
 log("stop");

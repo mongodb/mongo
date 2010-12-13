@@ -31,7 +31,7 @@ stopMongod(30000);
 
 // durable version
 log();
-var conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur");
+var conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--durOptions", 8);
 log();
 var d = conn.getDB("test");
 d.foo.insert({ _id: 123 });
@@ -49,7 +49,7 @@ stopMongod(30001, /*signal*/9);
 
 // restart and recover
 log();
-var conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur");
+var conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", 8);
 log();
 var d = conn.getDB("test");
 print("count:" + d.foo.count());
