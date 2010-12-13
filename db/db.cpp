@@ -568,7 +568,7 @@ sendmore:
 
         getDur().startup();
 
-        if( cmdLine.durTrace & CmdLine::DurRecoverOnly ) 
+        if( cmdLine.durOptions & CmdLine::DurRecoverOnly ) 
             return;
 
         repairDatabasesAndCheckVersion();
@@ -746,7 +746,7 @@ int main(int argc, char* argv[])
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
         // these move to unhidden later:
         ("dur", "enable journaling")
-        ("durTrace", po::value<int>(), "durability diagnostic options")
+        ("durOptions", po::value<int>(), "durability diagnostic options")
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
         ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
         ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
@@ -840,8 +840,8 @@ int main(int argc, char* argv[])
             cmdLine.dur = true;
             log() << "***** WARNING --dur should not be used yet except for testing" << endl;
         }
-        if (params.count("durTrace")) {
-            cmdLine.durTrace = params["durTrace"].as<int>();
+        if (params.count("durOptions")) {
+            cmdLine.durOptions = params["durOptions"].as<int>();
         }
         if (params.count("objcheck")) {
             objcheck = true;

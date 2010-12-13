@@ -220,7 +220,7 @@ namespace mongo {
                 }
                 p = f->map(fn.c_str());
                 uassert(13534, str::stream() << "recovery error couldn't open " << fn, p);
-                if( cmdLine.durTrace & CmdLine::DurDumpJournal ) 
+                if( cmdLine.durOptions & CmdLine::DurDumpJournal ) 
                     log() << "  opened " << fn << ' ' << f->length()/1024.0/1024.0 << endl;
                 uassert(13543, str::stream() << "recovery error file has length zero " << fn, f->length());
                 assert( ofs < f->length() );
@@ -243,8 +243,8 @@ namespace mongo {
         }
 
         void RecoveryJob::applyEntries(const vector<FullyQualifiedJournalEntry> &entries) { 
-            bool apply = (cmdLine.durTrace & CmdLine::DurScanOnly) == 0;
-            bool dump = cmdLine.durTrace & CmdLine::DurDumpJournal;
+            bool apply = (cmdLine.durOptions & CmdLine::DurScanOnly) == 0;
+            bool dump = cmdLine.durOptions & CmdLine::DurDumpJournal;
             if( dump )
                 log() << "BEGIN section" << endl;
             
@@ -303,7 +303,7 @@ namespace mongo {
                 }
             }
             catch( BufReader::eof& ) { 
-                if( cmdLine.durTrace & CmdLine::DurDumpJournal )
+                if( cmdLine.durOptions & CmdLine::DurDumpJournal )
                     log() << "ABRUPT END" << endl;
                 return true; // abrupt end
             }
@@ -333,8 +333,8 @@ namespace mongo {
 
             close();
 
-            if( cmdLine.durTrace & CmdLine::DurScanOnly ) {
-                uasserted(13545, str::stream() << "--durTrace " << (int) CmdLine::DurScanOnly << " specified, terminating");
+            if( cmdLine.durOptions & CmdLine::DurScanOnly ) {
+                uasserted(13545, str::stream() << "--durOptions " << (int) CmdLine::DurScanOnly << " specified, terminating");
             }
 
             log() << "recover cleaning up" << endl;

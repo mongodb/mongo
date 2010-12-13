@@ -28,7 +28,7 @@ namespace mongo {
 
         CmdLine() : 
             port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(false),
-            quota(false), quotaFiles(8), cpu(false), durTrace(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ), 
+            quota(false), quotaFiles(8), cpu(false), durOptions(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ), 
             syncdelay(60)
         { 
             // default may change for this later.
@@ -78,15 +78,15 @@ namespace mongo {
 
         bool dur;              // --dur durability
 
-        /** --durTrace 7      dump journal and terminate without doing anything further 
-            --durTrace 4      recover and terminate without listening
+        /** --durOptions 7      dump journal and terminate without doing anything further 
+            --durOptions 4      recover and terminate without listening
         */
         enum { // bits to be ORed
             DurDumpJournal = 1,   // dump diagnostics on the journal during recovery
             DurScanOnly = 2,      // don't do any real work, just scan and dump if dump specified
             DurRecoverOnly = 4    // terminate after recovery step
         };
-        int durTrace;          // --durTrace <n> for debugging
+        int durOptions;          // --durOptions <n> for debugging
 
         long long oplogSize;   // --oplogSize
         int defaultProfile;    // --profile
