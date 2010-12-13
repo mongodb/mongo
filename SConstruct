@@ -371,7 +371,7 @@ for x in os.listdir( "db/modules/" ):
     if os.path.exists( modBuildFile ):
         modules += [ imp.load_module( "module_" + x , open( modBuildFile , "r" ) , modBuildFile , ( ".py" , "r" , imp.PY_SOURCE  ) ) ]
 
-allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
+allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp", "db/cmdline.cpp" ];
 
 # ---- other build setup -----
 
