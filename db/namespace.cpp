@@ -96,7 +96,32 @@ namespace mongo {
     
 	unsigned lenForNewNsFiles = 16 * 1024 * 1024;
     
+#if defined(_DEBUG)
+    void NamespaceDetails::dump(const Namespace& k) {
+        static NamespaceDetails *first;
+        if( first == 0 )
+            first = this;
+
+        cout << "ns" << hex << setw(8) << ((size_t)this)-((size_t)first) << ' ';
+        cout << k.toString() << '\n';
+
+        if( k.isExtra() ) { 
+            cout << "ns\t extra" << endl;
+            return;
+        }
+
+        cout << "ns         " << firstExtent.toString() << ' ' << lastExtent.toString() << " nidx:" << nIndexes << '\n';
+        cout << "ns         " << stats.datasize << ' ' << stats.nrecords << ' ' << nIndexes << '\n';
+        cout << "ns         " << capped << ' ' << paddingFactor << ' ' << flags << ' ' << dataFileVersion << '\n';
+        cout << "ns         " << multiKeyIndexBits << ' ' << backgroundIndexBuildInProgress << '\n';
+        cout << "ns         " << (int) reserved[0] << ' ' << (int) reserved[59];
+        cout << endl;
+    }
+#endif
+
     void NamespaceDetails::onLoad(const Namespace& k) { 
+        //dump(k);
+
         if( k.isExtra() ) { 
             /* overflow storage for indexes - so don't treat as a NamespaceDetails object. */
             return;

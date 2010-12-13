@@ -198,8 +198,14 @@ namespace mongo {
         /* add extra space for indexes when more than 10 */
         Extra* allocExtra(const char *ns, int nindexessofar);
         void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
+
         /* called when loaded from disk */
         void onLoad(const Namespace& k);
+
+        /* dump info on this namespace.  for debugging. */
+        void dump(const Namespace& k);
+
+        /* dump info on all extents for this namespace.  for debugging. */
         void dumpExtents();
 
     private:
