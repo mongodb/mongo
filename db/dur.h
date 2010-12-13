@@ -153,7 +153,6 @@ namespace mongo {
 #endif
         };
 
-#ifdef _DURABLE
         class DurableImpl : public DurableInterface {
             void startup();
             void* writingPtr(void *x, unsigned len);
@@ -167,7 +166,6 @@ namespace mongo {
             void debugCheckLastDeclaredWrite();
 #endif
         };
-#endif
 
     } // namespace dur
 

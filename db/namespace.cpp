@@ -217,11 +217,6 @@ namespace mongo {
         getDur().assertReading(this);
 		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
-#if defined(_DEBUG) && !defined(_DURABLE)
-        if( dloc.drec() != d ) {
-            assert(false);
-        }
-#endif
         {
             Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));
             d = &r->asDeleted();
@@ -486,11 +481,6 @@ namespace mongo {
 
     /* you MUST call when adding an index.  see pdfile.cpp */
     IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
-#if !defined(_DEBUG) || !defined(_DURABLE)
-        // in debug durable mode the write view could be "this" not the nsdetails returned view...
-        assert( nsdetails(thisns) == this );
-#endif
-
         IndexDetails *id;
         try {
             id = &idx(nIndexes,true);

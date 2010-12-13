@@ -124,7 +124,6 @@ add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boo
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
-add_option( "durable", "durability build" , 0 , True )
 
 # library choices
 add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
@@ -212,9 +211,6 @@ if has_option( "libpath" ):
 
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
-
-if has_option( "durable" ):
-    env.Append( CPPDEFINES=[ "_DURABLE" ] )
 
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
 env.Append( CPPPATH=[ "." ] )

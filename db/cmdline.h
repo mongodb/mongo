@@ -33,9 +33,6 @@ namespace mongo {
         { 
             // default may change for this later.
 #if defined(_DURABLEDEFAULTON)
-# if !defined(_DURABLE)
-# error define _DURABLE when using _DURABLEDEFAULTON
-# endif
             dur = true;
 #else
             dur = false;

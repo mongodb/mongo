@@ -215,18 +215,16 @@ namespace mongo {
     }
 
     inline void MongoMutex::_releasedWriteLock() { 
-#if defined(_DURABLE) && defined(_DEBUG)
+#if defined(_DEBUG)
         dur::_debugCheckLastDeclaredWrite();
 #endif
     }
 
     inline void MongoMutex::_acquiredWriteLock() { 
-#if defined(_DURABLE)
         if( _remapPrivateViewRequested ) { 
             dur::REMAPPRIVATEVIEW();
             dassert( !_remapPrivateViewRequested );
         }
-#endif
     }
 
     /* @return true if was already write locked.  increments recursive lock count. */

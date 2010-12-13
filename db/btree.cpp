@@ -29,12 +29,9 @@
 
 namespace mongo {
 
-#if !defined(_DURABLE) || !defined(_DEBUG)
-#define VERIFYTHISLOC dassert( thisLoc.btree() == this );
-#else
+//#define VERIFYTHISLOC dassert( thisLoc.btree() == this );
 // with _DURABLE, this assert wouldn't work without getting fancier as there are multiple mmap views for _DEBUG mode...
 #define VERIFYTHISLOC 
-#endif
 
     /**
      * give us a writable version of the btree bucket (declares write intent). 

@@ -719,12 +719,10 @@ namespace mongo {
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );
 
-#if defined(_DURABLE)
         if( cmdLine.dur ) {
             log() << "shutdown: journalCleanup..." << endl;
             dur::journalCleanup();
         }
-#endif
 
 #if !defined(_WIN32) && !defined(__sunos__)
         if ( lockFile ){

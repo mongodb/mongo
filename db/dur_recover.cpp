@@ -18,8 +18,6 @@
 
 #include "pch.h"
 
-#if defined(_DURABLE)
-
 #include "dur.h"
 #include "dur_journal.h"
 #include "dur_journalformat.h"
@@ -390,4 +388,3 @@ namespace mongo {
 
 } // namespace mongo
 
-#endif

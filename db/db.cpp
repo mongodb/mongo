@@ -838,16 +838,10 @@ int main(int argc, char* argv[])
         }
         if( params.count("dur") ) { 
             cmdLine.dur = true;
-#if !defined(_DURABLE)
-            log() << "--dur not yet available" << endl;
-            assert( false );
-#endif
+            log() << "***** WARNING --dur should not be used yet except for testing" << endl;
         }
         if (params.count("durTrace")) {
             cmdLine.durTrace = params["durTrace"].as<int>();
-#if !defined(_DURABLE)
-            assert( cmdLine.durTrace == 0 );
-#endif
         }
         if (params.count("objcheck")) {
             objcheck = true;

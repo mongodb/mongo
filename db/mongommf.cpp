@@ -209,7 +209,6 @@ namespace mongo {
     }
 
     /*virtual*/ void MongoMMF::close() {
-#if defined(_DURABLE)
         {
             if( !testIntent && cmdLine.dur ) { 
                 dur::closingFileNotification();
@@ -219,7 +218,6 @@ namespace mongo {
                 ourReadViews.remove(_view_readonly);
             }
         }
-#endif
         _view_write = _view_private = _view_readonly = 0;
         MemoryMappedFile::close();
     }

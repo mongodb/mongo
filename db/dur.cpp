@@ -55,14 +55,12 @@ namespace mongo {
     namespace dur {
 
         void NonDurableImpl::startup() {
-#if defined(_DURABLE)
             if( haveJournalFiles() ) { 
                 log() << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
                 log() << "It is recommended that you start with journalling enabled so that recovery may occur." << endl;
                 log() << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
                 uasserted(13597, "can't start without --dur enabled when journal/ files are present");
             }
-#endif
         }
 
 #if defined(_DEBUG)
@@ -75,10 +73,6 @@ namespace mongo {
 
         DurableInterface* DurableInterface::_impl = new NonDurableImpl();
 
-#if !defined(_DURABLE)
-        // called by startup/main
-        void enableDurability() {}
-#else
         void enableDurability() { // TODO: merge with startup() ?
             assert(typeid(*DurableInterface::_impl) == typeid(NonDurableImpl));
             // lets NonDurableImpl instance leak, but its tiny and only happens once
@@ -521,9 +515,6 @@ namespace mongo {
             boost::thread t(durThread);
             boost::thread t2(unlinkThread);
         }
-
-#endif
-
 
     } // namespace dur
     

@@ -61,9 +61,6 @@ namespace mongo {
 
     void printSysInfo() { 
         log() << "sys info: " << sysInfo() << endl; 
-#if defined(_DURABLE)
-        log() << "_DURABLE defined, but durable is not finished" << endl;
-#endif
 #if defined(_TESTINTENT)
         log() << "_TESTINTENT defined - this mode is for qa purposes" << endl;
 #endif

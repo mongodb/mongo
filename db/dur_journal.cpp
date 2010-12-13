@@ -18,8 +18,6 @@
 
 #include "pch.h"
 
-#if defined(_DURABLE)
-
 #include "client.h"
 #include "namespace.h"
 #include "dur_journal.h"
@@ -297,8 +295,6 @@ namespace mongo {
 
     }
 }
-
-#endif
 
 /* todo 
    test (and handle) disk full on journal append 

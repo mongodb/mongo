@@ -97,8 +97,6 @@
 
 namespace mongo {
 
-/** _DURABLE define - this likely goes away later. to facilitate testing for a while without impacting other things. */
-#if defined(_DURABLE)
 # if defined(_TESTINTENT)
     /** Use _TESTINTENT to test write intent declarations by using a read only view for non-declared operations. 
         We don't do journalling when _TESTINTENT is enabled.
@@ -107,12 +105,6 @@ namespace mongo {
 # else
     const bool testIntent = false;
 # endif
-#else
-# if defined(_TESTINTENT)
-#  error _TESTINTENT requires _DURABLE
-# endif
-    const bool testIntent = false;
-#endif
 
     using namespace std;
     using boost::shared_ptr;
