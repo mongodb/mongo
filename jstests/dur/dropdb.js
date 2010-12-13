@@ -64,8 +64,8 @@ if (debugging) {
 log();
 
 // directories
-var path1 = testname + "nodur";
-var path2 = testname + "dur";
+var path1 = "/data/db/" + testname + "nodur";
+var path2 = "/data/db/" + testname + "dur";
 
 // non-durable version
 log();

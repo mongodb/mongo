@@ -7,8 +7,8 @@
 print("quick.js");
 
 // directories
-var path1 = "quicknodur";
-var path2 = "quickdur";
+var path1 = "/data/db/quicknodur";
+var path2 = "/data/db/quickdur";
 
 var step = 1;
 function log(str) {
