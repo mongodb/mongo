@@ -185,6 +185,8 @@ namespace mongo {
                     // but we'd require analysis of the situation before a manual intervention
                     log(LL_ERROR) << "config.locks: " << _name << " lock is taken by old process? "
                                << "remove the following lock if the process is not active anymore: " << o << endl;
+                    *other = o;
+                    other->getOwned();
                     conn.done();
                     return false;
                 }
