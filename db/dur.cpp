@@ -79,6 +79,11 @@ namespace mongo {
 
         static CommitJob commitJob;
 
+        bool DurableImpl::commitNow() {
+            groupCommit();
+            return true;
+        }
+
         bool DurableImpl::awaitCommit() { 
             commitJob.awaitNextCommit();
             return true;

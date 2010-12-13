@@ -24,6 +24,21 @@ namespace mongo {
             */
             virtual bool awaitCommit() = 0;
 
+            /** Commit immediately.
+
+                Generally, you do not want to do this often, as highly granular committing may affect 
+                performance.
+                
+                Does not return until the commit is complete.
+
+                You must be at least read locked when you call this.  Ideally, you are not write locked 
+                and then read operations can occur concurrently.
+
+                @return true if --dur is on.
+                @return false if --dur is off. (in which case there is action)
+            */
+            virtual bool commitNow() = 0;
+
             /** Declare that a file has been created 
                 Normally writes are applied only after journalling, for safety.  But here the file 
                 is created first, and the journal will just replay the creation if the create didn't 
@@ -132,6 +147,7 @@ namespace mongo {
             void createdFile(string filename, unsigned long long len) { }
             void droppingDb(string db) { }
             bool awaitCommit() { return false; }
+            bool commitNow() { return false; }
 #if defined(_DEBUG)
             void debugCheckLastDeclaredWrite() {}
 #endif
@@ -146,6 +162,7 @@ namespace mongo {
             void createdFile(string filename, unsigned long long len);
             void droppingDb(string db);
             bool awaitCommit();
+            bool commitNow();
 #if defined(_DEBUG)
             void debugCheckLastDeclaredWrite();
 #endif
