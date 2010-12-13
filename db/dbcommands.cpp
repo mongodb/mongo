@@ -205,14 +205,14 @@ namespace mongo {
         }
         virtual LockType locktype() const { return WRITE; } 
         CmdDropDatabase() : Command("dropDatabase") {}
-        bool run(const string& dbnamne, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
-            log() << "dropDatabase " << dbnamne << endl;
+            log() << "dropDatabase " << dbname << endl;
             int p = (int) e.number();
             if ( p != 1 )
                 return false;
-            dropDatabase(dbnamne);
-            result.append( "dropped" , dbnamne );
+            dropDatabase(dbname);
+            result.append( "dropped" , dbname );
             return true;
         }
     } cmdDropDatabase;
