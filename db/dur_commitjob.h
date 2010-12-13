@@ -89,7 +89,7 @@ namespace mongo {
         public:
             AlignedBuilder _ab; // for direct i/o writes to journal
 
-            CommitJob() : _hasWritten(false), _ab(4 * 1024 * 1024) { }
+            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false) { }
 
             /** record/note an intent to write */
             void note(WriteIntent& w);

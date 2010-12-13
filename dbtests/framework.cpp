@@ -199,7 +199,7 @@ namespace mongo {
             }
 
             if( params.count("dur") ) { 
-                enableDurability();
+                dur::enableDurability();
                 cmdLine.dur = true;
             }
 

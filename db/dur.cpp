@@ -489,7 +489,11 @@ namespace mongo {
 
         void unlinkThread();
         void recover();
-        void _debugCheckLastDeclaredWrite() { return getDur().debugCheckLastDeclaredWrite(); }
+        void _debugCheckLastDeclaredWrite() { 
+#if defined(_DEBUG)
+            getDur().debugCheckLastDeclaredWrite(); 
+#endif
+        }
 
         void DurableImpl::startup() {
             if( !cmdLine.dur )
@@ -501,9 +505,12 @@ namespace mongo {
             boost::thread t(durThread);
             boost::thread t2(unlinkThread);
         }
-    } // namespace dur
 
 #endif
 
+
+    } // namespace dur
+    
+    
 } // namespace mongo
 
