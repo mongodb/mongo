@@ -1,4 +1,4 @@
-/* @file dur_commitjob.cpp
+/* @file dur_commitjob.cpp */
 
 /**
 *    Copyright (C) 2009 10gen Inc.
