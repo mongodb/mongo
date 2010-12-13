@@ -21,7 +21,9 @@
 
 #include "../util/alignedbuilder.h"
 #include "../util/mongoutils/hash.h"
+#include "cmdline.h"
 #include "durop.h"
+#include "dur.h"
 
 namespace mongo { 
     namespace dur {
@@ -153,6 +155,11 @@ namespace mongo {
                 trying to acquire a lock, which might be helpful at times. 
             */
             bool hasWritten() const { return _hasWritten; }
+
+            /** accelerate the group commit to immediate.  do not return until done. 
+                usually that is a bad idea and could cause lag or other issues.
+            */
+            void commitNow();
 
             /** we use the commitjob object over and over, calling reset() rather than reconstructing */
             void reset() { 

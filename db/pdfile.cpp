@@ -154,7 +154,7 @@ namespace mongo {
 
     void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator = false, const string& path = dbpath );
 
-    inline void _deleteDataFiles(const char *database) {
+    void _deleteDataFiles(const char *database) {
         if ( directoryperdb ) {
             BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( boost::filesystem::path( dbpath ) / database ) );
             return;
@@ -1740,6 +1740,7 @@ namespace mongo {
 
         Database::closeDatabase( d->name.c_str(), d->path );
         d = 0; // d is now deleted
+        getDur().droppingDb(db);
         _deleteDataFiles( db.c_str() );
     }
 

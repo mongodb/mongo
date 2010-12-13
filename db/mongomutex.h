@@ -18,6 +18,8 @@
 
 #pragma once
 
+// note: include concurrency.h, not this.
+
 namespace mongo { 
 
     /** the 'big lock' we use for most operations. a read/write lock.

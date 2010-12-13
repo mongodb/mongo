@@ -17,6 +17,7 @@
 */
 
 #include "pch.h"
+#include "concurrency.h"
 #include "../util/alignedbuilder.h"
 #include "../util/mongoutils/str.h"
 #include "../util/file.h"
@@ -27,6 +28,8 @@ using namespace mongoutils;
 namespace mongo { 
 
     extern string dbpath; // --dbpath parm
+
+    void _deleteDataFiles(const char *);
 
     namespace dur {
         
@@ -39,6 +42,9 @@ namespace mongo {
             case JEntry::OpCode_FileCreated:
                 op = shared_ptr<DurOp>( new FileCreatedOp(br) );
                 break;
+            case JEntry::OpCode_DropDb:
+                op = shared_ptr<DurOp>( new DropDbOp(br) );
+                break;
             default:
                 massert(13546, str::stream() << "dur recover unrecognized opcode in journal " << opcode, false);
             }
@@ -48,6 +54,28 @@ namespace mongo {
         void DurOp::serialize(AlignedBuilder& ab) { 
             ab.appendNum(_opcode);
             _serialize(ab);
+        }
+
+        DropDbOp::DropDbOp(BufReader& log) : DurOp(JEntry::OpCode_DropDb) {
+            unsigned long long reserved;
+            log.read(reserved);
+            log.read(reserved);
+            log.readStr(_db);
+            string reservedStr;
+            log.readStr(reservedStr);
+        }
+
+        void DropDbOp::_serialize(AlignedBuilder& ab) { 
+            ab.appendNum((unsigned long long) 0); // reserved for future use
+            ab.appendNum((unsigned long long) 0); // reserved for future use
+            ab.appendStr(_db);
+            ab.appendStr(""); // reserved
+        }
+
+        /** throws */
+        void DropDbOp::replay() { 
+            log() << "recover replay drop db " << _db << endl;
+            _deleteDataFiles(_db.c_str());
         }
 
         FileCreatedOp::FileCreatedOp(BufReader& log) : DurOp(JEntry::OpCode_FileCreated) { 
@@ -71,20 +99,26 @@ namespace mongo {
             }*/
             ab.appendStr(_filename);
         }
-
+        
         string FileCreatedOp::toString() { 
             return str::stream() << "FileCreatedOp " << _filename << ' ' << _len/1024.0/1024.0;
+        }
+
+        bool FileCreatedOp::needFilesClosed() {
+            return exists( _filename );
         }
 
         void FileCreatedOp::replay() { 
             // i believe the code assumes new files are filled with zeros.  thus we have to recreate the file,
             // or rewrite at least, even if it were the right length.  perhaps one day we should change that
             // although easier to avoid defects if we assume it is zeros perhaps.
-            try { 
-                remove(_filename);
-            }
-            catch(std::exception& e) { 
-                log(1) << "recover info FileCreateOp::replay unlink " << e.what() << endl;
+            if( exists( _filename ) ) {
+                try { 
+                    remove(_filename);
+                }
+                catch(std::exception& e) { 
+                    log(1) << "recover info FileCreateOp::replay unlink " << e.what() << endl;
+                }
             }
 
             log() << "recover create file " << _filename << ' ' << _len/1024.0/1024.0 << "MB" << endl;

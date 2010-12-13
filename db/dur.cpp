@@ -57,6 +57,10 @@ namespace mongo {
     void enableDurability() {}
 #else
 
+    namespace dur { 
+        void groupCommit();
+    }
+
     namespace { 
         using namespace dur;
 
@@ -85,6 +89,15 @@ namespace mongo {
         void DurableImpl::createdFile(string filename, unsigned long long len) { 
             shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
             commitJob.noteOp(op);
+        }
+
+        /** indicate that a database is about to be dropped.  call before the actual drop. */
+        void DurableImpl::droppingDb(string db) { 
+            shared_ptr<DurOp> op( new DropDbOp(db) );
+            commitJob.noteOp(op);
+
+            // must commit now, before files are actually unlinked:
+            dur::groupCommit();
         }
 
         /** declare write intent.  when already in the write view if testIntent is true. */
@@ -371,7 +384,7 @@ namespace mongo {
         /** locking in read lock when called 
             @see MongoMMF::close()
         */
-        void _go() {
+        void groupCommit() {
             dbMutex.assertAtLeastReadLocked();
 
             if( !commitJob.hasWritten() )
@@ -419,7 +432,7 @@ namespace mongo {
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
-                    _go();
+                    groupCommit();
                     return;
                 }
             }
@@ -427,7 +440,7 @@ namespace mongo {
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a 
             // write lock instead.  otherwise writes could use too much RAM.
             writelock lk;
-            _go();
+            groupCommit();
         }
 
         /** called when a MongoMMF is closing -- we need to go ahead and group commit in that case before its 
@@ -435,7 +448,7 @@ namespace mongo {
         */
         void closingFileNotification() {
             if( dbMutex.atLeastReadLocked() ) {
-                _go(); 
+                groupCommit(); 
             }
             else {
                 assert( inShutdown() );

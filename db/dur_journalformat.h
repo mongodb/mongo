@@ -59,6 +59,7 @@ namespace mongo {
                 OpCode_Footer      = 0xffffffff,
                 OpCode_DbContext   = 0xfffffffe,
                 OpCode_FileCreated = 0xfffffffd,
+                OpCode_DropDb      = 0xfffffffc,
                 OpCode_Min         = 0xfffff000 // higher than max len: OpCode_Min + sizeof(JHeader) > 2^32
             };
 

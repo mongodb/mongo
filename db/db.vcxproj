@@ -480,6 +480,7 @@
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="dur.cpp" />
     <ClCompile Include="durop.cpp" />
+    <ClCompile Include="dur_commitjob.cpp" />
     <ClCompile Include="dur_journal.cpp" />
     <ClCompile Include="dur_recover.cpp" />
     <ClCompile Include="geo\2d.cpp" />

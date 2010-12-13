@@ -190,7 +190,9 @@ namespace mongo {
             */
             void* ptr(const char *dbName, int fileNo, unsigned ofs);
 
+            // fileno,dbname -> map
             map< pair<int,string>, void* > _fileToPtr;
+
             list< shared_ptr<MemoryMappedFile> > _files;
         };
         
@@ -267,6 +269,9 @@ namespace mongo {
                         log() << "  OP " << fqe.op->toString() << endl;
                     } 
                     if( apply ) {
+                        if( fqe.op->needFilesClosed() ) {
+                            close();
+                        }
                         fqe.op->replay();
                     }
                 }

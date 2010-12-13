@@ -442,6 +442,9 @@
     <ClCompile Include="restapi.cpp">
       <Filter>db\core</Filter>
     </ClCompile>
+    <ClCompile Include="dur_commitjob.cpp">
+      <Filter>_storage engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">
