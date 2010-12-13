@@ -18,7 +18,6 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
-
 #include "mutex.h"
 
 namespace mongo {
@@ -48,6 +47,27 @@ namespace mongo {
         mongo::mutex _mutex;          // protects state below
         bool _notified;               // was notifyOne() issued?
         boost::condition _condition;  // cond over _notified being true
+    };
+
+    /** establishes a sinchronization point between threads. N threads are waits and one is notifier.
+        threadsafe.
+    */
+    class NotifyAll : boost::noncopyable { 
+    public:
+        NotifyAll();
+
+        /** awaits the next notifyAll() call by another thread. notifications that preceed this 
+            call are ignored -- we are looking for a fresh event. 
+        */
+        void waitToBeNotified();
+
+        /** may be called multiple times. notifies all waiters */
+        void notifyAll();
+
+    private:
+        mongo::mutex _mutex;
+        unsigned long long _counter;
+        boost::condition _condition;
     };
 
 } // namespace mongo

@@ -445,6 +445,9 @@
     <ClCompile Include="dur_commitjob.cpp">
       <Filter>_storage engine</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\synchronization.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

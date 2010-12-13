@@ -16,11 +16,9 @@
  */
 
 #include "pch.h"
-
 #include "synchronization.h"
 
 namespace mongo {
-
 
     Notification::Notification() : _mutex ( "Notification" ) , _notified( false ) { }
 
@@ -37,6 +35,22 @@ namespace mongo {
         assert( !_notified );
         _notified = true;
         _condition.notify_one();
+    }
+
+    NotifyAll::NotifyAll() : _mutex("NotifyAll"), _counter(0) { }
+    
+    void NotifyAll::waitToBeNotified() {
+        scoped_lock lock( _mutex );
+        unsigned long long old = _counter;
+        while( old == _counter ) {
+            _condition.wait( lock.boost() );
+        }
+    }
+
+    void NotifyAll::notifyAll() {
+        scoped_lock lock( _mutex );
+        ++_counter;
+        _condition.notify_all();
     }
 
 } // namespace mongo
