@@ -64,10 +64,8 @@ namespace mongo {
         }
 
 #if defined(_DEBUG)
-        const bool DebugValidateMapsMatch = false;
         const bool DebugCheckLastDeclaredWrite = false;
 #else
-        const bool DebugValidateMapsMatch = false;
         const bool DebugCheckLastDeclaredWrite = false;
 #endif
 
@@ -279,9 +277,10 @@ namespace mongo {
         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
         */
         static void debugValidateMapsMatch() {
-            if( !DebugValidateMapsMatch ) 
+            if( ! (cmdLine.durOptions & CmdLine::DurParanoid) )
                  return;
 
+            unsigned long long data = 0;
             Timer t;
             set<MongoFile*>& files = MongoFile::getAllFiles();
             for( set<MongoFile*>::iterator i = files.begin(); i != files.end(); i++ ) { 
@@ -290,6 +289,12 @@ namespace mongo {
                     MongoMMF *mmf = (MongoMMF*) mf;
                     const char *p = (const char *) mmf->getView();
                     const char *w = (const char *) mmf->view_write();
+
+                    data += mmf->length();
+
+                    if (memcmp(p, w, mmf->length()) == 0)
+                        continue; // next file
+
                     unsigned low = 0xffffffff;
                     unsigned high = 0;
                     for( unsigned i = 0; i < mmf->length(); i++ ) {
@@ -311,7 +316,7 @@ namespace mongo {
                     }
                 }
             }
-            log() << "debugValidateMapsMatch " << t.millis() << "ms " << endl;
+            log() << "debugValidateMapsMatch " << t.millis() << "ms for " <<  (data / (1024*1024)) << "MB" << endl;
         }
 
         /** apply the writes back to the non-private MMF after they are for certain in redo log 
