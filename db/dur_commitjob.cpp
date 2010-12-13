@@ -18,11 +18,31 @@
 
 #include "pch.h"
 #include "dur_commitjob.h"
-#include "concurrency.h"
 
 namespace mongo {
     namespace dur {
 
-     
+        void Writes::clear() { 
+            _alreadyNoted.clear();
+            _writes.clear();
+            _ops.clear();
+        }
+
+        /** note an operation other than a "basic write" */
+        void CommitJob::noteOp(shared_ptr<DurOp> p) {
+            DEV dbMutex.assertWriteLocked();
+            dassert( cmdLine.dur );
+            if( !_hasWritten ) {
+                assert( !dbMutex._remapPrivateViewRequested );
+                _hasWritten = true;
+            }
+            _wi._ops.push_back(p);
+        }
+
+        void CommitJob::reset() { 
+            _hasWritten = false;
+            _wi.clear();
+            _ab.reset();
+        }
     }
 }
