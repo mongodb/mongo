@@ -51,18 +51,8 @@
 using namespace mongoutils;
 
 namespace mongo { 
-    DurableInterface* DurableInterface::_impl = new NonDurableImpl();
 
-#if !defined(_DURABLE)
-    void enableDurability() {}
-#else
-
-    namespace dur { 
-        void groupCommit();
-    }
-
-    namespace { 
-        using namespace dur;
+    namespace dur {
 
 #if defined(_DEBUG)
         const bool DebugValidateMapsMatch = false;
@@ -72,19 +62,27 @@ namespace mongo {
         const bool DebugCheckLastDeclaredWrite = false;
 #endif
 
-        CommitJob commitJob;
-    }
+        DurableInterface* DurableInterface::_impl = new NonDurableImpl();
 
-    void enableDurability() { // TODO: merge with startup() ?
-        assert(typeid(*DurableInterface::_impl) == typeid(NonDurableImpl));
-        // lets NonDurableImpl instance leak, but its tiny and only happens once
-        DurableInterface::_impl = new DurableImpl();
-    }
+#if !defined(_DURABLE)
+        // called by startup/main
+        void enableDurability() {}
+#else
+        void enableDurability() { // TODO: merge with startup() ?
+            assert(typeid(*DurableInterface::_impl) == typeid(NonDurableImpl));
+            // lets NonDurableImpl instance leak, but its tiny and only happens once
+            DurableInterface::_impl = new DurableImpl();
+        }
 
-    bool DurableImpl::awaitCommit() { 
-        commitJob.awaitNextCommit();
-        return true;
-    }
+        // later in this file
+        static void groupCommit();
+
+        static CommitJob commitJob;
+
+        bool DurableImpl::awaitCommit() { 
+            commitJob.awaitNextCommit();
+            return true;
+        }
 
         /** Declare that a file has been created 
             Normally writes are applied only after journalling, for safety.  But here the file 
@@ -102,7 +100,7 @@ namespace mongo {
             commitJob.noteOp(op);
 
             // must commit now, before files are actually unlinked:
-            dur::groupCommit();
+            groupCommit();
         }
 
         /** declare write intent.  when already in the write view if testIntent is true. */
@@ -186,7 +184,6 @@ namespace mongo {
         }
 #endif
 
-    namespace dur {
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking 
@@ -389,7 +386,7 @@ namespace mongo {
         /** locking in read lock when called 
             @see MongoMMF::close()
         */
-        void groupCommit() {
+        static void groupCommit() {
             dbMutex.assertAtLeastReadLocked();
 
             if( !commitJob.hasWritten() )
@@ -492,21 +489,19 @@ namespace mongo {
 
         void unlinkThread();
         void recover();
-
         void _debugCheckLastDeclaredWrite() { return getDur().debugCheckLastDeclaredWrite(); }
 
+        void DurableImpl::startup() {
+            if( !cmdLine.dur )
+                return;
+            if( testIntent )
+                return;
+            recover();
+            journalMakeDir();
+            boost::thread t(durThread);
+            boost::thread t2(unlinkThread);
+        }
     } // namespace dur
-
-    void DurableImpl::startup() {
-        if( !cmdLine.dur )
-            return;
-        if( testIntent )
-            return;
-        recover();
-        journalMakeDir();
-        boost::thread t(durThread);
-        boost::thread t2(unlinkThread);
-    }
 
 #endif
 

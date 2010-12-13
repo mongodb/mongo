@@ -564,7 +564,7 @@ sendmore:
         }
 
         if (cmdLine.dur)
-            enableDurability();
+            dur::enableDurability();
 
         getDur().startup();
         if( cmdLine.durTrace & CmdLine::DurRecoverOnly ) 
