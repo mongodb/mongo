@@ -329,6 +329,12 @@ namespace mongo {
             (2) todo should we do this using N threads?  would be quite easy
                 see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
 
+            (3) with enough work, we could do this outside the read lock.  it's a bit tricky though. 
+                - we couldn't do it from the private views then as they may be changing.  would have to then 
+                  be from the journal alignedbuffer.
+                - we need to be careful the file isn't unmapped on us -- perhaps a mutex or something 
+                  with MongoMMF on closes or something to coordinate that.
+
             locking: in read lock when called
         */
         static void WRITETODATAFILES() { 
