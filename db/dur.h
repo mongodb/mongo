@@ -11,7 +11,9 @@ namespace mongo {
 
         class DurableInterface : boost::noncopyable { 
         public:
-            virtual ~DurableInterface() { assert(false); /* don't destroy these objects */ }
+            virtual ~DurableInterface() { 
+                log() << "ERROR warning ~DurableInterface not intended to be called" << endl;
+            }
 
             /** Call during startup so durability module can initialize 
                 throws if fatal error
