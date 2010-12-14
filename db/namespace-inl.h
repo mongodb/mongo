@@ -31,15 +31,10 @@ namespace mongo {
         // if profiling indicates this method is a significant bottleneck, we could have a version we 
         // use for reads which does not fill with zeroes, and keep the zeroing behavior on writes.
         //
-        int i = 0;
-        while( ns[i] ) {
-            buf[i] = ns[i];
-            if( ++i >= MaxNsLen-1 )
-                uasserted( 10080 , "ns name too long, max size is 128" );
-        }
-        do { 
-            buf[i++] = 0;
-        } while( i < MaxNsLen );
+        unsigned len = strlen(ns);
+        uassert( 10080 , "ns name too long, max size is 128", len < MaxNsLen);
+        memset(buf, 0, MaxNsLen);
+        memcpy(buf, ns, len);
         return *this;
     }
 
