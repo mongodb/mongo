@@ -498,7 +498,8 @@ namespace mongo {
                     go();
                 }
                 catch(std::exception& e) { 
-                    log() << "exception in durThread " << e.what() << endl;
+                    log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
+                    abort(); // based on myTerminate()
                 }
             }
         }
