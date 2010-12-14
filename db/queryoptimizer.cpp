@@ -584,7 +584,9 @@ namespace mongo {
         
         std::priority_queue< OpHolder > queue;
         for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
-            queue.push( *i );
+            if ( !(*i)->error() ) {
+                queue.push( *i );
+            }
         }
         
         while( !queue.empty() ) {
