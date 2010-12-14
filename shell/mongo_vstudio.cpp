@@ -23,7 +23,7 @@ const StringData _jscode_raw_utils =
 "\n" 
 "printStackTrace = function(){\n" 
 "try{\n" 
-"throw new Error(\"Printing Stack Trace (lines are 0-based in spidermonkey)\");\n" 
+"throw new Error(\"Printing Stack Trace\");\n" 
 "} catch (e) {\n" 
 "print(e.stack);\n" 
 "}\n" 
