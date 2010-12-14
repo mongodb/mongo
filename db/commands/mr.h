@@ -193,6 +193,11 @@ namespace mongo {
         public:
             State( Config& c );
             void init();
+            
+            // ---- prep  -----
+            bool sourceExists();
+
+            long long incomingDocuments();
 
             // ---- map stage ---- 
             
@@ -223,13 +228,17 @@ namespace mongo {
             
             void finalReduce( BSONList& values );
             
+            void finalReduce( CurOp * op , ProgressMeterHolder& pm );
+            
             // ------- cleanup/data positioning ----------
 
             /**
                @return number objects in collection
              */
             long long renameIfNeeded();
-
+            
+            /** removes temp collections */
+            void cleanup();
             
             // -------- util ------------
             

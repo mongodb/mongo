@@ -363,7 +363,20 @@ namespace mongo {
         State::State( Config& c ) : _config( c ), _size(0), _numEmits(0){
             _temp.reset( new InMemory() );
         }
+
+        bool State::sourceExists(){
+            return _db.exists( _config.ns );
+        }
         
+        long long State::incomingDocuments(){
+            return _db.count( _config.ns , _config.filter , 0 , (unsigned) _config.limit );
+        }
+
+        void State::cleanup(){
+            _db.dropCollection( _config.tempLong );
+            _db.dropCollection( _config.incLong );
+        }
+
         void State::init(){
             // setup js
             _scope.reset(globalScriptEngine->getPooledScope( _config.dbname ).release() );
@@ -399,6 +412,68 @@ namespace mongo {
             BSONObj res = _config.reducer->reduce( values , _config.finalizer.get() );
             
             insert( _config.tempLong , res );
+        }
+
+        void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ){
+            assert( _temp->size() == 0 );
+
+            // TODO: this is a bit sketchy
+            //       since it could block
+            BSONObj sortKey = BSON( "0" << 1 );
+            _db.ensureIndex( _config.incLong , sortKey );
+
+            readlock rl( _config.incLong.c_str() );
+            Client::Context ctx( _config.incLong );
+            
+            BSONObj prev;
+            BSONList all;
+            
+            assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _db.count( _config.incLong ) ) );
+            
+            shared_ptr<Cursor> temp = bestGuessCursor( _config.incLong.c_str() , BSONObj() , sortKey );
+            auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , _config.incLong.c_str() ) );
+            
+            while ( cursor->ok() ){
+                BSONObj o = cursor->current().getOwned();
+                cursor->advance();
+                
+                pm.hit();
+                
+                if ( o.woSortOrder( prev , sortKey ) == 0 ){
+                    all.push_back( o );
+                    if ( pm->hits() % 1000 == 0 ){
+                        if ( ! cursor->yield() ){
+                            cursor.release();
+                            break;
+                        } 
+                        killCurrentOp.checkForInterrupt();
+                    }
+                    continue;
+                }
+                
+                ClientCursor::YieldLock yield (cursor.get());
+                finalReduce( all );
+                
+                all.clear();
+                prev = o;
+                all.push_back( o );
+                
+                if ( ! yield.stillOk() ){
+                    cursor.release();
+                    break;
+                }
+                
+                killCurrentOp.checkForInterrupt();
+            }
+            
+            {
+                dbtempreleasecond tl;
+                if ( ! tl.unlocked() )
+                    log( LL_WARNING ) << "map/reduce can't temp release" << endl;
+                finalReduce( all );
+            }
+            
+            pm.finished();
         }
 
         void State::reduceInMemory(){
@@ -496,11 +571,6 @@ namespace mongo {
 
                 log(1) << "mr ns: " << config.ns << endl;
                 
-                if ( ! db.exists( config.ns ) ){
-                    errmsg = "ns doesn't exist";
-                    return false;
-                }
-                
                 bool shouldHaveData = false;
                 
                 long long num = 0;
@@ -509,6 +579,11 @@ namespace mongo {
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
                 State state( config );
+
+                if ( ! state.sourceExists() ){
+                    errmsg = "ns doesn't exist";
+                    return false;
+                }
                 
                 try {
                     state.init();
@@ -520,7 +595,7 @@ namespace mongo {
                     }
 
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
-                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( config.ns , config.filter , 0 , (unsigned) config.limit ) ) );
+                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , state.incomingDocuments() ) );
                     long long mapTime = 0;
                     {
                         readlock lock( config.ns );
@@ -586,72 +661,14 @@ namespace mongo {
                     state.reduceInMemory();
                     state.dumpToInc();
                     
-                    BSONObj sortKey = BSON( "0" << 1 );
-                    db.ensureIndex( config.incLong , sortKey );
-                    
                     state.prepTempCollection();
-
-                    {
-                        readlock rl(config.incLong.c_str());
-                        Client::Context ctx( config.incLong );
-                        
-                        BSONObj prev;
-                        BSONList all;
-                        
-                        assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( config.incLong ) ) );
-
-                        shared_ptr<Cursor> temp = bestGuessCursor( config.incLong.c_str() , BSONObj() , sortKey );
-                        auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.incLong.c_str() ) );
-                        
-                        while ( cursor->ok() ){
-                            BSONObj o = cursor->current().getOwned();
-                            cursor->advance();
-                            
-                            pm.hit();
-                            
-                            if ( o.woSortOrder( prev , sortKey ) == 0 ){
-                                all.push_back( o );
-                                if ( pm->hits() % 1000 == 0 ){
-                                    if ( ! cursor->yield() ){
-                                        cursor.release();
-                                        break;
-                                    } 
-                                    killCurrentOp.checkForInterrupt();
-                                }
-                                continue;
-                            }
-                        
-                            ClientCursor::YieldLock yield (cursor.get());
-                            state.finalReduce( all );
-                            
-                            all.clear();
-                            prev = o;
-                            all.push_back( o );
-
-                            if ( ! yield.stillOk() ){
-                                cursor.release();
-                                break;
-                            }
-                            
-                            killCurrentOp.checkForInterrupt();
-                        }
-
-                        {
-                            dbtempreleasecond tl;
-                            if ( ! tl.unlocked() )
-                                log( LL_WARNING ) << "map/reduce can't temp release" << endl;
-                            state.finalReduce( all );
-                        }
-
-                        pm.finished();
-                    }
-
+                    state.finalReduce( op , pm );
+                    
                     _tl.reset();
                 }
                 catch ( ... ){
                     log() << "mr failed, removing collection" << endl;
-                    db.dropCollection( config.tempLong );
-                    db.dropCollection( config.incLong );
+                    state.cleanup();
                     throw;
                 }
                 
@@ -677,9 +694,6 @@ namespace mongo {
 
                 return true;
             }
-
-        private:
-            DBDirectClient db;
 
         } mapReduceCommand;
         
