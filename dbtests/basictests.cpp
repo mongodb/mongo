@@ -531,8 +531,8 @@ namespace BasicTests {
     public:
         
         void run(){
-            ASSERT_EQUALS( 1 , str::count( "abc" , 'b' ) );
-            ASSERT_EQUALS( 3 , str::count( "babab" , 'b' ) );
+            ASSERT_EQUALS( 1u , str::count( "abc" , 'b' ) );
+            ASSERT_EQUALS( 3u , str::count( "babab" , 'b' ) );
         }
         
     };
