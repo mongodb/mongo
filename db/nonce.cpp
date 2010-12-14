@@ -63,7 +63,7 @@ namespace mongo {
         _devrandom->read((char*)&n, sizeof(n));
         massert( 10355 , "devrandom failed", !_devrandom->fail());
 #elif defined(_WIN32)
-        unsigned a, b;
+        unsigned a=0, b=0;
         assert( rand_s(&a) == 0 );
         assert( rand_s(&b) == 0 );
         n = (((unsigned long long)a)<<32) | b;
