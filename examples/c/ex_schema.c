@@ -2,7 +2,7 @@
  * ex_column.c Copyright (c) 2010 WiredTiger
  *
  * This is an example application demonstrating how to create and access
- * column-oriented data.
+ * tables using a schema.
  */
 
 #include <stdio.h>
@@ -11,11 +11,42 @@
 #include <inttypes.h>
 #include <wiredtiger.h>
 
+#define	ARRAY_SIZE(a)	(sizeof (a) / sizeof ((a)[0]))
+
+const char *home = "WT_TEST";
+
+/* The C struct for the data we are storing with WiredTiger. */
 typedef struct {
 	char country[5];
 	uint16_t year;
 	uint64_t population;
 } POP_RECORD;
+
+/* Description of the schema. */
+static WT_COLUMN_INFO pop_columns[] = {
+	{ "country", 0, NULL, NULL },
+	{ "year", 0, NULL, NULL },
+	{ "population", 1, NULL, NULL }
+};
+
+static const char *country_year_cols[] = { "country", "year" };
+static WT_INDEX_INFO pop_indices[] = {
+	{ "country_year",  country_year_cols, ARRAY_SIZE(country_year_cols) }
+};
+
+static WT_SCHEMA pop_schema = {
+	"r",		/* Format string for keys (recno). */
+	"5sHQ",		/*
+			 * Format string for data items:
+			 * (5-byte string, short, long).
+			 * See ::wiredtiger_struct_pack
+			 */
+	pop_columns,	/* Column descriptions. */
+	ARRAY_SIZE(pop_columns), /* Number of columns. */
+	pop_indices,	/* Index descriptions. */
+	ARRAY_SIZE(pop_indices), /* Number of indices. */
+	0		/* Session cookie size. */
+};
 
 POP_RECORD pop_data[] = {
 	{ "USA", 1980, 226542250 },
@@ -24,10 +55,6 @@ POP_RECORD pop_data[] = {
 	{ "CAN", 2008, 33311400 },
 	{ "AU", 2008, 21431800 }
 };
-
-#define	num_pop_data (sizeof(pop_data) / sizeof(pop_data[0]))
-
-const char *home = "WT_TEST";
 
 int main()
 {
@@ -46,25 +73,19 @@ int main()
 	/* Note: error checking omitted for clarity. */
 
 	if (conn->is_new) {
-#if LOADABLE_MODULE
-		ret = conn->add_extension(conn, NULL, "ex_column_app.so", NULL);
-#else
-		extern int add_pop_schema(WT_CONNECTION *);
-		ret = add_pop_schema(conn);
-#endif
-		ret = session->create_table(session,
-		    "population", "schema=POP_RECORD");
+		ret = conn->add_schema(conn, "POP_RECORD", &pop_schema, NULL);
+		ret = session->create_table(session, "population",
+		    "schema=POP_RECORD");
 	}
 
 	ret = conn->open_session(conn, NULL, &session);
 	ret = session->open_cursor(session, "table:population", NULL, &cursor);
 
-	endp = pop_data + num_pop_data;
+	endp = pop_data + ARRAY_SIZE(pop_data);
 	for (p = pop_data; p < endp; p++) {
 		cursor->set_value(cursor, p->country, p->year, p->population);
 		ret = cursor->insert(cursor);
 	}
-
 	ret = cursor->close(cursor, NULL);
 
 	/* Now just read through the countries we know about */

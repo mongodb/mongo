@@ -1,0 +1,27 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \page config_strings Configuration Strings
+
+Many operations in WiredTiger accept a string to configure options.  These strings all have the same format:
+
+<pre>
+  [key1[=value1]][','+[key2[=value2]]]*
+</pre>
+
+That is, they are simple comma-separated lists of <code>"<key>=<value>"</code> pairs.  If the <code>"=<value>"</code> part is omitted, the value of 1 is assumed.
+
+Empty configuration strings may be represented in C or C++ by passing <code>NULL</code>.
+
+Superfluous commas in the configuration string are ignored (including at the beginning and end of the string), so it is always safe to combine two configuration strings by concatenating them with a comma in between.
+
+Keys are processed in order from left to right, with later settings overriding earlier ones unless multiple settings for a key are permitted.
+
+\section config_examples Examples
+
+<ul>
+<li>To open a connection to a database, creating it if it does not exist and set a cache size of 10MiB, pass <code>"create,cache_size=10000000"</code> to ::wiredtiger_open.
+<li>Create a table that uses C language strings for keys and values: pass <code>"keyfmt=S,valuefmt=S"</code> to WT_SESSION::create_table.</li>
+<li>Assign a name to a transaction for debugging purposes: pass <code>"name=mytxn"</code> to WT_SESSION::begin_transaction.</li>
+<li>Assign a priority to a transaction to avoid aborting: pass <code>"priority=100"</code> to WT_SESSION::begin_transaction.</li>
+</ul>
+*/

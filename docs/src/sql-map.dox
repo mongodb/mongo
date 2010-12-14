@@ -1,24 +1,32 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \defgroup sql Mapping SQL onto the WiredTiger API
- *
- * An RDBMS has the SQL language, a parser and a query planner.  All of them
- * sitting on top of WT, as they would on top of BDB.  The difference with this
- * API is that the query plan is going to be based on fundamental operations
- * like: 1) scan a range; 2)  join (various flavors); 3) sort 4) project, and
- * so on.  Those operations would be implemented as different cursor types.
- *
- * They would be implemented as one or more extensions, loaded automatically
- * whenever the database is opened.  The cursor types would always be there,
- * and the query planner just asks for a cursor that combines together data
- * from various other cursors and comes out as a set of key/data pairs it can
- * deal with.
- *
- * With the right set of special cursor types are implemented, one cursor could
- * return the SQL result set.  That is, combining cursors would implement a
- * query plan.  And that could happen over a socket, mixing local processing
- * with server-side processing.
- *
- * This same interface could deal with many types of compression, transforming
- * data on the fly in various ways (like views), and so on.
+/*! \page sql_mapping Mapping SQL onto the WiredTiger API
+
+An RDBMS has the SQL language, a parser and a query planner.  All of them
+sit on top of WiredTiger, as they would on top of any key-value store.
+
+The difference with WiredTiger's API is that the query plan is going to be
+based on fundamental operations including:
+<ol>
+<li>sequential scan through a range;</li>
+<li>join (various flavors);</li>
+<li>sort (group by);</li>
+<li>projection, and so on.</li>
+</ol>
+Those operations would be implemented as different WiredTiger cursor types,
+using WT_CONNECTION::add_cursor_factory.
+
+The cursor types could be implemented as one or more extensions, loaded
+automatically whenever the database is opened for the first time.  Then the
+cursor types would always be there, and the query planner just asks for a
+cursor that combines together data from various other cursors and comes out as
+a set of key/data pairs it can deal with.
+
+With the right set of special cursor types are implemented, one cursor could
+return the SQL result set.  That is, combining cursors would implement a
+query plan.  And that could happen over a socket, mixing local processing
+with server-side processing.
+
+This same interface could deal with many types of compression, transforming
+data on the fly in various ways (like views), and so on.
  */

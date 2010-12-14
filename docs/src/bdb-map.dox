@@ -913,7 +913,7 @@ struct DB_SEQUENCE_STAT {
  *******************************************************/
 /*! Database types
  *
- * <b>Passed in \p config parameter to WT_SESSION::create_database.</b>
+ * <b>Passed in \p config parameter to WT_SESSION::create_table.</b>
  */
 typedef enum {
 	DB_BTREE=1,
@@ -1356,7 +1356,7 @@ struct DBC {
 	int cmp(DBC *, DBC *, int *, u_int32_t); /*!< <b>Not implemented.</b> */
 	int count(DBC *, db_recno_t *, u_int32_t); /*!< <b>Not implemented.</b> */
 	int del(DBC *, u_int32_t); /*!< <b>WT_CURSOR::del</b> */
-	int dup(DBC *, DBC **, u_int32_t); /*!< <b>WT_SESSION::duplicate_cursor</b> */
+	int dup(DBC *, DBC **, u_int32_t); /*!< <b>WT_SESSION::dup_cursor</b> */
 	int get(DBC *, DBT *, DBT *, u_int32_t); /*!< <b>WT_CURSOR::get and WT_CURSOR::search</b> */
 	int get_priority(DBC *, DB_CACHE_PRIORITY *); /*!< <b>Not implemented.</b> */
 	int pget(DBC *, DBT *, DBT *, DBT *, u_int32_t); /*!< <b>WT_CURSOR::get with \p config parameter to WT_SESSION::open_cursor</b> */

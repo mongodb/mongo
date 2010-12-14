@@ -1,6 +1,6 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \defgroup layout Wired Tiger File Format
+/*! \page layout Table File Formats
 
 <p>
 There are a number of page formats used in WiredTiger, each with a unique page

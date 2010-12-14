@@ -1,6 +1,6 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \defgroup architecture Wired Tiger Architecture
+/*! \page architecture WiredTiger Architecture
 
 <h3>Major architectural differences from Berkeley DB:</h3>
 <ol>
@@ -11,21 +11,21 @@ core, and touching shared memory kills performance.  Berkeley DB's
 architecture is based on shared memory data mutex architecture (where
 mutexes serialize access to data structures), which doesn't scale well.
 
-<p>Wired Tiger will have a "work queue architecture", that is, an
+WiredTiger will have a "work queue architecture", that is, an
 interface outside of the database engine where threads of control queue
 work.   Inside the database engine, a different thread of control will
 perform the work.  The work queue will be read and written by only two
 threads, limiting the amount of memory that's touched by more than a
 single thread of control.
 
-<p>Initial benchmarks show that schedulers/architectures are not
+Initial benchmarks show that schedulers/architectures are not
 uniform: for some, processes are better than threads and vice-versa, and
 polling is better than mutexing, and vice-versa.  For that reason, we
 will use a combination of polling and mutexes for the work queue, and
 configure at run-time if the database engine uses separate processes or
 threads to perform work.
 
-<p>Mutexes will behave in the usual fashion: clients will write their
+Mutexes will behave in the usual fashion: clients will write their
 work into the shared memory queue, wake the worker if necessary, then
 sleep on a mutex.  Workers will perform the work and wake the client.
 Polling will be implemented using shared memory and a memory flush, in
@@ -37,7 +37,7 @@ be responsible for binding threads to cores.  This means we will need
 to export controls so applications can bind threads of control to
 specific processors and do other platform-specific scheduling tasks.
 
-<p>As in Berkeley DB, this "work queue architecture" must handle two
+As in Berkeley DB, this "work queue architecture" must handle two
 different programmatic architectures:
 
 <ol>
@@ -48,17 +48,17 @@ work itself.
 
 <li>One or more processes, optionally threaded -- in other words,
 multiple threads of control.  Complicating this architecture is the
-possibility that Wired Tiger may be called from other library routines
+possibility that WiredTiger may be called from other library routines
 (this is the Berkeley DB Subversion problem, and the reason Berkeley DB
 implemented the DB_REGISTER flag).
 </ol>
 
-<p>
+
 The programmatic architecture will be selectable at run-time (unless
 that proves too costly in terms of performance, in which case we can
 add configuration-time options).
 
-<p>
+
 The "work queue architecture" results in one significant difference from
 the Berkeley DB architecture.   A separate process cannot configure any
 database engine callbacks or other functions for the database (such as
@@ -69,7 +69,7 @@ done before any separate process accesses the database.  On the other
 hand, it is useful as only one process in the application suite has to
 be aware of the underlying configuration details of the database.
 
-<p>
+
 <i>Maybe</i> Automatically partition the database to transfer work requests to a different machine or thread of control.   Once the database is large enough that threads will reasonably not conflict, it would be best to have multiple threads of control to partition work on the data.  In this case, each thread which owns a chunk of a database should write to its own, individual, log file.
 
 <li><b>Environment creation and recovery</b>:
@@ -78,12 +78,12 @@ Applications were often unable to determine when to run recovery,
 requiring, for example, features like the DB_REGISTER flag and the
 DbEnv.failchk method.
 
-<p>As previously described, Wired Tiger environments will have separate
+As previously described, WiredTiger environments will have separate
 threads of control performing all database work.  The default Wired
 Tiger environment will be a combination of Berkeley DB's DbEnv.failchk
 and DB_REGISTER configurations: whenever a thread of control "joins" a
-Wired Tiger environment, or periodically as called by an application
-thread, Wired Tiger will confirm the database engine's thread of control
+WiredTiger environment, or periodically as called by an application
+thread, WiredTiger will confirm the database engine's thread of control
 is still running.  If that thread of control has failed, another thread
 of control will optionally be created, whatever recovery is necessary
 will be performed, and the system will continue.   In this sense, Wired
@@ -92,7 +92,7 @@ know that recovery was performed, it will be performed behind the scenes
 as necessary.
 
 <li><b>Schema layer</b>:
-Wired Tiger database environments have a configuration which describes
+WiredTiger database environments have a configuration which describes
 the contents of the environment.   This focuses on, but is not limited
 to, the database files.  The goal is to eliminate Berkeley DB's baroque
 file handling.   File operations (for example, remove, rename, create,
@@ -133,7 +133,7 @@ per-thread handle will be updated to reference any current environment
 and database handles, then the per-thread handle will be the handle
 passed as the first argument of every internal database function.
 
-<p>
+
 Each thread of control's information will include a lock ID which will
 be used for deadlock detection.  (This assumes we eventually implement
 some kind of deadlock detection...)
@@ -146,7 +146,7 @@ and then destroy it.   It may be repeatedly used, as it contains no
 internal information.
 
 <li><b>Error handling</b>:
-Wired Tiger error messages will include a URL which can be used to look
+WiredTiger error messages will include a URL which can be used to look
 up detailed error information.  This makes error configuration fairly
 complicated: an error message will have two parts, a per-release URL for
 detailed information and a cryptic error message.  By default, both will
@@ -156,19 +156,19 @@ will need to contain the number, the short message and the detailed
 message, and the URL support will be automatically generated for each
 release.
 
-<p>
+
 Error handling (error message, prefix, stream, whatever) will be
 database name specific.
 
 <li><b>Configuration</b>:
-There will be no general configuration functions, Wired Tiger will use
+There will be no general configuration functions, WiredTiger will use
 configuration methods only; as in Berkeley DB, there will be getter
 functions in all cases.  This will also apply to many of the arguments
 for methods, that is, optional arguments will be set with configuration
 methods, rather than specifying potentially ignored-values to the method
 call.
 
-<p>
+
 Configuration routines will only update specific shared memory region
 locations, to allow auto-generation of the configuration code.
 
@@ -210,7 +210,7 @@ Bulk load
 </td><td>
 Yes
 </td><td>
-Wired Tiger supports bulk load, where sorted key/data pairs are read
+WiredTiger supports bulk load, where sorted key/data pairs are read
 from a callback function, and a B+tree is built bottom-up in a new
 database.
 
@@ -220,13 +220,13 @@ Page size
 Yes
 </td><td>
 Berkeley DB's maximum page size is 64KB, limiting on-page key/data items
-to roughly 16KB.  Wired Tiger supports pages of any practical size.  The
+to roughly 16KB.  WiredTiger supports pages of any practical size.  The
 goal is two-fold, to allow databases with key or data items larger than
 16KB to be stored on-page, and to increase the data transfer of a single
 disk read.  However, simply increasing the size of the database page has
 a problem: in Berkeley DB, internal nodes are the same size as leaf
 pages, and a binary search of large pages will behave badly in the L1/L2
-caches.  To avoid this problem, Wired Tiger supports configuration of
+caches.  To avoid this problem, WiredTiger supports configuration of
 different sizes for internal and leaf nodes.
 
 </td></tr>
@@ -235,7 +235,7 @@ Overflow items
 </td><td>
 Yes
 </td><td>
-<p>
+
 In Berkeley DB, overflow items (key or data items too large to fit on a
 leaf page), are allocated in units of database page size.  This wastes,
 on average, half a database page for each overflow item.  Also, overflow
@@ -250,7 +250,7 @@ or retrieve overflow items.
 Extent allocation
 </td><td>
 </td><td>
-Wired Tiger supports extent-based allocation in the B+tree.   Pages will
+WiredTiger supports extent-based allocation in the B+tree.   Pages will
 be initially allocated at the page size; when splitting, pages will
 increase in size to the maximum page size.   Pages split after reaching
 the maximum page size will be aggregated into extents.  For example,
@@ -262,7 +262,7 @@ that is, a 10MB extent.  Internal pages will not be gathered into
 extents, although they will increase in size from the initial size to
 the maximum page size.
 
-<p>
+
 The goal is to speed sequential search as much larger chunks of disk can
 be returned in a single disk read.  As extents are made up of smaller
 pages, random accesses do not need to read the full extent.
@@ -272,7 +272,7 @@ pages, random accesses do not need to read the full extent.
 Secondary indices
 </td><td>
 </td><td>
-Wired Tiger optionally stores  a copy (or part of a copy) of the primary
+WiredTiger optionally stores  a copy (or part of a copy) of the primary
 data item in the secondary to speed the use of a secondary index,
 avoiding subsequent lookup in the primary.  In Berkeley DB, an "ordered"
 lookup when walking a secondary becomes a "random" lookup on the primary
@@ -285,7 +285,7 @@ secondary, we can avoid the second lookup.
 Compression
 </td><td>
 </td><td>
-Wired Tiger will support static (probalby Huffman encoding) key/data
+WiredTiger will support static (probalby Huffman encoding) key/data
 item compression.  This worth doing because CPU is less-important than
 memory, and trading CPU to keep the cache hotter is the right choice to
 make.
@@ -295,14 +295,14 @@ make.
 Salvage
 </td><td>
 </td><td>
-Wired Tiger supports in-place database salvage.
+WiredTiger supports in-place database salvage.
 
 </td></tr>
 <tr valign="top"><td>
 Automatic transaction retry
 </td><td>
 </td><td>
-Wired Tiger supports automatic retry of an individual transactional
+WiredTiger supports automatic retry of an individual transactional
 operation, should it be selected to resolve a deadlock.
 
 </td></tr>
@@ -310,7 +310,7 @@ operation, should it be selected to resolve a deadlock.
 Copy avoidance
 </td><td>
 </td><td>
-Wired Tiger supports a call-back function which is called from inside
+WiredTiger supports a call-back function which is called from inside
 the library and given a pointer to the key/data item (normally on the
 page), avoiding any data copy at all.
 
@@ -319,8 +319,8 @@ page), avoiding any data copy at all.
 BLOB support
 </td><td>
 </td><td>
-Wired Tiger will support BLOBs using Berkeley DB's "returned file
-handle" design.  While this is less necessary given Wired Tiger's
+WiredTiger will support BLOBs using Berkeley DB's "returned file
+handle" design.  While this is less necessary given WiredTiger's
 support for large page sizes, it's still useful for truly large data
 items.
 
@@ -371,7 +371,7 @@ requirements.
 <ol>
 
 <li><b>Micro-logging</b>:
-To the extent possible, Wired Tiger should support TimesTen's notion of
+To the extent possible, WiredTiger should support TimesTen's notion of
 micro-logging (where threads of control do work in ways that if they
 fail, other threads of control can clean up without interrupting the
 overall progress of the database engine).  While desirable, this is not
@@ -379,22 +379,22 @@ a requirement of the architecture itself, it's a performance enhancement
 in that it minimizes the events which can force more or less expensive
 recovery operations to be performed.
 
-<p>
+
 The biggest problem for Berkeley DB was the shared regions, as they
 could be corrupted by an application thread of control dying while
 modifying the shared region, resulting in an expensive recovery period
 as well as an expensive re-creation of the large shared region.  In
-Wired Tiger, the only shared regions will be the individual chunks used
+WiredTiger, the only shared regions will be the individual chunks used
 by threads of control to communicate with the threads running in the
 database engine, removing this problem entirely.
 
 <li><b>Utilities</b>:
-All of the Wired Tiger utilities (except for any code generation
+All of the WiredTiger utilities (except for any code generation
 utility) will be implemented as thin wrappers.  (In Berkeley DB db_dump,
 db_load and db_hotbackup have far too much program logic.)
 
 <li><b>Exported subsystems</b>:
-Wired Tiger will not export the cache, locking, logging, mutex and
+WiredTiger will not export the cache, locking, logging, mutex and
 transaction APIs in a general way.  Reason: the insistence on separate
 subsystems meant we didn't pass a single object handle throughout the
 entire system.  There isn't enough demand for the subsystems to make
@@ -402,30 +402,30 @@ them available initially.  That said, we will continue to rigorously
 separate the functionality to the extent possible.
 
 <li><b>API layering</b>:
-Wired Tiger will not require mutexes to cross the API layer.  This will
+WiredTiger will not require mutexes to cross the API layer.  This will
 allow us to consistently use handle methods to access internal as well
 as external functions throughout the library.  The "global" thread
 cookie will contain the information we need to figure out if any locks
 are needed as we cross API layers.
 
 <li><b>Code Generation</b>:
-Wired Tiger will support a code-generation utility early on.   It will
+WiredTiger will support a code-generation utility early on.   It will
 be a script that outputs a C-language program, supporting all features.
 
 <li><b>File types</b>:
-Wired Tiger will use the file name space to aggressively categorize
+WiredTiger will use the file name space to aggressively categorize
 storage by class: optionally taking advantage of Flash vs. RAM vs.
 durable disk writes vs. standard disk, vs. network storage.
 
 <li><b>Hot backup</b>:
-Wired Tiger will have a hot-backup operation as part of the library.
+WiredTiger will have a hot-backup operation as part of the library.
 Hot backups can be faster if the hot backup thread writes a log record
 ("starting database copy") into the log, because recovery only has to
 go back to the checkpoint preceding that record, rather than to the
 beginning of the log, when doing "catastrophic" recovery on a hot
 backup.
 
-<p>
+
 Additionally, hot backup should be integrated with replication: a hot
 backup is no different from the initialization of a replica.
 
@@ -439,17 +439,17 @@ of the current complex set of flags.
 
 <li><b>Record numbers</b>:
 Support 64-bit logical record numbers.
-<p>
+
 Give the application a flag to specify keys are numbers, it's too common
 an error.
-<p>
+
 Support holes in the record number space.
 
 <li><b>Statistics</b>:
 Implement 64-bit statistics values.
-<p>
+
 Output statistics in XML, and provide a script to display them in text.
-<p>
+
 Store all statistics in a single chunk of space so it's easy to snapshot
 the engine's performance.
 
@@ -500,8 +500,8 @@ programmers.
 <li>Test suite (written in Python, Ruby, or C)
 </ul>
 
-<p><b>Replication Manager</b>:
-Wired Tiger's focus needs to be on partial and cascading replication,
+<b>Replication Manager</b>:
+WiredTiger's focus needs to be on partial and cascading replication,
 there's useful features in both.
 
 
@@ -534,7 +534,7 @@ outside of the engine.
 <li><b>Hash access method</b>:
 The Berkeley DB Hash access method offers one feature: a hotter cache
 because fewer meta-data pages are required when the data is truly large.
-This feature is less useful for Wired Tiger, given Wired Tiger's support
+This feature is less useful for WiredTiger, given WiredTiger's support
 for larger pages, but is still useful in some cases.   However, it isn't
 useful enough to implement a separate access method as in Berkeley DB.
 Could we do it by modifying the B+tree somehow?
@@ -592,13 +592,13 @@ List of other features/support not useful enough to replace:
 <li>
 Why not use real database terms ("database" means environment, "table"
 means database)?
-<p>
+
 Even though that's desirable, since we're continuing to use the
 Berkeley DB API, it doesn't make sense to switch.
 
 <li>
 Will the engine require a 64-bit type?
-<p>
+
 I guess so, this shouldn't be a problem, should it?
 
 </ol>
@@ -610,8 +610,11 @@ I guess so, this shouldn't be a problem, should it?
 A Transaction Recovery Method Supporting Fine-Granularity Locking and
 Partial Rollbacks Using Write-Ahead Logging</a>
 
-<p>
+
 <li><a href="http://Berkeley DB.cs.yale.edu/hstore/oltpperf-sigmod08.pdf">OLTP Through the Looking Glass, and What We Found There</a>
 
 </ul>
+
+For more information about the file format, see:
+\subpage layout
 */

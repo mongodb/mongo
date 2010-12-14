@@ -189,7 +189,11 @@ TAB_SIZE               = 8
 # will result in a user-defined paragraph with heading "Side Effects:". 
 # You can put \n's in the value part of an alias to insert newlines.
 
-ALIASES                = 
+ALIASES                = config{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr> \
+                         configend=</table> \
+                         "configstart=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table><tr><th>Key</th><th>Value [Default]</th><th>Notes</th></tr>" \
+                         "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted." \
+                         "errors=\returns an integer status, zero indicates success"
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C 
 # sources only. Doxygen will then generate output that is more tailored for C. 
@@ -564,7 +568,7 @@ WARN_IF_DOC_ERROR      = YES
 # wrong or incomplete parameter documentation, but not about the absence of 
 # documentation.
 
-WARN_NO_PARAMDOC       = NO
+WARN_NO_PARAMDOC       = YES
 
 # The WARN_FORMAT tag determines the format of the warning messages that 
 # doxygen can produce. The string should contain the $file, $line, and $text 

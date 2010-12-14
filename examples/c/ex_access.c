@@ -25,16 +25,24 @@ int main()
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
-	if (conn->is_new)
+	if (conn->is_new) {
 		session->create_table(session, "access",
-		    "keystruct=s,valuestruct=s");
+		    "keyfmt=S,valuefmt=S");
+
+		/* Insert a record. */
+		ret = session->open_cursor(session,
+		    "table:access", NULL, &cursor);
+
+		cursor->set_key(cursor, "key1");
+		cursor->set_value(cursor, "value1");
+		ret = cursor->insert(cursor);
+
+		cursor->close(cursor);
+	}
 
 	ret = session->open_cursor(session, "table:access", NULL, &cursor);
 
-	cursor->set_key(cursor, "1");
-	cursor->set_value(cursor, "one");
-	ret = cursor->insert(cursor);
-
+	/* Show all records. */
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &key);
 		cursor->get_value(cursor, &value);
