@@ -116,7 +116,7 @@ namespace mongo {
 
         path Journal::getFilePathFor(int filenumber) const { 
             filesystem::path p(dir);
-            p /= (str::stream() << "j._" << filenumber);
+            p /= string(str::stream() << "j._" << filenumber);
             return p;
         }
 
