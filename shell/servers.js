@@ -1357,6 +1357,11 @@ ReplSetTest.prototype.awaitReplication = function() {
                printjson( entry );
                var ts = entry['ts'];
                print("TS for " + slave + " is " + ts.t+":"+ts.i + " and latest is " + latest.t+":"+latest.i);
+               
+               if (latest.t < ts.t || (latest.t == ts.t && latest.i < ts.i)) {
+                   latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
+               }
+               
                print("Oplog size for " + slave + " is " + log.count());
                synced = (synced && friendlyEqual(latest,ts))
              }
