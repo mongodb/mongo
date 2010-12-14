@@ -730,7 +730,7 @@ namespace mongo {
            insert an object into the database
          */
         virtual void insert( const string &ns , BSONObj obj );
-
+        
         /**
            insert a vector of objects into the database
          */
@@ -750,14 +750,6 @@ namespace mongo {
         virtual bool isFailed() const = 0;
         
         virtual void killCursor( long long cursorID ) = 0;
-
-        static int countCommas( const string& s ){
-            int n = 0;
-            for ( unsigned i=0; i<s.size(); i++ )
-                if ( s[i] == ',' )
-                    n++;
-            return n;
-        }
 
         virtual bool callRead( Message& toSend , Message& response ) = 0;
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
