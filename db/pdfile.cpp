@@ -948,9 +948,9 @@ namespace mongo {
            below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
         */
         vector<IndexChanges> changes;
-        bool changedId;
+        bool changedId = false;
         getIndexChanges(changes, *d, objNew, objOld, changedId);
-        uassert( 13596 , "cannot change _id of a document " , ! changedId );
+        uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew , ! changedId );
         dupCheck(changes, *d, dl);
 
         if ( toupdate->netLength() < objNew.objsize() ) {
