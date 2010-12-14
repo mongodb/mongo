@@ -44,7 +44,7 @@ namespace mongo {
         }
 
         void JSFunction::init( State * state ){
-            _scope = state->scope.get();
+            _scope = state->scope();
             assert( _scope );
             _scope->init( &_wantedScope );
             
@@ -54,7 +54,7 @@ namespace mongo {
 
         void JSMapper::init( State * state ){ 
             _func.init( state ); 
-            _params = state->config.mapparams; 
+            _params = state->config().mapparams; 
         }
 
         void JSMapper::map( const BSONObj& o ){
@@ -210,8 +210,8 @@ namespace mongo {
             if ( cmdObj["outType"].type() == String ){
                 uassert( 13521 , "need 'out' if using 'outType'" , cmdObj["out"].type() == String );
                 string t = cmdObj["outType"].String();
-                if ( t == "normal" )
-                    outType = NORMAL;
+                if ( t == "normal" || t == "replace" )
+                    outType = REPLACE;
                 else if ( t == "merge" )
                     outType = MERGE;
                 else if ( t == "reduce" )
@@ -220,7 +220,7 @@ namespace mongo {
                     uasserted( 13522 , str::stream() << "unknown outType [" << t << "]" );
             }
             else {
-                outType = NORMAL;
+                outType = REPLACE;
             }
 
             { // scope and code
@@ -255,95 +255,136 @@ namespace mongo {
             }
         }
 
-        long long Config::renameIfNeeded( DBDirectClient& db , State * state ){
-            assertInWriteLock();
-            if ( finalLong != tempLong ){
-                    
-                if ( outType == NORMAL ){
-                    db.dropCollection( finalLong );
-                    BSONObj info;
-                    uassert( 10076 ,  "rename failed" , 
-                             db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
-                    db.dropCollection( tempLong );
-                }
-                else if ( outType == MERGE ){
-                    auto_ptr<DBClientCursor> cursor = db.query( tempLong , BSONObj() );
-                    while ( cursor->more() ){
-                        BSONObj o = cursor->next();
-                        Helpers::upsert( finalLong , o );
-                    }
-                    db.dropCollection( tempLong );
-                }
-                else if ( outType == REDUCE ){
-                    BSONList values;
-                    
-                    auto_ptr<DBClientCursor> cursor = db.query( tempLong , BSONObj() );
-                    while ( cursor->more() ){
-                        BSONObj temp = cursor->next();
-                        BSONObj old;
+        void State::prepTempCollection(){
+            _db.dropCollection( _config.tempLong );
 
-                        bool found;
-                        {
-                            Client::Context tx( finalLong );
-                            found = Helpers::findOne( finalLong.c_str() , temp["_id"].wrap() , old , true );
-                        }
-                        
-                        if ( found ){
-                            // need to reduce
-                            values.clear();
-                            values.push_back( temp );
-                            values.push_back( old );
-                            Helpers::upsert( finalLong , reducer->reduce( values , finalizer.get() ) );
-                        }
-                        else {
-                            Helpers::upsert( finalLong , temp );
-                        }
-                    }
-                    db.dropCollection( tempLong );
-                }
-                else {
-                    assert(0);
-                }
+            { // create
+                writelock lock( _config.tempLong.c_str() );
+                Client::Context ctx( _config.tempLong.c_str() );
+                string errmsg;
+                assert( userCreateNS( _config.tempLong.c_str() , BSONObj() , errmsg , _config.replicate ) );
             }
-            return db.count( finalLong );
+            
+            
+            { // copy indexes 
+                auto_ptr<DBClientCursor> idx = _db.getIndexes( _config.finalLong );
+                while ( idx->more() ){
+                    BSONObj i = idx->next();
+                    
+                    BSONObjBuilder b( i.objsize() + 16 );
+                    b.append( "ns" , _config.tempLong );
+                    BSONObjIterator j( i );
+                    while ( j.more() ){
+                        BSONElement e = j.next();
+                        if ( str::equals( e.fieldName() , "_id" ) || 
+                             str::equals( e.fieldName() , "ns" ) )
+                            continue;
+                        
+                        b.append( e );
+                    }
+                    
+                    BSONObj indexToInsert = b.obj();
+                    insert( Namespace( _config.tempLong.c_str() ).getSisterNS( "system.indexes" ).c_str() , indexToInsert );
+                }
+                
+            }
+
+        }
+
+        long long State::renameIfNeeded(){
+            assertInWriteLock();
+            if ( _config.finalLong == _config.tempLong )
+                return _db.count( _config.finalLong );
+            
+            switch ( _config.outType ){
+            case Config::REPLACE: {
+                _db.dropCollection( _config.finalLong );
+                BSONObj info;
+                uassert( 10076 ,  "rename failed" , 
+                         _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) );
+                _db.dropCollection( _config.tempLong );
+                break;
+            }
+            case Config::MERGE: {
+                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
+                while ( cursor->more() ){
+                    BSONObj o = cursor->next();
+                    Helpers::upsert( _config.finalLong , o );
+                }
+                _db.dropCollection( _config.tempLong );
+                break;
+            }
+            case Config::REDUCE: { 
+                BSONList values;
+                
+                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
+                while ( cursor->more() ){
+                    BSONObj temp = cursor->next();
+                    BSONObj old;
+                    
+                    bool found;
+                    {
+                        Client::Context tx( _config.finalLong );
+                        found = Helpers::findOne( _config.finalLong.c_str() , temp["_id"].wrap() , old , true );
+                    }
+                    
+                    if ( found ){
+                        // need to reduce
+                        values.clear();
+                        values.push_back( temp );
+                        values.push_back( old );
+                        Helpers::upsert( _config.finalLong , _config.reducer->reduce( values , _config.finalizer.get() ) );
+                    }
+                    else {
+                        Helpers::upsert( _config.finalLong , temp );
+                    }
+                }
+                _db.dropCollection( _config.tempLong );
+                break;
+            }
+            }
+            return _db.count( _config.finalLong );
         }
         
         void State::insert( const string& ns , BSONObj& o ){
             writelock l( ns );
             Client::Context ctx( ns );
                 
-            if ( config.replicate )
+            if ( _config.replicate )
                 theDataFileMgr.insertAndLog( ns.c_str() , o , false );
             else
                 theDataFileMgr.insertWithObjMod( ns.c_str() , o , false );
 
         }
 
-        State::State( Config& c ) : config( c ), _size(0), numEmits(0){
+        State::State( Config& c ) : _config( c ), _size(0), _numEmits(0){
             _temp.reset( new InMemory() );
         }
         
         void State::init(){
             // setup js
-            scope.reset(globalScriptEngine->getPooledScope( config.dbname ).release() );
-            scope->localConnect( config.dbname.c_str() );
+            _scope.reset(globalScriptEngine->getPooledScope( _config.dbname ).release() );
+            _scope->localConnect( _config.dbname.c_str() );
             
-            if ( ! config.scopeSetup.isEmpty() )
-                scope->init( &config.scopeSetup );
+            if ( ! _config.scopeSetup.isEmpty() )
+                _scope->init( &_config.scopeSetup );
 
-            config.mapper->init( this );
-            config.reducer->init( this );
-            if ( config.finalizer )
-                config.finalizer->init( this );
+            _config.mapper->init( this );
+            _config.reducer->init( this );
+            if ( _config.finalizer )
+                _config.finalizer->init( this );
+
+            _scope->injectNative( "emit" , fast_emit );
+
             
             // clear temp collections
-            db.dropCollection( config.tempLong );
-            db.dropCollection( config.incLong );
+            _db.dropCollection( _config.tempLong );
+            _db.dropCollection( _config.incLong );
             
-            writelock l( config.incLong );
-            Client::Context ctx( config.incLong );
+            writelock l( _config.incLong );
+            Client::Context ctx( _config.incLong );
             string err;
-            assert( userCreateNS( config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+            assert( userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
             
         }
         
@@ -352,9 +393,9 @@ namespace mongo {
                 return;
             
             BSONObj key = values.begin()->firstElement().wrap( "_id" );
-            BSONObj res = config.reducer->reduce( values , config.finalizer.get() );
+            BSONObj res = _config.reducer->reduce( values , _config.finalizer.get() );
             
-            insert( config.tempLong , res );
+            insert( _config.tempLong , res );
         }
 
         void State::reduceInMemory(){
@@ -368,20 +409,20 @@ namespace mongo {
                 
                 if ( all.size() == 1 ){
                     // this key has low cardinality, so just write to db
-                    writelock l(config.incLong);
-                    Client::Context ctx(config.incLong.c_str());
+                    writelock l(_config.incLong);
+                    Client::Context ctx(_config.incLong.c_str());
                     _insert( *(all.begin()) );
                 }
                 else if ( all.size() > 1 ){
-                    BSONObj res = config.reducer->reduce( all );
-                    emit( res );
+                    BSONObj res = _config.reducer->reduce( all );
+                    _emit( res );
                 }
             }
         }
         
         void State::dump(){
-            writelock l(config.incLong);
-            Client::Context ctx(config.incLong);
+            writelock l(_config.incLong);
+            Client::Context ctx(_config.incLong);
                     
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
                 BSONList& all = i->second;
@@ -397,6 +438,11 @@ namespace mongo {
         }
             
         void State::emit( const BSONObj& a ){
+            _numEmits++;
+            _emit( a );
+        }
+
+        void State::_emit( const BSONObj& a ){
             BSONList& all = (*_temp)[a];
             all.push_back( a );
             _size += a.objsize() + 16;
@@ -418,16 +464,15 @@ namespace mongo {
         }
 
         void State::_insert( BSONObj& o ){
-            theDataFileMgr.insertWithObjMod( config.incLong.c_str() , o , true );
+            theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
         }
 
         boost::thread_specific_ptr<State*> _tl;
 
         BSONObj fast_emit( const BSONObj& args ){
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
-            uassert( 13069 , "an emit can't be more than 2mb" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
+            uassert( 13069 , "an emit can't be more than half max bson size" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
             (*_tl)->emit( args );
-            (*_tl)->numEmits++;
             return BSONObj();
         }
 
@@ -468,7 +513,6 @@ namespace mongo {
                 
                 try {
                     state.init();
-                    state.scope->injectNative( "emit" , fast_emit );
                     
                     {
                         State** s = new State*[1];
@@ -531,8 +575,8 @@ namespace mongo {
                     killCurrentOp.checkForInterrupt();
 
                     countsBuilder.appendNumber( "input" , num );
-                    countsBuilder.appendNumber( "emit" , state.numEmits );
-                    if ( state.numEmits )
+                    countsBuilder.appendNumber( "emit" , state.numEmits() );
+                    if ( state.numEmits() )
                         shouldHaveData = true;
                     
                     timingBuilder.append( "mapTime" , mapTime / 1000 );
@@ -546,35 +590,7 @@ namespace mongo {
                     BSONObj sortKey = BSON( "0" << 1 );
                     db.ensureIndex( config.incLong , sortKey );
                     
-                    { // create temp output collection
-                        writelock lock( config.tempLong.c_str() );
-                        Client::Context ctx( config.tempLong.c_str() );
-                        assert( userCreateNS( config.tempLong.c_str() , BSONObj() , errmsg , config.replicate ) );
-                    }
-                    
-                    { // copy indexes 
-                        assert( db.count( config.tempLong ) == 0 );
-                        auto_ptr<DBClientCursor> idx = db.getIndexes( config.finalLong );
-                        while ( idx->more() ){
-                            BSONObj i = idx->next();
-                            
-                            BSONObjBuilder b( i.objsize() + 16 );
-                            b.append( "ns" , config.tempLong );
-                            BSONObjIterator j( i );
-                            while ( j.more() ){
-                                BSONElement e = j.next();
-                                if ( str::equals( e.fieldName() , "_id" ) || 
-                                     str::equals( e.fieldName() , "ns" ) )
-                                    continue;
-                                
-                                b.append( e );
-                            }
-                            
-                            BSONObj indexToInsert = b.obj();
-                            state.insert( Namespace( config.tempLong.c_str() ).getSisterNS( "system.indexes" ).c_str() , indexToInsert );
-                        }
-                        
-                    }
+                    state.prepTempCollection();
 
                     {
                         readlock rl(config.incLong.c_str());
@@ -643,9 +659,7 @@ namespace mongo {
                 long long finalCount = 0;
                 {
                     dblock lock;
-                    db.dropCollection( config.incLong );
-                
-                    finalCount = config.renameIfNeeded( db , &state );
+                    finalCount = state.renameIfNeeded();
                 }
 
                 timingBuilder.append( "total" , t.millis() );
@@ -680,7 +694,8 @@ namespace mongo {
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() , false );
-                
+                config.incLong = config.tempLong;
+
                 set<ServerAndQuery> servers;
                 
                 BSONObjBuilder shardCounts;
@@ -712,6 +727,7 @@ namespace mongo {
                 }
                 
                 State state(config);
+                state.prepTempCollection();
 
                 { // reduce from each stream
                     
@@ -740,20 +756,22 @@ namespace mongo {
                         }
                         
                         
-                        state.db.insert( config.tempLong , config.reducer->reduce( values , config.finalizer.get() ) );
+                        state.emit( config.reducer->reduce( values , config.finalizer.get() ) );
                         values.clear();
                         values.push_back( t );
                     }
                     
                     if ( values.size() )
-                        state.db.insert( config.tempLong , config.reducer->reduce( values , config.finalizer.get() ) );
+                        state.emit( config.reducer->reduce( values , config.finalizer.get() ) );
                 }
                 
-
+                
+                state.dump();
+                
                 long long finalCount;
                 {
                     dblock lk;
-                    finalCount = config.renameIfNeeded( state.db , &state );
+                    finalCount = state.renameIfNeeded();
                 }
                 log(0) << " mapreducefinishcommand " << config.finalLong << " " << finalCount << endl;
 

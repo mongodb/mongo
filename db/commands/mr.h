@@ -145,11 +145,6 @@ namespace mongo {
         public:
             Config( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp = true );
 
-            /**
-               @return number objects in collection
-             */
-            long long renameIfNeeded( DBDirectClient& db , State * state );
-            
             string dbname;
             string ns;
             
@@ -182,13 +177,17 @@ namespace mongo {
             string finalShort;
             string finalLong;
 
-            enum { NORMAL , MERGE , REDUCE } outType;
+            enum { REPLACE , // atomically replace the collection
+                   MERGE ,  // merge keys, override dups
+                   REDUCE // merge keys, reduce dups
+            } outType;
             
             static AtomicUInt JOB_NUMBER;
         }; // end MRsetup
         
         /**
          * stores information about intermediate map reduce state
+         * controls flow of data from map->reduce->finalize->output
          */
         class State {
         public:
@@ -221,20 +220,55 @@ namespace mongo {
             void checkSize();
             
             void _insert( BSONObj& o );
+
+            void prepTempCollection();
+
+            /**
+               @return number objects in collection
+             */
+            long long renameIfNeeded();
             
-            // -----
+            /** State maintains ownership, do no use past State lifetime */
+            Scope* scope() { return _scope.get(); }
 
-            scoped_ptr<Scope> scope;
-            Config& config;
+            Config& config() { return _config; }
 
-            DBDirectClient db;
+            long long numEmits() const { return _numEmits; }
+
+        private:
+            
+            void _emit( const BSONObj& a );
+
+            scoped_ptr<Scope> _scope;
+            Config& _config;
+
+            DBDirectClient _db;
 
             shared_ptr<InMemory> _temp;
             long _size;
             
-            long long numEmits;
+            long long _numEmits;
+        };
+
+        /**
+         * keeps all temporary state in memory
+         * if data is larger than can fit in a BSONObj to return
+         * will throw an exception
+         */
+        class StateInMemory : public State {
+
         };
         
+        /**
+         * keeps some things in memory and pushes
+         * to disk when gets too big for ram
+         * intended for when output will end up on disk
+         */
+        class StateOnDisk : public State {
+            
+        };
+
+        BSONObj fast_emit( const BSONObj& args );
 
     } // end mr namespace
 }
