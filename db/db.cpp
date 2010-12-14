@@ -903,7 +903,7 @@ int main(int argc, char* argv[])
         if (params.count("upgrade")) {
             shouldRepairDatabases = 1;
         }
-        if (params.count("noTableScan")) {
+        if (params.count("notablescan")) {
             cmdLine.noTableScan = true;
         }
         if (params.count("master")) {
