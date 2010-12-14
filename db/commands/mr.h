@@ -23,19 +23,110 @@ namespace mongo {
     
     namespace mr {
 
-        class MRReduceState {
+        typedef vector<BSONObj> BSONList;
+
+        class State;
+
+        // ------------  function interfaces -----------
+
+        class Mapper : boost::noncopyable {
         public:
+            virtual ~Mapper(){}
+            virtual void init( State * state ) = 0;
 
-            MRReduceState() : reduce(), finalize(){}
-
-            scoped_ptr<Scope> scope;
+            virtual void map( const BSONObj& o ) = 0;
+        };
+        
+        class Finalizer : boost::noncopyable {
+        public:
+            virtual ~Finalizer(){}
+            virtual void init( State * state ) = 0;
             
-            ScriptingFunction reduce;
-            ScriptingFunction finalize;
+            virtual BSONObj finalize( const BSONObj& o ) = 0;
+        };
+        
+        class Reducer : boost::noncopyable {
+        public:
+            virtual ~Reducer(){}
+            virtual void init( State * state ) = 0;
+            
+            virtual BSONObj reduce( const BSONList& tuples ) = 0;
+            /** this means its a fianl reduce, even if there is no finalizer */
+            virtual BSONObj reduce( const BSONList& tuples , Finalizer * finalizer ) = 0;
+        };
+        
+        // ------------  js function implementations -----------        
+        
+        /**
+         * used as a holder for Scope and ScriptingFunction
+         * visitor like pattern as Scope is gotten from first access
+         */
+        class JSFunction : boost::noncopyable {
+        public:
+            /**
+             * @param type (map|reduce|finalzie)
+             */
+            JSFunction( string type , const BSONElement& e );
+            virtual ~JSFunction(){}
+            
+            virtual void init( State * state );
+
+            Scope * scope(){ return _scope; }
+            ScriptingFunction func(){ return _func; }
+
+        private:
+            string _type;
+            string _code; // actual javascript code
+            BSONObj _wantedScope; // this is for CodeWScope 
+            
+            Scope * _scope; // this is not owned by us, and might be shared
+            ScriptingFunction _func;
         };
 
+        class JSMapper : public Mapper {
+        public:
+            JSMapper( const BSONElement & code ) : _func( "map" , code ){}
+            virtual void map( const BSONObj& o );
+            virtual void init( State * state );
+            
+        private:
+            JSFunction _func;
+            BSONObj _params;
+        };
+        
+        class JSReducer : public Reducer {
+        public:
+            JSReducer( const BSONElement& code ) : _func( "reduce" , code ){}
+            virtual void init( State * state ){ _func.init( state ); }
 
-        typedef vector<BSONObj> BSONList;
+            virtual BSONObj reduce( const BSONList& tuples );
+            virtual BSONObj reduce( const BSONList& tuples , Finalizer * finalizer );
+
+        private:
+
+            /**
+             * result in "return"
+             * @param key OUT 
+             * @param endSizeEstimate OUT
+            */
+            void _reduce( const BSONList& values , BSONObj& key , int& endSizeEstimate );
+            
+            JSFunction _func;
+
+        };
+        
+        class JSFinalizer : public Finalizer  {
+        public:
+            JSFinalizer( const BSONElement& code ) : _func( "finalize" , code ){}
+            virtual BSONObj finalize( const BSONObj& o );
+            virtual void init( State * state ){ _func.init( state ); }
+        private:
+            JSFunction _func;
+
+        };
+
+        // -----------------
+        
 
         class MyCmp {
         public:
@@ -54,15 +145,10 @@ namespace mongo {
         public:
             Config( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp = true );
 
-            /** Field expected to be a Code or CodeWScope.
-             * Add its scope, if any, to scopeBuilder, and return its code.
-             * Scopes added later will shadow those added earlier. */
-            static string scopeAndCode (BSONObjBuilder& scopeBuilder, const BSONElement& field);
-
             /**
                @return number objects in collection
              */
-            long long renameIfNeeded( DBDirectClient& db , MRReduceState * state );
+            long long renameIfNeeded( DBDirectClient& db , State * state );
             
             string dbname;
             string ns;
@@ -80,9 +166,9 @@ namespace mongo {
 
             // functions
             
-            string mapCode;
-            string reduceCode;
-            string finalizeCode;
+            scoped_ptr<Mapper> mapper;
+            scoped_ptr<Reducer> reducer;
+            scoped_ptr<Finalizer> finalizer;
             
             BSONObj mapparams;
             BSONObj scopeSetup;
@@ -102,11 +188,11 @@ namespace mongo {
         }; // end MRsetup
         
         /**
-         * container for all stack based map/reduce state
+         * stores information about intermediate map reduce state
          */
-        class MRState : public MRReduceState {
+        class State {
         public:
-            MRState( Config& s );
+            State( Config& c );
             void init();
             
             void finalReduce( BSONList& values );
@@ -136,11 +222,12 @@ namespace mongo {
             
             void _insert( BSONObj& o );
             
+            // -----
 
-            Config& setup;
+            scoped_ptr<Scope> scope;
+            Config& config;
+
             DBDirectClient db;
-
-            ScriptingFunction map;
 
             shared_ptr<InMemory> _temp;
             long _size;
