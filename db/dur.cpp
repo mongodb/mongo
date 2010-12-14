@@ -292,7 +292,8 @@ namespace mongo {
 
                     data += mmf->length();
 
-                    if (memcmp(p, w, mmf->length()) == 0)
+                    assert( mmf->length() == (unsigned) mmf->length() );
+                    if (memcmp(p, w, (unsigned) mmf->length()) == 0)
                         continue; // next file
 
                     unsigned low = 0xffffffff;
