@@ -105,9 +105,11 @@ namespace mongo {
         /** indicate that a database is about to be dropped.  call before the actual drop. */
         void DurableImpl::droppingDb(string db) { 
             shared_ptr<DurOp> op( new DropDbOp(db) );
-            commitJob.noteOp(op);
 
-            // must commit now, before files are actually unlinked:
+            // DropDbOp must be in a commit group by itself to ensure proper
+            // sequencing because all DurOps are applied before any WriteOps.
+            groupCommit();
+            commitJob.noteOp(op);
             groupCommit();
         }
 
