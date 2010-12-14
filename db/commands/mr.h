@@ -193,20 +193,8 @@ namespace mongo {
         public:
             State( Config& c );
             void init();
-            
-            void finalReduce( BSONList& values );
 
-            void insert( const string& ns , BSONObj& o );
-            
-            /**
-             * run reduce on _temp
-             */
-            void reduceInMemory();
-            
-            /**
-             * transfers in memory storage to temp collection
-             */
-            void dump();
+            // ---- map stage ---- 
             
             /**
              * stages on in in-memory storage
@@ -218,25 +206,47 @@ namespace mongo {
              * if its still big, dump to temp collection
              */
             void checkSize();
-            
-            void _insert( BSONObj& o );
 
-            void prepTempCollection();
+            /**
+             * run reduce on _temp
+             */
+            void reduceInMemory();
+
+            /**
+             * transfers in memory storage to temp collection
+             */
+            void dumpToInc();
+
+            // ------ reduce stage -----------
+
+            void prepTempCollection();            
+            
+            void finalReduce( BSONList& values );
+            
+            // ------- cleanup/data positioning ----------
 
             /**
                @return number objects in collection
              */
             long long renameIfNeeded();
+
             
+            // -------- util ------------
+            
+            void insert( const string& ns , BSONObj& o );
+            
+            // ------ simple accessors -----
+
             /** State maintains ownership, do no use past State lifetime */
             Scope* scope() { return _scope.get(); }
-
+            
             Config& config() { return _config; }
 
             long long numEmits() const { return _numEmits; }
 
         private:
-            
+
+            void _insertToInc( BSONObj& o );
             void _emit( const BSONObj& a );
 
             scoped_ptr<Scope> _scope;

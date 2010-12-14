@@ -354,7 +354,10 @@ namespace mongo {
                 theDataFileMgr.insertAndLog( ns.c_str() , o , false );
             else
                 theDataFileMgr.insertWithObjMod( ns.c_str() , o , false );
+        }
 
+        void State::_insertToInc( BSONObj& o ){
+            theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
         }
 
         State::State( Config& c ) : _config( c ), _size(0), _numEmits(0){
@@ -411,7 +414,7 @@ namespace mongo {
                     // this key has low cardinality, so just write to db
                     writelock l(_config.incLong);
                     Client::Context ctx(_config.incLong.c_str());
-                    _insert( *(all.begin()) );
+                    _insertToInc( *(all.begin()) );
                 }
                 else if ( all.size() > 1 ){
                     BSONObj res = _config.reducer->reduce( all );
@@ -420,7 +423,7 @@ namespace mongo {
             }
         }
         
-        void State::dump(){
+        void State::dumpToInc(){
             writelock l(_config.incLong);
             Client::Context ctx(_config.incLong);
                     
@@ -430,7 +433,7 @@ namespace mongo {
                     continue;
                     
                 for ( BSONList::iterator j=all.begin(); j!=all.end(); j++ )
-                    _insert( *j );
+                    _insertToInc( *j );
             }
             _temp->clear();
             _size = 0;
@@ -459,12 +462,8 @@ namespace mongo {
             if ( _size < 1024 * 15 )
                 return;
                 
-            dump();
+            dumpToInc();
             log(1) << "  mr: dumping to db" << endl;
-        }
-
-        void State::_insert( BSONObj& o ){
-            theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
         }
 
         boost::thread_specific_ptr<State*> _tl;
@@ -585,7 +584,7 @@ namespace mongo {
                     // final reduce
                     op->setMessage( "m/r: (2/3) final reduce in memory" );
                     state.reduceInMemory();
-                    state.dump();
+                    state.dumpToInc();
                     
                     BSONObj sortKey = BSON( "0" << 1 );
                     db.ensureIndex( config.incLong , sortKey );
@@ -766,7 +765,7 @@ namespace mongo {
                 }
                 
                 
-                state.dump();
+                state.dumpToInc();
                 
                 long long finalCount;
                 {
