@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		93A3000D12B801EF001DAB61 /* mr_killop.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = mr_killop.js; sourceTree = "<group>"; };
 		93A3FF6012B7E8E9001DAB61 /* command_line_parsing.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = command_line_parsing.js; sourceTree = "<group>"; };
 		93A3FF9312B7EC40001DAB61 /* notablescan.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = notablescan.js; sourceTree = "<group>"; };
 		93AACA0312AF68F2001F1BB9 /* APACHE-2.0.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "APACHE-2.0.txt"; sourceTree = "<group>"; };
@@ -1749,6 +1750,7 @@
 		93AACB6E12AF68F4001F1BB9 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				93A3000D12B801EF001DAB61 /* mr_killop.js */,
 				93A3FF9312B7EC40001DAB61 /* notablescan.js */,
 				93AACB6F12AF68F4001F1BB9 /* _fail.js */,
 				93AACB7012AF68F4001F1BB9 /* _lodeRunner.js */,
