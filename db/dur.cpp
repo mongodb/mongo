@@ -313,7 +313,7 @@ namespace mongo {
                         vector<WriteIntent>& w = commitJob.writes();
                         (void)w; // mark as unused. Useful for inspection in debugger
 
-                        breakpoint();
+                        massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);
                     }
                 }
             }
