@@ -527,6 +527,16 @@ namespace BasicTests {
         }
     };
 
+    class StrTests {
+    public:
+        
+        void run(){
+            ASSERT_EQUALS( 1 , str::count( "abc" , 'b' ) );
+            ASSERT_EQUALS( 3 , str::count( "babab" , 'b' ) );
+        }
+        
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "basic" ){
@@ -556,6 +566,8 @@ namespace BasicTests {
             add< IsValidUTF8Test >();
 
             add< QueueTest >();
+
+            add< StrTests >();
         }
     } myall;
     

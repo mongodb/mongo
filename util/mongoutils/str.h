@@ -160,6 +160,14 @@ namespace mongoutils {
             return true;
         }
 
+        inline unsigned count( const string& s , char c ){
+            unsigned n=0;
+            for ( unsigned i=0; i<s.size(); i++ )
+                if ( s[i] == c )
+                    n++;
+            return n;
+        }
+        
     }
 
 }
