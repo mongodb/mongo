@@ -96,6 +96,20 @@ namespace mongo {
 
     class DBClientBase;
 
+    /**
+     * ConnectionString handles parsing different ways to connect to mongo and determining method
+     * samples:
+     *    server
+     *    server:port
+     *    foo/server:port,server:port   SET
+     *    server,server,server          SYNC
+     * 
+     * tyipcal use
+     * string errmsg,
+     * ConnectionString cs = ConnectionString::parse( url , errmsg );
+     * if ( ! cs.isValid() ) throw "bad: " + errmsg;
+     * DBClientBase * conn = cs.connect( errmsg );
+     */
     class ConnectionString {
     public:
         enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC };
