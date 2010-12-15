@@ -48,9 +48,9 @@ stopMongod(30001, /*signal*/9);
 // journal file should be present, and non-empty as we killed hard
 
 // restart and recover
-log("restart and recover");
+log();
 var conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", 8);
-log("restarted");
+log();
 var d = conn.getDB("test");
 print("count:" + d.foo.count());
 assert(d.foo.count() == 1, "count 1");
