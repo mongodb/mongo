@@ -41,9 +41,9 @@ namespace mongo {
          struct FullyQualifiedJournalEntry { 
              bool isBasicWrite() const { return dbName != 0; }
 
-             const char *dbName;
+             const char *dbName; // pointer into mmaped Journal file
              JEntry e;
-             const char *srcData;
+             const char *srcData; // pointer into mmaped Journal file
 
              shared_ptr<DurOp> op;
         };
@@ -83,7 +83,7 @@ namespace mongo {
         public:
             JournalIterator(void *p, unsigned len) : _br(p, len) {
                 _sectHead = NULL;
-                *_lastDbName = 0;
+                _lastDbName = NULL;
 
                 JHeader h;
                 _br.read(h); // read/skip file header
@@ -135,20 +135,11 @@ namespace mongo {
 
                     // JDbContext
                     {
-                        char c;
-                        char *p = _lastDbName;
-                        char *end = p + Namespace::MaxNsLen;
-                        while( 1 ) { 
-                            _br.read(c);
-                            *p++ = c;
-                            if( c == 0 )
-                                break;
-                            if( p >= end ) { 
-                                /* this shouldn't happen, even if log is truncated. */
-                                log() << _br.offset() << endl;
-                                uasserted(13533, "problem processing journal file during recovery");
-                            }
-                        }
+                        _lastDbName = (const char*) _br.pos();
+                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _br.remaining());
+                        const unsigned len = strnlen(_lastDbName, limit);
+                        massert(13533, "problem processing journal file during recovery", _lastDbName[len] == '\0');
+                        _br.skip(len+1); // skip '\0' too
 
                         _br.read(lenOrOpCode);
                     }
@@ -166,7 +157,7 @@ namespace mongo {
         private:
             const JSectHeader* _sectHead;
             BufReader _br;
-            char _lastDbName[Namespace::MaxNsLen];
+            const char *_lastDbName; // pointer into mmaped journal file
         };
 
        /** call go() to execute a recovery from existing journal files.
