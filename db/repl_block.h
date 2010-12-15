@@ -31,4 +31,5 @@ namespace mongo {
     void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp );
     bool opReplicatedEnough( OpTime op , int w );
     void resetSlaveCache();
+    unsigned getSlaveCount();
 }

@@ -171,9 +171,15 @@ namespace mongo {
             }
             return w <= 0;
         }
+
+        unsigned getSlaveCount() const {
+            scoped_lock mylk(_mutex);
+
+            return _slaves.size();
+        }
         
         // need to be careful not to deadlock with this
-        mongo::mutex _mutex;
+        mutable mongo::mutex _mutex;
         map<Ident,Info> _slaves;
         bool _dirty;
         bool _started;
@@ -203,5 +209,9 @@ namespace mongo {
 
     void resetSlaveCache(){
         slaveTracking.reset();
+    }
+
+    unsigned getSlaveCount(){
+        return slaveTracking.getSlaveCount();
     }
 }
