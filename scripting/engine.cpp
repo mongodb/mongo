@@ -330,7 +330,7 @@ namespace mongo {
         void reset(){
             _real->reset();
         }
-        void init( BSONObj * data ){
+        void init( const BSONObj * data ){
             _real->init( data );
         }
         

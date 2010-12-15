@@ -46,7 +46,7 @@ namespace mongo {
         virtual ~Scope();
         
         virtual void reset() = 0;
-        virtual void init( BSONObj * data ) = 0;
+        virtual void init( const BSONObj * data ) = 0;
         void init( const char * data ){
             BSONObj o( data , 0 );
             init( &o );

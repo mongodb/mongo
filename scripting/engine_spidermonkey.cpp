@@ -1194,7 +1194,7 @@ namespace mongo {
             _roots.push_back( root );
         }
 
-        void init( BSONObj * data ){
+        void init( const BSONObj * data ){
             smlock;
             if ( ! data )
                 return;
