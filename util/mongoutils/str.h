@@ -162,7 +162,7 @@ namespace mongoutils {
             return true;
         }
 
-        /** @return umber of occurrences of c in s */
+        /** @return number of occurrences of c in s */
         inline unsigned count( const string& s , char c ){
             unsigned n=0;
             for ( unsigned i=0; i<s.size(); i++ )
