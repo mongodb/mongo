@@ -115,19 +115,20 @@ namespace mongo {
     
     void* MemoryMappedFile::createPrivateMap() {
         void * x = mmap( /*start*/0 , len , PROT_READ|PROT_WRITE , MAP_PRIVATE , fd , 0 );        
-	    if( x == MAP_FAILED ) {
-	        if ( errno == ENOMEM ) {
-	            if( sizeof(void*) == 4 )
-		        error() << "mmap private failed with out of memory. You are using a 32-bit build and probably need to upgrade to 64" << endl;
-		    else
-  		        error() << "mmap private failed with out of memory. (64 bit build)" << endl;
-	        }
-	        return 0;
-	    }
+        if( x == MAP_FAILED ) {
+            if ( errno == ENOMEM ) {
+                if( sizeof(void*) == 4 ) {
+                    error() << "mmap private failed with out of memory. You are using a 32-bit build and probably need to upgrade to 64" << endl;
+                } else {
+                    error() << "mmap private failed with out of memory. (64 bit build)" << endl;
+                }
+            }
+            return 0;
+        }
         else { 
             views.push_back(x);
         }
-	    return x;
+        return x;
     }
     
     void MemoryMappedFile::flush(bool sync) {
