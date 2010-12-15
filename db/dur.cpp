@@ -194,31 +194,33 @@ namespace mongo {
 
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
-            caller handles locking 
-            */
+            caller handles locking
+        */
         static void PREPLOGBUFFER() { 
             assert( cmdLine.dur );
             AlignedBuilder& bb = commitJob._ab;
             bb.reset();
 
-            unsigned lenOfs;
+            unsigned lenOfs; // we will need to backfill the length when prep is wrapping up
             // JSectHeader
             {
                 bb.appendStr("\nHH\n", false);
                 lenOfs = bb.skip(4);
             }
 
-            // ops other than basic writes
+            // ops other than basic writes (DurOp's)
             {
                 for( vector< shared_ptr<DurOp> >::iterator i = commitJob.ops().begin(); i != commitJob.ops().end(); ++i ) { 
                     (*i)->serialize(bb);
                 }
             }
 
-            // write intents
+            // write intents.  note there is no particular order to these : if we have 
+            // two writes to the same location during the group commit interval, it is likely
+            // (although not assured) that it is journalled here once.
             {
                 scoped_lock lk(privateViews._mutex());
-                string lastFilePath;
+                RelativePath lastFilePath;
                 for( vector<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
                     size_t ofs;
                     MongoMMF *mmf = privateViews._find(i->p, ofs);
@@ -229,14 +231,18 @@ namespace mongo {
                     }
 
                     if( !mmf->willNeedRemap() ) {
-                        mmf->willNeedRemap() = true; // usually it will already be dirty so don't bother writing then
+                        // tag this mmf as needed a remap of its private view later. 
+                        // usually it will already be dirty/already set, so we do the if above first
+                        // to avoid possibility of cpu cache line contention
+                        mmf->willNeedRemap() = true;
                     }
                     i->w_ptr = ((char*)mmf->view_write()) + ofs;
                     if( mmf->relativePath() != lastFilePath ) { 
                         lastFilePath = mmf->relativePath();
+                        //assert( !str::startsWith(lastFilePath, dbpath) ); // dbpath should be stripped this is a relative path
                         JDbContext c;
                         bb.appendStruct(c);
-                        bb.appendStr(lastFilePath);
+                        bb.appendStr(lastFilePath.toString());
                     }
                     JEntry e;
                     e.len = i->len;
@@ -517,6 +523,7 @@ namespace mongo {
 #endif
         }
 
+        /** at startup, recover, and then start the journal threads */
         void DurableImpl::startup() {
             if( !cmdLine.dur )
                 return;

@@ -153,23 +153,15 @@ namespace mongo {
 
     void MongoMMF::setPath(string f) {
         string suffix;
-        string fullpath;
-        bool ok = str::rSplitOn(f, '.', fullpath, suffix);
+        string prefix;
+        bool ok = str::rSplitOn(f, '.', prefix, suffix);
         uassert(13520, str::stream() << "MongoMMF only supports filenames in a certain format " << f, ok);
         if( suffix == "ns" )
             _fileSuffixNo = -1;
         else 
             _fileSuffixNo = (int) str::toUnsigned(suffix);
 
-        string relative = str::after(fullpath, dbpath);
-        uassert(13600, 
-                str::stream() << "MongoMMF file path is not under the db path? " << fullpath << ' ' << dbpath, 
-                relative != fullpath);
-
-        if( str::startsWith(relative, "/") || str::startsWith(relative, "\\") ) { 
-            relative.erase(0, 1);
-        }
-        _relativePath = relative;
+        _p = RelativePath::fromFullPath(prefix);
     }
 
     bool MongoMMF::open(string fname, bool sequentialHint) {
