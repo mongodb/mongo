@@ -20,6 +20,7 @@
 
 #include "dur_journalformat.h"
 #include "bufreader.h"
+#include "../util/paths.h"
 
 namespace mongo {
 
@@ -76,15 +77,15 @@ namespace mongo {
         class FileCreatedOp : public DurOp { 
         public:
             FileCreatedOp(BufReader& log);
-            FileCreatedOp(string f, unsigned long long l) : 
-              DurOp(JEntry::OpCode_FileCreated), _filename(f), _len(l)  { }
+            /** param f filename to create with path */
+            FileCreatedOp(string f, unsigned long long l);
             virtual void replay();
             virtual string toString();
             virtual bool needFilesClosed();
         protected:
             virtual void _serialize(AlignedBuilder& ab);
         private:
-            string _filename;
+            RelativePath _p;
             unsigned long long _len; // size of file, not length of name
         };
 

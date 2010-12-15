@@ -553,6 +553,14 @@ sendmore:
         Client::initThread("initandlisten");
         _diaglog.init();
 
+        if (cmdLine.dur)
+            dur::enableDurability();
+
+        getDur().startup();
+
+        if( cmdLine.durOptions & CmdLine::DurRecoverOnly ) 
+            return;
+
         clearTmpCollections();
 
         Module::initAll();
@@ -562,14 +570,6 @@ sendmore:
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
             globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
         }
-
-        if (cmdLine.dur)
-            dur::enableDurability();
-
-        getDur().startup();
-
-        if( cmdLine.durOptions & CmdLine::DurRecoverOnly ) 
-            return;
 
         repairDatabasesAndCheckVersion();
 

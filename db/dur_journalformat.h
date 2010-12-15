@@ -25,31 +25,37 @@ namespace mongo {
     namespace dur {
 
 #pragma pack(1)
-        /** header for a journal/j._<n> file */
+        /** beginning header for a journal/j._<n> file 
+            there is nothing important int this header at this time.  except perhaps version #.
+        */
         struct JHeader {
             JHeader() { }
             JHeader(string fname);
 
             char magic[2]; // "j\n". j means journal, then a linefeed, fwiw if you were to run "less" on the file or something...
 
+            // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near 
+            // that.  simply incrementing the version # is safe on a fwd basis.
             enum { CurrentVersion = 0x4142 };
             unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
             char n1; // '\n'
-            char ts[20]; // offset 6
+            char ts[20]; // offset 6.  ascii timestamp of file generation.  for user reading, not used by code.
             char n2; // '\n'
-            char dbpath[128]; // offset 27
+            char dbpath[128]; // offset 27.  path/filename of this file for human reading and diagnostics.  not used by code. 
             char n3, n4; // '\n', '\n'
 
-            char reserved3[8192 - 68 - 96 + 10 -4]; // 8KB total for the file header
-            char txt2[2]; // "\n\n" offset 8190
+            char reserved3[8034]; // 8KB total for the file header
+            char txt2[2];         // "\n\n" offset 8190
 
             bool versionOk() const { return _version == CurrentVersion; }
             bool valid() const { return magic[0] == 'j' && txt2[1] == '\n'; }
         };
 
-        /** "Section" header.  A section corresponds to a group commit. */
+        /** "Section" header.  A section corresponds to a group commit.
+            len is length of the entire section including header and footer.
+        */
         struct JSectHeader {
             char magic[4]; // "\nhh\n"
             unsigned len; // length in bytes of the whole section
@@ -65,12 +71,16 @@ namespace mongo {
                 OpCode_Min         = 0xfffff000 // higher than max len: OpCode_Min + sizeof(JHeader) > 2^32
             };
 
-            unsigned len; // or opcode, see structs below
+            union {
+                unsigned len;    
+                OpCodes opcode;
+            };
             unsigned ofs; // offset in file
             int fileNo;
             // char data[] follows
         };
 
+        /** group commit section footer. md5 is a key field. */
         struct JSectFooter { 
             JSectFooter(const void* begin, int len) { // needs buffer to compute hash
                 sentinel = JEntry::OpCode_Footer;
@@ -90,14 +100,11 @@ namespace mongo {
 
             bool checkHash(const void* begin, int len) const {
                 if (*(int*)hash == 0) return true; // TODO(mathias): remove this
-
                 // skip section header since size modified after hashing
                 (const char*&)begin += sizeof(JSectHeader);
                 len                 -= sizeof(JSectHeader);
-
                 md5digest current;
                 md5(begin, len, current);
-
                 return (memcmp(hash, current, sizeof(hash)) == 0);
             }
 
