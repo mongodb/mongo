@@ -34,6 +34,8 @@
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
 #include "../db/btree.h"
+#include "../db/repl_block.h"
+#include "../db/dur.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -741,9 +743,6 @@ namespace mongo {
 
             // 5.
             { 
-                // TODO SERVER-2119
-                // + 5.b check opReplicatedEnough on _recvChunkCommit TO-side
-
                 // 5.a
                 // we're under the collection lock here, so no other migrate can change maxVersion or ShardChunkManager state
                 migrateFromStatus.setInCriticalSection( true );
@@ -1085,6 +1084,9 @@ namespace mongo {
                 timing.done(3);
             }
             
+            // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
+            ReplTime lastOpApplied;
+
             { // 4. do bulk of mods
                 state = CATCHUP;
                 while ( true ){
@@ -1100,7 +1102,7 @@ namespace mongo {
                     if ( res["size"].number() == 0 )
                         break;
                     
-                    apply( res );
+                    apply( res , &lastOpApplied );
 
                     if ( state == ABORT ){
                         timing.note( "aborted" );
@@ -1125,10 +1127,10 @@ namespace mongo {
                         return;
                     }
 
-                    if ( res["size"].number() > 0 && apply( res ) )
+                    if ( res["size"].number() > 0 && apply( res , &lastOpApplied ) )
                         continue;
                     
-                    if ( state == COMMIT_START )
+                    if ( state == COMMIT_START && flushPendingWrites( lastOpApplied ) )
                         break;
 
                     sleepmillis( 10 );
@@ -1175,7 +1177,12 @@ namespace mongo {
 
         }
 
-        bool apply( const BSONObj& xfer ){
+        bool apply( const BSONObj& xfer , ReplTime* lastOpApplied ){
+            ReplTime dummy;
+            if ( lastOpApplied == NULL ) {
+                lastOpApplied = &dummy;
+            }
+
             bool didAnything = false;
             
             if ( xfer["deleted"].isABSONObj() ){
@@ -1199,6 +1206,8 @@ namespace mongo {
                     }
 
                     Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0 );
+
+                    *lastOpApplied = cx.getClient()->getLastOp();
                     didAnything = true;
                 }
             }
@@ -1210,7 +1219,10 @@ namespace mongo {
                 BSONObjIterator i( xfer["reload"].Obj() );
                 while ( i.more() ){
                     BSONObj it = i.next().Obj();
+
                     Helpers::upsert( ns , it );
+
+                    *lastOpApplied = cx.getClient()->getLastOp();
                     didAnything = true;
                 }
             }
@@ -1218,6 +1230,26 @@ namespace mongo {
             return didAnything;
         }
         
+        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+            // if replication is on, try to force enough secondaries to catch up
+            // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
+            //      for now, we try to replicate to a sensible number of secondaries
+            const int slaveCount = getSlaveCount() / 2 + 1;
+            if ( ! opReplicatedEnough( lastOpApplied , slaveCount ) ) {
+                log( LL_WARNING ) << "migrate commit attempt timed out contacting " << slaveCount 
+                                  << " slaves for '" << ns << "' " << min << " -> " << max << endl;
+                return false;
+            }
+            log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << endl;
+
+            // if durability is on, force a write to journal
+            if ( getDur().commitNow() ) {
+                log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << endl;
+            }
+
+            return true;
+        }
+
         string stateString(){
             switch ( state ){
             case READY: return "ready";
