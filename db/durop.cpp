@@ -21,7 +21,6 @@
 #include "../util/alignedbuilder.h"
 #include "../util/mongoutils/str.h"
 #include "../util/file.h"
-#include "mongommf.h"
 #include "durop.h"
 
 using namespace mongoutils;
@@ -47,7 +46,7 @@ namespace mongo {
                 op = shared_ptr<DurOp>( new DropDbOp(br) );
                 break;
             default:
-                massert(13546, (str::stream() << "dur recover unrecognized opcode in journal " << opcode), false);
+                massert(13546, str::stream() << "dur recover unrecognized opcode in journal " << opcode, false);
             }
             return op;
         }
@@ -79,67 +78,53 @@ namespace mongo {
             _deleteDataFiles(_db.c_str());
         }
 
-        FileCreatedOp::FileCreatedOp(string f, unsigned long long l) : 
-              DurOp(JEntry::OpCode_FileCreated) 
-        { 
-            _p = RelativePath::fromFullPath(f);
-            _len = l;
-        }
-
-        FileCreatedOp::FileCreatedOp(BufReader& log) : DurOp(JEntry::OpCode_FileCreated) 
-        { 
+        FileCreatedOp::FileCreatedOp(BufReader& log) : DurOp(JEntry::OpCode_FileCreated) { 
             unsigned long long reserved;
             log.read(reserved);
             log.read(reserved);
             log.read(_len); // size of file, not length of name
-            string s;
-            log.readStr(s);
-            _p._p = path(s);
+            log.readStr(_filename);
         }
 
         void FileCreatedOp::_serialize(AlignedBuilder& ab) {
             ab.appendNum((unsigned long long) 0); // reserved for future use
             ab.appendNum((unsigned long long) 0); // reserved for future use
             ab.appendNum(_len);
-            ab.appendStr(_p.toString());
+            /*string fn;
+            if( str::startsWith(_filename, dbpath) )
+                fn = str::after(_filename, dbpath);
+            else {
+                fn = _filename;
+                log() << "warning logging creation of file " << _filename << " which is not below dbpath " << dbpath << endl;
+            }*/
+            ab.appendStr(_filename);
         }
         
         string FileCreatedOp::toString() { 
-            return str::stream() << "FileCreatedOp " << _p.toString() << ' ' << _len/1024.0/1024.0;
+            return str::stream() << "FileCreatedOp " << _filename << ' ' << _len/1024.0/1024.0;
         }
 
-        // if an operation deletes or creates a file (or moves etc.), it may need files closed.
         bool FileCreatedOp::needFilesClosed() {
-            return exists( _p.asFullPath() );
+            return exists( _filename );
         }
 
         void FileCreatedOp::replay() { 
             // i believe the code assumes new files are filled with zeros.  thus we have to recreate the file,
             // or rewrite at least, even if it were the right length.  perhaps one day we should change that
             // although easier to avoid defects if we assume it is zeros perhaps.
-            string full = _p.asFullPath();
-            if( exists(full) ) {
+            if( exists( _filename ) ) {
                 try { 
-                    remove(full);
+                    remove(_filename);
                 }
                 catch(std::exception& e) { 
                     log(1) << "recover info FileCreateOp::replay unlink " << e.what() << endl;
                 }
             }
 
-            log() << "recover create file " << full << ' ' << _len/1024.0/1024.0 << "MB" << endl;
-            if( MemoryMappedFile::exists(full) ) {
-                // first delete if exists.
-                try {
-                    remove(full);
-                }
-                catch(...) { 
-                    log() << "warning could not delete file " << full << endl;
-                }
-            }
+            log() << "recover create file " << _filename << ' ' << _len/1024.0/1024.0 << "MB" << endl;
             File f;
-            f.open(full.c_str());
-            massert(13547, str::stream() << "recover couldn't create file " << full, f.is_open());
+            f.open(_filename.c_str());
+            massert(13547, str::stream() << "recover couldn't create file " << _filename, f.is_open());
             unsigned long long left = _len;
             const unsigned blksz = 64 * 1024;
             scoped_ptr<char> v( new char[blksz] );

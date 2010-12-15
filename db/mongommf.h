@@ -18,7 +18,7 @@
 #pragma once
 
 #include "../util/mmap.h"
-#include "../util/paths.h"
+//#include "../util/moveablebuffer.h"
 
 namespace mongo {
 
@@ -67,7 +67,7 @@ namespace mongo {
             fileSuffixNo() is 3
             if the suffix is "ns", fileSuffixNo -1
         */
-        RelativePath relativePath() const { return _p; }
+        string relativePath() const { return _relativePath; }
         int fileSuffixNo() const { return _fileSuffixNo; }
         void* view_write() { return _view_write; }
 
@@ -87,7 +87,7 @@ namespace mongo {
         void *_view_private;
         void *_view_readonly; // for _DEBUG build
         bool _willNeedRemap;
-        RelativePath _p;   // e.g. "somepath/dbname"
+        string _relativePath;   // e.g. "somepath/dbname"
         int _fileSuffixNo;  // e.g. 3.  -1="ns"
 
         void setPath(string pathAndFileName);

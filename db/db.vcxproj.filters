@@ -843,9 +843,6 @@
     <ClInclude Include="projection.h">
       <Filter>db\geo</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\paths.h">
-      <Filter>util\core</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
@@ -916,9 +913,6 @@
     </Filter>
     <Filter Include="_storage engine">
       <UniqueIdentifier>{d565a775-7a99-4860-b25f-441e1655b7c6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="util\NewFilter1">
-      <UniqueIdentifier>{e504bcc8-efa8-451e-a040-d94339fa649e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

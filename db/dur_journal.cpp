@@ -1,4 +1,4 @@
-// @file dur_journal.cpp writing to the writeahead logging journal
+// @file dur_journal.cpp
 
 /**
 *    Copyright (C) 2010 10gen Inc.
@@ -76,11 +76,11 @@ namespace mongo {
             static const unsigned long long DataLimit = 1 * 1024 * 1024 * 1024;
         public:
             string dir; // set by journalMakeDir() during initialization
-            MVar<path> &toUnlink; // unlinks of old journal threads are via background thread
+            MVar<path> &toUnlink;
 
             Journal() : 
               toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
-              _lfMutex("JournalLfMutex")
+              _lfMutex("lfMutex")
             { 
                 _written = 0;
                 _nextFileNumber = 0;
@@ -112,7 +112,7 @@ namespace mongo {
             mutex _lfMutex; // lock when using _lf
         };
 
-        Journal j;
+        static Journal j;
 
         path Journal::getFilePathFor(int filenumber) const { 
             filesystem::path p(dir);
@@ -120,9 +120,7 @@ namespace mongo {
             return p;
         }
 
-        /** never throws 
-            @return true if journal dir is not emptya
-        */
+        /** never throws */
         bool haveJournalFiles() { 
             try {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
@@ -212,7 +210,6 @@ namespace mongo {
             _open();
         }
 
-        /** background removal of old journal files */
         void unlinkThread() { 
             Client::initThread("unlink");
             while( 1 ) {
@@ -300,6 +297,5 @@ namespace mongo {
 }
 
 /* todo 
-   test (and handle) disk full on journal append.  best quick thing to do is to terminate.
-   if we roll back operations, there are nuances such as is ReplSetImpl::lastOpTimeWritten too new in ram then?
+   test (and handle) disk full on journal append 
 */

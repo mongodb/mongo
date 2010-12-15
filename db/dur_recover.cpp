@@ -218,16 +218,7 @@ namespace mongo {
                     */
                     fn = ss.str();
                 }
-                path full(dbpath);
-                try {
-                    // relative name -> full path name
-                    full /= fn;
-                    p = f->map(full.string().c_str());
-                }
-                catch(DBException&) { 
-                    log() << "recover error opening file " << full.string() << endl;
-                    throw;
-                }
+                p = f->map(fn.c_str());
                 uassert(13534, str::stream() << "recovery error couldn't open " << fn, p);
                 if( cmdLine.durOptions & CmdLine::DurDumpJournal ) 
                     log() << "  opened " << fn << ' ' << f->length()/1024.0/1024.0 << endl;
@@ -268,7 +259,9 @@ namespace mongo {
                         log() << ss.str() << endl;
                     } 
                     if( apply ) {
-                        void *p = ptr(fqe.dbName, fqe.e.fileNo, fqe.e.ofs);
+                        path filepath = dbpath;
+                        filepath /= fqe.dbName;
+                        void *p = ptr(filepath.string().c_str(), fqe.e.fileNo, fqe.e.ofs);
                         memcpy(p, fqe.srcData, fqe.e.len);
                     }
                 } else {
