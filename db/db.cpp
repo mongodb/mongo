@@ -561,6 +561,7 @@ sendmore:
         if( cmdLine.durOptions & CmdLine::DurRecoverOnly ) 
             return;
 
+        // comes after getDur().startup() because this reads from the database
         clearTmpCollections();
 
         Module::initAll();

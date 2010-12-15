@@ -172,7 +172,7 @@ namespace mongoutils {
         }
         
         /** remove trailing chars in place */
-        inline bool stripTrailing(string& s, const char *chars) { 
+        inline void stripTrailing(string& s, const char *chars) { 
             string::iterator i = s.end();
             while( s.begin() != i ) { 
                 i--;
