@@ -30,8 +30,10 @@ namespace mongo {
             JHeader() { }
             JHeader(string fname);
 
-            char magic[2]; // "j\n"
-            unsigned short version; // 0x4141 or "AA"
+            char magic[2]; // "j\n". j means journal, then a linefeed, fwiw if you were to run "less" on the file or something...
+
+            enum { CurrentVersion = 0x4142 };
+            unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
             char n1; // '\n'
@@ -43,7 +45,7 @@ namespace mongo {
             char reserved3[8192 - 68 - 96 + 10 -4]; // 8KB total for the file header
             char txt2[2]; // "\n\n" offset 8190
 
-            bool versionOk() const { return version == 0x4141; }
+            bool versionOk() const { return _version == CurrentVersion; }
             bool valid() const { return magic[0] == 'j' && txt2[1] == '\n'; }
         };
 

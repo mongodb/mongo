@@ -87,7 +87,7 @@ namespace mongo {
 
                 JHeader h;
                 _br.read(h); // read/skip file header
-                uassert(13536, str::stream() << "journal version number mismatch " << h.version, h.versionOk());
+                uassert(13536, str::stream() << "journal version number mismatch " << h._version, h.versionOk());
                 uassert(13537, "journal header invalid", h.valid());
             }
 
@@ -259,7 +259,9 @@ namespace mongo {
                         log() << ss.str() << endl;
                     } 
                     if( apply ) {
-                        void *p = ptr(fqe.dbName, fqe.e.fileNo, fqe.e.ofs);
+                        path filepath = dbpath;
+                        filepath /= fqe.dbName;
+                        void *p = ptr(filepath.string().c_str(), fqe.e.fileNo, fqe.e.ofs);
                         memcpy(p, fqe.srcData, fqe.e.len);
                     }
                 } else {

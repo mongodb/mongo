@@ -62,7 +62,7 @@ namespace mongo {
 
         JHeader::JHeader(string fname) { 
             magic[0] = 'j'; magic[1] = '\n';
-            version = 0x4141;
+            _version = CurrentVersion;
             memset(ts, 0, sizeof(ts));
             strncpy(ts, time_t_to_String_short(time(0)).c_str(), sizeof(ts)-1);
             memset(dbpath, 0, sizeof(dbpath));

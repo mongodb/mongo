@@ -70,5 +70,5 @@ var diff = run("diff", path1 + "/test.0", path2 + "/test.0");
 print(diff);
 assert(diff == "", "error test.0 files differ");
 
-print("SUCCESS quick.js");
+print("quick.js SUCCESS");
 

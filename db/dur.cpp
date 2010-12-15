@@ -231,10 +231,9 @@ namespace mongo {
                     if( !mmf->willNeedRemap() ) {
                         mmf->willNeedRemap() = true; // usually it will already be dirty so don't bother writing then
                     }
-                    //size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
                     i->w_ptr = ((char*)mmf->view_write()) + ofs;
-                    if( mmf->filePath() != lastFilePath ) { 
-                        lastFilePath = mmf->filePath();
+                    if( mmf->relativePath() != lastFilePath ) { 
+                        lastFilePath = mmf->relativePath();
                         JDbContext c;
                         bb.appendStruct(c);
                         bb.appendStr(lastFilePath);
@@ -523,7 +522,13 @@ namespace mongo {
                 return;
             if( testIntent )
                 return;
-            recover();
+            try {
+                recover();
+            }
+            catch(...) { 
+                log() << "exception during recovery" << endl;
+                throw;
+            }
             journalMakeDir();
             boost::thread t(durThread);
             boost::thread t2(unlinkThread);
