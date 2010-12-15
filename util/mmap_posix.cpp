@@ -130,6 +130,18 @@ namespace mongo {
         }
         return x;
     }
+
+    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+        assert( munmap(oldPrivateAddr,len) == 0 );
+        void * x = mmap( oldPrivateAddr, len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_FIXED , fd , 0 );        
+        if( x == MAP_FAILED ) {
+            int err = errno;
+            remove(views.begin(), views.end(), oldPrivateAddr);
+            massert(13601, str::stream() << "Couldn't remap private view: " << errnoWithDescription(err), false);
+        }
+        assert( x == oldPrivateAddr );
+        return x;
+    }
     
     void MemoryMappedFile::flush(bool sync) {
         if ( views.empty() || fd == 0 )
@@ -166,12 +178,6 @@ namespace mongo {
 
     void MemoryMappedFile::_unlock() {
         if (! views.empty() ) assert(mprotect(views[0], len, PROT_READ) == 0);
-    }
-
-    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        remove(views.begin(), views.end(), oldPrivateAddr);
-	assert( munmap(oldPrivateAddr,len) == 0 );
-        return createPrivateMap();
     }
 
 } // namespace mongo
