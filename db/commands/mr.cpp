@@ -54,7 +54,7 @@ namespace mongo {
 
         void JSMapper::init( State * state ){ 
             _func.init( state ); 
-            _params = state->config().mapparams; 
+            _params = state->config().mapParams; 
         }
 
         void JSMapper::map( const BSONObj& o ){
@@ -234,7 +234,7 @@ namespace mongo {
                     finalizer.reset( new JSFinalizer( cmdObj["finalize"] ) );
 
                 if ( cmdObj["mapparams"].type() == Array ){
-                    mapparams = cmdObj["mapparams"].embeddedObjectUserCheck();
+                    mapParams = cmdObj["mapparams"].embeddedObjectUserCheck();
                 }
                     
             }
@@ -360,7 +360,7 @@ namespace mongo {
             theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
         }
 
-        State::State( Config& c ) : _config( c ), _size(0), _numEmits(0){
+        State::State( const Config& c ) : _config( c ), _size(0), _numEmits(0){
             _temp.reset( new InMemory() );
         }
 
@@ -475,13 +475,12 @@ namespace mongo {
             
             pm.finished();
         }
-
+        
         void State::reduceInMemory(){
-            boost::shared_ptr<InMemory> old = _temp;
-            _temp.reset(new InMemory());
-            _size = 0;
+            InMemory * n = new InMemory(); // for new data
+            long nSize = 0;
             
-            for ( InMemory::iterator i=old->begin(); i!=old->end(); i++ ){
+            for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ){
                 BSONObj key = i->first;
                 BSONList& all = i->second;
                 
@@ -493,9 +492,12 @@ namespace mongo {
                 }
                 else if ( all.size() > 1 ){
                     BSONObj res = _config.reducer->reduce( all );
-                    _emit( res );
+                    _add( n , res , nSize );
                 }
             }
+            
+            _temp.reset( n );
+            _size = nSize;
         }
         
         void State::dumpToInc(){
@@ -517,13 +519,13 @@ namespace mongo {
             
         void State::emit( const BSONObj& a ){
             _numEmits++;
-            _emit( a );
+            _add( _temp.get() , a , _size );
         }
 
-        void State::_emit( const BSONObj& a ){
-            BSONList& all = (*_temp)[a];
+        void State::_add( InMemory* im, const BSONObj& a , long& size ){
+            BSONList& all = (*im)[a];
             all.push_back( a );
-            _size += a.objsize() + 16;
+            size += a.objsize() + 16;
         }
 
         void State::checkSize(){

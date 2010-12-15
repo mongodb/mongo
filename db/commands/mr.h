@@ -71,8 +71,8 @@ namespace mongo {
             
             virtual void init( State * state );
 
-            Scope * scope(){ return _scope; }
-            ScriptingFunction func(){ return _func; }
+            Scope * scope() const { return _scope; }
+            ScriptingFunction func() const { return _func; }
 
         private:
             string _type;
@@ -128,15 +128,15 @@ namespace mongo {
         // -----------------
         
 
-        class MyCmp {
+        class TupleKeyCmp {
         public:
-            MyCmp(){}
+            TupleKeyCmp(){}
             bool operator()( const BSONObj &l, const BSONObj &r ) const {
                 return l.firstElement().woCompare( r.firstElement() ) < 0;
             }
         };
         
-        typedef map< BSONObj,BSONList,MyCmp > InMemory;
+        typedef map< BSONObj,BSONList,TupleKeyCmp > InMemory; // from key to list of tuples
 
         /**
          * holds map/reduce config information
@@ -165,7 +165,7 @@ namespace mongo {
             scoped_ptr<Reducer> reducer;
             scoped_ptr<Finalizer> finalizer;
             
-            BSONObj mapparams;
+            BSONObj mapParams;
             BSONObj scopeSetup;
             
             // output tables
@@ -191,7 +191,7 @@ namespace mongo {
          */
         class State {
         public:
-            State( Config& c );
+            State( const Config& c );
             void init();
             
             // ---- prep  -----
@@ -242,6 +242,9 @@ namespace mongo {
             
             // -------- util ------------
             
+            /**
+             * inserts with correct replication semantics
+             */
             void insert( const string& ns , BSONObj& o );
             
             // ------ simple accessors -----
@@ -249,21 +252,21 @@ namespace mongo {
             /** State maintains ownership, do no use past State lifetime */
             Scope* scope() { return _scope.get(); }
             
-            Config& config() { return _config; }
+            const Config& config() { return _config; }
 
             long long numEmits() const { return _numEmits; }
 
-        private:
+        protected:
 
             void _insertToInc( BSONObj& o );
-            void _emit( const BSONObj& a );
+            static void _add( InMemory* im , const BSONObj& a , long& size );
 
             scoped_ptr<Scope> _scope;
-            Config& _config;
+            const Config& _config;
 
             DBDirectClient _db;
 
-            shared_ptr<InMemory> _temp;
+            scoped_ptr<InMemory> _temp;
             long _size;
             
             long long _numEmits;
