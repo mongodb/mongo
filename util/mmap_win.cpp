@@ -113,7 +113,8 @@ namespace mongo {
                      createOptions , // flags
                      NULL); // hTempl
             if ( fd == INVALID_HANDLE_VALUE ) {
-                log() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
+                DWORD e = GetLastError();
+                log() << "Create/OpenFile failed " << filename << " errno:" << e << endl;
                 return 0;
             }
         }
