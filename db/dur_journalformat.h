@@ -99,21 +99,12 @@ namespace mongo {
             char magic[4]; // "\n\n\n\n"
 
             bool checkHash(const void* begin, int len) const {
-                if (*(int*)hash == 0) return true; // TODO(mathias): remove this
                 // skip section header since size modified after hashing
                 (const char*&)begin += sizeof(JSectHeader);
                 len                 -= sizeof(JSectHeader);
                 md5digest current;
                 md5(begin, len, current);
                 return (memcmp(hash, current, sizeof(hash)) == 0);
-            }
-
-            // TODO(mathias): remove this
-            int size() const {
-                if (*(int*)hash == 0)
-                    return (sizeof(*this) - sizeof(md5digest) + sizeof(unsigned));
-                else
-                    return sizeof(*this);
             }
         };
 

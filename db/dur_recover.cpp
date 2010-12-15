@@ -119,8 +119,7 @@ namespace mongo {
                                     , false);
                         }
 
-                        //_br.skip(sizeof(JSectFooter) - 4); //TODO(mathias): go back to this
-                        _br.skip(footer.size() - 4);
+                        _br.skip(sizeof(JSectFooter) - 4);
                         _br.align(Alignment);
 
                         _sectHead = NULL;
