@@ -172,11 +172,13 @@ namespace mongo {
     ChunkPtr Chunk::singleSplit( bool force ){
         vector<BSONObj> splitPoint;
 
-        // If splitting is not obligatory, we may return early if there are not enough data. 
+        // if splitting is not obligatory we may return early if there are not enough data
+        // we cap the number of objects that would fall in the first half (before the split point)
+        // the rationale is we'll find a split point without traversing all the data
         if ( ! force ) {
             vector<BSONObj> candidates;
             const int maxPoints = 2;
-            const int maxObjs = 100000;
+            const int maxObjs = 250000; 
             pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
             if ( candidates.size() <= 1 ) {
                 // no split points means there isn't enough data to split on
