@@ -515,9 +515,18 @@ namespace mongo {
         void unlinkThread();
         void recover();
         void releasingWriteLock() {
+            try {
 #if defined(_DEBUG)
-            getDur().debugCheckLastDeclaredWrite(); 
+                getDur().debugCheckLastDeclaredWrite(); 
 #endif
+
+                if (commitJob.bytes() > 100*1024*1024)
+                    groupCommit();
+            }
+            catch(std::exception& e) {
+                log() << "exception in dur::releasingWriteLock causing immediate shutdown: " << e.what() << endl;
+                abort(); // based on myTerminate()
+            }
         }
 
         /** at startup, recover, and then start the journal threads */

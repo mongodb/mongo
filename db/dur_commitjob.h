@@ -89,7 +89,7 @@ namespace mongo {
         public:
             AlignedBuilder _ab; // for direct i/o writes to journal
 
-            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false) { }
+            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytes(0) { }
 
             /** record/note an intent to write */
             void note(WriteIntent& w);
@@ -117,10 +117,13 @@ namespace mongo {
                     _notify.wait(); 
             }
 
+            size_t bytes() const { return _bytes; }
+
         private:
             bool _hasWritten;
             Writes _wi;
             NotifyAll _notify;
+            size_t _bytes;
         };
         extern CommitJob commitJob;
 
@@ -170,8 +173,9 @@ namespace mongo {
 
                 // remember intent. we will journal it in a bit
                 _wi._writes.push_back(w);
+                _bytes += w.len;
                 wassert( _wi._writes.size() <  2000000 );
-                assert(  _wi._writes.size() < 20000000 );
+                //assert(  _wi._writes.size() < 20000000 );
             }
         }
     }
