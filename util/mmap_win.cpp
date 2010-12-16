@@ -47,10 +47,16 @@ namespace mongo {
     unsigned long long mapped = 0;
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        remove(views.begin(), views.end(), oldPrivateAddr);
         bool ok = UnmapViewOfFile(oldPrivateAddr);
-        dassert(ok);
-        return createPrivateMap();
+        assert(ok);
+
+        // we want the new address to be the same as the old address in case things keep pointers around (as namespaceindex does).
+        void *p = MapViewOfFileEx(maphandle, FILE_MAP_COPY, 0, 0, 
+                                  /*dwNumberOfBytesToMap 0 means to eof*/0 /*len*/,
+                                  oldPrivateAddr);
+        assert(p);
+        assert(p == oldPrivateAddr);
+        return p;
     }
 
     void* MemoryMappedFile::createPrivateMap() { 
