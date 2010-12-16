@@ -468,8 +468,7 @@ namespace mongo {
         long ofs = e->ofsFrom(this);
         if( i == 0 ) {
             assert( extraOffset == 0 );
-            getDur().writing(&extraOffset);
-            extraOffset = ofs;
+            *getDur().writing(&extraOffset) = ofs;
             assert( extra() == e );
         }
         else { 
