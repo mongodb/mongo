@@ -313,7 +313,7 @@ namespace mongo {
                     const char *p = (const char *) mmf->getView();
                     const char *w = (const char *) mmf->view_write();
 
-                    if (!p && !w) return;
+                    if (!p && !w) continue;
 
                     assert(p);
                     assert(w);
