@@ -1008,13 +1008,14 @@ namespace mongo {
         virtual bool isMember( const DBConnector * conn ) const;
 
         virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
+        
+        virtual bool isFailed() const {
+            return _currentMaster == 0 || _currentMaster->isFailed();
+        }
 
     protected:                
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
         
-        bool isFailed() const {
-            return _currentMaster == 0 || _currentMaster->isFailed();
-        }
     };
     
     /** pings server to check if it's up
