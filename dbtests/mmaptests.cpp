@@ -17,10 +17,63 @@
  */
 
 #include "pch.h"
-#include "../util/mmap.h"
+#include "../db/mongommf.h"
 #include "dbtests.h"
 
 namespace MMapTests {
+
+    string fn = "/tmp/testfile.map";
+    
+    class LeakTest  {
+    public:
+        ~LeakTest() { 
+            try { boost::filesystem::remove(fn); } catch(...) { }
+        }
+        void run() {
+
+            try { boost::filesystem::remove(fn); } catch(...) { }
+
+            writelock lk;
+
+            {
+                MongoMMF f;
+                unsigned long long len = 256 * 1024 * 1024;
+                assert( f.create(fn, len, /*sequential*/false) );
+                char *p = (char *) f.getView();
+                assert(p);
+                strcpy(p, "hello");
+                if( cmdLine.dur ) { 
+                    char *w = (char *) f.view_write();
+                    strcpy(w + 6, "world");
+                }
+            }
+
+            // we make a lot here -- if we were leaking, presumably it would fail doing this many.
+            for( int i = 0; i < 10000; i++ ) {
+                MongoMMF f;
+                assert( f.open(fn, i%4==1) );
+                char *p = (char *) f.getView();
+                assert(p);
+                strcpy(p, "zzz");
+                if( cmdLine.dur ) { 
+                    char *w = (char *) f.view_write();
+                    if( i % 2 == 0 )
+                        ++(*w);
+                    assert( w[6] == 'w' );
+                    assert( p[6] == 'w' );
+                }
+            }
+
+        }
+    };
+    
+    class All : public Suite {
+    public:
+        All() : Suite( "mmap" ){}
+        void setupTests(){
+            add< LeakTest >();
+        }
+    } myall;
 
 #if 0
 

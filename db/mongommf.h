@@ -31,8 +31,13 @@ namespace mongo {
         MongoMMF();
         virtual ~MongoMMF();
         virtual void close();
+
+        /** @return true if opened ok. */
         bool open(string fname, bool sequentialHint);
+
+        /** @return file length */
         unsigned long long length() const { return MemoryMappedFile::length(); }
+
         string filename() const { return MemoryMappedFile::filename(); }
         void flush(bool sync)   { MemoryMappedFile::flush(sync); }
 
