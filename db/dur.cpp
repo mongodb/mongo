@@ -297,6 +297,11 @@ namespace mongo {
                     const char *p = (const char *) mmf->getView();
                     const char *w = (const char *) mmf->view_write();
 
+                    if (!p && !w) return;
+
+                    assert(p);
+                    assert(w);
+
                     data += mmf->length();
 
                     assert( mmf->length() == (unsigned) mmf->length() );
