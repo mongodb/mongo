@@ -185,7 +185,7 @@ namespace mongo {
                 if( _next == 0 ) return 0;
                 return (Extra*) (((char *) d) + _next);
             }
-            void setNext(long ofs) { _next = ofs;  }
+            void setNext(long ofs) { getDur().writing(this); _next = ofs;  }
             void copy(NamespaceDetails *d, const Extra& e) { 
                 memcpy(this, &e, sizeof(Extra));
                 _next = 0;
