@@ -178,7 +178,7 @@ namespace mongo {
         if ( ! force ) {
             vector<BSONObj> candidates;
             const int maxPoints = 2;
-            const int maxObjs = 2500000; 
+            const int maxObjs = 250000; 
             pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
             if ( candidates.size() <= 1 ) {
                 // no split points means there isn't enough data to split on
