@@ -514,7 +514,7 @@ namespace mongo {
 
         void unlinkThread();
         void recover();
-        void _debugCheckLastDeclaredWrite() { 
+        void releasingWriteLock() {
 #if defined(_DEBUG)
             getDur().debugCheckLastDeclaredWrite(); 
 #endif

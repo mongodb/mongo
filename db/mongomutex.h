@@ -88,6 +88,7 @@ namespace mongo {
 
         // un write lock 
         void unlock() { 
+            _releasingWriteLock();
             int s = _state.get();
             if( s > 1 ) { 
                 _state.set(s-1); // recursive lock case
@@ -103,7 +104,6 @@ namespace mongo {
             MongoFile::unmarkAllWritable(); // _DEBUG validation
             _state.set(0);
             _minfo.leaving();
-            _releasedWriteLock();
             _m.unlock(); 
         }
 
@@ -177,7 +177,7 @@ namespace mongo {
 
     private:
         void _acquiredWriteLock();
-        void _releasedWriteLock();
+        void _releasingWriteLock();
 
         /* @return true if was already write locked.  increments recursive lock count. */
         bool _writeLockedAlready();
@@ -211,14 +211,12 @@ namespace mongo {
 
     namespace dur {
         void REMAPPRIVATEVIEW();
-        void _debugCheckLastDeclaredWrite(); // because it's hard to include dur.h here
+        void releasingWriteLock(); // because it's hard to include dur.h here
     }
 
-    inline void MongoMutex::_releasedWriteLock() { 
-#if defined(_DEBUG)
+    inline void MongoMutex::_releasingWriteLock() { 
         if (this == &dbMutex)
-            dur::_debugCheckLastDeclaredWrite();
-#endif
+            dur::releasingWriteLock();
     }
 
     inline void MongoMutex::_acquiredWriteLock() { 
