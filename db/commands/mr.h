@@ -42,7 +42,10 @@ namespace mongo {
             virtual ~Finalizer(){}
             virtual void init( State * state ) = 0;
             
-            virtual BSONObj finalize( const BSONObj& o ) = 0;
+            /**
+             * this takes a tuple and returns a tuple
+             */
+            virtual BSONObj finalize( const BSONObj& tuple ) = 0;
         };
         
         class Reducer : boost::noncopyable {
@@ -150,8 +153,6 @@ namespace mongo {
             
             // options
             bool verbose;            
-            bool keeptemp;
-            bool replicate;
 
             // query options
             
@@ -179,7 +180,8 @@ namespace mongo {
 
             enum { REPLACE , // atomically replace the collection
                    MERGE ,  // merge keys, override dups
-                   REDUCE // merge keys, reduce dups
+                   REDUCE , // merge keys, reduce dups
+                   INMEMORY // only store in memory, limited in size
             } outType;
             
             static AtomicUInt JOB_NUMBER;
@@ -192,6 +194,8 @@ namespace mongo {
         class State {
         public:
             State( const Config& c );
+            ~State();
+
             void init();
             
             // ---- prep  -----
@@ -231,15 +235,18 @@ namespace mongo {
             void finalReduce( CurOp * op , ProgressMeterHolder& pm );
             
             // ------- cleanup/data positioning ----------
-
+            
             /**
                @return number objects in collection
              */
             long long renameIfNeeded();
             
-            /** removes temp collections */
-            void cleanup();
-            
+            /**
+             * if INMEMORY will append
+             * may also append stats or anything else it likes
+             */
+            void appendResults( BSONObjBuilder& b );
+
             // -------- util ------------
             
             /**
@@ -263,31 +270,14 @@ namespace mongo {
 
             scoped_ptr<Scope> _scope;
             const Config& _config;
+            bool _onDisk; // if the end result of this map reduce is disk or not
 
             DBDirectClient _db;
 
             scoped_ptr<InMemory> _temp;
-            long _size;
+            long _size; // bytes in _temp
             
             long long _numEmits;
-        };
-
-        /**
-         * keeps all temporary state in memory
-         * if data is larger than can fit in a BSONObj to return
-         * will throw an exception
-         */
-        class StateInMemory : public State {
-
-        };
-        
-        /**
-         * keeps some things in memory and pushes
-         * to disk when gets too big for ram
-         * intended for when output will end up on disk
-         */
-        class StateOnDisk : public State {
-            
         };
 
         BSONObj fast_emit( const BSONObj& args );

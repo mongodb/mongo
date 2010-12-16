@@ -25,7 +25,7 @@ r = function( k , v ){
     return { stats : stats , total : total }
 }
 
-res = t.mapReduce( m , r , { scope : { xx : 1 } } );
+res = t.mapReduce( m , r , { out : "mr5_out" , scope : { xx : 1 } } );
 //res.find().forEach( printjson )
 
 z = res.convertToSingleObject()
@@ -44,7 +44,7 @@ m = function(){
 
 
 
-res = t.mapReduce( m , r , { scope : { xx : 1 } } );
+res = t.mapReduce( m , r , { out : "mr5_out" , scope : { xx : 1 } } );
 //res.find().forEach( printjson )
 
 z = res.convertToSingleObject()

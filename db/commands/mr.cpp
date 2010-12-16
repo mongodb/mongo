@@ -75,7 +75,7 @@ namespace mongo {
             // since there are many cases where the point of finalize
             // is converting many fields to 1
             BSONObjBuilder b; 
-            b.append( o["_id"] );
+            b.append( o.firstElement() );
             s->append( b , "value" , "return" );
             return b.obj();
         }
@@ -180,47 +180,53 @@ namespace mongo {
             ns = dbname + "." + cmdObj.firstElement().valuestr();
             
             verbose = cmdObj["verbose"].trueValue();
-            keeptemp = cmdObj["keeptemp"].trueValue();
-            
-            { // setup names
-                stringstream ss;
-                if ( ! keeptemp )
-                    ss << "tmp.";
-                ss << "mr." << cmdObj.firstElement().String() << "_" << time(0) << "_" << JOB_NUMBER++;    
-                tempShort = ss.str();
-                tempLong = dbname + "." + tempShort;
-                incLong = tempLong + "_inc";
-                
-                if ( ! keeptemp && markAsTemp )
-                    cc().addTempCollection( tempLong );
 
-                replicate = keeptemp;
+            uassert( 13602 , "outType is no longer a valid option" , cmdObj["outType"].eoo() );
 
-                if ( cmdObj["out"].type() == String ){
-                    finalShort = cmdObj["out"].valuestr();
-                    replicate = true;
-                }
-                else
-                    finalShort = tempShort;
-                    
-                finalLong = dbname + "." + finalShort;
-                    
+            if ( cmdObj["out"].type() == String ){
+                finalShort = cmdObj["out"].String();
+                outType = REPLACE;
             }
+            else if ( cmdObj["out"].type() == Object ){
+                BSONObj o = cmdObj["out"].embeddedObject();
+                uassert( 13607 , "'out' has to have a single field" , o.nFields() == 1 );
+
+                BSONElement e = o.firstElement();
+                string t = e.fieldName();
                 
-            if ( cmdObj["outType"].type() == String ){
-                uassert( 13521 , "need 'out' if using 'outType'" , cmdObj["out"].type() == String );
-                string t = cmdObj["outType"].String();
-                if ( t == "normal" || t == "replace" )
+                if ( t == "normal" || t == "replace" ){
                     outType = REPLACE;
-                else if ( t == "merge" )
+                    finalShort = e.String();
+                }
+                else if ( t == "merge" ){
                     outType = MERGE;
-                else if ( t == "reduce" )
+                    finalShort = e.String();
+                }
+                else if ( t == "reduce" ){
                     outType = REDUCE;
-                else 
-                    uasserted( 13522 , str::stream() << "unknown outType [" << t << "]" );
+                    finalShort = e.String();
+                }
+                else if ( t == "inline" ){
+                    outType = INMEMORY;
+                }
+                else{
+                    uasserted( 13522 , str::stream() << "unknown out specifier [" << t << "]" );
+                }   
             }
             else {
-                outType = REPLACE;
+                uasserted( 13606 , "'out' has to be a string or an object" );
+            }
+                
+            if ( outType != INMEMORY ){ // setup names
+                tempShort = str::stream() << "tmp.mr." << cmdObj.firstElement().String() << "_" << finalShort << "_" << JOB_NUMBER++;
+                tempLong = dbname + "." + tempShort;
+                
+                incLong = tempLong + "_inc";
+                
+                //if ( markAsTemp )
+                    cc().addTempCollection( tempLong );
+                
+                finalLong = dbname + "." + finalShort;
             }
 
             { // scope and code
@@ -256,13 +262,16 @@ namespace mongo {
         }
 
         void State::prepTempCollection(){
+            if ( ! _onDisk )
+                return;
+
             _db.dropCollection( _config.tempLong );
 
             { // create
                 writelock lock( _config.tempLong.c_str() );
                 Client::Context ctx( _config.tempLong.c_str() );
                 string errmsg;
-                assert( userCreateNS( _config.tempLong.c_str() , BSONObj() , errmsg , _config.replicate ) );
+                assert( userCreateNS( _config.tempLong.c_str() , BSONObj() , errmsg , true ) );
             }
             
             
@@ -291,8 +300,41 @@ namespace mongo {
 
         }
 
+        void State::appendResults( BSONObjBuilder& final ){
+            if ( _onDisk )
+                return;
+            
+            uassert( 13604 , "too much data for in memory map/reduce" , _size < ( BSONObjMaxUserSize / 2 ) );
+
+            BSONArrayBuilder b( (int)(_size * 1.2) ); // _size is data size, doesn't count overhead and keys
+
+            for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ){
+                BSONObj key = i->first;
+                BSONList& all = i->second;
+                
+                assert( all.size() == 1 );
+
+                BSONObjIterator vi( all[0] );
+                vi.next();
+
+                BSONObjBuilder temp( b.subobjStart() );
+                temp.appendAs( key.firstElement() , "_id" );
+                temp.appendAs( vi.next() , "value" );
+                temp.done();
+            }
+            
+            BSONArray res = b.arr();
+            uassert( 13605 , "too much data for in memory map/reduce" , res.objsize() < ( BSONObjMaxUserSize * 2 / 3 ) );                
+
+            final.append( "results" , res );
+        }
+
         long long State::renameIfNeeded(){
-            assertInWriteLock();
+            if ( ! _onDisk )
+                return _temp->size();
+            
+            dblock lock;
+
             if ( _config.finalLong == _config.tempLong )
                 return _db.count( _config.finalLong );
             
@@ -342,26 +384,31 @@ namespace mongo {
                 _db.dropCollection( _config.tempLong );
                 break;
             }
+            case Config::INMEMORY: {
+                return _temp->size();
             }
+            }
+            
             return _db.count( _config.finalLong );
         }
         
         void State::insert( const string& ns , BSONObj& o ){
+            assert( _onDisk );
+
             writelock l( ns );
             Client::Context ctx( ns );
                 
-            if ( _config.replicate )
-                theDataFileMgr.insertAndLog( ns.c_str() , o , false );
-            else
-                theDataFileMgr.insertWithObjMod( ns.c_str() , o , false );
+            theDataFileMgr.insertAndLog( ns.c_str() , o , false );
         }
 
         void State::_insertToInc( BSONObj& o ){
+            assert( _onDisk );
             theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
         }
 
         State::State( const Config& c ) : _config( c ), _size(0), _numEmits(0){
             _temp.reset( new InMemory() );
+            _onDisk = _config.outType != Config::INMEMORY;
         }
 
         bool State::sourceExists(){
@@ -372,9 +419,16 @@ namespace mongo {
             return _db.count( _config.ns , _config.filter , 0 , (unsigned) _config.limit );
         }
 
-        void State::cleanup(){
-            _db.dropCollection( _config.tempLong );
-            _db.dropCollection( _config.incLong );
+        State::~State(){
+            if ( _onDisk ){
+                try {
+                    _db.dropCollection( _config.tempLong );
+                    _db.dropCollection( _config.incLong );
+                }
+                catch ( std::exception& e ){
+                    error() << "couldn't cleanup after map reduce: " << e.what() << endl;
+                }
+            }
         }
 
         void State::init(){
@@ -391,16 +445,17 @@ namespace mongo {
                 _config.finalizer->init( this );
 
             _scope->injectNative( "emit" , fast_emit );
-
             
-            // clear temp collections
-            _db.dropCollection( _config.tempLong );
-            _db.dropCollection( _config.incLong );
-            
-            writelock l( _config.incLong );
-            Client::Context ctx( _config.incLong );
-            string err;
-            assert( userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+            if ( _onDisk ){
+                // clear temp collections
+                _db.dropCollection( _config.tempLong );
+                _db.dropCollection( _config.incLong );
+                
+                writelock l( _config.incLong );
+                Client::Context ctx( _config.incLong );
+                string err;
+                assert( userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+            }
             
         }
         
@@ -415,6 +470,26 @@ namespace mongo {
         }
 
         void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ){
+            if ( ! _onDisk ){
+                if ( _config.finalizer ){
+                    long size = 0;
+                    for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ){
+                        BSONObj key = i->first;
+                        BSONList& all = i->second;
+                        
+                        assert( all.size() == 1 );
+                        
+                        BSONObj res = _config.finalizer->finalize( all[0] );
+
+                        all.clear();
+                        all.push_back( res );
+                        size += res.objsize();
+                    }
+                    _size = size;
+                }
+                return;
+            }
+
             assert( _temp->size() == 0 );
 
             // TODO: this is a bit sketchy
@@ -477,6 +552,7 @@ namespace mongo {
         }
         
         void State::reduceInMemory(){
+
             InMemory * n = new InMemory(); // for new data
             long nSize = 0;
             
@@ -485,10 +561,15 @@ namespace mongo {
                 BSONList& all = i->second;
                 
                 if ( all.size() == 1 ){
-                    // this key has low cardinality, so just write to db
-                    writelock l(_config.incLong);
-                    Client::Context ctx(_config.incLong.c_str());
-                    _insertToInc( *(all.begin()) );
+                    if ( _onDisk ){
+                        // this key has low cardinality, so just write to db
+                        writelock l(_config.incLong);
+                        Client::Context ctx(_config.incLong.c_str());
+                        _insertToInc( *(all.begin()) );
+                    }
+                    else {
+                        _add( n , all[0] , nSize );
+                    }
                 }
                 else if ( all.size() > 1 ){
                     BSONObj res = _config.reducer->reduce( all );
@@ -501,6 +582,9 @@ namespace mongo {
         }
         
         void State::dumpToInc(){
+            if ( ! _onDisk )
+                return;
+
             writelock l(_config.incLong);
             Client::Context ctx(_config.incLong);
                     
@@ -529,6 +613,9 @@ namespace mongo {
         }
 
         void State::checkSize(){
+            if ( ! _onDisk )
+                return;
+
             if ( _size < 1024 * 5 )
                 return;
 
@@ -670,16 +757,12 @@ namespace mongo {
                 }
                 catch ( ... ){
                     log() << "mr failed, removing collection" << endl;
-                    state.cleanup();
                     throw;
                 }
                 
-                long long finalCount = 0;
-                {
-                    dblock lock;
-                    finalCount = state.renameIfNeeded();
-                }
-
+                long long finalCount = state.renameIfNeeded();
+                state.appendResults( result );
+                
                 timingBuilder.append( "total" , t.millis() );
                 
                 result.append( "result" , config.finalShort );
@@ -783,13 +866,9 @@ namespace mongo {
                 
                 state.dumpToInc();
                 
-                long long finalCount;
-                {
-                    dblock lk;
-                    finalCount = state.renameIfNeeded();
-                }
-                log(0) << " mapreducefinishcommand " << config.finalLong << " " << finalCount << endl;
-
+                state.renameIfNeeded();
+                state.appendResults( result );
+                
                 for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ){
                     ScopedDbConnection conn( i->_server );
                     conn->dropCollection( dbname + "." + shardedOutputCollection );

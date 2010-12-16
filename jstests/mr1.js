@@ -49,7 +49,7 @@ r2 = function( key , values ){
     return total;
 };
 
-res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , out : "mr1_out" } );
 d( res );
 if ( ks == "_id" ) assert( res.ok , "not ok" );
 assert.eq( 4 , res.counts.input , "A" );
@@ -66,7 +66,7 @@ assert.eq( 3 , z.b , "E" );
 assert.eq( 3 , z.c , "F" );
 x.drop();
 
-res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
+res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , query : { x : { "$gt" : 2 } } , out : "mr1_out" } );
 d( res );
 assert.eq( 2 , res.counts.input , "B" );
 x = db[res.result];
@@ -77,7 +77,7 @@ assert.eq( 1 , z.b , "C2" );
 assert.eq( 2 , z.c , "C3" );
 x.drop();
 
-res = db.runCommand( { mapreduce : "mr1" , map : m2 , reduce : r2 , query : { x : { "$gt" : 2 } } } );
+res = db.runCommand( { mapreduce : "mr1" , map : m2 , reduce : r2 , query : { x : { "$gt" : 2 } } , out : "mr1_out" } );
 d( res );
 assert.eq( 2 , res.counts.input , "B" );
 x = db[res.result];
@@ -104,7 +104,7 @@ for ( i=5; i<1000; i++ ){
     t.save( { x : i , tags : [ "b" , "d" ] } );
 }
 
-res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , out : "mr1_out" } );
 d( res );
 assert.eq( 999 , res.counts.input , "Z1" );
 x = db[res.result];
@@ -125,12 +125,12 @@ assert.eq( 995 , getk( "d" ).value.count , "ZD" );
 x.drop();
 
 if ( true ){
-    printjson( db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , verbose : true } ) );
+    printjson( db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , verbose : true , out : "mr1_out" } ) );
 }
 
 print( "t1: " + Date.timeFunc( 
     function(){
-        var out = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+        var out = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , out : "mr1_out" } );
         if ( ks == "_id" ) assert( out.ok , "XXX : " + tojson( out ) );
         db[out.result].drop();
     } , 10 ) + " (~500 on 2.8ghz) - itcount: " + Date.timeFunc( function(){ db.mr1.find().itcount(); } , 10 ) );    
@@ -138,7 +138,7 @@ print( "t1: " + Date.timeFunc(
 
 
 // test doesn't exist
-res = db.runCommand( { mapreduce : "lasjdlasjdlasjdjasldjalsdj12e" , map : m , reduce : r } );
+res = db.runCommand( { mapreduce : "lasjdlasjdlasjdjasldjalsdj12e" , map : m , reduce : r , out : "mr1_out" } );
 assert( ! res.ok , "should be not ok" );
 
 if ( true ){
@@ -166,11 +166,15 @@ if ( true ){
     }
     x.drop();
     
-    res = db.runCommand( { mapreduce : "mr1" , out : "mr1_foo" , map : m2 , reduce : r2 } );
+    res = db.runCommand( { mapreduce : "mr1" , out : "mr1_foo" , map : m2 , reduce : r2 , out : "mr1_out" } );
     d(res);
     print( "t3: " + res.timeMillis + " (~3500 on 2.8ghz)" );
+
+    res = db.runCommand( { mapreduce : "mr1" , map : m2 , reduce : r2 , out : { inline : true } } );
+    print( "t4: " + res.timeMillis  );
+
 }
 
 
-res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , out : "mr1_out" } );
 assert( res.ok , "should be ok" );
