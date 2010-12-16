@@ -32,7 +32,7 @@ def unpack(fmt, s):
     result = ()
     pfmt = tfmt
     sizebytes = 0
-    for f in fmt:
+    for offset, f in enumerate(fmt):
         if f.isdigit():
             sizebytes += 1
         # With a fixed size, everything is encoded as a string
@@ -54,10 +54,13 @@ def unpack(fmt, s):
             result += (s[:l],)
             s = s[l+1:]
         if f == 'u':
-            l = struct.unpack_from(tfmt + 'l', s)[0]
-            s = s[struct.calcsize(tfmt + 'l'):]
-            result += (s[:l],)
-            s = s[l:]
+            if offset == len(fmt) - 1:
+                result += (s,)
+            else:
+                l = struct.unpack_from(tfmt + 'l', s)[0]
+                s = s[struct.calcsize(tfmt + 'l'):]
+                result += (s[:l],)
+                s = s[l:]
         pfmt = tfmt
         sizebytes = 0
 
@@ -70,7 +73,7 @@ def pack(fmt, *values):
     if not fmt:
         return ''
     i = sizebytes = 0
-    for f in fmt:
+    for offset, f in enumerate(fmt):
         if f == 'S':
             # Note: this code is being careful about embedded NUL characters
             if sizebytes == 0:
@@ -81,7 +84,7 @@ def pack(fmt, *values):
                 sizebytes = len(str(l))
             f = 's'
         elif f == 'u':
-            if sizebytes == 0:
+            if sizebytes == 0 and offset != len(fmt) - 1:
                 l = len(values[i])
                 pfmt += 'l' + str(l)
                 values = values[:i] + (l,) + values[i:]

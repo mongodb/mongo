@@ -4,6 +4,8 @@
 
 \section schema_intro Tables, Rows and Columns
 
+XXX rewrite from scratch, fill out with more details about how to use WT_SCHEMA for various things: native C structs, portability between programming languages, non-relational data such as multiple index keys per row, etc.
+
 Lifted from http://en.wikipedia.org/wiki/Column-oriented_DBMS.
 
 A database program must show its data as two-dimensional tables, of columns and rows, but store it as one-dimensional strings. For example, a database might have this table.
@@ -19,7 +21,7 @@ This simple table includes an employee identifier (EmpId), name fields (Lastname
 
 A row-oriented database serializes all of the values in a row together, then the values in the next row, and so on:
 
-<pre>
+<pre>k
       1,Smith,Joe,40000;
       2,Jones,Mary,50000;
       3,Johnson,Cathy,44000;

@@ -15,6 +15,7 @@ struct WT_CONNECTION;	  typedef struct WT_CONNECTION WT_CONNECTION;
 struct WT_COLUMN_INFO;	  typedef struct WT_COLUMN_INFO WT_COLUMN_INFO;
 struct WT_CURSOR;	  typedef struct WT_CURSOR WT_CURSOR;
 struct WT_CURSOR_FACTORY; typedef struct WT_CURSOR_FACTORY WT_CURSOR_FACTORY;
+struct WT_ERROR_HANDLER;  typedef struct WT_ERROR_HANDLER WT_ERROR_HANDLER;
 struct WT_INDEX_INFO;	  typedef struct WT_INDEX_INFO WT_INDEX_INFO;
 struct WT_ITEM;		  typedef struct WT_ITEM WT_ITEM;
 struct WT_SCHEMA;	  typedef struct WT_SCHEMA WT_SCHEMA;
@@ -36,19 +37,18 @@ typedef uint64_t wiredtiger_recno_t;
  */
 struct WT_ITEM {
 	/*!
-	 * A pointer to the location in memory of the data item.
+	 * The memory reference of the data item.
 	 *
 	 * For items returned by a WT_CURSOR, the pointer is only valid until
 	 * the next operation on that cursor.  Applications that need to keep
 	 * an item across multiple cursor operations must make a copy.
-	 * WiredTiger never copies data into the application's buffer.
 	 */
 	const void *data;
 
 	/*!
 	 * The number of bytes in the data item.
 	 */
-	size_t size;
+	uint32_t size;
 };
 
 /*!
@@ -198,6 +198,20 @@ struct WT_CURSOR {
 };
 
 /*!
+ * The interface implemented by applications in order to handle errors.
+ */
+struct WT_ERROR_HANDLER {
+	/*! Callback to handle errors within the session. */
+	int (*handle_error)(WT_ERROR_HANDLER *handler, int err, const char *errmsg);
+
+	/*! Optional callback to retrieve buffered messages. */
+	int (*get_messages)(WT_ERROR_HANDLER *handler, const char **errmsgp);
+
+	/*! Optional callback to clear buffered messages. */
+	int (*clear_messages)(WT_ERROR_HANDLER *handler);
+};
+
+/*!
  * All data operations are performed in the context of a WT_SESSION.  This
  * encapsulates the thread and transactional context of the operation.
  *
@@ -208,9 +222,6 @@ struct WT_CURSOR {
 struct WT_SESSION {
 	/*! The connection for this session. */
 	WT_CONNECTION *connection;
-
-	/*! Callback to handle errors within the session. */
-	int (*handle_error)(WT_SESSION *session, const char *err);
 
 	/*! Close the session.
 	 *
@@ -407,31 +418,6 @@ struct WT_SESSION {
  * their operations.
  */
 struct WT_CONNECTION {
-	/*! The home directory of the connection. */
-	const char *home;
-
-	/*! Did opening this handle create the database? */
-	int is_new;
-
-	/*! Close a connection.
-	 *
-	 * Any open sessions will be closed.
-	 *
-	 * \param connection the connection handle
-	 * \configempty
-	 * \errors
-	 */
-	int __F(close)(WT_CONNECTION *connection, const char *config);
-
-	/*! Open a session.
-	 *
-	 * \param connection the connection handle
-	 * \configempty
-	 * \param sessionp the new session handle
-	 * \errors
-	 */
-	int __F(open_session)(WT_CONNECTION *connection, const char *config, WT_SESSION **sessionp);
-
 	/*! Register a new type of cursor.
 	 *
 	 * \param connection the connection handle
@@ -462,6 +448,32 @@ struct WT_CONNECTION {
 	 * \errors
 	 */
 	int __F(add_schema)(WT_CONNECTION *connection, const char *name, WT_SCHEMA *schema, const char *config);
+
+	/*! Close a connection.
+	 *
+	 * Any open sessions will be closed.
+	 *
+	 * \param connection the connection handle
+	 * \configempty
+	 * \errors
+	 */
+	int __F(close)(WT_CONNECTION *connection, const char *config);
+
+	/*! The home directory of the connection. */
+	const char *__F(get_home)(WT_CONNECTION *connection);
+
+	/*! Did opening this handle create the database? */
+	int __F(is_new)(WT_CONNECTION *connection);
+
+	/*! Open a session.
+	 *
+	 * \param connection the connection handle
+	 * \param errhandler An error handler.  If <code>NULL</code>, the connection's error handler is used
+	 * \configempty
+	 * \param sessionp the new session handle
+	 * \errors
+	 */
+	int __F(open_session)(WT_CONNECTION *connection, WT_ERROR_HANDLER *errhandler, const char *config, WT_SESSION **sessionp);
 };
 
 /*!
@@ -564,14 +576,12 @@ struct WT_SCHEMA {
 
 	/*! The number of indices for a table (zero for unindexed tables). */
 	int num_indices;
-
-	/*! Space to allocate for this schema in every WT_SESSION handle */
-	size_t cookie_size;
 };
 
 /*! Open a connection to a database.
  *
  * \param home The path to the database home directory
+ * \param errhandler An error handler.  If <code>NULL</code>, a builtin error handler is installed that writes error messages to stderr
  * \configstart
  * \config{create,["0"] or "1",create the database if it does not exist}
  * \config{exclusive,["0"] or "1",fail if the database already exists}
@@ -582,7 +592,7 @@ struct WT_SCHEMA {
  * \param connectionp A pointer to the newly opened connection handle
  * \errors
  */
-int wiredtiger_open(const char *home, const char *config, WT_CONNECTION **connectionp);
+int wiredtiger_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *config, WT_CONNECTION **connectionp);
 
 /*! Get information about an error as a string.
  *
@@ -655,6 +665,14 @@ int wiredtiger_struct_size(const char *fmt, ...);
 <tr><td>S</td><td>char[]</td><td>String</td><td>string</td><td>variable</td></tr>
 <tr><td>u</td><td>WT_ITEM</td><td>byte[]</td><td>string</td><td>variable</td></tr>
  * </table>
+ *
+ * The <code>'S'</code> type is encoded as a C language string terminated by a NUL character.
+ *
+ * The <code>'u'</code> type is for raw byte arrays: if it appears at the end
+ * of a format string (including in the default <code>"u"</code> format for
+ * untyped tables), the size is not stored explicitly.  When <code>'u'</code>
+ * appears within a format string, the size is stored as a 32-bit integer in
+ * the same byte order as the rest of the format string, followed by the data.
  *
  * \section pack_examples Packing Examples
  *

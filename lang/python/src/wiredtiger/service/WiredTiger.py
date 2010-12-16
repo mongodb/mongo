@@ -50,6 +50,13 @@ class Iface:
     """
     pass
 
+  def is_new(self, connection):
+    """
+    Parameters:
+     - connection
+    """
+    pass
+
   def close_session(self, session, config):
     """
     Parameters:
@@ -383,6 +390,36 @@ class Client(Iface):
     if result.err != None:
       raise result.err
     return
+
+  def is_new(self, connection):
+    """
+    Parameters:
+     - connection
+    """
+    self.send_is_new(connection)
+    return self.recv_is_new()
+
+  def send_is_new(self, connection):
+    self._oprot.writeMessageBegin('is_new', TMessageType.CALL, self._seqid)
+    args = is_new_args()
+    args.connection = connection
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_is_new(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = is_new_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "is_new failed: unknown result");
 
   def close_session(self, session, config):
     """
@@ -1088,6 +1125,7 @@ class Processor(Iface, TProcessor):
     self._processMap["open"] = Processor.process_open
     self._processMap["open_session"] = Processor.process_open_session
     self._processMap["close_connection"] = Processor.process_close_connection
+    self._processMap["is_new"] = Processor.process_is_new
     self._processMap["close_session"] = Processor.process_close_session
     self._processMap["open_cursor"] = Processor.process_open_cursor
     self._processMap["dup_cursor"] = Processor.process_dup_cursor
@@ -1185,6 +1223,17 @@ class Processor(Iface, TProcessor):
     except WT_ERROR, err:
       result.err = err
     oprot.writeMessageBegin("close_connection", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_is_new(self, seqid, iprot, oprot):
+    args = is_new_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = is_new_result()
+    result.success = self._handler.is_new(args.connection)
+    oprot.writeMessageBegin("is_new", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -2100,6 +2149,123 @@ class close_connection_result:
     if self.err != None:
       oprot.writeFieldBegin('err', TType.STRUCT, 1)
       self.err.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+    def validate(self):
+      return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class is_new_args:
+  """
+  Attributes:
+   - connection
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.I32, 'connection', None, None, ), # 1
+  )
+
+  def __init__(self, connection=None,):
+    self.connection = connection
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.I32:
+          self.connection = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('is_new_args')
+    if self.connection != None:
+      oprot.writeFieldBegin('connection', TType.I32, 1)
+      oprot.writeI32(self.connection)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+    def validate(self):
+      return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class is_new_result:
+  """
+  Attributes:
+   - success
+  """
+
+  thrift_spec = (
+    (0, TType.BOOL, 'success', None, None, ), # 0
+  )
+
+  def __init__(self, success=None,):
+    self.success = success
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.BOOL:
+          self.success = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('is_new_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.BOOL, 0)
+      oprot.writeBool(self.success)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()

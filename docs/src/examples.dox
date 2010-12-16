@@ -15,4 +15,8 @@ Shows how to access database and table statistics.
 
 \example ex_schema.c
 Shows how to create column-oriented data and access individual columns.
+
+\example ex_call_center.c
+A more complex schema based on a call center example, showing how to map some
+SQL constructs onto the WiredTiger API.
  */

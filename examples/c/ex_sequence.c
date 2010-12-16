@@ -17,16 +17,15 @@ int main()
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	WT_ITEM key, value;
 	wiredtiger_recno_t recno;
 
-	if ((ret = wiredtiger_open(home, "create", &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, &session)) != 0)
+	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
+	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
-	if (conn->is_new) {
+	if (conn->is_new(conn)) {
 		/*
 		 * If we created the database, create the sequence by opening a
 		 * cursor on the sequence view and inserting a new record.

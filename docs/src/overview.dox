@@ -8,9 +8,12 @@ The WiredTiger Data Store is a platform for extensible data management.
 This documentation describes the public interface used by developers to
 construct applications.
 
-We follow SQL terminology: a database is set of tables.
+We follow SQL terminology: a database is set of tables that are managed together.  Tables logically consist of rows, each row has a key and a value.  Tables may optionally have an associated schema, which splits the key/value pair into a set of columns.  Tables may also have associated indices, each of which is ordered by some set of columns.
 
-The API consists of only a small set of interfaces:
+TODO: we need more paragraphs on this page -- maybe two more paragraphs in the Introduction that say "Applications will generally do X, Y and Z, configuration is based on strings passed to the methods, the retrieval/update interfaces is based on cursors that look like X, Y and Z."
+
+The API consists of only a small set of classes, of which the following are
+the most commonly used:
 
  - a WT_CONNECTION represents a connection to a database.  Most applications
  will only open one connection to a database for each process.  The first

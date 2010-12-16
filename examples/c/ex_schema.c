@@ -45,7 +45,6 @@ static WT_SCHEMA pop_schema = {
 	ARRAY_SIZE(pop_columns), /* Number of columns. */
 	pop_indices,	/* Index descriptions. */
 	ARRAY_SIZE(pop_indices), /* Number of indices. */
-	0		/* Session cookie size. */
 };
 
 POP_RECORD pop_data[] = {
@@ -58,7 +57,7 @@ POP_RECORD pop_data[] = {
 
 int main()
 {
-	int is_new, ret;
+	int ret;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
@@ -66,19 +65,19 @@ int main()
 	const char *country;
 	wiredtiger_recno_t recno;
 
-	ret = wiredtiger_open(home, "create", &conn);
+	ret = wiredtiger_open(home, NULL, "create", &conn);
 	if (ret != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/* Note: error checking omitted for clarity. */
 
-	if (conn->is_new) {
+	if (conn->is_new(conn)) {
 		ret = conn->add_schema(conn, "POP_RECORD", &pop_schema, NULL);
 		ret = session->create_table(session, "population",
 		    "schema=POP_RECORD");
 	}
 
-	ret = conn->open_session(conn, NULL, &session);
+	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->open_cursor(session, "table:population", NULL, &cursor);
 
 	endp = pop_data + ARRAY_SIZE(pop_data);

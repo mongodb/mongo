@@ -20,9 +20,9 @@ int main()
 	WT_CURSOR *cursor;
 	const char *key, *value;
 
-	if ((ret = wiredtiger_open(home,
+	if ((ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=10000000", &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, &session)) != 0)
+	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */

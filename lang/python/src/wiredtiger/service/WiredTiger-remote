@@ -26,6 +26,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  WT_HANDLE open(string home, string config)'
   print '  WT_HANDLE open_session(WT_HANDLE connection, string config)'
   print '  void close_connection(WT_HANDLE connection, string config)'
+  print '  bool is_new(WT_HANDLE connection)'
   print '  void close_session(WT_HANDLE session, string config)'
   print '  WT_CURSOR_HANDLE open_cursor(WT_HANDLE session, string uri, string config)'
   print '  WT_CURSOR_HANDLE dup_cursor(WT_HANDLE session, WT_HANDLE cursor, string config)'
@@ -126,6 +127,12 @@ elif cmd == 'close_connection':
     print 'close_connection requires 2 args'
     sys.exit(1)
   pp.pprint(client.close_connection(eval(args[0]),args[1],))
+
+elif cmd == 'is_new':
+  if len(args) != 1:
+    print 'is_new requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.is_new(eval(args[0]),))
 
 elif cmd == 'close_session':
   if len(args) != 2:

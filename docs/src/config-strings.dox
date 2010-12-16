@@ -12,14 +12,16 @@ That is, they are simple comma-separated lists of <code>"<key>=<value>"</code> p
 
 Empty configuration strings may be represented in C or C++ by passing <code>NULL</code>.
 
-Superfluous commas in the configuration string are ignored (including at the beginning and end of the string), so it is always safe to combine two configuration strings by concatenating them with a comma in between.
+Superfluous commas and whitespace in the configuration string are ignored (including at the beginning and end of the string), so it is always safe to combine two configuration strings by concatenating them with a comma in between.
 
 Keys are processed in order from left to right, with later settings overriding earlier ones unless multiple settings for a key are permitted.
 
 \section config_examples Examples
 
+TODO: more whitespace, complete code fragments.
+
 <ul>
-<li>To open a connection to a database, creating it if it does not exist and set a cache size of 10MiB, pass <code>"create,cache_size=10000000"</code> to ::wiredtiger_open.
+<li>To open a connection to a database, creating it if it does not exist and set a cache size of 10MiB, pass <code>"create,cache_size=10M"</code> to ::wiredtiger_open.
 <li>Create a table that uses C language strings for keys and values: pass <code>"keyfmt=S,valuefmt=S"</code> to WT_SESSION::create_table.</li>
 <li>Assign a name to a transaction for debugging purposes: pass <code>"name=mytxn"</code> to WT_SESSION::begin_transaction.</li>
 <li>Assign a priority to a transaction to avoid aborting: pass <code>"priority=100"</code> to WT_SESSION::begin_transaction.</li>

@@ -160,18 +160,26 @@ static int __session_checkpoint(WT_SESSION *session, const char *config)
 }
 
 
+static const char *__conn_get_home(WT_CONNECTION *conn)
+{
+	return NULL;
+}
+
+static int __conn_is_new(WT_CONNECTION *conn)
+{
+	return 0;
+}
+
 static int __conn_close(WT_CONNECTION *conn, const char *config)
 {
 	printf("WT_CONNECTION->close\n");
-	free((char *)conn->home);
 	free(conn);
 	return 0;
 }
 
-static int __conn_open_session(WT_CONNECTION *connection, const char *config, WT_SESSION **sessionp)
+static int __conn_open_session(WT_CONNECTION *connection, WT_ERROR_HANDLER *errhandler, const char *config, WT_SESSION **sessionp)
 {
 	WT_SESSION stds = {
-		NULL,
 		NULL,
 		__session_close,
 		__session_open_cursor,
@@ -185,8 +193,6 @@ static int __conn_open_session(WT_CONNECTION *connection, const char *config, WT
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
-		NULL,
-		NULL
 	};
 	WT_SESSION *s = (WT_SESSION *)malloc(sizeof(WT_SESSION));
 
@@ -205,7 +211,7 @@ static int __conn_add_cursor_factory(WT_CONNECTION *connection, const char *pref
 	return ENOTSUP;
 }
 
-static int __conn_add_extension(WT_CONNECTION *connection, const char *prefix, const char *path, const char *config)
+static int __conn_add_extension(WT_CONNECTION *connection, const char *path, const char *config)
 {
 	return ENOTSUP;
 }
@@ -215,16 +221,16 @@ static int __conn_add_schema(WT_CONNECTION *connection, const char *name, WT_SCH
 	return ENOTSUP;
 }
 
-int wiredtiger_open(const char *home, const char *config, WT_CONNECTION **connectionp)
+int wiredtiger_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *config, WT_CONNECTION **connectionp)
 {
 	WT_CONNECTION stdc = {
-		NULL,
-		0,
-		__conn_close,
-		__conn_open_session,
 		__conn_add_cursor_factory,
 		__conn_add_extension,
-		__conn_add_schema
+		__conn_add_schema,
+		__conn_close,
+		__conn_get_home,
+		__conn_is_new,
+		__conn_open_session
 	};
 	WT_CONNECTION *c = (WT_CONNECTION *)malloc(sizeof(WT_CONNECTION));
 
@@ -232,7 +238,7 @@ int wiredtiger_open(const char *home, const char *config, WT_CONNECTION **connec
 	if (c == NULL)
 		return ENOMEM;
 	*c = stdc;
-	c->home = strdup(home);
+	/* TODO: c->home = strdup(home); */
 	*connectionp = c;
 	return 0;
 }

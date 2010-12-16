@@ -13,6 +13,6 @@ The following are builtin cursor types:
 <tr><td><tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt></td><td>Join the contents of multiple cursors together.</td></tr>
 <tr><td><tt>module:</tt></td><td>loadable modules (key=(string)name, data=(string)path)</td></tr>
 <tr><td><tt>sequence:[\<seqname\>]</tt></td><td>Sequence cursor (key=recno, data=NULL)</td></tr>
-<tr><td><tt>statistics:[table:\<tablename\>]</tt></td><td>database or table statistics (key=(string)keyname, data=(int64_t)value)</td></tr>
+<tr><td><tt>statistics:[table:\<tablename\>]</tt></td><td>database or table statistics (key=(string)keyname, data=(string)value)</td></tr>
 </table>
  */
