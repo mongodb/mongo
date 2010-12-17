@@ -44,7 +44,7 @@ namespace mongo {
 
     string Chunk::chunkMetadataNS = "config.chunks";
     
-    int Chunk::MaxChunkSize = 1024 * 1024 * 200;
+    int Chunk::MaxChunkSize = 1024 * 1024 * 64;
     
     Chunk::Chunk( ChunkManager * manager )
       : _manager(manager),
