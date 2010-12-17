@@ -12,13 +12,13 @@ extern "C" {
 #endif
 
 struct WT_CONNECTION;	  typedef struct WT_CONNECTION WT_CONNECTION;
-struct WT_COLUMN_INFO;	  typedef struct WT_COLUMN_INFO WT_COLUMN_INFO;
 struct WT_CURSOR;	  typedef struct WT_CURSOR WT_CURSOR;
 struct WT_CURSOR_FACTORY; typedef struct WT_CURSOR_FACTORY WT_CURSOR_FACTORY;
 struct WT_ERROR_HANDLER;  typedef struct WT_ERROR_HANDLER WT_ERROR_HANDLER;
-struct WT_INDEX_INFO;	  typedef struct WT_INDEX_INFO WT_INDEX_INFO;
 struct WT_ITEM;		  typedef struct WT_ITEM WT_ITEM;
 struct WT_SCHEMA;	  typedef struct WT_SCHEMA WT_SCHEMA;
+struct WT_SCHEMA_COLUMN_SET;	  typedef struct WT_SCHEMA_COLUMN_SET WT_SCHEMA_COLUMN_SET;
+struct WT_SCHEMA_INDEX;	  typedef struct WT_SCHEMA_INDEX WT_SCHEMA_INDEX;
 struct WT_SESSION;	  typedef struct WT_SESSION WT_SESSION;
 
 #ifdef DOXYGEN
@@ -459,10 +459,20 @@ struct WT_CONNECTION {
 	 */
 	int __F(close)(WT_CONNECTION *connection, const char *config);
 
-	/*! The home directory of the connection. */
+	/*! The home directory of the connection.
+	 *
+	 * \param connection the connection handle
+	 * \returns a pointer to a string naming the home directory
+	 */
 	const char *__F(get_home)(WT_CONNECTION *connection);
 
-	/*! Did opening this handle create the database? */
+	/*! Did opening this handle create the database?
+	 *
+	 * \param connection the connection handle
+	 * \returns false (zero) if the connection existed before the call to
+	 *    ::wiredtiger_open, true (non-zero) if it was created by opening
+	 *    this handle.
+	 */
 	int __F(is_new)(WT_CONNECTION *connection);
 
 	/*! Open a session.
@@ -506,32 +516,56 @@ struct WT_CURSOR_FACTORY {
 };
 
 /*!
- * Description of a column returned in WT_SCHEMA::column_info.
+ * Definition of a set of columns to store together for WT_SCHEMA::column_sets.
  */
-struct WT_COLUMN_INFO {
-	const char *name;	/*!< The name of the column. */
-	int in_column;		/*!< Stored in a dedicated column store? */
+struct WT_SCHEMA_COLUMN_SET {
+	const char *name;	/*!< The name of the column set. */
+	const char *columns;	/*!< The columns in the set, comma-separated. */
 
-	/*! Callback to compare column keys.
-	 *
-	 * \returns -1 if <code>key1 < key2</code>, 0 if <code>key1 == key2</code>, 1 if <code>key1 > key2</code>
-	 */
-	int (*cmp)(WT_SESSION *session, WT_SCHEMA *schema, const WT_ITEM *key1, const WT_ITEM *key2);
-
-	/*! Callback to extract one or more column keys.
+	/*! Optional callback to extract the column set value
 	 *
 	 * \errors
 	 */
-	int (*get_key)(WT_SESSION *session, WT_SCHEMA *schema, const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *column_key, int *more);
+	int (*get_value)(WT_SESSION *session,
+	    WT_SCHEMA *schema, WT_SCHEMA_COLUMN_SET *colset,
+	    const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *column_key);
+
+	/*! Optional callback to compare column set values to order duplicates.
+	 *
+	 * \returns -1 if <code>value1 < value2</code>,
+	 * 	     0 if <code>value1 == value2</code>,
+	 * 	     1 if <code>value1 > value2</code>.
+	 */
+	int (*cmp)(WT_SESSION *session,
+	    WT_SCHEMA *schema, WT_SCHEMA_COLUMN_SET *colset,
+	    const WT_ITEM *value1, const WT_ITEM *value2);
 };
 
 /*!
- * Description of an index in WT_SCHEMA::index_info.
+ * Definition of an index in WT_SCHEMA::index_info.
  */
-struct WT_INDEX_INFO {
+struct WT_SCHEMA_INDEX {
 	const char *name;	/*!< The name of the index. */
-	const char **columns;	/*!< The columns making up the index. */
-	int num_columns;	/*!< The number of columns. */
+	const char *columns;	/*!< The columns making up the index */
+
+	/*! Optional callback to extract one or more column keys.
+	 *
+	 * \errors
+	 */
+	int (*get_key)(WT_SESSION *session,
+	    WT_SCHEMA *schema, WT_SCHEMA_INDEX *index,
+	    const WT_ITEM *key, const WT_ITEM *value,
+	    WT_ITEM *index_key, int *more);
+
+	/*! Optional callback to order index keys.
+	 *
+	 * \returns -1 if <code>key1 < key2</code>,
+	 * 	     0 if <code>key1 == key2</code>,
+	 * 	     1 if <code>key1 > key2</code>.
+	 */
+	int (*cmp)(WT_SESSION *session,
+	    WT_SCHEMA *schema, WT_SCHEMA_INDEX *index,
+	    const WT_ITEM *key1, const WT_ITEM *key2);
 };
 
 /*!
@@ -555,27 +589,25 @@ struct WT_SCHEMA {
 	const char *valuefmt;
 
 	/*!
-	 * Description of the columns in a table, an array of
-	 * WT_SCHEMA::num_columns elements.
+	 * Names of the columns in a table, comma separated.  The number of
+	 * entries must match the total number of values in WT_SCHEMA::keyfmt
+	 * and WT_SCHEMA::valuefmt.
 	 */
-	WT_COLUMN_INFO *column_info;
+	const char *column_names;
 
 	/*!
-	 * The number of columns in a table. The WT_SCHEMA::column_info field
-	 * must be an array of this length.  This must also match the total
-	 * number of values in WT_SCHEMA::keyfmt and WT_SCHEMA::valuefmt, if
-	 * they are set.
+	 * Description of the column sets for a table, terminated by a NULL.
+	 * Each column set is stored separately, keyed by the primary key of
+	 * the table.  Any column that does not appear in a column set is
+	 * stored in an unnamed default column set for the table.
 	 */
-	int num_columns;
+	WT_SCHEMA_COLUMN_SET *column_sets;
 
 	/*!
-	 * Description of the indices for a table, an array of
-	 * WT_SCHEMA::num_indices elements.  Set to NULL for unindexed tables.
+	 * Description of the indices for a table, terminated by a NULL.
+	 * Can be set to NULL for unindexed tables.
 	 */
-	WT_INDEX_INFO *index_info;
-
-	/*! The number of indices for a table (zero for unindexed tables). */
-	int num_indices;
+	WT_SCHEMA_INDEX *indices;
 };
 
 /*! Open a connection to a database.

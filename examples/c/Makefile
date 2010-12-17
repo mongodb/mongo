@@ -6,5 +6,5 @@ all: $(OBJS)
 clean:
 	rm -f $(OBJS)
 
-%.o:	%.c ../../include/wt/wtds.h
+%.o:	%.c ../../include/wiredtiger.h
 	$(CC) -o $@ -c $<

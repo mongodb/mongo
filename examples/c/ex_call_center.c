@@ -11,8 +11,6 @@
 #include <inttypes.h>
 #include <wiredtiger.h>
 
-#define	ARRAY_SIZE(a)	(sizeof (a) / sizeof ((a)[0]))
-
 const char *home = "WT_TEST";
 
 /*
@@ -26,8 +24,8 @@ const char *home = "WT_TEST";
  *     cust_id INTEGER, emp_id INTEGER, call_type VARCHAR(12), notes VARCHAR(25))
  * CREATE INDEX CallsCustDate ON Calls(cust_id, call_date)
  *
- * In WiredTiger, both tables will use record numbers for IDs, which will be
- * the key.  The C structs for the records are as follows.
+ * In this example, both tables will use record numbers for their IDs, which
+ * will be the key.  The C structs for the records are as follows.
  */
 typedef struct {
 	wiredtiger_recno_t id;
@@ -45,54 +43,44 @@ typedef struct {
 	char *notes;
 } CALL;
 
+/* Store address in a column of its own. */
+static WT_SCHEMA_COLUMN_SET cust_column_sets[] = {
+	{ "cust_address", "address", NULL, NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
+static WT_SCHEMA_INDEX cust_indices[] = {
+	{ "cust_phone", "phone", NULL , NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
 /* Description of the customer schema. */
-static WT_COLUMN_INFO cust_columns[] = {
-	{ "id", 0, NULL, NULL },
-	{ "name", 1, NULL, NULL },
-	{ "address", 1, NULL, NULL },
-	{ "phone", 1, NULL, NULL }
-};
-
-static const char *cust_phone_cols[] = { "phone" };
-static WT_INDEX_INFO cust_indices[] = {
-	{ "cust_phone", cust_phone_cols, ARRAY_SIZE(cust_phone_cols) }
-};
-
 static WT_SCHEMA cust_schema = {
 	"r",		/* Format string for keys (recno). */
 	"SSS",		/* Format string for data items: 3 strings */
-	cust_columns,	/* Column descriptions. */
-	ARRAY_SIZE(cust_columns), /* Number of columns. */
-	cust_indices,	/* Index descriptions. */
-	ARRAY_SIZE(cust_indices) /* Number of indices. */
+	/* Columns */
+	"id,name,address,phone",
+	cust_column_sets,
+	cust_indices
+};
+
+static WT_SCHEMA_INDEX call_indices[] = {
+	{ "call_cust_date", "cust_id,call_date", NULL, NULL },
+	{ NULL, NULL, NULL, NULL }
 };
 
 /* Description of the call record schema. */
-static WT_COLUMN_INFO call_columns[] = {
-	{ "id", 0, NULL, NULL },
-	{ "call_date", 0, NULL, NULL },
-	{ "cust_id", 0, NULL, NULL },
-	{ "emp_id", 0, NULL, NULL },
-	{ "call_type", 0, NULL, NULL },
-	{ "notes", 0, NULL, NULL }
-};
-
-static const char *call_cust_date_cols[] = { "cust_id", "call_date" };
-static WT_INDEX_INFO call_indices[] = {
-	{ "call_cust_date",
-	    call_cust_date_cols, ARRAY_SIZE(call_cust_date_cols) }
-};
-
 static WT_SCHEMA call_schema = {
 	"r",		/* Format string for keys (recno). */
 	"qrrSS",	/*
 			 * Format string for data items:
 			 *     i64, 2 recnos, 2 strings
 			 */
-	call_columns,	/* Column descriptions. */
-	ARRAY_SIZE(call_columns), /* Number of columns. */
-	call_indices,	/* Index descriptions. */
-	ARRAY_SIZE(call_indices) /* Number of indices. */
+	/* Columns. */
+	"id,call_date,cust_id,emp_id,call_type,notes",
+	/* Column sets. */
+	NULL,
+	call_indices
 };
 
 int main()
@@ -126,23 +114,22 @@ int main()
 	/*
 	 * First query: a call arrives.  In SQL:
 	 *
-	 * SELECT * FROM Customers WHERE phone=?
+	 * SELECT id, name FROM Customers WHERE phone=?
 	 *
 	 * Use the cust_phone index, lookup by phone number to fill the
 	 * customer record.  The cursor will have a key format of "S" for a
 	 * string because the cust_phone index has a single column ("phone"),
 	 * which is of type "S".
 	 *
-	 * The "with_pkey" option includes the primary key in the cursor's
-	 * values, so the value format will be "rSSS".
+	 * Specify the columns we want: the customer ID and the name.  This
+	 * means the cursor's value format will be "rS".
 	 */
 	ret = session->open_cursor(session,
-	    "index:cust_phone", "with_pkey", &cursor);
+	    "index:cust_phone(id,name)", NULL, &cursor);
 	ret = cursor->set_key(cursor, "212-555-1000");
 	ret = cursor->search(cursor, &exact);
 	if (exact == 0)
-		cursor->get_value(cursor, &cust.id,
-		    &cust.name, &cust.address, &cust.phone);
+		ret = cursor->get_value(cursor, &cust.id, &cust.name);
 	printf("Got customer record for %s\n", cust.name);
 	ret = cursor->close(cursor, NULL);
 
@@ -154,6 +141,10 @@ int main()
 	 * Use the call_cust_date index to find the matching calls.  Since it is
 	 * is in increasing order by date for a given customer, we want to start
 	 * with the last record for the customer and work backwards.
+	 *
+	 * Specify a subset of columns to be returned.  If these were all
+	 * covered by the index, the primary would not be accessed.  Stop after
+	 * getting 3 records.
 	 */
 	ret = session->open_cursor(session,
 	    "index:call_cust_date(cust_id,call_type,notes)", NULL, &cursor);
@@ -162,15 +153,19 @@ int main()
 	/* If we found a larger entry, go back one. */
 	if (exact > 0)
 		ret = cursor->prev(cursor);
+	ret = cursor->get_value(cursor,
+	    &call.cust_id, &call.call_type, &call.notes);
 
 	count = 0;
-	while ((ret = cursor->get_value(cursor,
-	    &call.cust_id, &call.call_type, &call.notes)) == 0 &&
-	    call.cust_id == cust.id && count++ < 3) {
+	while (call.cust_id == cust.id) {
 		printf("Got call record on date %d: type %s: %s\n",
 		    (int)call.call_date, call.call_type, call.notes);
+		if (++count == 3)
+			break;
 
 		ret = cursor->prev(cursor);
+		ret = cursor->get_value(cursor,
+		    &call.cust_id, &call.call_type, &call.notes);
 	}
 
 	ret = conn->close(conn, NULL);

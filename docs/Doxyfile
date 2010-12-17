@@ -193,7 +193,7 @@ ALIASES                = config{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr> \
                          configend=</table> \
                          "configstart=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table><tr><th>Key</th><th>Value [Default]</th><th>Notes</th></tr>" \
                          "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted." \
-                         "errors=\returns an integer status, zero indicates success"
+                         "errors=\returns zero on success and a non-zero error code on failure"
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C 
 # sources only. Doxygen will then generate output that is more tailored for C. 
@@ -489,7 +489,7 @@ ENABLED_SECTIONS       =
 # documentation can be controlled using \showinitializer or \hideinitializer 
 # command in the documentation regardless of this setting.
 
-MAX_INITIALIZER_LINES  = 30
+MAX_INITIALIZER_LINES  = 32
 
 # Set the SHOW_USED_FILES tag to NO to disable the list of files generated 
 # at the bottom of the documentation of classes and structs. If set to YES the 
@@ -703,7 +703,7 @@ EXAMPLE_RECURSIVE      = NO
 # directories that contain image that are included in the documentation (see 
 # the \image command).
 
-IMAGE_PATH             = 
+IMAGE_PATH             = images
 
 # The INPUT_FILTER tag can be used to specify a program that doxygen should 
 # invoke to filter for each input file. Doxygen will invoke the filter program 

@@ -38,9 +38,10 @@ the most commonly used:
 
 See \ref wt for the API reference.
 
-For more details about using the API, see:
+For more details about using WiredTiger, see:
 
 <ul>
+<li>\subpage architecture</li>
 <li>\subpage config_strings</li>
 <li>\subpage cursor_types</li>
 <li>\subpage schema</li>

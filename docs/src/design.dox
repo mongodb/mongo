@@ -1,6 +1,6 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page architecture WiredTiger Architecture
+/*! \page design WiredTiger Design
 
 <h3>Major architectural differences from Berkeley DB:</h3>
 <ol>
@@ -614,7 +614,4 @@ Partial Rollbacks Using Write-Ahead Logging</a>
 <li><a href="http://Berkeley DB.cs.yale.edu/hstore/oltpperf-sigmod08.pdf">OLTP Through the Looking Glass, and What We Found There</a>
 
 </ul>
-
-For more information about the file format, see:
-\subpage layout
 */

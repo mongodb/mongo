@@ -11,8 +11,6 @@
 #include <inttypes.h>
 #include <wiredtiger.h>
 
-#define	ARRAY_SIZE(a)	(sizeof (a) / sizeof ((a)[0]))
-
 const char *home = "WT_TEST";
 
 /* The C struct for the data we are storing with WiredTiger. */
@@ -22,16 +20,14 @@ typedef struct {
 	uint64_t population;
 } POP_RECORD;
 
-/* Description of the schema. */
-static WT_COLUMN_INFO pop_columns[] = {
-	{ "country", 0, NULL, NULL },
-	{ "year", 0, NULL, NULL },
-	{ "population", 1, NULL, NULL }
+static WT_SCHEMA_COLUMN_SET pop_colsets[] = {
+	{ "population",  "population", NULL, NULL },
+	{ NULL, NULL, NULL, NULL }
 };
 
-static const char *country_year_cols[] = { "country", "year" };
-static WT_INDEX_INFO pop_indices[] = {
-	{ "country_year",  country_year_cols, ARRAY_SIZE(country_year_cols) }
+static WT_SCHEMA_INDEX pop_indices[] = {
+	{ "country_year",  "country,year", NULL, NULL },
+	{ NULL, NULL, NULL, NULL }
 };
 
 static WT_SCHEMA pop_schema = {
@@ -41,10 +37,10 @@ static WT_SCHEMA pop_schema = {
 			 * (5-byte string, short, long).
 			 * See ::wiredtiger_struct_pack
 			 */
-	pop_columns,	/* Column descriptions. */
-	ARRAY_SIZE(pop_columns), /* Number of columns. */
+	/* Column names */
+	"id,country,year,population",
+	pop_colsets,	/* Column sets to store separately. */
 	pop_indices,	/* Index descriptions. */
-	ARRAY_SIZE(pop_indices), /* Number of indices. */
 };
 
 POP_RECORD pop_data[] = {
@@ -80,7 +76,7 @@ int main()
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->open_cursor(session, "table:population", NULL, &cursor);
 
-	endp = pop_data + ARRAY_SIZE(pop_data);
+	endp = pop_data + (sizeof (pop_data) / sizeof (pop_data[0]));
 	for (p = pop_data; p < endp; p++) {
 		cursor->set_value(cursor, p->country, p->year, p->population);
 		ret = cursor->insert(cursor);
@@ -88,7 +84,7 @@ int main()
 	ret = cursor->close(cursor, NULL);
 
 	/* Now just read through the countries we know about */
-	ret = session->open_cursor(session, "column:population.country",
+	ret = session->open_cursor(session, "table:population(country)",
 	    "dup=first", &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
