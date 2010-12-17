@@ -49,6 +49,7 @@
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
+#include "dur_stats.h"
 
 using namespace mongoutils;
 
@@ -57,6 +58,12 @@ namespace mongo {
     namespace dur {
 
         void WRITETODATAFILES();
+
+        Stats stats;
+
+        Stats::Stats() {
+            memset(this, 0, sizeof(*this));
+        }
 
         void NonDurableImpl::startup() {
             if( haveJournalFiles() ) { 
@@ -402,6 +409,8 @@ namespace mongo {
             @see MongoMMF::close()
         */
         static void groupCommit() {
+            stats.curr._commits++;
+
             dbMutex.assertAtLeastReadLocked();
 
             if( !commitJob.hasWritten() )

@@ -22,6 +22,7 @@
 #include "namespace.h"
 #include "dur_journal.h"
 #include "dur_journalformat.h"
+#include "dur_stats.h"
 #include "../util/logfile.h"
 #include "../util/timer.h"
 #include "../util/alignedbuilder.h"
@@ -288,6 +289,7 @@ namespace mongo {
                 mutex::scoped_lock lk(_lfMutex);
                 if( _lf == 0 )
                     open();
+                stats.curr._journaledBytes += b.len();
                 _written += b.len();
                 _lf->synchronousAppend((void *) b.buf(), b.len());
             }

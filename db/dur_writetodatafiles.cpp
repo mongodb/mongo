@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "dur_commitjob.h"
+#include "dur_stats.h"
 
 namespace mongo { 
     namespace dur {
@@ -49,6 +50,7 @@ namespace mongo {
                 const WriteIntent& intent = commitJob.writes()[i];
                 char *dst = (char *) (intent.w_ptr);
                 memcpy(dst, intent.p, intent.len);
+                stats.curr._writeToDataFilesBytes += intent.len;
             }
 
             debugValidateMapsMatch();

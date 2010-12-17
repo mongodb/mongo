@@ -849,6 +849,9 @@
     <ClInclude Include="..\util\paths.h">
       <Filter>util\core</Filter>
     </ClInclude>
+    <ClInclude Include="dur_stats.h">
+      <Filter>_storage engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
