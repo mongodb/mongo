@@ -180,7 +180,17 @@ DBCollection.prototype.remove = function( t , justOne ){
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
     assert( query , "need a query" );
     assert( obj , "need an object" );
-    this._validateObject( obj );
+
+    var firstKey = null;
+    for (var k in obj) { firstKey = k; break; }
+
+    if (firstKey != null && firstKey[0] == '$') {
+        // for mods we only validate partially, for example keys may have dots
+        this._validateObject( obj );
+    } else {
+        // we're basically inserting a brand new object, do full validation
+        this._validateForStorage( obj );
+    }
     this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
 }
 
