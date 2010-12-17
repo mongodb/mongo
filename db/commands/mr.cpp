@@ -243,14 +243,19 @@ namespace mongo {
             }
                 
             { // query options
-                if ( cmdObj["query"].type() == Object ){
-                    filter = cmdObj["query"].embeddedObjectUserCheck();
-                }
+                BSONElement q = cmdObj["query"];
+                if ( q.type() == Object )
+                    filter = q.embeddedObjectUserCheck();
+                else 
+                    uassert( 13608 , "query has to be blank or an Object" , ! q.trueValue() );
+                
                     
-                if ( cmdObj["sort"].type() == Object ){
-                    sort = cmdObj["sort"].embeddedObjectUserCheck();
-                }
-
+                BSONElement s = cmdObj["sort"];
+                if ( s.type() == Object )
+                    sort = s.embeddedObjectUserCheck();
+                else 
+                    uassert( 13609 , "sort has to be blank or an Object" , ! s.trueValue() );
+                
                 if ( cmdObj["limit"].isNumber() )
                     limit = cmdObj["limit"].numberLong();
                 else 
