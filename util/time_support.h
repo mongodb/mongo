@@ -24,6 +24,11 @@
 
 namespace mongo {
 
+    // some convenient constants
+    const unsigned minuteInMillis = 60u * 1000u;
+    const unsigned hourInMillis = 60u * minuteInMillis;
+    const unsigned dayInMillis = 24u * hourInMillis;
+
     inline void time_t_to_Struct(time_t t, struct tm * buf , bool local = false ) {
 #if defined(_WIN32)
         if ( local )

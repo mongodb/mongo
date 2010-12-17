@@ -20,6 +20,7 @@
 
 #include "../client/connpool.h"
 #include "../db/queryutil.h"
+#include "../util/time_support.h"
 #include "../util/unittest.h"
 
 #include "chunk.h"
@@ -315,12 +316,16 @@ namespace mongo {
                 splitThreshold = (int) ((double)splitThreshold * .9);
             }
 
-            if ( _dataWritten < splitThreshold / 5 )
+            // there may be more than one mongos so check for splits before this mongos has seen a full threshold
+            unsigned now = curTimeMillis();
+            if (( _dataWritten < splitThreshold / 5 ) && ( _nextCheck > now ) )
                 return false;
         
             log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << endl;
             
-            _dataWritten = 0; // reset so we check often enough
+            // reset so we check again soon but make sure not to synchronize all mongos
+            _dataWritten = 0;
+            _nextCheck = now + 10*minuteInMillis + ( rand() % 3 )*minuteInMillis;
             
             ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ );
             if ( newShard.get() == NULL ){
