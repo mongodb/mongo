@@ -11,35 +11,12 @@ namespace mongo {
 
         class DurableInterface : boost::noncopyable { 
         public:
-            virtual ~DurableInterface() { 
-                log() << "ERROR warning ~DurableInterface not intended to be called" << endl;
-            }
+            virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << endl; }
 
             /** Call during startup so durability module can initialize 
                 throws if fatal error
             */
             virtual void startup() = 0;
-
-            /** Wait for acknowledgement of the next group commit. 
-                @return true if --dur is on.  There will be delay.
-                @return false if --dur is off.
-            */
-            virtual bool awaitCommit() = 0;
-
-            /** Commit immediately.
-
-                Generally, you do not want to do this often, as highly granular committing may affect 
-                performance.
-                
-                Does not return until the commit is complete.
-
-                You must be at least read locked when you call this.  Ideally, you are not write locked 
-                and then read operations can occur concurrently.
-
-                @return true if --dur is on.
-                @return false if --dur is off. (in which case there is action)
-            */
-            virtual bool commitNow() = 0;
 
             /** Declare that a file has been created 
                 Normally writes are applied only after journalling, for safety.  But here the file 
@@ -77,21 +54,39 @@ namespace mongo {
             */
             virtual void* writingAtOffset(void *buf, unsigned ofs, unsigned len) = 0;
 
+            /** Wait for acknowledgement of the next group commit. 
+                @return true if --dur is on.  There will be delay.
+                @return false if --dur is off.
+            */
+            virtual bool awaitCommit() = 0;
+
+            /** Commit immediately.
+
+                Generally, you do not want to do this often, as highly granular committing may affect 
+                performance.
+                
+                Does not return until the commit is complete.
+
+                You must be at least read locked when you call this.  Ideally, you are not write locked 
+                and then read operations can occur concurrently.
+
+                @return true if --dur is on.
+                @return false if --dur is off. (in which case there is action)
+            */
+            virtual bool commitNow() = 0;
+
 #if defined(_DEBUG)
             virtual void debugCheckLastDeclaredWrite() = 0;
 #endif
 
-            /// END OF VIRTUAL FUNCTIONS 
+            /** Declare write intent for a DiskLoc.  @see DiskLoc::writing() */
+            inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
 
-            inline DiskLoc& writingDiskLoc(DiskLoc& d) {
-                return *((DiskLoc*) writingPtr(&d, sizeof(d)));
-            }
-
-            inline int& writingInt(int& d) {
-                return *((int*) writingPtr(&d, sizeof(d)));
-            }
+            /** Declare write intent for an int */
+            inline int& writingInt(int& d) { return *((int*) writingPtr(&d, sizeof(d))); }
 
             /** "assume i've already indicated write intent, let me write"
+                redeclaration is fine too, but this is faster.
             */
             template <typename T>
             inline
@@ -168,6 +163,9 @@ namespace mongo {
             void debugCheckLastDeclaredWrite();
 #endif
         };
+
+        /** puts DurableImpl into effect. call druing startup if --dur specified. */
+        void enableDurability();
 
     } // namespace dur
 

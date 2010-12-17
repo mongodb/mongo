@@ -41,10 +41,18 @@ namespace mongo {
          struct FullyQualifiedJournalEntry { 
              bool isBasicWrite() const { return dbName != 0; }
 
-             const char *dbName; // pointer into mmaped Journal file
-             JEntry e;
-             const char *srcData; // pointer into mmaped Journal file
+             // relative path of database for the operation.
+             // might be a pointer into mmaped Journal file
+             const char *dbName;  
 
+
+             // local db sentinel is already parsed out here into dbName
+             JEntry e;
+
+             // pointer into mmaped Journal file
+             const char *srcData; 
+
+             // if not a simple JEntry, the operation
              shared_ptr<DurOp> op;
         };
 
@@ -98,7 +106,7 @@ namespace mongo {
              *  throws on premature end of section. 
              */
             bool next(FullyQualifiedJournalEntry& e) { 
-                if( !_sectHead ) {
+                if( !_sectHead ) {  
                     _sectHead = static_cast<const JSectHeader*>(_br.pos());
                     _br.skip(sizeof(JSectHeader));
                 }
@@ -106,6 +114,8 @@ namespace mongo {
                 unsigned lenOrOpCode;
                 _br.read(lenOrOpCode);
                 if( lenOrOpCode >= JEntry::OpCode_Min ) { 
+                    // not a "basic write"
+
                     if( lenOrOpCode == JEntry::OpCode_Footer ) { 
                         const char* pos = (const char*) _br.pos();
                         pos -= sizeof(lenOrOpCode); // rewind to include OpCode
@@ -139,17 +149,20 @@ namespace mongo {
                         const unsigned len = strnlen(_lastDbName, limit);
                         massert(13533, "problem processing journal file during recovery", _lastDbName[len] == '\0');
                         _br.skip(len+1); // skip '\0' too
-
                         _br.read(lenOrOpCode);
                     }
                 }
 
-                // now do JEntry
+                // JEntry - a basic write
                 assert( lenOrOpCode && lenOrOpCode < JEntry::OpCode_Min );
                 e.dbName = _lastDbName;
                 e.e.len = lenOrOpCode;
                 _br.read(e.e.ofs);
-                _br.read(e.e.fileNo);
+                _br.read(e.e._fileNo);
+                if( e.e.isLocalDbContext() ) { 
+                    e.dbName = "local";
+                    e.e.clearLocalDbContextBit();
+                }
                 e.srcData = (const char *) _br.skip(lenOrOpCode);
                 return true;
             }
@@ -197,7 +210,8 @@ namespace mongo {
                 {
                     stringstream ss;
                     ss << dbName << '.';
-                    if( fileNo < 0 )
+                    assert( fileNo >= 0 );
+                    if( fileNo == JEntry::DotNsSuffix )
                         ss << "ns";
                     else 
                         ss << fileNo;
@@ -252,13 +266,16 @@ namespace mongo {
                 if( fqe.isBasicWrite() ) {
                     if( dump ) {
                         stringstream ss;
-                        ss << "  BASICWRITE " << setw(20) << fqe.dbName << '.' 
-                              << setw(2) << fqe.e.fileNo << ' ' << setw(6) << fqe.e.len
-                              << ' ' << hex << setw(8) << (size_t) fqe.srcData << dec << "  " << hexdump(fqe.srcData, fqe.e.len);
+                        ss << "  BASICWRITE " << setw(20) << fqe.dbName << '.';
+                        if( fqe.e._fileNo == JEntry::DotNsSuffix )
+                            ss << "ns";
+                        else
+                            ss << setw(2) << fqe.e._fileNo;
+                        ss << ' ' << setw(6) << fqe.e.len << ' ' << hex << setw(8) << (size_t) fqe.srcData << dec << "  " << hexdump(fqe.srcData, fqe.e.len);
                         log() << ss.str() << endl;
                     } 
                     if( apply ) {
-                        void *p = ptr(fqe.dbName, fqe.e.fileNo, fqe.e.ofs);
+                        void *p = ptr(fqe.dbName, fqe.e._fileNo, fqe.e.ofs);
                         memcpy(p, fqe.srcData, fqe.e.len);
                     }
                 } else {
@@ -333,7 +350,7 @@ namespace mongo {
             close();
 
             if( cmdLine.durOptions & CmdLine::DurScanOnly ) {
-                uasserted(13545, str::stream() << "--durOptions " << (int) CmdLine::DurScanOnly << " specified, terminating");
+                uasserted(13545, str::stream() << "--durOptions " << (int) CmdLine::DurScanOnly << " (scan only) specified");
             }
 
             log() << "recover cleaning up" << endl;

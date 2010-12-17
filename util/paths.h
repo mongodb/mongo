@@ -32,6 +32,12 @@ namespace mongo {
     struct RelativePath { 
         path _p;
 
+        static RelativePath fromRelativePath(path f) { 
+           RelativePath rp;
+            rp._p = f;
+            return rp;
+        }
+
         /** from a full path */
         static RelativePath fromFullPath(path f) { 
             string fullpath = f.string();
@@ -50,6 +56,7 @@ namespace mongo {
         string toString() const { return _p.string(); }
 
         inline bool operator!=(const RelativePath& r) const { return _p != r._p; }
+        inline bool operator==(const RelativePath& r) const { return _p == r._p; }
 
         string asFullPath() const { 
             path x(dbpath);

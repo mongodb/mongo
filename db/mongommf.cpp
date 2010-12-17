@@ -24,6 +24,7 @@
 #include "cmdline.h"
 #include "mongommf.h"
 #include "dur.h"
+#include "dur_journalformat.h"
 #include "../util/mongoutils/str.h"
 
 using namespace mongoutils;
@@ -151,13 +152,14 @@ namespace mongo {
 
     extern string dbpath;
 
+    // here so that it is precomputed...
     void MongoMMF::setPath(string f) {
         string suffix;
         string prefix;
         bool ok = str::rSplitOn(f, '.', prefix, suffix);
         uassert(13520, str::stream() << "MongoMMF only supports filenames in a certain format " << f, ok);
         if( suffix == "ns" )
-            _fileSuffixNo = -1;
+            _fileSuffixNo = dur::JEntry::DotNsSuffix;
         else 
             _fileSuffixNo = (int) str::toUnsigned(suffix);
 

@@ -194,6 +194,8 @@ namespace mongo {
         }
 #endif
 
+        RelativePath local = RelativePath::fromRelativePath("local");
+
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking
@@ -239,18 +241,21 @@ namespace mongo {
                         mmf->willNeedRemap() = true;
                     }
                     i->w_ptr = ((char*)mmf->view_write()) + ofs;
-                    if( mmf->relativePath() != lastFilePath ) { 
+                    JEntry e;
+                    e.len = i->len;
+                    assert( ofs <= 0x80000000 );
+                    e.ofs = (unsigned) ofs;
+                    e.setFileNo( mmf->fileSuffixNo() );
+                    if( mmf->relativePath() == local ) { 
+                        e.setLocalDbContextBit();
+                    }
+                    else if( mmf->relativePath() != lastFilePath ) { 
                         lastFilePath = mmf->relativePath();
                         //assert( !str::startsWith(lastFilePath, dbpath) ); // dbpath should be stripped this is a relative path
                         JDbContext c;
                         bb.appendStruct(c);
                         bb.appendStr(lastFilePath.toString());
                     }
-                    JEntry e;
-                    e.len = i->len;
-                    assert( ofs <= 0x80000000 );
-                    e.ofs = (unsigned) ofs;
-                    e.fileNo = mmf->fileSuffixNo();
                     bb.appendStruct(e);
                     bb.appendBuf(i->p, i->len);
                 }

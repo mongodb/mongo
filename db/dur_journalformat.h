@@ -36,7 +36,7 @@ namespace mongo {
 
             // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near 
             // that.  simply incrementing the version # is safe on a fwd basis.
-            enum { CurrentVersion = 0x4142 };
+            enum { CurrentVersion = 0x4143 };
             unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
@@ -61,23 +61,36 @@ namespace mongo {
             unsigned len; // length in bytes of the whole section
         };
 
-        /** an individual operation within section.  Either the entire section should be applied, or nothing. */
+        /** an individual write operation within a group commit section.  Either the entire section should 
+            be applied, or nothing.  (We check the md5 for the whole section before doing anything on recovery.)
+        */
         struct JEntry {
             enum OpCodes {
                 OpCode_Footer      = 0xffffffff,
                 OpCode_DbContext   = 0xfffffffe,
                 OpCode_FileCreated = 0xfffffffd,
                 OpCode_DropDb      = 0xfffffffc,
-                OpCode_Min         = 0xfffff000 // higher than max len: OpCode_Min + sizeof(JHeader) > 2^32
+                OpCode_Min         = 0xfffff000
             };
 
             union {
                 unsigned len;    
                 OpCodes opcode;
             };
-            unsigned ofs; // offset in file
-            int fileNo;
+            unsigned ofs;  // offset in file
+
+            enum {
+                DotNsSuffix = 0x7fffffff, // ".ns" file
+                LocalDbBit  = 0x80000000  // assuming "local" db instead of using the JDbContext
+            };
+            int _fileNo;   // high bit is set to indicate it should be the <dbpath>/local database
             // char data[] follows
+
+            int getFileNo() const { return _fileNo & (~LocalDbBit); }
+            void setFileNo(int f) { _fileNo = f; }
+            void setLocalDbContextBit() { _fileNo |= LocalDbBit; }
+            bool isLocalDbContext() const { return _fileNo & LocalDbBit; }
+            void clearLocalDbContextBit() { _fileNo = getFileNo(); }
         };
 
         /** group commit section footer. md5 is a key field. */
