@@ -259,10 +259,6 @@ namespace mongo {
         return "";
     }
 
-    string Client::clientAddress() const {
-        return clientAddress(false);
-    }
-
     string Client::toString() const {
         stringstream ss;
         if ( _curOp )

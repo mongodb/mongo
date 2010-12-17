@@ -177,8 +177,7 @@ namespace mongo {
         Client(const char *desc, MessagingPort *p = 0);
         ~Client();
 
-        string clientAddress(bool includePort) const;
-        string clientAddress() const;
+        string clientAddress(bool includePort=false) const;
         AuthenticationInfo * getAuthenticationInfo(){ return &_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
         CurOp* curop() { return _curOp; }        

@@ -16,6 +16,7 @@
  */
 
 #include "pch.h"
+#include "request.h"
 #include "../client/dbclient.h"
 #include "../db/dbhelpers.h"
 #include "../db/matcher.h"
@@ -48,6 +49,13 @@ namespace mongo {
         currentClient.reset(c);
         mongo::lastError.initThread();
         return *c;
+    }
+
+    string Client::clientAddress(bool includePort) const {
+        ClientInfo * ci = ClientInfo::get();
+        if ( ci )
+            return ci->getRemote();
+        return "";
     }
 
     bool execCommand( Command * c ,
