@@ -559,7 +559,7 @@ namespace mongo {
                 }
                 
                 BSONObj res;
-                if ( ! c->moveAndCommit( to , res ) ){
+                if ( ! c->moveAndCommit( to , Chunk::MaxChunkSize , res ) ){
                     errmsg = "move failed";
                     result.append( "cause" , res );
                     return false;

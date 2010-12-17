@@ -68,7 +68,7 @@ namespace mongo {
             }
         
             BSONObj res;
-            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , res ) ){
+            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , Chunk::MaxChunkSize , res ) ){
                 movedCount++;
                 continue;
             }
