@@ -82,6 +82,11 @@ namespace mongo {
          */
         bool shouldBalance() const;
 
+        /**
+         * @return the number of mongos processes recently known
+         */
+        unsigned getMongosCount() const;
+
         unsigned long long getNextOpTime() const;
 
         // exposed methods below are for testing only
