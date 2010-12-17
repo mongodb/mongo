@@ -36,6 +36,8 @@
        there could be a slow down immediately after remapping as fresh copy-on-writes for commonly written pages will 
          be required.  so doing these remaps more incrementally in the future might make sense - but have to be careful
          not to introduce bugs.
+
+     @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
 
 #include "pch.h"
@@ -53,6 +55,8 @@ using namespace mongoutils;
 namespace mongo { 
 
     namespace dur {
+
+        void WRITETODATAFILES();
 
         void NonDurableImpl::startup() {
             if( haveJournalFiles() ) { 
@@ -80,7 +84,7 @@ namespace mongo {
         // later in this file
         static void groupCommit();
 
-        static CommitJob commitJob;
+        CommitJob commitJob;
 
         bool DurableImpl::commitNow() {
             groupCommit();
@@ -288,7 +292,7 @@ namespace mongo {
 
         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
         */
-        static void debugValidateMapsMatch() {
+        void debugValidateMapsMatch() {
             if( ! (cmdLine.durOptions & CmdLine::DurParanoid) )
                  return;
 
@@ -335,34 +339,6 @@ namespace mongo {
                 }
             }
             log() << "debugValidateMapsMatch " << t.millis() << "ms for " <<  (data / (1024*1024)) << "MB" << endl;
-        }
-
-        /** apply the writes back to the non-private MMF after they are for certain in redo log 
-
-            (1) todo we don't need to write back everything every group commit.  we MUST write back
-            that which is going to be a remapped on its private view - but that might not be all 
-            views.
-
-            (2) todo should we do this using N threads?  would be quite easy
-                see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
-
-            (3) with enough work, we could do this outside the read lock.  it's a bit tricky though. 
-                - we couldn't do it from the private views then as they may be changing.  would have to then 
-                  be from the journal alignedbuffer.
-                - we need to be careful the file isn't unmapped on us -- perhaps a mutex or something 
-                  with MongoMMF on closes or something to coordinate that.
-
-            locking: in read lock when called
-        */
-        static void WRITETODATAFILES() { 
-            /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
-            for( int i = commitJob.writes().size() - 1; i >= 0; i-- ) {
-                const WriteIntent& intent = commitJob.writes()[i];
-                char *dst = (char *) (intent.w_ptr);
-                memcpy(dst, intent.p, intent.len);
-            }
-
-            debugValidateMapsMatch();
         }
 
         /** We need to remap the private views periodically. otherwise they would become very large.

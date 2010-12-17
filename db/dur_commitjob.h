@@ -122,6 +122,7 @@ namespace mongo {
             Writes _wi;
             NotifyAll _notify;
         };
+        extern CommitJob commitJob;
 
         // inlines
 

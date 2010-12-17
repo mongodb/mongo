@@ -448,6 +448,9 @@
     <ClCompile Include="..\util\concurrency\synchronization.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
+    <ClCompile Include="dur_writetodatafiles.cpp">
+      <Filter>_storage engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

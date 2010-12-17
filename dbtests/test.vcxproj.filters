@@ -746,6 +746,9 @@
     <ClCompile Include="..\db\dur_commitjob.cpp">
       <Filter>dur</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\dur_writetodatafiles.cpp">
+      <Filter>dur</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

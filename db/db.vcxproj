@@ -484,6 +484,7 @@
     <ClCompile Include="dur_commitjob.cpp" />
     <ClCompile Include="dur_journal.cpp" />
     <ClCompile Include="dur_recover.cpp" />
+    <ClCompile Include="dur_writetodatafiles.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
     <ClCompile Include="mongommf.cpp" />

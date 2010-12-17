@@ -275,6 +275,7 @@
     <ClCompile Include="..\db\dur_commitjob.cpp" />
     <ClCompile Include="..\db\dur_journal.cpp" />
     <ClCompile Include="..\db\dur_recover.cpp" />
+    <ClCompile Include="..\db\dur_writetodatafiles.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
