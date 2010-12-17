@@ -60,7 +60,7 @@ r = function( key , v ){
 correct = { a : 2 , b : 1 };
 
 function checkMR( t ){
-    var res = t.mapReduce( m , r );
+    var res = t.mapReduce( m , r , "basic1_out" );
     assert.eq( correct , res.convertToSingleObject() , "checkMR: " + tojson( t ) );
 }
 

@@ -141,7 +141,7 @@ s.adminCommand({movechunk:'test.mr', find:{x:3}, to: s.getServer('test').name } 
 
 doMR( "after extra split" );
 
-cmd = { mapreduce : "mr" , map : "emit( " , reduce : "fooz + " };
+cmd = { mapreduce : "mr" , map : "emit( " , reduce : "fooz + " , "broken1" };
 
 x = db.runCommand( cmd );
 y = s._connections[0].getDB( "test" ).runCommand( cmd );

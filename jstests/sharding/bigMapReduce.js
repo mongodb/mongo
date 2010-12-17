@@ -15,7 +15,7 @@ s.printChangeLog();
 function map() { emit('count', 1); } 
 function reduce(key, values) { return Array.sum(values) } 
 
-out = db.foo.mapReduce(map, reduce) 
+out = db.foo.mapReduce(map, reduce,"big_out") 
 printjson(out) // SERVER-1400
 
 s.stop()

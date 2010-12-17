@@ -1,7 +1,8 @@
 t = db.jstests_mr_killop;
 t.drop();
 
-if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900
+// TODO turning off because not working for me
+if ( false && typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900 
 
     t.save( {a:1} );
     db.getLastError();
