@@ -105,7 +105,7 @@ namespace mongo {
                     n = map.size();
                     s->setObject( "$key" , key , true );
 
-                    uassert( 10043 ,  "group() can't handle more than 10000 unique keys" , n <= 10000 );
+                    uassert( 10043 ,  "group() can't handle more than 20000 unique keys" , n <= 20000 );
                 }
 
                 s->setObject( "obj" , obj , true );
