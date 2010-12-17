@@ -158,12 +158,9 @@ namespace mongo {
         }; // class Client::Context
         
     private:
-        void _dropns( const string& ns );
-
         CurOp * _curOp;
         Context * _context;
         bool _shutdown;
-        set<string> _tempCollections;
         const char *_desc;
         bool _god;
         AuthenticationInfo _ai;
@@ -185,13 +182,8 @@ namespace mongo {
         Database* database() {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
         const char *desc() const { return _desc; }
-        void addTempCollection( const string& ns );
-        void _invalidateDB(const string& db);
         void setLastOp( ReplTime op ) { _lastOp = op; }
         ReplTime getLastOp() const { return _lastOp; }
-
-        static void invalidateDB(const string& db);
-        static void invalidateNS( const string& ns );
 
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) {

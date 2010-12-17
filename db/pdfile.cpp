@@ -787,7 +787,6 @@ namespace mongo {
         log(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
-        Client::invalidateNS( name );
         Top::global.collectionDropped( name );
         dropNS(name);        
     }
@@ -1733,10 +1732,6 @@ namespace mongo {
         assert( d->name == db );
 
         BackgroundOperation::assertNoBgOpInProgForDb(d->name.c_str());
-
-        /* why is this not called all the time in closeDatabase?! seems dangerous? */
-        /* no path specified here - seems dangerous */
-        Client::invalidateDB( d->name );
 
         Database::closeDatabase( d->name.c_str(), d->path );
         d = 0; // d is now deleted

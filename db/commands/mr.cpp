@@ -174,7 +174,7 @@ namespace mongo {
             _reduce( x , key , endSizeEstimate );
         }
         
-        Config::Config( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp ){
+        Config::Config( const string& _dbname , const BSONObj& cmdObj ){
             
             dbname = _dbname;
             ns = dbname + "." + cmdObj.firstElement().valuestr();
@@ -222,9 +222,6 @@ namespace mongo {
                 tempLong = dbname + "." + tempShort;
                 
                 incLong = tempLong + "_inc";
-                
-                //if ( markAsTemp )
-                    cc().addTempCollection( tempLong );
                 
                 finalLong = dbname + "." + finalShort;
             }
@@ -791,7 +788,7 @@ namespace mongo {
             bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
 
-                Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() , false );
+                Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
                 config.incLong = config.tempLong;
 
                 set<ServerAndQuery> servers;

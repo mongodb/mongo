@@ -146,7 +146,7 @@ namespace mongo {
          */
         class Config {
         public:
-            Config( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp = true );
+            Config( const string& _dbname , const BSONObj& cmdObj );
 
             string dbname;
             string ns;

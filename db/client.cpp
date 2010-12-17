@@ -81,56 +81,6 @@ namespace mongo {
         delete _curOp;
     }
     
-    void Client::_dropns( const string& ns ){
-        Top::global.collectionDropped( ns );
-                    
-        dblock l;
-        Client::Context ctx( ns );
-        if ( ! nsdetails( ns.c_str() ) )
-            return;
-        
-        try {
-            string err;
-            BSONObjBuilder b;
-            dropCollection( ns , err , b );
-        }
-        catch ( ... ){
-            warning() << "error dropping temp collection: " << ns << endl;
-        }
-
-    }
-    
-    void Client::_invalidateDB( const string& db ) {
-        assert( db.find( '.' ) == string::npos );
-
-        set<string>::iterator min = _tempCollections.lower_bound( db + "." );
-        set<string>::iterator max = _tempCollections.lower_bound( db + "|" );
-        
-        _tempCollections.erase( min , max );
-
-    }
-    
-    void Client::invalidateDB(const string& db) {
-        scoped_lock bl(clientsMutex);
-        for ( set<Client*>::iterator i = clients.begin(); i!=clients.end(); i++ ){
-            Client* cli = *i;
-            cli->_invalidateDB(db);
-        }
-    }
-
-    void Client::invalidateNS( const string& ns ){
-        scoped_lock bl(clientsMutex);
-        for ( set<Client*>::iterator i = clients.begin(); i!=clients.end(); i++ ){
-            Client* cli = *i;
-            cli->_tempCollections.erase( ns );
-        }
-    }
-
-
-    void Client::addTempCollection( const string& ns ) { 
-        _tempCollections.insert( ns ); 
-    }
-
     bool Client::shutdown(){
         _shutdown = true;
         if ( inShutdown() )
@@ -143,17 +93,7 @@ namespace mongo {
             }
         }
 
-        bool didAnything = false;
-        
-        if ( _tempCollections.size() ){
-            didAnything = true;
-            for ( set<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
-                _dropns( *i );
-            }
-            _tempCollections.clear();
-        }
-        
-        return didAnything;
+        return false;
     }
 
     BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
