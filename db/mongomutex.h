@@ -215,12 +215,11 @@ namespace mongo {
     }
 
     inline void MongoMutex::_releasingWriteLock() { 
-        if (this == &dbMutex)
-            dur::releasingWriteLock();
+        dur::releasingWriteLock();
     }
 
     inline void MongoMutex::_acquiredWriteLock() { 
-        if( this == &dbMutex && _remapPrivateViewRequested ) { 
+        if( _remapPrivateViewRequested ) { 
             dur::REMAPPRIVATEVIEW();
             dassert( !_remapPrivateViewRequested );
         }
