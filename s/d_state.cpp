@@ -505,7 +505,7 @@ namespace mongo {
 
                 ShardChunkVersion currVersion = version;
                 if ( ! shardingState.trySetVersion( ns , currVersion ) ){
-                    errmsg = "client version differs from config's for colleciton '" + ns "'";
+                    errmsg = str::stream() << "client version differs from config's for colleciton '" << ns << "'";
                     result.append( "ns" , ns );
                     result.appendTimestamp( "version" , version );
                     result.appendTimestamp( "globalVersion" , currVersion );
