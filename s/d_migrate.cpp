@@ -371,12 +371,19 @@ namespace mongo {
         /** 
          * @return ok
          */
-        bool storeCurrentLocs( string& errmsg ){
+        bool storeCurrentLocs( long long maxChunkSize , string& errmsg ){
             readlock l( _ns ); 
             Client::Context ctx( _ns );
             NamespaceDetails *d = nsdetails( _ns.c_str() );
             if ( ! d ){
                 errmsg = "ns not found, should be impossible";
+                return false;
+            }
+
+            // if the chunk is larger than allowed, don't even bother trying
+            long long dataSize = d->stats.datasize;
+            if ( dataSize > maxChunkSize ) {
+                errmsg = str::stream() << "can't move chunk size at " << dataSize << " because size limit is " << maxChunkSize;
                 return false;
             }
             
@@ -562,6 +569,7 @@ namespace mongo {
             BSONObj min  = cmdObj["min"].Obj();
             BSONObj max  = cmdObj["max"].Obj();
             BSONElement shardId = cmdObj["shardId"];
+            BSONElement maxSizeElem = cmdObj["maxChunkSizeBytes"];
             
             if ( ns.empty() ){
                 errmsg = "need to specify namespace in command";
@@ -591,6 +599,12 @@ namespace mongo {
                 errmsg = "need shardId";
                 return false;
             }
+
+            if ( maxSizeElem.eoo() || ! maxSizeElem.isNumber() ){
+                errmsg = "need to specify maxChunkSizeBytes";
+                return false;
+            } 
+            const long long maxChunkSize = maxSizeElem.numberLong(); // in bytes
             
             if ( ! shardingState.enabled() ){
                 if ( cmdObj["configdb"].type() != String ){
@@ -675,7 +689,7 @@ namespace mongo {
             MigrateStatusHolder statusHolder( ns , min , max );
             { 
                 // this gets a read lock, so we know we have a checkpoint for mods
-                if ( ! migrateFromStatus.storeCurrentLocs( errmsg ) )
+                if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg ) )
                     return false;
 
                 ScopedDbConnection connTo( to );
