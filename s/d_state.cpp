@@ -455,6 +455,7 @@ namespace mongo {
             if ( version == 0 && globalVersion > 0 ){
                 if ( ! authoritative ){
                     result.appendBool( "need_authoritative" , true );
+                    result.append( "ns" , ns );
                     result.appendTimestamp( "globalVersion" , globalVersion );
                     result.appendTimestamp( "oldVersion" , oldVersion );
                     errmsg = "dropping needs to be authoritative";
@@ -470,7 +471,8 @@ namespace mongo {
             }
 
             if ( version < oldVersion ){
-                errmsg = "you already have a newer version";
+                errmsg = "you already have a newer version of collection '" + ns + "'";
+                result.append( "ns" , ns );
                 result.appendTimestamp( "oldVersion" , oldVersion );
                 result.appendTimestamp( "newVersion" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
@@ -483,7 +485,8 @@ namespace mongo {
                     sleepmillis(2);
                     log() << "waiting till out of critical section" << endl;
                 }
-                errmsg = "going to older version for global";
+                errmsg = "going to older version for global for collection '" + ns + "'";
+                result.append( "ns" , ns );
                 result.appendTimestamp( "version" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
                 return false;
@@ -491,9 +494,9 @@ namespace mongo {
             
             if ( globalVersion == 0 && ! cmdObj.getBoolField( "authoritative" ) ){
                 // need authoritative for first look
-                result.appendBool( "need_authoritative" , true );
                 result.append( "ns" , ns );
-                errmsg = "first time for this ns";
+                result.appendBool( "need_authoritative" , true );
+                errmsg = "first time for collection '" + ns + "'";
                 return false;
             }
 
@@ -502,9 +505,10 @@ namespace mongo {
 
                 ShardChunkVersion currVersion = version;
                 if ( ! shardingState.trySetVersion( ns , currVersion ) ){
+                    errmsg = "client version differs from config's for colleciton '" + ns "'";
+                    result.append( "ns" , ns );
                     result.appendTimestamp( "version" , version );
                     result.appendTimestamp( "globalVersion" , currVersion );
-                    errmsg = "client version differs from config's";
                     return false;
                 }
             }
