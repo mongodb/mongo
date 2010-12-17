@@ -293,9 +293,6 @@ namespace mongo {
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( replSettings.master ) {
             _logOp(opstr, ns, 0, obj, patt, b);
-            // why? :
-            //char cl[ 256 ];
-            //nsToDatabase( ns, cl );
         }
         
         logOpForSharding( opstr , ns , obj , patt );
