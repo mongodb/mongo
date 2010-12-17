@@ -1,4 +1,4 @@
-// balance.h
+//@file balance.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -25,6 +25,15 @@
 
 namespace mongo {
     
+    /**
+     * The balancer is a background task that tries to keep the number of chunks across all servers of the cluster even. Although
+     * every mongos will have one balancer running, only one of them will be active at the any given point in time. The balancer
+     * uses a 'DistributedLock' for that coordination.
+     *
+     * The balancer does act continuously but in "rounds". At a given round, it would decide if there is an imbalance by 
+     * checking the difference in chunks between the most and least loaded shards. It would issue a request for a chunk 
+     * migration per round, if it found so.
+     */
     class Balancer : public BackgroundJob {
     public:
         Balancer();
@@ -40,35 +49,56 @@ namespace mongo {
         typedef BalancerPolicy::ChunkInfo CandidateChunk;
         typedef shared_ptr<CandidateChunk> CandidateChunkPtr;
 
+        // hostname:port of my mongos
+        string _myid;
+
+        // time the Balancer started running
+        time_t _started;
+
+        // number of moved chunks in last round
+        int _balancedLastTime; 
+
+        // decide which chunks to move; owned here.
+        BalancerPolicy* _policy;           
+
         /**
-         * Gathers all the necessary information about shards and chunks, and 
-         * decides whether there are candidate chunks to be moved.
+         * Checks that the balancer can connect to all servers it needs to do its job.
+         *
+         * @return true if balancing can be started
+         *
+         * This method throws on a network exception
+         */
+        bool _init();
+        
+        /**
+         * Gathers all the necessary information about shards and chunks, and decides whether there are candidate chunks to
+         * be moved.
+         *
+         * @param conn is the connection with the config server(s)
+         * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could possibly be moved
          */
         void _doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks );
 
         /**
-         * Execute the chunk migrations described in 'candidateChunks' and
-         * returns the number of chunks effectively moved.
+         * Issues chunk migration request, one at a time.
+         * 
+         * @param candidateChunks possible chunks to move
+         * @return number of chunks effectively moved
          */
         int _moveChunks( const vector<CandidateChunkPtr>* candidateChunks );
 
         /**
-         * Check the health of the master configuration server
+         * Marks this balancer as being live on the config server(s).
+         *
+         * @param conn is the connection with the config server(s)
          */
-        void _ping();
         void _ping( DBClientBase& conn );
 
         /**
-         * @return true if everything is ok
+         * @return true if all the servers listed in configdb as being shards are reachable and are distinct processes
          */
         bool _checkOIDs();
 
-        // internal state
-
-        string          _myid;             // hostname:port of my mongos
-        time_t          _started;          // time Balancer starte running
-        int             _balancedLastTime; // number of moved chunks in last round
-        BalancerPolicy* _policy;           // decide which chunks to move; owned here.
     };
     
     extern Balancer balancer;

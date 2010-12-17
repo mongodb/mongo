@@ -74,7 +74,7 @@ public:
 
 private:
     T *_head;
-    mutex _m;
+    mongo::mutex _m;
     int _orphans;
 };
 

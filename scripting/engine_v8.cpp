@@ -140,7 +140,7 @@ namespace mongo {
 
     // ---- global stuff ----
 
-    void V8Scope::init( BSONObj * data ){
+    void V8Scope::init( const BSONObj * data ){
         V8Lock l;
         if ( ! data )
             return;

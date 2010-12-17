@@ -358,19 +358,19 @@ namespace mongo {
     }
 
     long long BSONTool::processFile( const path& root ){
-        string fileString = root.string();
+        _fileName = root.string();
         
         unsigned long long fileLength = file_size( root );
 
         if ( fileLength == 0 ) {
-            out() << "file " << fileString << " empty, skipping" << endl;
+            out() << "file " << _fileName << " empty, skipping" << endl;
             return 0;
         }
 
 
-        FILE* file = fopen( fileString.c_str() , "rb" );
+        FILE* file = fopen( _fileName.c_str() , "rb" );
         if ( ! file ){
-            log() << "error opening file: " << fileString << endl;
+            log() << "error opening file: " << _fileName << endl;
             return 0;
         }
 

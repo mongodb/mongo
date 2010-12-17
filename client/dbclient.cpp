@@ -80,7 +80,7 @@ namespace mongo {
             return ConnectionString( SET , host.substr( i + 1 ) , host.substr( 0 , i ) );
         }
 
-        int numCommas = DBClientBase::countCommas( host );
+        int numCommas = str::count( host , ',' );
         
         if( numCommas == 0 ) 
             return ConnectionString( HostAndPort( host ) );

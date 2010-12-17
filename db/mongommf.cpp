@@ -149,14 +149,19 @@ namespace mongo {
         return p;
     }
 
+    extern string dbpath;
+
     void MongoMMF::setPath(string f) {
         string suffix;
-        bool ok = str::rSplitOn(f, '.', _filePath, suffix);
+        string prefix;
+        bool ok = str::rSplitOn(f, '.', prefix, suffix);
         uassert(13520, str::stream() << "MongoMMF only supports filenames in a certain format " << f, ok);
         if( suffix == "ns" )
             _fileSuffixNo = -1;
         else 
             _fileSuffixNo = (int) str::toUnsigned(suffix);
+
+        _p = RelativePath::fromFullPath(prefix);
     }
 
     bool MongoMMF::open(string fname, bool sequentialHint) {
@@ -170,7 +175,7 @@ namespace mongo {
         bool preExisting = MemoryMappedFile::exists(fname.c_str());
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         if( cmdLine.dur && !testIntent && _view_write && !preExisting ) { 
-            dur::createdFile(fname, len);
+            getDur().createdFile(fname, len);
         }
         return finishOpening();
     }
@@ -209,7 +214,6 @@ namespace mongo {
     }
 
     /*virtual*/ void MongoMMF::close() {
-#if defined(_DURABLE)
         {
             if( !testIntent && cmdLine.dur ) { 
                 dur::closingFileNotification();
@@ -219,7 +223,6 @@ namespace mongo {
                 ourReadViews.remove(_view_readonly);
             }
         }
-#endif
         _view_write = _view_private = _view_readonly = 0;
         MemoryMappedFile::close();
     }

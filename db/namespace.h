@@ -185,7 +185,7 @@ namespace mongo {
                 if( _next == 0 ) return 0;
                 return (Extra*) (((char *) d) + _next);
             }
-            void setNext(long ofs) { _next = ofs;  }
+            void setNext(long ofs) { *getDur().writing(&_next) = ofs;  }
             void copy(NamespaceDetails *d, const Extra& e) { 
                 memcpy(this, &e, sizeof(Extra));
                 _next = 0;
@@ -198,8 +198,14 @@ namespace mongo {
         /* add extra space for indexes when more than 10 */
         Extra* allocExtra(const char *ns, int nindexessofar);
         void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
+
         /* called when loaded from disk */
         void onLoad(const Namespace& k);
+
+        /* dump info on this namespace.  for debugging. */
+        void dump(const Namespace& k);
+
+        /* dump info on all extents for this namespace.  for debugging. */
         void dumpExtents();
 
     private:
@@ -266,13 +272,13 @@ namespace mongo {
             dassert( i < NIndexesMax );
             unsigned long long x = ((unsigned long long) 1) << i;
             if( multiKeyIndexBits & x ) return;
-            *dur::writing(&multiKeyIndexBits) |= x;
+            *getDur().writing(&multiKeyIndexBits) |= x;
         }
         void clearIndexIsMultikey(int i) { 
             dassert( i < NIndexesMax );
             unsigned long long x = ((unsigned long long) 1) << i;
             if( (multiKeyIndexBits & x) == 0 ) return;
-            *dur::writing(&multiKeyIndexBits) &= ~x;
+            *getDur().writing(&multiKeyIndexBits) &= ~x;
         }
 
         /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
@@ -288,12 +294,12 @@ namespace mongo {
         void paddingFits() {
             double x = paddingFactor - 0.01;
             if ( x >= 1.0 )
-                *dur::writingNoLog(&paddingFactor) = x;
+                *getDur().writingNoLog(&paddingFactor) = x;
         }
         void paddingTooSmall() {
             double x = paddingFactor + 0.6;
             if ( x <= 2.0 )
-                *dur::writingNoLog(&paddingFactor) = x;
+                *getDur().writingNoLog(&paddingFactor) = x;
         }
 
         // @return offset in indexes[]

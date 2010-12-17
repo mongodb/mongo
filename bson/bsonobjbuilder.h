@@ -376,7 +376,7 @@ namespace mongo {
            return append(fieldName, str, (int) strlen(str)+1);
         }
         /** Append a string element */
-        BSONObjBuilder& append(const StringData& fieldName, string str) {
+        BSONObjBuilder& append(const StringData& fieldName, const string& str) {
             return append(fieldName, str.c_str(), (int) str.size()+1);
         }
 

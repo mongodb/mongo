@@ -35,7 +35,7 @@ namespace mongo {
         ~V8Scope();
         
         virtual void reset();
-        virtual void init( BSONObj * data );
+        virtual void init( const BSONObj * data );
 
         virtual void localConnect( const char * dbName );
         virtual void externalSetup();

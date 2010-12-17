@@ -29,12 +29,9 @@
 
 namespace mongo {
 
-#if !defined(_DURABLE) || !defined(_DEBUG)
-#define VERIFYTHISLOC dassert( thisLoc.btree() == this );
-#else
+//#define VERIFYTHISLOC dassert( thisLoc.btree() == this );
 // with _DURABLE, this assert wouldn't work without getting fancier as there are multiple mmap views for _DEBUG mode...
 #define VERIFYTHISLOC 
-#endif
 
     /**
      * give us a writable version of the btree bucket (declares write intent). 
@@ -43,11 +40,11 @@ namespace mongo {
     BtreeBucket* DiskLoc::btreemod() const {
         assert( _a != -1 );
         BtreeBucket *b = const_cast< BtreeBucket * >( btree() );
-        return static_cast< BtreeBucket* >( dur::writingPtr( b, BucketSize ) );
+        return static_cast< BtreeBucket* >( getDur().writingPtr( b, BucketSize ) );
     }
 
     _KeyNode& _KeyNode::writing() const { 
-        return *dur::writing( const_cast< _KeyNode* >( this ) );
+        return *getDur().writing( const_cast< _KeyNode* >( this ) );
     }
 
     KeyNode::KeyNode(const BucketBasics& bb, const _KeyNode &k) :
@@ -354,7 +351,7 @@ namespace mongo {
             // declare that we will write to [k(keypos),k(n)]
             // todo: this writes a medium amount to the journal.  we may want to add a verb "shift" to the redo log so  
             //       we can log a very small amount.
-            b = (BucketBasics*) dur::writingAtOffset((void *) this, p-(char*)this, q-p);
+            b = (BucketBasics*) getDur().writingAtOffset((void *) this, p-(char*)this, q-p);
 
             // e.g. n==3, keypos==2
             // 1 4 9
@@ -364,7 +361,7 @@ namespace mongo {
                 b->k(j) = b->k(j-1);
         }
 
-        dur::declareWriteIntent(&b->emptySize, 12);
+        getDur().declareWriteIntent(&b->emptySize, 12);
         b->emptySize -= sizeof(_KeyNode);
         b->n++;
 
@@ -373,7 +370,7 @@ namespace mongo {
         kn.recordLoc = recordLoc;
         kn.setKeyDataOfs((short) b->_alloc(key.objsize()) );
         char *p = b->dataAt(kn.keyDataOfs());
-        dur::declareWriteIntent(p, key.objsize());
+        getDur().declareWriteIntent(p, key.objsize());
         memcpy(p, key.objdata(), key.objsize());
         return true;
     }
@@ -765,15 +762,16 @@ namespace mongo {
                 if ( isHead() ) {
                     // we don't delete the top bucket ever
                 } else {
-                    // An empty bucket is only allowed as a transient state.  If
-                    // there are no neighbors to balance with, we delete ourself.
                     if ( !mayBalanceWithNeighbors( thisLoc, id, order ) ) {
+                        // An empty bucket is only allowed as a transient state.  If
+                        // there are no neighbors to balance with, we delete ourself.
+                        // This condition is only expected in legacy btrees.
                         delBucket(thisLoc, id);
                     }
                 }
                 return;
             }
-            markUnused(p);
+            deleteInternalKey( thisLoc, p, id, order );
             return;
         }
 
@@ -781,8 +779,50 @@ namespace mongo {
             _delKeyAtPos(p);
             mayBalanceWithNeighbors( thisLoc, id, order );
         } else {
-            markUnused(p);
+            deleteInternalKey( thisLoc, p, id, order );
         }
+    }
+    
+    /**
+     * This function replaces the specified key (k) by either the prev or next
+     * key in the btree (k').  We require that k have either a left or right
+     * child.  If k has a left child, we set k' to the prev key of k, which must
+     * be a leaf present in the left child.  If k does not have a left child, we
+     * set k' to the next key of k, which must be a leaf present in the right
+     * child.  When we replace k with k', we copy k' over k (which may cause a
+     * split) and then remove k' from its original location.  Because k' is
+     * stored in a descendent of k, replacing k by k' will not modify the
+     * storage location of the original k', and we can easily remove k' from
+     * its original location.
+     *
+     * This function is only needed in cases where k has a left or right child;
+     * in other cases a simpler key removal implementation is possible.
+     *
+     * NOTE on legacy btree structures:
+     * In legacy btrees, k' can be a nonleaf.  In such a case we 'delete' k by
+     * marking it as an unused node rather than replacing it with k'.  Also, k'
+     * may be a leaf but marked as an unused node.  In such a case we replace
+     * k by k', preserving the key's unused marking.  This function is only
+     * expected to mark a key as unused when handling a legacy btree.
+     */
+    void BtreeBucket::deleteInternalKey( const DiskLoc thisLoc, int keypos, IndexDetails &id, const Ordering &order ) {
+        DiskLoc lchild = childForPos( keypos );
+        DiskLoc rchild = childForPos( keypos + 1 );
+        assert( !lchild.isNull() || !rchild.isNull() );
+        int advanceDirection = lchild.isNull() ? 1 : -1;
+        int advanceKeyOfs = keypos;
+        DiskLoc advanceLoc = advance( thisLoc, advanceKeyOfs, advanceDirection, __FUNCTION__ );
+
+        if ( !advanceLoc.btree()->childForPos( advanceKeyOfs ).isNull() ||
+            !advanceLoc.btree()->childForPos( advanceKeyOfs + 1 ).isNull() ) {
+            // only expected with legacy btrees, see note above
+            markUnused( keypos );
+            return;
+        }
+        
+        KeyNode kn = advanceLoc.btree()->keyNode( advanceKeyOfs );
+        setInternalKey( thisLoc, keypos, kn.recordLoc, kn.key, order, childForPos( keypos ), childForPos( keypos + 1 ), id );
+        advanceLoc.btreemod()->delKeyAtPos( advanceLoc, id, advanceKeyOfs, order );        
     }
 
     void BtreeBucket::replaceWithNextChild( const DiskLoc thisLoc, IndexDetails &id ) {
@@ -1082,13 +1122,17 @@ namespace mongo {
                                      const DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
                                      const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx ) {
         childForPos( keypos ).Null();
+
         // This may leave the bucket empty (n == 0) which is ok only as a
         // transient state.  In the instant case, the implementation of
         // insertHere behaves correctly when n == 0 and as a side effect
         // increments n.
         _delKeyAtPos( keypos, true );
         
-        // just set temporarily, required to pass validation in insertHere()
+        // Ensure we do not orphan neighbor's old child.
+        assert( childForPos( keypos ) == rchild );
+        
+        // Just set temporarily - required to pass validation in insertHere()
         childForPos( keypos ) = lchild;
         
         insertHere( thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx );        
@@ -1096,7 +1140,7 @@ namespace mongo {
     
     /**
      * insert a key in this bucket, splitting if necessary.
-     * @keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
+     * @keypos - where to insert the key in range 0..n.  0=make leftmost, n=make rightmost.
      * NOTE this function may free some data, and as a result the value passed for keypos may
      * be invalid after calling insertHere()
      */    
@@ -1117,7 +1161,7 @@ namespace mongo {
 
         {
             const _KeyNode *_kn = &k(keypos);
-            _KeyNode *kn = (_KeyNode *) dur::alreadyDeclared((_KeyNode*) _kn); // already declared intent in basicInsert()
+            _KeyNode *kn = (_KeyNode *) getDur().alreadyDeclared((_KeyNode*) _kn); // already declared intent in basicInsert()
             if ( keypos+1 == n ) { // last key
                 if ( nextChild != lchild ) {
                     out() << "ERROR nextChild != lchild" << endl;
@@ -1148,7 +1192,7 @@ namespace mongo {
                     assert(false);
                 }
                 const DiskLoc *pc = &k(keypos+1).prevChildBucket;
-                *dur::alreadyDeclared((DiskLoc*) pc) = rchild; // declared in basicInsert()
+                *getDur().alreadyDeclared((DiskLoc*) pc) = rchild; // declared in basicInsert()
                 if ( !rchild.isNull() )
                     rchild.btree()->parent.writing() = thisLoc;
             }
@@ -1679,7 +1723,7 @@ namespace mongo {
         while( 1 ) { 
             if( loc.btree()->tempNext().isNull() ) { 
                 // only 1 bucket at this level. we are done.
-                dur::writingDiskLoc(idx.head) = loc;
+                getDur().writingDiskLoc(idx.head) = loc;
                 break;
             }
             levels++;

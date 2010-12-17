@@ -26,18 +26,39 @@
 namespace mongo {
 
     /**
-     * distributed locking mechanism
+     * The distributed lock is a configdb backed way of synchronizing system-wide tasks. A task must be identified by a
+     * unique name across the system (e.g., "balancer"). A lock is taken by writing a document in the configdb's locks
+     * collection with that name. 
+     *
+     * To be maintained, each taken lock needs to be revalidaded ("pinged") within a pre-established amount of time. This 
+     * class does this maintenance automatically once a DistributedLock object was constructed.
      */
     class DistributedLock {
     public:
 
         /**
-       what does this do ???  what is conn? name?
-         * @param takeoverMinutes how long before we steal lock in minutes
+         * The constructor does not connect to the configdb yet and constructing does not mean the lock was acquired. 
+         * Construction does trigger a lock "pinging" mechanism, though.
+         *
+         * @param conn address of config(s) server(s)
+         * @param name identifier for the lock
+         * @param takeoverMinutes how long can the log go "unpinged" before a new attempt to lock steals it (in minutes)
          */
         DistributedLock( const ConnectionString& conn , const string& name , unsigned takeoverMinutes = 10 );
 
+        /**
+         * Attempts to aquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
+         * consider using the dist_lock_try construct to acquire this lock in an exception safe way.
+         * 
+         * @param why human readable description of why the lock is being taken (used to log)
+         * @param other configdb's lock document that is currently holding the lock, if lock is taken
+         * @return true if it managed to grab the lock
+         */
         bool lock_try( string why , BSONObj * other = 0 );
+
+        /**
+         * Releases a previously taken lock.
+         */
         void unlock();
 
     private:

@@ -541,6 +541,8 @@ MapReduceResult.prototype._simpleKeys = function(){
 }
 
 MapReduceResult.prototype.find = function(){
+    if ( this.results )
+        return this.results;
     return DBCollection.prototype.find.apply( this._coll , arguments );
 }
 
@@ -560,10 +562,15 @@ MapReduceResult.prototype.convertToSingleObject = function(){
 /**
 * @param optional object of optional fields;
 */
-DBCollection.prototype.mapReduce = function( map , reduce , optional ){
+DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString ){
     var c = { mapreduce : this._shortName , map : map , reduce : reduce };
-    if ( optional )
-        Object.extend( c , optional );
+    assert( optionsOrOutString , "need to an optionsOrOutString" )
+
+    if ( typeof( optionsOrOutString ) == "string" )
+        c["out"] = optionsOrOutString;
+    else
+        Object.extend( c , optionsOrOutString );
+
     var raw = this._db.runCommand( c );
     if ( ! raw.ok )
         throw "map reduce failed: " + tojson( raw );

@@ -27,6 +27,17 @@ using namespace std;
 using namespace mongoutils;
 
 int main() {
+    {
+        string s = "abcde";
+        str::stripTrailing(s, "ef");
+        assert( s == "abcd" );
+        str::stripTrailing(s, "abcd");
+        assert( s.empty() );
+        s = "abcddd";
+        str::stripTrailing(s, "d");
+        assert( s == "abc" );
+    }
+
     string x = str::after("abcde", 'c');
     assert( x == "de" );
     assert( str::after("abcde", 'x') == "" );

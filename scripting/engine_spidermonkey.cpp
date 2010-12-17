@@ -1194,7 +1194,7 @@ namespace mongo {
             _roots.push_back( root );
         }
 
-        void init( BSONObj * data ){
+        void init( const BSONObj * data ){
             smlock;
             if ( ! data )
                 return;
@@ -1429,7 +1429,7 @@ namespace mongo {
             jsval ret = JSVAL_VOID;
 
             installInterrupt( timeoutMs );
-            JSBool worked = JS_EvaluateScript( _context , _global , code.data() , code.size() , name.c_str() , 0 , &ret );
+            JSBool worked = JS_EvaluateScript( _context , _global , code.data() , code.size() , name.c_str() , 1 , &ret );
             uninstallInterrupt( timeoutMs );
 
             if ( ! worked && _error.size() == 0 ){

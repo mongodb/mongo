@@ -117,11 +117,22 @@ namespace mongo {
         virtual void appendPrefix( stringstream& ss ) const { ss << "massert:"; }
     };
 
+
     void asserted(const char *msg, const char *file, unsigned line);
     void wasserted(const char *msg, const char *file, unsigned line);
+
+    /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user 
+       could cause, such as dupliate key, disk full, etc.
+    */
     void uasserted(int msgid, const char *msg);
     inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }
-    void uassert_nothrow(const char *msg); // reported via lasterror, but don't throw exception
+
+    /** reported via lasterror, but don't throw exception */
+    void uassert_nothrow(const char *msg); 
+
+    /** msgassert and massert are for errors that are internal but have a well defined error text string.
+        a stack trace is logged.
+    */
     void msgassertedNoTrace(int msgid, const char *msg);
     inline void msgassertedNoTrace(int msgid, const string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
     void msgasserted(int msgid, const char *msg);

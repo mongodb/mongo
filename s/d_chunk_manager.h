@@ -101,9 +101,20 @@ namespace mongo {
          */
         bool belongsToMe( const BSONObj& obj ) const;
 
+        /**
+         * Given a chunk's min key (or empty doc), gets the boundary of the chunk following that one (the first).
+         *
+         * @param lookupKey is the min key for a previously obtained chunk or the empty document
+         * @param foundMin IN/OUT min for chunk following the one starting at lookupKey
+         * @param foundMax IN/OUT max for the above chunk
+         * @return true if the chunk returned is the last one
+         */
+        bool getNextChunk( const BSONObj& lookupKey, BSONObj* foundMin , BSONObj* foundMax ) const;
+
         // accessors
 
         ShardChunkVersion getVersion() const { return _version; }
+        BSONObj getKey() const { return _key.getOwned(); }
         unsigned getNumChunks() const { return _chunksMap.size(); }
 
     private:

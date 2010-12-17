@@ -49,9 +49,10 @@ namespace mongo {
 
 
     /**
-       this is the main entry point into the mongo grid fs
+      GridFS is for storing large file-style objects in MongoDB.
+      @see http://www.mongodb.org/display/DOCS/GridFS+Specification
      */
-    class GridFS{
+    class GridFS {
     public:
         /**
          * @param client - db connection
@@ -88,6 +89,7 @@ namespace mongo {
          * @return the file object
          */
         BSONObj storeFile( const char* data , size_t length , const string& remoteName , const string& contentType="");
+
         /**
          * removes file referenced by fileName from the db
          * @param fileName filename (in GridFS) of the file to remove

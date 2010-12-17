@@ -96,6 +96,20 @@ namespace mongo {
 
     class DBClientBase;
 
+    /**
+     * ConnectionString handles parsing different ways to connect to mongo and determining method
+     * samples:
+     *    server
+     *    server:port
+     *    foo/server:port,server:port   SET
+     *    server,server,server          SYNC
+     * 
+     * tyipcal use
+     * string errmsg,
+     * ConnectionString cs = ConnectionString::parse( url , errmsg );
+     * if ( ! cs.isValid() ) throw "bad: " + errmsg;
+     * DBClientBase * conn = cs.connect( errmsg );
+     */
     class ConnectionString {
     public:
         enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC };
@@ -730,7 +744,7 @@ namespace mongo {
            insert an object into the database
          */
         virtual void insert( const string &ns , BSONObj obj );
-
+        
         /**
            insert a vector of objects into the database
          */
@@ -750,14 +764,6 @@ namespace mongo {
         virtual bool isFailed() const = 0;
         
         virtual void killCursor( long long cursorID ) = 0;
-
-        static int countCommas( const string& s ){
-            int n = 0;
-            for ( unsigned i=0; i<s.size(); i++ )
-                if ( s[i] == ',' )
-                    n++;
-            return n;
-        }
 
         virtual bool callRead( Message& toSend , Message& response ) = 0;
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
@@ -1002,13 +1008,14 @@ namespace mongo {
         virtual bool isMember( const DBConnector * conn ) const;
 
         virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
+        
+        virtual bool isFailed() const {
+            return _currentMaster == 0 || _currentMaster->isFailed();
+        }
 
     protected:                
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
         
-        bool isFailed() const {
-            return _currentMaster == 0 || _currentMaster->isFailed();
-        }
     };
     
     /** pings server to check if it's up

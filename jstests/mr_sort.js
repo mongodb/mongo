@@ -24,17 +24,17 @@ r = function( k , v ){
 }
 
 
-res = t.mapReduce( m , r );
+res = t.mapReduce( m , r , "mr_sort_out " );
 x = res.convertToSingleObject();
 res.drop();
 assert.eq( { "a" : 55 } , x , "A1" )
 
-res = t.mapReduce( m , r , { query : { x : { $lt : 3 } } } )
+res = t.mapReduce( m , r , { out : "mr_sort_out" , query : { x : { $lt : 3 } } } )
 x = res.convertToSingleObject();
 res.drop();
 assert.eq( { "a" : 3 } , x , "A2" )
 
-res = t.mapReduce( m , r , { sort : { x : 1 } , limit : 2 } );
+res = t.mapReduce( m , r , { out : "mr_sort_out" , sort : { x : 1 } , limit : 2 } );
 x = res.convertToSingleObject();
 res.drop();
 assert.eq( { "a" : 3 } , x , "A3" )

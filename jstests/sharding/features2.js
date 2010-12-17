@@ -92,8 +92,10 @@ r = function( key , values ){
 
 doMR = function( n ){
     print(n);
-
-    var res = db.mr.mapReduce( m , r );
+    
+    // on-disk
+    
+    var res = db.mr.mapReduce( m , r , "smr1_out" );
     printjson( res );
     assert.eq( new NumberLong(4) , res.counts.input , "MR T0 " + n );
 
@@ -103,11 +105,30 @@ doMR = function( n ){
     var z = {};
     x.find().forEach( function(a){ z[a._id] = a.value.count; } );
     assert.eq( 3 , Object.keySet( z ).length , "MR T2 " + n );
-    assert.eq( 2 , z.a , "MR T2 " + n );
-    assert.eq( 3 , z.b , "MR T2 " + n );
-    assert.eq( 3 , z.c , "MR T2 " + n );
+    assert.eq( 2 , z.a , "MR T3 " + n );
+    assert.eq( 3 , z.b , "MR T4 " + n );
+    assert.eq( 3 , z.c , "MR T5 " + n );
 
     x.drop();
+
+    // inline
+
+    var res = db.mr.mapReduce( m , r , { out : { inline : 1 } } );
+    printjson( res );
+    assert.eq( new NumberLong(4) , res.counts.input , "MR T6 " + n );
+
+    var z = {};
+    res.find().forEach( function(a){ z[a._id] = a.value.count; } );
+    printjson( z );
+    assert.eq( 3 , Object.keySet( z ).length , "MR T7 " + n ) ;
+    assert.eq( 2 , z.a , "MR T8 " + n );
+    assert.eq( 3 , z.b , "MR T9 " + n );
+    assert.eq( 3 , z.c , "MR TA " + n );
+
+    print( "sleeping for eliot" );
+    sleep( 20000 );
+    
+
 }
 
 doMR( "before" );

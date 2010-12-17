@@ -430,6 +430,13 @@ namespace mongo {
         void setInternalKey( const DiskLoc thisLoc, int keypos,
                             const DiskLoc recordLoc, const BSONObj &key, const Ordering &order,
                             const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx);
+        
+        /**
+         * Deletes the specified key, replacing it with the key immediately 
+         * preceding or succeeding it in the btree.  Either the left or right
+         * child of the specified key must be non null.
+         */
+        void deleteInternalKey( const DiskLoc thisLoc, int keypos, IndexDetails &id, const Ordering &order );
     public:
         /** simply builds and returns a dup key error message string */
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );

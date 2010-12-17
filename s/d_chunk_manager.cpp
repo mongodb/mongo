@@ -31,8 +31,8 @@ namespace mongo {
         // have to get a connection to the config db
         // special case if i'm the configdb since i'm locked and if i connect to myself
         // its a deadlock
-        auto_ptr<ScopedDbConnection> scoped;
-        auto_ptr<DBDirectClient> direct;
+        scoped_ptr<ScopedDbConnection> scoped;
+        scoped_ptr<DBDirectClient> direct;
         DBClientBase * conn;
         if ( configServer.empty() ){
             direct.reset( new DBDirectClient() );
@@ -158,6 +158,34 @@ namespace mongo {
         #endif
 
         return good;
+    }
+
+    bool ShardChunkManager::getNextChunk( const BSONObj& lookupKey, BSONObj* foundMin , BSONObj* foundMax ) const {
+        assert( foundMin );
+        assert( foundMax );
+        *foundMin = BSONObj();
+        *foundMax = BSONObj();
+
+        if ( _chunksMap.empty() ) {
+            return true;
+        }
+
+        RangeMap::const_iterator it;
+        if ( lookupKey.isEmpty() ) {
+            it = _chunksMap.begin();
+            *foundMin = it->first;
+            *foundMax = it->second;
+            return _chunksMap.size() == 1;
+        }
+
+        it = _chunksMap.upper_bound( lookupKey );
+        if ( it != _chunksMap.end() ) {
+            *foundMin = it->first;
+            *foundMax = it->second;
+            return false;
+        }
+            
+        return true;
     }
 
     void ShardChunkManager::_assertChunkExists( const BSONObj& min , const BSONObj& max ) const {

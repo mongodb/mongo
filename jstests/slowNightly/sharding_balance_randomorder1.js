@@ -1,7 +1,6 @@
 // sharding_balance1.js
 
-
-s = new ShardingTest( "slow_sharding_balance1" , 2 , 2 , 1 , { chunksize : 1 } )
+s = new ShardingTest( "sharding_balance_randomorder1" , 2 , 2 , 1 , { chunksize : 1 } )
 
 s.adminCommand( { enablesharding : "test" } );
 

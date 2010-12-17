@@ -224,13 +224,19 @@ namespace mongo {
                         BSONObjIterator fields(op.embeddedObject());
                         while(fields.more()){
                             const string field = fields.next().fieldName();
-                            uassert(13123, "Can't modify shard key's value", ! manager->getShardKey().partOfShardKey(field));
+                            uassert(13123, 
+                                    str::stream() << "Can't modify shard key's value field" << field 
+                                                  << " for collection: " << manager->getns(),
+                                    ! manager->getShardKey().partOfShardKey(field));
                         }
                     }
                 } else if ( manager->hasShardKey( toupdate ) ){
-                    uassert( 8014, "cannot modify shard key", manager->getShardKey().compare( query , toupdate ) == 0 );
+                    uassert( 8014, 
+                             str::stream() << "cannot modify shard key for collection: " << manager->getns(),
+                             manager->getShardKey().compare( query , toupdate ) == 0 );
                 } else {
-                    uasserted(12376, "shard key must be in update object");
+                    uasserted(12376, 
+                              str::stream() << "shard key must be in update object for collection: " << manager->getns() );
                 }
             }
             

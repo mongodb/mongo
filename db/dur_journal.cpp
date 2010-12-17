@@ -1,4 +1,4 @@
-// @file dur_journal.cpp
+// @file dur_journal.cpp writing to the writeahead logging journal
 
 /**
 *    Copyright (C) 2010 10gen Inc.
@@ -17,8 +17,6 @@
 */
 
 #include "pch.h"
-
-#if defined(_DURABLE)
 
 #include "client.h"
 #include "namespace.h"
@@ -41,7 +39,7 @@ namespace mongo {
     namespace dur {
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 8 );
-        BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 20 );
+        BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 32 );
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
 
         filesystem::path getJournalDir() { 
@@ -63,8 +61,8 @@ namespace mongo {
         }
 
         JHeader::JHeader(string fname) { 
-            txt[0] = 'j'; txt[1] = '\n';
-            version = 0x4141;
+            magic[0] = 'j'; magic[1] = '\n';
+            _version = CurrentVersion;
             memset(ts, 0, sizeof(ts));
             strncpy(ts, time_t_to_String_short(time(0)).c_str(), sizeof(ts)-1);
             memset(dbpath, 0, sizeof(dbpath));
@@ -78,11 +76,11 @@ namespace mongo {
             static const unsigned long long DataLimit = 1 * 1024 * 1024 * 1024;
         public:
             string dir; // set by journalMakeDir() during initialization
-            MVar<path> &toUnlink;
+            MVar<path> &toUnlink; // unlinks of old journal threads are via background thread
 
             Journal() : 
               toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
-              _lfMutex("lfMutex")
+              _lfMutex("JournalLfMutex")
             { 
                 _written = 0;
                 _nextFileNumber = 0;
@@ -114,14 +112,31 @@ namespace mongo {
             mutex _lfMutex; // lock when using _lf
         };
 
-        static Journal j;
+        Journal j;
 
         path Journal::getFilePathFor(int filenumber) const { 
             filesystem::path p(dir);
-            p /= (str::stream() << "j._" << filenumber);
+            p /= string(str::stream() << "j._" << filenumber);
             return p;
         }
 
+        /** never throws 
+            @return true if journal dir is not emptya
+        */
+        bool haveJournalFiles() { 
+            try {
+                for ( boost::filesystem::directory_iterator i( getJournalDir() );
+                      i != boost::filesystem::directory_iterator(); 
+                      ++i ) {
+                    string fileName = boost::filesystem::path(*i).leaf();
+                    if( str::startsWith(fileName, "j._") )
+                        return true;
+                }
+            }
+            catch(...) { }
+            return false;
+        }
+        
         /** throws */
         void removeJournalFiles() { 
             try {
@@ -197,6 +212,7 @@ namespace mongo {
             _open();
         }
 
+        /** background removal of old journal files */
         void unlinkThread() { 
             Client::initThread("unlink");
             while( 1 ) {
@@ -283,8 +299,7 @@ namespace mongo {
     }
 }
 
-#endif
-
 /* todo 
-   test (and handle) disk full on journal append 
+   test (and handle) disk full on journal append.  best quick thing to do is to terminate.
+   if we roll back operations, there are nuances such as is ReplSetImpl::lastOpTimeWritten too new in ram then?
 */

@@ -18,63 +18,94 @@
 
 #pragma once
 
+#include "../util/md5.hpp"
+
 namespace mongo {
 
     namespace dur {
 
 #pragma pack(1)
-        /** header for a journal/j._<n> file */
+        /** beginning header for a journal/j._<n> file 
+            there is nothing important int this header at this time.  except perhaps version #.
+        */
         struct JHeader {
             JHeader() { }
             JHeader(string fname);
 
-            char txt[2];
-            unsigned short version;
+            char magic[2]; // "j\n". j means journal, then a linefeed, fwiw if you were to run "less" on the file or something...
 
-            // these are just for diagnostic ease
-            char n1;
-            char ts[20]; 
-            char n2;
-            char dbpath[128];
-            char n3, n4;
+            // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near 
+            // that.  simply incrementing the version # is safe on a fwd basis.
+            enum { CurrentVersion = 0x4142 };
+            unsigned short _version;
 
-            char reserved3[8192 - 68 - 96 + 10 -4]; // 8KB total for the file header
-            char txt2[2];
+            // these are just for diagnostic ease (make header more useful as plain text)
+            char n1; // '\n'
+            char ts[20]; // offset 6.  ascii timestamp of file generation.  for user reading, not used by code.
+            char n2; // '\n'
+            char dbpath[128]; // offset 27.  path/filename of this file for human reading and diagnostics.  not used by code. 
+            char n3, n4; // '\n', '\n'
 
-            bool versionOk() const { return version == 0x4141; }
-            bool valid() const { return txt[0] == 'j' && txt2[1] == '\n'; }
+            char reserved3[8034]; // 8KB total for the file header
+            char txt2[2];         // "\n\n" offset 8190
+
+            bool versionOk() const { return _version == CurrentVersion; }
+            bool valid() const { return magic[0] == 'j' && txt2[1] == '\n'; }
         };
 
-        /** "Section" header.  A section corresponds to a group commit. */
+        /** "Section" header.  A section corresponds to a group commit.
+            len is length of the entire section including header and footer.
+        */
         struct JSectHeader {
-            char txt[4];
+            char magic[4]; // "\nhh\n"
             unsigned len; // length in bytes of the whole section
         };
 
         /** an individual operation within section.  Either the entire section should be applied, or nothing. */
         struct JEntry {
-            static const unsigned OpCode_Footer      = 0xffffffff;
-            static const unsigned OpCode_DbContext   = 0xfffffffe;
-            static const unsigned OpCode_FileCreated = 0xfffffffd;
-            static const unsigned OpCode_Min         = 0xfffff000;
+            enum OpCodes {
+                OpCode_Footer      = 0xffffffff,
+                OpCode_DbContext   = 0xfffffffe,
+                OpCode_FileCreated = 0xfffffffd,
+                OpCode_DropDb      = 0xfffffffc,
+                OpCode_Min         = 0xfffff000 // higher than max len: OpCode_Min + sizeof(JHeader) > 2^32
+            };
 
-            unsigned len; // or sentinel, see structs below
+            union {
+                unsigned len;    
+                OpCodes opcode;
+            };
             unsigned ofs; // offset in file
             int fileNo;
             // char data[] follows
         };
 
+        /** group commit section footer. md5 is a key field. */
         struct JSectFooter { 
-            JSectFooter() { 
+            JSectFooter(const void* begin, int len) { // needs buffer to compute hash
                 sentinel = JEntry::OpCode_Footer;
-                hash = 0;
                 reserved = 0;
-                txt2[0] = txt2[1] = txt2[2] = txt2[3] = '\n';
+                magic[0] = magic[1] = magic[2] = magic[3] = '\n';
+
+                // skip section header since size modified after hashing
+                (const char*&)begin += sizeof(JSectHeader);
+                len                 -= sizeof(JSectHeader);
+
+                md5(begin, len, hash);
             }
             unsigned sentinel;
-            unsigned hash;
+            md5digest hash; // unsigned char[16]
             unsigned long long reserved;
-            char txt2[4];
+            char magic[4]; // "\n\n\n\n"
+
+            bool checkHash(const void* begin, int len) const {
+                // skip section header since size modified after hashing
+                (const char*&)begin += sizeof(JSectHeader);
+                len                 -= sizeof(JSectHeader);
+                md5digest current;
+                md5(begin, len, current);
+                return (memcmp(hash, current, sizeof(hash)) == 0);
+            }
         };
 
         /** declares "the next entry(s) are for this database / file path prefix" */

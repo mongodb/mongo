@@ -18,7 +18,7 @@ friendlyEqual = function( a , b ){
 
 printStackTrace = function(){
     try{
-        throw new Error("Printing Stack Trace (lines are 0-based in spidermonkey)");
+        throw new Error("Printing Stack Trace");
     } catch (e) {
         print(e.stack);
     }
@@ -1415,7 +1415,7 @@ help = shellHelper.help = function (x) {
         print("\tlistFiles([path])               returns file list");
         print("\thostname()                      returns name of this host");
         print("\tcat(fname)                      returns contents of text file as a string");
-        print("\tremoveFile(f)                   delete a file");
+        print("\tremoveFile(f)                   delete a file or directory");
         print("\tload(jsfilename)                load and execute a .js file");
         print("\trun(program[, args...])         spawn a program and wait for its completion");
         print("\tsleep(m)                        sleep m milliseconds");
@@ -1425,12 +1425,14 @@ help = shellHelper.help = function (x) {
     else if (x == "test") {
         print("\tstartMongodEmpty(args)        DELETES DATA DIR and then starts mongod");
         print("\t                              returns a connection to the new server");
-        print("\tstartMongodTest()             DELETES DATA DIR");
+        print("\tstartMongodTest(port,dir,options)");
+        print("\t                              DELETES DATA DIR");
         print("\t                              automatically picks port #s starting at 27000 and increasing");
         print("\t                              or you can specify the port as the first arg");
         print("\t                              dir is /data/db/<port>/ if not specified as the 2nd arg");
         print("\t                              returns a connection to the new server");
         print("\tresetDbpath(dirpathstr)       deletes everything under the dir specified including subdirs");
+        print("\tstopMongoProgram(port[, signal])");
         return;
     }
     else if (x == "") {

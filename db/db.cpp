@@ -553,6 +553,15 @@ sendmore:
         Client::initThread("initandlisten");
         _diaglog.init();
 
+        if (cmdLine.dur)
+            dur::enableDurability();
+
+        getDur().startup();
+
+        if( cmdLine.durOptions & CmdLine::DurRecoverOnly ) 
+            return;
+
+        // comes after getDur().startup() because this reads from the database
         clearTmpCollections();
 
         Module::initAll();
@@ -562,10 +571,6 @@ sendmore:
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
             globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
         }
-
-        dur::startup();
-        if( cmdLine.durTrace & CmdLine::DurRecoverOnly ) 
-            return;
 
         repairDatabasesAndCheckVersion();
 
@@ -716,9 +721,6 @@ int main(int argc, char* argv[])
         ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
-        ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
-        ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
-        ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
         ;
 
         ms_options.add_options()
@@ -730,7 +732,7 @@ int main(int argc, char* argv[])
         ;
             
         rs_options.add_options()
-        ("replSet", po::value<string>(), "specify repl set seed hostnames format <set id>/<host1>,<host2>,etc...")
+        ("replSet", po::value<string>(), "arg is <setname>[/<optionalseedhostlist>]")
         ;
         
 	sharding_options.add_options()
@@ -745,7 +747,11 @@ int main(int argc, char* argv[])
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
         // these move to unhidden later:
         ("dur", "enable journaling")
-        ("durTrace", po::value<int>(), "durability diagnostic options")
+        ("durOptions", po::value<int>(), "durability diagnostic options")
+        ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
+        ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
+        ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
+        ("nodur", "disable journaling (currently the default)")
         ;
 
 
@@ -828,18 +834,15 @@ int main(int argc, char* argv[])
             cmdLine.quota = true;
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
         }
+        if( params.count("nodur") ) { 
+            cmdLine.dur = false;
+        }
         if( params.count("dur") ) { 
             cmdLine.dur = true;
-#if !defined(_DURABLE)
-            log() << "--dur not yet available" << endl;
-            assert( false );
-#endif
+            log() << "***** WARNING --dur should not be used yet except for testing" << endl;
         }
-        if (params.count("durTrace")) {
-            cmdLine.durTrace = params["durTrace"].as<int>();
-#if !defined(_DURABLE)
-            assert( cmdLine.durTrace == 0 );
-#endif
+        if (params.count("durOptions")) {
+            cmdLine.durOptions = params["durOptions"].as<int>();
         }
         if (params.count("objcheck")) {
             objcheck = true;
@@ -901,7 +904,7 @@ int main(int argc, char* argv[])
         if (params.count("upgrade")) {
             shouldRepairDatabases = 1;
         }
-        if (params.count("noTableScan")) {
+        if (params.count("notablescan")) {
             cmdLine.noTableScan = true;
         }
         if (params.count("master")) {

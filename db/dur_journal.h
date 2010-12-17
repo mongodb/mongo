@@ -39,13 +39,20 @@ namespace mongo {
          */
         void journalRotate();
 
-        /** write/append to journal */
-        void journal(const AlignedBuilder& b);
+        /** write/append to journal file *
+            @param buf - a buffer that will be written to the journal.
+            will not return until on disk
+        */
+        void journal(const AlignedBuilder& buf);
 
         /** flag that something has gone wrong during writing to the journal
             (not for recovery mode) 
         */
         void journalingFailure(const char *msg);
 
+        /** never throws.  
+            @return true if there are any journal files in the journal dir. 
+        */
+        bool haveJournalFiles();
     }
 }

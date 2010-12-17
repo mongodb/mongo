@@ -45,9 +45,9 @@ namespace mongo {
         }
         void SetNumber(double d) {
             if ( _element.type() == NumberDouble ) 
-                *dur::writing( reinterpret_cast< double * >( value() )  ) = d;
+                *getDur().writing( reinterpret_cast< double * >( value() )  ) = d;
             else if ( _element.type() == NumberInt ) 
-                *dur::writing( reinterpret_cast< int * >( value() ) ) = (int) d;
+                *getDur().writing( reinterpret_cast< int * >( value() ) ) = (int) d;
             else assert(0);
         }
         void setLong(long long n) { 
@@ -56,7 +56,7 @@ namespace mongo {
         }
         void SetLong(long long n) { 
             assert( _element.type() == NumberLong );
-            *dur::writing( reinterpret_cast< long long * >(value()) ) = n;
+            *getDur().writing( reinterpret_cast< long long * >(value()) ) = n;
         }
         void setInt(int n) { 
             assert( _element.type() == NumberInt );
@@ -64,7 +64,7 @@ namespace mongo {
         }
         void SetInt(int n) { 
             assert( _element.type() == NumberInt );
-            dur::writingInt( *reinterpret_cast< int * >( value() ) ) = n;
+            getDur().writingInt( *reinterpret_cast< int * >( value() ) ) = n;
         }
 
         
@@ -82,7 +82,7 @@ namespace mongo {
             int valsize = e.valuesize();
             int ofs = (int) (v-d);
             dassert( ofs > 0 );
-            char *p = (char *) dur::writingPtr(d, valsize + ofs);
+            char *p = (char *) getDur().writingPtr(d, valsize + ofs);
             *p = e.type();
             memcpy( p + ofs, e.value(), valsize );
         }

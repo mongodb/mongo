@@ -18,7 +18,7 @@
 #pragma once
 
 #include "../util/mmap.h"
-//#include "../util/moveablebuffer.h"
+#include "../util/paths.h"
 
 namespace mongo {
 
@@ -31,8 +31,13 @@ namespace mongo {
         MongoMMF();
         virtual ~MongoMMF();
         virtual void close();
+
+        /** @return true if opened ok. */
         bool open(string fname, bool sequentialHint);
+
+        /** @return file length */
         unsigned long long length() const { return MemoryMappedFile::length(); }
+
         string filename() const { return MemoryMappedFile::filename(); }
         void flush(bool sync)   { MemoryMappedFile::flush(sync); }
 
@@ -67,7 +72,7 @@ namespace mongo {
             fileSuffixNo() is 3
             if the suffix is "ns", fileSuffixNo -1
         */
-        string filePath() const { return _filePath; }
+        RelativePath relativePath() const { return _p; }
         int fileSuffixNo() const { return _fileSuffixNo; }
         void* view_write() { return _view_write; }
 
@@ -87,10 +92,10 @@ namespace mongo {
         void *_view_private;
         void *_view_readonly; // for _DEBUG build
         bool _willNeedRemap;
-        string _filePath;   // e.g. "somepath/dbname"
+        RelativePath _p;   // e.g. "somepath/dbname"
         int _fileSuffixNo;  // e.g. 3.  -1="ns"
 
-        void setPath(string fn);
+        void setPath(string pathAndFileName);
         bool finishOpening();
     };
 

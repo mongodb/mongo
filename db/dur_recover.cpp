@@ -18,8 +18,6 @@
 
 #include "pch.h"
 
-#if defined(_DURABLE)
-
 #include "dur.h"
 #include "dur_journal.h"
 #include "dur_journalformat.h"
@@ -43,9 +41,9 @@ namespace mongo {
          struct FullyQualifiedJournalEntry { 
              bool isBasicWrite() const { return dbName != 0; }
 
-             const char *dbName;
+             const char *dbName; // pointer into mmaped Journal file
              JEntry e;
-             const char *srcData;
+             const char *srcData; // pointer into mmaped Journal file
 
              shared_ptr<DurOp> op;
         };
@@ -84,12 +82,12 @@ namespace mongo {
         class JournalIterator : boost::noncopyable {
         public:
             JournalIterator(void *p, unsigned len) : _br(p, len) {
-                _needHeader = true;
-                *_lastDbName = 0;
+                _sectHead = NULL;
+                _lastDbName = NULL;
 
                 JHeader h;
                 _br.read(h); // read/skip file header
-                uassert(13536, str::stream() << "journal version number mismatch " << h.version, h.versionOk());
+                uassert(13536, str::stream() << "journal version number mismatch " << h._version, h.versionOk());
                 uassert(13537, "journal header invalid", h.valid());
             }
 
@@ -100,19 +98,31 @@ namespace mongo {
              *  throws on premature end of section. 
              */
             bool next(FullyQualifiedJournalEntry& e) { 
-                if( _needHeader ) {
-                    JSectHeader h;
-                    _br.read(h);
-                    _needHeader = false;
+                if( !_sectHead ) {
+                    _sectHead = static_cast<const JSectHeader*>(_br.pos());
+                    _br.skip(sizeof(JSectHeader));
                 }
 
                 unsigned lenOrOpCode;
                 _br.read(lenOrOpCode);
                 if( lenOrOpCode >= JEntry::OpCode_Min ) { 
                     if( lenOrOpCode == JEntry::OpCode_Footer ) { 
-                        _needHeader = true;
+                        const char* pos = (const char*) _br.pos();
+                        pos -= sizeof(lenOrOpCode); // rewind to include OpCode
+                        const JSectFooter& footer = *(const JSectFooter*)pos;
+
+                        int len = pos - (char*)_sectHead;
+                        if (!footer.checkHash(_sectHead, len)){
+                            massert(13594, str::stream() << "Journal checksum doesn't match. recorded: "
+                                                         << toHex(footer.hash, sizeof(footer.hash))
+                                                         << " actual: " << md5simpledigest(_sectHead, len)
+                                    , false);
+                        }
+
                         _br.skip(sizeof(JSectFooter) - 4);
                         _br.align(Alignment);
+
+                        _sectHead = NULL;
                         return false;
                     }
 
@@ -124,20 +134,11 @@ namespace mongo {
 
                     // JDbContext
                     {
-                        char c;
-                        char *p = _lastDbName;
-                        char *end = p + Namespace::MaxNsLen;
-                        while( 1 ) { 
-                            _br.read(c);
-                            *p++ = c;
-                            if( c == 0 )
-                                break;
-                            if( p >= end ) { 
-                                /* this shouldn't happen, even if log is truncated. */
-                                log() << _br.offset() << endl;
-                                uasserted(13533, "problem processing journal file during recovery");
-                            }
-                        }
+                        _lastDbName = (const char*) _br.pos();
+                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _br.remaining());
+                        const unsigned len = strnlen(_lastDbName, limit);
+                        massert(13533, "problem processing journal file during recovery", _lastDbName[len] == '\0');
+                        _br.skip(len+1); // skip '\0' too
 
                         _br.read(lenOrOpCode);
                     }
@@ -153,9 +154,9 @@ namespace mongo {
                 return true;
             }
         private:
-            bool _needHeader;
+            const JSectHeader* _sectHead;
             BufReader _br;
-            char _lastDbName[Namespace::MaxNsLen];
+            const char *_lastDbName; // pointer into mmaped journal file
         };
 
        /** call go() to execute a recovery from existing journal files.
@@ -177,7 +178,9 @@ namespace mongo {
             */
             void* ptr(const char *dbName, int fileNo, unsigned ofs);
 
+            // fileno,dbname -> map
             map< pair<int,string>, void* > _fileToPtr;
+
             list< shared_ptr<MemoryMappedFile> > _files;
         };
         
@@ -205,9 +208,18 @@ namespace mongo {
                     */
                     fn = ss.str();
                 }
-                p = f->map(fn.c_str());
+                path full(dbpath);
+                try {
+                    // relative name -> full path name
+                    full /= fn;
+                    p = f->map(full.string().c_str());
+                }
+                catch(DBException&) { 
+                    log() << "recover error opening file " << full.string() << endl;
+                    throw;
+                }
                 uassert(13534, str::stream() << "recovery error couldn't open " << fn, p);
-                if( cmdLine.durTrace & CmdLine::DurDumpJournal ) 
+                if( cmdLine.durOptions & CmdLine::DurDumpJournal ) 
                     log() << "  opened " << fn << ' ' << f->length()/1024.0/1024.0 << endl;
                 uassert(13543, str::stream() << "recovery error file has length zero " << fn, f->length());
                 assert( ofs < f->length() );
@@ -229,22 +241,9 @@ namespace mongo {
             _fileToPtr.clear();
         }
 
-        string hexdump(const char *data, unsigned len) {
-            const unsigned char *p = (const unsigned char *) data;
-            stringstream ss;
-            for( unsigned i = 0; i < 4 && i < len; i++ ) {
-                ss << std::hex << setw(2) << setfill('0');
-                unsigned n = p[i];
-                ss << n;
-                ss << ' ';
-            }
-            string s = ss.str();
-            return s;
-        }
-
         void RecoveryJob::applyEntries(const vector<FullyQualifiedJournalEntry> &entries) { 
-            bool apply = (cmdLine.durTrace & CmdLine::DurScanOnly) == 0;
-            bool dump = cmdLine.durTrace & CmdLine::DurDumpJournal;
+            bool apply = (cmdLine.durOptions & CmdLine::DurScanOnly) == 0;
+            bool dump = cmdLine.durOptions & CmdLine::DurDumpJournal;
             if( dump )
                 log() << "BEGIN section" << endl;
             
@@ -267,6 +266,9 @@ namespace mongo {
                         log() << "  OP " << fqe.op->toString() << endl;
                     } 
                     if( apply ) {
+                        if( fqe.op->needFilesClosed() ) {
+                            close();
+                        }
                         fqe.op->replay();
                     }
                 }
@@ -300,7 +302,7 @@ namespace mongo {
                 }
             }
             catch( BufReader::eof& ) { 
-                if( cmdLine.durTrace & CmdLine::DurDumpJournal )
+                if( cmdLine.durOptions & CmdLine::DurDumpJournal )
                     log() << "ABRUPT END" << endl;
                 return true; // abrupt end
             }
@@ -330,8 +332,8 @@ namespace mongo {
 
             close();
 
-            if( cmdLine.durTrace & CmdLine::DurScanOnly ) {
-  			    uasserted(13545, str::stream() << "--durTrace " << (int) CmdLine::DurScanOnly << " specified, terminating");
+            if( cmdLine.durOptions & CmdLine::DurScanOnly ) {
+                uasserted(13545, str::stream() << "--durOptions " << (int) CmdLine::DurScanOnly << " specified, terminating");
             }
 
             log() << "recover cleaning up" << endl;
@@ -366,13 +368,13 @@ namespace mongo {
             j.go(journalFiles);
        }
 
-  	    struct BufReaderY { int a,b; };
+        struct BufReaderY { int a,b; };
         class BufReaderUnitTest : public UnitTest {
         public:
             void run() { 
-  			    BufReader r((void*) "abcdabcdabcd", 12);
+                BufReader r((void*) "abcdabcdabcd", 12);
                 char x;
-				BufReaderY y;
+                BufReaderY y;
                 r.read(x); cout << x; // a
                 assert( x == 'a' );
                 r.read(y);
@@ -385,4 +387,3 @@ namespace mongo {
 
 } // namespace mongo
 
-#endif

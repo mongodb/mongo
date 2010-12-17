@@ -23,9 +23,18 @@
 namespace mongo { 
 
     inline Namespace& Namespace::operator=(const char *ns) {
-        uassert( 10080 , "ns name too long, max size is 128", strlen(ns) < MaxNsLen);
-        //memset(buf, 0, MaxNsLen); /* this is just to keep stuff clean in the files for easy dumping and reading */
-        strcpy_s(buf, MaxNsLen, ns);
+        // we fill the remaining space with all zeroes here.  as the full Namespace struct is in 
+        // the datafiles (the .ns files specifically), that is helpful as then they are deterministic 
+        // in the bytes they have for a given sequence of operations.  that makes testing and debugging
+        // the data files easier.
+        //
+        // if profiling indicates this method is a significant bottleneck, we could have a version we 
+        // use for reads which does not fill with zeroes, and keep the zeroing behavior on writes.
+        //
+        unsigned len = strlen(ns);
+        uassert( 10080 , "ns name too long, max size is 128", len < MaxNsLen);
+        memset(buf, 0, MaxNsLen);
+        memcpy(buf, ns, len);
         return *this;
     }
 

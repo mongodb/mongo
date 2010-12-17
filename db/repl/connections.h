@@ -65,9 +65,9 @@ namespace mongo {
 
     private:
         auto_ptr<scoped_lock> connLock;
-        static mutex mapMutex;
+        static mongo::mutex mapMutex;
         struct X { 
-            mutex z;
+            mongo::mutex z;
             DBClientConnection cc;
             X() : z("X"), cc(/*reconnect*/ true, 0, /*timeout*/ 10.0) { 
                 cc._logLevel = 2;

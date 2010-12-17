@@ -61,7 +61,7 @@ case "$1" in
     restart
     ;;
   condrestart)
-    [ -f /var/lock/subsys/mongodb ] && restart || :
+    [ -f /var/lock/subsys/mongod ] && restart || :
     ;;
   status)
     status $mongod

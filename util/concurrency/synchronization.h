@@ -18,13 +18,12 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
-
 #include "mutex.h"
 
 namespace mongo {
 
     /*
-     * A class to establish a sinchronization point between two threads. One thread is the waiter and one is
+     * A class to establish a synchronization point between two threads. One thread is the waiter and one is
      * the notifier. After the notification event, both proceed normally.
      *
      * This class is thread-safe.
@@ -40,7 +39,7 @@ namespace mongo {
         void waitToBeNotified();
 
         /*
-         * Notifies the waiter of '*this' that it can proceed.
+         * Notifies the waiter of '*this' that it can proceed.  Can only be called once.
          */
         void notifyOne();
 
@@ -48,6 +47,27 @@ namespace mongo {
         mongo::mutex _mutex;          // protects state below
         bool _notified;               // was notifyOne() issued?
         boost::condition _condition;  // cond over _notified being true
+    };
+
+    /** establishes a synchronization point between threads. N threads are waits and one is notifier.
+        threadsafe.
+    */
+    class NotifyAll : boost::noncopyable { 
+    public:
+        NotifyAll();
+
+        /** awaits the next notifyAll() call by another thread. notifications that precede this 
+            call are ignored -- we are looking for a fresh event. 
+        */
+        void wait();
+
+        /** may be called multiple times. notifies all waiters */
+        void notifyAll();
+
+    private:
+        mongo::mutex _mutex;
+        unsigned long long _counter;
+        boost::condition _condition;
     };
 
 } // namespace mongo

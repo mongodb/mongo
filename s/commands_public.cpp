@@ -842,9 +842,7 @@ namespace mongo {
                          fn == "verbose" ){
                         b.append( e );
                     }
-                    else if ( fn == "keeptemp" ||
-                              fn == "out" ||
-                              fn == "outType" ||
+                    else if ( fn == "out" ||
                               fn == "finalize" ){
                         // we don't want to copy these
                     }

@@ -303,7 +303,7 @@ namespace BtreeTests {
         }        
     };
     
-    class ReuseUnused : public Base {
+    class DontReuseUnused : public Base {
     public:
         void run() {
             for ( int i = 0; i < 10; ++i ) {
@@ -313,7 +313,7 @@ namespace BtreeTests {
             BSONObj root = key( 'p' );
             unindex( root );
             Base::insert( root );
-            locate( root, 0, true, dl(), 1 );
+            locate( root, 0, true, bt()->getNextChild(), 1 );
         }
     private:
         BSONObj key( char c ) {
@@ -410,8 +410,8 @@ namespace BtreeTests {
             }
             // too much work to try to make this happen through inserts and deletes
             // we are intentionally manipulating the btree bucket directly here
-            dur::writingDiskLoc( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket ) ) = DiskLoc();
-            dur::writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
+            getDur().writingDiskLoc( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket ) ) = DiskLoc();
+            getDur().writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
             BSONObj k = BSON( "a" << toInsert );
             Base::insert( k );
         }
@@ -542,7 +542,7 @@ namespace BtreeTests {
         }
         static void set( const DiskLoc &l, IndexDetails &id ) {
             ArtificialTree::is( id.head )->deallocBucket( id.head, id );
-            dur::writingDiskLoc(id.head) = l;
+            getDur().writingDiskLoc(id.head) = l;
         }
         static string expectedKey( const char *spec ) {
             if ( spec[ 0 ] != '$' ) {
@@ -1424,6 +1424,194 @@ namespace BtreeTests {
         }
     };
     
+    class DelInternal : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null,c:{b:null},d:null}", id() );
+            int unused = 0;
+            ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "c" );
+//            dump();
+            ASSERT( unindex( k ) );
+//            dump();
+            ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 1, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{a:null,b:null,d:null}", id() );                                    
+        }
+    };
+    
+    class DelInternalReplaceWithUnused : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null,c:{b:null},d:null}", id() );
+            getDur().writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket.btree()->keyNode( 0 ).recordLoc ).GETOFS() ) |= 1; // make unused
+            int unused = 0;
+            ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 1, unused );
+            ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "c" );
+//            dump();
+            ASSERT( unindex( k ) );
+//            dump();
+            unused = 0;
+            ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 1, unused );
+            ASSERT_EQUALS( 1, nsdetails( ns.c_str() )->stats.nrecords );
+            // doesn't discriminate between used and unused
+            ArtificialTree::checkStructure( "{a:null,b:null,d:null}", id() );                                                
+        }
+    };
+    
+    class DelInternalReplaceRight : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null,_:{b:null}}", id() );
+            int unused = 0;
+            ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "a" );
+//            dump();
+            ASSERT( unindex( k ) );
+//            dump();
+            unused = 0;
+            ASSERT_EQUALS( 1, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 1, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{b:null}", id() );                                                            
+        }
+    };
+    
+    class DelInternalPromoteKey : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null,y:{d:{c:{b:null}},_:{e:null}},z:null}", id() );
+            int unused = 0;
+            ASSERT_EQUALS( 7, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 5, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "y" );
+//            dump();
+            ASSERT( unindex( k ) );
+//            dump();
+            unused = 0;
+            ASSERT_EQUALS( 6, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{a:null,e:{c:{b:null},d:null},z:null}", id() );                                                            
+        }
+    };
+
+    class DelInternalPromoteRightKey : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null,_:{e:{c:null},_:{f:null}}}", id() );
+            int unused = 0;
+            ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "a" );
+//            dump();
+            ASSERT( unindex( k ) );
+//            dump();
+            unused = 0;
+            ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{c:null,_:{e:null,f:null}}", id() );                                                            
+        }
+    };
+    
+    class DelInternalReplacementPrevNonNull : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null,d:{c:{b:null}},e:null}", id() );
+            int unused = 0;
+            ASSERT_EQUALS( 5, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "d" );
+            //            dump();
+            ASSERT( unindex( k ) );
+            //            dump();
+            ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 1, unused );
+            ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{a:null,d:{c:{b:null}},e:null}", id() );                                    
+            ASSERT( bt()->keyNode( 1 ).recordLoc.getOfs() & 1 ); // check 'unused' key
+        }
+    };    
+
+    class DelInternalReplacementNextNonNull : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{a:null,_:{c:null,_:{d:null}}}", id() );
+            int unused = 0;
+            ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << "a" );
+            //            dump();
+            ASSERT( unindex( k ) );
+            //            dump();
+            ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 1, unused );
+            ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{a:null,_:{c:null,_:{d:null}}}", id() );                                    
+            ASSERT( bt()->keyNode( 0 ).recordLoc.getOfs() & 1 ); // check 'unused' key
+        }
+    };
+    
+    class DelInternalSplitPromoteLeft : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{$10:null,$20:null,$30$10:{$25:{$23:null},_:{$27:null}},$40:null,$50:null,$60:null,$70:null,$80:null,$90:null,$100:null}", id() );
+            int unused = 0;
+            ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << bigNumString( 0x30, 0x10 ) );
+//            dump();
+            ASSERT( unindex( k ) );
+//            dump();
+            ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{$60:{$10:null,$20:null,$27:{$23:null,$25:null},$40:null,$50:null},_:{$70:null,$80:null,$90:null,$100:null}}", id() );                                    
+        }
+    };
+
+    class DelInternalSplitPromoteRight : public Base {
+    public:
+        void run() {
+            string ns = id().indexNamespace();
+            ArtificialTree::setTree( "{$10:null,$20:null,$30:null,$40:null,$50:null,$60:null,$70:null,$80:null,$90:null,$100$10:{$95:{$93:null},_:{$97:null}}}", id() );
+            int unused = 0;
+            ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
+            BSONObj k = BSON( "" << bigNumString( 0x100, 0x10 ) );
+//            dump();
+            ASSERT( unindex( k ) );
+//            dump();
+            ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, unused );
+            ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
+            ArtificialTree::checkStructure( "{$80:{$10:null,$20:null,$30:null,$40:null,$50:null,$60:null,$70:null},_:{$90:null,$97:{$93:null,$95:null}}}", id() );                                    
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "btree" ){
@@ -1437,7 +1625,7 @@ namespace BtreeTests {
             add< MissingLocate >();
             add< MissingLocateMultiBucket >();
             add< SERVER983 >();
-            add< ReuseUnused >();
+            add< DontReuseUnused >();
             add< PackUnused >();
             add< DontDropReferenceKey >();
             add< MergeBucketsLeft >();
@@ -1499,6 +1687,15 @@ namespace BtreeTests {
             add< BalanceLeftEmpty >();
             add< DelEmptyNoNeighbors >();
             add< DelEmptyEmptyNeighbors >();
+            add< DelInternal >();
+            add< DelInternalReplaceWithUnused >();
+            add< DelInternalReplaceRight >();
+            add< DelInternalPromoteKey >();
+            add< DelInternalPromoteRightKey >();
+            add< DelInternalReplacementPrevNonNull >();
+            add< DelInternalReplacementNextNonNull >();
+            add< DelInternalSplitPromoteLeft >();
+            add< DelInternalSplitPromoteRight >();
         }
     } myall;
 }

@@ -1,4 +1,4 @@
-// balance.cpp
+//@file balance.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -81,19 +81,6 @@ namespace mongo {
         return movedCount;
     }
     
-    void Balancer::_ping(){
-        assert( _myid.size() && _started );
-        try {
-            ScopedDbConnection conn( configServer.getPrimary() );
-            _ping( conn.conn() );
-            conn.done();
-        }
-        catch ( std::exception& e ){
-            log() << "bare ping failed: " << e.what() << endl;
-        }
-        
-    }
-
     void Balancer::_ping( DBClientBase& conn ){
         WriteConcern w = conn.getWriteConcern();
         conn.setWriteConcern( W_NONE );
@@ -219,22 +206,53 @@ namespace mongo {
         }
     }
 
-    void Balancer::run(){
+    bool Balancer::_init() {
+        try {
+            
+            log() << "about to contact config servers and shards" << endl;
 
-        { // init stuff, don't want to do at static init
+            // contact the config server and refresh shard information
+            // checks that each shard is indeed a different process (no hostname mixup)
+            // these checks are redundant in that they're redone at every new round but we want to do them initially here
+            // so to catch any problem soon
+            Shard::reloadShardInfo();
+            _checkOIDs();
+
+            log() << "config servers and shards contacted successfully" << endl;
+
             StringBuilder buf;
             buf << getHostNameCached() << ":" << cmdLine.port;
             _myid = buf.str();
-            log() << "balancer myid: " << _myid << endl;
-            
             _started = time(0);
 
-            Shard::reloadShardInfo();
-        }
-        
-        _ping();
-        _checkOIDs();
+            log() << "balancer id: " << _myid << " started at " << time_t_to_String_short(_started) << endl;            
 
+            return true;
+
+        } catch ( std::exception& ) {
+
+            log( LL_WARNING ) << "could not initialize balancer, please check that all shards and config servers are up" << endl;
+            return false;
+
+        }
+    }
+
+    void Balancer::run(){
+
+        // this is the body of a BackgroundJob so if we throw here we're basically ending the balancer thread prematurely
+        while ( ! inShutdown() ) {
+
+            if ( ! _init() ) {
+                log() << "will retry to initialize balancer in one minute" << endl;
+                sleepsecs( 60 );
+                continue;
+            }
+
+            break;
+        }
+
+        // getConnectioString and the constructor of a DistributedLock do not throw, which is what we expect on while
+        // on the balancer thread
         ConnectionString config = configServer.getConnectionString();
         DistributedLock balanceLock( config , "balancer" );
 

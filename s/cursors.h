@@ -89,7 +89,7 @@ namespace mongo {
         void doTimeouts();
         void startTimeoutThread();
     private:
-        mutex _mutex;
+        mongo::mutex _mutex;
 
         MapSharded _cursors;
         MapNormal _refs;

@@ -40,6 +40,18 @@ namespace mongo {
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;
 
+    /* each thread which does db operations has a Client object in TLS.  
+       call this when your thread starts. 
+    */
+    Client& Client::initThread(const char *desc, MessagingPort *mp) {
+        setThreadName(desc);
+        assert( currentClient.get() == 0 );
+        Client *c = new Client(desc, mp);
+        currentClient.reset(c);
+        mongo::lastError.initThread();
+        return *c;
+    }
+
     Client::Client(const char *desc, MessagingPort *p) : 
       _context(0),
       _shutdown(false),

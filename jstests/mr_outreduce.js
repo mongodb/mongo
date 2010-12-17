@@ -31,7 +31,7 @@ assert.eq( tos( expected ) , tos( res.convertToSingleObject() ) , "A" );
 
 t.insert( { _id : 4 , a : [ 4 , 5 ] } )
 out.insert( { _id : 10 , value : "5" } ) // this is a sentinal to make sure it wasn't killed
-res = t.mapReduce( m , r , { out : outName , outType : "reduce" , query : { _id : { $gt : 3 } } } )
+res = t.mapReduce( m , r , { out : { reduce : outName } , query : { _id : { $gt : 3 } } } )
 
 expected["4"]++;
 expected["5"] = 1

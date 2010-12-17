@@ -57,6 +57,9 @@ namespace mongo {
         /** return current offset into buffer */
         unsigned offset() const { return (char*)_pos - (char*)_start; }
 
+        /** return remaining bytes */
+        unsigned remaining() const { return (char*)_end -(char*)_pos; }
+
         /** return current position pointer, and advance by len */
         const void* skip(unsigned len) { 
             char *nxt = ((char *) _pos) + len;
@@ -84,6 +87,8 @@ namespace mongo {
             ofs = (ofs + (alignment-1)) & (~(alignment-1));
             _pos = ((char*)_start) + ofs;
         }
+
+        void* pos() { return _pos; }
 
     private:
         void *_start;

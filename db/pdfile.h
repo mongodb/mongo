@@ -112,7 +112,7 @@ namespace mongo {
             NamespaceDetails *d,
             NamespaceDetailsTransient *nsdt,
             Record *toupdate, const DiskLoc& dl,
-            const char *buf, int len, OpDebug& debug, bool &changedId, bool god=false);
+            const char *buf, int len, OpDebug& debug, bool god=false);
 
         // The object o may be updated if modified on insert.                                
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
@@ -271,7 +271,7 @@ namespace mongo {
             DiskLoc lastRecord;
         };
         /** often we want to update just the firstRecord and lastRecord fields. 
-            this helper is for that -- for use with dur::writing() method
+            this helper is for that -- for use with getDur().writing() method
         */
         FL* fl() { return (FL*) &firstRecord; }
     private:
@@ -312,7 +312,7 @@ namespace mongo {
             if ( uninitialized() ) {
                 assert(filelength > 32768 );
                 assert( HeaderSize == 8192 );
-                DataFileHeader *h = dur::writing(this);
+                DataFileHeader *h = getDur().writing(this);
                 h->fileLength = filelength;
                 h->version = VERSION;
                 h->versionMinor = VERSION_MINOR;

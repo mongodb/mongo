@@ -39,7 +39,7 @@ assert.eq( tos( expected ) , tos( res.convertToSingleObject() ) , "B" );
 
 t.insert( { a : [ 5 , 6 ] } )
 out.insert( { _id : 10 , value : "5" } )
-res = t.mapReduce( m , r , { out : outName , outType : "merge" } )
+res = t.mapReduce( m , r , { out : { merge : outName } } )
 
 expected["5"]++;
 expected["10"] = 5

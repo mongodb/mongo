@@ -39,17 +39,6 @@
 */
 
 #include "pch.h"
-
-#if !defined(_DURABLE)
-
-namespace mongo {
-    namespace dur {
-        void debugCheckLastDeclaredWrite() { }
-    }
-}
-
-#else
-
 #include "cmdline.h"
 #include "client.h"
 #include "dur.h"
@@ -63,32 +52,74 @@ using namespace mongoutils;
 
 namespace mongo { 
 
-    namespace dur { 
+    namespace dur {
 
-        const bool DebugValidateMapsMatch = false;
+        void NonDurableImpl::startup() {
+            if( haveJournalFiles() ) { 
+                log() << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
+                log() << "It is recommended that you start with journalling enabled so that recovery may occur." << endl;
+                log() << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
+                uasserted(13597, "can't start without --dur enabled when journal/ files are present");
+            }
+        }
+
+#if defined(_DEBUG)
         const bool DebugCheckLastDeclaredWrite = false;
+#else
+        const bool DebugCheckLastDeclaredWrite = false;
+#endif
+
+        DurableInterface* DurableInterface::_impl = new NonDurableImpl();
+
+        void enableDurability() { // TODO: merge with startup() ?
+            assert(typeid(*DurableInterface::_impl) == typeid(NonDurableImpl));
+            // lets NonDurableImpl instance leak, but its tiny and only happens once
+            DurableInterface::_impl = new DurableImpl();
+        }
+
+        // later in this file
+        static void groupCommit();
 
         static CommitJob commitJob;
+
+        bool DurableImpl::commitNow() {
+            groupCommit();
+            return true;
+        }
+
+        bool DurableImpl::awaitCommit() { 
+            commitJob.awaitNextCommit();
+            return true;
+        }
 
         /** Declare that a file has been created 
             Normally writes are applied only after journalling, for safety.  But here the file 
             is created first, and the journal will just replay the creation if the create didn't 
             happen because of crashing.
         */
-        void createdFile(string filename, unsigned long long len) { 
+        void DurableImpl::createdFile(string filename, unsigned long long len) { 
             shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
             commitJob.noteOp(op);
         }
 
+        /** indicate that a database is about to be dropped.  call before the actual drop. */
+        void DurableImpl::droppingDb(string db) { 
+            shared_ptr<DurOp> op( new DropDbOp(db) );
+
+            // DropDbOp must be in a commit group by itself to ensure proper
+            // sequencing because all DurOps are applied before any WriteOps.
+            groupCommit();
+            commitJob.noteOp(op);
+            groupCommit();
+        }
+
         /** declare write intent.  when already in the write view if testIntent is true. */
-        void declareWriteIntent(void *p, unsigned len) {
+        void DurableImpl::declareWriteIntent(void *p, unsigned len) {
             WriteIntent w(p, len);
             commitJob.note(w);
         }
 
-        string hexdump(const char *data, unsigned len);
-
-        void* writingPtr(void *x, unsigned len) { 
+        void* DurableImpl::writingPtr(void *x, unsigned len) { 
             void *p = x;
             if( testIntent )
                 p = MongoMMF::switchToPrivateView(x);
@@ -101,7 +132,7 @@ namespace mongo {
             @param len the length at ofs we will write
             @return new buffer pointer.  this is modified when testIntent is true.
         */
-        void* writingAtOffset(void *buf, unsigned ofs, unsigned len) {
+        void* DurableImpl::writingAtOffset(void *buf, unsigned ofs, unsigned len) {
             char *p = (char *) buf;
             if( testIntent )
                 p = (char *) MongoMMF::switchToPrivateView(buf);
@@ -117,7 +148,8 @@ namespace mongo {
 
             SLOW
         */
-        void debugCheckLastDeclaredWrite() { 
+#if defined(_DEBUG)
+        void DurableImpl::debugCheckLastDeclaredWrite() { 
             if( !DebugCheckLastDeclaredWrite )
                 return;
 
@@ -160,34 +192,37 @@ namespace mongo {
                 log() << endl;
             }
         }
+#endif
 
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
-            caller handles locking 
-            */
+            caller handles locking
+        */
         static void PREPLOGBUFFER() { 
             assert( cmdLine.dur );
             AlignedBuilder& bb = commitJob._ab;
             bb.reset();
 
-            unsigned lenOfs;
+            unsigned lenOfs; // we will need to backfill the length when prep is wrapping up
             // JSectHeader
             {
                 bb.appendStr("\nHH\n", false);
                 lenOfs = bb.skip(4);
             }
 
-            // ops other than basic writes
+            // ops other than basic writes (DurOp's)
             {
                 for( vector< shared_ptr<DurOp> >::iterator i = commitJob.ops().begin(); i != commitJob.ops().end(); ++i ) { 
                     (*i)->serialize(bb);
                 }
             }
 
-            // write intents
+            // write intents.  note there is no particular order to these : if we have 
+            // two writes to the same location during the group commit interval, it is likely
+            // (although not assured) that it is journalled here once.
             {
                 scoped_lock lk(privateViews._mutex());
-                string lastFilePath;
+                RelativePath lastFilePath;
                 for( vector<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
                     size_t ofs;
                     MongoMMF *mmf = privateViews._find(i->p, ofs);
@@ -198,15 +233,18 @@ namespace mongo {
                     }
 
                     if( !mmf->willNeedRemap() ) {
-                        mmf->willNeedRemap() = true; // usually it will already be dirty so don't bother writing then
+                        // tag this mmf as needed a remap of its private view later. 
+                        // usually it will already be dirty/already set, so we do the if above first
+                        // to avoid possibility of cpu cache line contention
+                        mmf->willNeedRemap() = true;
                     }
-                    //size_t ofs = ((char *)i->p) - ((char*)mmf->getView().p);
                     i->w_ptr = ((char*)mmf->view_write()) + ofs;
-                    if( mmf->filePath() != lastFilePath ) { 
-                        lastFilePath = mmf->filePath();
+                    if( mmf->relativePath() != lastFilePath ) { 
+                        lastFilePath = mmf->relativePath();
+                        //assert( !str::startsWith(lastFilePath, dbpath) ); // dbpath should be stripped this is a relative path
                         JDbContext c;
                         bb.appendStruct(c);
-                        bb.appendStr(lastFilePath);
+                        bb.appendStr(lastFilePath.toString());
                     }
                     JEntry e;
                     e.len = i->len;
@@ -219,8 +257,7 @@ namespace mongo {
             }
 
             {
-                JSectFooter f;
-                f.hash = 0;
+                JSectFooter f(bb.buf(), bb.len());
                 bb.appendStruct(f);
             }
 
@@ -247,9 +284,10 @@ namespace mongo {
         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
         */
         static void debugValidateMapsMatch() {
-            if( !DebugValidateMapsMatch ) 
+            if( ! (cmdLine.durOptions & CmdLine::DurParanoid) )
                  return;
 
+            unsigned long long data = 0;
             Timer t;
             set<MongoFile*>& files = MongoFile::getAllFiles();
             for( set<MongoFile*>::iterator i = files.begin(); i != files.end(); i++ ) { 
@@ -258,6 +296,18 @@ namespace mongo {
                     MongoMMF *mmf = (MongoMMF*) mf;
                     const char *p = (const char *) mmf->getView();
                     const char *w = (const char *) mmf->view_write();
+
+                    if (!p && !w) return;
+
+                    assert(p);
+                    assert(w);
+
+                    data += mmf->length();
+
+                    assert( mmf->length() == (unsigned) mmf->length() );
+                    if (memcmp(p, w, (unsigned) mmf->length()) == 0)
+                        continue; // next file
+
                     unsigned low = 0xffffffff;
                     unsigned high = 0;
                     for( unsigned i = 0; i < mmf->length(); i++ ) {
@@ -275,11 +325,11 @@ namespace mongo {
                         vector<WriteIntent>& w = commitJob.writes();
                         (void)w; // mark as unused. Useful for inspection in debugger
 
-                        breakpoint();
+                        massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);
                     }
                 }
             }
-            log() << "debugValidateMapsMatch " << t.millis() << "ms " << endl;
+            log() << "debugValidateMapsMatch " << t.millis() << "ms for " <<  (data / (1024*1024)) << "MB" << endl;
         }
 
         /** apply the writes back to the non-private MMF after they are for certain in redo log 
@@ -290,6 +340,12 @@ namespace mongo {
 
             (2) todo should we do this using N threads?  would be quite easy
                 see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
+
+            (3) with enough work, we could do this outside the read lock.  it's a bit tricky though. 
+                - we couldn't do it from the private views then as they may be changing.  would have to then 
+                  be from the journal alignedbuffer.
+                - we need to be careful the file isn't unmapped on us -- perhaps a mutex or something 
+                  with MongoMMF on closes or something to coordinate that.
 
             locking: in read lock when called
         */
@@ -339,29 +395,32 @@ namespace mongo {
             const set<MongoFile*>::iterator b = files.begin();
             const set<MongoFile*>::iterator e = files.end();
             set<MongoFile*>::iterator i = b;
+            // skip to our starting position
             for( unsigned x = 0; x < startAt; x++ ) {
                 i++;
                 if( i == e ) i = b;
             }
-            startAt = (startAt + ntodo) % sz;
+            startAt = (startAt + ntodo) % sz; // mark where to start next time
 
             for( unsigned x = 0; x < ntodo; x++ ) {
                 dassert( i != e );
-                MongoMMF *mmf = dynamic_cast<MongoMMF*>(*i);
-                if( mmf && mmf->willNeedRemap() ) {
-                    mmf->willNeedRemap() = false;
-                    mmf->remapThePrivateView();
+                if( (*i)->isMongoMMF() ) {
+                    MongoMMF *mmf = (MongoMMF*) *i;
+                    assert(mmf);
+                    if( mmf->willNeedRemap() ) {
+                        mmf->willNeedRemap() = false;
+                        mmf->remapThePrivateView();
+                    }
+                    i++;
+                    if( i == e ) i = b;
                 }
-
-                i++;
-                if( i == e ) i = b;
             }
         }
 
         /** locking in read lock when called 
             @see MongoMMF::close()
         */
-        void _go() {
+        static void groupCommit() {
             dbMutex.assertAtLeastReadLocked();
 
             if( !commitJob.hasWritten() )
@@ -370,6 +429,11 @@ namespace mongo {
             PREPLOGBUFFER();
 
             WRITETOJOURNAL(commitJob._ab);
+
+            // data is now in the journal, which is sufficient for acknowledging getlasterror. 
+            // (ok to crash after that)
+            log() << "TEMP NOTIFYING COMMITTED" << endl;
+            commitJob.notifyCommitted();
 
             // write the noted write intent entries to the data files.
             // this has to come after writing to the journal, obviously...
@@ -409,7 +473,7 @@ namespace mongo {
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
-                    _go();
+                    groupCommit();
                     return;
                 }
             }
@@ -417,7 +481,7 @@ namespace mongo {
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a 
             // write lock instead.  otherwise writes could use too much RAM.
             writelock lk;
-            _go();
+            groupCommit();
         }
 
         /** called when a MongoMMF is closing -- we need to go ahead and group commit in that case before its 
@@ -425,7 +489,7 @@ namespace mongo {
         */
         void closingFileNotification() {
             if( dbMutex.atLeastReadLocked() ) {
-                _go(); 
+                groupCommit(); 
             }
             else {
                 assert( inShutdown() );
@@ -452,27 +516,40 @@ namespace mongo {
                     go();
                 }
                 catch(std::exception& e) { 
-                    log() << "exception in durThread " << e.what() << endl;
+                    log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
+                    abort(); // based on myTerminate()
                 }
             }
         }
 
         void unlinkThread();
         void recover();
+        void _debugCheckLastDeclaredWrite() { 
+#if defined(_DEBUG)
+            getDur().debugCheckLastDeclaredWrite(); 
+#endif
+        }
 
-        void startup() {
+        /** at startup, recover, and then start the journal threads */
+        void DurableImpl::startup() {
             if( !cmdLine.dur )
                 return;
             if( testIntent )
                 return;
-            recover();
+            try {
+                recover();
+            }
+            catch(...) { 
+                log() << "exception during recovery" << endl;
+                throw;
+            }
             journalMakeDir();
             boost::thread t(durThread);
             boost::thread t2(unlinkThread);
         }
 
     } // namespace dur
-
+    
+    
 } // namespace mongo
 
-#endif

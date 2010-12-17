@@ -20,6 +20,7 @@
 
 #include "dur_journalformat.h"
 #include "bufreader.h"
+#include "../util/paths.h"
 
 namespace mongo {
 
@@ -61,6 +62,9 @@ namespace mongo {
 
             virtual string toString() = 0;
 
+            /** if the op requires all file to be closed before doing its work, returns true. */
+            virtual bool needFilesClosed() { return false; }
+
         protected:
             /** DurOp will have already written the opcode for you */
             virtual void _serialize(AlignedBuilder& ab) = 0;
@@ -73,19 +77,31 @@ namespace mongo {
         class FileCreatedOp : public DurOp { 
         public:
             FileCreatedOp(BufReader& log);
-            FileCreatedOp(string f, unsigned long long l) : 
-              DurOp(JEntry::OpCode_FileCreated), _filename(f), _len(l)  { }
-
+            /** param f filename to create with path */
+            FileCreatedOp(string f, unsigned long long l);
             virtual void replay();
-
             virtual string toString();
-
+            virtual bool needFilesClosed();
         protected:
             virtual void _serialize(AlignedBuilder& ab);
-
         private:
-            string _filename;
-            unsigned long long _len;
+            RelativePath _p;
+            unsigned long long _len; // size of file, not length of name
+        };
+
+        /** record drop of a database */
+        class DropDbOp : public DurOp { 
+        public:
+            DropDbOp(BufReader& log);
+            DropDbOp(string db) : 
+              DurOp(JEntry::OpCode_DropDb), _db(db) { }
+            virtual void replay();
+            virtual string toString() { return string("DropDbOp ") + _db; }
+            virtual bool needFilesClosed() { return true; }
+        protected:
+            virtual void _serialize(AlignedBuilder& ab);
+        private:
+            string _db;
         };
 
     }

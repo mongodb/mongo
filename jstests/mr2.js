@@ -29,7 +29,12 @@ function r( who , values ){
 
 function reformat( r ){
     var x = {};
-    r.find().forEach( 
+    var cursor;
+    if ( r.results )
+        cursor = r.results;
+    else
+        cursor = r.find();
+    cursor.forEach( 
         function(z){
             x[z._id] = z.value;
         }
@@ -41,10 +46,21 @@ function f( who , res ){
     res.avg = res.totalSize / res.num;
     return res;
 }
-res = t.mapReduce( m , r , { finalize : f } );
+
+res = t.mapReduce( m , r , { finalize : f , out : "mr2_out" } );
+printjson( res )
 x = reformat( res );
-assert.eq( 9 , x.a.avg , "A" );
-assert.eq( 16 , x.b.avg , "B" );
-assert.eq( 18 , x.c.avg , "C" );
+assert.eq( 9 , x.a.avg , "A1" );
+assert.eq( 16 , x.b.avg , "A2" );
+assert.eq( 18 , x.c.avg , "A3" );
 res.drop();
+
+res = t.mapReduce( m , r , { finalize : f , out : { inline : 1 } } );
+printjson( res )
+x = reformat( res );
+assert.eq( 9 , x.a.avg , "B1" );
+assert.eq( 16 , x.b.avg , "B2" );
+assert.eq( 18 , x.c.avg , "B3" );
+res.drop();
+
 

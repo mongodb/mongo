@@ -241,7 +241,7 @@ namespace mongo {
 
         {
             const int size2 = obj.objsize() + 1 + 2;
-            char *p = (char *) dur::writingPtr(r->data, size2+posz);
+            char *p = (char *) getDur().writingPtr(r->data, size2+posz);
             memcpy(p, partial.objdata(), posz);
             *((unsigned *)p) += size2;
             p += posz - 1;

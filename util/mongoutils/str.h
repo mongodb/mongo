@@ -97,6 +97,8 @@ namespace mongoutils {
         /** @return true if s contains x */
         inline bool contains(string s, string x) { 
             return strstr(s.c_str(), x.c_str()) != 0; }
+        inline bool contains(string s, char x) { 
+            return strchr(s.c_str(), x) != 0; }
 
         /** @return everything befor the character x, else entire string */
         inline string before(const string& s, char x) {
@@ -147,7 +149,7 @@ namespace mongoutils {
             R = string(p+1);
             return true;
         }
-        /** split scanning reverse direction */
+        /** split scanning reverse direction. Splits ONCE ONLY. */
         inline bool rSplitOn(const string &s, char c, string& L, string& R) {
             const char *start = s.c_str();
             const char *p = strrchr(start, c);
@@ -158,6 +160,26 @@ namespace mongoutils {
             L = string(start, p-start);
             R = string(p+1);
             return true;
+        }
+
+        /** @return number of occurrences of c in s */
+        inline unsigned count( const string& s , char c ){
+            unsigned n=0;
+            for ( unsigned i=0; i<s.size(); i++ )
+                if ( s[i] == c )
+                    n++;
+            return n;
+        }
+        
+        /** remove trailing chars in place */
+        inline void stripTrailing(string& s, const char *chars) { 
+            string::iterator i = s.end();
+            while( s.begin() != i ) { 
+                i--;
+                if( contains(chars, *i) ) { 
+                    s.erase(i);
+                }
+            }
         }
 
     }

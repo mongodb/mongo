@@ -115,19 +115,32 @@ namespace mongo {
     
     void* MemoryMappedFile::createPrivateMap() {
         void * x = mmap( /*start*/0 , len , PROT_READ|PROT_WRITE , MAP_PRIVATE , fd , 0 );        
-	    if( x == MAP_FAILED ) {
-	        if ( errno == ENOMEM ) {
-	            if( sizeof(void*) == 4 )
-		        error() << "mmap private failed with out of memory. You are using a 32-bit build and probably need to upgrade to 64" << endl;
-		    else
-  		        error() << "mmap private failed with out of memory. (64 bit build)" << endl;
-	        }
-	        return 0;
-	    }
+        if( x == MAP_FAILED ) {
+            if ( errno == ENOMEM ) {
+                if( sizeof(void*) == 4 ) {
+                    error() << "mmap private failed with out of memory. You are using a 32-bit build and probably need to upgrade to 64" << endl;
+                } else {
+                    error() << "mmap private failed with out of memory. (64 bit build)" << endl;
+                }
+            }
+            return 0;
+        }
         else { 
             views.push_back(x);
         }
-	    return x;
+        return x;
+    }
+
+    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+        assert( munmap(oldPrivateAddr,len) == 0 );
+        void * x = mmap( oldPrivateAddr, len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_FIXED , fd , 0 );        
+        if( x == MAP_FAILED ) {
+            int err = errno;
+            remove(views.begin(), views.end(), oldPrivateAddr);
+            massert(13601, str::stream() << "Couldn't remap private view: " << errnoWithDescription(err), false);
+        }
+        assert( x == oldPrivateAddr );
+        return x;
     }
     
     void MemoryMappedFile::flush(bool sync) {
@@ -165,12 +178,6 @@ namespace mongo {
 
     void MemoryMappedFile::_unlock() {
         if (! views.empty() ) assert(mprotect(views[0], len, PROT_READ) == 0);
-    }
-
-    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        remove(views.begin(), views.end(), oldPrivateAddr);
-	assert( munmap(oldPrivateAddr,len) == 0 );
-        return createPrivateMap();
     }
 
 } // namespace mongo

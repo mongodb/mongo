@@ -34,6 +34,8 @@
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
 #include "../db/btree.h"
+#include "../db/repl_block.h"
+#include "../db/dur.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -741,9 +743,6 @@ namespace mongo {
 
             // 5.
             { 
-                // TODO SERVER-2119
-                // + 5.b check opReplicatedEnough on _recvChunkCommit TO-side
-
                 // 5.a
                 // we're under the collection lock here, so no other migrate can change maxVersion or ShardChunkManager state
                 migrateFromStatus.setInCriticalSection( true );
@@ -780,7 +779,7 @@ namespace mongo {
                             writelock lk( ns );
 
                             // revert the chunk manager back to the state before "forgetting" about the chunk
-                            shardingState.undoDonateChunk( ns , min , max , myVersion );
+                            shardingState.undoDonateChunk( ns , min , max , currVersion );
                         }
 
                         log() << "_recvChunkCommit failed: " << res << " resetting shard version to: " << currVersion << endl;
@@ -793,44 +792,130 @@ namespace mongo {
 
                 // 5.c
 
-                // TODO SERVER-2024
-                // + 5.c kill isEmpty check by using ChunkMatcher knowledge and send the config updates on an applyOps format
+                // we want to go only once to the configDB but perhaps change two chunks, the one being migrated and another
+                // local one (so to bump version for the entire shard)
+                // we use the 'applyOps' mechanism to group the two updates and make them safer
+                // TODO pull config update code to a module
 
-                ScopedDbConnection conn( shardingState.getConfigServer() );
-                
-                BSONObjBuilder temp;
-                temp.append( "shard" , toShard.getName() );
-                temp.appendTimestamp( "lastmod" , myVersion );
+                BSONObjBuilder cmdBuilder;
 
-                conn->update( ShardNS::chunk , shardId.wrap( "_id" ) , BSON( "$set" << temp.obj() ) );
-                
-                { 
-                    // update another random chunk
-                    BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns << "shard" << myOldShard ) ).sort( BSON( "lastmod" << -1 ) ) );
-                    if ( ! x.isEmpty() ){
-                        
-                        BSONObjBuilder temp2;
-                        myVersion.incMinor();
+                BSONArrayBuilder updates( cmdBuilder.subarrayStart( "applyOps" ) );                
+                {
+                    // update for the chunk being moved
+                    BSONObjBuilder op;
+                    op.append( "op" , "u" );
+                    op.appendBool( "b" , false /* no upserting */ );
+                    op.append( "ns" , ShardNS::chunk );
 
-                        temp2.appendTimestamp( "lastmod" , myVersion );
-                        
-                        // logic moved to donateChunk above, clean this up at SERVER-2024
-                        // shardingState.setVersion( ns , myVersion );
+                    BSONObjBuilder n( op.subobjStart( "o" ) );
+                    n.append( "_id" , Chunk::genID( ns , min ) );
+                    n.appendTimestamp( "lastmod" , myVersion /* same as used on donateChunk */ );
+                    n.append( "ns" , ns );
+                    n.append( "min" , min );
+                    n.append( "max" , max );
+                    n.append( "shard" , toShard.getName() );
+                    n.done();
+                    
+                    BSONObjBuilder q( op.subobjStart( "o2" ) );
+                    q.append( "_id" , Chunk::genID( ns , min ) );
+                    q.done();
 
-                        BSONObj chunkIDDoc = x["_id"].wrap();
-                        conn->update( ShardNS::chunk , chunkIDDoc , BSON( "$set" << temp2.obj() ) );
-                        
-                        log() << "moveChunk updating self to: " << myVersion << " through " << chunkIDDoc << endl;
-                    }
-                    else {
-                        log() << "moveChunk: i have no chunks left for collection '" << ns << "'" << endl;
-
-                        // logic moved to donateChunk above, clean this up at SERVER-2024
-                        // shardingState.setVersion( ns , 0 );
-                    }
+                    updates.append( op.obj() );
                 }
 
-                conn.done();
+                // if we have chunks left on the FROM shard, update the version of one of them as well
+                // we can figure that out by grabbing the chunkManager installed on 5.a
+                // TODO expose that manager when installing it
+
+                ShardChunkManagerPtr chunkManager = shardingState.getShardChunkManager( ns );
+                if( chunkManager->getNumChunks() > 0 ) {
+
+                    // get another chunk on that shard
+                    BSONObj lookupKey;
+                    BSONObj bumpMin, bumpMax;
+                    do { 
+                        chunkManager->getNextChunk( lookupKey , &bumpMin , &bumpMax );
+                        lookupKey = bumpMin;
+                    } while( bumpMin == min );
+                    
+                    BSONObjBuilder op;
+                    op.append( "op" , "u" );
+                    op.appendBool( "b" , false );
+                    op.append( "ns" , ShardNS::chunk );
+
+                    ShardChunkVersion nextVersion = myVersion;
+                    nextVersion.incMinor();  // same as used on donateChunk
+                    BSONObjBuilder n( op.subobjStart( "o" ) );
+                    n.append( "_id" , Chunk::genID( ns , bumpMin ) );
+                    n.appendTimestamp( "lastmod" , nextVersion );
+                    n.append( "ns" , ns );
+                    n.append( "min" , bumpMin );
+                    n.append( "max" , bumpMax );
+                    n.append( "shard" , fromShard.getName() );
+                    n.done();
+
+                    BSONObjBuilder q( op.subobjStart( "o2" ) );
+                    q.append( "_id" , Chunk::genID( ns , bumpMin  ) );
+                    q.done();
+                    
+                    updates.append( op.obj() );
+
+                    log() << "moveChunk updating self version to: " << nextVersion << " through "
+                          << bumpMin << " -> " << bumpMax << " for collection '" << ns << "'" << endl;
+
+                } else { 
+
+                    log() << "moveChunk: no chunks left to update version for collection '" << ns << "'" << endl;
+                }
+
+                updates.done();
+
+                BSONArrayBuilder preCond( cmdBuilder.subarrayStart( "preCondition" ) );
+                {
+                    BSONObjBuilder b;
+                    b.append( "ns" , ShardNS::chunk );
+                    b.append( "q" , BSON( "query" << BSON( "ns" << ns ) << "orderby" << BSON( "lastmod" << -1 ) ) );
+                    {
+                        BSONObjBuilder bb( b.subobjStart( "res" ) );
+                        bb.appendTimestamp( "lastmod" , maxVersion );
+                        bb.done();
+                    }
+                    preCond.append( b.obj() );
+                }
+
+                preCond.done();
+
+                BSONObj cmd = cmdBuilder.obj();
+                log(7) << "moveChunk update: " << cmd << endl;
+
+                bool ok;
+                BSONObj cmdResult;
+                {
+                    ScopedDbConnection conn( shardingState.getConfigServer() );
+                    ok = conn->runCommand( "config" , cmd , cmdResult );
+                    conn.done();
+                }
+
+                if ( ! ok ){
+                    // TODO perform the following check automatically
+
+                    // the applyOps command may or may not have made it through to the config (e.g., the request may have 
+                    // reached it but the response could have been dropped on a failed connection)
+                    // we can't be sure without reaching the config again and checking which case are we in
+                    // 
+                    // if the commit made it to the config, we'll see the chunk in the new shard and there's no action
+                    // if the commit did not make it, currently the only way to fix this state is to bounce the mongod so
+                    // that the old state (before migrating) we'll be brought in
+
+                    log(LL_ERROR) << "***** moveChunk commit failed: " << cmd << " for command :" << cmdResult << endl;
+
+                    stringstream ss;
+                    ss << "changing chunk location failed.  cmd: " << cmd << " result: " << cmdResult;
+                    error() << ss.str() << endl;
+                    msgasserted( 13595 , ss.str() ); // uassert(13595)
+
+                }
+
                 migrateFromStatus.setInCriticalSection( false );
 
                 // 5.d
@@ -999,6 +1084,9 @@ namespace mongo {
                 timing.done(3);
             }
             
+            // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
+            ReplTime lastOpApplied;
+
             { // 4. do bulk of mods
                 state = CATCHUP;
                 while ( true ){
@@ -1014,7 +1102,7 @@ namespace mongo {
                     if ( res["size"].number() == 0 )
                         break;
                     
-                    apply( res );
+                    apply( res , &lastOpApplied );
 
                     if ( state == ABORT ){
                         timing.note( "aborted" );
@@ -1039,10 +1127,10 @@ namespace mongo {
                         return;
                     }
 
-                    if ( res["size"].number() > 0 && apply( res ) )
+                    if ( res["size"].number() > 0 && apply( res , &lastOpApplied ) )
                         continue;
                     
-                    if ( state == COMMIT_START )
+                    if ( state == COMMIT_START && flushPendingWrites( lastOpApplied ) )
                         break;
 
                     sleepmillis( 10 );
@@ -1089,7 +1177,12 @@ namespace mongo {
 
         }
 
-        bool apply( const BSONObj& xfer ){
+        bool apply( const BSONObj& xfer , ReplTime* lastOpApplied ){
+            ReplTime dummy;
+            if ( lastOpApplied == NULL ) {
+                lastOpApplied = &dummy;
+            }
+
             bool didAnything = false;
             
             if ( xfer["deleted"].isABSONObj() ){
@@ -1113,6 +1206,8 @@ namespace mongo {
                     }
 
                     Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0 );
+
+                    *lastOpApplied = cx.getClient()->getLastOp();
                     didAnything = true;
                 }
             }
@@ -1124,7 +1219,10 @@ namespace mongo {
                 BSONObjIterator i( xfer["reload"].Obj() );
                 while ( i.more() ){
                     BSONObj it = i.next().Obj();
+
                     Helpers::upsert( ns , it );
+
+                    *lastOpApplied = cx.getClient()->getLastOp();
                     didAnything = true;
                 }
             }
@@ -1132,6 +1230,26 @@ namespace mongo {
             return didAnything;
         }
         
+        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+            // if replication is on, try to force enough secondaries to catch up
+            // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
+            //      for now, we try to replicate to a sensible number of secondaries
+            const int slaveCount = getSlaveCount() / 2 + 1;
+            if ( ! opReplicatedEnough( lastOpApplied , slaveCount ) ) {
+                log( LL_WARNING ) << "migrate commit attempt timed out contacting " << slaveCount 
+                                  << " slaves for '" << ns << "' " << min << " -> " << max << endl;
+                return false;
+            }
+            log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << endl;
+
+            // if durability is on, force a write to journal
+            if ( getDur().commitNow() ) {
+                log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << endl;
+            }
+
+            return true;
+        }
+
         string stateString(){
             switch ( state ){
             case READY: return "ready";

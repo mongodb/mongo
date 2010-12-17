@@ -124,7 +124,6 @@ add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boo
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
-add_option( "durable", "durability build" , 0 , True )
 
 # library choices
 add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
@@ -212,9 +211,6 @@ if has_option( "libpath" ):
 
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
-
-if has_option( "durable" ):
-    env.Append( CPPDEFINES=[ "_DURABLE" ] )
 
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
 env.Append( CPPPATH=[ "." ] )
@@ -331,7 +327,7 @@ coreServerFiles = [ "util/message_server_port.cpp" ,
 if has_option( "asio" ):
     coreServerFiles += [ "util/message_server_asio.cpp" ]
 
-serverOnlyFiles = Split( "util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_recover.cpp db/dur_journal.cpp db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp db/queryoptimizer.cpp db/extsort.cpp db/cmdline.cpp" )
+serverOnlyFiles = Split( "util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp db/queryoptimizer.cpp db/extsort.cpp db/cmdline.cpp" )
 
 serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/geo/*.cpp" )
 
@@ -545,7 +541,7 @@ elif "win32" == os.sys.platform:
     # some warnings we don't like:
     env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
     
-    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","SUPPORT_UCP","SUPPORT_UTF8,PSAPI_VERSION=1" ] )
+    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","SUPPORT_UCP","SUPPORT_UTF8","PSAPI_VERSION=1" ] )
 
     #env.Append( CPPFLAGS='  /Yu"pch.h" ' ) # this would be for pre-compiled headers, could play with it later
 
@@ -652,6 +648,7 @@ if nix:
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
         env.Append( CPPFLAGS=" -Werror " )
+        env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
@@ -856,6 +853,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
     for m in modules:
         m.configure( conf , myenv )
 
+    # XP_* is for spidermonkey.
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
         myenv.Append( CPPDEFINES=[ "XP_WIN" ] )
@@ -1169,7 +1167,7 @@ elif not onlyServer:
             shell32BitFiles.append( "32bit/" + str( f ) )
         for f in scriptingFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
-        shellEnv.VariantDir( "32bit" , "." , duplicate=0 )
+        shellEnv.VariantDir( "32bit" , "." , duplicate=1 )
     else:
         shellEnv.Prepend( LIBPATH=[ "." ] )
 
@@ -1238,7 +1236,7 @@ if not onlyServer and not noshell:
     addSmoketest("smokeJsSlowNightly", [add_exe("mongo")])
     addSmoketest("smokeJsSlowWeekly", [add_exe("mongo")])
     addSmoketest( "smokeQuota", [ "mongo" ] )
-    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ] )
+    addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), "tools" ] )
 
 # Note: although the test running logic has been moved to
 # buildscripts/smoke.py, the interface to running the tests has been

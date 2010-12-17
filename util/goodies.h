@@ -23,6 +23,9 @@
 
 namespace mongo {
 
+    /* @return a dump of the buffer as hex byte ascii output */
+    string hexdump(const char *data, unsigned len);
+
     void setThreadName(const char * name);
     string getThreadName();
     

@@ -18,6 +18,8 @@
 
 #pragma once
 
+// note: include concurrency.h, not this.
+
 namespace mongo { 
 
     /** the 'big lock' we use for most operations. a read/write lock.
@@ -209,22 +211,21 @@ namespace mongo {
 
     namespace dur {
         void REMAPPRIVATEVIEW();
-        void debugCheckLastDeclaredWrite();
+        void _debugCheckLastDeclaredWrite(); // because it's hard to include dur.h here
     }
 
     inline void MongoMutex::_releasedWriteLock() { 
-#if defined(_DURABLE) && defined(_DEBUG)
-        dur::debugCheckLastDeclaredWrite();
+#if defined(_DEBUG)
+        if (this == &dbMutex)
+            dur::_debugCheckLastDeclaredWrite();
 #endif
     }
 
     inline void MongoMutex::_acquiredWriteLock() { 
-#if defined(_DURABLE)
-        if( _remapPrivateViewRequested ) { 
+        if( this == &dbMutex && _remapPrivateViewRequested ) { 
             dur::REMAPPRIVATEVIEW();
             dassert( !_remapPrivateViewRequested );
         }
-#endif
     }
 
     /* @return true if was already write locked.  increments recursive lock count. */
