@@ -125,10 +125,6 @@ doMR = function( n ){
     assert.eq( 3 , z.b , "MR T9 " + n );
     assert.eq( 3 , z.c , "MR TA " + n );
 
-    print( "sleeping for eliot" );
-    sleep( 20000 );
-    
-
 }
 
 doMR( "before" );
