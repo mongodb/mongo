@@ -642,8 +642,9 @@ namespace mongo {
             changeID = id.str();
 
             // send a copy of the message to the log in case it doesn't manage to reach config.changelog
-            BSONObj msg = BSON( "_id" << changeID << "server" << getHostNameCached() << "time" << DATENOW <<
-                                "what" << what << "ns" << ns << "details" << detail );
+            Client& c = cc();
+            BSONObj msg = BSON( "_id" << changeID << "server" << getHostNameCached() << "clientAddr" << c.clientAddress(true)
+                    << "time" << DATENOW << "what" << what << "ns" << ns << "details" << detail );
             log() << "about to issue config change: " << msg << endl;
 
             assert( _primary.ok() );

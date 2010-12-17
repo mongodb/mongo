@@ -241,10 +241,14 @@ namespace mongo {
         _client->_context = _oldContext; // note: _oldContext may be null
     }
 
-    string Client::clientAddress() const {
+    string Client::clientAddress(bool includePort) const {
         if( _curOp )
-            return _curOp->getRemoteString(false);
+            return _curOp->getRemoteString(includePort);
         return "";
+    }
+
+    string Client::clientAddress() const {
+        return clientAddress(false);
     }
 
     string Client::toString() const {
