@@ -96,11 +96,8 @@ namespace mongo {
         //
 
         /**
-         * if the amount of data written nears the max size of a shard, check the real size, and if its too big, we split
-         * we'll also trigger a check if there has been enough time since the last time we split
-         *
-         * @param dataWritten amount in bytes just inserted or updated
-         * @return true if a split was issued
+         * if the amount of data written nears the max size of a shard
+         * then we check the real size, and if its too big, we split
          */
         bool splitIfShould( long dataWritten );
         
@@ -200,13 +197,9 @@ namespace mongo {
         Shard _shard;
         ShardChunkVersion _lastmod;
 
-        // split control
+        // transient stuff
 
-        // amount of bytes written to this chunk since the last time we split (or boot up)
         long _dataWritten;
-
-        // next time we're supposed to check for splits, regardless of amount of data written so far
-        unsigned _nextCheck;
 
         // methods, etc..
         
