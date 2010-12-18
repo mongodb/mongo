@@ -418,17 +418,6 @@ namespace mongo {
         return false;
     }
 
-    unsigned Grid::getMongosCount() const {
-        ShardConnection conn( configServer.getPrimary() , "" );
-
-        // look for the how many mongos's ping in the last 5 minutes
-        Date_t lastFiveMinutes = jsTime() - 5*minuteInMillis;
-        unsigned long long mongosNum = conn->count( ShardNS::mongos, BSON( "ping" << GT << lastFiveMinutes ) );
-        conn.done();
-
-        return unsigned( mongosNum );        
-    }
-
     unsigned long long Grid::getNextOpTime() const {
         ScopedDbConnection conn( configServer.getPrimary() );
         
