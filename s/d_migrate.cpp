@@ -369,7 +369,11 @@ namespace mongo {
         }
 
         /** 
-         * @return ok
+         * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs (to avoid seeking disk later)
+         *
+         * @param maxChunkSize number of bytes beyond which a chunk's base data (no indices) is considered too large to move
+         * @param errmsg filled with textual description of error if this call return false
+         * @return false if approximate chunk size is too big to move or true otherwise
          */
         bool storeCurrentLocs( long long maxChunkSize , string& errmsg ){
             readlock l( _ns ); 
@@ -380,15 +384,8 @@ namespace mongo {
                 return false;
             }
 
-            // if the chunk is larger than allowed, don't even bother trying
-            long long dataSize = d->stats.datasize;
-            if ( dataSize > maxChunkSize ) {
-                errmsg = str::stream() << "can't move chunk size at " << dataSize << " because size limit is " << maxChunkSize;
-                return false;
-            }
-            
             BSONObj keyPattern;
-            // the copies are needed because the indexDetailsForRange destrorys the input
+            // the copies are needed because the indexDetailsForRange destroys the input
             BSONObj min = _min.copy();
             BSONObj max = _max.copy();
             IndexDetails *idx = indexDetailsForRange( _ns.c_str() , errmsg , min , max , keyPattern ); 
@@ -396,22 +393,56 @@ namespace mongo {
                 errmsg = "can't find index in storeCurrentLocs";
                 return false;
             }
-            
+
             scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , 
                                                            shared_ptr<Cursor>( new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
                                                            _ns ) );
+
+            // use the average object size to estimate how many objects a full chunk would carry
+            // do that while traversing the chunk's range using the sharding index, below
+            // there's a fair amout of slack before we determine a chunk is too large because object sizes will vary
+            unsigned long long maxRecsWhenFull;
+            long long avgRecSize;
+            const long long totalRecs = d->stats.nrecords;
+            if ( totalRecs > 0 ){
+                avgRecSize = d->stats.datasize / totalRecs;
+                maxRecsWhenFull = maxChunkSize / avgRecSize;
+                maxRecsWhenFull = 130 * maxRecsWhenFull / 100; // slack
+            } else {
+                avgRecSize = 0;
+                maxRecsWhenFull = numeric_limits<long long>::max();
+            }
+
+            // do a full traversal of the chunk and don't stop even if we think it is a large chunk
+            // we want the number of records to better report, in that case
+            bool isLargeChunk = false;
+            unsigned long long recCount = 0;;
             while ( cc->ok() ){
                 DiskLoc dl = cc->currLoc();
-                _cloneLocs.insert( dl );
+                if ( ! isLargeChunk ) {
+                    _cloneLocs.insert( dl ); 
+                }
                 cc->advance();
-                
-                if ( ! cc->yieldSometimes() )
-                    break;
 
+                // we can afford to yield here because any change to the base data that we might miss is already being 
+                // queued and will be migrated in the 'transferMods' stage
+                if ( ! cc->yieldSometimes() ) {
+                   break;
+                }
+
+                if ( ++recCount > maxRecsWhenFull ) {
+                    isLargeChunk = true;
+                } 
+            }
+
+            if ( isLargeChunk ) {
+                errmsg = str::stream() << "can't move chunk of size (aprox) " << recCount * avgRecSize 
+                                       << " because maximum size allowed to move is " << maxChunkSize;
+                log( LL_WARNING ) << errmsg << endl;
+                return false;
             }
             
-            log() << "\t moveChunk number of documents: " << _cloneLocs.size() << endl;
-
+            log() << "moveChunk number of documents: " << _cloneLocs.size() << endl;
             return true;
         }
 

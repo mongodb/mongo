@@ -34,12 +34,13 @@ primary = s.getServer( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 
 // Make sure that we don't move that chunk if it goes past what we consider the maximum chunk size
+print("Checkpoint 1a")
 max = 200 * 1024 * 1024;
 moveChunkCmd = { movechunk : "test.foo" , find : { _id : 1 } , to : secondary.getMongo().name , maxChunkSizeBytes : max };
-assert.throws( function(){ s.adminCommand( movChunkCmd ) } );
+assert.throws( function() { s.adminCommand( moveChunkCmd ); } );
 
 // Move the chunk
-
+print("checkpoint 1b");
 before = s.config.chunks.find().toArray();
 s.adminCommand( { movechunk : "test.foo" , find : { _id : 1 } , to : secondary.getMongo().name } );
 after = s.config.chunks.find().toArray();
