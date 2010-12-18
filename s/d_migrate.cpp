@@ -591,8 +591,7 @@ namespace mongo {
             // 7. remove data locally
             
             // -------------------------------
-            
-            
+                        
             // 1.
             string ns = cmdObj.firstElement().str();
             string to = cmdObj["to"].str();
@@ -655,8 +654,8 @@ namespace mongo {
             log() << "received moveChunk request: " << cmdObj << endl;
 
             timing.done(1);
-            // 2. 
-            
+
+            // 2.            
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
             dist_lock_try dlk( &lockSetup , (string)"migrate-" + min.toString() );
             if ( ! dlk.got() ){
@@ -664,6 +663,9 @@ namespace mongo {
                 result.append( "who" , dlk.other() );
                 return false;
             }
+
+            BSONObj chunkInfo = BSON("min" << min << "max" << max << "from" << fromShard.getName() << "to" << toShard.getName());
+            configServer.logChange( "moveChunk.start" , ns , chunkInfo );
 
             ShardChunkVersion maxVersion;
             string myOldShard;
@@ -964,9 +966,7 @@ namespace mongo {
                 migrateFromStatus.setInCriticalSection( false );
 
                 // 5.d
-                configServer.logChange( "moveChunk" , ns , BSON( "min" << min << "max" << max <<
-                                                                 "from" << fromShard.getName() << 
-                                                                 "to" << toShard.getName() ) );
+                configServer.logChange( "moveChunk.commit" , ns , chunkInfo );
             }
             
             migrateFromStatus.done();
