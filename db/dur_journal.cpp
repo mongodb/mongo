@@ -30,7 +30,7 @@
 #undef assert
 #define assert MONGO_assert
 #include "../util/mongoutils/str.h"
-#include "../util/concurrency/mvar.h"
+#include "dur_journalimpl.h"
 
 using namespace mongoutils;
 
@@ -74,52 +74,32 @@ namespace mongo {
             n1 = n2 = n3 = n4 = '\n';
         }
 
-        struct Journal {
-            static const unsigned long long DataLimit = 1 * 1024 * 1024 * 1024;
-        public:
-            string dir; // set by journalMakeDir() during initialization
-            MVar<path> &toUnlink; // unlinks of old journal threads are via background thread
-
-            Journal() : 
-              toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
-              _curLogFileMutex("JournalLfMutex")
-            { 
-                _written = 0;
-                _nextFileNumber = 0;
-                _curLogFile = 0; 
-            }
-
-            void open();
-            void rotate();
-            void journal(const AlignedBuilder& b);
-
-            path getFilePathFor(int filenumber) const;
-
-            bool tryToCloseLogFile() { 
-                mutex::try_lock lk(_curLogFileMutex, 2000);
-                if( lk.ok ) {
-                    delete _curLogFile; 
-                    _curLogFile = 0;
-                }
-                return lk.ok;
-            }
-
-        private:
-            void _open();
-
-            unsigned long long _written; // bytes written so far
-            unsigned _nextFileNumber;
-
-            LogFile *_curLogFile;
-            mutex _curLogFileMutex; // lock when using _curLogFile
-        };
+        // class Journal
 
         Journal j;
+
+        Journal::Journal() : 
+            toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
+            _curLogFileMutex("JournalLfMutex")
+        { 
+            _written = 0;
+            _nextFileNumber = 0;
+            _curLogFile = 0; 
+        }
 
         path Journal::getFilePathFor(int filenumber) const { 
             filesystem::path p(dir);
             p /= string(str::stream() << "j._" << filenumber);
             return p;
+        }
+
+        bool Journal::tryToCloseCurLogFile() { 
+            mutex::try_lock lk(_curLogFileMutex, 2000);
+            if( lk.ok ) {
+                delete _curLogFile; 
+                _curLogFile = 0;
+            }
+            return lk.ok;
         }
 
         /** never throws 
@@ -169,7 +149,7 @@ namespace mongo {
                 return;
             if( !okToCleanUp ) 
                 return;
-            if( !j.tryToCloseLogFile() ) {
+            if( !j.tryToCloseCurLogFile() ) {
                 return;
             }
             try { 
@@ -248,7 +228,7 @@ namespace mongo {
                 _curLogFile = 0;
                 _written = 0;
 
-                /* remove an older journal file. */
+                /* remove older journal files. */
                 if( _nextFileNumber >= 3 ) {
                     unsigned fn = _nextFileNumber - 3;
                     // we do unlinks asynchronously - unless they are falling behind.
