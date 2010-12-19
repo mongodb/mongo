@@ -255,20 +255,6 @@ namespace mongo {
 		return true;
 	}
 
-    bool DBClientReplicaSet::isMember( const DBConnector * conn ) const {
-        if ( conn == this )
-            return true;
-        
-        // TODO
-        assert(0);
-        /*
-        for ( unsigned i=0; i<_conns.size(); i++ )
-            if ( _conns[i]->isMember( conn ) )
-                return true;
-        */
-        return false;
-    }
-
     // ------------- simple functions -----------------
 
     void DBClientReplicaSet::insert( const string &ns , BSONObj obj ) {

@@ -771,8 +771,6 @@ namespace mongo {
 
         virtual ConnectionString::ConnectionType type() const = 0;
 
-        /** @return true if conn is either equal to or contained in this connection */
-        virtual bool isMember( const DBConnector * conn ) const = 0;
     }; // DBClientBase
     
     class DBClientReplicaSet;
@@ -887,7 +885,6 @@ namespace mongo {
         virtual void say( Message &toSend );
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );        
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }  
-        virtual bool isMember( const DBConnector * conn ) const { return this == conn; };
         virtual void checkResponse( const char *data, int nReturned );
         void setSoTimeout(double to) { _so_timeout = to; }
         

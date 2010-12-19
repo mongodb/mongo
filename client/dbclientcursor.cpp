@@ -193,7 +193,6 @@ namespace mongo {
 
     void DBClientCursor::attach( AScopedConnection * conn ){
         assert( _scopedHost.size() == 0 );
-        assert( conn->get()->isMember( connector ) );
         _scopedHost = conn->getHost();
         conn->done();
         connector = 0;

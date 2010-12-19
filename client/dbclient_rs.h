@@ -147,8 +147,6 @@ namespace mongo {
 
         // ----- status ------
 
-        virtual bool isMember( const DBConnector * conn ) const;        
-
         virtual bool isFailed() const { return ! _master || _master->isFailed(); }
 
         // ----- informational ----
