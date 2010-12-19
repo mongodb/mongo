@@ -24,6 +24,7 @@
 #include "../util/array.h"
 #include "../util/text.h"
 #include "../util/queue.h"
+#include "../util/paths.h"
 
 namespace BasicTests {
 
@@ -552,6 +553,22 @@ namespace BasicTests {
         }
     };
 
+    class RelativePathTest {
+    public:
+        void run(){
+            RelativePath a = RelativePath::fromRelativePath( "a" );
+            RelativePath b = RelativePath::fromRelativePath( "a" );
+            RelativePath c = RelativePath::fromRelativePath( "b" );
+            RelativePath d = RelativePath::fromRelativePath( "a/b" );
+
+
+            ASSERT( a == b );
+            ASSERT( a != c );
+            ASSERT( a != d );
+            ASSERT( c != d );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "basic" ){
@@ -585,6 +602,7 @@ namespace BasicTests {
             add< StrTests >();
             
             add< HostAndPortTests >();
+            add< RelativePathTest >();
         }
     } myall;
     
