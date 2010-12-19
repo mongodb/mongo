@@ -712,8 +712,6 @@ namespace mongo {
                 ShardChunkVersion shardVersion;
                 shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
 
-                log() << "moveChunk request accepted at version " << shardVersion << endl;
-
             }
             
             timing.done(2);
@@ -835,9 +833,16 @@ namespace mongo {
                         result.append( "cause" , res );
                         return false;
                     }
+
+                    log() << "moveChunk migrate commit accepted by TO-shard: " << res << endl;
                 }
 
                 // 5.c
+
+                // version at which the next highest lastmod will be set
+                // if the chunk being moved is the last in the shard, nextVersion is that chunk's lastmod
+                // otherwise the highest version is from the chunk being bumped on the FROM-shard
+                ShardChunkVersion nextVersion;
 
                 // we want to go only once to the configDB but perhaps change two chunks, the one being migrated and another
                 // local one (so to bump version for the entire shard)
@@ -870,6 +875,8 @@ namespace mongo {
                     updates.append( op.obj() );
                 }
 
+                nextVersion = myVersion;
+
                 // if we have chunks left on the FROM shard, update the version of one of them as well
                 // we can figure that out by grabbing the chunkManager installed on 5.a
                 // TODO expose that manager when installing it
@@ -890,7 +897,6 @@ namespace mongo {
                     op.appendBool( "b" , false );
                     op.append( "ns" , ShardNS::chunk );
 
-                    ShardChunkVersion nextVersion = myVersion;
                     nextVersion.incMinor();  // same as used on donateChunk
                     BSONObjBuilder n( op.subobjStart( "o" ) );
                     n.append( "_id" , Chunk::genID( ns , bumpMin ) );
@@ -944,23 +950,42 @@ namespace mongo {
                 }
 
                 if ( ! ok ){
-                    // TODO perform the following check automatically
 
-                    // the applyOps command may or may not have made it through to the config (e.g., the request may have 
-                    // reached it but the response could have been dropped on a failed connection)
-                    // we can't be sure without reaching the config again and checking which case are we in
+                    // this could be a blip in the connectivity
+                    // wait out a few seconds and check if the commit request made it
                     // 
                     // if the commit made it to the config, we'll see the chunk in the new shard and there's no action
                     // if the commit did not make it, currently the only way to fix this state is to bounce the mongod so
                     // that the old state (before migrating) we'll be brought in
 
-                    log(LL_ERROR) << "***** moveChunk commit failed: " << cmd << " for command :" << cmdResult << endl;
+                    log( LL_WARNING ) << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << endl;
+                    sleepsecs( 10 ); 
 
-                    stringstream ss;
-                    ss << "changing chunk location failed.  cmd: " << cmd << " result: " << cmdResult;
-                    error() << ss.str() << endl;
-                    msgasserted( 13595 , ss.str() ); // uassert(13595)
+                    try {
+                        ScopedDbConnection conn( shardingState.getConfigServer() ); 
 
+                        // look for the chunk in this shard whose version got bumped
+                        // we assume that if that mod made it to the config, the applyOps was successful
+                        BSONObj doc = conn->findOne( ShardNS::chunk , Query(BSON( "ns" << ns )).sort( BSON("lastmod" << -1)));
+                        ShardChunkVersion checkVersion = doc["lastmod"];
+
+                        if ( checkVersion == nextVersion ) {
+                            log() << "moveChunk commit confirmed" << endl;
+
+                        } else {
+                            log( LL_ERROR ) << "moveChunk commit failed: version is at"
+                                            << checkVersion << " instead of " << nextVersion << endl;
+                            log( LL_ERROR ) << "TERMINATING" << endl;
+                            dbexit( EXIT_SHARDING_ERROR );
+                        }
+
+                        conn.done();
+
+                    } catch ( ... ) {
+                        log( LL_ERROR ) << "moveChunk failed to get confirmation of commit" << endl;
+                        log( LL_ERROR ) << "TERMINATING" << endl;
+                        dbexit( EXIT_SHARDING_ERROR );
+                    }
                 }
 
                 migrateFromStatus.setInCriticalSection( false );
