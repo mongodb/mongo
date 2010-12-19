@@ -49,6 +49,89 @@ namespace mongo {
             return f;
         }
 
+        /** basic write ops / write intents.  note there is no particular order to these : if we have 
+            two writes to the same location during the group commit interval, it is likely
+            (although not assured) that it is journaled here once.
+        */ 
+        void prepBasicWrites(AlignedBuilder& bb) {
+            // each time events switch to a different database we journal a JDbContext 
+            RelativePath lastDbPath;
+
+            for( vector<BasicWriteOp>::iterator i = commitJob.basicWrites().begin(); i != commitJob.basicWrites().end(); i++ ) {
+                size_t ofs = 1;
+                MongoMMF *mmf = findMMF(i->src, /*out*/ofs);
+                dassert( i->dst == 0 );
+
+                if( !mmf->willNeedRemap() ) {
+                    // tag this mmf as needed a remap of its private view later. 
+                    // usually it will already be dirty/already set, so we do the if above first
+                    // to avoid possibility of cpu cache line contention
+                    mmf->willNeedRemap() = true;
+                }
+
+                // since we have already looked up the mmf, we go ahead and remember the write view location 
+                // so we don't have to find the MongoMMF again later in WRITETODATAFILES()
+                dassert( i->dst == 0 );
+                i->dst = ((char*)mmf->view_write()) + ofs;
+
+                JEntry e;
+                e.len = i->len();
+                assert( ofs <= 0x80000000 );
+                e.ofs = (unsigned) ofs;
+                e.setFileNo( mmf->fileSuffixNo() );
+                if( mmf->relativePath() == local ) { 
+                    e.setLocalDbContextBit();
+                }
+                else if( mmf->relativePath() != lastDbPath ) { 
+                    lastDbPath = mmf->relativePath();
+                    JDbContext c;
+                    bb.appendStruct(c);
+                    bb.appendStr(lastDbPath.toString());
+                }
+                bb.appendStruct(e);
+                bb.appendBuf(i->src, i->len());
+            }
+        }
+
+        void prepAppendOps(AlignedBuilder& bb) { 
+            // each time events switch to a different database we journal a JDbContext 
+            RelativePath lastDbPath;
+
+            for( vector<AppendOp>::iterator i = commitJob.appendOps().begin(); i != commitJob.appendOps().end(); i++ ) {
+                size_t ofs = 1;
+                MongoMMF *mmf = findMMF(i->src, /*out*/ofs);
+
+                // objAppend operation
+
+                if( mmf->relativePath() != lastDbPath ) { 
+                    lastDbPath = mmf->relativePath();
+                    dassert( lastDbPath != local ); // objAppend is not used for the local database
+                    JDbContext c;
+                    bb.appendStruct(c);
+                    bb.appendStr(lastDbPath.toString());
+                }
+
+                size_t dstofs;
+                MongoMMF *dstmmf = findMMF(i->localDestPrivateMap, dstofs);
+                if( !dstmmf->willNeedRemap() ) {
+                    dstmmf->willNeedRemap() = true;
+                }
+
+                // since we have already looked up the mmf, we go ahead and remember the write view location 
+                // so we don't have to find the MongoMMF again later in WRITETODATAFILES()
+                i->localDestWriteMap = ((char*)dstmmf->view_write()) + dstofs;
+
+                JObjAppend d;
+                d.dstFileNo = dstmmf->fileSuffixNo();
+                d.dstOfs = (unsigned) dstofs;
+                d.srcFileNo = mmf->fileSuffixNo();
+                d.srcOfs = ofs;
+                d.len = i->_len;
+                bb.appendStruct(d);
+                ++stats.curr._objCopies;
+            }
+        }
+
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking
@@ -73,86 +156,10 @@ namespace mongo {
                 }
             }
 
-            // basic write ops / write intents.  note there is no particular order to these : if we have 
-            // two writes to the same location during the group commit interval, it is likely
-            // (although not assured) that it is journaled here once.
-            // 
-            // "objAppend" operations are herein too
-            //
             {
                 scoped_lock lk(privateViews._mutex());
-
-                // each time events switch to a different database we journal a JDbContext 
-                RelativePath lastDbPath;
-
-                for( vector<BasicWriteOp>::iterator i = commitJob.basicWrites().begin(); i != commitJob.basicWrites().end(); i++ ) {
-                    size_t ofs = 1;
-                    MongoMMF *mmf = findMMF(i->src, /*out*/ofs);
-                    dassert( i->dst == 0 );
-
-                    if( !mmf->willNeedRemap() ) {
-                        // tag this mmf as needed a remap of its private view later. 
-                        // usually it will already be dirty/already set, so we do the if above first
-                        // to avoid possibility of cpu cache line contention
-                        mmf->willNeedRemap() = true;
-                    }
-
-                    // since we have already looked up the mmf, we go ahead and remember the write view location 
-                    // so we don't have to find the MongoMMF again later in WRITETODATAFILES()
-                    dassert( i->dst == 0 );
-                    i->dst = ((char*)mmf->view_write()) + ofs;
-
-                    JEntry e;
-                    e.len = i->len();
-                    assert( ofs <= 0x80000000 );
-                    e.ofs = (unsigned) ofs;
-                    e.setFileNo( mmf->fileSuffixNo() );
-                    if( mmf->relativePath() == local ) { 
-                        e.setLocalDbContextBit();
-                    }
-                    else if( mmf->relativePath() != lastDbPath ) { 
-                        lastDbPath = mmf->relativePath();
-                        JDbContext c;
-                        bb.appendStruct(c);
-                        bb.appendStr(lastDbPath.toString());
-                    }
-                    bb.appendStruct(e);
-                    bb.appendBuf(i->src, i->len());
-                }
-
-                for( vector<AppendOp>::iterator i = commitJob.appendOps().begin(); i != commitJob.appendOps().end(); i++ ) {
-                    size_t ofs = 1;
-                    MongoMMF *mmf = findMMF(i->src, /*out*/ofs);
-
-                    // objAppend operation
-
-                    if( mmf->relativePath() != lastDbPath ) { 
-                        lastDbPath = mmf->relativePath();
-                        dassert( lastDbPath != local ); // objAppend is not used for the local database
-                        JDbContext c;
-                        bb.appendStruct(c);
-                        bb.appendStr(lastDbPath.toString());
-                    }
-
-                    size_t dstofs;
-                    MongoMMF *dstmmf = findMMF(i->localDestPrivateMap, dstofs);
-                    if( !dstmmf->willNeedRemap() ) {
-                        dstmmf->willNeedRemap() = true;
-                    }
-
-                    // since we have already looked up the mmf, we go ahead and remember the write view location 
-                    // so we don't have to find the MongoMMF again later in WRITETODATAFILES()
-                    i->localDestWriteMap = ((char*)dstmmf->view_write()) + dstofs;
-
-                    JObjAppend d;
-                    d.dstFileNo = dstmmf->fileSuffixNo();
-                    d.dstOfs = (unsigned) dstofs;
-                    d.srcFileNo = mmf->fileSuffixNo();
-                    d.srcOfs = ofs;
-                    d.len = i->_len;
-                    bb.appendStruct(d);
-                    ++stats.curr._objCopies;
-                }
+                prepBasicWrites(bb);
+                prepAppendOps(bb);
             }
 
             {
