@@ -119,7 +119,7 @@ namespace mongo {
             }
 
             BasicWriteOp b;
-            b.setObjAppend(dst, (void*)src, len);
+            b.setObjAppend(dst, (void*)src, len-1);
             commitJob.basicWrites().push_back(b);
             if( testIntent )
                 dst = MongoMMF::switchToPrivateView(dst);
@@ -129,6 +129,10 @@ namespace mongo {
             p[-2] = 'o';
             p[-1] = 0;
             p[len] = EOO;
+
+            /* the len-1 in the setObjAppend call is because we know it's an EOO char */
+            assert( p[len-1] == EOO );
+
             return true;
         }
 

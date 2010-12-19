@@ -57,6 +57,7 @@ namespace mongo {
                     p[-2] = 'o';
                     p[-1] = 0;
                     p[b.len()] = EOO;
+                    p[b.len()+1] = EOO;
                 }
             }
 

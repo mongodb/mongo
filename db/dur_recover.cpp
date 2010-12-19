@@ -91,7 +91,10 @@ namespace mongo {
 
                 JHeader h;
                 _br.read(h); // read/skip file header
-                uassert(13536, str::stream() << "journal version number mismatch " << h._version, h.versionOk());
+                if( !h.versionOk() ) {
+                    log() << "journal file version number mismatch. recover with old version of mongod, terminate cleanly, then upgrade." << endl;
+                    uasserted(13536, str::stream() << "journal version number mismatch " << h._version);
+                }
                 uassert(13537, "journal header invalid", h.valid());
             }
 
@@ -299,6 +302,7 @@ namespace mongo {
                     p[-2] = 'o';
                     p[-1] = 0;
                     p[entry.d->len] = EOO;
+                    p[entry.d->len+1] = EOO;
                 }
             }
             else {
