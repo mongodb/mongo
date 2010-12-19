@@ -191,17 +191,8 @@ namespace mongo {
             }
         }
 
-        char *p = r->data;
-        memcpy(p, partial.objdata(), posz);
-        *((unsigned *)p) += obj.objsize() + 1 + 2;
-        p += posz - 1;
-        *p++ = (char) Object;
-        *p++ = 'o';
-        *p++ = 0;
-        memcpy(p, obj.objdata(), obj.objsize());
-        p += obj.objsize();
-        *p = EOO;
-        
+        append_O_Obj(r->data, partial, obj);
+
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
             log( 6 ) << "logOp:" << temp << endl;
