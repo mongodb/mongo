@@ -45,15 +45,18 @@ namespace mongo {
     
     int Chunk::MaxChunkSize = 1024 * 1024 * 64;
     
-    Chunk::Chunk( ChunkManager * manager )
-      : _manager(manager),
-        _lastmod(0), _dataWritten(0)
-    {}
+    Chunk::Chunk( ChunkManager * manager ) : _manager(manager), _lastmod(0) {
+        _setDataWritten();
+    }
 
     Chunk::Chunk(ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
-      : _manager(info), _min(min), _max(max), _shard(shard),
-        _lastmod(0), _dataWritten(0)
-    {}
+      : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0) {
+        _setDataWritten();
+    }
+
+    void Chunk::_setDataWritten(){
+        _dataWritten = rand() % ( MaxChunkSize / 5 );
+    }
 
     string Chunk::getns() const {
         assert( _manager );
