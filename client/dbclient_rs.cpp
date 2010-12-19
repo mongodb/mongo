@@ -98,7 +98,7 @@ namespace mongo {
         int x = rand() % _nodes.size();
         {
             scoped_lock lk( _lock );
-            for ( int i=0; i<_nodes.size(); i++ ){
+            for ( unsigned i=0; i<_nodes.size(); i++ ){
                 int p = ( i + x ) % _nodes.size();
                 if ( p == _master )
                     continue;
@@ -109,14 +109,14 @@ namespace mongo {
 
         {
             scoped_lock lk( _lock );
-            for ( int i=0; i<_nodes.size(); i++ ){
+            for ( unsigned i=0; i<_nodes.size(); i++ ){
                 _nodes[i].ok = true;
             }
         }
         
         {
             scoped_lock lk( _lock );
-            for ( int i=0; i<_nodes.size(); i++ ){
+            for ( unsigned i=0; i<_nodes.size(); i++ ){
                 int p = ( i + x ) % _nodes.size();
                 if ( p == _master )
                     continue;
