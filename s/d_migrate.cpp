@@ -712,6 +712,7 @@ namespace mongo {
                 ShardChunkVersion shardVersion;
                 shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
 
+                log() << "moveChunk request accepted at version " << shardVersion << endl;
             }
             
             timing.done(2);
