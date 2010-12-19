@@ -85,6 +85,7 @@ namespace mongo {
 
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
+        // ^- static is safe as we are in write lock
         static BufBuilder bufbuilder(8*1024);
         
         if ( strncmp(ns, "local.", 6) == 0 ){
@@ -95,15 +96,15 @@ namespace mongo {
 
         const OpTime ts = OpTime::now();
 
-        long long hNew;
+        long long hashNew;
         if( theReplSet ) { 
             massert(13312, "replSet error : logOp() but not primary?", theReplSet->box.getState().primary());
-            hNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
+            hashNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         }
         else {
             // must be initiation
             assert( *ns == 0 );
-            hNew = 0;
+            hashNew = 0;
         }
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
@@ -114,7 +115,7 @@ namespace mongo {
         BSONObjBuilder b(bufbuilder);
 
         b.appendTimestamp("ts", ts.asDate());
-        b.append("h", hNew);
+        b.append("h", hashNew);
 
         b.append("op", opstr);
         b.append("ns", ns);
@@ -148,7 +149,7 @@ namespace mongo {
                     log() << "replSet " << theReplSet->isPrimary() << rsLog;
                 }
                 theReplSet->lastOpTimeWritten = ts;
-                theReplSet->lastH = hNew;
+                theReplSet->lastH = hashNew;
                 ctx.getClient()->setLastOp( ts.asDate() );
             }
         }
