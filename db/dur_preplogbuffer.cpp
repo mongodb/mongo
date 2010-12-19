@@ -136,6 +136,18 @@ namespace mongo {
             }
         }
 
+        void resetLogBuffer(AlignedBuilder& bb) {
+            bb.reset();
+
+            // JSectHeader
+            {
+                bb.appendStr("\nHH\n", false);
+
+                // total length, will fill in later:
+                bb.appendNum((unsigned) 0xffffffff);
+            }
+        }
+
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking
@@ -143,15 +155,7 @@ namespace mongo {
         void PREPLOGBUFFER() { 
             assert( cmdLine.dur );
             AlignedBuilder& bb = commitJob._ab;
-            bb.reset();
-
-            unsigned lenOfs; // we will need to backfill the length when prep is wrapping up
-
-            // JSectHeader
-            {
-                bb.appendStr("\nHH\n", false);
-                lenOfs = bb.skip(4);
-            }
+            resetLogBuffer(bb);
 
             // ops other than basic writes (DurOp's)
             {
@@ -176,7 +180,7 @@ namespace mongo {
                 assert( 0xffffe000 == (~(Alignment-1)) );
                 unsigned L = (bb.len() + Alignment-1) & (~(Alignment-1));
                 dassert( L >= (unsigned) bb.len() );
-                *((unsigned*)bb.atOfs(lenOfs)) = L;
+                *((unsigned*)bb.atOfs(4)) = L;
                 unsigned padding = L - bb.len();
                 bb.skip(padding);
                 dassert( bb.len() % Alignment == 0 );
