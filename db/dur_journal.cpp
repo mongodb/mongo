@@ -82,11 +82,11 @@ namespace mongo {
 
             Journal() : 
               toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
-              _lfMutex("JournalLfMutex")
+              _curLogFileMutex("JournalLfMutex")
             { 
                 _written = 0;
                 _nextFileNumber = 0;
-                _lf = 0; 
+                _curLogFile = 0; 
             }
 
             void open();
@@ -96,10 +96,10 @@ namespace mongo {
             path getFilePathFor(int filenumber) const;
 
             bool tryToCloseLogFile() { 
-                mutex::try_lock lk(_lfMutex, 2000);
+                mutex::try_lock lk(_curLogFileMutex, 2000);
                 if( lk.ok ) {
-                    delete _lf; 
-                    _lf = 0;
+                    delete _curLogFile; 
+                    _curLogFile = 0;
                 }
                 return lk.ok;
             }
@@ -110,8 +110,8 @@ namespace mongo {
             unsigned long long _written; // bytes written so far
             unsigned _nextFileNumber;
 
-            LogFile *_lf;
-            mutex _lfMutex; // lock when using _lf
+            LogFile *_curLogFile;
+            mutex _curLogFileMutex; // lock when using _curLogFile
         };
 
         Journal j;
@@ -197,20 +197,20 @@ namespace mongo {
        }
 
         void Journal::_open() {
-            assert( _lf == 0 );
+            assert( _curLogFile == 0 );
             string fname = getFilePathFor(_nextFileNumber).string();
-            _lf = new LogFile(fname);
+            _curLogFile = new LogFile(fname);
             _nextFileNumber++;
             {
                 JHeader h(fname);
                 AlignedBuilder b(8192);
                 b.appendStruct(h);
-                _lf->synchronousAppend(b.buf(), b.len());
+                _curLogFile->synchronousAppend(b.buf(), b.len());
             }
         }
 
         void Journal::open() {
-            mutex::scoped_lock lk(_lfMutex);
+            mutex::scoped_lock lk(_curLogFileMutex);
             _open();
         }
 
@@ -237,15 +237,15 @@ namespace mongo {
             j.rotate();
         }
         void Journal::rotate() {
-            if( _lf && _written < DataLimit ) 
+            if( _curLogFile && _written < DataLimit ) 
                 return;
-            scoped_lock lk(_lfMutex);
-            if( _lf && _written < DataLimit ) 
+            scoped_lock lk(_curLogFileMutex);
+            if( _curLogFile && _written < DataLimit ) 
                 return;
 
-            if( _lf ) { 
-                delete _lf; // close
-                _lf = 0;
+            if( _curLogFile ) { 
+                delete _curLogFile; // close
+                _curLogFile = 0;
                 _written = 0;
 
                 /* remove an older journal file. */
@@ -287,12 +287,12 @@ namespace mongo {
         }
         void Journal::journal(const AlignedBuilder& b) {
             try {
-                mutex::scoped_lock lk(_lfMutex);
-                if( _lf == 0 )
+                mutex::scoped_lock lk(_curLogFileMutex);
+                if( _curLogFile == 0 )
                     open();
                 stats.curr._journaledBytes += b.len();
                 _written += b.len();
-                _lf->synchronousAppend((void *) b.buf(), b.len());
+                _curLogFile->synchronousAppend((void *) b.buf(), b.len());
             }
             catch(std::exception& e) { 
                 log() << "warning exception in dur::journal " << e.what() << endl;
