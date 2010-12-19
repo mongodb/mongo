@@ -171,10 +171,9 @@ namespace mongo {
             ++n;
 
             assert(debug && cmdLine.dur);
-            vector<WriteIntent>& w = commitJob.writes();
-            if( w.size() == 0 ) 
+            if (commitJob.writes().empty())
                 return;
-            const WriteIntent &i = w[w.size()-1];
+            const WriteIntent &i = commitJob.lastWrite();
             size_t ofs;
             MongoMMF *mmf = privateViews.find(i.p, ofs);
             if( mmf == 0 ) 
@@ -187,8 +186,8 @@ namespace mongo {
             unsigned long long *a = (unsigned long long *) (priv+past);
             unsigned long long *b = (unsigned long long *) (writ+past);
             if( *a != *b ) { 
-                for( unsigned z = 0; z < w.size() - 1; z++ ) { 
-                    const WriteIntent& wi = w[z];
+                for( set<WriteIntent>::iterator it(commitJob.writes().begin()), end((commitJob.writes().begin())); it != end; ++it ) { 
+                    const WriteIntent& wi = *it;
                     char *r1 = (char*) wi.p;
                     char *r2 = r1 + wi.len;
                     if( r1 <= (((char*)a)+8) && r2 > (char*)a ) { 
@@ -267,7 +266,7 @@ namespace mongo {
                         ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << ' ' << stats.curr._objCopies << endl;
-                        vector<WriteIntent>& b = commitJob.writes();
+                        set<WriteIntent>& b = commitJob.writes();
                         (void)b; // mark as unused. Useful for inspection in debugger
 
                         massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);

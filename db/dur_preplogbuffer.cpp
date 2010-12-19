@@ -50,7 +50,7 @@ namespace mongo {
             return f;
         }
 
-        void prepBasicWrite(AlignedBuilder&bb, WriteIntent *i, RelativePath& lastDbPath) {
+        void prepBasicWrite(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
             size_t ofs = 1;
             MongoMMF *mmf = findMMF(i->p, /*out*/ofs);
             dassert( i->w_ptr == 0 );
@@ -93,7 +93,7 @@ namespace mongo {
             // each time events switch to a different database we journal a JDbContext 
             RelativePath lastDbPath;
 
-            for( vector<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
+            for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
                 prepBasicWrite(bb, &(*i), lastDbPath);
             }
         }

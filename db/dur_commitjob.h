@@ -33,9 +33,32 @@ namespace mongo {
         struct WriteIntent /* copyable */ { 
             WriteIntent() : w_ptr(0), p(0) { }
             WriteIntent(void *a, unsigned b) : w_ptr(0), p(a), len(b) { }
-            void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap
+            /*temp*/ mutable void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap 
             void *p;      // intent to write at p
             unsigned len; // up to this len
+
+            // these two are to make algorithms more readable
+            void* start() const { return p; }
+            void* end() const { return (char*) p + len; }
+
+            bool operator < (const WriteIntent& rhs) const { return end() < rhs.end(); }
+
+            // can they be merged?
+            bool overlaps(const WriteIntent& rhs) const {
+                return (start() <= rhs.end() && end() >= rhs.start());
+            }
+
+            // is merging necessary?
+            bool contains(const WriteIntent& rhs) const {
+                return (start() <= rhs.start() && end() >= rhs.end());
+            }
+
+            // merge into me
+            void absorb(const WriteIntent& other);
+
+            friend ostream& operator << (ostream& out, const WriteIntent& wi) {
+                return (out << "p: " << wi.p << " end: " << wi.end() << " len: " << wi.len);
+            }
         };
 
         /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
@@ -74,11 +97,16 @@ namespace mongo {
         class Writes : boost::noncopyable {
         public:
             Already<127> _alreadyNoted;
-            vector<WriteIntent> _writes;
+            set<WriteIntent> _writes;
             vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
 
             /** reset the Writes structure (empties all the above) */
             void clear();
+            void insert(WriteIntent& wi); // merges into set
+
+#ifdef _DEBUG
+            WriteIntent _last;
+#endif
         };
 
         /** A commit job object for a group commit.  Currently there is one instance of this object.
@@ -99,7 +127,7 @@ namespace mongo {
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p);
 
-            vector<WriteIntent>& writes() { return _wi._writes; }
+            set<WriteIntent>& writes() { return _wi._writes; }
             vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
 
             /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even 
@@ -122,6 +150,10 @@ namespace mongo {
             /** we check how much written and if it is getting to be a lot, we commit sooner. */
             size_t bytes() const { return _bytes; }
 
+#if defined(_DEBUG)
+            const WriteIntent& lastWrite() const { return _wi._last; }
+#endif
+
         private:
             bool _hasWritten;
             Writes _wi;
@@ -135,6 +167,7 @@ namespace mongo {
         inline void CommitJob::note(WriteIntent& w) {
 #if defined(_DEBUG)
             // TEMP?
+            _wi._last = w;
             getDur().debugCheckLastDeclaredWrite();
 #endif
 
@@ -182,7 +215,8 @@ namespace mongo {
 #endif
 
                 // remember intent. we will journal it in a bit
-                _wi._writes.push_back(w);
+                _wi.insert(w);
+                _bytes += w.len;
                 wassert( _wi._writes.size() <  2000000 );
                 assert(  _wi._writes.size() < 20000000 );
             }

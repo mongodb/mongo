@@ -22,11 +22,66 @@
 namespace mongo {
     namespace dur {
 
+        void WriteIntent::absorb(const WriteIntent& other){
+            dassert(overlaps(other));
+
+            void* newEnd = max(end(), other.end());
+            p = min(p, other.p);
+            len = (char*)newEnd - (char*)p;
+
+            dassert(contains(other));
+        }
+
         void Writes::clear() { 
             _alreadyNoted.clear();
             _writes.clear();
             _ops.clear();
         }
+
+        void Writes::insert(WriteIntent& wi){
+            if (_writes.empty()){
+                _writes.insert(wi);
+                return;
+            }
+
+            typedef set<WriteIntent>::const_iterator iterator; // shorter
+
+            iterator closest = _writes.lower_bound(wi);
+            // closest.end() >= wi.end()
+
+            if ((closest != _writes.end() && closest->overlaps(wi)) || // high end
+                (closest != _writes.begin() && (--closest)->overlaps(wi))) // low end
+            {
+                if (closest->contains(wi))
+                    return; // nothing to do
+
+                // find overlapping range and merge into wi
+                iterator   end(closest);
+                iterator begin(closest);
+                while (  end->overlaps(wi)) { wi.absorb(*end); ++end; if (end == _writes.end()) break; }  // look forwards
+                while (begin->overlaps(wi)) { wi.absorb(*begin); if (begin == _writes.begin()) break; --begin; } // look backwards
+                if (!begin->overlaps(wi)) ++begin; // make inclusive
+
+                DEV { // ensure we're not deleting anything we shouldn't
+                    for (iterator it(begin); it != end; ++it){
+                        assert(wi.contains(*it));
+                    }
+                }
+
+                _writes.erase(begin, end);
+                _writes.insert(wi);
+
+                DEV { // ensure there are no overlaps
+                    for (iterator it(_writes.begin()), end(boost::prior(_writes.end())); it != end; ++it){
+                        assert(!it->overlaps(*boost::next(it)));
+                    }
+                }
+            }
+            else { // no entries overlapping wi
+                _writes.insert(closest, wi);
+            }
+        }
+
 
         /** note an operation other than a "basic write" */
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
