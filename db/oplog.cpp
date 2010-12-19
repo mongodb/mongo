@@ -83,6 +83,43 @@ namespace mongo {
         }
     }
 
+    /** given a BSON object, create a new one at dst which is the existing (partial) object 
+        with a new object element appended at the end with fieldname "o".
+
+        @param partial already build object with everything except the o member.  e.g. something like:
+               { ts:..., ns:..., os2:... }
+        @param o a bson object to be added with fieldname "o"
+        @dst   where to put the newly built combined object.  e.g. ends up as something like:
+               { ts:..., ns:..., os2:..., o:... }
+    */
+    void append_O_Obj(char *dst, const BSONObj& partial, const BSONObj& o) {
+        const int size1 = partial.objsize() - 1;  // less the EOO char
+        const int oOfs = size1+3;                 // 3 = byte BSONOBJTYPE + byte 'o' + byte \0
+
+        // don't bother if obj is tiny as there is some header overhead for the additional journal entry
+        // and also some computational administrative overhead.
+        bool objAppendOpWorked = o.objsize() >= 32 && 
+                                 getDur().objAppend(dst + oOfs, o.objdata(), o.objsize());
+
+        void *p = getDur().writingPtr(dst, objAppendOpWorked ? size1 : oOfs+o.objsize()+1);
+
+        memcpy(p, partial.objdata(), size1);
+
+        // adjust overall bson object size for the o: field
+        *(static_cast<unsigned*>(p)) += o.objsize() + 1/*fieldtype byte*/ + 2/*"o" fieldname*/;
+
+        if( !objAppendOpWorked ) {
+            char *b = static_cast<char *>(p);
+            b += size1;
+            *b++ = (char) Object;
+            *b++ = 'o'; // { o : ... }
+            *b++ = 0;   // null terminate "o" fieldname
+            memcpy(b, o.objdata(), o.objsize());
+            b += o.objsize();
+            *b = EOO;
+        }
+    }
+
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
         // ^- static is safe as we are in write lock
@@ -242,34 +279,7 @@ namespace mongo {
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
 
-        {
-            const int size1 = po_sz-1;  // less the EOO char
-            const int objOfs = size1+3; // 3 = byte BSONOBJTYPE + byte 'o' + byte \0
-            char *objInsertPoint = r->data + objOfs;
-
-            // don't bother if obj is tiny as there is some header overhead for the additional journal entry
-            // and also some computational administrative overhead.
-            bool objAppendWorked = obj.objsize() >= 32 && 
-                                 getDur().objAppend(objInsertPoint, obj.objdata(), obj.objsize());
-
-            void *p = (char *) getDur().writingPtr(r->data, objAppendWorked ? size1 : objOfs+obj.objsize()+1);
-
-            memcpy(p, partial.objdata(), size1);
-
-            // adjust overall bson object size for the o: field
-            *(static_cast<unsigned*>(p)) += obj.objsize() + 1/*fieldtype byte*/ + 2/*"o" fieldname*/;
-
-            if( !objAppendWorked ) {
-                char *b = static_cast<char *>(p);
-                b += size1;
-                *b++ = (char) Object;
-                *b++ = 'o'; // { o : ... }
-                *b++ = 0;   // null terminate "o" fieldname
-                memcpy(b, obj.objdata(), obj.objsize());
-                b += obj.objsize();
-                *b = EOO;
-            }
-        }
+        append_O_Obj(r->data, partial, obj);
 
         context.getClient()->setLastOp( ts.asDate() );
 
