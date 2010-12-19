@@ -1099,6 +1099,7 @@ clientTests = []
 
 # examples
 clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "rsExample" , [ "client/examples/rs.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
