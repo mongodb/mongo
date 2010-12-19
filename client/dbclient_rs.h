@@ -22,6 +22,69 @@
 
 namespace mongo {
 
+    class ReplicaSetMonitor;
+    typedef shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
+
+    /**
+     * manages state about a replica set for client
+     * keeps tabs on whose master and what slaves are up
+     * can hand a slave to someone for SLAVE_OK
+     * one instace per process per replica set
+     * TODO: we might be able to use a regular Node * to avoid _lock
+     */
+    class ReplicaSetMonitor {
+    public:
+        
+        /**
+         * gets a cached Monitor per name or will create if doesn't exist
+         */
+        static ReplicaSetMonitorPtr get( const string& name , const vector<HostAndPort>& servers );
+
+        ~ReplicaSetMonitor();
+        
+        /** @return HostAndPort or throws an exception */
+        HostAndPort getMaster();
+
+        /**
+         * notify the monitor that server has faild
+         */
+        void notifyFailure( const HostAndPort& server );
+
+        string setName() const { return _name; }
+
+        string getServerAddress() const;
+
+    private:
+        ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers );
+
+        void _check();
+
+        /** 
+         * @param c the connection to check
+         * @param maybePrimary OUT
+         * @param verbose
+         * @return if the connection is good */
+        bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose );
+
+        int _find( const string& server ) const ;
+
+        mutable mongo::mutex _lock; // protects _nodes
+
+        string _name;
+        struct Node {
+            Node( const HostAndPort& a , DBClientConnection* c ) : addr( a ) , conn(c){}
+            HostAndPort addr;
+            DBClientConnection* conn;
+        };
+        vector<Node> _nodes;
+
+        int _master; // which node is the current master.  -1 means no master is known
+
+        
+        static mongo::mutex _setsLock; // protects _sets
+        static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
+    };
+
     /** Use this class to connect to a replica set of servers.  The class will manage
        checking for which server in a replica set is master, and do failover automatically.
        
@@ -31,12 +94,6 @@ namespace mongo {
 	   an exception) before the failover is complete.  Operations are not retried.
     */
     class DBClientReplicaSet : public DBClientBase {
-        string _name;
-        DBClientConnection * _currentMaster;
-        vector<HostAndPort> _servers;
-        vector<DBClientConnection*> _conns;        
-        void _checkMaster();
-        DBClientConnection * checkMaster();
 
     public:
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
@@ -44,80 +101,102 @@ namespace mongo {
         virtual ~DBClientReplicaSet();
 
         /** Returns false if nomember of the set were reachable, or neither is
-           master, although,
-           when false returned, you can still try to use this connection object, it will
-           try reconnects.
-           */
+         * master, although,
+         * when false returned, you can still try to use this connection object, it will
+         * try reconnects.
+         */
         bool connect();
 
         /** Authorize.  Authorizes all nodes as needed
         */
         virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true );
+        
+        // ----------- simple functions --------------
 
         /** throws userassertion "no master found" */
-        virtual
-        auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
-                                       const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );
-
+        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
+                                               const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );
+        
         /** throws userassertion "no master found" */
-        virtual
-        BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        /** insert */
-        virtual void insert( const string &ns , BSONObj obj ) {
-            checkMaster()->insert(ns, obj);
-        }
+        virtual void insert( const string &ns , BSONObj obj );
 
         /** insert multiple objects.  Note that single object insert is asynchronous, so this version 
             is only nominally faster and not worth a special effort to try to use.  */
-        virtual void insert( const string &ns, const vector< BSONObj >& v ) {
-            checkMaster()->insert(ns, v);
-        }
+        virtual void insert( const string &ns, const vector< BSONObj >& v );
 
-        /** remove */
-        virtual void remove( const string &ns , Query obj , bool justOne = 0 ) {
-            checkMaster()->remove(ns, obj, justOne);
-        }
-
-        /** update */
-        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 ) {
-            return checkMaster()->update(ns, query, obj, upsert,multi);
-        }
+        virtual void remove( const string &ns , Query obj , bool justOne = 0 );
         
-        virtual void killCursor( long long cursorID ){
-            checkMaster()->killCursor( cursorID );
-        }
-
-        string toString();
-
-        /* this is the callback from our underlying connections to notify us that we got a "not master" error.
-         */
-        void isntMaster() {
-            _currentMaster = 0;
-        }
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 );
         
-        string getServerAddress() const;
+        virtual void killCursor( long long cursorID );
+        
+        // ---- access raw connections ----
         
         DBClientConnection& masterConn();
         DBClientConnection& slaveConn();
+        
+        // ---- callback pieces -------
+
+        virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
+
+        /* this is the callback from our underlying connections to notify us that we got a "not master" error.
+         */
+        void isntMaster() { _master.reset(); }
+
+        // ----- status ------
+
+        virtual bool isMember( const DBConnector * conn ) const;        
+
+        virtual bool isFailed() const { return ! _master || _master->isFailed(); }
+
+        // ----- informational ----
+
+        string toString() { return getServerAddress(); }
+
+        string getServerAddress() const { return _monitor->getServerAddress(); }
+        
+        virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }  
+        
+        // ---- low level ------
 
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { return checkMaster()->call( toSend , response , assertOk ); }
         virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
         virtual bool callRead( Message& toSend , Message& response ){ return checkMaster()->callRead( toSend , response ); }
 
-        virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }  
-
-        virtual bool isMember( const DBConnector * conn ) const;
-
-        virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
-        
-        virtual bool isFailed() const {
-            return _currentMaster == 0 || _currentMaster->isFailed();
-        }
 
     protected:                
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
+
+    private:
+
+        DBClientConnection * checkMaster();
+        void _checkMaster();
+
+        ReplicaSetMonitorPtr _monitor;
+
+        HostAndPort _masterHost;        
+        scoped_ptr<DBClientConnection> _master;
         
+        /**
+         * for storing authentication info
+         * fields are exactly for DBClientConnection::auth
+         */
+        struct AuthInfo {
+            AuthInfo( string d , string u , string p , bool di ) 
+                : dbname( d ) , username( u ) , pwd( p ) , digestPassword( di ){}
+            string dbname;
+            string username;
+            string pwd;
+            bool digestPassword;
+        };
+
+        // we need to store so that when we connect to a new node on failure
+        // we can re-auth
+        // this could be a security issue, as the password is stored in memory
+        // not sure if/how we should handle
+        list<AuthInfo> _auths; 
     };
     
 
