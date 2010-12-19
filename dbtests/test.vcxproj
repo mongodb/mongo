@@ -262,6 +262,7 @@
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\gridfs.cpp" />
     <ClCompile Include="..\client\model.cpp" />
@@ -274,6 +275,7 @@
     <ClCompile Include="..\db\durop.cpp" />
     <ClCompile Include="..\db\dur_commitjob.cpp" />
     <ClCompile Include="..\db\dur_journal.cpp" />
+    <ClCompile Include="..\db\dur_preplogbuffer.cpp" />
     <ClCompile Include="..\db\dur_recover.cpp" />
     <ClCompile Include="..\db\dur_writetodatafiles.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />

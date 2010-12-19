@@ -749,6 +749,12 @@
     <ClCompile Include="..\db\dur_writetodatafiles.cpp">
       <Filter>dur</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\dbclient_rs.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\dur_preplogbuffer.cpp">
+      <Filter>dur</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
