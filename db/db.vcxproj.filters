@@ -451,6 +451,9 @@
     <ClCompile Include="dur_writetodatafiles.cpp">
       <Filter>_storage engine</Filter>
     </ClCompile>
+    <ClCompile Include="dur_preplogbuffer.cpp">
+      <Filter>_storage engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

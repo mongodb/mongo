@@ -10,7 +10,7 @@ namespace mongo {
             Stats();
             struct S { 
                 unsigned _commits;
-                unsigned _dittos;
+                unsigned _objCopies;
                 unsigned long long _journaledBytes;
                 unsigned long long _writeToDataFilesBytes;
             } curr;

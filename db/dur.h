@@ -28,6 +28,21 @@ namespace mongo {
             /** Declare a database is about to be dropped */
             virtual void droppingDb(string db) = 0;
 
+            /** this function appends a nested bsonobj, with the fieldname, "o", to a partially built 
+                bson object.  it then terminates the bson object with EOO.  The caller is responsible 
+                for setting the outer bson object's total size correctly.
+
+                It also journals the operation. an optimization occurs in the journaling.
+                if the src was just journaled, a new copy is not written, rather, 
+                JObjAppend is added to the journal which is small.
+
+                If the src was not recently journaled, that is ok: in that case the function returns false 
+                and you must do your traditional behavior.
+
+                This is used to make writing to the replication oplog efficient.
+            */
+            virtual bool objAppend(void *dst, const void *src, unsigned len) = 0;
+
             /** Declarations of write intent.
             
                 Use these methods to declare "i'm about to write to x and it should be logged for redo." 
@@ -143,6 +158,7 @@ namespace mongo {
             void declareWriteIntent(void *, unsigned) { }
             void createdFile(string filename, unsigned long long len) { }
             void droppingDb(string db) { }
+            bool objAppend(void *dst, const void *src, unsigned len) { return false; }
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
 #if defined(_DEBUG)
@@ -157,6 +173,7 @@ namespace mongo {
             void declareWriteIntent(void *, unsigned);
             void createdFile(string filename, unsigned long long len);
             void droppingDb(string db);
+            bool objAppend(void *dst, const void *src, unsigned len);
             bool awaitCommit();
             bool commitNow();
 #if defined(_DEBUG)
