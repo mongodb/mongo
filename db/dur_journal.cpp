@@ -32,8 +32,9 @@
 #include "../util/mongoutils/str.h"
 #include "../util/concurrency/mvar.h"
 
+using namespace mongoutils;
+
 namespace mongo {
-    using namespace mongoutils;
 
     class AlignedBuilder;
 

@@ -70,27 +70,58 @@ namespace mongo {
                 OpCode_DbContext   = 0xfffffffe,
                 OpCode_FileCreated = 0xfffffffd,
                 OpCode_DropDb      = 0xfffffffc,
+                OpCode_ObjAppend       = 0xfffffffb,
                 OpCode_Min         = 0xfffff000
             };
-
             union {
-                unsigned len;    
+                unsigned len;    // length in bytes of the data of the JEntry. does not include the JEntry header
                 OpCodes opcode;
             };
+
             unsigned ofs;  // offset in file
 
-            enum {
+            // sentinel and masks for _fileNo
+            enum { 
                 DotNsSuffix = 0x7fffffff, // ".ns" file
                 LocalDbBit  = 0x80000000  // assuming "local" db instead of using the JDbContext
             };
             int _fileNo;   // high bit is set to indicate it should be the <dbpath>/local database
             // char data[] follows
 
+            const char * srcData() const { 
+                const int *i = &_fileNo;
+                return (const char *) (i+1);
+            }
+
             int getFileNo() const { return _fileNo & (~LocalDbBit); }
             void setFileNo(int f) { _fileNo = f; }
+            bool isNsSuffix() const { return getFileNo() == DotNsSuffix; }
+
             void setLocalDbContextBit() { _fileNo |= LocalDbBit; }
             bool isLocalDbContext() const { return _fileNo & LocalDbBit; }
             void clearLocalDbContextBit() { _fileNo = getFileNo(); }
+
+            static string suffix(int fileno) {
+                if( fileno == DotNsSuffix ) return "ns";
+                stringstream ss;
+                ss << fileno;
+                return ss.str();
+            }
+        };
+
+        /** append an object to a partial BSON buffer under construction.
+            adds 
+               o : <data>, EOO
+            len is the length of the data            
+        */
+        struct JObjAppend { 
+            JObjAppend() : opcode(JEntry::OpCode_ObjAppend) { }
+            unsigned opcode;
+            int dstFileNo;    // destination in the local database.
+            unsigned dstOfs;
+            int srcFileNo;    // source in the database of current context (JDbContext)
+            unsigned srcOfs;
+            unsigned len;
         };
 
         /** group commit section footer. md5 is a key field. */

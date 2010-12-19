@@ -217,9 +217,10 @@ namespace mongo {
             b.appendBool("b", *bb);
         if ( o2 )
             b.append("o2", *o2);
-        BSONObj partial = b.done();
-        int posz = partial.objsize();
-        int len = posz + obj.objsize() + 1 + 2 /*o:*/;
+        BSONObj partial = b.done(); // partial is everything except the o:... part.
+
+        int po_sz = partial.objsize();
+        int len = po_sz + obj.objsize() + 1 + 2 /*o:*/;
 
         Record *r;
         if( logNS == 0 ) {
@@ -236,21 +237,37 @@ namespace mongo {
         } else {
             Client::Context ctx( logNS, dbpath, 0, false );
             assert( nsdetails( logNS ) );
+            // first we allocate the space, then we fill it below.
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
 
         {
-            const int size2 = obj.objsize() + 1 + 2;
-            char *p = (char *) getDur().writingPtr(r->data, size2+posz);
-            memcpy(p, partial.objdata(), posz);
-            *((unsigned *)p) += size2;
-            p += posz - 1;
-            *p++ = (char) Object;
-            *p++ = 'o'; // { o : ... }
-            *p++ = 0;
-            memcpy(p, obj.objdata(), obj.objsize());
-            p += obj.objsize();
-            *p = EOO;
+            const int size1 = po_sz-1;  // less the EOO char
+            const int objOfs = size1+3; // 3 = byte BSONOBJTYPE + byte 'o' + byte \0
+            char *objInsertPoint = r->data + objOfs;
+
+            // don't bother if obj is tiny as there is some header overhead for the additional journal entry
+            // and also some computational administrative overhead.
+            bool objAppendWorked = obj.objsize() >= 32 && 
+                                 getDur().objAppend(objInsertPoint, obj.objdata(), obj.objsize());
+
+            void *p = (char *) getDur().writingPtr(r->data, objAppendWorked ? size1 : objOfs+obj.objsize()+1);
+
+            memcpy(p, partial.objdata(), size1);
+
+            // adjust overall bson object size for the o: field
+            *(static_cast<unsigned*>(p)) += obj.objsize() + 1/*fieldtype byte*/ + 2/*"o" fieldname*/;
+
+            if( !objAppendWorked ) {
+                char *b = static_cast<char *>(p);
+                b += size1;
+                *b++ = (char) Object;
+                *b++ = 'o'; // { o : ... }
+                *b++ = 0;   // null terminate "o" fieldname
+                memcpy(b, obj.objdata(), obj.objsize());
+                b += obj.objsize();
+                *b = EOO;
+            }
         }
 
         context.getClient()->setLastOp( ts.asDate() );

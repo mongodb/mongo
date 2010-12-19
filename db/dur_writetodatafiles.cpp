@@ -46,11 +46,18 @@ namespace mongo {
         */
         void WRITETODATAFILES() { 
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
-            for( int i = commitJob.writes().size() - 1; i >= 0; i-- ) {
-                const WriteIntent& intent = commitJob.writes()[i];
-                char *dst = (char *) (intent.w_ptr);
-                memcpy(dst, intent.p, intent.len);
-                stats.curr._writeToDataFilesBytes += intent.len;
+            for( int i = commitJob.basicWrites().size() - 1; i >= 0; i-- ) {
+                const BasicWriteOp& b = commitJob.basicWrites()[i];
+                stats.curr._writeToDataFilesBytes += b.len();
+                dassert(b.dst);
+                memcpy(b.dst, b.src, b.len());
+                if( b.isObjAppend() ) { 
+                    char *p = static_cast<char*>(b.dst);
+                    p[-3] = (char) Object; // { ..., o: <copiedobj>, ..., EOO}
+                    p[-2] = 'o';
+                    p[-1] = 0;
+                    p[b.len()] = EOO;
+                }
             }
 
             debugValidateMapsMatch();

@@ -360,7 +360,7 @@ namespace mongo {
                 try {
                     return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
                 }
-                catch ( DBException & e ){
+                catch ( DBException & ){
                     LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
                 }
             }
@@ -378,7 +378,7 @@ namespace mongo {
                 try {
                     return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
-                catch ( DBException & e ){
+                catch ( DBException & ){
                     LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
                 }
             }

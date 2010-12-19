@@ -60,6 +60,12 @@ namespace mongo {
         /** return remaining bytes */
         unsigned remaining() const { return (char*)_end -(char*)_pos; }
 
+        /** back up by nbytes */
+        void rewind(unsigned nbytes) { 
+            _pos = ((char *) _pos) - nbytes;
+            assert( _pos >= _start );
+        }
+
         /** return current position pointer, and advance by len */
         const void* skip(unsigned len) { 
             char *nxt = ((char *) _pos) + len;

@@ -29,13 +29,31 @@
 namespace mongo { 
     namespace dur {
 
-        /** declaration of an intent to write to a region of a memory mapped view */
-        struct WriteIntent /* copyable */ { 
-            WriteIntent() : w_ptr(0), p(0) { }
-            WriteIntent(void *a, unsigned b) : w_ptr(0), p(a), len(b) { }
-            void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap
-            void *p;      // intent to write at p
-            unsigned len; // up to this len
+        /** "I intend to write at p for up to len bytes" */
+        struct WriteIntent { 
+            void *p;
+            unsigned len;
+        };
+
+        /** declaration of an intent to write to a region of a memory mapped view 
+            this could be either a JEntry or a JObjAppend in the journal
+        */
+        struct BasicWriteOp /* copyable */ { 
+            void *dst;
+            void *src;
+            unsigned len() const { return _len & 0x7fffffff; }
+            bool isObjAppend() const { return _len & 0x80000000; }
+            void set(void *Src, unsigned Len) {
+                dst = 0;
+                src = Src;
+                _len = Len;
+            }
+            void setObjAppend(void *Dst, void *Src, unsigned Len) { 
+                dst = Dst; src = Src; 
+                _len = Len | 0x80000000;
+            }
+        private:
+            unsigned _len;
         };
 
         /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
@@ -64,6 +82,15 @@ namespace mongo {
                 nd = w;
                 return false; // a new set
             }
+
+            /**
+               @return true if already indicated.
+            */
+            bool check(const WriteIntent& w) {
+                unsigned x = mongoutils::hashPointer(w.p);
+                WriteIntent& nd = nodes[x % N];
+                return nd.p == w.p && nd.len >= w.len;
+            }
         private:
             enum { N = Prime }; // this should be small the idea is that it fits in the cpu cache easily
             WriteIntent nodes[N];
@@ -73,8 +100,9 @@ namespace mongo {
         class Writes : boost::noncopyable {
         public:
             Already<127> _alreadyNoted;
-            vector<WriteIntent> _writes;
+            vector<BasicWriteOp> _basicWrites;
             vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
+
             /** reset the Writes structure (empties all the above) */
             void clear();
         };
@@ -97,7 +125,10 @@ namespace mongo {
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p);
 
-            vector<WriteIntent>& writes() { return _wi._writes; }
+            /** @return true if was already noted. false negatives possible (to be fast). */
+            bool alreadyNoted(WriteIntent& w) { return _wi._alreadyNoted.check(w); }
+
+            vector<BasicWriteOp>& basicWrites() { return _wi._basicWrites; }
             vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
 
             /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even 
@@ -117,13 +148,14 @@ namespace mongo {
                     _notify.wait(); 
             }
 
+            /** we check how much written and if it is getting to be a lot, we commit sooner. */
             size_t bytes() const { return _bytes; }
 
         private:
             bool _hasWritten;
             Writes _wi;
-            NotifyAll _notify;
             size_t _bytes;
+            NotifyAll _notify; // for getlasterror fsync:true acknowledgements
         };
         extern CommitJob commitJob;
 
@@ -142,7 +174,10 @@ namespace mongo {
             dassert( cmdLine.dur );
             if( !_wi._alreadyNoted.checkAndSet(w) ) {
                 if( !_hasWritten ) {
+                    // you can't be writing if one of these is pending, so this is a verification.
                     assert( !dbMutex._remapPrivateViewRequested );
+
+                    // we don't bother doing a group commit when nothing is written, so we have a var to track that
                     _hasWritten = true;
                 }
 
@@ -164,6 +199,10 @@ namespace mongo {
                         else { 
                             log() << "DEBUG note write intent " << w.p << ' ' << w.len << " NOT FOUND IN privateViews" << endl;
                         }
+                        /*if( w.len > 48 ) {
+                            log() << "big TEMP" << endl;
+                            log() << hexdump((char*) w.p, 48) << endl;
+                        }*/
                     }
                     else if( n == 10000 ) { 
                         log() << "DEBUG stopping write intent logging, too much to log" << endl;
@@ -172,10 +211,11 @@ namespace mongo {
 #endif
 
                 // remember intent. we will journal it in a bit
-                _wi._writes.push_back(w);
-                _bytes += w.len;
-                wassert( _wi._writes.size() <  2000000 );
-                //assert(  _wi._writes.size() < 20000000 );
+                BasicWriteOp b;
+                b.set(w.p, w.len);
+                _wi._basicWrites.push_back(b);
+                wassert( _wi._basicWrites.size() <  2000000 );
+                assert(  _wi._basicWrites.size() < 20000000 );
             }
         }
     }

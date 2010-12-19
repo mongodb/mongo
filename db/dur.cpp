@@ -50,6 +50,7 @@
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
 #include "dur_stats.h"
+#include "pdfile.h" // Record::HeaderSize
 
 using namespace mongoutils;
 
@@ -57,13 +58,26 @@ namespace mongo {
 
     namespace dur {
 
+#if defined(_DEBUG)
+        const bool DebugCheckLastDeclaredWrite = false;
+#else
+        const bool DebugCheckLastDeclaredWrite = false;
+#endif
+
         void WRITETODATAFILES();
+        void PREPLOGBUFFER();
+
+        static void groupCommit(); // later in this file
+
+        CommitJob commitJob;
 
         Stats stats;
 
         Stats::Stats() {
             memset(this, 0, sizeof(*this));
         }
+
+        DurableInterface* DurableInterface::_impl = new NonDurableImpl();
 
         void NonDurableImpl::startup() {
             if( haveJournalFiles() ) { 
@@ -74,24 +88,55 @@ namespace mongo {
             }
         }
 
-#if defined(_DEBUG)
-        const bool DebugCheckLastDeclaredWrite = false;
-#else
-        const bool DebugCheckLastDeclaredWrite = false;
-#endif
+        /** base declare write intent function that all the helpers call. */
+        void DurableImpl::declareWriteIntent(void *p, unsigned len) {
+            WriteIntent w;
+            w.p = p;
+            w.len = len;
+            commitJob.note(w);
+        }
 
-        DurableInterface* DurableInterface::_impl = new NonDurableImpl();
+        bool DurableImpl::objAppend(void *dst, const void *src, unsigned len) { 
+            {
+                char *srcRecord = (char*) src;
+                srcRecord -= Record::HeaderSize;
+                WriteIntent w;
+                w.p = srcRecord;
+                w.len = len+Record::HeaderSize;
+                if( !commitJob.alreadyNoted(w) ) { 
+
+                    if( debug ) {
+                        WriteIntent w;
+                        w.p = (void*)src;
+                        w.len = len;
+                        if( commitJob.alreadyNoted(w) ) { 
+                            log() << "dur info it appears an optimization is possible that is not yet done" << endl;
+                        }
+                    }
+
+                    return false;
+                }
+            }
+
+            BasicWriteOp b;
+            b.setObjAppend(dst, (void*)src, len);
+            commitJob.basicWrites().push_back(b);
+            if( testIntent )
+                dst = MongoMMF::switchToPrivateView(dst);
+            memcpy(dst, src, len);
+            char *p = static_cast<char*>(dst);
+            p[-3] = (char) Object; // { ..., o: <copiedobj>, ..., EOO}
+            p[-2] = 'o';
+            p[-1] = 0;
+            p[len] = EOO;
+            return true;
+        }
 
         void enableDurability() { // TODO: merge with startup() ?
             assert(typeid(*DurableInterface::_impl) == typeid(NonDurableImpl));
             // lets NonDurableImpl instance leak, but its tiny and only happens once
             DurableInterface::_impl = new DurableImpl();
         }
-
-        // later in this file
-        static void groupCommit();
-
-        CommitJob commitJob;
 
         bool DurableImpl::commitNow() {
             groupCommit();
@@ -122,12 +167,6 @@ namespace mongo {
             groupCommit();
             commitJob.noteOp(op);
             groupCommit();
-        }
-
-        /** declare write intent.  when already in the write view if testIntent is true. */
-        void DurableImpl::declareWriteIntent(void *p, unsigned len) {
-            WriteIntent w(p, len);
-            commitJob.note(w);
         }
 
         void* DurableImpl::writingPtr(void *x, unsigned len) { 
@@ -171,15 +210,15 @@ namespace mongo {
             ++n;
 
             assert(debug && cmdLine.dur);
-            vector<WriteIntent>& w = commitJob.writes();
+            vector<BasicWriteOp>& w = commitJob.basicWrites();
             if( w.size() == 0 ) 
                 return;
-            const WriteIntent &i = w[w.size()-1];
+            const BasicWriteOp &i = w[w.size()-1];
             size_t ofs;
-            MongoMMF *mmf = privateViews.find(i.p, ofs);
+            MongoMMF *mmf = privateViews.find(i.src, ofs);
             if( mmf == 0 ) 
                 return;
-            size_t past = ofs + i.len;
+            size_t past = ofs + i.len();
             if( mmf->length() < past + 8 ) 
                 return; // too close to end of view
             char *priv = (char *) mmf->getView();
@@ -188,15 +227,15 @@ namespace mongo {
             unsigned long long *b = (unsigned long long *) (writ+past);
             if( *a != *b ) { 
                 for( unsigned z = 0; z < w.size() - 1; z++ ) { 
-                    const WriteIntent& wi = w[z];
-                    char *r1 = (char*) wi.p;
-                    char *r2 = r1 + wi.len;
+                    const BasicWriteOp& wi = w[z];
+                    char *r1 = (char*) wi.src;
+                    char *r2 = r1 + wi.len();
                     if( r1 <= (((char*)a)+8) && r2 > (char*)a ) { 
                         //log() << "it's ok " << wi.p << ' ' << wi.len << endl;
                         return;
                     }
                 }
-                log() << "dur data after write area " << i.p << " does not agree" << endl;
+                log() << "dur data after write area " << i.src << " does not agree" << endl;
                 log() << " was:  " << ((void*)b) << "  " << hexdump((char*)b, 8) << endl;
                 log() << " now:  " << ((void*)a) << "  " << hexdump((char*)a, 8) << endl;
                 log() << " n:    " << n << endl;
@@ -204,91 +243,6 @@ namespace mongo {
             }
         }
 #endif
-
-        RelativePath local = RelativePath::fromRelativePath("local");
-
-        /** we will build an output buffer ourself and then use O_DIRECT
-            we could be in read lock for this
-            caller handles locking
-        */
-        static void PREPLOGBUFFER() { 
-            assert( cmdLine.dur );
-            AlignedBuilder& bb = commitJob._ab;
-            bb.reset();
-
-            unsigned lenOfs; // we will need to backfill the length when prep is wrapping up
-            // JSectHeader
-            {
-                bb.appendStr("\nHH\n", false);
-                lenOfs = bb.skip(4);
-            }
-
-            // ops other than basic writes (DurOp's)
-            {
-                for( vector< shared_ptr<DurOp> >::iterator i = commitJob.ops().begin(); i != commitJob.ops().end(); ++i ) { 
-                    (*i)->serialize(bb);
-                }
-            }
-
-            // write intents.  note there is no particular order to these : if we have 
-            // two writes to the same location during the group commit interval, it is likely
-            // (although not assured) that it is journalled here once.
-            {
-                scoped_lock lk(privateViews._mutex());
-                RelativePath lastFilePath;
-                for( vector<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
-                    size_t ofs;
-                    MongoMMF *mmf = privateViews._find(i->p, ofs);
-                    if( mmf == 0 ) {
-                        string s = str::stream() << "view pointer cannot be resolved " << (size_t) i->p;
-                        journalingFailure(s.c_str()); // asserts
-                        return;
-                    }
-
-                    if( !mmf->willNeedRemap() ) {
-                        // tag this mmf as needed a remap of its private view later. 
-                        // usually it will already be dirty/already set, so we do the if above first
-                        // to avoid possibility of cpu cache line contention
-                        mmf->willNeedRemap() = true;
-                    }
-                    i->w_ptr = ((char*)mmf->view_write()) + ofs;
-                    JEntry e;
-                    e.len = i->len;
-                    assert( ofs <= 0x80000000 );
-                    e.ofs = (unsigned) ofs;
-                    e.setFileNo( mmf->fileSuffixNo() );
-                    if( mmf->relativePath() == local ) { 
-                        e.setLocalDbContextBit();
-                    }
-                    else if( mmf->relativePath() != lastFilePath ) { 
-                        lastFilePath = mmf->relativePath();
-                        //assert( !str::startsWith(lastFilePath, dbpath) ); // dbpath should be stripped this is a relative path
-                        JDbContext c;
-                        bb.appendStruct(c);
-                        bb.appendStr(lastFilePath.toString());
-                    }
-                    bb.appendStruct(e);
-                    bb.appendBuf(i->p, i->len);
-                }
-            }
-
-            {
-                JSectFooter f(bb.buf(), bb.len());
-                bb.appendStruct(f);
-            }
-
-            {
-                assert( 0xffffe000 == (~(Alignment-1)) );
-                unsigned L = (bb.len() + Alignment-1) & (~(Alignment-1)); // fill to alignment
-                dassert( L >= (unsigned) bb.len() );
-                *((unsigned*)bb.atOfs(lenOfs)) = L;
-                unsigned padding = L - bb.len();
-                bb.skip(padding);
-                dassert( bb.len() % Alignment == 0 );
-            }
-
-            return;
-        }
 
         /** write the buffer we have built to the journal and fsync it.
             outside of lock as that could be slow.
@@ -326,9 +280,23 @@ namespace mongo {
 
                     unsigned low = 0xffffffff;
                     unsigned high = 0;
+                    log() << "DurParanoid mismatch in " << mmf->filename() << endl;
+                    int logged = 0;
+                    unsigned lastMismatch = 0xffffffff;
                     for( unsigned i = 0; i < mmf->length(); i++ ) {
                         if( p[i] != w[i] ) { 
-                            log() << i << '\t' << (int) p[i] << '\t' << (int) w[i] << endl;
+                            if( lastMismatch != 0xffffffff && lastMismatch+1 != i ) 
+                                log() << endl; // separate blocks of mismatches
+                            lastMismatch= i;
+                            if( ++logged < 60 ) {
+                                stringstream ss;
+                                ss << "mismatch ofs:" << hex << i <<  "\tfilemap:" << setw(2) << (unsigned) w[i] << "\tprivmap:" << setw(2) << (unsigned) p[i];
+                                if( p[i] > 32 && p[i] <= 126 )
+                                    ss << '\t' << p[i];
+                                log() << ss.str() << endl;
+                            }
+                            if( logged == 60 )
+                                log() << "..." << endl;
                             if( i < low ) low = i;
                             if( i > high ) high = i;
                         }
@@ -337,9 +305,9 @@ namespace mongo {
                         std::stringstream ss;
                         ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
-                        log() << "priv loc: " << (void*)(p+low) << endl;
-                        vector<WriteIntent>& w = commitJob.writes();
-                        (void)w; // mark as unused. Useful for inspection in debugger
+                        log() << "priv loc: " << (void*)(p+low) << ' ' << stats.curr._objCopies << endl;
+                        vector<BasicWriteOp>& b = commitJob.basicWrites();
+                        (void)b; // mark as unused. Useful for inspection in debugger
 
                         massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);
                     }
@@ -412,6 +380,9 @@ namespace mongo {
             stats.curr._commits++;
 
             dbMutex.assertAtLeastReadLocked();
+            if( dbMutex.isWriteLocked() ) { 
+                stats.curr._commitsInWriteLock++;
+            }
 
             if( !commitJob.hasWritten() )
                 return;
@@ -514,6 +485,7 @@ namespace mongo {
 
         void unlinkThread();
         void recover();
+
         void releasingWriteLock() {
             try {
 #if defined(_DEBUG)
@@ -548,7 +520,5 @@ namespace mongo {
         }
 
     } // namespace dur
-    
-    
+        
 } // namespace mongo
-

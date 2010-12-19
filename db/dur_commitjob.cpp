@@ -24,7 +24,7 @@ namespace mongo {
 
         void Writes::clear() { 
             _alreadyNoted.clear();
-            _writes.clear();
+            _basicWrites.clear();
             _ops.clear();
         }
 

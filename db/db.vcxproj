@@ -198,6 +198,7 @@
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
@@ -483,6 +484,7 @@
     <ClCompile Include="durop.cpp" />
     <ClCompile Include="dur_commitjob.cpp" />
     <ClCompile Include="dur_journal.cpp" />
+    <ClCompile Include="dur_preplogbuffer.cpp" />
     <ClCompile Include="dur_recover.cpp" />
     <ClCompile Include="dur_writetodatafiles.cpp" />
     <ClCompile Include="geo\2d.cpp" />
