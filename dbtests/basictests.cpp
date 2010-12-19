@@ -536,6 +536,21 @@ namespace BasicTests {
         }
         
     };
+    
+    class HostAndPortTests {
+    public:
+        void run(){
+            HostAndPort a( "x1" , 1000 );
+            HostAndPort b( "x1" , 1000 );
+            HostAndPort c( "x1" , 1001 );
+            HostAndPort d( "x2" , 1000 );
+            
+            ASSERT( a == b );
+            ASSERT( a != c );
+            ASSERT( a != d );
+                
+        }
+    };
 
     class All : public Suite {
     public:
@@ -568,6 +583,8 @@ namespace BasicTests {
             add< QueueTest >();
 
             add< StrTests >();
+            
+            add< HostAndPortTests >();
         }
     } myall;
     

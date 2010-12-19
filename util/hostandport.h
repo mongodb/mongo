@@ -61,6 +61,10 @@ namespace mongo {
             return _host == r._host && port() == r.port();
         }
 
+        bool operator!=(const HostAndPort& r) const {
+            return _host != r._host || port() != r.port();
+        }
+
         /* returns true if the host/port combo identifies this process instance. */
         bool isSelf() const; // defined in message.cpp
 
