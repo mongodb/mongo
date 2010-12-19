@@ -1576,6 +1576,16 @@ namespace JsobjTests {
             ASSERT( s.count( a ) );
             ASSERT( s.count( b ) );
             ASSERT( s.count( c ) );
+
+            {
+                BSONElementSet x;
+                BSONObj o = fromjson( "{ 'a' : [ 1 , 2 , 1 ] }" );
+                BSONObjIterator i( o["a"].embeddedObjectUserCheck() );
+                while ( i.more() ){
+                    x.insert( i.next() );
+                }
+                ASSERT_EQUALS( 2U , x.size() );
+            }
         }
     };
 

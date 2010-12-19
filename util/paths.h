@@ -30,10 +30,10 @@ namespace mongo {
         checking.  if you want to say 'my param MUST be a relative path", use this.
     */
     struct RelativePath { 
-        path _p;
+        string _p;
 
-        static RelativePath fromRelativePath(path f) { 
-           RelativePath rp;
+        static RelativePath fromRelativePath(string f) { 
+            RelativePath rp;
             rp._p = f;
             return rp;
         }
@@ -48,12 +48,12 @@ namespace mongo {
             if( str::startsWith(relative, "/") || str::startsWith(relative, "\\") ) { 
                 relative.erase(0, 1);
             }
-           RelativePath rp;
+            RelativePath rp;
             rp._p = relative;
             return rp;
         }
 
-        string toString() const { return _p.string(); }
+        string toString() const { return _p; }
 
         inline bool operator!=(const RelativePath& r) const { return _p != r._p; }
         inline bool operator==(const RelativePath& r) const { return _p == r._p; }

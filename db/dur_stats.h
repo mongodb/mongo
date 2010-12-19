@@ -13,6 +13,13 @@ namespace mongo {
                 unsigned _objCopies;
                 unsigned long long _journaledBytes;
                 unsigned long long _writeToDataFilesBytes;
+
+                // undesirable to be in write lock for the group commit (it can be done in a read lock), so good if we 
+                // have visibility when this happens.  can happen for a couple reasons
+                // - read lock starvation
+                // - file being closed
+                // - data being written faster than the normal group commit interval
+                unsigned _commitsInWriteLock; 
             } curr;
         };
         extern Stats stats;

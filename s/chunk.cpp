@@ -20,7 +20,6 @@
 
 #include "../client/connpool.h"
 #include "../db/queryutil.h"
-#include "../util/time_support.h"
 #include "../util/unittest.h"
 
 #include "chunk.h"
@@ -46,15 +45,18 @@ namespace mongo {
     
     int Chunk::MaxChunkSize = 1024 * 1024 * 64;
     
-    Chunk::Chunk( ChunkManager * manager )
-      : _manager(manager),
-        _lastmod(0), _dataWritten(0)
-    {}
+    Chunk::Chunk( ChunkManager * manager ) : _manager(manager), _lastmod(0) {
+        _setDataWritten();
+    }
 
     Chunk::Chunk(ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
-      : _manager(info), _min(min), _max(max), _shard(shard),
-        _lastmod(0), _dataWritten(0)
-    {}
+      : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0) {
+        _setDataWritten();
+    }
+
+    void Chunk::_setDataWritten(){
+        _dataWritten = rand() % ( MaxChunkSize / 5 );
+    }
 
     string Chunk::getns() const {
         assert( _manager );
@@ -317,16 +319,12 @@ namespace mongo {
                 splitThreshold = (int) ((double)splitThreshold * .9);
             }
 
-            // there may be more than one mongos so check for splits before this mongos has seen a full threshold
-            unsigned now = curTimeMillis();
-            if (( _dataWritten < splitThreshold / 5 ) && ( _nextCheck > now ) )
+            if ( _dataWritten < splitThreshold / 5 )
                 return false;
         
             log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << endl;
             
-            // reset so we check again soon but make sure not to synchronize all mongos
-            _dataWritten = 0;
-            _nextCheck = now + 10*minuteInMillis + ( rand() % 3 )*minuteInMillis;
+            _dataWritten = 0; // reset so we check often enough
             
             ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ );
             if ( newShard.get() == NULL ){

@@ -117,7 +117,7 @@ namespace mongo {
         public:
             AlignedBuilder _ab; // for direct i/o writes to journal
 
-            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false) { }
+            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytes(0) { }
 
             /** record/note an intent to write */
             void note(WriteIntent& w);
@@ -148,9 +148,13 @@ namespace mongo {
                     _notify.wait(); 
             }
 
+            /** we check how much written and if it is getting to be a lot, we commit sooner. */
+            size_t bytes() const { return _bytes; }
+
         private:
             bool _hasWritten;
             Writes _wi;
+            size_t _bytes;
             NotifyAll _notify; // for getlasterror fsync:true acknowledgements
         };
         extern CommitJob commitJob;

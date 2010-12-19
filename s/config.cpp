@@ -645,7 +645,7 @@ namespace mongo {
             Client& c = cc();
             BSONObj msg = BSON( "_id" << changeID << "server" << getHostNameCached() << "clientAddr" << c.clientAddress(true)
                     << "time" << DATENOW << "what" << what << "ns" << ns << "details" << detail );
-            log() << "about to issue config change: " << msg << endl;
+            log() << "about to log metadata event: " << msg << endl;
 
             assert( _primary.ok() );
 

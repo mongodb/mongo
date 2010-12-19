@@ -369,9 +369,13 @@ namespace mongo {
         }
 
         /** 
-         * @return ok
+         * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs (to avoid seeking disk later)
+         *
+         * @param maxChunkSize number of bytes beyond which a chunk's base data (no indices) is considered too large to move
+         * @param errmsg filled with textual description of error if this call return false
+         * @return false if approximate chunk size is too big to move or true otherwise
          */
-        bool storeCurrentLocs( string& errmsg ){
+        bool storeCurrentLocs( long long maxChunkSize , string& errmsg ){
             readlock l( _ns ); 
             Client::Context ctx( _ns );
             NamespaceDetails *d = nsdetails( _ns.c_str() );
@@ -379,9 +383,9 @@ namespace mongo {
                 errmsg = "ns not found, should be impossible";
                 return false;
             }
-            
+
             BSONObj keyPattern;
-            // the copies are needed because the indexDetailsForRange destrorys the input
+            // the copies are needed because the indexDetailsForRange destroys the input
             BSONObj min = _min.copy();
             BSONObj max = _max.copy();
             IndexDetails *idx = indexDetailsForRange( _ns.c_str() , errmsg , min , max , keyPattern ); 
@@ -389,22 +393,56 @@ namespace mongo {
                 errmsg = "can't find index in storeCurrentLocs";
                 return false;
             }
-            
+
             scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , 
                                                            shared_ptr<Cursor>( new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
                                                            _ns ) );
+
+            // use the average object size to estimate how many objects a full chunk would carry
+            // do that while traversing the chunk's range using the sharding index, below
+            // there's a fair amout of slack before we determine a chunk is too large because object sizes will vary
+            unsigned long long maxRecsWhenFull;
+            long long avgRecSize;
+            const long long totalRecs = d->stats.nrecords;
+            if ( totalRecs > 0 ){
+                avgRecSize = d->stats.datasize / totalRecs;
+                maxRecsWhenFull = maxChunkSize / avgRecSize;
+                maxRecsWhenFull = 130 * maxRecsWhenFull / 100; // slack
+            } else {
+                avgRecSize = 0;
+                maxRecsWhenFull = numeric_limits<long long>::max();
+            }
+
+            // do a full traversal of the chunk and don't stop even if we think it is a large chunk
+            // we want the number of records to better report, in that case
+            bool isLargeChunk = false;
+            unsigned long long recCount = 0;;
             while ( cc->ok() ){
                 DiskLoc dl = cc->currLoc();
-                _cloneLocs.insert( dl );
+                if ( ! isLargeChunk ) {
+                    _cloneLocs.insert( dl ); 
+                }
                 cc->advance();
-                
-                if ( ! cc->yieldSometimes() )
-                    break;
 
+                // we can afford to yield here because any change to the base data that we might miss is already being 
+                // queued and will be migrated in the 'transferMods' stage
+                if ( ! cc->yieldSometimes() ) {
+                   break;
+                }
+
+                if ( ++recCount > maxRecsWhenFull ) {
+                    isLargeChunk = true;
+                } 
+            }
+
+            if ( isLargeChunk ) {
+                errmsg = str::stream() << "can't move chunk of size (aprox) " << recCount * avgRecSize 
+                                       << " because maximum size allowed to move is " << maxChunkSize;
+                log( LL_WARNING ) << errmsg << endl;
+                return false;
             }
             
-            log() << "\t moveChunk number of documents: " << _cloneLocs.size() << endl;
-
+            log() << "moveChunk number of documents: " << _cloneLocs.size() << endl;
             return true;
         }
 
@@ -553,8 +591,7 @@ namespace mongo {
             // 7. remove data locally
             
             // -------------------------------
-            
-            
+                        
             // 1.
             string ns = cmdObj.firstElement().str();
             string to = cmdObj["to"].str();
@@ -562,6 +599,7 @@ namespace mongo {
             BSONObj min  = cmdObj["min"].Obj();
             BSONObj max  = cmdObj["max"].Obj();
             BSONElement shardId = cmdObj["shardId"];
+            BSONElement maxSizeElem = cmdObj["maxChunkSizeBytes"];
             
             if ( ns.empty() ){
                 errmsg = "need to specify namespace in command";
@@ -591,6 +629,12 @@ namespace mongo {
                 errmsg = "need shardId";
                 return false;
             }
+
+            if ( maxSizeElem.eoo() || ! maxSizeElem.isNumber() ){
+                errmsg = "need to specify maxChunkSizeBytes";
+                return false;
+            } 
+            const long long maxChunkSize = maxSizeElem.numberLong(); // in bytes
             
             if ( ! shardingState.enabled() ){
                 if ( cmdObj["configdb"].type() != String ){
@@ -610,8 +654,8 @@ namespace mongo {
             log() << "received moveChunk request: " << cmdObj << endl;
 
             timing.done(1);
-            // 2. 
-            
+
+            // 2.            
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
             dist_lock_try dlk( &lockSetup , (string)"migrate-" + min.toString() );
             if ( ! dlk.got() ){
@@ -619,6 +663,9 @@ namespace mongo {
                 result.append( "who" , dlk.other() );
                 return false;
             }
+
+            BSONObj chunkInfo = BSON("min" << min << "max" << max << "from" << fromShard.getName() << "to" << toShard.getName());
+            configServer.logChange( "moveChunk.start" , ns , chunkInfo );
 
             ShardChunkVersion maxVersion;
             string myOldShard;
@@ -675,7 +722,7 @@ namespace mongo {
             MigrateStatusHolder statusHolder( ns , min , max );
             { 
                 // this gets a read lock, so we know we have a checkpoint for mods
-                if ( ! migrateFromStatus.storeCurrentLocs( errmsg ) )
+                if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg ) )
                     return false;
 
                 ScopedDbConnection connTo( to );
@@ -919,9 +966,7 @@ namespace mongo {
                 migrateFromStatus.setInCriticalSection( false );
 
                 // 5.d
-                configServer.logChange( "moveChunk" , ns , BSON( "min" << min << "max" << max <<
-                                                                 "from" << fromShard.getName() << 
-                                                                 "to" << toShard.getName() ) );
+                configServer.logChange( "moveChunk.commit" , ns , chunkInfo );
             }
             
             migrateFromStatus.done();

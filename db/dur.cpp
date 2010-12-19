@@ -267,7 +267,7 @@ namespace mongo {
                     const char *p = (const char *) mmf->getView();
                     const char *w = (const char *) mmf->view_write();
 
-                    if (!p && !w) return;
+                    if (!p && !w) continue;
 
                     assert(p);
                     assert(w);
@@ -380,6 +380,9 @@ namespace mongo {
             stats.curr._commits++;
 
             dbMutex.assertAtLeastReadLocked();
+            if( dbMutex.isWriteLocked() ) { 
+                stats.curr._commitsInWriteLock++;
+            }
 
             if( !commitJob.hasWritten() )
                 return;
@@ -482,10 +485,20 @@ namespace mongo {
 
         void unlinkThread();
         void recover();
-        void _debugCheckLastDeclaredWrite() { 
+
+        void releasingWriteLock() {
+            try {
 #if defined(_DEBUG)
-            getDur().debugCheckLastDeclaredWrite(); 
+                getDur().debugCheckLastDeclaredWrite(); 
 #endif
+
+                if (commitJob.bytes() > 100*1024*1024)
+                    groupCommit();
+            }
+            catch(std::exception& e) {
+                log() << "exception in dur::releasingWriteLock causing immediate shutdown: " << e.what() << endl;
+                abort(); // based on myTerminate()
+            }
         }
 
         /** at startup, recover, and then start the journal threads */

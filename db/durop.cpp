@@ -94,7 +94,7 @@ namespace mongo {
             log.read(_len); // size of file, not length of name
             string s;
             log.readStr(s);
-            _p._p = path(s);
+            _p._p = s;
         }
 
         void FileCreatedOp::_serialize(AlignedBuilder& ab) {

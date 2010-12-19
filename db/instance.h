@@ -141,7 +141,6 @@ namespace mongo {
         }
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }  
-        virtual bool isMember( const DBConnector * conn ) const { return this == conn; };
     };
 
     extern int lockFile;

@@ -198,6 +198,7 @@
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">

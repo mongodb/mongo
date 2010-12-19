@@ -454,6 +454,12 @@
     <ClCompile Include="dur_preplogbuffer.cpp">
       <Filter>_storage engine</Filter>
     </ClCompile>
+<<<<<<< HEAD
+=======
+    <ClCompile Include="..\client\dbclient_rs.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+>>>>>>> temp
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="repl\rs_config.h">

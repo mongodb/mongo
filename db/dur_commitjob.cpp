@@ -43,6 +43,7 @@ namespace mongo {
             _hasWritten = false;
             _wi.clear();
             _ab.reset();
+            _bytes = 0;
         }
     }
 }

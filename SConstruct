@@ -302,7 +302,7 @@ commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/sock.cpp" ,  "u
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" , "util/processinfo.cpp" ,
                  "util/concurrency/synchronization.cpp" ]
 commonFiles += Glob( "util/*.c" )
-commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
+commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_rs.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
 
 #mmap stuff
 
@@ -1099,6 +1099,7 @@ clientTests = []
 
 # examples
 clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "rsExample" , [ "client/examples/rs.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
