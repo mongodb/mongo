@@ -277,7 +277,7 @@ namespace mongo {
         return _manager->findChunk( m[0] );
      }
 
-    bool Chunk::moveAndCommit( const Shard& to , int chunkSize /* bytes */, BSONObj& res ){
+    bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, BSONObj& res ){
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
         
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
