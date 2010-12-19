@@ -50,6 +50,14 @@ namespace mongo {
          */
         void notifyFailure( const HostAndPort& server );
 
+        /** @return a random slave that is ok for reads */
+        HostAndPort getSlave();
+
+        /**
+         * notify the monitor that server has faild
+         */
+        void notifySlaveFailure( const HostAndPort& server );        
+
         string setName() const { return _name; }
 
         string getServerAddress() const;
@@ -67,14 +75,20 @@ namespace mongo {
         bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose );
 
         int _find( const string& server ) const ;
+        int _find( const HostAndPort& server ) const ;
 
         mutable mongo::mutex _lock; // protects _nodes
 
         string _name;
         struct Node {
-            Node( const HostAndPort& a , DBClientConnection* c ) : addr( a ) , conn(c){}
+            Node( const HostAndPort& a , DBClientConnection* c ) : addr( a ) , conn(c) , ok(true){}
             HostAndPort addr;
             DBClientConnection* conn;
+
+            // if this node is in a failure state
+            // used for slave routing
+            // this is too simple, should make it better
+            bool ok; 
         };
         vector<Node> _nodes;
 
@@ -170,12 +184,17 @@ namespace mongo {
     private:
 
         DBClientConnection * checkMaster();
-        void _checkMaster();
+        DBClientConnection * checkSlave();
+        
+        void _auth( DBClientConnection * conn );
 
         ReplicaSetMonitorPtr _monitor;
 
         HostAndPort _masterHost;        
         scoped_ptr<DBClientConnection> _master;
+
+        HostAndPort _slaveHost;
+        scoped_ptr<DBClientConnection> _slave;
         
         /**
          * for storing authentication info

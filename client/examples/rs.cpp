@@ -33,7 +33,7 @@ int main( int argc , const char ** argv ){
         return 1;
     }
     
-    DBClientBase * conn = cs.connect( errmsg );
+    DBClientReplicaSet * conn = (DBClientReplicaSet*)cs.connect( errmsg );
     if ( ! conn ){
         cout << "error connecting: " << errmsg << endl;
         return 2;
@@ -46,6 +46,7 @@ int main( int argc , const char ** argv ){
         try {
             conn->update( collName , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) , true );
             cout << conn->findOne( collName , BSONObj() ) << endl;
+            cout << "\t" << conn->slaveConn().findOne( collName , BSONObj() , 0 , QueryOption_SlaveOk ) << endl;
         }
         catch ( std::exception& e ){
             cout << "ERROR: " << e.what() << endl;

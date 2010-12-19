@@ -93,6 +93,51 @@ namespace mongo {
         scoped_lock lk( _lock );
         return _nodes[_master].addr;
     }
+    
+    HostAndPort ReplicaSetMonitor::getSlave(){
+        int x = rand() % _nodes.size();
+        {
+            scoped_lock lk( _lock );
+            for ( int i=0; i<_nodes.size(); i++ ){
+                int p = ( i + x ) % _nodes.size();
+                if ( p == _master )
+                    continue;
+                if ( _nodes[p].ok )
+                    return _nodes[p].addr;
+            }
+        }
+
+        {
+            scoped_lock lk( _lock );
+            for ( int i=0; i<_nodes.size(); i++ ){
+                _nodes[i].ok = true;
+            }
+        }
+        
+        {
+            scoped_lock lk( _lock );
+            for ( int i=0; i<_nodes.size(); i++ ){
+                int p = ( i + x ) % _nodes.size();
+                if ( p == _master )
+                    continue;
+                if ( _nodes[p].ok )
+                    return _nodes[p].addr;
+            }
+        }
+        
+        return _nodes[0].addr;
+    }
+
+    /**
+     * notify the monitor that server has faild
+     */
+    void ReplicaSetMonitor::notifySlaveFailure( const HostAndPort& server ){
+        int x = _find( server );
+        if ( x >= 0 ){
+            scoped_lock lk( _lock );
+            _nodes[x].ok = false;
+        }
+    }
 
     bool ReplicaSetMonitor::_checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose ) {
         bool good = false;
@@ -186,6 +231,15 @@ namespace mongo {
         return -1;
     }
 
+    int ReplicaSetMonitor::_find( const HostAndPort& server ) const {
+        scoped_lock lk( _lock );
+        for ( unsigned i=0; i<_nodes.size(); i++ )
+            if ( _nodes[i].addr == server )
+                return i;
+        return -1;
+    }
+
+
     mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
     map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;
 
@@ -207,20 +261,44 @@ namespace mongo {
                 return _master.get();
             _monitor->notifyFailure( _masterHost );
         }
-        
-        _masterHost = _monitor->getMaster();
-        _master.reset( new DBClientConnection( true ) );
-        _master->connect( _masterHost );
-        
+
+        HostAndPort h = _monitor->getMaster();
+        if ( h != _masterHost ){
+            _masterHost = h;
+            _master.reset( new DBClientConnection( true ) );
+            _master->connect( _masterHost );
+            _auth( _master.get() );
+        }
+        return _master.get();
+    }
+
+    DBClientConnection * DBClientReplicaSet::checkSlave() {
+        if ( _slave ){
+            if ( ! _slave->isFailed() )
+                return _slave.get();
+            _monitor->notifySlaveFailure( _slaveHost );
+        }
+
+        HostAndPort h = _monitor->getSlave();
+        if ( h != _slaveHost ){
+            _slaveHost = h;
+            _slave.reset( new DBClientConnection( true ) );
+            _slave->connect( _slaveHost );
+            _auth( _slave.get() );
+        }
+        return _slave.get();
+    }
+
+
+    void DBClientReplicaSet::_auth( DBClientConnection * conn ){
         for ( list<AuthInfo>::iterator i=_auths.begin(); i!=_auths.end(); ++i ){
             const AuthInfo& a = *i;
             string errmsg;
-            if ( ! _master->auth( a.dbname , a.username , a.pwd , errmsg, a.digestPassword ) )
+            if ( ! conn->auth( a.dbname , a.username , a.pwd , errmsg, a.digestPassword ) )
                 warning() << "cached auth failed for set: " << _monitor->setName() << " db: " << a.dbname << " user: " << a.username << endl;
 
         }
 
-        return _master.get();
     }
 
     DBClientConnection& DBClientReplicaSet::masterConn(){
@@ -228,9 +306,7 @@ namespace mongo {
     }
 
     DBClientConnection& DBClientReplicaSet::slaveConn(){
-        // TODO
-        assert(0);
-        return masterConn();
+        return *checkSlave();
     }
 
     bool DBClientReplicaSet::connect(){
