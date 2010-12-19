@@ -124,6 +124,7 @@ namespace mongo {
         EXIT_BADOPTIONS = 2 , 
         EXIT_REPLICATION_ERROR = 3 ,
         EXIT_NEED_UPGRADE = 4 ,
+        EXIT_SHARDING_ERROR = 5 ,
         EXIT_KILL = 12 ,
         EXIT_ABRUPT = 14 ,
         EXIT_NTSERVICE_ERROR = 20 ,
