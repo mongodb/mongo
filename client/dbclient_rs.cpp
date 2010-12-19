@@ -52,10 +52,10 @@ namespace mongo {
     
     ReplicaSetMonitorPtr ReplicaSetMonitor::get( const string& name , const vector<HostAndPort>& servers ){
         scoped_lock lk( _setsLock );
-        map<string,ReplicaSetMonitorPtr>::iterator i = _sets.find( name );
-        if ( i == _sets.end() )
-            i->second.reset( new ReplicaSetMonitor( name , servers ) );
-        return i->second;
+        ReplicaSetMonitorPtr& m = _sets[name];
+        if ( ! m )
+            m.reset( new ReplicaSetMonitor( name , servers ) );
+        return m;
     }
 
     string ReplicaSetMonitor::getServerAddress() const {
