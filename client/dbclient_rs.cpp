@@ -349,14 +349,42 @@ namespace mongo {
         return checkMaster()->update(ns, query, obj, upsert,multi);
     }
 
-    auto_ptr<DBClientCursor> DBClientReplicaSet::query(const string &a, Query b, int c, int d,
-                                                   const BSONObj *e, int f, int g){
-        // TODO: if slave ok is set go to a slave
-        return checkMaster()->query(a,b,c,d,e,f,g);
+    auto_ptr<DBClientCursor> DBClientReplicaSet::query(const string &ns, Query query, int nToReturn, int nToSkip,
+                                                       const BSONObj *fieldsToReturn, int queryOptions, int batchSize){
+
+        if ( queryOptions & QueryOption_SlaveOk ){
+            // we're ok sending to a slave
+            // we'll try 2 slaves before just using master
+            // checkSlave will try a different slave automatically after a failure
+            for ( int i=0; i<2; i++ ){
+                try {
+                    return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
+                }
+                catch ( DBException & e ){
+                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                }
+            }
+        }
+        
+        return checkMaster()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
     }
 
-    BSONObj DBClientReplicaSet::findOne(const string &a, const Query& b, const BSONObj *c, int d) {
-        return checkMaster()->findOne(a,b,c,d);
+    BSONObj DBClientReplicaSet::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
+        if ( queryOptions & QueryOption_SlaveOk ){
+            // we're ok sending to a slave
+            // we'll try 2 slaves before just using master
+            // checkSlave will try a different slave automatically after a failure
+            for ( int i=0; i<2; i++ ){
+                try {
+                    return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
+                }
+                catch ( DBException & e ){
+                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                }
+            }
+        }
+        
+        return checkMaster()->findOne(ns,query,fieldsToReturn,queryOptions);
     }
 
     void DBClientReplicaSet::killCursor( long long cursorID ){
