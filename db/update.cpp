@@ -155,8 +155,10 @@ namespace mongo {
                     BSONObjIterator i( getEach() );
                     while ( i.more() ){
                         BSONElement e = i.next();
-                        if ( toadd.count(e) )
+                        if ( toadd.count(e) ){
                             bb.appendAs( e , BSONObjBuilder::numStr( n++ ) );
+                            toadd.erase( e );
+                        }
                     }
                 }
 
