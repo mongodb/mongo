@@ -35,22 +35,24 @@ namespace mongo {
             unsigned len;
         };
 
+        struct AppendOp { 
+            void *localDestWriteMap;
+            void *localDestPrivateMap; // writing to the local db oplog
+            void *src;                 // src is in some non-local db
+            unsigned _len;
+        };
+
         /** declaration of an intent to write to a region of a memory mapped view 
             this could be either a JEntry or a JObjAppend in the journal
         */
         struct BasicWriteOp /* copyable */ { 
             void *dst;
             void *src;
-            unsigned len() const { return _len & 0x7fffffff; }
-            bool isObjAppend() const { return _len & 0x80000000; }
+            unsigned len() const { return _len; }
             void set(void *Src, unsigned Len) {
                 dst = 0;
                 src = Src;
                 _len = Len;
-            }
-            void setObjAppend(void *Dst, void *Src, unsigned Len) { 
-                dst = Dst; src = Src; 
-                _len = Len | 0x80000000;
             }
         private:
             unsigned _len;
@@ -101,6 +103,7 @@ namespace mongo {
         public:
             Already<127> _alreadyNoted;
             vector<BasicWriteOp> _basicWrites;
+            vector<AppendOp> _appendOps;
             vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
 
             /** reset the Writes structure (empties all the above) */
@@ -129,6 +132,7 @@ namespace mongo {
             bool alreadyNoted(WriteIntent& w) { return _wi._alreadyNoted.check(w); }
 
             vector<BasicWriteOp>& basicWrites() { return _wi._basicWrites; }
+            vector<AppendOp>& appendOps() { return _wi._appendOps; }
             vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
 
             /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even 

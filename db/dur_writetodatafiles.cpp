@@ -51,14 +51,26 @@ namespace mongo {
                 stats.curr._writeToDataFilesBytes += b.len();
                 dassert(b.dst);
                 memcpy(b.dst, b.src, b.len());
-                if( b.isObjAppend() ) { 
+                /*if( b.isObjAppend() ) { 
                     char *p = static_cast<char*>(b.dst);
                     p[-3] = (char) Object; // { ..., o: <copiedobj>, ..., EOO}
                     p[-2] = 'o';
                     p[-1] = 0;
                     p[b.len()] = EOO;
                     p[b.len()+1] = EOO;
-                }
+                }*/
+            }
+
+            for( unsigned i = 0; i < commitJob.appendOps().size(); i++ ) {
+                const AppendOp& a = commitJob.appendOps()[i];
+                stats.curr._writeToDataFilesBytes += a._len;
+                char *dst = (char *) a.localDestWriteMap;
+                char *src = (char *) a.localDestPrivateMap;
+                memcpy(dst, src, a._len);
+                dst[-3] = (char)Object;
+                dst[-2] = 'o';
+                dst[-1] = 0;
+                dst[a._len] = EOO;
             }
 
             debugValidateMapsMatch();

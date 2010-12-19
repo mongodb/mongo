@@ -16,6 +16,14 @@ function log(str) {
         print(testname+" step " + step++);
 }
 
+function verify() {
+    log("verify");
+    var d = conn.getDB("local");
+    var mycount = d.oplog.$main.find({ "o.z": 3 }).count();
+    print(mycount);
+    assert(mycount == 3, "oplog doesnt match");
+}
+
 // if you do inserts here, you will want to set _id.  otherwise they won't match on different 
 // runs so we can't do a binary diff of the resulting files to check they are consistent.
 function work() {
@@ -42,15 +50,11 @@ function work() {
     d.foo.update({ _id: 5 }, { $set: { z: 99} });
 
     // assure writes applied in case we kill -9 on return from this function
-    d.getLastError(); 
+    d.getLastError();
 
     log("endwork");
-}
 
-function verify() { 
-    log("verify");
-    var d = conn.getDB("local");
-    assert( d.oplog.$main.find({"o.z":3}).count() == 3, "oplog doesnt match" );
+    verify();
 }
 
 if( debugging ) {

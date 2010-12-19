@@ -97,6 +97,10 @@ namespace mongo {
         }
 
         bool DurableImpl::objAppend(void *dst, const void *src, unsigned len) { 
+            // temporarily off
+            if( 1 ) 
+                return false;
+
             {
                 char *srcRecord = (char*) src;
                 srcRecord -= Record::HeaderSize;
@@ -118,20 +122,26 @@ namespace mongo {
                 }
             }
 
-            BasicWriteOp b;
-            b.setObjAppend(dst, (void*)src, len-1);
-            commitJob.basicWrites().push_back(b);
-            if( testIntent )
-                dst = MongoMMF::switchToPrivateView(dst);
-            memcpy(dst, src, len);
-            char *p = static_cast<char*>(dst);
-            p[-3] = (char) Object; // { ..., o: <copiedobj>, ..., EOO}
-            p[-2] = 'o';
-            p[-1] = 0;
-            p[len] = EOO;
+            {
+                {
+                    AppendOp a;
+                    a.localDestWriteMap = 0; // set later, in PREPLOGBUFFER()
+                    a.localDestPrivateMap = dst;
+                    a.src = (void*) src;
+                    a._len = len;
+                    commitJob.appendOps().push_back(a);
+                }
+                if( testIntent )
+                    dst = MongoMMF::switchToPrivateView(dst);
+                memcpy(dst, src, len);
+                char *p = static_cast<char*>(dst);
+                p[-3] = (char) Object; // { ..., o: <copiedobj>, ..., EOO}
+                p[-2] = 'o';
+                p[-1] = 0;
+                p[len] = EOO;
 
-            /* the len-1 in the setObjAppend call is because we know it's an EOO char */
-            assert( p[len-1] == EOO );
+                assert( p[len-1] == EOO );
+            }
 
             return true;
         }
