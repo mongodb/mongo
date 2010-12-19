@@ -21,9 +21,12 @@ function log(str) {
 function work() {
     log("work");
     var d = conn.getDB("test");
+    var q = conn.getDB("testq"); // use tewo db's to exercise JDbContext a bit.
     d.foo.insert({ _id: 3, x: 22 });
     d.foo.insert({ _id: 4, x: 22 });
+    q.foo.insert({ _id: 4, x: 22 });
     d.a.insert({ _id: 3, x: 22, y: [1, 2, 3] });
+    q.a.insert({ _id: 3, x: 22, y: [1, 2, 3] });
     d.a.insert({ _id: 4, x: 22, y: [1, 2, 3] });
     d.a.update({ _id: 4 }, { $inc: { x: 1} });
     // OpCode_ObjCopy fires on larger operations so make one that isn't tiny
@@ -34,6 +37,8 @@ function work() {
     big = big + big;
     big = big + big;
     d.foo.insert({ _id: 5, q: "aaaaa", b: big, z: 3 });
+    q.foo.insert({ _id: 5, q: "aaaaa", b: big, z: 3 });
+    d.foo.insert({ _id: 6, q: "aaaaa", b: big, z: 3 });
 
     // assure writes applied in case we kill -9 on return from this function
     d.getLastError(); 
@@ -44,7 +49,7 @@ function work() {
 function verify() { 
     log("verify");
     var d = conn.getDB("local");
-    assert( d.oplog.$main.find({"o.z":3}).count() == 1, "oplog doesnt match" );
+    assert( d.oplog.$main.find({"o.z":3}).count() == 3, "oplog doesnt match" );
 }
 
 if( debugging ) {
