@@ -65,14 +65,14 @@ int main()
 
 	if (conn->is_new(conn)) {
 		ret = session->add_schema(session, "CUSTOMER",
-		    "rSSS", "id", "name,address,phone",
+		    "r", "SSS", "id,name,address,phone",
 		    /* Column sets. */ "cust_address(address)",
 		    /* Indices. */ "cust_phone(phone)", NULL);
 		ret = session->create_table(session, "customers",
 		    "schema=CUSTOMER");
 
 		ret = session->add_schema(session, "CALL",
-		    "rqrrSS", "id", "call_date,cust_id,emp_id,call_type,notes",
+		    "r", "qrrSS", "id,call_date,cust_id,emp_id,call_type,notes",
 		    /* Column sets. */ NULL,
 		    /* Indices. */ "call_cust_date(cust_id,call_date)", NULL);
 		ret = session->create_table(session, "calls", "schema=CALL");
