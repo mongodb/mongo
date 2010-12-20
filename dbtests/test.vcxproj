@@ -657,6 +657,7 @@
     <ClCompile Include="namespacetests.cpp" />
     <ClCompile Include="pairingtests.cpp" />
     <ClCompile Include="pdfiletests.cpp" />
+    <ClCompile Include="perftests.cpp" />
     <ClCompile Include="queryoptimizertests.cpp" />
     <ClCompile Include="querytests.cpp" />
     <ClCompile Include="repltests.cpp" />
