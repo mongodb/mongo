@@ -257,8 +257,8 @@ namespace mongo {
         if ( loc.isNull() )
             return loc;
 
-        DeletedRecord *r = loc.drec();
-        r = getDur().writing(r);
+        const DeletedRecord *r = loc.drec();
+        //r = getDur().writing(r);
 
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
@@ -278,7 +278,7 @@ namespace mongo {
         }
 
         /* split off some for further use. */
-        r->lengthWithHeaders = lenToAlloc;
+        getDur().writingInt(r->lengthWithHeaders) = lenToAlloc;
 		//DataFileMgr::grow(loc, lenToAlloc);
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);

@@ -98,7 +98,7 @@ namespace mongo {
             inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
 
             /** Declare write intent for an int */
-            inline int& writingInt(int& d) { return *((int*) writingPtr(&d, sizeof(d))); }
+            inline int& writingInt(const int& d) { return *((int*) writingPtr((int*) &d, sizeof(d))); }
 
             /** "assume i've already indicated write intent, let me write"
                 redeclaration is fine too, but this is faster.
