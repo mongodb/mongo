@@ -312,23 +312,17 @@ namespace mongo {
             vector<ParsedJournalEntry> entries;
 
             try {
-                while( 1 ) { 
+                while ( !i.atEof() ) {
                     entries.clear();
 
-                    while( 1 ) {
-                        ParsedJournalEntry e;
-                        if( !i.next(e) )
-                            break;
+                    // parse out entries from buffer
+                    ParsedJournalEntry e;
+                    while( i.next(e) ) {
                         entries.push_back(e);
                     }
 
                     // got all the entries for one group commit.  apply them: 
                     applyEntries(entries);
-
-                    if( i.atEof() )
-                        break;
-
-                    // loop back and do the new group commit section
                 }
             }
             catch( BufReader::eof& ) { 
