@@ -82,20 +82,13 @@ namespace mongo {
         /** read through the memory mapped data of a journal file (journal/j._<n> file)
             throws 
         */
-        class JournalIterator : boost::noncopyable {
+        class JournalSectionIterator : boost::noncopyable {
         public:
-            JournalIterator(void *p, unsigned len) : _br(p, len) {
-                _sectHead = NULL;
-                _lastDbName = NULL;
-
-                JHeader h;
-                _br.read(h); // read/skip file header
-                if( !h.versionOk() ) {
-                    log() << "journal file version number mismatch. recover with old version of mongod, terminate cleanly, then upgrade." << endl;
-                    uasserted(13536, str::stream() << "journal version number mismatch " << h._version);
-                }
-                uassert(13537, "journal header invalid", h.valid());
-            }
+            JournalSectionIterator(const void *p, unsigned len)
+                : _br(p, len)
+                , _sectHead(static_cast<const JSectHeader*>(_br.skip(sizeof(JSectHeader))))
+                , _lastDbName(NULL)
+            {}
 
             bool atEof() const { return _br.atEof(); }
 
@@ -104,13 +97,6 @@ namespace mongo {
              *  throws on premature end of section. 
              */
             bool next(ParsedJournalEntry& e) { 
-                assert( e.e == 0 );
-
-                if( !_sectHead ) {  
-                    _sectHead = static_cast<const JSectHeader*>(_br.pos());
-                    _br.skip(sizeof(JSectHeader));
-                }
-
                 unsigned lenOrOpCode;
                 _br.read(lenOrOpCode);
 
@@ -128,9 +114,6 @@ namespace mongo {
                                 << " actual: " << md5simpledigest(_sectHead, len)
                                 , false);
                         }
-                        _br.skip(sizeof(JSectFooter) - 4);
-                        _br.align(Alignment);
-                        _sectHead = NULL;
                         return false; // false return value denotes end of section
                     }
 
@@ -168,8 +151,8 @@ namespace mongo {
                 return true;
             }
         private:
-            const JSectHeader* _sectHead;
             BufReader _br;
+            const JSectHeader* _sectHead;
             const char *_lastDbName; // pointer into mmaped journal file
         };
 
@@ -182,7 +165,8 @@ namespace mongo {
         private:
             void applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump);
             void applyEntries(const vector<ParsedJournalEntry> &entries);
-            bool processBuffer(void *, unsigned len);
+            void processSection(const void *, unsigned len);
+            bool processFileBuffer(const void *, unsigned len);
             bool processFile(path journalfile);
             void close();
 
@@ -303,26 +287,43 @@ namespace mongo {
                 log() << "END section" << endl;
         }
 
+        void RecoveryJob::processSection(const void *p, unsigned len) {
+            vector<ParsedJournalEntry> entries;
+            JournalSectionIterator i(p, len);
+
+            // first read all entries to make sure this section is valid
+            ParsedJournalEntry e;
+            while( i.next(e) ) {
+                entries.push_back(e);
+            }
+
+            // got all the entries for one group commit.  apply them: 
+            applyEntries(entries);
+        }
+
         /** apply a specific journal file, that is already mmap'd
             @param p start of the memory mapped file
             @return true if this is detected to be the last file (ends abruptly) 
         */
-        bool RecoveryJob::processBuffer(void *p, unsigned len) {
-            JournalIterator i(p, len);
-            vector<ParsedJournalEntry> entries;
-
+        bool RecoveryJob::processFileBuffer(const void *p, unsigned len) {
             try {
-                while ( !i.atEof() ) {
-                    entries.clear();
+                BufReader br(p,len);
 
-                    // parse out entries from buffer
-                    ParsedJournalEntry e;
-                    while( i.next(e) ) {
-                        entries.push_back(e);
+                { // read file header
+                    JHeader h;
+                    br.read(h);
+                    if( !h.versionOk() ) {
+                        log() << "journal file version number mismatch. recover with old version of mongod, terminate cleanly, then upgrade." << endl;
+                        uasserted(13536, str::stream() << "journal version number mismatch " << h._version);
                     }
+                    uassert(13537, "journal header invalid", h.valid());
+                }
 
-                    // got all the entries for one group commit.  apply them: 
-                    applyEntries(entries);
+                // read sections
+                while ( !br.atEof() ) {
+                    JSectHeader h;
+                    br.peek(h);
+                    processSection(br.skip(h.len), h.len);
                 }
             }
             catch( BufReader::eof& ) { 
@@ -340,7 +341,7 @@ namespace mongo {
             MemoryMappedFile f;
             void *p = f.mapWithOptions(journalfile.string().c_str(), MongoFile::READONLY | MongoFile::SEQUENTIAL);
             massert(13544, str::stream() << "recover error couldn't open " << journalfile.string(), p);
-            return processBuffer(p, (unsigned) f.length());
+            return processFileBuffer(p, (unsigned) f.length());
         }
 
         /** @param files all the j._0 style files we need to apply for recovery */

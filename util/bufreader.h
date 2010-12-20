@@ -31,7 +31,7 @@ namespace mongo {
             virtual const char * what() { return "BufReader eof"; }
         };
 
-        BufReader(void *p, unsigned len) : _start(p), _pos(p), _end(((char *)_pos)+len) { }
+        BufReader(const void *p, unsigned len) : _start(p), _pos(p), _end(((char *)_pos)+len) { }
 
         bool atEof() const { return _pos == _end; }
         
@@ -68,9 +68,9 @@ namespace mongo {
 
         /** return current position pointer, and advance by len */
         const void* skip(unsigned len) { 
-            char *nxt = ((char *) _pos) + len;
+            const char *nxt = ((char *) _pos) + len;
             if( _end < nxt ) throw eof();
-            void *p = _pos;
+            const void *p = _pos;
             _pos = nxt;
             return p;
         }
@@ -87,19 +87,12 @@ namespace mongo {
             s = b.str();
         }
 
-        /** skip ahead to our alignment boundary */
-        void align(unsigned alignment) {
-            size_t ofs = ((char*)_pos) - ((char*)_start);
-            ofs = (ofs + (alignment-1)) & (~(alignment-1));
-            _pos = ((char*)_start) + ofs;
-        }
-
-        void* pos() { return _pos; }
+        const void* pos() { return _pos; }
 
     private:
-        void *_start;
-        void *_pos;
-        void *_end;
+        const void *_start;
+        const void *_pos;
+        const void *_end;
     };
 
 }
