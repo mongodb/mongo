@@ -29,33 +29,13 @@
 namespace mongo { 
     namespace dur {
 
-        /** "I intend to write at p for up to len bytes" */
-        struct WriteIntent { 
-            void *p;
-            unsigned len;
-        };
-
-        struct AppendOp { 
-            void *localDestWriteMap;
-            void *localDestPrivateMap; // writing to the local db oplog
-            void *src;                 // src is in some non-local db
-            unsigned _len;
-        };
-
-        /** declaration of an intent to write to a region of a memory mapped view 
-            this could be either a JEntry or a JObjAppend in the journal
-        */
-        struct BasicWriteOp /* copyable */ { 
-            void *dst;
-            void *src;
-            unsigned len() const { return _len; }
-            void set(void *Src, unsigned Len) {
-                dst = 0;
-                src = Src;
-                _len = Len;
-            }
-        private:
-            unsigned _len;
+        /** declaration of an intent to write to a region of a memory mapped view */
+        struct WriteIntent /* copyable */ { 
+            WriteIntent() : w_ptr(0), p(0) { }
+            WriteIntent(void *a, unsigned b) : w_ptr(0), p(a), len(b) { }
+            void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap
+            void *p;      // intent to write at p
+            unsigned len; // up to this len
         };
 
         /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
@@ -85,14 +65,6 @@ namespace mongo {
                 return false; // a new set
             }
 
-            /**
-               @return true if already indicated.
-            */
-            bool check(const WriteIntent& w) {
-                unsigned x = mongoutils::hashPointer(w.p);
-                WriteIntent& nd = nodes[x % N];
-                return nd.p == w.p && nd.len >= w.len;
-            }
         private:
             enum { N = Prime }; // this should be small the idea is that it fits in the cpu cache easily
             WriteIntent nodes[N];
@@ -102,8 +74,7 @@ namespace mongo {
         class Writes : boost::noncopyable {
         public:
             Already<127> _alreadyNoted;
-            vector<BasicWriteOp> _basicWrites;
-            vector<AppendOp> _appendOps;
+            vector<WriteIntent> _writes;
             vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
 
             /** reset the Writes structure (empties all the above) */
@@ -128,11 +99,7 @@ namespace mongo {
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p);
 
-            /** @return true if was already noted. false negatives possible (to be fast). */
-            bool alreadyNoted(WriteIntent& w) { return _wi._alreadyNoted.check(w); }
-
-            vector<BasicWriteOp>& basicWrites() { return _wi._basicWrites; }
-            vector<AppendOp>& appendOps() { return _wi._appendOps; }
+            vector<WriteIntent>& writes() { return _wi._writes; }
             vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
 
             /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even 
@@ -215,11 +182,9 @@ namespace mongo {
 #endif
 
                 // remember intent. we will journal it in a bit
-                BasicWriteOp b;
-                b.set(w.p, w.len);
-                _wi._basicWrites.push_back(b);
-                wassert( _wi._basicWrites.size() <  2000000 );
-                assert(  _wi._basicWrites.size() < 20000000 );
+                _wi._writes.push_back(w);
+                wassert( _wi._writes.size() <  2000000 );
+                assert(  _wi._writes.size() < 20000000 );
             }
         }
     }

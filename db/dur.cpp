@@ -50,7 +50,6 @@
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
 #include "dur_stats.h"
-#include "pdfile.h" // Record::HeaderSize
 
 using namespace mongoutils;
 
@@ -90,60 +89,8 @@ namespace mongo {
 
         /** base declare write intent function that all the helpers call. */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
-            WriteIntent w;
-            w.p = p;
-            w.len = len;
+            WriteIntent w(p, len);
             commitJob.note(w);
-        }
-
-        bool DurableImpl::objAppend(void *dst, const void *src, unsigned len) { 
-            // temporarily off
-            if( 1 ) 
-                return false;
-
-            {
-                char *srcRecord = (char*) src;
-                srcRecord -= Record::HeaderSize;
-                WriteIntent w;
-                w.p = srcRecord;
-                w.len = len+Record::HeaderSize;
-                if( !commitJob.alreadyNoted(w) ) { 
-
-                    if( debug ) {
-                        WriteIntent w;
-                        w.p = (void*)src;
-                        w.len = len;
-                        if( commitJob.alreadyNoted(w) ) { 
-                            log() << "dur info it appears an optimization is possible that is not yet done" << endl;
-                        }
-                    }
-
-                    return false;
-                }
-            }
-
-            {
-                {
-                    AppendOp a;
-                    a.localDestWriteMap = 0; // set later, in PREPLOGBUFFER()
-                    a.localDestPrivateMap = dst;
-                    a.src = (void*) src;
-                    a._len = len;
-                    commitJob.appendOps().push_back(a);
-                }
-                if( testIntent )
-                    dst = MongoMMF::switchToPrivateView(dst);
-                memcpy(dst, src, len);
-                char *p = static_cast<char*>(dst);
-                p[-3] = (char) Object; // { ..., o: <copiedobj>, ..., EOO}
-                p[-2] = 'o';
-                p[-1] = 0;
-                p[len] = EOO;
-
-                assert( p[len-1] == EOO );
-            }
-
-            return true;
         }
 
         void enableDurability() { // TODO: merge with startup() ?
@@ -224,15 +171,15 @@ namespace mongo {
             ++n;
 
             assert(debug && cmdLine.dur);
-            vector<BasicWriteOp>& w = commitJob.basicWrites();
+            vector<WriteIntent>& w = commitJob.writes();
             if( w.size() == 0 ) 
                 return;
-            const BasicWriteOp &i = w[w.size()-1];
+            const WriteIntent &i = w[w.size()-1];
             size_t ofs;
-            MongoMMF *mmf = privateViews.find(i.src, ofs);
+            MongoMMF *mmf = privateViews.find(i.p, ofs);
             if( mmf == 0 ) 
                 return;
-            size_t past = ofs + i.len();
+            size_t past = ofs + i.len;
             if( mmf->length() < past + 8 ) 
                 return; // too close to end of view
             char *priv = (char *) mmf->getView();
@@ -241,15 +188,15 @@ namespace mongo {
             unsigned long long *b = (unsigned long long *) (writ+past);
             if( *a != *b ) { 
                 for( unsigned z = 0; z < w.size() - 1; z++ ) { 
-                    const BasicWriteOp& wi = w[z];
-                    char *r1 = (char*) wi.src;
+                    const WriteIntent& wi = w[z];
+                    char *r1 = (char*) wi.p;
                     char *r2 = r1 + wi.len();
                     if( r1 <= (((char*)a)+8) && r2 > (char*)a ) { 
                         //log() << "it's ok " << wi.p << ' ' << wi.len << endl;
                         return;
                     }
                 }
-                log() << "dur data after write area " << i.src << " does not agree" << endl;
+                log() << "dur data after write area " << i.p << " does not agree" << endl;
                 log() << " was:  " << ((void*)b) << "  " << hexdump((char*)b, 8) << endl;
                 log() << " now:  " << ((void*)a) << "  " << hexdump((char*)a, 8) << endl;
                 log() << " n:    " << n << endl;
@@ -320,7 +267,7 @@ namespace mongo {
                         ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << ' ' << stats.curr._objCopies << endl;
-                        vector<BasicWriteOp>& b = commitJob.basicWrites();
+                        vector<WriteIntent>& b = commitJob.writes();
                         (void)b; // mark as unused. Useful for inspection in debugger
 
                         massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);

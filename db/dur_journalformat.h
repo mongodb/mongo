@@ -69,7 +69,6 @@ namespace mongo {
                 OpCode_DbContext   = 0xfffffffe,
                 OpCode_FileCreated = 0xfffffffd,
                 OpCode_DropDb      = 0xfffffffc,
-                OpCode_ObjAppend   = 0xfffffffb,
                 OpCode_Min         = 0xfffff000
             };
             union {
@@ -106,21 +105,6 @@ namespace mongo {
                 ss << fileno;
                 return ss.str();
             }
-        };
-
-        /** append an object to a partial BSON buffer under construction.
-            adds 
-               o : <data>, EOO
-            len is the length of the data            
-        */
-        struct JObjAppend { 
-            JObjAppend() : opcode(JEntry::OpCode_ObjAppend) { }
-            unsigned opcode;
-            int dstFileNo;    // destination in the local database.
-            unsigned dstOfs;
-            int srcFileNo;    // source in the database of current context (JDbContext)
-            unsigned srcOfs;
-            unsigned len;
         };
 
         /** group commit section footer. md5 is a key field. */

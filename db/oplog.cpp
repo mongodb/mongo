@@ -96,28 +96,21 @@ namespace mongo {
         const int size1 = partial.objsize() - 1;  // less the EOO char
         const int oOfs = size1+3;                 // 3 = byte BSONOBJTYPE + byte 'o' + byte \0
 
-        // don't bother if obj is tiny as there is some header overhead for the additional journal entry
-        // and also some computational administrative overhead.
-        bool objAppendOpWorked = o.objsize() >= 32 && 
-                                 getDur().objAppend(dst + oOfs, o.objdata(), o.objsize());
-
-        void *p = getDur().writingPtr(dst, objAppendOpWorked ? size1 : oOfs+o.objsize()+1);
+        void *p = getDur().writingPtr(dst, oOfs+o.objsize()+1);
 
         memcpy(p, partial.objdata(), size1);
 
         // adjust overall bson object size for the o: field
         *(static_cast<unsigned*>(p)) += o.objsize() + 1/*fieldtype byte*/ + 2/*"o" fieldname*/;
 
-        if( !objAppendOpWorked ) {
-            char *b = static_cast<char *>(p);
-            b += size1;
-            *b++ = (char) Object;
-            *b++ = 'o'; // { o : ... }
-            *b++ = 0;   // null terminate "o" fieldname
-            memcpy(b, o.objdata(), o.objsize());
-            b += o.objsize();
-            *b = EOO;
-        }
+        char *b = static_cast<char *>(p);
+        b += size1;
+        *b++ = (char) Object;
+        *b++ = 'o'; // { o : ... }
+        *b++ = 0;   // null terminate "o" fieldname
+        memcpy(b, o.objdata(), o.objsize());
+        b += o.objsize();
+        *b = EOO;
     }
 
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {

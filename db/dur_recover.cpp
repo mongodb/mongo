@@ -38,7 +38,7 @@ namespace mongo {
     namespace dur { 
 
         struct ParsedJournalEntry /*copyable*/ { 
-            ParsedJournalEntry() : e(0), d(0) { }
+            ParsedJournalEntry() : e(0) { }
 
             // relative path of database for the operation.
             // might be a pointer into mmaped Journal file
@@ -46,7 +46,6 @@ namespace mongo {
 
             // thse are pointers into the memory mapped journal file
             const JEntry *e;  // local db sentinel is already parsed out here into dbName
-            const JObjAppend *d;
 
             // if not one of the two simple JEntry's above, this is the operation:
             shared_ptr<DurOp> op;
@@ -154,26 +153,18 @@ namespace mongo {
                     }
                     // fall through as a basic operation always follows jdbcontext, and we don't have anything to return yet
 
-                case JEntry::OpCode_ObjAppend:
                 default:
                     // fall through
                     ;
                 }
 
-                {
-                    assert( lenOrOpCode && lenOrOpCode <= JEntry::OpCode_ObjAppend );
-                    _br.rewind(4);
-                    if( lenOrOpCode == JEntry::OpCode_ObjAppend ) { 
-                        e.d = (JObjAppend *) _br.skip(sizeof(JObjAppend));
-                        e.dbName = _lastDbName;
-                    }
-                    else {
-                        e.e = (JEntry *) _br.skip(sizeof(JEntry));
-                        e.dbName = e.e->isLocalDbContext() ? "local" : _lastDbName;
-                        dassert( e.e->len == lenOrOpCode );
-                        _br.skip(e.e->len);
-                    }
-                }
+                // JEntry - a basic write
+                assert( lenOrOpCode && lenOrOpCode < JEntry::OpCode_Min );
+                _br.rewind(4);
+                e.e = (JEntry *) _br.skip(sizeof(JEntry));
+                e.dbName = e.e->isLocalDbContext() ? "local" : _lastDbName;
+                assert( e.e->len == lenOrOpCode );
+                _br.skip(e.e->len);
                 return true;
             }
         private:
@@ -284,27 +275,6 @@ namespace mongo {
                     memcpy(p, entry.e->srcData(), entry.e->len);
                 }
             } 
-            else if( entry.d ) { 
-                // OpCode_ObjAppend (struct JObjAppend)
-                if( dump ) {
-                    stringstream ss;
-                    ss << "  JObjAppend dst: local." << JEntry::suffix(entry.d->dstFileNo) << " ofs:" << entry.d->dstOfs;
-                    ss << " src:" << entry.dbName << '.' << JEntry::suffix(entry.d->srcFileNo) << " ofs:" << entry.d->srcOfs;
-                    ss << " len:" << entry.d->len;
-                    log() << ss.str() << endl;
-                } 
-                if( apply ) {
-                    void *dst = ptr("local", entry.d->dstFileNo, entry.d->dstOfs);
-                    void *src = ptr(entry.dbName, entry.d->srcFileNo, entry.d->srcOfs);
-                    memcpy(dst, src, entry.d->len);
-                    char *p = (char *) dst;
-                    p[-3] = (char) Object; // { ..., o: <copiedobj>, ..., EOO}
-                    p[-2] = 'o';
-                    p[-1] = 0;
-                    p[entry.d->len] = EOO;
-                    p[entry.d->len+1] = EOO;
-                }
-            }
             else {
                 // a DurOp subclass operation
                 if( dump ) {
