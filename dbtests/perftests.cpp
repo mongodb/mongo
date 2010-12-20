@@ -83,7 +83,7 @@ namespace PerfTests {
                     break;
             }
             int ms = t.millis();
-            cout << n << ' ' << ms << "ms" << " expect:" << expectation() << endl;
+            cout << n << "/sec " << ms << "ms" << " expect:" << expectation() << endl;
 
             if( n < expectation() ) { 
 #if !defined(_DEBUG)
@@ -97,7 +97,7 @@ namespace PerfTests {
     class InsertDup : public B { 
         const BSONObj o;
     public:
-        InsertDup() : o( BSON("_id" << 1) ) { }
+        InsertDup() : o( BSON("_id" << 1) ) { } // dup keys
         string name() { 
             return "InsertDup"; 
         }
@@ -112,24 +112,33 @@ namespace PerfTests {
         }
         unsigned long long expectation() { return 1000; }
     };
-        
-    class Update : public B { 
+
+    /*
+    class Insert : public InsertDup { 
     public:
-        string name() { return "update"; }
-        void prep() { }
+        InsertDup() : o( BSON("_id" << 1) ) { } // dup keys
+        string name() { 
+            return "InsertDup"; 
+        }
+        void prep() { 
+            client().insert( ns(), o );
+        }
         void timed() {
-            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().insert( ns(), o );
+        }
+        void post() {
+            assert( client().count(ns()) == 1 );
         }
         unsigned long long expectation() { return 1000; }
     };
-        
+              */  
     class All : public Suite {
     public:
         All() : Suite( "perf" ) {
         }
         void setupTests(){
             add< InsertDup >();
-            add< Update >();
+            //add< Insert >();
         }
     } myall;
 }
