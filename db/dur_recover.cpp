@@ -131,7 +131,7 @@ namespace mongo {
                         _br.skip(sizeof(JSectFooter) - 4);
                         _br.align(Alignment);
                         _sectHead = NULL;
-                        return false; // false return value denotes of section
+                        return false; // false return value denotes end of section
                     }
 
                 case JEntry::OpCode_FileCreated:
