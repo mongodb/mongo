@@ -263,7 +263,7 @@ int main(int argc, char* argv[]) {
     pool.addHook( &shardingConnectionHook );
     pool.setName( "mongos connectionpool" );
 
-    ReplicaSetMonitor::setConfigChangeHook( new RSChangeWatcher() );
+    ReplicaSetMonitor::setConfigChangeHook( boost::bind( &ConfigServer::replicaSetChange , &configServer , _1 ) );
 
     if ( argc <= 1 ) {
         usage( argv );

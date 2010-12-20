@@ -675,7 +675,7 @@ namespace mongo {
         }
     }
 
-    void RSChangeWatcher::changed( const ReplicaSetMonitor * monitor ){
+    void ConfigServer::replicaSetChange( const ReplicaSetMonitor * monitor ){
         try {
             ScopedDbConnection conn( configServer.getConnectionString() );
             conn->update( ShardNS::shard , BSON( "_id" << monitor->getName() ) , BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
