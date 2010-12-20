@@ -106,8 +106,8 @@ namespace mongo {
         
     }
 
-    void ReplicaSetMonitor::setConfigChangeHook( ConfigChangeHook * hook ){
-        massert( 13610 , "ConfigChangeHook already specified" , _hook == 0 || hook == 0 );
+    void ReplicaSetMonitor::setConfigChangeHook( ConfigChangeHook hook ){
+        massert( 13610 , "ConfigChangeHook already specified" , _hook == 0 );
         _hook = hook;
     }
 
@@ -233,7 +233,7 @@ namespace mongo {
         }
         
         if ( _hook )
-            _hook->changed( this );
+            _hook( this );
 
         return good;
     }
@@ -314,7 +314,7 @@ namespace mongo {
 
     mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
     map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;
-    ReplicaSetMonitor::ConfigChangeHook * ReplicaSetMonitor::_hook = 0;
+    ReplicaSetMonitor::ConfigChangeHook ReplicaSetMonitor::_hook;
     // --------------------------------
     // ----- DBClientReplicaSet ---------
     // --------------------------------

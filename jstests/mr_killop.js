@@ -1,14 +1,12 @@
 t = db.jstests_mr_killop;
 t.drop();
+t2 = db.jstests_mr_killop_out;
+t2.drop();
 
-// TODO turning off because not working for me
-if ( false && typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900 
-
-    t.save( {a:1} );
-    db.getLastError();
+if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900 
 
     function debug( x ) {
-        //    printjson( x );
+//        printjson( x );
     }
 
     /** @return op code for map reduce op created by spawned shell, or that op's child */
@@ -39,9 +37,16 @@ if ( false && typeof _threadInject == "undefined" ) { // don't run in v8 mode - 
  * ops currently mask parent ops in currentOp.
  */
     function testOne( map, reduce, finalize, scope, where, wait ) {
+        t.drop();
+        t2.drop();
+        // Ensure we have one document for the m/r functions to run on.
+        t.save( {a:1} );
+        db.getLastError();
+                
         spec =
             {
                 mapreduce:"jstests_mr_killop",
+                out:"jstests_mr_killop_out",
                 map: map,
                 reduce: reduce
             };
@@ -52,7 +57,9 @@ if ( false && typeof _threadInject == "undefined" ) { // don't run in v8 mode - 
             spec[ "scope" ] = scope;
         }
 
-        s = startParallelShell( "db.runCommand( " + tojson( spec ) + " );" );
+        // The assert below won't be caught by this test script, but it will cause error messages
+        // to be printed.
+        s = startParallelShell( "assert.commandWorked( db.runCommand( " + tojson( spec ) + " ) );" );
         
         if ( wait ) {
             sleep( 2000 );

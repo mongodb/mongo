@@ -233,6 +233,8 @@ namespace mongo {
             return ConnectionString( _primary.getConnString() , ConnectionString::SYNC );
         }
 
+        void replicaSetChange( const ReplicaSetMonitor * monitor );
+
         static int VERSION;
         
 
@@ -246,11 +248,5 @@ namespace mongo {
         string getHost( string name , bool withPort );
         vector<string> _config;
     };
-
-    class RSChangeWatcher : public ReplicaSetMonitor::ConfigChangeHook {
-    public:
-        void changed( const ReplicaSetMonitor * monitor );
-    };
-    
 
 } // namespace mongo

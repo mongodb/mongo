@@ -35,12 +35,7 @@ namespace mongo {
     class ReplicaSetMonitor {
     public:
         
-        class ConfigChangeHook {
-        public:
-            virtual ~ConfigChangeHook(){}
-            /** called whenever the state of the ReplicaSet changes */
-            virtual void changed( const ReplicaSetMonitor * monitor ) = 0;
-        };
+        typedef boost::function1<void,const ReplicaSetMonitor*> ConfigChangeHook;
 
         /**
          * gets a cached Monitor per name or will create if doesn't exist
@@ -57,8 +52,9 @@ namespace mongo {
          * this is called whenever the config of any repclia set changes
          * currently only 1 globally
          * asserts if one already exists
+         * ownership passes to ReplicaSetMonitor and the hook will actually never be deleted
          */
-        static void setConfigChangeHook( ConfigChangeHook * hook );
+        static void setConfigChangeHook( ConfigChangeHook hook );
 
         ~ReplicaSetMonitor();
         
@@ -123,7 +119,7 @@ namespace mongo {
         static mongo::mutex _setsLock; // protects _sets
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
         
-        static ConfigChangeHook * _hook;
+        static ConfigChangeHook _hook;
     };
 
     /** Use this class to connect to a replica set of servers.  The class will manage
