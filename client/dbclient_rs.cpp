@@ -22,12 +22,29 @@
 #include "../db/json.h"
 #include "connpool.h"
 #include "dbclient_rs.h"
+#include "../util/background.h"
 
 namespace mongo {
     
     // --------------------------------
     // ----- ReplicaSetMonitor ---------
     // --------------------------------
+
+    // global background job responsible for checking every X amount of time
+    class ReplicaSetMonitorWatcher : public BackgroundJob {
+    protected:
+        void run(){
+            sleepsecs( 20 );
+            try {
+                ReplicaSetMonitor::checkAll();
+            }
+            catch ( std::exception& e ){
+                error() << "ReplicaSetMonitorWatcher: check failed: " << e.what() << endl;
+            }
+        }
+
+    } replicaSetMonitorWatcher;
+    
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
         : _lock( "ReplicaSetMonitor instance" ) , _name( name ) , _master(-1) {
@@ -55,7 +72,42 @@ namespace mongo {
         ReplicaSetMonitorPtr& m = _sets[name];
         if ( ! m )
             m.reset( new ReplicaSetMonitor( name , servers ) );
+
+        if ( replicaSetMonitorWatcher.getState() == BackgroundJob::NotStarted )
+            replicaSetMonitorWatcher.go();
+        
         return m;
+    }
+
+    void ReplicaSetMonitor::checkAll(){
+        set<string> seen;
+        
+        while ( true ){
+            ReplicaSetMonitorPtr m;
+            {
+                for ( map<string,ReplicaSetMonitorPtr>::iterator i=_sets.begin(); i!=_sets.end(); ++i ){
+                    string name = i->first;
+                    if ( seen.count( name ) )
+                        continue;
+                    LOG(0) << "checking replica set: " << name << endl;
+                    seen.insert( name );
+                    m = i->second;
+                    break;
+                }
+            }
+
+            if ( ! m )
+                break;
+
+            m->check();
+        }
+        
+        
+    }
+
+    void ReplicaSetMonitor::setConfigChangeHook( ConfigChangeHook * hook ){
+        massert( 13610 , "ConfigChangeHook already specified" , _hook == 0 || hook == 0 );
+        _hook = hook;
     }
 
     string ReplicaSetMonitor::getServerAddress() const {
@@ -141,6 +193,7 @@ namespace mongo {
 
     bool ReplicaSetMonitor::_checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose ) {
         bool good = false;
+        bool changed = false;
         try {
             BSONObj o;
             c->isMaster(good, &o);
@@ -169,6 +222,7 @@ namespace mongo {
                         _nodes.push_back( Node( h , newConn ) );
                     }
                     log() << "updated set (" << _name << ") to: " << getServerAddress() << endl;
+                    changed = true;
                 }
             }
 
@@ -177,6 +231,9 @@ namespace mongo {
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception " << c->toString() << ' ' << e.what() << endl;
         }
         
+        if ( _hook )
+            _hook->changed( this );
+
         return good;
     }
 
@@ -223,6 +280,20 @@ namespace mongo {
 
     }
 
+    void ReplicaSetMonitor::check(){
+        // first see if the current master is fine
+        if ( _master >= 0 ){
+            string temp;
+            if ( _checkConnection( _nodes[_master].conn , temp , false ) ){
+                // current master is fine, so we're done
+                return;
+            }
+        }
+
+        // we either have no master, or the current is dead
+        _check();
+    }
+
     int ReplicaSetMonitor::_find( const string& server ) const {
         scoped_lock lk( _lock );
         for ( unsigned i=0; i<_nodes.size(); i++ )
@@ -242,7 +313,7 @@ namespace mongo {
 
     mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
     map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;
-
+    ReplicaSetMonitor::ConfigChangeHook * ReplicaSetMonitor::_hook = 0;
     // --------------------------------
     // ----- DBClientReplicaSet ---------
     // --------------------------------
@@ -295,7 +366,7 @@ namespace mongo {
             const AuthInfo& a = *i;
             string errmsg;
             if ( ! conn->auth( a.dbname , a.username , a.pwd , errmsg, a.digestPassword ) )
-                warning() << "cached auth failed for set: " << _monitor->setName() << " db: " << a.dbname << " user: " << a.username << endl;
+                warning() << "cached auth failed for set: " << _monitor->getName() << " db: " << a.dbname << " user: " << a.username << endl;
 
         }
 

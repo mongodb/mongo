@@ -35,10 +35,30 @@ namespace mongo {
     class ReplicaSetMonitor {
     public:
         
+        class ConfigChangeHook {
+        public:
+            virtual ~ConfigChangeHook(){}
+            /** called whenever the state of the ReplicaSet changes */
+            virtual void changed( const ReplicaSetMonitor * monitor ) = 0;
+        };
+
         /**
          * gets a cached Monitor per name or will create if doesn't exist
          */
         static ReplicaSetMonitorPtr get( const string& name , const vector<HostAndPort>& servers );
+
+        /**
+         * checks all sets for current master and new secondaries
+         * usually only called from a BackgroundJob
+         */
+        static void checkAll();
+
+        /**
+         * this is called whenever the config of any repclia set changes
+         * currently only 1 globally
+         * asserts if one already exists
+         */
+        static void setConfigChangeHook( ConfigChangeHook * hook );
 
         ~ReplicaSetMonitor();
         
@@ -58,10 +78,15 @@ namespace mongo {
          */
         void notifySlaveFailure( const HostAndPort& server );        
 
-        string setName() const { return _name; }
+        /**
+         * checks for current master and new secondaries
+         */
+        void check();
+
+        string getName() const { return _name; }
 
         string getServerAddress() const;
-
+        
     private:
         ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers );
 
@@ -97,6 +122,8 @@ namespace mongo {
         
         static mongo::mutex _setsLock; // protects _sets
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
+        
+        static ConfigChangeHook * _hook;
     };
 
     /** Use this class to connect to a replica set of servers.  The class will manage
