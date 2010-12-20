@@ -101,7 +101,7 @@ const StringData _jscode_raw_utils =
 "}\n" 
 "}\n" 
 "\n" 
-"assert.soon = function( f, msg, timeout, interval ) {\n" 
+"assert.soon = function( f, msg, timeout /*ms*/, interval ) {\n" 
 "if ( assert._debug && msg ) print( \"in assert for: \" + msg );\n" 
 "\n" 
 "var start = new Date();\n" 

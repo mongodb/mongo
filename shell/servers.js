@@ -179,8 +179,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         // start replica sets
         this._rs = []
         for ( var i=0; i<numShards; i++){
-            var rs = new ReplSetTest( { name : testName + "-rs" + i , nodes : 3 , startPort : 31100 + ( i * 100 ) } );
-            this._rs[i] = { test : rs , nodes : rs.startSet( { oplogSize:40 } ) , url : rs.getURL() };
+            var setName = testName + "-rs" + i;
+            var rs = new ReplSetTest( { name : setName , nodes : 3 , startPort : 31100 + ( i * 100 ) } );
+            this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( { oplogSize:40 } ) , url : rs.getURL() };
             rs.initiate();
             
         }
@@ -251,6 +252,13 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             }
         );
     }
+}
+
+ShardingTest.prototype.getRSEntry = function( setName ){
+    for ( var i=0; i<this._rs.length; i++ )
+        if ( this._rs[i].setName == setName )
+            return this._rs[i];
+    throw "can't find rs: " + setName;
 }
 
 ShardingTest.prototype.getDB = function( name ){

@@ -96,7 +96,7 @@ assert.repeat = function( f, msg, timeout, interval ) {
     }
 }
     
-assert.soon = function( f, msg, timeout, interval ) {
+assert.soon = function( f, msg, timeout /*ms*/, interval ) {
     if ( assert._debug && msg ) print( "in assert for: " + msg );
 
     var start = new Date();
