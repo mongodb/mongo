@@ -392,6 +392,7 @@ def expand_suites(suites):
                                   "clone": ("clone/*.js", False),
                                   "repl": ("repl/*.js", False),
                                   "replSets": ("replsets/*.js", False),
+                                  "dur": ("dur/*.js", False),
                                   "auth": ("auth/*.js", False),
                                   "sharding": ("sharding/*.js", False),
                                   "tool": ("tool/*.js", False)}[suite]
