@@ -360,9 +360,9 @@ namespace mongo {
 
         /* unlink ourself from the deleted list */
         {
-            DeletedRecord *bmr = getDur().writing(bestmatch.drec());
+            const DeletedRecord *bmr = bestmatch.drec();
             *getDur().writing(bestprev) = bmr->nextDeleted;
-            bmr->nextDeleted.setInvalid(); // defensive.
+            bmr->nextDeleted.writing().setInvalid(); // defensive.
             assert(bmr->extentOfs < bestmatch.getOfs());
         }
 
