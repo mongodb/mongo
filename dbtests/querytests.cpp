@@ -148,7 +148,10 @@ namespace QueryTests {
     class ClientBase {
     public:
         ClientBase() {
-            mongo::lastError.get()->reset();
+            mongo::lastError.reset( new LastError() );
+        }
+        ~ClientBase() {
+            mongo::lastError.release();
         }
     protected:
         static void insert( const char *ns, BSONObj o ) {
