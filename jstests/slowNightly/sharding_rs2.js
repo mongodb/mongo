@@ -52,6 +52,8 @@ assert.soon(
 // ---------- test routing to slaves ----------------
 // -------------------------------------------------------------------------------------------
 
+// --- not sharded ----
+
 m = new Mongo( s.s.name );
 t = m.getDB( "test" ).foo
 
@@ -71,4 +73,36 @@ printjson( after )
 
 assert.eq( before.query + 10 , after.query , "B3" )
 
+// --- sharded ----
+
+t.ensureIndex( { x : 1 } )
+
+for ( i=0; i<100; i++ ){
+    if ( i == 17 ) continue;
+    t.insert( { x : i } )
+}
+
+assert.eq( 100 , t.count() , "C1" )
+
+/*
+s.adminCommand( { enablesharding : "test" } );
+s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
+
+assert.eq( 100 , t.count() , "C2" )
+try {
+    s.adminCommand( { split : "test.foo" , middle : { x : 50 } } )
+}
+catch ( e ){
+    printjson( e );
+}
+
+db.printShardingStatus()
+throw 1
+
+other : s.config.shards.findOne( { _id : { $ne : serverName } } );
+s.adminCommand( { moveChunk : "test.foo" , find : { x : 10 } , to : other } )
+assert.eq( 100 , t.count() , "C3" )
+
+assert.eq( 50 , rs.test.getMaster().getDB( "test" ).foo.count() , "C4" )
+*/
 s.stop()
