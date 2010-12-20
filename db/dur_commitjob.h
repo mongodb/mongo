@@ -191,7 +191,7 @@ namespace mongo {
                         turn this on and see what is logged.  if you have a copy of its output from before the 
                         regression, a simple diff of these lines would tell you a lot likely.
                 */
-#if 1 && defined(_DEBUG)
+#if 0 && defined(_DEBUG)
                 { 
                     static int n;
                     if( ++n < 10000 ) { 
