@@ -494,7 +494,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
-        uassert( 10276 ,  str::stream() << "DBClientBase::findOne: transport error: " << getServerAddress() , c.get() );
+        uassert( 10276 ,  str::stream() << "DBClientBase::findOne: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
 
         if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
             throw StaleConfigException( ns , "findOne has stale config" );
