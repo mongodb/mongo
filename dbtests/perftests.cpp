@@ -83,7 +83,7 @@ namespace PerfTests {
                     break;
             }
             int ms = t.millis();
-            cout << n << "/sec " << ms << "ms" << " expect:" << expectation() << endl;
+            cout << setw(24) << name() << ' ' << setw(7) << n << "/sec " << setw(4) << ms << "ms" << " expect:" << expectation() << endl;
 
             if( n < expectation() ) { 
 #if !defined(_DEBUG)
@@ -99,7 +99,7 @@ namespace PerfTests {
     public:
         InsertDup() : o( BSON("_id" << 1) ) { } // dup keys
         string name() { 
-            return "InsertDup"; 
+            return "insert duplicate _ids"; 
         }
         void prep() { 
             client().insert( ns(), o );
@@ -113,32 +113,27 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
 
-    /*
-    class Insert : public InsertDup { 
+    class Insert1 : public InsertDup { 
+        const BSONObj x;
     public:
-        InsertDup() : o( BSON("_id" << 1) ) { } // dup keys
-        string name() { 
-            return "InsertDup"; 
-        }
-        void prep() { 
-            client().insert( ns(), o );
-        }
+        Insert1() : x( BSON("x" << 99) ) { }
+        string name() { return "insert simple"; }
         void timed() {
-            client().insert( ns(), o );
+            client().insert( ns(), x );
         }
         void post() {
-            assert( client().count(ns()) == 1 );
+            assert( client().count(ns()) > 100 );
         }
         unsigned long long expectation() { return 1000; }
     };
-              */  
+                
     class All : public Suite {
     public:
         All() : Suite( "perf" ) {
         }
         void setupTests(){
             add< InsertDup >();
-            //add< Insert >();
+            add< Insert1 >();
         }
     } myall;
 }
