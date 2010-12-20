@@ -712,6 +712,7 @@ namespace mongo {
                 ShardChunkVersion shardVersion;
                 shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
 
+                log() << "moveChunk request accepted at version " << shardVersion << endl;
             }
             
             timing.done(2);
@@ -736,7 +737,7 @@ namespace mongo {
                 connTo.done();
 
                 if ( ! ok ){
-                    errmsg = "_recvChunkStart failed: ";
+                    errmsg = "moveChunk failed to engage TO-shard in the data transfer: ";
                     assert( res["errmsg"].type() );
                     errmsg += res["errmsg"].String();
                     result.append( "cause" , res );
@@ -756,12 +757,12 @@ namespace mongo {
                 res = res.getOwned();
                 conn.done();
                 
-                log(0) << "_recvChunkStatus : " << res << " my mem used: " << migrateFromStatus.mbUsed() << endl;
+                log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << endl;
                 
                 if ( ! ok || res["state"].String() == "fail" ){
-                    log( LL_ERROR ) << "_recvChunkStatus error : " << res << endl;
-                    errmsg = "_recvChunkStatus error";
-                    result.append( "cause" ,res );
+                    log( LL_WARNING ) << "moveChunk error transfering data caused migration abort: " << res << endl;
+                    errmsg = "data transfer error";
+                    result.append( "cause" , res );
                     return false;
                 }
 
@@ -817,8 +818,6 @@ namespace mongo {
                                                   res );
                     connTo.done();
 
-                    log() << "moveChunk commit result: " << res << endl;
-
                     if ( ! ok ){
                         {
                             writelock lk( ns );
@@ -827,7 +826,8 @@ namespace mongo {
                             shardingState.undoDonateChunk( ns , min , max , currVersion );
                         }
 
-                        log() << "_recvChunkCommit failed: " << res << " resetting shard version to: " << currVersion << endl;
+                        log() << "movChunk migrate commit not accepted by TO-shard: " << res 
+                              << " resetting shard version to: " << currVersion << endl;
 
                         errmsg = "_recvChunkCommit failed!";
                         result.append( "cause" , res );
@@ -918,7 +918,7 @@ namespace mongo {
 
                 } else { 
 
-                    log() << "moveChunk: no chunks left to update version for collection '" << ns << "'" << endl;
+                    log() << "moveChunk moved last chunk out for collection '" << ns << "'" << endl;
                 }
 
                 updates.done();
@@ -956,7 +956,7 @@ namespace mongo {
                     // 
                     // if the commit made it to the config, we'll see the chunk in the new shard and there's no action
                     // if the commit did not make it, currently the only way to fix this state is to bounce the mongod so
-                    // that the old state (before migrating) we'll be brought in
+                    // that the old state (before migrating) be brought in
 
                     log( LL_WARNING ) << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << endl;
                     sleepsecs( 10 ); 
