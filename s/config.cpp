@@ -297,6 +297,13 @@ namespace mongo {
         {
             ScopedDbConnection conn( configServer.modelServer() );
             conn->remove( ShardNS::database , BSON( "_id" << _name ) );
+            errmsg = conn->getLastError();
+            if ( ! errmsg.empty() ){
+                log() << "could not drop '" << _name << "': " << errmsg << endl;
+                conn.done();
+                return false;
+            }
+
             conn.done();
         }
 
