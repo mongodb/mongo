@@ -755,6 +755,9 @@
     <ClCompile Include="..\db\dur_preplogbuffer.cpp">
       <Filter>dur</Filter>
     </ClCompile>
+    <ClCompile Include="compresstests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

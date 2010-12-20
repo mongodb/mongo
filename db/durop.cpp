@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "concurrency.h"
-#include "../util/alignedbuilder.h"
+#include "../util/compress.h"
 #include "../util/mongoutils/str.h"
 #include "../util/file.h"
 #include "mongommf.h"
@@ -52,7 +52,7 @@ namespace mongo {
             return op;
         }
 
-        void DurOp::serialize(AlignedBuilder& ab) { 
+        void DurOp::serialize(CompressedBuilder& ab) { 
             ab.appendNum(_opcode);
             _serialize(ab);
         }
@@ -66,7 +66,7 @@ namespace mongo {
             log.readStr(reservedStr);
         }
 
-        void DropDbOp::_serialize(AlignedBuilder& ab) { 
+        void DropDbOp::_serialize(CompressedBuilder& ab) { 
             ab.appendNum((unsigned long long) 0); // reserved for future use
             ab.appendNum((unsigned long long) 0); // reserved for future use
             ab.appendStr(_db);
@@ -97,7 +97,7 @@ namespace mongo {
             _p._p = s;
         }
 
-        void FileCreatedOp::_serialize(AlignedBuilder& ab) {
+        void FileCreatedOp::_serialize(CompressedBuilder& ab) {
             ab.appendNum((unsigned long long) 0); // reserved for future use
             ab.appendNum((unsigned long long) 0); // reserved for future use
             ab.appendNum(_len);

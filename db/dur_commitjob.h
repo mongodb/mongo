@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "../util/alignedbuilder.h"
+#include "../util/compress.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/concurrency/synchronization.h"
 #include "cmdline.h"
@@ -118,7 +118,7 @@ namespace mongo {
         */
         class CommitJob : boost::noncopyable { 
         public:
-            AlignedBuilder _ab; // for direct i/o writes to journal
+            CompressedBuilder _ab; // for direct i/o writes to journal
 
             CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytes(0) { }
 

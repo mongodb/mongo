@@ -646,6 +646,7 @@
     <ClCompile Include="basictests.cpp" />
     <ClCompile Include="btreetests.cpp" />
     <ClCompile Include="clienttests.cpp" />
+    <ClCompile Include="compresstests.cpp" />
     <ClCompile Include="cursortests.cpp" />
     <ClCompile Include="dbtests.cpp" />
     <ClCompile Include="framework.cpp" />

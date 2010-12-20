@@ -261,7 +261,7 @@ namespace mongo {
         /** write the buffer we have built to the journal and fsync it.
             outside of lock as that could be slow.
         */
-        static void WRITETOJOURNAL(AlignedBuilder& ab) { 
+        static void WRITETOJOURNAL(CompressedBuilder& ab) { 
             journal(ab);
         }
 
@@ -407,7 +407,6 @@ namespace mongo {
 
             // data is now in the journal, which is sufficient for acknowledging getlasterror. 
             // (ok to crash after that)
-            log() << "TEMP NOTIFYING COMMITTED" << endl;
             commitJob.notifyCommitted();
 
             // write the noted write intent entries to the data files.

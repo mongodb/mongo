@@ -31,6 +31,7 @@
 #include "dur_commitjob.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
+#include "../util/compress.h"
 #include "dur_stats.h"
 
 using namespace mongoutils;
@@ -49,7 +50,7 @@ namespace mongo {
             return f;
         }
 
-        void prepBasicWrite(AlignedBuilder&bb, BasicWriteOp *i, RelativePath& lastDbPath) {
+        void prepBasicWrite(CompressedBuilder&bb, BasicWriteOp *i, RelativePath& lastDbPath) {
             size_t ofs = 1;
             MongoMMF *mmf = findMMF(i->src, /*out*/ofs);
             dassert( i->dst == 0 );
@@ -88,7 +89,7 @@ namespace mongo {
             two writes to the same location during the group commit interval, it is likely
             (although not assured) that it is journaled here once.
         */ 
-        void prepBasicWrites(AlignedBuilder& bb) {
+        void prepBasicWrites(CompressedBuilder& bb) {
             // each time events switch to a different database we journal a JDbContext 
             RelativePath lastDbPath;
 
@@ -97,7 +98,7 @@ namespace mongo {
             }
         }
 
-        void prepAppendOps(AlignedBuilder& bb) { 
+        void prepAppendOps(CompressedBuilder& bb) { 
             // each time events switch to a different database we journal a JDbContext 
             RelativePath lastDbPath;
 
@@ -136,15 +137,16 @@ namespace mongo {
             }
         }
 
-        void resetLogBuffer(AlignedBuilder& bb) {
+        void resetLogBuffer(CompressedBuilder& bb) {
             bb.reset();
 
             // JSectHeader
             {
-                bb.appendStr("\nHH\n", false);
+                //bb.appendStr("\nHH\n", false);
 
                 // total length, will fill in later:
-                bb.appendNum((unsigned) 0xffffffff);
+                bb.reserve32();
+                //bb.appendNum((unsigned) 0xffffffff);
             }
         }
 
@@ -154,7 +156,7 @@ namespace mongo {
         */
         void PREPLOGBUFFER() { 
             assert( cmdLine.dur );
-            AlignedBuilder& bb = commitJob._ab;
+            CompressedBuilder& bb = commitJob._ab;
             resetLogBuffer(bb);
 
             // ops other than basic writes (DurOp's)
@@ -163,6 +165,7 @@ namespace mongo {
                     (*i)->serialize(bb);
                 }
             }
+
 
             {
                 scoped_lock lk(privateViews._mutex());
@@ -180,9 +183,12 @@ namespace mongo {
                 assert( 0xffffe000 == (~(Alignment-1)) );
                 unsigned L = (bb.len() + Alignment-1) & (~(Alignment-1));
                 dassert( L >= (unsigned) bb.len() );
-                *((unsigned*)bb.atOfs(4)) = L;
+
+                bb.backfill32(L);
+                //*((unsigned*)bb.atOfs(4)) = L;
+
                 unsigned padding = L - bb.len();
-                bb.skip(padding);
+                bb.pad(padding);
                 dassert( bb.len() % Alignment == 0 );
             }
 

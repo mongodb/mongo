@@ -36,7 +36,7 @@ namespace mongo {
 
             // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near 
             // that.  simply incrementing the version # is safe on a fwd basis.
-            enum { CurrentVersion = 0x4144 };
+            enum { CurrentVersion = 0x4145 };
             unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
@@ -57,7 +57,6 @@ namespace mongo {
             len is length of the entire section including header and footer.
         */
         struct JSectHeader {
-            char magic[4]; // "\nhh\n"
             unsigned len; // length in bytes of the whole section
         };
 
@@ -70,7 +69,7 @@ namespace mongo {
                 OpCode_DbContext   = 0xfffffffe,
                 OpCode_FileCreated = 0xfffffffd,
                 OpCode_DropDb      = 0xfffffffc,
-                OpCode_ObjAppend       = 0xfffffffb,
+                OpCode_ObjAppend   = 0xfffffffb,
                 OpCode_Min         = 0xfffff000
             };
             union {

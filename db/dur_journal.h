@@ -19,7 +19,7 @@
 #pragma once
 
 namespace mongo {
-    class AlignedBuilder;
+    class CompressedBuilder;
 
     namespace dur {
 
@@ -43,7 +43,7 @@ namespace mongo {
             @param buf - a buffer that will be written to the journal.
             will not return until on disk
         */
-        void journal(const AlignedBuilder& buf);
+        void journal(const CompressedBuilder& buf);
 
         /** flag that something has gone wrong during writing to the journal
             (not for recovery mode) 
