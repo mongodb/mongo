@@ -1,7 +1,7 @@
 // mostly for testing mongos w/replica sets
 
 
-s = new ShardingTest( "rs2" , 1 /*2*/ , 1 , 1 , { rs : true , chunksize : 1 } )
+s = new ShardingTest( "rs2" , 2 , 1 , 1 , { rs : true , chunksize : 1 } )
 
 db = s.getDB( "test" )
 
@@ -10,10 +10,11 @@ db = s.getDB( "test" )
 // -------------------------------------------------------------------------------------------
 
 
-db.foo.save( { x : 1 } )
+db.foo.save( { x : 17 } )
 assert.eq( 1 , db.foo.count() );
 
-print( s.config.databases.find().forEach( printjson ) )
+s.config.databases.find().forEach( printjson )
+s.config.shards.find().forEach( printjson )
 
 serverName = s.getServerName( "test" ) 
 
@@ -46,5 +47,28 @@ assert.soon(
         }
     } , "waiting for config server to update" , 180 * 1000 , 1000 );
 
+
+// -------------------------------------------------------------------------------------------
+// ---------- test routing to slaves ----------------
+// -------------------------------------------------------------------------------------------
+
+m = new Mongo( s.s.name );
+t = m.getDB( "test" ).foo
+
+before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+
+for ( i=0; i<10; i++ )
+    assert.eq( 17 , t.findOne().x , "B1" )
+
+m.setSlaveOk()
+for ( i=0; i<10; i++ )
+    assert.eq( 17 , t.findOne().x , "B2" )
+
+after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+
+printjson( before )
+printjson( after )
+
+assert.eq( before.query + 10 , after.query , "B3" )
 
 s.stop()

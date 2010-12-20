@@ -200,7 +200,7 @@ namespace mongo {
         
         // ---- low level ------
 
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { return checkMaster()->call( toSend , response , assertOk ); }
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true );
         virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
         virtual bool callRead( Message& toSend , Message& response ){ return checkMaster()->callRead( toSend , response ); }
 

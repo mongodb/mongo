@@ -20,6 +20,7 @@
 #include "../bson/util/builder.h"
 #include "../db/jsobj.h"
 #include "../db/json.h"
+#include "../db/dbmessage.h"
 #include "connpool.h"
 #include "dbclient_rs.h"
 #include "../util/background.h"
@@ -462,5 +463,24 @@ namespace mongo {
         checkMaster()->killCursor( cursorID );
     }    
 
+
+    bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk ) { 
+        if ( toSend.operation() == dbQuery ){
+            // TODO: might be possible to do this faster by changing api
+            DbMessage dm( toSend );
+            QueryMessage qm( dm );
+            if ( qm.queryOptions & QueryOption_SlaveOk ){
+                for ( int i=0; i<2; i++ ){
+                    try {
+                        return checkSlave()->call( toSend , response , assertOk );
+                    }
+                    catch ( DBException & ){
+                        LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                    }
+                }
+            }
+            return checkMaster()->call( toSend , response , assertOk );
+        }
+    }
 
 }
