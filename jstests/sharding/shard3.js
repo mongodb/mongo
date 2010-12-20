@@ -138,6 +138,8 @@ s.printCollectionInfo( "test.foo" , "after dropDatabase setup3" );
 print( "*** ready to call dropDatabase" )
 res = s.getDB( "test" ).dropDatabase();
 assert.eq( 1 , res.ok , "dropDatabase failed : " + tojson( res ) );
+// Waiting for SERVER-2253
+// assert.eq( 0 , s.config.databases.count( { _id: "test" } ) , "database 'test' was dropped but still appears in configDB" );
 
 s.printShardingStatus();
 s.printCollectionInfo( "test.foo" , "after dropDatabase call 1" );
