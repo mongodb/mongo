@@ -46,6 +46,10 @@ namespace mongo {
 
         static set<MongoFile*>& getAllFiles()  { return mmfiles; }
 
+        // callbacks if you need them
+        static void (*notifyPreFlush)();
+        static void (*notifyPostFlush)();
+
         static int flushAll( bool sync ); // returns n flushed
         static long long totalMappedLength();
         static void closeAllFiles( stringstream &message );
@@ -58,6 +62,8 @@ namespace mongo {
 
         virtual bool isMongoMMF() { return false; }
 
+    private:
+        static int _flushAll( bool sync ); // returns n flushed
     protected:
         virtual void close() = 0;
         virtual void flush(bool sync) = 0;

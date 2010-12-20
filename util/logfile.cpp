@@ -56,7 +56,7 @@ namespace mongo {
 
 namespace mongo { 
 
-    LogFile::LogFile(string name) {
+    LogFile::LogFile(string name) : _name(name) {
         _fd = CreateFile(
             toNativeString(name.c_str()).c_str(),
             GENERIC_WRITE,

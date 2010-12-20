@@ -36,6 +36,8 @@ namespace mongo {
         */
         void synchronousAppend(const void *buf, size_t len);
 
+        const string _name;
+
     private:
 #if defined(_WIN32)
         typedef HANDLE fd_type;

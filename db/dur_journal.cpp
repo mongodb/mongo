@@ -17,7 +17,6 @@
 */
 
 #include "pch.h"
-
 #include "client.h"
 #include "namespace.h"
 #include "dur_journal.h"
@@ -26,6 +25,7 @@
 #include "../util/logfile.h"
 #include "../util/timer.h"
 #include "../util/alignedbuilder.h"
+#include "../util/message.h" // getelapsedtimemillis
 #include <boost/static_assert.hpp>
 #undef assert
 #define assert MONGO_assert
@@ -93,11 +93,10 @@ namespace mongo {
             return p;
         }
 
-        bool Journal::tryToCloseCurLogFile() { 
+        bool Journal::tryToCloseCurJournalFile() { 
             mutex::try_lock lk(_curLogFileMutex, 2000);
             if( lk.ok ) {
-                delete _curLogFile; 
-                _curLogFile = 0;
+                closeCurrentJournalFile();
             }
             return lk.ok;
         }
@@ -149,7 +148,7 @@ namespace mongo {
                 return;
             if( !okToCleanUp ) 
                 return;
-            if( !j.tryToCloseCurLogFile() ) {
+            if( !j.tryToCloseCurJournalFile() ) {
                 return;
             }
             try { 
@@ -160,8 +159,10 @@ namespace mongo {
             }
         }
 
-        /** assure journal/ dir exists. throws */
+        /** assure journal/ dir exists. throws. call during startup. */
         void journalMakeDir() {
+            j.init();
+
             filesystem::path p = getJournalDir();
             j.dir = p.string();
             DEV log() << "dev journalMakeDir() " << j.dir << endl;
@@ -189,7 +190,14 @@ namespace mongo {
             }
         }
 
+        void Journal::init() {
+            assert( _curLogFile == 0 );
+            MongoFile::notifyPreFlush = preFlush;
+            MongoFile::notifyPostFlush = postFlush;
+        }
+
         void Journal::open() {
+            assert( MongoFile::notifyPreFlush == preFlush );
             mutex::scoped_lock lk(_curLogFileMutex);
             _open();
         }
@@ -208,6 +216,60 @@ namespace mongo {
             }
         }
 
+        void Journal::preFlush() { 
+            j._preFlushTime = Listener::getElapsedTimeMillis();
+        }
+
+        void Journal::postFlush() { 
+            j._lastFlushTime = j._preFlushTime;
+        }
+
+        // call from within _curLogFileMutex
+        void Journal::closeCurrentJournalFile() { 
+            assert(_curLogFile);
+
+            JFile jf;
+            jf.filename = _curLogFile->_name;
+            jf.lastEventTimeMs = Listener::getElapsedTimeMillis();
+
+            delete _curLogFile; // close
+            _curLogFile = 0;
+            _written = 0;
+        }
+
+        /** remove older journal files. 
+            be in mutex when calling
+        */
+        void Journal::removeUnneededJournalFiles() { 
+            const long long ExtraKeepTimeMs = 10000; // in case disk controller buffers writes
+
+            while( !_oldJournalFiles.empty() ) {
+                JFile f = _oldJournalFiles.front();
+
+                if( f.lastEventTimeMs < _lastFlushTime + ExtraKeepTimeMs ) { 
+                    // eligible for deletion
+                    path p( f.filename );
+                    log() << "old journal file will be removed: " << f.filename << endl;
+
+                    // we do the unlink in a separate thread unless for some reason unlinks are backlogging
+                    if( !j.toUnlink.tryPut(p) ) {
+                        /* DR___ for durability error and warning codes 
+                            Compare to RS___ for replica sets
+                        */
+                        log() << "DR100 latency warning on journal unlink " << endl;
+                        Timer t;
+                        j.toUnlink.put(p);
+                        log() << "toUnlink.put(" << f.filename << ") " << t.millis() << "ms" << endl;
+                    }
+                }
+                else {
+                    break; 
+                }
+
+                _oldJournalFiles.pop_front();
+            }
+        }
+
         /** check if time to rotate files.  assure a file is open. 
             done separately from the journal() call as we can do this part
             outside of lock.
@@ -219,31 +281,16 @@ namespace mongo {
         void Journal::rotate() {
             if( _curLogFile && _written < DataLimit ) 
                 return;
+
             scoped_lock lk(_curLogFileMutex);
             if( _curLogFile && _written < DataLimit ) 
                 return;
 
             if( _curLogFile ) { 
-                delete _curLogFile; // close
-                _curLogFile = 0;
-                _written = 0;
 
-                /* remove older journal files. */
-                if( _nextFileNumber >= 3 ) {
-                    unsigned fn = _nextFileNumber - 3;
-                    // we do unlinks asynchronously - unless they are falling behind.
-                    // (unlinking big files can be slow on some operating systems; we don't want to stop world)
-                    path p = j.getFilePathFor(fn);
-                    if( !j.toUnlink.tryPut(p) ) {
-                        /* DR___ for durability error and warning codes 
-                           Compare to RS___ for replica sets
-                        */
-                        log() << "DR100 latency warning on journal unlink" << endl;
-                        Timer t;
-                        j.toUnlink.put(p);
-                        log() << "toUnlink.put() " << t.millis() << "ms" << endl;
-                    }
-                }
+                closeCurrentJournalFile();
+
+                removeUnneededJournalFiles();
             }
 
             try {

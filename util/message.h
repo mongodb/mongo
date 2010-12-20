@@ -63,6 +63,8 @@ namespace mongo {
         static long long getElapsedTimeMillis() { 
             if ( _timeTracker )
                 return _timeTracker->getMyElapsedTimeMillis();
+
+            // should this assert or throw?  seems like callers may not expect to get zero back, certainly not forever.
             return 0;
         }
 

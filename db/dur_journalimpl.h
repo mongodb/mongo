@@ -30,26 +30,49 @@ namespace mongo {
 
             Journal();
 
-            void open();
+            void init();
+
             void rotate();
+
             void journal(const AlignedBuilder& b);
 
-            path getFilePathFor(int filenumber) const;
+            boost::filesystem::path getFilePathFor(int filenumber) const;
 
             /** used at shutdown.
                 @return false if can't close in a timely manner. 
             */
-            bool tryToCloseCurLogFile();
+            bool tryToCloseCurJournalFile();
 
         private:
             static const unsigned long long DataLimit = 1 * 1024 * 1024 * 1024;
 
+            /** open a journal file to journal operations to. */
+            void open();
+
             void _open();
+            void closeCurrentJournalFile();
+            void removeUnneededJournalFiles();
 
             unsigned long long _written; // bytes written so far to the current journal (log) file
             unsigned _nextFileNumber;
-            LogFile *_curLogFile;
-            mutex _curLogFileMutex; // lock when using _curLogFile
+
+            mutex _curLogFileMutex;
+
+            LogFile *_curLogFile; // use _curLogFileMutex
+
+            struct JFile { 
+                string filename;
+                long long lastEventTimeMs;
+            };
+
+            // files which have been closed but not unlinked (rotated out) yet
+            // ordered oldest to newest
+            list<JFile> _oldJournalFiles; // use _curLogFileMutex
+
+            static void preFlush();
+            static void postFlush();
+            long long _preFlushTime;
+            long long _lastFlushTime; // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
         };
 
     }
