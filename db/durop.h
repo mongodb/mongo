@@ -19,13 +19,12 @@
 #pragma once
 
 #include "dur_journalformat.h"
-#include "bufreader.h"
+#include "../util/bufreader.h"
 #include "../util/paths.h"
 
 namespace mongo {
 
     class CompressedBuilder;
-    class BufReader;
 
     namespace dur {
 

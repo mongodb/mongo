@@ -24,7 +24,7 @@
 #include "durop.h"
 #include "namespace.h"
 #include "../util/mongoutils/str.h"
-#include "bufreader.h"
+#include "../util/bufreader.h"
 #include "pdfile.h"
 #include "database.h"
 #include "db.h"
