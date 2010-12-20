@@ -190,7 +190,7 @@ namespace mongo {
                 for( unsigned z = 0; z < w.size() - 1; z++ ) { 
                     const WriteIntent& wi = w[z];
                     char *r1 = (char*) wi.p;
-                    char *r2 = r1 + wi.len();
+                    char *r2 = r1 + wi.len;
                     if( r1 <= (((char*)a)+8) && r2 > (char*)a ) { 
                         //log() << "it's ok " << wi.p << ' ' << wi.len << endl;
                         return;
