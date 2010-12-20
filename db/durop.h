@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    class CompressedBuilder;
+    class AlignedBuilder;
 
     namespace dur {
 
@@ -47,7 +47,7 @@ namespace mongo {
             virtual ~DurOp() { }
 
             /** serialize the op out to a builder which will then be written (presumably) to the journal */
-            void serialize(CompressedBuilder& ab);
+            void serialize(AlignedBuilder& ab);
 
             /** read a durop from journal file referenced by br.
                 @param opcode the opcode which has already been written from the bufreader
@@ -66,7 +66,7 @@ namespace mongo {
 
         protected:
             /** DurOp will have already written the opcode for you */
-            virtual void _serialize(CompressedBuilder& ab) = 0;
+            virtual void _serialize(AlignedBuilder& ab) = 0;
 
         private:
             const unsigned _opcode;
@@ -82,7 +82,7 @@ namespace mongo {
             virtual string toString();
             virtual bool needFilesClosed();
         protected:
-            virtual void _serialize(CompressedBuilder& ab);
+            virtual void _serialize(AlignedBuilder& ab);
         private:
             RelativePath _p;
             unsigned long long _len; // size of file, not length of name
@@ -98,7 +98,7 @@ namespace mongo {
             virtual string toString() { return string("DropDbOp ") + _db; }
             virtual bool needFilesClosed() { return true; }
         protected:
-            virtual void _serialize(CompressedBuilder& ab);
+            virtual void _serialize(AlignedBuilder& ab);
         private:
             string _db;
         };

@@ -25,7 +25,7 @@
 #include "dur_stats.h"
 #include "../util/logfile.h"
 #include "../util/timer.h"
-#include "../util/compress.h"
+#include "../util/alignedbuilder.h"
 #include <boost/static_assert.hpp>
 #undef assert
 #define assert MONGO_assert
@@ -36,7 +36,7 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    class CompressedBuilder;
+    class AlignedBuilder;
 
     namespace dur {
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
@@ -262,10 +262,10 @@ namespace mongo {
         /** write to journal
             thread: durThread()
         */
-        void journal(const CompressedBuilder& b) {
+        void journal(const AlignedBuilder& b) {
             j.journal(b);
         }
-        void Journal::journal(const CompressedBuilder& b) {
+        void Journal::journal(const AlignedBuilder& b) {
             try {
                 mutex::scoped_lock lk(_curLogFileMutex);
                 if( _curLogFile == 0 )

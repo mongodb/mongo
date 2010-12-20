@@ -32,7 +32,7 @@ namespace mongo {
 
             void open();
             void rotate();
-            void journal(const CompressedBuilder& b);
+            void journal(const AlignedBuilder& b);
 
             path getFilePathFor(int filenumber) const;
 

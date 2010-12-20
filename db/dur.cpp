@@ -261,7 +261,7 @@ namespace mongo {
         /** write the buffer we have built to the journal and fsync it.
             outside of lock as that could be slow.
         */
-        static void WRITETOJOURNAL(CompressedBuilder& ab) { 
+        static void WRITETOJOURNAL(AlignedBuilder& ab) { 
             journal(ab);
         }
 
