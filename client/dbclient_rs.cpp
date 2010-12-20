@@ -475,12 +475,12 @@ namespace mongo {
                         return checkSlave()->call( toSend , response , assertOk );
                     }
                     catch ( DBException & ){
-                        LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                        log(1) << "can't query replica set slave: " << _slaveHost << endl;
                     }
                 }
             }
-            return checkMaster()->call( toSend , response , assertOk );
         }
+        return checkMaster()->call( toSend , response , assertOk );
     }
 
 }
