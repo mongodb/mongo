@@ -247,4 +247,10 @@ namespace mongo {
         vector<string> _config;
     };
 
+    class RSChangeWatcher : public ReplicaSetMonitor::ConfigChangeHook {
+    public:
+        void changed( const ReplicaSetMonitor * monitor );
+    };
+    
+
 } // namespace mongo

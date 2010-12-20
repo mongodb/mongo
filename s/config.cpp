@@ -675,6 +675,17 @@ namespace mongo {
         }
     }
 
+    void RSChangeWatcher::changed( const ReplicaSetMonitor * monitor ){
+        try {
+            ScopedDbConnection conn( configServer.getConnectionString() );
+            conn->update( ShardNS::shard , BSON( "_id" << monitor->getName() ) , BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
+            conn.done();
+        }
+        catch ( DBException & e ){
+            error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName() << " to: " << monitor->getServerAddress() << endl;
+        }
+    }
+
     DBConfigPtr configServerPtr (new ConfigServer());    
     ConfigServer& configServer = dynamic_cast<ConfigServer&>(*configServerPtr);    
 
