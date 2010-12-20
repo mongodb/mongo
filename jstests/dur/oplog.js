@@ -74,13 +74,13 @@ var path2 = "/data/db/" + testname+"dur";
 
 // non-durable version
 log();
-conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallfiles", "--master");
+conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallfiles", "--master", "--oplogSize", 64);
 work();
 stopMongod(30000);
 
 // durable version
 log();
-conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master");
+conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master", "--oplogSize", 64);
 work();
 
 // wait for group commit.  use getLastError(...) later when that is enhanced.
@@ -93,7 +93,7 @@ stopMongod(30001, /*signal*/9);
 
 // restart and recover
 log();
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8, "--master");
+conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8, "--master", "--oplogSize", 64);
 verify();
 
 log("stop");
