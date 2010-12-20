@@ -39,6 +39,10 @@ Mongo.prototype.getDBs = function(){
     return res;
 }
 
+Mongo.prototype.adminCommand = function( cmd ){
+    return this.getDB( "admin" ).runCommand( cmd );
+}
+
 Mongo.prototype.getDBNames = function(){
     return this.getDBs().databases.map( 
         function(z){
