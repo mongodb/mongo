@@ -5,10 +5,10 @@
  * complex SQL application into WiredTiger.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <inttypes.h>
 #include <wiredtiger.h>
 
 const char *home = "WT_TEST";
@@ -18,7 +18,7 @@ const char *home = "WT_TEST";
  *
  * CREATE TABLE Customers(id INTEGER PRIMARY KEY,
  *     name VARCHAR(30), address VARCHAR(50), phone VARCHAR(15))
- * CREATE INDEX CustomersPhone ON Cusomters(phone)
+ * CREATE INDEX CustomersPhone ON Customers(phone)
  *
  * CREATE TABLE Calls(id INTEGER PRIMARY KEY, call_date DATE,
  *     cust_id INTEGER, emp_id INTEGER, call_type VARCHAR(12), notes VARCHAR(25))
@@ -27,6 +27,8 @@ const char *home = "WT_TEST";
  * In this example, both tables will use record numbers for their IDs, which
  * will be the key.  The C structs for the records are as follows.
  */
+
+/* Customer records. */
 typedef struct {
 	wiredtiger_recno_t id;
 	char *name;
@@ -34,6 +36,7 @@ typedef struct {
 	char *phone;
 } CUSTOMER;
 
+/* Call records. */
 typedef struct {
 	wiredtiger_recno_t id;
 	uint64_t call_date;
@@ -42,46 +45,6 @@ typedef struct {
 	char *call_type;
 	char *notes;
 } CALL;
-
-/* Store address in a column of its own. */
-static WT_SCHEMA_COLUMN_SET cust_column_sets[] = {
-	{ "cust_address", "address", NULL, NULL },
-	{ NULL, NULL, NULL, NULL }
-};
-
-static WT_SCHEMA_INDEX cust_indices[] = {
-	{ "cust_phone", "phone", NULL , NULL },
-	{ NULL, NULL, NULL, NULL }
-};
-
-/* Description of the customer schema. */
-static WT_SCHEMA cust_schema = {
-	"r",		/* Format string for keys (recno). */
-	"SSS",		/* Format string for data items: 3 strings */
-	/* Columns */
-	"id,name,address,phone",
-	cust_column_sets,
-	cust_indices
-};
-
-static WT_SCHEMA_INDEX call_indices[] = {
-	{ "call_cust_date", "cust_id,call_date", NULL, NULL },
-	{ NULL, NULL, NULL, NULL }
-};
-
-/* Description of the call record schema. */
-static WT_SCHEMA call_schema = {
-	"r",		/* Format string for keys (recno). */
-	"qrrSS",	/*
-			 * Format string for data items:
-			 *     i64, 2 recnos, 2 strings
-			 */
-	/* Columns. */
-	"id,call_date,cust_id,emp_id,call_type,notes",
-	/* Column sets. */
-	NULL,
-	call_indices
-};
 
 int main()
 {
@@ -96,20 +59,26 @@ int main()
 	if (ret != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
-	/* Note: error checking omitted for clarity. */
+	/* Note: further error checking omitted for clarity. */
+
+	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	if (conn->is_new(conn)) {
-		ret = conn->add_schema(conn, "CUSTOMER", &cust_schema, NULL);
-		ret = conn->add_schema(conn, "CALL", &call_schema, NULL);
+		ret = session->add_schema(session, "CUSTOMER",
+		    "rSSS", "id", "name,address,phone",
+		    /* Column sets. */ "cust_address(address)",
+		    /* Indices. */ "cust_phone(phone)", NULL);
 		ret = session->create_table(session, "customers",
 		    "schema=CUSTOMER");
-		ret = session->create_table(session, "calls",
-		    "schema=CALL");
+
+		ret = session->add_schema(session, "CALL",
+		    "rqrrSS", "id", "call_date,cust_id,emp_id,call_type,notes",
+		    /* Column sets. */ NULL,
+		    /* Indices. */ "call_cust_date(cust_id,call_date)", NULL);
+		ret = session->create_table(session, "calls", "schema=CALL");
 
 		/* Omitted: populate the tables with some data. */
 	}
-
-	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	/*
 	 * First query: a call arrives.  In SQL:
@@ -148,18 +117,30 @@ int main()
 	 */
 	ret = session->open_cursor(session,
 	    "index:call_cust_date(cust_id,call_type,notes)", NULL, &cursor);
+
+	/*
+	 * The keys in the index are (cust_id,call_date) -- we want the largest
+	 * call date for a given cust_id.  Search for (cust_id+1,0), then work
+	 * backwards.
+	 */
 	ret = cursor->set_key(cursor, cust.id + 1, 0);
 	ret = cursor->search(cursor, &exact);
-	/* If we found a larger entry, go back one. */
-	if (exact > 0)
+
+	/*
+	 * If the table is empty, the search will return WT_NOTFOUND.
+	 * Otherwise the cursor will on a matching key if one exists, or on an
+	 * adjacent key.  If the key we find is equal or larger than the search
+	 * key, go back one.
+	 */
+	if (exact >= 0)
 		ret = cursor->prev(cursor);
 	ret = cursor->get_value(cursor,
 	    &call.cust_id, &call.call_type, &call.notes);
 
 	count = 0;
 	while (call.cust_id == cust.id) {
-		printf("Got call record on date %d: type %s: %s\n",
-		    (int)call.call_date, call.call_type, call.notes);
+		printf("Got call record on date %" PRIu64 ": type %s: %s\n",
+		    call.call_date, call.call_type, call.notes);
 		if (++count == 3)
 			break;
 

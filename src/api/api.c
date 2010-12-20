@@ -114,6 +114,11 @@ static int __session_dup_cursor(WT_SESSION *, WT_CURSOR *cursor, const char *con
 	return ENOTSUP;
 }
 
+static int __session_add_schema(WT_SESSION *session, const char *name, const char *keyfmt, const char *valuefmt, const char *columns, const char *column_sets, const char *indices, const char *config)
+{
+	return ENOTSUP;
+}
+
 static int __session_create_table(WT_SESSION *session, const char *name, const char *config)
 {
 	printf("WT_SESSION->create_table\n");
@@ -159,6 +164,25 @@ static int __session_checkpoint(WT_SESSION *session, const char *config)
 	return ENOTSUP;
 }
 
+static int __conn_load_extension(WT_CONNECTION *connection, const char *path, const char *config)
+{
+	return ENOTSUP;
+}
+
+static int __conn_add_cursor_factory(WT_CONNECTION *connection, const char *prefix, WT_CURSOR_FACTORY *factory, const char *config)
+{
+	return ENOTSUP;
+}
+
+static int __conn_add_collator(WT_CONNECTION *connection, const char *name, WT_COLLATOR *collator, const char *config)
+{
+	return ENOTSUP;
+}
+
+static int __conn_add_extractor(WT_CONNECTION *connection, const char *name, WT_EXTRACTOR *extractor, const char *config)
+{
+	return ENOTSUP;
+}
 
 static const char *__conn_get_home(WT_CONNECTION *conn)
 {
@@ -184,6 +208,7 @@ static int __conn_open_session(WT_CONNECTION *connection, WT_ERROR_HANDLER *errh
 		__session_close,
 		__session_open_cursor,
 		__session_dup_cursor,
+		__session_add_schema,
 		__session_create_table,
 		__session_rename_table,
 		__session_drop_table,
@@ -205,28 +230,13 @@ static int __conn_open_session(WT_CONNECTION *connection, WT_ERROR_HANDLER *errh
 	return 0;
 }
 
-
-static int __conn_add_cursor_factory(WT_CONNECTION *connection, const char *prefix, WT_CURSOR_FACTORY *factory, const char *config)
-{
-	return ENOTSUP;
-}
-
-static int __conn_add_extension(WT_CONNECTION *connection, const char *path, const char *config)
-{
-	return ENOTSUP;
-}
-
-static int __conn_add_schema(WT_CONNECTION *connection, const char *name, WT_SCHEMA *schema, const char *config)
-{
-	return ENOTSUP;
-}
-
 int wiredtiger_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *config, WT_CONNECTION **connectionp)
 {
 	WT_CONNECTION stdc = {
+		__conn_load_extension,
 		__conn_add_cursor_factory,
-		__conn_add_extension,
-		__conn_add_schema,
+		__conn_add_collator,
+		__conn_add_extractor,
 		__conn_close,
 		__conn_get_home,
 		__conn_is_new,

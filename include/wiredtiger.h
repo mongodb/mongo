@@ -12,13 +12,12 @@ extern "C" {
 #endif
 
 struct WT_CONNECTION;	  typedef struct WT_CONNECTION WT_CONNECTION;
+struct WT_COLLATOR;	  typedef struct WT_COLLATOR WT_COLLATOR;
 struct WT_CURSOR;	  typedef struct WT_CURSOR WT_CURSOR;
 struct WT_CURSOR_FACTORY; typedef struct WT_CURSOR_FACTORY WT_CURSOR_FACTORY;
 struct WT_ERROR_HANDLER;  typedef struct WT_ERROR_HANDLER WT_ERROR_HANDLER;
+struct WT_EXTRACTOR;	  typedef struct WT_EXTRACTOR WT_EXTRACTOR;
 struct WT_ITEM;		  typedef struct WT_ITEM WT_ITEM;
-struct WT_SCHEMA;	  typedef struct WT_SCHEMA WT_SCHEMA;
-struct WT_SCHEMA_COLUMN_SET;	  typedef struct WT_SCHEMA_COLUMN_SET WT_SCHEMA_COLUMN_SET;
-struct WT_SCHEMA_INDEX;	  typedef struct WT_SCHEMA_INDEX WT_SCHEMA_INDEX;
 struct WT_SESSION;	  typedef struct WT_SESSION WT_SESSION;
 
 #ifdef DOXYGEN
@@ -289,6 +288,37 @@ struct WT_SESSION {
 	/*! \name Table operations
 	 * @{
 	 */
+	/*! Add a new schema.
+	 *
+	 * \param session the session handle
+	 * \param name the name of the new schema
+	 * \param keyfmt The format of the data packed into key items.  See
+	 * ::wiredtiger_struct_pack for details.  If not set, a default value
+	 * of "u" is assumed, and applications use the WT_ITEM struct to
+	 * manipulate raw byte arrays.
+	 * \param valuefmt The format of the data packed into value items.  See
+	 * ::wiredtiger_struct_pack for details.  If not set, a default value
+	 * of "u" is assumed, and applications use the WT_ITEM struct to
+	 * manipulate raw byte arrays.
+	 * \param columns Names of the columns in the schema, comma separated.
+	 * The number of entries must match the total number of values in
+	 * #keyfmt and #valuefmt.
+	 * \param column_sets List of the column sets.  Comma-separated list of
+	 * the form <code>name(column[,...])[,...]</code>.  Each column set is
+	 * stored separately, keyed by the primary key of the table.  Any
+	 * column that does not appear in a column set is stored in an unnamed
+	 * default column set for the table.
+	 * \param indices List of the indices.  Comma-separated list of the
+	 * form <code>name(column[,...])[,...]</code>.  Each index is keyed by
+	 * the specified columns.
+	 * \configempty
+	 * \configend
+	 * \errors
+	 */
+	int __F(add_schema)(WT_SESSION *session, const char *name,
+	    const char *keyfmt, const char *valuefmt, const char *columns,
+	    const char *column_sets, const char *indices, const char *config);
+
 	/*! Create a table.
 	 *
 	 * \param session the session handle
@@ -300,6 +330,7 @@ struct WT_SESSION {
 	 * \configend
 	 * \errors
 	 */
+
 	int __F(create_table)(WT_SESSION *session, const char *name, const char *config);
 
 	/*! Rename a table.
@@ -418,7 +449,19 @@ struct WT_SESSION {
  * their operations.
  */
 struct WT_CONNECTION {
-	/*! Register a new type of cursor.
+	/*! Load an extension.
+	 *
+	 * \param connection the connection handle
+	 * \param path the filename of the extension module
+	 * \configstart
+	 * \config{entry,["wiredtiger_extension_init"],the entry point of the extension}
+	 * \config{prefix,[none],a prefix for all names registered by this extension (e.g.\, to make namespaces distinct or during upgrades}
+	 * \configend
+	 * \errors
+	 */
+	int __F(load_extension)(WT_CONNECTION *connection, const char *path, const char *config);
+
+	/*! Add a new type of cursor.
 	 *
 	 * \param connection the connection handle
 	 * \param prefix the prefix for location strings passed to WT_SESSION::open_cursor
@@ -428,26 +471,26 @@ struct WT_CONNECTION {
 	 */
 	int __F(add_cursor_factory)(WT_CONNECTION *connection, const char *prefix, WT_CURSOR_FACTORY *factory, const char *config);
 
-	/*! Register an extension.
+	/*! Add a custom collation function.
 	 *
 	 * \param connection the connection handle
-	 * \param path the filename of the extension module
-	 * \configstart
-	 * \config{prefix,[none],a prefix for all names registered by this extension (e.g.\, to make namespaces distinct or during upgrades}
-	 * \configend
-	 * \errors
-	 */
-	int __F(add_extension)(WT_CONNECTION *connection, const char *path, const char *config);
-
-	/*! Register a new schema.
-	 *
-	 * \param connection the connection handle
-	 * \param name the name of the new schema
-	 * \param schema the application-supplied schema information
+	 * \param name the name of the collation to be used in calls to WT_SESSION::add_schema
+	 * \param collator the application-supplied collation handler
 	 * \configempty
 	 * \errors
 	 */
-	int __F(add_schema)(WT_CONNECTION *connection, const char *name, WT_SCHEMA *schema, const char *config);
+	int __F(add_collation)(WT_CONNECTION *connection, const char *name, WT_COLLATOR *collator, const char *config);
+
+	/*! Add a custom extractor for index keys or column sets.
+	 *
+	 * \param connection the connection handle
+	 * \param name the name of the extractor to be used in calls to WT_SESSION::add_schema
+	 * \param extractor the application-supplied extractor
+	 * \configempty
+	 * \errors
+	 */
+	int __F(add_extractor)(WT_CONNECTION *connection, const char *name, WT_EXTRACTOR *extractor, const char *config);
+
 
 	/*! Close a connection.
 	 *
@@ -484,130 +527,6 @@ struct WT_CONNECTION {
 	 * \errors
 	 */
 	int __F(open_session)(WT_CONNECTION *connection, WT_ERROR_HANDLER *errhandler, const char *config, WT_SESSION **sessionp);
-};
-
-/*!
- * Applications can extend WiredTiger by providing new implementation of the
- * WT_CURSOR interface.  This is done by implementing the WT_CURSOR_FACTORY
- * interface, then calling WT_CONNECTION#add_cursor_factory.
- *
- * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_CURSOR_FACTORY
- * interface from multiple threads concurrently.  It is the responsibility of
- * the implementation to protect any shared data.
- */
-struct WT_CURSOR_FACTORY {
-	/*! Callback to determine how much space to allocate for a cursor.
-	 *
-	 * If the callback is NULL, no additional space is allocated in the
-	 * WT_CURSOR implementation.
-	 *
-	 * \errors
-	 */
-	int (*cursor_size)(WT_CURSOR_FACTORY *factory, const char *obj, size_t *sizep);
-
-	/*! Callback to initialize a cursor. */
-	int (*init_cursor)(WT_CURSOR_FACTORY *factory, WT_SESSION *session, const char *obj, WT_CURSOR *cursor);
-
-	/*! Callback to duplicate a cursor.
-	 *
-	 * \errors
-	 */
-	int (*dup_cursor)(WT_CURSOR_FACTORY *factory, WT_SESSION *session, WT_CURSOR *old_cursor, WT_CURSOR *new_cursor);
-};
-
-/*!
- * Definition of a set of columns to store together for WT_SCHEMA::column_sets.
- */
-struct WT_SCHEMA_COLUMN_SET {
-	const char *name;	/*!< The name of the column set. */
-	const char *columns;	/*!< The columns in the set, comma-separated. */
-
-	/*! Optional callback to extract the column set value
-	 *
-	 * \errors
-	 */
-	int (*get_value)(WT_SESSION *session,
-	    WT_SCHEMA *schema, WT_SCHEMA_COLUMN_SET *colset,
-	    const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *column_key);
-
-	/*! Optional callback to compare column set values to order duplicates.
-	 *
-	 * \returns -1 if <code>value1 < value2</code>,
-	 * 	     0 if <code>value1 == value2</code>,
-	 * 	     1 if <code>value1 > value2</code>.
-	 */
-	int (*cmp)(WT_SESSION *session,
-	    WT_SCHEMA *schema, WT_SCHEMA_COLUMN_SET *colset,
-	    const WT_ITEM *value1, const WT_ITEM *value2);
-};
-
-/*!
- * Definition of an index in WT_SCHEMA::index_info.
- */
-struct WT_SCHEMA_INDEX {
-	const char *name;	/*!< The name of the index. */
-	const char *columns;	/*!< The columns making up the index */
-
-	/*! Optional callback to extract one or more column keys.
-	 *
-	 * \errors
-	 */
-	int (*get_key)(WT_SESSION *session,
-	    WT_SCHEMA *schema, WT_SCHEMA_INDEX *index,
-	    const WT_ITEM *key, const WT_ITEM *value,
-	    WT_ITEM *index_key, int *more);
-
-	/*! Optional callback to order index keys.
-	 *
-	 * \returns -1 if <code>key1 < key2</code>,
-	 * 	     0 if <code>key1 == key2</code>,
-	 * 	     1 if <code>key1 > key2</code>.
-	 */
-	int (*cmp)(WT_SESSION *session,
-	    WT_SCHEMA *schema, WT_SCHEMA_INDEX *index,
-	    const WT_ITEM *key1, const WT_ITEM *key2);
-};
-
-/*!
- * Applications implement the WT_SCHEMA interface to manage tables containing structured data.
- */
-struct WT_SCHEMA {
-	/*!
-	 * The format of the data packed into key items.  See
-	 * ::wiredtiger_struct_pack for details.  If not set, a default value
-	 * of "u" is assumed, and applications use the WT_ITEM struct to
-	 * manipulate raw byte arrays.
-	 */
-	const char *keyfmt;
-
-	/*!
-	 * The format of the data packed into value items.  See
-	 * ::wiredtiger_struct_pack for details.  If not set, a default value
-	 * of "u" is assumed, and applications use the WT_ITEM struct to
-	 * manipulate raw byte arrays.
-	 */
-	const char *valuefmt;
-
-	/*!
-	 * Names of the columns in a table, comma separated.  The number of
-	 * entries must match the total number of values in WT_SCHEMA::keyfmt
-	 * and WT_SCHEMA::valuefmt.
-	 */
-	const char *column_names;
-
-	/*!
-	 * Description of the column sets for a table, terminated by a NULL.
-	 * Each column set is stored separately, keyed by the primary key of
-	 * the table.  Any column that does not appear in a column set is
-	 * stored in an unnamed default column set for the table.
-	 */
-	WT_SCHEMA_COLUMN_SET *column_sets;
-
-	/*!
-	 * Description of the indices for a table, terminated by a NULL.
-	 * Can be set to NULL for unindexed tables.
-	 */
-	WT_SCHEMA_INDEX *indices;
 };
 
 /*! Open a connection to a database.
@@ -755,6 +674,68 @@ extern int wiredtiger_extension_init(WT_CONNECTION *connection, const char *conf
 
 /*! No matching record was found, including when reaching the limits of a cursor traversal. */
 #define	WT_NOTFOUND	(-10000)
+
+/*! \defgroup extensions Application extension points
+ * @{
+ */
+/*!
+ * Applications can extend WiredTiger by providing new implementation of the
+ * WT_CURSOR interface.  This is done by implementing the WT_CURSOR_FACTORY
+ * interface, then calling WT_CONNECTION#add_cursor_factory.
+ *
+ * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_CURSOR_FACTORY
+ * interface from multiple threads concurrently.  It is the responsibility of
+ * the implementation to protect any shared data.
+ */
+struct WT_CURSOR_FACTORY {
+	/*! Callback to determine how much space to allocate for a cursor.
+	 *
+	 * If the callback is NULL, no additional space is allocated in the
+	 * WT_CURSOR implementation.
+	 *
+	 * \errors
+	 */
+	int (*cursor_size)(WT_CURSOR_FACTORY *factory, const char *obj, size_t *sizep);
+
+	/*! Callback to initialize a cursor. */
+	int (*init_cursor)(WT_CURSOR_FACTORY *factory, WT_SESSION *session, const char *obj, WT_CURSOR *cursor);
+
+	/*! Callback to duplicate a cursor.
+	 *
+	 * \errors
+	 */
+	int (*dup_cursor)(WT_CURSOR_FACTORY *factory, WT_SESSION *session, WT_CURSOR *old_cursor, WT_CURSOR *new_cursor);
+};
+
+/*!
+ * The interface implemented by applications to provide custom ordering of
+ * records.
+ */
+struct WT_COLLATOR {
+	/*! Callback to compare keys or order duplicate values.
+	 *
+	 * \returns -1 if <code>value1 < value2</code>,
+	 * 	     0 if <code>value1 == value2</code>,
+	 * 	     1 if <code>value1 > value2</code>.
+	 */
+	int (*compare)(WT_SESSION *session, WT_COLLATOR *collator,
+	    const WT_ITEM *value1, const WT_ITEM *value2);
+};
+
+/*!
+ * The interface implemented by applications to provide custom extraction of
+ * index keys or column set values.
+ */
+struct WT_EXTRACTOR {
+	/*! Callback to extract a value for an index or column set.
+	 *
+	 * \errors
+	 */
+	int (*extract)(WT_SESSION *session, WT_EXTRACTOR *extractor,
+	    const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *result);
+};
+
+/*! @} */
 
 /*! @} */
 

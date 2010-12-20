@@ -20,29 +20,6 @@ typedef struct {
 	uint64_t population;
 } POP_RECORD;
 
-static WT_SCHEMA_COLUMN_SET pop_colsets[] = {
-	{ "population",  "population", NULL, NULL },
-	{ NULL, NULL, NULL, NULL }
-};
-
-static WT_SCHEMA_INDEX pop_indices[] = {
-	{ "country_year",  "country,year", NULL, NULL },
-	{ NULL, NULL, NULL, NULL }
-};
-
-static WT_SCHEMA pop_schema = {
-	"r",		/* Format string for keys (recno). */
-	"5sHQ",		/*
-			 * Format string for data items:
-			 * (5-byte string, short, long).
-			 * See ::wiredtiger_struct_pack
-			 */
-	/* Column names */
-	"id,country,year,population",
-	pop_colsets,	/* Column sets to store separately. */
-	pop_indices,	/* Index descriptions. */
-};
-
 POP_RECORD pop_data[] = {
 	{ "USA", 1980, 226542250 },
 	{ "USA", 2009, 307006550 },
@@ -67,13 +44,23 @@ int main()
 		    home, wiredtiger_strerror(ret));
 	/* Note: error checking omitted for clarity. */
 
+	ret = conn->open_session(conn, NULL, NULL, &session);
+
 	if (conn->is_new(conn)) {
-		ret = conn->add_schema(conn, "POP_RECORD", &pop_schema, NULL);
+		/*
+		 * Create a schema for the population table.
+		 * Keys are record numbers, the format for values is
+		 * (5-byte string, short, long).
+		 * See ::wiredtiger_struct_pack for details.
+		 */
+		ret = session->add_schema(session, "POP_RECORD", "r", "5sHQ",
+		    "id,country,year,population",
+		    "population(population)",
+		    "country_year(country,year)", NULL);
 		ret = session->create_table(session, "population",
 		    "schema=POP_RECORD");
 	}
 
-	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->open_cursor(session, "table:population", NULL, &cursor);
 
 	endp = pop_data + (sizeof (pop_data) / sizeof (pop_data[0]));
@@ -84,8 +71,8 @@ int main()
 	ret = cursor->close(cursor, NULL);
 
 	/* Now just read through the countries we know about */
-	ret = session->open_cursor(session, "table:population(country)",
-	    "dup=first", &cursor);
+	ret = session->open_cursor(session,
+	    "index:population.country_year(country,id)", "dup=first", &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &country);
