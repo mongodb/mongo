@@ -681,7 +681,7 @@ namespace mongo {
             conn->update( ShardNS::shard , BSON( "_id" << monitor->getName() ) , BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
             conn.done();
         }
-        catch ( DBException & e ){
+        catch ( DBException & ){
             error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName() << " to: " << monitor->getServerAddress() << endl;
         }
     }
