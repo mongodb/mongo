@@ -26,6 +26,13 @@ from buildscripts import utils
 
 buildscripts.bb.checkOk()
 
+def findSettingsSetup():
+    sys.path.append( "." )
+    sys.path.append( ".." )
+    sys.path.append( "../../" )
+
+
+
 # --- options ----
 
 options = {}
@@ -1338,6 +1345,7 @@ def getSystemInstallName():
         n += "-" + "-".join( moduleNames )
 
     try:
+        findSettingsSetup()
         import settings
         if "distmod" in dir( settings ):
             n = n + "-" + str( settings.distmod )
@@ -1520,9 +1528,7 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
         else:
             remotePrefix = "-" + distName
 
-    sys.path.append( "." )
-    sys.path.append( ".." )
-    sys.path.append( "../../" )
+    findSettingsSetup()
 
     import simples3
     import settings
