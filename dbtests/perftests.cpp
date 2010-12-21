@@ -187,6 +187,23 @@ namespace PerfTests {
         }
         unsigned long long expectation() { return 1000; }
     };
+
+    class InsertRandom : public B { 
+    public:
+        string name() { return "random inserts"; }
+        void prep() { 
+            client().insert( ns(), BSONObj() );
+            client().ensureIndex(ns(), BSON("x"<<1));
+        }
+        void timed() {
+            int x = rand();
+            BSONObj y = BSON("x" << x << "y" << rand() << "z" << 33);
+            client().insert(ns(), y);
+        }
+        void post() {
+        }
+        unsigned long long expectation() { return 1000; }
+    };
                 
     /** upserts about 32k records and then keeps updating them 
         2 indexes
@@ -222,13 +239,14 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
                 
-    class UpdateMoreIndexes : public Update1 { 
+    template <typename T>
+    class MoreIndexes : public T { 
     public:
-        string name() { return "more indexes"; }
+        string name() { return T::name() + " with more indexes"; }
         void prep() { 
-            Update1::prep();
-            client().ensureIndex(ns(), BSON("y"<<1));
-            client().ensureIndex(ns(), BSON("z"<<1));
+            T::prep();
+            this->client().ensureIndex(this->ns(), BSON("y"<<1));
+            this->client().ensureIndex(this->ns(), BSON("z"<<1));
         }
     };
 
@@ -240,8 +258,10 @@ namespace PerfTests {
             add< DefInvoke >();
             add< InsertDup >();
             add< Insert1 >();
+            add< InsertRandom >();
+            add< MoreIndexes<InsertRandom> >();
             add< Update1 >();
-            add< UpdateMoreIndexes >();
+            add< MoreIndexes<Update1> >();
         }
     } myall;
 }
