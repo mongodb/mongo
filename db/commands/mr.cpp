@@ -218,12 +218,11 @@ namespace mongo {
             }
                 
             if ( outType != INMEMORY ){ // setup names
-                tempShort = str::stream() << "tmp.mr." << cmdObj.firstElement().String() << "_" << finalShort << "_" << JOB_NUMBER++;
-                tempLong = dbname + "." + tempShort;
+                tempLong = str::stream() << dbname << ".tmp.mr." << cmdObj.firstElement().String() << "_" << finalShort << "_" << JOB_NUMBER++;
                 
                 incLong = tempLong + "_inc";
                 
-                finalLong = dbname + "." + finalShort;
+                finalLong = str::stream() << dbname << "." << finalShort;
             }
 
             { // scope and code

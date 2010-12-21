@@ -171,8 +171,6 @@ namespace mongo {
             
             // output tables
             string incLong;
-            
-            string tempShort;
             string tempLong;
             
             string finalShort;
