@@ -93,15 +93,18 @@ namespace mongo {
         }
 
         const Shard& find( const string& ident ){
+            string mykey = ident;
+
+            {
+                // if its a replica set, just use set name
+                size_t pos = mykey.find( '/' );
+                if ( pos != string::npos )
+                    mykey = mykey.substr(0,pos);
+            }
+
             {
                 scoped_lock lk( _mutex );
-                map<string,Shard>::iterator i = _lookup.find( ident );
-
-                // if normal find didn't find anything, try to find by rs name
-                size_t pos;
-                if ( i == _lookup.end() && (pos = ident.find('/', 0)) != string::npos) {
-                    i = _lookup.find( ident.substr(0, pos) );
-                }
+                map<string,Shard>::iterator i = _lookup.find( mykey );
 
                 if ( i != _lookup.end() )
                     return i->second;
@@ -111,8 +114,8 @@ namespace mongo {
             reload();
 
             scoped_lock lk( _mutex );
-            map<string,Shard>::iterator i = _lookup.find( ident );
-            uassert( 13129 , (string)"can't find shard for: " + ident , i != _lookup.end() );
+            map<string,Shard>::iterator i = _lookup.find( mykey );
+            uassert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
             return i->second;        
         }
         
