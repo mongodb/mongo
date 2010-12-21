@@ -71,12 +71,18 @@ assert(d.foo.count() == 1, "count 1");
 log("stop");
 stopMongod(30002);
 
+// stopMongod is asynchronous.  wait some.
+sleep(2000);
+
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files");
 var jfiles = listFiles(path2 + "/journal");
 if (jfiles.length) {
+    print("sleeping more waiting for mongod to stop");
+    sleep(10000);
+    jfiles = listFiles(path2 + "/journal");
     printjson(jfiles);
-    assert(jfiles.length == 0, "journal empty");
+    assert(jfiles.length == 0, "journal dir not empty");
 }
 
 log("check data matches");
