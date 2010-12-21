@@ -121,8 +121,9 @@ namespace PerfTests {
                 if( t.millis() > 5000 ) 
                     break;
             }
+            client().getLastError(); // block untill all ops are finished
             int ms = t.millis();
-            cout << setw(24) << name() << ' ' << setw(7) << n << "/sec  " << setw(4) << ms << "ms" << endl;
+            cout << setw(24) << name() << ' ' << setw(7) << n*1000/ms << "/sec  " << setw(4) << ms << "ms" << endl;
 
             if( n < expectation() ) { 
                 cout << "test " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
