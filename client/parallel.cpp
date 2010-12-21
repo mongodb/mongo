@@ -117,7 +117,7 @@ namespace mongo {
         BSONObj o;
 
         ShardConnection conn( server , _ns );
-        auto_ptr<DBClientCursor> cursor = conn->query( _ns , Query( q ).explain() , abs( _batchSize ) * -1 );
+        auto_ptr<DBClientCursor> cursor = conn->query( _ns , Query( q ).explain() , abs( _batchSize ) * -1 , 0 , _fields.isEmpty() ? 0 : &_fields );
         if ( cursor.get() && cursor->more() )
             o = cursor->next().getOwned();
         conn.done();
