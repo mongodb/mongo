@@ -16,6 +16,8 @@ namespace mongo {
             ~RecoveryJob();
             void processSection(const void *, unsigned len);
             void close();
+
+            static RecoveryJob & get() { return _instance; }
         private:
             void applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump);
             void applyEntries(const vector<ParsedJournalEntry> &entries);
@@ -36,6 +38,8 @@ namespace mongo {
             list< shared_ptr<MemoryMappedFile> > _files;
 
             unsigned long long _lastDataSyncedFromLastRun;
+
+            static RecoveryJob _instance;
         };
     }
 }

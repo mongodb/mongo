@@ -377,8 +377,7 @@ namespace mongo {
                 return;
             }
 
-            RecoveryJob j;
-            j.go(journalFiles);
+            RecoveryJob::get().go(journalFiles);
         }
 
         /** recover from a crash
@@ -405,6 +404,9 @@ namespace mongo {
                 assert( x == 'b' );
             }
         } brunittest;
+
+        
+        RecoveryJob RecoveryJob::_instance;
 
     } // namespace dur
 
