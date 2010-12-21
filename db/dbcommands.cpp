@@ -122,8 +122,6 @@ namespace mongo {
                 }
             }
 
-            log() << cmdObj.toString() << endl;
-
             if ( cmdObj["fsync"].trueValue() ) {
                 Timer t;
                 if( !getDur().awaitCommit() ) {
