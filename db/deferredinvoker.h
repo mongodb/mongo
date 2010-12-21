@@ -73,7 +73,6 @@ namespace mongo {
                 // flip defer to the other queue
                 readlock lk;
                 mutex::scoped_lock lk2(_invokeMutex);
-                int cur = _which;
                 int other = _which ^ 1;
                 if( _queues[other].empty() )
                     _which = other;
@@ -86,7 +85,7 @@ namespace mongo {
 
     private:
         int _which; // 0 or 1
-        typedef vector<V> Queue;
+        typedef vector< V > Queue;
         Queue _queues[2];
 
         // lock order when multiple locks: dbMutex, _invokeMutex
@@ -94,8 +93,9 @@ namespace mongo {
 
         void _drain(Queue& queue) {
             unsigned oldCap = queue.capacity();
-            for( Queue::iterator i = queue.begin(); i != queue.end(); i++ ) { 
-                V::go(*i);
+            for( typename Queue::iterator i = queue.begin(); i != queue.end(); i++ ) { 
+		const V& v = *i;
+                V::go(v);
             }
             queue.clear();
             DEV assert( queue.capacity() == oldCap ); // just checking that clear() doesn't deallocate, we don't want that            
