@@ -956,7 +956,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
-    if ( GetOption( "heapcheck" ) is not None ) and ( not shell ):
+    if has_option( "heapcheck" ) and not shell:
         if ( not debugBuild ) and ( not debugLogging ):
             print( "--heapcheck needs --d or --dd" )
             Exit( 1 )
@@ -972,7 +972,7 @@ def doConfigure( myenv , needPcre=True , shell=False ):
     # FIXME doConfigure() is being called twice, in the case of the shell. So if it is called 
     # with shell==True, it'd be on its second call and it would need to rearrange the libraries'
     # order. The following removes tcmalloc from the LIB's list and reinserts it at the end.
-    if ( GetOption( "heapcheck" ) is not None ) and ( shell ):
+    if has_option( "heapcheck" ) and shell:
         removeIfInList( myenv["LIBS"] , "tcmalloc" )
         myenv.Append( LIBS="tcmalloc" )
 
@@ -1090,7 +1090,7 @@ mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + s
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
-if GetOption( "sharedclient" ):
+if has_option( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
 env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
@@ -1195,7 +1195,7 @@ smokeFlags = []
 
 # Ugh.  Frobbing the smokeFlags must precede using them to construct
 # actions, I think.
-if GetOption( 'smokedbprefix') is not None:
+if has_option( 'smokedbprefix'):
     smokeFlags += ['--smoke-db-prefix', GetOption( 'smokedbprefix')]
 
 if 'startMongodSmallOplog' in COMMAND_LINE_TARGETS:
@@ -1329,7 +1329,7 @@ def getSystemInstallName():
     n = platform + "-" + processor
     if static:
         n += "-static"
-    if GetOption("nostrip"):
+    if has_option("nostrip"):
         n += "-debugsymbols"
     if nix and os.uname()[2].startswith( "8." ):
         n += "-tiger"
@@ -1418,7 +1418,7 @@ def installBinary( e , name ):
     fullInstallName = installDir + "/bin/" + name
 
     allBinaries += [ name ]
-    if (solaris or linux) and (not GetOption("nostrip")):
+    if (solaris or linux) and (not has_option("nostrip")):
         e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
 
     if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
@@ -1457,7 +1457,7 @@ if installSetup.clientSrc:
 #lib
 if installSetup.libraries:
     env.Install( installDir + "/" + nixLibPrefix, clientLibName )
-    if GetOption( "sharedclient" ): 
+    if has_option( "sharedclient" ): 
         env.Install( installDir + "/" + nixLibPrefix, sharedClientLibName )
 
 
@@ -1484,7 +1484,7 @@ if installSetup.clientTestsDir:
 env.Alias( "install" , installDir )
 
 # aliases
-env.Alias( "mongoclient" , GetOption( "sharedclient" ) and sharedClientLibName or clientLibName )
+env.Alias( "mongoclient" , has_option( "sharedclient" ) and sharedClientLibName or clientLibName )
 
 
 #  ---- CONVENIENCE ----
