@@ -102,7 +102,9 @@ namespace mongo {
 
             /** reset the Writes structure (empties all the above) */
             void clear();
-            void insert(WriteIntent& wi); // merges into set
+
+            /** merges into set */
+            void insertWriteIntent(WriteIntent& wi); 
 
 #ifdef _DEBUG
             WriteIntent _last;
@@ -215,7 +217,7 @@ namespace mongo {
 #endif
 
                 // remember intent. we will journal it in a bit
-                _wi.insert(w);
+                _wi.insertWriteIntent(w);
                 _bytes += w.len;
                 wassert( _wi._writes.size() <  2000000 );
                 assert(  _wi._writes.size() < 20000000 );

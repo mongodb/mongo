@@ -38,7 +38,7 @@ namespace mongo {
             _ops.clear();
         }
 
-        void Writes::insert(WriteIntent& wi){
+        void Writes::insertWriteIntent(WriteIntent& wi){
             if (_writes.empty()){
                 _writes.insert(wi);
                 return;
