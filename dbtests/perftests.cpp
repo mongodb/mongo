@@ -201,7 +201,7 @@ namespace PerfTests {
         void timed() {
             int x = rand();
             BSONObj q = BSON("x" << x);
-            BSONObj y = BSON("y" << rand() << "z" << 33);
+            BSONObj y = BSON("x" << x << "y" << rand() << "z" << 33);
             client().update(ns(), q, y, /*upsert*/true);
         }
 
