@@ -3,8 +3,6 @@
 */
 
 var debugging = false;
-if (""+typeof(db) != "undefined")
-    debugging = true;
 var testname = "oplog";
 var step = 1;
 var conn = null;

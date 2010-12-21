@@ -4,8 +4,6 @@
 */
 
 var debugging = false;
-if (""+typeof(db) != "undefined")
-    debugging = true;
 var testname = "dur2";
 var step = 1;
 var conn = null;
