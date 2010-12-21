@@ -42,7 +42,7 @@ namespace PerfTests {
             mongo::lastError.reset( new LastError() );
         }
         virtual ~ClientBase() {
-            mongo::lastError.release();
+            //mongo::lastError.release();
         }
     protected:
         static void insert( const char *ns, BSONObj o ) {
@@ -94,7 +94,13 @@ namespace PerfTests {
     protected:
         const char *ns() { return _ns.c_str(); }
         virtual void prep() = 0;
+
         virtual void timed() = 0;
+
+        // optional 2nd test phase to be timed separately
+        // return name of it
+        virtual const char * timed2() { return 0; }
+
         virtual void post() { }
         virtual string name() = 0;
         virtual unsigned long long expectation() = 0;
@@ -123,6 +129,24 @@ namespace PerfTests {
 #if !defined(_DEBUG)
                 assert(false);
 #endif
+            }
+
+            {
+                const char *test2name = timed2();
+                if( test2name ) {
+                    Timer t;
+                    unsigned long long n = 0;
+                    while( 1 ) { 
+                        unsigned i;
+                        for( i = 0; i < 10; i++ )
+                            timed2();
+                        n += i;
+                        if( t.millis() > 5000 ) 
+                            break;
+                    }
+                    int ms = t.millis();
+                    cout << setw(24) << test2name << ' ' << setw(7) << n << "/sec  " << setw(4) << ms << "ms" << endl;
+                }
             }
         }
     };
@@ -176,6 +200,19 @@ namespace PerfTests {
             BSONObj y = BSON("y" << rand() << "z" << 33);
             client().update(ns(), q, y, /*upsert*/true);
         }
+
+        const char * timed2() {
+            static BSONObj I = BSON( "$inc" << BSON( "y" << 1 ) );
+
+            // test some $inc's
+
+            int x = rand();
+            BSONObj q = BSON("x" << x);
+            client().update(ns(), q, I);
+
+            return "inc";
+        }
+
         void post() {
         }
         unsigned long long expectation() { return 1000; }
