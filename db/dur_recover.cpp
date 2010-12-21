@@ -30,6 +30,7 @@
 #include "db.h"
 #include "../util/unittest.h"
 #include "cmdline.h"
+#include "curop.h"
 
 using namespace mongoutils;
 
@@ -334,6 +335,9 @@ namespace mongo {
                     JSectHeader h;
                     br.peek(h);
                     processSection(br.skip(h.len), h.len);
+
+                    // ctrl c check
+                    killCurrentOp.checkForInterrupt(false);
                 }
             }
             catch( BufReader::eof& ) { 
@@ -383,10 +387,7 @@ namespace mongo {
             okToCleanUp = true;
         }
 
-        /** recover from a crash
-            throws on error 
-        */
-        void recover() {
+        void _recover() {
             assert( cmdLine.dur );
 
             filesystem::path p = getJournalDir();
@@ -407,7 +408,17 @@ namespace mongo {
 
             RecoveryJob j;
             j.go(journalFiles);
-       }
+        }
+
+        /** recover from a crash
+            throws on error 
+        */
+        void recover() { 
+            // we use a lock so that exitCleanly will wait for us
+            // to finish (or at least to notice what is up and stop)
+            readlock lk;
+            _recover(); // throws on interruption
+        }
 
         struct BufReaderY { int a,b; };
         class BufReaderUnitTest : public UnitTest {
