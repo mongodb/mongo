@@ -39,10 +39,8 @@
 #endif
 
 #if defined(_WIN32)
-
 // for rand_s() usage:
-#define _CRT_RAND_S
-
+# define _CRT_RAND_S
 # ifndef NOMINMAX
 #  define NOMINMAX
 # endif
