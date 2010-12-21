@@ -112,7 +112,7 @@ namespace PerfTests {
         }
         unsigned long long expectation() { return 1000; }
     };
-
+    
     class Insert1 : public InsertDup { 
         const BSONObj x;
     public:
@@ -127,6 +127,24 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
                 
+    class Update1 : public InsertDup { 
+    public:
+        string name() { return "random upserts"; }
+        void prep() { 
+            client().insert( ns(), BSONObj() );
+            client().ensureIndex(ns(), BSON("x"<<1));
+        }
+        void timed() {
+            int x = rand();
+            BSONObj q = BSON("x" << x);
+            BSONObj y = BSON("y" << rand());
+            client().update(ns(), q, y, /*upsert*/true);
+        }
+        void post() {
+        }
+        unsigned long long expectation() { return 1000; }
+    };
+                
     class All : public Suite {
     public:
         All() : Suite( "perf" ) {
@@ -134,6 +152,7 @@ namespace PerfTests {
         void setupTests(){
             add< InsertDup >();
             add< Insert1 >();
+            add< Update1 >();
         }
     } myall;
 }
