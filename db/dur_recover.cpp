@@ -212,6 +212,11 @@ namespace mongo {
         }
 
         void RecoveryJob::close() { 
+            scoped_lock lk(_mx);
+            _close();
+        }
+
+        void RecoveryJob::_close() { 
             log() << "recover flush" << endl;
             MongoFile::flushAll(true);
             log() << "recover close" << endl;
@@ -244,7 +249,7 @@ namespace mongo {
                 } 
                 if( apply ) {
                     if( entry.op->needFilesClosed() ) {
-                        close();
+                        _close(); // locked in processSection
                     }
                     entry.op->replay();
                 }
@@ -266,6 +271,8 @@ namespace mongo {
         }
 
         void RecoveryJob::processSection(const void *p, unsigned len) {
+            scoped_lock lk(_mx);
+
             vector<ParsedJournalEntry> entries;
             JournalSectionIterator i(p, len);
 

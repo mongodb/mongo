@@ -1,6 +1,9 @@
 // @file dur.h durability support
 
 #pragma once
+
+#include "../util/concurrency/mutex.h"
+
 namespace mongo {
     class MemoryMappedFile;
 
@@ -11,11 +14,11 @@ namespace mongo {
         */
         class RecoveryJob : boost::noncopyable { 
         public:
-            RecoveryJob() { _lastDataSyncedFromLastRun = 0; }
+            RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") {}
             void go(vector<path>& files);
             ~RecoveryJob();
             void processSection(const void *, unsigned len);
-            void close();
+            void close(); // locks and calls _close()
 
             static RecoveryJob & get() { return _instance; }
         private:
@@ -23,6 +26,7 @@ namespace mongo {
             void applyEntries(const vector<ParsedJournalEntry> &entries);
             bool processFileBuffer(const void *, unsigned len);
             bool processFile(path journalfile);
+            void _close(); // doesn't lock
 
             /** retrieve the mmap pointer for the specified dbName plus file number.
                 open if not yet open.
@@ -38,6 +42,8 @@ namespace mongo {
             list< shared_ptr<MemoryMappedFile> > _files;
 
             unsigned long long _lastDataSyncedFromLastRun;
+
+            mongo::mutex _mx; // protects _files and _fileToPtr
 
             static RecoveryJob _instance;
         };
