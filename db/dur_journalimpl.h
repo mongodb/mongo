@@ -63,7 +63,7 @@ namespace mongo {
 
             struct JFile { 
                 string filename;
-                long long lastEventTimeMs;
+                unsigned long long lastEventTimeMs;
             };
 
             // files which have been closed but not unlinked (rotated out) yet
@@ -72,8 +72,8 @@ namespace mongo {
 
             static void preFlush();
             static void postFlush();
-            long long _preFlushTime;
-            long long _lastFlushTime; // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
+            unsigned long long _preFlushTime;
+            unsigned long long _lastFlushTime; // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
         };
 
     }

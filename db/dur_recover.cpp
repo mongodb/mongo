@@ -162,7 +162,7 @@ namespace mongo {
         */
         class RecoveryJob : boost::noncopyable { 
         public:
-            RecoveryJob() { _lsn = 0; }
+            RecoveryJob() { _lastDataSyncedFromLastRun = 0; }
             void go(vector<path>& files);
             ~RecoveryJob();
         private:
@@ -186,7 +186,7 @@ namespace mongo {
             // all close at end (destruction) of RecoveryJob
             list< shared_ptr<MemoryMappedFile> > _files;
 
-            unsigned long long _lsn;
+            unsigned long long _lastDataSyncedFromLastRun;
         };
         
         /** retrieve the mmap pointer for the specified dbName plus file number.
@@ -297,8 +297,8 @@ namespace mongo {
             vector<ParsedJournalEntry> entries;
             JournalSectionIterator i(p, len);
 
-            if( _lsn + ExtraKeepTimeMs > i.seqNumber() ) { 
-                log() << "recover skipping application of section " << i.seqNumber() << " lsn:" << _lsn << endl;
+            if( _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) { 
+                log() << "recover skipping application of section " << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
             }
 
             // first read all entries to make sure this section is valid
@@ -359,8 +359,8 @@ namespace mongo {
             log() << "recover begin" << endl;
 
             // load the last sequence number synced to the datafiles on disk before the last crash
-            _lsn = journalReadLSN();
-            log() << "recover lsn: " << _lsn << endl;
+            _lastDataSyncedFromLastRun = journalReadLSN();
+            log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
             for( unsigned i = 0; i != files.size(); ++i ) { 
                 bool abruptEnd = processFile(files[i]);

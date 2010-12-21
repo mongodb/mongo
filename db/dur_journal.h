@@ -50,7 +50,10 @@ namespace mongo {
         */
         void journalingFailure(const char *msg);
 
+        /** read lsn from disk from the last run before doing recovery */
         unsigned long long journalReadLSN();
+
+        unsigned long long getLastDataFileFlushTime();
 
         /** never throws.  
             @return true if there are any journal files in the journal dir. 

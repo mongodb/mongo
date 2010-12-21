@@ -90,7 +90,15 @@ sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files");
-assert(ls(path2 + "/journal") == null);
+{
+    if (ls(path2 + "/journal") != null) {
+        // wait longer, stopMongod isn't synchronous
+        sleep(8000);
+        if (ls(path2 + "/journal") != null) {
+            assert(false, "error seems to be journal files present after a clean mongod shutdown");
+        }
+    }
+}
 
 log("check data matches ns");
 var diff = run("diff", path1 + "/test.ns", path2 + "/test.ns");
