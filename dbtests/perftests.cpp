@@ -34,11 +34,14 @@
 #include "dbtests.h"
 
 namespace PerfTests {
+    typedef DBDirectClient DBClientType;
+    //typedef DBClientConnection DBClientType;
 
     class ClientBase {
     public:
         // NOTE: Not bothering to backup the old error record.
         ClientBase() {
+            //_client.connect("localhost");
             mongo::lastError.reset( new LastError() );
         }
         virtual ~ClientBase() {
@@ -54,11 +57,11 @@ namespace PerfTests {
         static bool error() {
             return !_client.getPrevError().getField( "err" ).isNull();
         }
-        DBDirectClient &client() const { return _client; }
+        DBClientBase &client() const { return _client; }
     private:
-        static DBDirectClient _client;
+        static DBClientType _client;
     };
-    DBDirectClient ClientBase::_client;
+    DBClientType ClientBase::_client;
 
     // todo: use a couple threads. not a very good test yet.
     class DefInvoke { 
