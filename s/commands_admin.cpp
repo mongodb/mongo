@@ -772,7 +772,7 @@ namespace mongo {
             }
             CmdIsMaster() : Command("isMaster" , false , "ismaster") { }
             virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-                result.append("ismaster", 1.0 );
+                result.appendBool("ismaster", true );
                 result.append("msg", "isdbgrid");
                 result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
                 return true;
