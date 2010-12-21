@@ -115,6 +115,15 @@ namespace mongo {
         */
         void PREPLOGBUFFER() { 
             assert( cmdLine.dur );
+
+            {
+                // now that we are locked, fully drain deferred notes of write intents
+                DEV dbMutex.assertAtLeastReadLocked();
+                Writes& writes = commitJob.wi();
+                writes._deferred.invoke();
+                writes._drained = true;
+            }
+
             AlignedBuilder& bb = commitJob._ab;
             resetLogBuffer(bb);
 
@@ -124,7 +133,6 @@ namespace mongo {
                     (*i)->serialize(bb);
                 }
             }
-
 
             {
                 scoped_lock lk(privateViews._mutex());

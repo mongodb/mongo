@@ -18,9 +18,15 @@
 
 #include "pch.h"
 #include "dur_commitjob.h"
+#include "deferredinvoker.h"
 
 namespace mongo {
     namespace dur {
+
+        void Writes::D::go(const Writes::D& d) { 
+            WriteIntent w(d.p, d.len);
+            commitJob.wi()._insertWriteIntent(w);
+        }
 
         void WriteIntent::absorb(const WriteIntent& other){
             dassert(overlaps(other));
@@ -36,9 +42,10 @@ namespace mongo {
             _alreadyNoted.clear();
             _writes.clear();
             _ops.clear();
+            _drained = false;
         }
 
-        void Writes::insertWriteIntent(WriteIntent& wi){
+        void Writes::_insertWriteIntent(WriteIntent& wi){
             if (_writes.empty()){
                 _writes.insert(wi);
                 return;

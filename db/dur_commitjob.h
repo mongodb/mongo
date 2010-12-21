@@ -25,6 +25,7 @@
 #include "cmdline.h"
 #include "durop.h"
 #include "dur.h"
+#include "deferredinvoker.h"
 
 namespace mongo { 
     namespace dur {
@@ -95,16 +96,31 @@ namespace mongo {
 
         /** our record of pending/uncommitted write intents */
         class Writes : boost::noncopyable {
+            struct D {
+                void *p;     
+                unsigned len;
+                static void go(const D& d);
+            };
         public:
+            DeferredInvoker<D> _deferred;
             Already<127> _alreadyNoted;
             set<WriteIntent> _writes;
             vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
+            bool _drained; // _deferred is drained?  for asserting/testing
 
             /** reset the Writes structure (empties all the above) */
             void clear();
 
             /** merges into set */
-            void insertWriteIntent(WriteIntent& wi); 
+            void _insertWriteIntent(WriteIntent& wi); 
+
+            void insertWriteIntent(WriteIntent& wi) { 
+                D d;
+                d.p = wi.p;
+                d.len = wi.len;
+                dassert( wi.w_ptr == 0 );
+                _deferred.defer(d); 
+            }
 
 #ifdef _DEBUG
             WriteIntent _last;
@@ -129,7 +145,15 @@ namespace mongo {
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p);
 
-            set<WriteIntent>& writes() { return _wi._writes; }
+            set<WriteIntent>& writes() { 
+                if( !_wi._drained ) {
+                    // generally, you don't want to use the set until it is prepared (after deferred ops are applied)
+                    // thus this assert here.
+                    assert(false); 
+                }
+                return _wi._writes; 
+            }
+
             vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
 
             /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even 
@@ -156,9 +180,10 @@ namespace mongo {
             const WriteIntent& lastWrite() const { return _wi._last; }
 #endif
 
+            Writes& wi() { return _wi; }
         private:
             bool _hasWritten;
-            Writes _wi;
+            Writes _wi; // todo: fix name
             size_t _bytes;
             NotifyAll _notify; // for getlasterror fsync:true acknowledgements
         };

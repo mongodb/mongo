@@ -333,6 +333,11 @@ namespace mongo {
             }
         }
 
+        void drainSome() { 
+            Writes& writes = commitJob.wi();
+            writes._deferred.invoke();
+        }
+
         /** locking in read lock when called 
             @see MongoMMF::close()
         */
@@ -432,7 +437,14 @@ namespace mongo {
                         if( millis < 5 || millis > HowOftenToGroupCommitMs )
                             millis = 5;
                     }
-                    sleepmillis(millis);
+
+                    // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
+                    // but is likely also less spiky on our cpu usage, which is good:
+                    sleepmillis(millis/2);
+                    drainSome();
+                    sleepmillis(millis/2);
+                    drainSome();
+
                     go();
                 }
                 catch(std::exception& e) { 
