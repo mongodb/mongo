@@ -118,7 +118,7 @@ namespace PerfTests {
             unsigned long long n = 0;
             while( 1 ) { 
                 unsigned i;
-                for( i = 0; i < 10; i++ )
+                for( i = 0; i < 1000; i++ )
                     timed();
                 n += i;
                 if( t.millis() > 5000 ) 
