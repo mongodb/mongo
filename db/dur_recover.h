@@ -14,13 +14,13 @@ namespace mongo {
             RecoveryJob() { _lastDataSyncedFromLastRun = 0; }
             void go(vector<path>& files);
             ~RecoveryJob();
+            void processSection(const void *, unsigned len);
+            void close();
         private:
             void applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump);
             void applyEntries(const vector<ParsedJournalEntry> &entries);
-            void processSection(const void *, unsigned len);
             bool processFileBuffer(const void *, unsigned len);
             bool processFile(path journalfile);
-            void close();
 
             /** retrieve the mmap pointer for the specified dbName plus file number.
                 open if not yet open.
