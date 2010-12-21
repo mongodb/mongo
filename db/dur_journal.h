@@ -50,9 +50,15 @@ namespace mongo {
         */
         void journalingFailure(const char *msg);
 
+        unsigned long long journalReadLSN();
+
         /** never throws.  
             @return true if there are any journal files in the journal dir. 
         */
         bool haveJournalFiles();
+
+        // in case disk controller buffers writes
+        const long long ExtraKeepTimeMs = 10000; 
+
     }
 }

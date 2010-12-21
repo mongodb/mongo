@@ -92,6 +92,8 @@ namespace mongo {
 
             bool atEof() const { return _br.atEof(); }
 
+            unsigned long long seqNumber() const { return _sectHead->seqNumber; }
+
             /** get the next entry from the log.  this function parses and combines JDbContext and JEntry's.
              *  @return true if got an entry.  false at successful end of section (and no entry returned).
              *  throws on premature end of section. 
@@ -160,6 +162,7 @@ namespace mongo {
         */
         class RecoveryJob : boost::noncopyable { 
         public:
+            RecoveryJob() { _lsn = 0; }
             void go(vector<path>& files);
             ~RecoveryJob();
         private:
@@ -180,7 +183,10 @@ namespace mongo {
             // fileno,dbname -> map
             map< pair<int,string>, void* > _fileToPtr;
 
+            // all close at end (destruction) of RecoveryJob
             list< shared_ptr<MemoryMappedFile> > _files;
+
+            unsigned long long _lsn;
         };
         
         /** retrieve the mmap pointer for the specified dbName plus file number.
@@ -291,6 +297,10 @@ namespace mongo {
             vector<ParsedJournalEntry> entries;
             JournalSectionIterator i(p, len);
 
+            if( _lsn + ExtraKeepTimeMs > i.seqNumber() ) { 
+                log() << "recover skipping application of section " << i.seqNumber() << " lsn:" << _lsn << endl;
+            }
+
             // first read all entries to make sure this section is valid
             ParsedJournalEntry e;
             while( i.next(e) ) {
@@ -347,6 +357,10 @@ namespace mongo {
         /** @param files all the j._0 style files we need to apply for recovery */
         void RecoveryJob::go(vector<path>& files) { 
             log() << "recover begin" << endl;
+
+            // load the last sequence number synced to the datafiles on disk before the last crash
+            _lsn = journalReadLSN();
+            log() << "recover lsn: " << _lsn << endl;
 
             for( unsigned i = 0; i != files.size(); ++i ) { 
                 bool abruptEnd = processFile(files[i]);

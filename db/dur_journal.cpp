@@ -50,6 +50,10 @@ namespace mongo {
             return p;
         }
 
+        path lsnPath() { 
+            return getJournalDir()/"lsn";
+        }
+
         /** this should be called when something really bad happens so that we can flag appropriately
         */
         void journalingFailure(const char *msg) { 
@@ -80,6 +84,7 @@ namespace mongo {
 
         Journal::Journal() : 
             toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
+            toStoreLastSeqNum(*(new MVar<unsigned long long>)),
             _curLogFileMutex("JournalLfMutex")
         { 
             _written = 0;
@@ -134,6 +139,7 @@ namespace mongo {
                         }
                     }
                 }
+                boost::filesystem::remove(lsnPath());
             }
             catch( std::exception& e ) { 
                 log() << "error removing journal files " << e.what() << endl;
@@ -216,12 +222,57 @@ namespace mongo {
             }
         }
 
+        unsigned long long journalReadLSN() {
+            try {
+                // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
+                // however, given we actually close the file, that seems unlikely.
+                MemoryMappedFile f;
+                unsigned long long *L = static_cast<unsigned long long*>(f.map(lsnPath().string().c_str()));
+                assert(L);
+                return *L;
+            }
+            catch(std::exception& e) { 
+                log() << "couldn't read journal/lsn file - if a recovery is needed will apply all files. " << e.what() << endl;
+            }
+            return 0;
+        }
+
+        /** remember "last sequence number" to speed recoveries */
+        void lsnThread() { 
+            Client::initThread("lsn");
+
+            time_t last = 0;
+            while( 1 ) {
+                unsigned long long lsn = j.toStoreLastSeqNum.take();
+
+                // if you are on a really fast fsync interval, we don't write this as often
+                if( time(0) - last < 5 ) 
+                    continue;
+
+                last = time(0);
+
+                try {
+                    // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
+                    // however, given we actually close the file, that seems unlikely.
+                    MemoryMappedFile f;
+                    unsigned long long length = 8;
+                    unsigned long long *L = static_cast<unsigned long long*>(f.map(lsnPath().string().c_str(), length));
+                    assert(L);
+                    *L = lsn;
+                }
+                catch(std::exception& e) { 
+                    log() << "write to lsn file fails " << e.what() << endl;
+                }
+            }
+        }
+
         void Journal::preFlush() { 
             j._preFlushTime = Listener::getElapsedTimeMillis();
         }
 
         void Journal::postFlush() { 
             j._lastFlushTime = j._preFlushTime;
+            j.toStoreLastSeqNum.tryPut( j._lastFlushTime );
         }
 
         // call from within _curLogFileMutex
@@ -241,8 +292,6 @@ namespace mongo {
             be in mutex when calling
         */
         void Journal::removeUnneededJournalFiles() { 
-            const long long ExtraKeepTimeMs = 10000; // in case disk controller buffers writes
-
             while( !_oldJournalFiles.empty() ) {
                 JFile f = _oldJournalFiles.front();
 
