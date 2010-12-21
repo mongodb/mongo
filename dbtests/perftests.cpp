@@ -29,6 +29,7 @@
 #include "../db/json.h"
 #include "../db/lasterror.h"
 #include "../db/update.h"
+#include "../db/deferredinvoker.h"
 #include "../util/timer.h"
 #include "dbtests.h"
 
@@ -58,6 +59,34 @@ namespace PerfTests {
         static DBDirectClient _client;
     };
     DBDirectClient ClientBase::_client;
+
+    // todo: use a couple threads. not a very good test yet.
+    class DefInvoke { 
+        static int tot;
+        struct V { 
+            int val;
+            static void go(const V &v) { tot += v.val; }
+        };
+    public:
+        void run() { 
+            tot = 0;
+            DeferredInvoker<V> d;
+            int x = 0;
+            for( int i = 0; i < 100; i++ ) {
+                if( i % 30 == 0 )
+                    d.invoke();
+
+                x += i;
+                writelock lk;
+                V v;
+                v.val = i;
+                d.defer(v);
+            }
+            d.invoke();
+            assert( x == tot );
+        }
+    };
+    int DefInvoke::tot;
 
     class B : public ClientBase 
     { 
@@ -167,6 +196,7 @@ namespace PerfTests {
         All() : Suite( "perf" ) {
         }
         void setupTests(){
+            add< DefInvoke >();
             add< InsertDup >();
             add< Insert1 >();
             add< Update1 >();
