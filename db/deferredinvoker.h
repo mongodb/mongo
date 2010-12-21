@@ -41,7 +41,7 @@ namespace mongo {
     template< class V >
     class DeferredInvoker {
     public:
-        DeferredInvoker() {
+        DeferredInvoker() : _invokeMutex("deferredinvoker") {
             _which = 0;
         }
 
@@ -55,9 +55,9 @@ namespace mongo {
 
         /** call to process pending invocations.  
 
-            concurrency: only one thread at a time may call invoke().  however other threads can call defer() 
-                         simultaneously. 
-            
+            concurrency: handled herein.  multiple threads could call invoke(), but their efforts will be 
+                         serialized.  the common case is that there is a single processor of invocations.
+
             normally, you call this outside of any lock.  but if you want to fully drain the queue,
             call from within a read lock.  a good way to drain :
             {
@@ -69,22 +69,28 @@ namespace mongo {
             }
         */
         void invoke() { 
-            int full = _which;
-            int empty = _which ^ 1;
-           
-            // flip
             {
+                // flip defer to the other queue
                 readlock lk;
-                assert( _queues[empty].empty() ); // queue-ers only touch the active queue, not the other one
-                _which = empty;
+                mutex::scoped_lock lk2(_invokeMutex);
+                int cur = _which;
+                int other = _which ^ 1;
+                if( _queues[other].empty() )
+                    _which = other;
             }
-            _drain( _queues[full] );
+            {
+                mutex::scoped_lock lk(_invokeMutex);
+                _drain( _queues[_which^1] );
+            }
         }
 
     private:
         int _which; // 0 or 1
         typedef vector<V> Queue;
         Queue _queues[2];
+
+        // lock order when multiple locks: dbMutex, _invokeMutex
+        mongo::mutex _invokeMutex;
 
         void _drain(Queue& queue) {
             unsigned oldCap = queue.capacity();
