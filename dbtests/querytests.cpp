@@ -151,7 +151,7 @@ namespace QueryTests {
             mongo::lastError.reset( new LastError() );
         }
         ~ClientBase() {
-            mongo::lastError.release();
+            //mongo::lastError.release();
         }
     protected:
         static void insert( const char *ns, BSONObj o ) {
