@@ -102,12 +102,10 @@ namespace mongo {
             bb.reset();
 
             // JSectHeader
-            {
-                //bb.appendStr("\nHH\n", false);
-
-                // total length, will fill in later:
-                bb.appendNum((unsigned) 0xffffffff);
-            }
+            JSectHeader h;
+            h.len = (unsigned) 0xffffffff;  // total length, will fill in later
+            h.seqNumber = 0; // tbd
+            bb.appendStruct(h);
         }
 
         /** we will build an output buffer ourself and then use O_DIRECT

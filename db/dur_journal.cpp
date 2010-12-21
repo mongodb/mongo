@@ -40,7 +40,7 @@ namespace mongo {
 
     namespace dur {
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
-        BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 4 );
+        BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 12 );
         BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 32 );
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
 

@@ -36,7 +36,7 @@ namespace mongo {
 
             // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near 
             // that.  simply incrementing the version # is safe on a fwd basis.
-            enum { CurrentVersion = 0x4145 };
+            enum { CurrentVersion = 0x4146 };
             unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
@@ -57,7 +57,8 @@ namespace mongo {
             len is length of the entire section including header and footer.
         */
         struct JSectHeader {
-            unsigned len; // length in bytes of the whole section
+            unsigned len;                  // length in bytes of the whole section
+            unsigned long long seqNumber;  // sequence number that can be used on recovery to not do too much work
         };
 
         /** an individual write operation within a group commit section.  Either the entire section should 
