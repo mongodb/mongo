@@ -45,24 +45,25 @@ namespace PerfTests {
         }
     protected:
         static void insert( const char *ns, BSONObj o ) {
-            client_.insert( ns, o );
+            _client.insert( ns, o );
         }
         static void update( const char *ns, BSONObj q, BSONObj o, bool upsert = 0 ) {
-            client_.update( ns, Query( q ), o, upsert );
+            _client.update( ns, Query( q ), o, upsert );
         }
         static bool error() {
-            return !client_.getPrevError().getField( "err" ).isNull();
+            return !_client.getPrevError().getField( "err" ).isNull();
         }
-        DBDirectClient &client() const { return client_; }
+        DBDirectClient &client() const { return _client; }
     private:
-        static DBDirectClient client_;
+        static DBDirectClient _client;
     };
-    DBDirectClient ClientBase::client_;
+    DBDirectClient ClientBase::_client;
 
     class B : public ClientBase 
     { 
+        string _ns;
     protected:
-        const char *ns() { return "perftest.abc"; }
+        const char *ns() { return _ns.c_str(); }
         virtual void prep() = 0;
         virtual void timed() = 0;
         virtual void post() { }
@@ -70,6 +71,9 @@ namespace PerfTests {
         virtual unsigned long long expectation() = 0;
     public:
         void run() { 
+            _ns = string("perftest.") + name();
+            client().dropCollection(ns());
+
             prep();
 
             Timer t;
@@ -79,15 +83,15 @@ namespace PerfTests {
                 for( i = 0; i < 10; i++ )
                     timed();
                 n += i;
-                if( t.millis() > 2000 ) 
+                if( t.millis() > 5000 ) 
                     break;
             }
             int ms = t.millis();
-            cout << setw(24) << name() << ' ' << setw(7) << n << "/sec " << setw(4) << ms << "ms" << " expect:" << expectation() << endl;
+            cout << setw(24) << name() << ' ' << setw(7) << n << "/sec  " << setw(4) << ms << "ms" << endl;
 
             if( n < expectation() ) { 
+                cout << "test " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
 #if !defined(_DEBUG)
-                cout << "test " << name() << " seems slow n:" << n << " expect greater than:" << expectation() << endl;
                 assert(false);
 #endif
             }
@@ -127,7 +131,10 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
                 
-    class Update1 : public InsertDup { 
+    /** upserts about 32k records and then keeps updating them 
+        2 indexes
+    */
+    class Update1 : public B { 
     public:
         string name() { return "random upserts"; }
         void prep() { 
@@ -137,7 +144,7 @@ namespace PerfTests {
         void timed() {
             int x = rand();
             BSONObj q = BSON("x" << x);
-            BSONObj y = BSON("y" << rand());
+            BSONObj y = BSON("y" << rand() << "z" << 33);
             client().update(ns(), q, y, /*upsert*/true);
         }
         void post() {
@@ -145,6 +152,16 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
                 
+    class UpdateMoreIndexes : public Update1 { 
+    public:
+        string name() { return "more indexes"; }
+        void prep() { 
+            Update1::prep();
+            client().ensureIndex(ns(), BSON("y"<<1));
+            client().ensureIndex(ns(), BSON("z"<<1));
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "perf" ) {
@@ -153,6 +170,7 @@ namespace PerfTests {
             add< InsertDup >();
             add< Insert1 >();
             add< Update1 >();
+            add< UpdateMoreIndexes >();
         }
     } myall;
 }
