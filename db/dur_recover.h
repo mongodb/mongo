@@ -9,7 +9,7 @@ namespace mongo {
     class MemoryMappedFile;
 
     namespace dur {
-        class ParsedJournalEntry;
+        struct ParsedJournalEntry;
 
        /** call go() to execute a recovery from existing journal files.
         */
