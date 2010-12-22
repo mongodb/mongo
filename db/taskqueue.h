@@ -41,7 +41,7 @@ namespace mongo {
     template< class MT >
     class TaskQueue {
     public:
-        TaskQueue() : _invokeMutex("deferredinvoker"), _which(0) { }
+        TaskQueue() : _which(0), _invokeMutex("deferredinvoker"){ }
 
         void defer(MT mt) { 
             // only one writer allowed.  however the invoke processing below can occur concurrently with 
