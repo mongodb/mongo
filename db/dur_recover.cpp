@@ -222,9 +222,7 @@ namespace mongo {
         }
 
         void RecoveryJob::_close() { 
-            log() << "recover flush" << endl;
             MongoFile::flushAll(true);
-            log() << "recover close" << endl;
             _files.clear(); // closes files
             _fileToPtr.clear();
         }
