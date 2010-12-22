@@ -473,8 +473,11 @@ namespace mongo {
 
     bool MessagingPort::call(Message& toSend, Message& response) {
         mmm( log() << "*call()" << endl; )
-        MSGID old = toSend.header()->id;
-        say(/*to,*/ toSend);
+        say(toSend);
+        return recv( toSend , response );
+    }
+    
+    bool MessagingPort::recv( const Message& toSend , Message& response ) {
         while ( 1 ) {
             bool ok = recv(response);
             if ( !ok )
@@ -484,7 +487,7 @@ namespace mongo {
                 break;
             log() << "********************" << endl;
             log() << "ERROR: MessagingPort::call() wrong id got:" << hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << endl;
-            log() << "  toSend op: " << toSend.operation() << " old id:" << (unsigned)old << endl;
+            log() << "  toSend op: " << toSend.operation() << endl;
             log() << "  response msgid:" << (unsigned)response.header()->id << endl;
             log() << "  response len:  " << (unsigned)response.header()->len << endl;
             log() << "  response op:  " << response.operation() << endl;

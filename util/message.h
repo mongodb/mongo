@@ -115,7 +115,19 @@ namespace mongo {
         void reply(Message& received, Message& response, MSGID responseTo);
         void reply(Message& received, Message& response);
         bool call(Message& toSend, Message& response);
+        
         void say(Message& toSend, int responseTo = -1);
+
+        /**
+         * this is used for doing 'async' queries
+         * instead of doing call( to , from )
+         * you would do
+         * say( to )
+         * recv( from )
+         * Note: if you fail to call recv and someone else uses this port,
+         *       horrible things will happend
+         */
+        bool recv( const Message& sent , Message& response ); 
 
         void piggyBack( Message& toSend , int responseTo = -1 );
 
