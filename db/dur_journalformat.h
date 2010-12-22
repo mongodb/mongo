@@ -40,14 +40,14 @@ namespace mongo {
             unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
-            char n1; // '\n'
-            char ts[20]; // offset 6.  ascii timestamp of file generation.  for user reading, not used by code.
-            char n2; // '\n'
-            char dbpath[128]; // offset 27.  path/filename of this file for human reading and diagnostics.  not used by code. 
-            char n3, n4; // '\n', '\n'
+            char n1;          // '\n'
+            char ts[20];      // ascii timestamp of file generation.  for user reading, not used by code.
+            char n2;          // '\n'
+            char dbpath[128]; // path/filename of this file for human reading and diagnostics.  not used by code. 
+            char n3, n4;      // '\n', '\n'
 
             char reserved3[8034]; // 8KB total for the file header
-            char txt2[2];         // "\n\n" offset 8190
+            char txt2[2];         // "\n\n" at the end
 
             bool versionOk() const { return _version == CurrentVersion; }
             bool valid() const { return magic[0] == 'j' && txt2[1] == '\n'; }
