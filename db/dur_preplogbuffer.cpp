@@ -52,7 +52,7 @@ namespace mongo {
 
         void prepBasicWrite(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
             size_t ofs = 1;
-            MongoMMF *mmf = findMMF(i->p, /*out*/ofs);
+            MongoMMF *mmf = findMMF(i->start(), /*out*/ofs);
             dassert( i->w_ptr == 0 );
 
             if( !mmf->willNeedRemap() ) {
@@ -68,7 +68,7 @@ namespace mongo {
             i->w_ptr = ((char*)mmf->view_write()) + ofs;
 
             JEntry e;
-            e.len = i->len;
+            e.len = i->length();
             assert( ofs <= 0x80000000 );
             e.ofs = (unsigned) ofs;
             e.setFileNo( mmf->fileSuffixNo() );
@@ -82,7 +82,7 @@ namespace mongo {
                 bb.appendStr(lastDbPath.toString());
             }
             bb.appendStruct(e);
-            bb.appendBuf(i->p, i->len);
+            bb.appendBuf(i->start(), i->length());
         }
 
         /** basic write ops / write intents.  note there is no particular order to these : if we have 

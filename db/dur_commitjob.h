@@ -34,13 +34,10 @@ namespace mongo {
         struct WriteIntent /* copyable */ { 
             WriteIntent() : w_ptr(0), p(0) { }
             WriteIntent(void *a, unsigned b) : w_ptr(0), p(a), len(b) { }
-            /*temp*/ mutable void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap 
-            void *p;      // intent to write at p
-            unsigned len; // up to this len
 
-            // these two are to make algorithms more readable
             void* start() const { return p; }
             void* end() const { return (char*) p + len; }
+            int length() const { return len; }
 
             bool operator < (const WriteIntent& rhs) const { return end() < rhs.end(); }
 
@@ -60,6 +57,12 @@ namespace mongo {
             friend ostream& operator << (ostream& out, const WriteIntent& wi) {
                 return (out << "p: " << wi.p << " end: " << wi.end() << " len: " << wi.len);
             }
+
+            /*temp*/ mutable void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap 
+        private:
+            void *p;      // intent to write at p
+            unsigned len; // up to this len
+
         };
 
         /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
