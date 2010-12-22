@@ -50,7 +50,7 @@ namespace mongo {
 
         /* Get the "standard" view (which is the private one).
            @return the private view.
-                   on _DEBUG, returns the readonly view
+                   on _TESTINTENT, returns the readonly view
         */
         void* getView();
 

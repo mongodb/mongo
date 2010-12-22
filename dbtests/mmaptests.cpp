@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "../db/mongommf.h"
+#include "../util/timer.h"
 #include "dbtests.h"
 
 namespace MMapTests {
@@ -39,29 +40,43 @@ namespace MMapTests {
                 MongoMMF f;
                 unsigned long long len = 256 * 1024 * 1024;
                 assert( f.create(fn, len, /*sequential*/false) );
-                char *p = (char *) f.getView();
-                assert(p);
-                strcpy(p, "hello");
+                if( !testIntent ) {
+                    char *p = (char *) f.getView();
+                    assert(p);
+                    // write something to the private view as a test
+                    strcpy(p, "hello");
+                }
                 if( cmdLine.dur ) { 
                     char *w = (char *) f.view_write();
                     strcpy(w + 6, "world");
                 }
             }
 
+            int N = 10000;
+#if !defined(_WIN32) && !defined(__linux__)
+            // seems this test is slow on OS X.
+            N = 100;
+#endif
+
             // we make a lot here -- if we were leaking, presumably it would fail doing this many.
+            Timer t;
             for( int i = 0; i < 10000; i++ ) {
                 MongoMMF f;
                 assert( f.open(fn, i%4==1) );
-                char *p = (char *) f.getView();
-                assert(p);
-                strcpy(p, "zzz");
+                if( !testIntent ) {
+                    char *p = (char *) f.getView();
+                    assert(p);
+                    strcpy(p, "zzz");
+                }
                 if( cmdLine.dur ) { 
                     char *w = (char *) f.view_write();
                     if( i % 2 == 0 )
                         ++(*w);
                     assert( w[6] == 'w' );
-                    assert( p[6] == 'w' );
                 }
+            }
+            if( t.millis() > 10000 ) { 
+                log() << "warning: MMap LeakTest is unusually slow N:" << N << ' ' << t.millis() << "ms" << endl;
             }
 
         }
