@@ -5,63 +5,65 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <db.h>
 #include "wt_int.h"
+
+/* We're putting all of these functions into "C" structures. */
+extern "C" {
 
 static int
 __cursor_first(WT_CURSOR *cursor)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __cursor_last(WT_CURSOR *cursor)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __cursor_next(WT_CURSOR *cursor)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __cursor_prev(WT_CURSOR *cursor)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __cursor_search(WT_CURSOR *cursor, int *exact)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __cursor_insert(WT_CURSOR *cursor)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __cursor_update(WT_CURSOR *cursor)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __cursor_del(WT_CURSOR *cursor)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __cursor_close(WT_CURSOR *cursor, const char *config)
 {
-	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
-	__wt_curstd_close(cstd);
 	free(cursor);
-	return (0);
+	return 0;
 }
 
 static int
@@ -69,7 +71,7 @@ __session_close(WT_SESSION *session, const char *config)
 {
 	printf("WT_SESSION->close\n");
 	free(session);
-	return (0);
+	return 0;
 }
 
 static int
@@ -109,22 +111,22 @@ __session_open_cursor(WT_SESSION *session, const char *uri, const char *config, 
 }
 
 static int
-__session_dup_cursor(WT_SESSION *session, WT_CURSOR *cursor, const char *config, WT_CURSOR **dupp)
+__session_dup_cursor(WT_SESSION *, WT_CURSOR *cursor, const char *config, WT_CURSOR **dupp)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __session_add_schema(WT_SESSION *session, const char *name, const char *keyfmt, const char *valuefmt, const char *columns, const char *column_sets, const char *indices, const char *config)
 {
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
 __session_create_table(WT_SESSION *session, const char *name, const char *config)
 {
 	printf("WT_SESSION->create_table\n");
-	return (ENOTSUP);
+	return ENOTSUP;
 }
 
 static int
@@ -150,7 +152,6 @@ __session_verify_table(WT_SESSION *session, const char *name, const char *config
 {
 	return 0;
 }
-
 static int
 __session_begin_transaction(WT_SESSION *session, const char *config)
 {
@@ -199,8 +200,7 @@ __conn_add_extractor(WT_CONNECTION *connection, const char *name, WT_EXTRACTOR *
 	return ENOTSUP;
 }
 
-static const char *
-__conn_get_home(WT_CONNECTION *conn)
+static const char *__conn_get_home(WT_CONNECTION *conn)
 {
 	return NULL;
 }
@@ -250,7 +250,7 @@ __conn_open_session(WT_CONNECTION *connection, WT_ERROR_HANDLER *errhandler, con
 }
 
 int
-wiredtiger_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *config, WT_CONNECTION **connectionp)
+__wt_bdb_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *config, WT_CONNECTION **connectionp)
 {
 	WT_CONNECTION stdc = {
 		__conn_load_extension,
@@ -273,18 +273,4 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *conf
 	return 0;
 }
 
-const char *
-wiredtiger_strerror(int err)
-{
-	/* TODO */
-	return "unknown error";
-}
-
-const char *
-wiredtiger_version(int *majorp, int *minorp, int *patchp)
-{
-	/* TODO */
-	*majorp = *minorp = 0;
-	*patchp = 1;
-	return "0.0.1";
-}
+} /* extern "C" */

@@ -1,5 +1,5 @@
 /*
- * ex_access.c Copyright (c) 2010 WiredTiger
+ * ex_access.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demostrating how to create and access a sequence.
  */

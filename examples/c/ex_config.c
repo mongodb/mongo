@@ -1,5 +1,5 @@
 /*
- * ex_config.c Copyright (c) 2010 WiredTiger
+ * ex_config.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demostrating how to configure various database and table
  * properties.

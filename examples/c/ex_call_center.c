@@ -1,5 +1,5 @@
 /*
- * ex_call_center.c Copyright (c) 2010 WiredTiger
+ * ex_call_center.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example application that demonstrates how to map a moderately
  * complex SQL application into WiredTiger.

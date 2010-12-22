@@ -1,0 +1,7 @@
+# filelist --
+#	List of source files for WiredTiger library.
+
+src/api/api.c
+src/api/cur_std.c
+src/api/pack.c
+src/bdb/bdb.cpp

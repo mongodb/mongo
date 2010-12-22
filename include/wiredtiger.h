@@ -1,11 +1,17 @@
+/* Copyright (c) 2010 WiredTiger, Inc.  All rights reserved. */
+
 /* vim: set filetype=c.doxygen : */
 
 /*! \defgroup wt WiredTiger API
  * @{
  */
 
+#ifndef _WIREDTIGER_H_
+#define _WIREDTIGER_H_
+
 #include <sys/types.h>
 #include <inttypes.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -194,20 +200,6 @@ struct WT_CURSOR {
 	 * \errors
 	 */
 	int __F(close)(WT_CURSOR *cursor, const char *config);
-};
-
-/*!
- * The interface implemented by applications in order to handle errors.
- */
-struct WT_ERROR_HANDLER {
-	/*! Callback to handle errors within the session. */
-	int (*handle_error)(WT_ERROR_HANDLER *handler, int err, const char *errmsg);
-
-	/*! Optional callback to retrieve buffered messages. */
-	int (*get_messages)(WT_ERROR_HANDLER *handler, const char **errmsgp);
-
-	/*! Optional callback to clear buffered messages. */
-	int (*clear_messages)(WT_ERROR_HANDLER *handler);
 };
 
 /*!
@@ -561,17 +553,6 @@ const char *wiredtiger_strerror(int err);
  */
 const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 
-/*! Calculate the size required to pack a structure.
- *
- * Note that for variable-sized fields including variable-sized strings and
- * integers, the calculated sized merely reflects the expected sizes specified
- * in the format string itself.
- *
- * \param fmt the data format, see ::wiredtiger_struct_pack
- * \returns the number of bytes needed for the matching call to ::wiredtiger_struct_pack
- */
-int wiredtiger_struct_size(const char *fmt, ...);
-
 /*! Pack a structure into a buffer.
  *
  * Uses format strings as specified in the Python struct module:
@@ -597,7 +578,7 @@ int wiredtiger_struct_size(const char *fmt, ...);
  * <table>
 <tr><th>Format</th><th>C Type</th><th>Java type</th><th>Python type</th><th>Standard size</th></tr>
 <tr><td>x</td><td>pad byte</td><td>N/A</td><td>N/A</td><td>1</td></tr>
-<tr><td>c</td><td>char</td><td>char></td><td>string of length 1</td><td>1</td></tr>
+<tr><td>c</td><td>char</td><td>char</td><td>string of length 1</td><td>1</td></tr>
 <tr><td>b</td><td>signed char</td><td>byte</td><td>integer</td><td>1</td></tr>
 <tr><td>B</td><td>unsigned char</td><td>byte</td><td>integer</td><td>1</td></tr>
 <tr><td>?</td><td>_Bool</td><td>boolean</td><td>bool</td><td>1</td></tr>
@@ -611,7 +592,7 @@ int wiredtiger_struct_size(const char *fmt, ...);
 <tr><td>Q</td><td>unsigned long long</td><td>long</td><td>integer</td><td>8</td></tr>
 <tr><td>f</td><td>float</td><td>float</td><td>float</td><td>4</td></tr>
 <tr><td>d</td><td>double</td><td>double</td><td>float</td><td>8</td></tr>
-<tr><td>r</td><td>wt_recno_t</td><td>long</td><td>integer</td><td>8</td></tr>
+<tr><td>r</td><td>::wiredtiger_recno_t</td><td>long</td><td>integer</td><td>8</td></tr>
 <tr><td>s</td><td>char[]</td><td>String</td><td>string</td><td>fixed length</td></tr>
 <tr><td>S</td><td>char[]</td><td>String</td><td>string</td><td>variable</td></tr>
 <tr><td>u</td><td>WT_ITEM</td><td>byte[]</td><td>string</td><td>variable</td></tr>
@@ -653,6 +634,29 @@ int wiredtiger_struct_size(const char *fmt, ...);
  */
 int wiredtiger_struct_pack(void *buffer, int size, const char *fmt, ...);
 
+/*! Pack a structure into a buffer.
+ *
+ * stdarg version of ::wiredtiger_struct_pack.
+ */
+int wiredtiger_struct_packv(void *buffer, int size, const char *fmt, va_list ap);
+
+/*! Calculate the size required to pack a structure.
+ *
+ * Note that for variable-sized fields including variable-sized strings and
+ * integers, the calculated sized merely reflects the expected sizes specified
+ * in the format string itself.
+ *
+ * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \returns the number of bytes needed for the matching call to ::wiredtiger_struct_pack
+ */
+int wiredtiger_struct_size(const char *fmt, ...);
+
+/*! Calculate the size required to pack a structure.
+ *
+ * stdarg version of ::wiredtiger_struct_size.
+ */
+int wiredtiger_struct_sizev(const char *fmt, va_list ap);
+
 /*! Unpack a structure from a buffer.
  *
  * Reverse of ::wiredtiger_struct_pack: gets values out of a packed byte string.
@@ -663,6 +667,12 @@ int wiredtiger_struct_pack(void *buffer, int size, const char *fmt, ...);
  * \errors
  */
 int wiredtiger_struct_unpack(const void *buffer, int size, const char *fmt, ...);
+
+/*! Unpack a structure from a buffer.
+ *
+ * stdarg version of ::wiredtiger_struct_unpack.
+ */
+int wiredtiger_struct_unpackv(const void *buffer, int size, const char *fmt, va_list ap);
 
 /*! Entry point to an extension, implemented by loadable modules.
  *
@@ -675,9 +685,6 @@ extern int wiredtiger_extension_init(WT_CONNECTION *connection, const char *conf
 /*! No matching record was found, including when reaching the limits of a cursor traversal. */
 #define	WT_NOTFOUND	(-10000)
 
-/*! \defgroup extensions Application extension points
- * @{
- */
 /*!
  * Applications can extend WiredTiger by providing new implementation of the
  * WT_CURSOR interface.  This is done by implementing the WT_CURSOR_FACTORY
@@ -723,6 +730,20 @@ struct WT_COLLATOR {
 };
 
 /*!
+ * The interface implemented by applications in order to handle errors.
+ */
+struct WT_ERROR_HANDLER {
+	/*! Callback to handle errors within the session. */
+	int (*handle_error)(WT_ERROR_HANDLER *handler, int err, const char *errmsg);
+
+	/*! Optional callback to retrieve buffered messages. */
+	int (*get_messages)(WT_ERROR_HANDLER *handler, const char **errmsgp);
+
+	/*! Optional callback to clear buffered messages. */
+	int (*clear_messages)(WT_ERROR_HANDLER *handler);
+};
+
+/*!
  * The interface implemented by applications to provide custom extraction of
  * index keys or column set values.
  */
@@ -737,8 +758,8 @@ struct WT_EXTRACTOR {
 
 /*! @} */
 
-/*! @} */
-
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* _WIREDTIGER_H_ */

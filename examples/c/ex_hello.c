@@ -1,5 +1,5 @@
 /*
- * ex_hello.c Copyright (c) 2010 WiredTiger
+ * ex_hello.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demostrating how to create and connect to a database.
  */

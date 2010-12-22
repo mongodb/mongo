@@ -1,5 +1,5 @@
 /*
- * ex_column.c Copyright (c) 2010 WiredTiger
+ * ex_column.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example application demonstrating how to create and access
  * tables using a schema.

@@ -1,5 +1,5 @@
 /*
- * ex_stat.c Copyright (c) 2010 WiredTiger
+ * ex_stat.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demostrating how to query a database's statistics.
  */
