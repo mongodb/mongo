@@ -389,10 +389,15 @@ namespace mongo {
     string errnoWithPrefix( const char * prefix );
 
     void Logstream::logLockless( const StringData& s ){
+
+        if ( s.size() == 0 )
+            return;
+
         if ( doneSetup == 1717 ){
-            if(fwrite(s.data(), s.size(), 1, logfile)){
+            if (fwrite(s.data(), s.size(), 1, logfile)){
                 fflush(logfile);
-            }else{
+            }
+            else{
                 int x = errno;
                 cout << "Failed to write to logfile: " << errnoWithDescription(x) << endl;
             }
