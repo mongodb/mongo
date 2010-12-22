@@ -105,7 +105,7 @@ namespace mongo {
         }
         
         string FileCreatedOp::toString() { 
-            return str::stream() << "FileCreatedOp " << _p.toString() << ' ' << _len/1024.0/1024.0;
+            return str::stream() << "FileCreatedOp " << _p.toString() << ' ' << _len/1024.0/1024.0 << "MB";
         }
 
         // if an operation deletes or creates a file (or moves etc.), it may need files closed.
