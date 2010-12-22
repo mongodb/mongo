@@ -1361,6 +1361,9 @@ smokeEnv.AlwaysBuild( "addMongodReqNoJsTargets" )
 smokeEnv.Alias( "smokeAllNoJs", [ "smoke", "mongosTest", "addMongodReqNoJsTargets" ] )
 smokeEnv.AlwaysBuild( "smokeAllNoJs" )
 
+# dummy smokeDur for 1.6
+smokeEnv.Alias( "smokeDur" , "util/concurrency/" )
+
 def recordPerformance( env, target, source ):
     from buildscripts import benchmark_tools
     global perftest
