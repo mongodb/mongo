@@ -136,7 +136,6 @@ public:
 
 #ifndef O_NOATIME
 #define O_NOATIME 0
-#define lseek64 lseek
 #endif
 
     void open(const char *filename, bool readOnly=false ) {
@@ -150,7 +149,7 @@ public:
         _bad = false;
     }
     void write(fileofs o, const char *data, unsigned len) {
-        lseek64(fd, o, SEEK_SET);
+        lseek(fd, o, SEEK_SET);
         err( ::write(fd, data, len) == (int) len );
     }
     void read(fileofs o, char *data, unsigned len) {
