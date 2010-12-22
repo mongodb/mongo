@@ -76,7 +76,7 @@ public:
                  NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if( !is_open() ) {
              DWORD e = GetLastError();
-             out() << "Create/Open File failed " << filename << " errno:" << e << endl;
+             log() << "Create/Open File failed " << filename << ' ' << errnoWithDescription(e) << endl;
         }
         else 
             _bad = false;
