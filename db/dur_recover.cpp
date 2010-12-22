@@ -33,6 +33,9 @@
 #include "cmdline.h"
 #include "curop.h"
 
+#include <sys/stat.h>
+#include <fcntl.h>
+
 using namespace mongoutils;
 
 namespace mongo { 
@@ -168,15 +171,13 @@ namespace mongo {
         };
 
         
-        /** retrieve the mmap pointer for the specified dbName plus file number.
+        /** retrieve the file for the specified dbName plus file number.
             open if not yet open.
         */
-        void* RecoveryJob::ptr(const char *dbName, int fileNo, unsigned ofs) {
-            void *&p = _fileToPtr[ pair<int,string>(fileNo,dbName) ];
+        File& RecoveryJob::getFile(const char *dbName, int fileNo) {
+            File &file = _files[ make_pair(fileNo,dbName) ];
 
-            if( p == 0 ) {
-                MemoryMappedFile *f = new MemoryMappedFile();
-                _files.push_back( shared_ptr<MemoryMappedFile>(f) );
+            if(!file.is_open()) {
                 string fn;
                 {
                     stringstream ss;
@@ -193,24 +194,30 @@ namespace mongo {
                     */
                     fn = ss.str();
                 }
+
                 path full(dbpath);
                 try {
                     // relative name -> full path name
                     full /= fn;
-                    p = f->map(full.string().c_str());
+                    file.open(full.string().c_str());
                 }
                 catch(DBException&) { 
                     log() << "recover error opening file " << full.string() << endl;
                     throw;
                 }
-                uassert(13534, str::stream() << "recovery error couldn't open " << fn, p);
+                uassert(13534, str::stream() << "recovery error couldn't open " << fn, file.is_open());
+
+                //TODO(mathias) add length method to File and enable these asserts
+                // They are less important now that we are using write() rather than mmap
+#if 0
                 if( cmdLine.durOptions & CmdLine::DurDumpJournal ) 
                     log() << "  opened " << fn << ' ' << f->length()/1024.0/1024.0 << endl;
                 uassert(13543, str::stream() << "recovery error file has length zero " << fn, f->length());
                 assert( ofs < f->length() );
+#endif
             }
 
-            return ((char*) p) + ofs;
+            return file;
         }
 
         RecoveryJob::~RecoveryJob() { 
@@ -224,9 +231,11 @@ namespace mongo {
         }
 
         void RecoveryJob::_close() { 
-            MongoFile::flushAll(true);
+            for(FileMap::iterator it(_files.begin()), end(_files.end()); it!=end; ++it){
+                it->second.fsync();
+            }
+
             _files.clear(); // closes files
-            _fileToPtr.clear();
         }
 
         void RecoveryJob::applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump) { 
@@ -243,8 +252,9 @@ namespace mongo {
                     log() << ss.str() << endl;
                 } 
                 if( apply ) {
-                    void *p = ptr(entry.dbName, entry.e->getFileNo(), entry.e->ofs);
-                    memcpy(p, entry.e->srcData(), entry.e->len);
+                    //TODO(mathias) look into writev() on linux
+                    File& file = getFile(entry.dbName, entry.e->getFileNo());
+                    file.write(entry.e->ofs, entry.e->srcData(), entry.e->len);
                 }
             } 
             else if(entry.op) {

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "../util/concurrency/mutex.h"
+#include "../util/file.h"
 
 namespace mongo {
     class MemoryMappedFile;
@@ -28,22 +29,21 @@ namespace mongo {
             bool processFile(path journalfile);
             void _close(); // doesn't lock
 
-            /** retrieve the mmap pointer for the specified dbName plus file number.
+            /** retrieve the File for the specified dbName plus file number.
                 open if not yet open.
                 @param fileNo a value of -1 indicates ".ns"
                 @param ofs offset to add to the pointer before returning
             */
-            void* ptr(const char *dbName, int fileNo, unsigned ofs);
+            File& getFile(const char *dbName, int fileNo);
 
-            // fileno,dbname -> map
-            map< pair<int,string>, void* > _fileToPtr;
-
+            // fileno,dbname -> File
             // all close at end (destruction) of RecoveryJob
-            list< shared_ptr<MemoryMappedFile> > _files;
+            typedef map< pair<int,string>, File > FileMap;
+            FileMap _files;
 
             unsigned long long _lastDataSyncedFromLastRun;
 
-            mongo::mutex _mx; // protects _files and _fileToPtr
+            mongo::mutex _mx; // protects _files
 
             static RecoveryJob _instance;
         };
