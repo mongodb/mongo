@@ -758,6 +758,9 @@
     <ClCompile Include="perftests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
+    <ClCompile Include="directclienttests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

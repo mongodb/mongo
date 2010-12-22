@@ -281,7 +281,7 @@ namespace mongo {
         cout << "dl[1]: " << deletedList[1].toString() << endl;
     }
 
-    /* everything from end on, eliminate from the capped collection.
+    /* truncate everything from 'end' onward from the capped collection.
        @param inclusive if true, deletes end (i.e. closed or open range)
     */
     void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive) {

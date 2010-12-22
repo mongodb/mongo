@@ -85,7 +85,7 @@ namespace mongo {
                 LocalDbBit  = 0x80000000  // assuming "local" db instead of using the JDbContext
             };
             int _fileNo;   // high bit is set to indicate it should be the <dbpath>/local database
-            // char data[] follows
+            // char data[len] follows
 
             const char * srcData() const { 
                 const int *i = &_fileNo;

@@ -1624,10 +1624,12 @@ namespace mongo {
             uassert( 13416, "captrunc must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             int n = cmdObj.getIntField( "n" );
+
+            // inclusive range?
             bool inc = cmdObj.getBoolField( "inc" );
             NamespaceDetails *nsd = nsdetails( ns.c_str() );
             ReverseCappedCursor c( nsd );
-            massert( 13417, "captrunc invalid collection", c.ok() );
+            massert( 13417, "captrunc collection not found or empty", c.ok() );
             for( int i = 0; i < n; ++i ) {
                 massert( 13418, "captrunc invalid n", c.advance() );
             }

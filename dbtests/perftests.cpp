@@ -91,6 +91,9 @@ namespace PerfTests {
     };
     int DefInvoke::tot;
 
+    class CappedTest : public ClientBase { 
+    };
+
     class B : public ClientBase 
     { 
         string _ns;
