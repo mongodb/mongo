@@ -361,7 +361,7 @@ namespace mongo {
                 b->k(j) = b->k(j-1);
         }
 
-        getDur().declareWriteIntent(&b->emptySize, 12);
+        getDur().declareWriteIntent(&b->emptySize, 12); // [b->emptySize..b->n] is 12 bytes and we are going to write those
         b->emptySize -= sizeof(_KeyNode);
         b->n++;
 
