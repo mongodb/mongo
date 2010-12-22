@@ -113,7 +113,7 @@ namespace mongo {
             fd = CreateFile(
                      toNativeString(filename).c_str(),
                      rw, // desired access
-                     FILE_SHARE_READ, // share mode
+                     FILE_SHARE_WRITE | FILE_SHARE_READ, // share mode
                      NULL, // security
                      OPEN_ALWAYS, // create disposition
                      createOptions , // flags

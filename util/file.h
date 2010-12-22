@@ -72,7 +72,7 @@ public:
     void open(const char *filename, bool readOnly=false ) {
         fd = CreateFile(
                  toNativeString(filename).c_str(),
-                 ( readOnly ? 0 : GENERIC_WRITE ) | GENERIC_READ, FILE_SHARE_READ,
+                 ( readOnly ? 0 : GENERIC_WRITE ) | GENERIC_READ, FILE_SHARE_WRITE|FILE_SHARE_READ,
                  NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if( !is_open() ) {
              DWORD e = GetLastError();
