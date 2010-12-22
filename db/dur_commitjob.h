@@ -30,13 +30,17 @@
 namespace mongo { 
     namespace dur {
 
-        /** declaration of an intent to write to a region of a memory mapped view */
+        /** declaration of an intent to write to a region of a memory mapped view
+         *
+         * We store the end rather than the start pointer to make operator< faster
+         * since that is heavily used in set lookup.
+         */
         struct WriteIntent /* copyable */ { 
             WriteIntent() : w_ptr(0), p(0) { }
-            WriteIntent(void *a, unsigned b) : w_ptr(0), p(a), len(b) { }
+            WriteIntent(void *a, unsigned b) : w_ptr(0), p((char*)a+b), len(b) { }
 
-            void* start() const { return p; }
-            void* end() const { return (char*) p + len; }
+            void* start() const { return (char*)p - len; }
+            void* end() const { return p; }
             int length() const { return len; }
 
             bool operator < (const WriteIntent& rhs) const { return end() < rhs.end(); }
@@ -60,9 +64,8 @@ namespace mongo {
 
             /*temp*/ mutable void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap 
         private:
-            void *p;      // intent to write at p
+            void *p;      // intent to write up to p
             unsigned len; // up to this len
-
         };
 
         /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 

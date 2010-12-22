@@ -175,10 +175,10 @@ namespace mongo {
                 return;
             const WriteIntent &i = commitJob.lastWrite();
             size_t ofs;
-            MongoMMF *mmf = privateViews.find(i.p, ofs);
+            MongoMMF *mmf = privateViews.find(i.start(), ofs);
             if( mmf == 0 ) 
                 return;
-            size_t past = ofs + i.len;
+            size_t past = ofs + i.length();
             if( mmf->length() < past + 8 ) 
                 return; // too close to end of view
             char *priv = (char *) mmf->getView();
@@ -188,14 +188,14 @@ namespace mongo {
             if( *a != *b ) { 
                 for( set<WriteIntent>::iterator it(commitJob.writes().begin()), end((commitJob.writes().begin())); it != end; ++it ) { 
                     const WriteIntent& wi = *it;
-                    char *r1 = (char*) wi.p;
-                    char *r2 = r1 + wi.len;
+                    char *r1 = (char*) wi.start();
+                    char *r2 = (char*) wi.end();
                     if( r1 <= (((char*)a)+8) && r2 > (char*)a ) { 
                         //log() << "it's ok " << wi.p << ' ' << wi.len << endl;
                         return;
                     }
                 }
-                log() << "dur data after write area " << i.p << " does not agree" << endl;
+                log() << "dur data after write area " << i.start() << " does not agree" << endl;
                 log() << " was:  " << ((void*)b) << "  " << hexdump((char*)b, 8) << endl;
                 log() << " now:  " << ((void*)a) << "  " << hexdump((char*)a, 8) << endl;
                 log() << " n:    " << n << endl;

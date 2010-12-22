@@ -30,9 +30,9 @@ namespace mongo {
         void WriteIntent::absorb(const WriteIntent& other){
             dassert(overlaps(other));
 
-            void* newEnd = max(end(), other.end());
-            p = min(p, other.p);
-            len = (char*)newEnd - (char*)p;
+            void* newStart = min(start(), other.start());
+            p = max(p, other.p);
+            len = (char*)p - (char*)newStart;
 
             dassert(contains(other));
         }
