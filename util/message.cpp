@@ -485,13 +485,12 @@ namespace mongo {
             //log() << "got response: " << response.data->responseTo << endl;
             if ( response.header()->responseTo == toSend.header()->id )
                 break;
-            log() << "********************" << endl;
-            log() << "ERROR: MessagingPort::call() wrong id got:" << hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << endl;
-            log() << "  toSend op: " << toSend.operation() << endl;
-            log() << "  response msgid:" << (unsigned)response.header()->id << endl;
-            log() << "  response len:  " << (unsigned)response.header()->len << endl;
-            log() << "  response op:  " << response.operation() << endl;
-            log() << "  farEnd: " << farEnd << endl;
+            error() << "MessagingPort::call() wrong id got:" << hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << '\n'
+                    << "  toSend op: " << toSend.operation() << '\n'
+                    << "  response msgid:" << (unsigned)response.header()->id << '\n'
+                    << "  response len:  " << (unsigned)response.header()->len << '\n'
+                    << "  response op:  " << response.operation() << '\n'
+                    << "  farEnd: " << farEnd << endl;
             assert(false);
             response.reset();
         }
