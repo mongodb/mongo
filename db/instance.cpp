@@ -38,6 +38,7 @@
 #include "stats/counters.h"
 #include "background.h"
 #include "dur_journal.h"
+#include "dur_recover.h"
 
 namespace mongo {
 
@@ -715,6 +716,10 @@ namespace mongo {
             /* is this useful?  needed?  helpful? perhaps even without _DURABLE.  ifdef'd for now just to avoid behavior change short term */
             MemoryMappedFile::flushAll(true);
         }
+
+        // this must be done before closeAllFiles
+        dur::RecoveryJob::get().close();
+
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );
