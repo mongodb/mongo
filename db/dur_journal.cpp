@@ -222,7 +222,14 @@ namespace mongo {
             }
         }
 
+        /** called during recovery (and error message text assumes that)
+        */
         unsigned long long journalReadLSN() {
+            if( !MemoryMappedFile::exists(lsnPath()) ) { 
+                log() << "info no lsn file in journal/ directory" << endl;
+                return 0;
+            }
+
             try {
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
                 // however, given we actually close the file, that seems unlikely.
@@ -232,7 +239,7 @@ namespace mongo {
                 return *L;
             }
             catch(std::exception& e) { 
-                log() << "couldn't read journal/lsn file - if a recovery is needed will apply all files. " << e.what() << endl;
+                uasserted(13611, str::stream() << "can't read lsn file in journal directory : " << e.what());
             }
             return 0;
         }
