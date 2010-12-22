@@ -407,6 +407,10 @@ def expand_suites(suites):
 
     return tests
 
+def add_exe(e):
+    if os.sys.platform.startswith( "win" ) and not e.endswith( ".exe" ):
+        e += ".exe"
+    return e
 
 def main():
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, smoke_db_prefix, test_path
@@ -442,17 +446,15 @@ def main():
 
     test_path = options.test_path
 
-    mongod_executable = options.mongod_executable
+    mongod_executable = add_exe(options.mongod_executable)
     if not os.path.exists(mongod_executable):
-        print "ERROR: no mongod found in this directory."
-        return
+        raise Exception("no mongod found in this directory.")
 
     mongod_port = options.mongod_port
 
-    shell_executable = options.shell_executable
+    shell_executable = add_exe( options.shell_executable )
     if not os.path.exists(shell_executable):
-        print "ERROR: no mongo shell found in this directory."
-        return
+        raise Exception("no mongo shell found in this directory.")
 
     continue_on_failure = options.continue_on_failure
     smoke_db_prefix = options.smoke_db_prefix
