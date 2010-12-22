@@ -149,12 +149,10 @@ public:
         _bad = false;
     }
     void write(fileofs o, const char *data, unsigned len) {
-        lseek(fd, o, SEEK_SET);
-        err( ::write(fd, data, len) == (int) len );
+        err( ::pwrite(fd, data, len, o) == (int) len );
     }
     void read(fileofs o, char *data, unsigned len) {
-        lseek(fd, o, SEEK_SET);
-        err( ::read(fd, data, len) == (int) len );
+        err( ::pread(fd, data, len, o) == (int) len );
     }
     bool bad() { return _bad; }
     bool is_open() { return fd > 0; }
