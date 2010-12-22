@@ -207,14 +207,8 @@ namespace mongo {
                 }
                 uassert(13534, str::stream() << "recovery error couldn't open " << fn, file.is_open());
 
-                //TODO(mathias) add length method to File and enable these asserts
-                // They are less important now that we are using write() rather than mmap
-#if 0
                 if( cmdLine.durOptions & CmdLine::DurDumpJournal ) 
-                    log() << "  opened " << fn << ' ' << f->length()/1024.0/1024.0 << endl;
-                uassert(13543, str::stream() << "recovery error file has length zero " << fn, f->length());
-                assert( ofs < f->length() );
-#endif
+                    log() << "  opened " << fn << ' ' << file.len()/1024.0/1024.0 << endl;
             }
 
             return file;
