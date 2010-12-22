@@ -235,7 +235,16 @@ namespace mongo {
             _id == cmdLine.ourSetName());
         uassert(13308, "replSet bad config version #", version > 0);
         uassert(13133, "replSet bad config no members", members.size() >= 1);
-        uassert(13309, "replSet bad config maximum number of members is 7 (for now)", members.size() <= 7);
+        uassert(13309, "replSet bad config maximum number of members is 12", members.size() <= 12);
+        {
+            unsigned voters = 0;
+            for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); ++i ) { 
+                if( i->votes )
+                    voters++;
+            }
+            uassert(13612, "replSet bad config maximum number of voting members is 7", voters <= 7);
+            uassert(13613, "replSet bad config no voting members", voters > 0);
+        }
     }
 
     void ReplSetConfig::from(BSONObj o) {
