@@ -24,7 +24,6 @@
 #include "../db/json.h"
 #include "../db/lasterror.h"
 #include "../db/update.h"
-#include "../db/deferredinvoker.h"
 #include "../util/timer.h"
 #include "dbtests.h"
 
