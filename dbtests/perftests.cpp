@@ -210,6 +210,9 @@ namespace PerfTests {
     */
     class Update1 : public B { 
     public:
+        static int rand() { 
+            return std::rand() & 0x7fff;
+        }
         string name() { return "random upserts"; }
         void prep() { 
             client().insert( ns(), BSONObj() );
