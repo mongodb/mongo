@@ -540,7 +540,7 @@ namespace mongo {
                             return;
                         }
                     }
-                    ClientCursor::staticYield( micros );
+                    ClientCursor::staticYield( micros , _plans._ns );
                     for( vector< shared_ptr< QueryOp > >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
                         recoverFromYield( **i );
                     }                        

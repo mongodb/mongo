@@ -174,7 +174,7 @@ namespace mongo {
         bool yieldSometimes();
         
         static int yieldSuggest();
-        static void staticYield( int micros );
+        static void staticYield( int micros , const StringData& ns );
         
         struct YieldData { CursorId _id; bool _doingDeletes; };
         bool prepareToYield( YieldData &data );

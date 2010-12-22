@@ -349,7 +349,7 @@ namespace mongo {
         return ( micros > 0 ) ? yield( micros ) : true;
     }
 
-    void ClientCursor::staticYield( int micros ) {
+    void ClientCursor::staticYield( int micros , const StringData& ns ) {
         killCurrentOp.checkForInterrupt( false );
         {
             dbtempreleasecond unlock;
@@ -360,7 +360,7 @@ namespace mongo {
                     sleepmicros( micros ); 
             }
             else {
-                log( LL_WARNING ) << "ClientCursor::yield can't unlock b/c of recursive lock" << endl;
+                warning() << "ClientCursor::yield can't unlock b/c of recursive lock ns: " << ns << endl;
             }
         }        
     }
@@ -418,7 +418,7 @@ namespace mongo {
         YieldData data; 
         prepareToYield( data );
         
-        staticYield( micros );
+        staticYield( micros , _ns );
 
         return ClientCursor::recoverFromYield( data );
     }
