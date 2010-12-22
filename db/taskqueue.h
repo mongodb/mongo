@@ -22,44 +22,42 @@
 
 namespace mongo {
 
-    /** defer work for invocation by another thread.  presumption is that thread is outside of locks 
-        more than the source thread that queues the deferred invocations.
+    /** defer work items by queueing them for invocation by another thread.  presumption is that 
+        consumer thread is outside of locks more than the source thread.  Additional presumption 
+        is that several objects or micro-tasks will be queued and that having a single thread 
+        processing them in batch is hepful as they (in the first use case) use a common data 
+        structure that can then be in local cpu classes.
 
         this class is in db/ as it is dbMutex (mongomutex) specific (so far).
 
-        using boost::bind() would be more elegant, but this will be used in a very hot code path, so 
-        we need to test performance impact before doing that.
-
         using a functor instead of go() might be more elegant too, once again, would like to test any 
-        performance differential.
+        performance differential.  also worry that operator() hides things?
 
-        V - copyable object we can queue
-            V must have a static method go(V) or go(const V&)
+        MT - copyable "micro task" object we can queue
+             must have a static method void MT::go(const MT&)             
 
         see DefInvoke in dbtests/ for an example.
     */
-    template< class V >
-    class DeferredInvoker {
+    template< class MT >
+    class TaskQueue {
     public:
-        DeferredInvoker() : _invokeMutex("deferredinvoker") {
-            _which = 0;
-        }
+        TaskQueue() : _invokeMutex("deferredinvoker"), _which(0) { }
 
-        void defer(V v) { 
+        void defer(MT mt) { 
             // only one writer allowed.  however the invoke processing below can occur concurrently with 
             // writes (for the most part)
             DEV dbMutex.assertWriteLocked(); 
 
-            _queues[_which].push_back(v);
+            _queues[_which].push_back(mt);
         }
 
-        /** call to process pending invocations.  
+        /** call to process deferrals.
 
             concurrency: handled herein.  multiple threads could call invoke(), but their efforts will be 
-                         serialized.  the common case is that there is a single processor of invocations.
+                         serialized.  the common case is that there is a single processor calling invoke().
 
             normally, you call this outside of any lock.  but if you want to fully drain the queue,
-            call from within a read lock.  a good way to drain :
+            call from within a read lock.  for example:
             {
               // drain with minimal time in lock
               d.invoke();
@@ -67,10 +65,11 @@ namespace mongo {
               d.invoke();
               ...
             }
+            you can also call invoke periodically to do some work and then pick up later on more.
         */
         void invoke() { 
             {
-                // flip defer to the other queue
+                // flip queueing to the other queue (we are double buffered)
                 readlock lk;
                 mutex::scoped_lock lk2(_invokeMutex);
                 int other = _which ^ 1;
@@ -85,7 +84,7 @@ namespace mongo {
 
     private:
         int _which; // 0 or 1
-        typedef vector< V > Queue;
+        typedef vector< MT > Queue;
         Queue _queues[2];
 
         // lock order when multiple locks: dbMutex, _invokeMutex
@@ -94,8 +93,8 @@ namespace mongo {
         void _drain(Queue& queue) {
             unsigned oldCap = queue.capacity();
             for( typename Queue::iterator i = queue.begin(); i != queue.end(); i++ ) { 
-		const V& v = *i;
-                V::go(v);
+                const MT& v = *i;
+                MT::go(v);
             }
             queue.clear();
             DEV assert( queue.capacity() == oldCap ); // just checking that clear() doesn't deallocate, we don't want that            

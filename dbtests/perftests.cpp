@@ -29,7 +29,7 @@
 #include "../db/json.h"
 #include "../db/lasterror.h"
 #include "../db/update.h"
-#include "../db/deferredinvoker.h"
+#include "../db/taskqueue.h"
 #include "../util/timer.h"
 #include "dbtests.h"
 
@@ -73,7 +73,7 @@ namespace PerfTests {
     public:
         void run() { 
             tot = 0;
-            DeferredInvoker<V> d;
+            TaskQueue<V> d;
             int x = 0;
             for( int i = 0; i < 100; i++ ) {
                 if( i % 30 == 0 )

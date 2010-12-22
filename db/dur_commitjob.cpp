@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "dur_commitjob.h"
-#include "deferredinvoker.h"
+#include "taskqueue.h"
 
 namespace mongo {
     namespace dur {

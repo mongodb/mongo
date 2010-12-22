@@ -25,7 +25,7 @@
 #include "cmdline.h"
 #include "durop.h"
 #include "dur.h"
-#include "deferredinvoker.h"
+#include "taskqueue.h"
 
 namespace mongo { 
     namespace dur {
@@ -102,7 +102,7 @@ namespace mongo {
                 static void go(const D& d);
             };
         public:
-            DeferredInvoker<D> _deferred;
+            TaskQueue<D> _deferred;
             Already<127> _alreadyNoted;
             set<WriteIntent> _writes;
             vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
