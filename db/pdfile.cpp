@@ -272,7 +272,7 @@ namespace mongo {
     */
     bool userCreateNS(const char *ns, BSONObj options, string& err, bool logForReplication, bool *deferIdIndex) {
         const char *coll = strchr( ns, '.' ) + 1;
-        massert( 10356 ,  "invalid ns", coll && *coll );
+        massert( 10356 ,  str::stream() << "invalid ns: " << ns , coll && *coll );
         char cl[ 256 ];
         nsToDatabase( ns, cl );
         bool ok = _userCreateNS(ns, options, err, deferIdIndex);
