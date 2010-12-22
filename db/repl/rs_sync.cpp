@@ -176,38 +176,87 @@ namespace mongo {
         return golive;
     }
 
+    /**
+     * Checks if the oplog given is too far ahead to read from.
+     *
+     * @param r the oplog
+     * @param hn the hostname (for log messages)
+     *
+     * @return if we are stale compared to the oplog on hn
+     */
+    bool ReplSetImpl::_isStale(OplogReader& r, const string& hn) {
+        BSONObj remoteOldestOp = r.findOne(rsoplog, Query());
+        OpTime ts = remoteOldestOp["ts"]._opTime();
+        DEV log() << "replSet remoteOldestOp:    " << ts.toStringLong() << rsLog;
+        else log(3) << "replSet remoteOldestOp: " << ts.toStringLong() << rsLog;
+        DEV { 
+            // debugging sync1.js...
+            log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
+            log() << "replSet our state: " << state().toString() << rsLog;
+        }
+        if( lastOpTimeWritten < ts ) { 
+            log() << "replSet error RS102 too stale to catch up, at least from " << hn << rsLog;
+            log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
+            log() << "replSet oldest at " << hn << " : " << ts.toStringLong() << rsLog;
+            log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
+            sethbmsg("error RS102 too stale to catch up");
+            changeState(MemberState::RS_RECOVERING);
+            sleepsecs(120);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Tries to connect the oplog reader to a potential sync source.  If
+     * successful, it checks that we are not stale compared to this source.
+     *
+     * @param r reader to populate
+     * @param hn hostname to try
+     *
+     * @return if both checks pass, it returns true, otherwise false.
+     */
+    bool ReplSetImpl::_getOplogReader(OplogReader& r, string& hn) {
+        if( !r.connect(hn) ) {
+            log(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
+            return false;
+        }
+        if( _isStale(r, hn)) {
+            return false;
+        }
+        return true;
+    }        
+    
     /* tail the primary's oplog.  ok to return, will be re-called. */
     void ReplSetImpl::syncTail() { 
         // todo : locking vis a vis the mgr...
-
-        const Member *primary = box.getPrimary();
-        if( primary == 0 ) return;
-        string hn = primary->h().toString();
         OplogReader r;
-        if( !r.connect(primary->h().toString()) ) { 
-            log(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
-            return;
-        }
+        string hn;
 
-        /* first make sure we are not hopelessly out of sync by being very stale. */
-        {
-            BSONObj remoteOldestOp = r.findOne(rsoplog, Query());
-            OpTime ts = remoteOldestOp["ts"]._opTime();
-            DEV log() << "replSet remoteOldestOp:    " << ts.toStringLong() << rsLog;
-            else log(3) << "replSet remoteOldestOp: " << ts.toStringLong() << rsLog;
-            DEV { 
-                // debugging sync1.js...
-                log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
-                log() << "replSet our state: " << state().toString() << rsLog;
+        const Member *target = box.getPrimary();
+        // if we cannot reach the master but someone else is more up-to-date
+        // than we are, sync from them.  
+        if( target == 0 ) {
+            Member *max = 0;
+            for(Member *m = head(); m; m=m->next()) {
+                hn = m->h().toString();
+                if (m->hbinfo().up() &&
+                    (!max || m->hbinfo().opTime > max->hbinfo().opTime) &&
+                    _getOplogReader(r, hn)) {
+                    max = m;
+                    break;
+                }
             }
-            if( lastOpTimeWritten < ts ) { 
-                log() << "replSet error RS102 too stale to catch up, at least from primary: " << hn << rsLog;
-                log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
-                log() << "replSet oldest at " << hn << " : " << ts.toStringLong() << rsLog;
-                log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
-                sethbmsg("error RS102 too stale to catch up");
-                changeState(MemberState::RS_RECOVERING);
-                sleepsecs(120);
+            
+            if (max && max->hbinfo().opTime > lastOpTimeWritten) {
+                target = max;
+            }
+            else {
+                return;
+            }
+        } else {
+            hn = target->h().toString();
+            if (!_getOplogReader(r, hn)) {
                 return;
             }
         }
@@ -257,7 +306,7 @@ namespace mongo {
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) { 
                 log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << endl;
-                log() << "replset primary's GTE: " << ts.toStringPretty() << endl;
+                log() << "replset source's GTE: " << ts.toStringPretty() << endl;
                 syncRollback(r);
                 return;
             }
@@ -289,9 +338,11 @@ namespace mongo {
 
                         /* todo: too stale capability */
                     }
-
-                    if( box.getPrimary() != primary ) 
+                    
+                    if( target->hbinfo().hbstate != MemberState::RS_PRIMARY &&
+                        target->hbinfo().hbstate != MemberState::RS_SECONDARY ) {
                         return;
+                    }
                 }
                 if( !r.more() )
                     break;
@@ -320,8 +371,10 @@ namespace mongo {
                                     sleepsecs(6);
                                     if( time(0) >= waitUntil )
                                         break;
-                                    if( box.getPrimary() != primary )
+                                    if( target->hbinfo().hbstate != MemberState::RS_PRIMARY &&
+                                        target->hbinfo().hbstate != MemberState::RS_SECONDARY ) {
                                         break;
+                                    }
                                     if( myConfig().slaveDelay != sd ) // reconf
                                         break;
                                 }
@@ -336,9 +389,8 @@ namespace mongo {
                         /* if we have become primary, we dont' want to apply things from elsewhere
                            anymore. assumePrimary is in the db lock so we are safe as long as 
                            we check after we locked above. */
-                        if( box.getPrimary() != primary ) {
-                            if( box.getState().primary() )
-                                log(0) << "replSet stopping syncTail we are now primary" << rsLog;
+                        if( box.getState().primary() ) {
+                            log(0) << "replSet stopping syncTail we are now primary" << rsLog;
                             return;
                         }
 
@@ -353,8 +405,10 @@ namespace mongo {
                 // TODO : reuse our connection to the primary.
                 return;
             }
-            if( box.getPrimary() != primary )
+            if( target->hbinfo().hbstate != MemberState::RS_PRIMARY &&
+                target->hbinfo().hbstate != MemberState::RS_SECONDARY ) {
                 return;
+            }
             // looping back is ok because this is a tailable cursor
         }
     }
@@ -367,11 +421,6 @@ namespace mongo {
         }
         if( sp.state.fatal() ) { 
             sleepsecs(5);
-            return;
-        }
-
-        /* later, we can sync from up secondaries if we want. tbd. */
-        if( sp.primary == 0 ) {
             return;
         }
 

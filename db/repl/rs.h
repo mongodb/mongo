@@ -348,6 +348,8 @@ namespace mongo {
         unsigned _syncRollback(OplogReader& r);
         void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);
+        bool _getOplogReader(OplogReader& r, string& hn);
+        bool _isStale(OplogReader& r, const string& hn);
     public:
         void syncThread();
     };
