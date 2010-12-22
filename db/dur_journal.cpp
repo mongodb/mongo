@@ -251,6 +251,8 @@ namespace mongo {
 
                 last = time(0);
 
+                (void)lsn; // mark as used
+#if 0
                 try {
                     // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
                     // however, given we actually close the file, that seems unlikely.
@@ -263,6 +265,7 @@ namespace mongo {
                 catch(std::exception& e) { 
                     log() << "write to lsn file fails " << e.what() << endl;
                 }
+#endif
             }
         }
 
