@@ -56,6 +56,9 @@ namespace mongo {
 
             /** replay the operation (during recovery) 
                 throws
+
+                For now, these are not replayed during the normal WRITETODATAFILES phase, since these
+                operations are handled in other parts of the code. At some point this may change.
             */
             virtual void replay() = 0;
 

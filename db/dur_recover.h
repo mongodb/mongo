@@ -17,7 +17,7 @@ namespace mongo {
             RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") {}
             void go(vector<path>& files);
             ~RecoveryJob();
-            void processSection(const void *, unsigned len);
+            void processSection(const void *, unsigned len, bool doDurOps);
             void close(); // locks and calls _close()
 
             static RecoveryJob & get() { return _instance; }

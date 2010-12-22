@@ -86,10 +86,11 @@ namespace mongo {
         */
         class JournalSectionIterator : boost::noncopyable {
         public:
-            JournalSectionIterator(const void *p, unsigned len)
+            JournalSectionIterator(const void *p, unsigned len, bool doDurOps)
                 : _br(p, len)
                 , _sectHead(static_cast<const JSectHeader*>(_br.skip(sizeof(JSectHeader))))
                 , _lastDbName(NULL)
+                , _doDurOps(doDurOps)
             {}
 
             bool atEof() const { return _br.atEof(); }
@@ -125,7 +126,10 @@ namespace mongo {
                 case JEntry::OpCode_DropDb:
                     { 
                         e.dbName = 0;
-                        e.op = DurOp::read(lenOrOpCode, _br);
+                        boost::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, _br);
+                        if (_doDurOps) {
+                            e.op = op;
+                        }
                         return true;
                     }
 
@@ -158,6 +162,7 @@ namespace mongo {
             BufReader _br;
             const JSectHeader* _sectHead;
             const char *_lastDbName; // pointer into mmaped journal file
+            const bool _doDurOps;
         };
 
         
@@ -242,7 +247,7 @@ namespace mongo {
                     memcpy(p, entry.e->srcData(), entry.e->len);
                 }
             } 
-            else {
+            else if(entry.op) {
                 // a DurOp subclass operation
                 if( dump ) {
                     log() << "  OP " << entry.op->toString() << endl;
@@ -270,11 +275,11 @@ namespace mongo {
                 log() << "END section" << endl;
         }
 
-        void RecoveryJob::processSection(const void *p, unsigned len) {
+        void RecoveryJob::processSection(const void *p, unsigned len, bool doDurOps) {
             scoped_lock lk(_mx);
 
             vector<ParsedJournalEntry> entries;
-            JournalSectionIterator i(p, len);
+            JournalSectionIterator i(p, len, doDurOps);
 
             if( _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) { 
                 log() << "recover skipping application of section " << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
@@ -312,7 +317,7 @@ namespace mongo {
                 while ( !br.atEof() ) {
                     JSectHeader h;
                     br.peek(h);
-                    processSection(br.skip(h.len), h.len);
+                    processSection(br.skip(h.len), h.len, /*doDurOps*/true);
 
                     // ctrl c check
                     killCurrentOp.checkForInterrupt(false);
