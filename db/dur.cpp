@@ -46,6 +46,7 @@
 #include "dur.h"
 #include "dur_journal.h"
 #include "dur_commitjob.h"
+#include "dur_recover.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
@@ -360,12 +361,17 @@ namespace mongo {
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
+#if 0
             // write the noted write intent entries to the data files.
             // this has to come after writing to the journal, obviously...
             MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
             WRITETODATAFILES();
             if (!dbMutex.isWriteLocked())
                 MongoFile::unmarkAllWritable();
+#else
+            RecoveryJob::get().processSection(commitJob._ab.buf(), commitJob._ab.len(), false);
+            debugValidateMapsMatch();
+#endif
 
             commitJob.reset();
 
@@ -415,6 +421,10 @@ namespace mongo {
         void closingFileNotification() {
             if( dbMutex.atLeastReadLocked() ) {
                 groupCommit(); 
+
+                if (!inShutdown()){
+                    RecoveryJob::get().close();
+                }
             }
             else {
                 assert( inShutdown() );
