@@ -105,48 +105,50 @@ namespace mongo {
                 unsigned lenOrOpCode;
                 _br.read(lenOrOpCode);
 
-                switch( lenOrOpCode ) {
+                if (lenOrOpCode > JEntry::OpCode_Min){
+                    switch( lenOrOpCode ) {
 
-                case JEntry::OpCode_Footer:
-                    { 
-                        const char* pos = (const char*) _br.pos();
-                        pos -= sizeof(lenOrOpCode); // rewind to include OpCode
-                        const JSectFooter& footer = *(const JSectFooter*)pos;
-                        int len = pos - (char*)_sectHead;
-                        if (!footer.checkHash(_sectHead, len)){
-                            massert(13594, str::stream() << "Journal checksum doesn't match. recorded: "
-                                << toHex(footer.hash, sizeof(footer.hash))
-                                << " actual: " << md5simpledigest(_sectHead, len)
-                                , false);
+                    case JEntry::OpCode_Footer:
+                        { 
+                            const char* pos = (const char*) _br.pos();
+                            pos -= sizeof(lenOrOpCode); // rewind to include OpCode
+                            const JSectFooter& footer = *(const JSectFooter*)pos;
+                            int len = pos - (char*)_sectHead;
+                            if (!footer.checkHash(_sectHead, len)){
+                                massert(13594, str::stream() << "Journal checksum doesn't match. recorded: "
+                                    << toHex(footer.hash, sizeof(footer.hash))
+                                    << " actual: " << md5simpledigest(_sectHead, len)
+                                    , false);
+                            }
+                            return false; // false return value denotes end of section
                         }
-                        return false; // false return value denotes end of section
-                    }
 
-                case JEntry::OpCode_FileCreated:
-                case JEntry::OpCode_DropDb:
-                    { 
-                        e.dbName = 0;
-                        boost::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, _br);
-                        if (_doDurOps) {
-                            e.op = op;
+                    case JEntry::OpCode_FileCreated:
+                    case JEntry::OpCode_DropDb:
+                        { 
+                            e.dbName = 0;
+                            boost::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, _br);
+                            if (_doDurOps) {
+                                e.op = op;
+                            }
+                            return true;
                         }
-                        return true;
-                    }
 
-                case JEntry::OpCode_DbContext:
-                    {
-                        _lastDbName = (const char*) _br.pos();
-                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _br.remaining());
-                        const unsigned len = strnlen(_lastDbName, limit);
-                        massert(13533, "problem processing journal file during recovery", _lastDbName[len] == '\0');
-                        _br.skip(len+1); // skip '\0' too
-                        _br.read(lenOrOpCode);
-                    }
-                    // fall through as a basic operation always follows jdbcontext, and we don't have anything to return yet
+                    case JEntry::OpCode_DbContext:
+                        {
+                            _lastDbName = (const char*) _br.pos();
+                            const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _br.remaining());
+                            const unsigned len = strnlen(_lastDbName, limit);
+                            massert(13533, "problem processing journal file during recovery", _lastDbName[len] == '\0');
+                            _br.skip(len+1); // skip '\0' too
+                            _br.read(lenOrOpCode);
+                        }
+                        // fall through as a basic operation always follows jdbcontext, and we don't have anything to return yet
 
-                default:
-                    // fall through
-                    ;
+                    default:
+                        // fall through
+                        ;
+                    }
                 }
 
                 // JEntry - a basic write
