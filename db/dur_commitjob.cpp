@@ -24,8 +24,7 @@ namespace mongo {
     namespace dur {
 
         void Writes::D::go(const Writes::D& d) { 
-            WriteIntent w(d.p, d.len);
-            commitJob.wi()._insertWriteIntent(w);
+            commitJob.wi()._insertWriteIntent(d.p, d.len);
         }
 
         void WriteIntent::absorb(const WriteIntent& other){
@@ -45,7 +44,9 @@ namespace mongo {
             _drained = false;
         }
 
-        void Writes::_insertWriteIntent(WriteIntent& wi){
+        void Writes::_insertWriteIntent(void* p, int len){
+            WriteIntent wi(p, len);
+
             if (_writes.empty()){
                 _writes.insert(wi);
                 return;

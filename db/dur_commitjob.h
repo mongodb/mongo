@@ -75,23 +75,24 @@ namespace mongo {
                automatically upgrades the length if the length was shorter previously.
                @return true if already indicated.
             */
-            bool checkAndSet(const WriteIntent& w) {
-                unsigned x = mongoutils::hashPointer(w.p);
-                WriteIntent& nd = nodes[x % N];
-                if( nd.p == w.p ) { 
-                    if( nd.len < w.len ) {
-                        nd.len = w.len;
+            bool checkAndSet(void* p, int len) {
+                unsigned x = mongoutils::hashPointer(p);
+                pair<void*, int> nd = nodes[x % N];
+                if( nd.first == p ) { 
+                    if( nd.second < len ) {
+                        nd.second = len;
                         return false; // haven't indicated this len yet
                     }
                     return true; // already indicated
                 }
-                nd = w;
+                nd.first = p;
+                nd.second = len;
                 return false; // a new set
             }
 
         private:
             enum { N = Prime }; // this should be small the idea is that it fits in the cpu cache easily
-            WriteIntent nodes[N];
+            pair<void*,int> nodes[N];
         };
 
         /** our record of pending/uncommitted write intents */
@@ -112,13 +113,12 @@ namespace mongo {
             void clear();
 
             /** merges into set */
-            void _insertWriteIntent(WriteIntent& wi); 
+            void _insertWriteIntent(void* p, int len); 
 
-            void insertWriteIntent(WriteIntent& wi) { 
+            void insertWriteIntent(void* p, int len) { 
                 D d;
-                d.p = wi.p;
-                d.len = wi.len;
-                dassert( wi.w_ptr == 0 );
+                d.p = p;
+                d.len = len;
                 _deferred.defer(d); 
             }
 
@@ -140,7 +140,7 @@ namespace mongo {
             CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytes(0) { }
 
             /** record/note an intent to write */
-            void note(WriteIntent& w);
+            void note(void* p, int len);
 
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p);
@@ -191,10 +191,10 @@ namespace mongo {
 
         // inlines
 
-        inline void CommitJob::note(WriteIntent& w) {
+        inline void CommitJob::note(void* p, int len) {
 #if defined(_DEBUG)
             // TEMP?
-            _wi._last = w;
+            _wi._last = WriteIntent(p, len);
             getDur().debugCheckLastDeclaredWrite();
 #endif
 
@@ -203,7 +203,7 @@ namespace mongo {
             // remapprivateview
             DEV dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
-            if( !_wi._alreadyNoted.checkAndSet(w) ) {
+            if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
                 if( !_hasWritten ) {
                     // you can't be writing if one of these is pending, so this is a verification.
                     assert( !dbMutex._remapPrivateViewRequested );
@@ -242,8 +242,8 @@ namespace mongo {
 #endif
 
                 // remember intent. we will journal it in a bit
-                _wi.insertWriteIntent(w);
-                _bytes += w.len;
+                _wi.insertWriteIntent(p, len);
+                _bytes += len;
                 wassert( _wi._writes.size() <  2000000 );
                 assert(  _wi._writes.size() < 20000000 );
             }

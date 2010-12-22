@@ -90,8 +90,7 @@ namespace mongo {
 
         /** base declare write intent function that all the helpers call. */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
-            WriteIntent w(p, len);
-            commitJob.note(w);
+            commitJob.note(p, len);
         }
 
         void enableDurability() { // TODO: merge with startup() ?
