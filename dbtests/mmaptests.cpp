@@ -60,7 +60,7 @@ namespace MMapTests {
 
             // we make a lot here -- if we were leaking, presumably it would fail doing this many.
             Timer t;
-            for( int i = 0; i < 10000; i++ ) {
+            for( int i = 0; i < N; i++ ) {
                 MongoMMF f;
                 assert( f.open(fn, i%4==1) );
                 if( !testIntent ) {
