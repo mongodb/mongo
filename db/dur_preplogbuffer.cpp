@@ -68,7 +68,7 @@ namespace mongo {
             i->w_ptr = ((char*)mmf->view_write()) + ofs;
 
             JEntry e;
-            e.len = i->length();
+            e.len = min((unsigned long long)i->length(), mmf->length() - ofs); //dont write past end of file
             assert( ofs <= 0x80000000 );
             e.ofs = (unsigned) ofs;
             e.setFileNo( mmf->fileSuffixNo() );
@@ -82,7 +82,18 @@ namespace mongo {
                 bb.appendStr(lastDbPath.toString());
             }
             bb.appendStruct(e);
-            bb.appendBuf(i->start(), i->length());
+            bb.appendBuf(i->start(), e.len);
+
+
+            if (e.len != (unsigned)i->length()){
+                // This only happens if we write to the last byte in a file and
+                // the fist byte in another file that is mapped adjacently. I
+                // think most OSs leave at least a one page gap between
+                // mappings, but better to be safe.
+
+                WriteIntent next ((char*)i->start() + e.len, i->length() - e.len);
+                prepBasicWrite(bb, &next, lastDbPath);
+            }
         }
 
         /** basic write ops / write intents.  note there is no particular order to these : if we have 
