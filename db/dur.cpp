@@ -488,6 +488,7 @@ namespace mongo {
                 return;
             if( testIntent )
                 return;
+            journalMakeDir();
             try {
                 recover();
             }
@@ -495,7 +496,6 @@ namespace mongo {
                 log() << "exception during recovery" << endl;
                 throw;
             }
-            journalMakeDir();
             boost::thread t(durThread);
             boost::thread t2(unlinkThread);
             boost::thread t3(lsnThread);
