@@ -53,6 +53,7 @@ namespace mongo {
         bool startup2() const { return s == RS_STARTUP2; }
         bool fatal() const { return s == RS_FATAL; }
         bool rollback() const { return s == RS_ROLLBACK; }
+        bool readable() const { return s == RS_PRIMARY || s == RS_SECONDARY; }
 
         string toString() const;
 

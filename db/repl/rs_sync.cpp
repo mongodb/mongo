@@ -156,7 +156,7 @@ namespace mongo {
        @return true if transitioned to SECONDARY
     */
     bool ReplSetImpl::tryToGoLiveAsASecondary(OpTime& /*out*/ minvalid) { 
-        bool golive = false;			
+        bool golive = false;
         {
             readlock lk("local.replset.minvalid");
             BSONObj mv;
@@ -217,46 +217,54 @@ namespace mongo {
      * @return if both checks pass, it returns true, otherwise false.
      */
     bool ReplSetImpl::_getOplogReader(OplogReader& r, string& hn) {
+        assert(r.conn() == 0);
+        
         if( !r.connect(hn) ) {
             log(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
+            r.resetConnection();
             return false;
         }
         if( _isStale(r, hn)) {
+            r.resetConnection();
             return false;
         }
         return true;
     }        
     
-    /* tail the primary's oplog.  ok to return, will be re-called. */
+    /* tail an oplog.  ok to return, will be re-called. */
     void ReplSetImpl::syncTail() { 
         // todo : locking vis a vis the mgr...
         OplogReader r;
         string hn;
-
+        
         const Member *target = box.getPrimary();
+        if (target != 0) {
+            hn = target->h().toString();
+            if (!_getOplogReader(r, hn)) {
+                // we might be stale wrt the primary, but could still sync from
+                // a secondary
+                target = 0;
+            }
+        }
+        
         // if we cannot reach the master but someone else is more up-to-date
         // than we are, sync from them.  
         if( target == 0 ) {
-            Member *max = 0;
             for(Member *m = head(); m; m=m->next()) {
                 hn = m->h().toString();
-                if (m->hbinfo().up() &&
-                    (!max || m->hbinfo().opTime > max->hbinfo().opTime) &&
+                if (m->hbinfo().up() && m->state().readable() &&
+                    (m->hbinfo().opTime > lastOpTimeWritten) &&
                     _getOplogReader(r, hn)) {
-                    max = m;
+                    target = m;
                     break;
                 }
             }
-            
-            if (max && max->hbinfo().opTime > lastOpTimeWritten) {
-                target = max;
-            }
-            else {
-                return;
-            }
-        } else {
-            hn = target->h().toString();
-            if (!_getOplogReader(r, hn)) {
+
+            // no server found
+            if (target == 0) {
+                // if there is no one to sync from
+                OpTime minvalid;
+                tryToGoLiveAsASecondary(minvalid);
                 return;
             }
         }
@@ -339,8 +347,7 @@ namespace mongo {
                         /* todo: too stale capability */
                     }
                     
-                    if( target->hbinfo().hbstate != MemberState::RS_PRIMARY &&
-                        target->hbinfo().hbstate != MemberState::RS_SECONDARY ) {
+                    if( !target->hbinfo().hbstate.readable() ) {
                         return;
                     }
                 }
@@ -371,8 +378,7 @@ namespace mongo {
                                     sleepsecs(6);
                                     if( time(0) >= waitUntil )
                                         break;
-                                    if( target->hbinfo().hbstate != MemberState::RS_PRIMARY &&
-                                        target->hbinfo().hbstate != MemberState::RS_SECONDARY ) {
+                                    if( !target->hbinfo().hbstate.readable() ) {
                                         break;
                                     }
                                     if( myConfig().slaveDelay != sd ) // reconf
@@ -405,8 +411,7 @@ namespace mongo {
                 // TODO : reuse our connection to the primary.
                 return;
             }
-            if( target->hbinfo().hbstate != MemberState::RS_PRIMARY &&
-                target->hbinfo().hbstate != MemberState::RS_SECONDARY ) {
+            if( !target->hbinfo().hbstate.readable() ) {
                 return;
             }
             // looping back is ok because this is a tailable cursor
