@@ -119,15 +119,13 @@ namespace PerfTests {
 
             Timer t;
             unsigned long long n = 0;
-            while( 1 ) { 
+            do { 
                 unsigned i;
                 for( i = 0; i < 1000; i++ )
                     timed();
                 n += i;
-                if( t.millis() > 5000 ) 
-                    break;
-            }
-            client().getLastError(); // block untill all ops are finished
+            } while( t.millis() < 5000 );
+            client().getLastError(); // block until all ops are finished
             int ms = t.millis();
             cout << setw(36) << name() << ' ' << setw(7) << n*1000/ms << "/sec  " << setw(4) << ms << "ms" << endl;
 
