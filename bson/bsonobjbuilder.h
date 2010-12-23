@@ -710,7 +710,7 @@ namespace mongo {
     private:
         void fill( const StringData& name ) {
             char *r;
-            int n = strtol( name.data(), &r, 10 );
+            long int n = strtol( name.data(), &r, 10 );
             if ( *r )
                 uasserted( 13048, (string)"can't append to array using string field name [" + name.data() + "]" );
             while( _i < n )

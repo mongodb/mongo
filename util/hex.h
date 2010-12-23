@@ -30,7 +30,7 @@ namespace mongo {
         return 0xff;
     }
     inline char fromHex( const char *c ) {
-        return ( fromHex( c[ 0 ] ) << 4 ) | fromHex( c[ 1 ] );
+        return (char)(( fromHex( c[ 0 ] ) << 4 ) | fromHex( c[ 1 ] ));
     }
 
     inline string toHex(const void* inRaw, int len){

@@ -415,7 +415,7 @@ namespace mongo {
             string threadName = getThreadName();
             const char * type = logLevelToString(logLevel);
 
-            int spaceNeeded = msg.size() + 64 + threadName.size();
+            int spaceNeeded = (int)(msg.size() + 64 + threadName.size());
             int bufSize = 128;
             while ( bufSize < spaceNeeded )
                 bufSize += 128;

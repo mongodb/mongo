@@ -52,18 +52,16 @@ namespace mongo {
     /* use "addr2line -CFe <exe>" to parse. */
     inline void printStackTrace( ostream &o = cout ) {
         void *b[20];
-        size_t size;
-        size_t i;
 
-        size = backtrace(b, 20);
-        for (i = 0; i < size; i++)
+        int size = backtrace(b, 20);
+        for (int i = 0; i < size; i++)
             o << hex << b[i] << dec << ' ';
         o << endl;
 
         char **strings;
 
         strings = backtrace_symbols(b, size);
-        for (i = 0; i < size; i++)
+        for (int i = 0; i < size; i++)
             o << ' ' << strings[i] << '\n';
         o.flush();
         free (strings);
@@ -512,8 +510,8 @@ namespace mongo {
                 while ( isNumber (*e1) ) e1++;
                 while ( isNumber (*e2) ) e2++;
 
-                int len1 = e1-s1;
-                int len2 = e2-s2;
+                int len1 = (int)(e1-s1);
+                int len2 = (int)(e2-s2);
 
                 int result;
                 // if one is longer than the other, return
