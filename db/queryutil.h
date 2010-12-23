@@ -343,8 +343,17 @@ namespace mongo {
 
     class IndexSpec;
     
+    /**
+     * This class manages the ranges of valid element values for each field in
+     * an ordered list of signed fields corresponding to an index specification.
+     */
     class FieldRangeVector {
     public:
+        /**
+         * @frs The valid ranges for all fields, as defined by the query spec
+         * @keyPattern The index key pattern
+         * @direction The direction of index traversal
+         */
         FieldRangeVector( const FieldRangeSet &frs, const BSONObj &keyPattern, int direction )
         :_keyPattern( keyPattern ), _direction( direction >= 0 ? 1 : -1 )
         {
@@ -400,6 +409,12 @@ namespace mongo {
             }
             return b.obj();
         }
+        /**
+         * @return true iff the provided document matches valid ranges on all
+         * of this FieldRangeVector's fields, which is the case iff this document
+         * would be returned while scanning the index corresponding to this
+         * FieldRangeVector.  This function is used for $or clause deduping.
+         */
         bool matches( const BSONObj &obj ) const;
         class Iterator {
         public:
