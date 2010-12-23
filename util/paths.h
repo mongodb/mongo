@@ -40,11 +40,18 @@ namespace mongo {
 
         /** from a full path */
         static RelativePath fromFullPath(path f) { 
+            path dbp(dbpath);
             string fullpath = f.string();
-            string relative = str::after(fullpath, dbpath);
-            uassert(13600, 
+            string relative = str::after(fullpath, dbp.string());
+            if( relative.empty() ) { 
+                log() << "warning file path is not under db path? " << fullpath << ' ' << dbp.string() << endl;
+                RelativePath rp;
+                rp._p = fullpath;
+                return rp;
+            }
+            /*uassert(13600, 
                     str::stream() << "file path is not under the db path? " << fullpath << ' ' << dbpath, 
-                    relative != fullpath);
+                    relative != fullpath);*/
             if( str::startsWith(relative, "/") || str::startsWith(relative, "\\") ) { 
                 relative.erase(0, 1);
             }

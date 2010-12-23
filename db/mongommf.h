@@ -72,7 +72,10 @@ namespace mongo {
             fileSuffixNo() is 3
             if the suffix is "ns", fileSuffixNo -1
         */
-        RelativePath relativePath() const { return _p; }
+        RelativePath relativePath() const { 
+            DEV assert( !_p._p.empty() );
+            return _p; 
+        }
         int fileSuffixNo() const { return _fileSuffixNo; }
         void* view_write() { return _view_write; }
 
