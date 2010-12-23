@@ -60,12 +60,8 @@ mdb.foo.save({a: 1000});
 print("2: initial sync");
 replTest.awaitReplication();
 
-
 print("3: blind s2");
-var slave2 = replTest.liveNodes.slaves[1];
-slave2.getDB("admin").runCommand({replSetTest:1, blind:true});
-reconnect(mdb);
-reconnect(slave2.getDB("foo"));
+replTest.stop(2);
 print("waiting until the master knows the slave is blind");
 assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health == 0 });
 print("okay");
@@ -80,15 +76,14 @@ while (count != prevCount) {
     mdb.bar.insert({x:i, date : new Date(), str : "safkaldmfaksndfkjansfdjanfjkafa"});
   }
   prevCount = count;
+  replTest.awaitReplication();
   count = master.getDB("local").oplog.rs.count();
   print("count: "+count+" prev: "+prevCount);
 }
 
 
 print("5: unblind s2");
-slave2.getDB("admin").runCommand({replSetTest:1, blind:false});
-reconnect(mdb);
-reconnect(slave2.getDB("admin"));
+replTest.restart(2);
 print("waiting until the master knows the slave is not blind");
 assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health != 0 });
 print("okay");
