@@ -23,6 +23,7 @@
 #include "queryoptimizer.h"
 #include "../util/unittest.h"
 #include "dbmessage.h"
+#include "indexkey.h"
 
 namespace mongo {
     extern BSONObj staticNull;
@@ -884,28 +885,34 @@ namespace mongo {
     }
     
     bool FieldRangeVector::matches( const BSONObj &obj ) const {
-        BSONObjIterator k( _keyPattern );
-        for( int i = 0; i < (int)_ranges.size(); ++i ) {
-            if ( _ranges[ i ].empty() ) {
-                return false;
-            }
-            BSONElement kk = k.next();
-            int number = (int) kk.number();
-            bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
-            BSONElementSet keys;
-            obj.getFieldsDotted( kk.fieldName(), keys );
-            bool match = false;
-            for( BSONElementSet::const_iterator j = keys.begin(); j != keys.end(); ++j ) {
-                if ( matchesElement( *j, i, forward ) ) {
-                    match = true;
+        if ( !_indexSpec.get() ) {
+            _indexSpec.reset( new IndexSpec( _keyPattern ) );
+        }
+        // TODO The representation of matching keys could potentially be optimized
+        // more for the case at hand.  (For example, we can potentially consider
+        // fields individually instead of constructing several bson objects using
+        // multikey arrays.)  But getKeys() canonically defines the key set for a
+        // given object and for now we are using it as is.
+        BSONObjSetDefaultOrder keys;
+        _indexSpec->getKeys( obj, keys );
+        for( BSONObjSetDefaultOrder::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
+            BSONObjIterator j( *i );
+            BSONObjIterator k( _keyPattern );
+            bool match = true;
+            for( int l = 0; l < (int)_ranges.size(); ++l ) {
+                int number = (int) k.next().number();
+                bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
+                if ( !matchesElement( j.next(), l, forward ) ) {
+                    match = false;
                     break;
                 }
             }
-            if ( !match ) {
-                return false;
+            if ( match ) {
+                // The *i key matched a valid range for every element.
+                return true;
             }
         }
-        return true;
+        return false;
     }
     
     // TODO optimize more

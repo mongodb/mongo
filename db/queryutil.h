@@ -341,6 +341,8 @@ namespace mongo {
         vector< BSONObj > _queries;
     };
 
+    class IndexSpec;
+    
     class FieldRangeVector {
     public:
         FieldRangeVector( const FieldRangeSet &frs, const BSONObj &keyPattern, int direction )
@@ -482,6 +484,8 @@ namespace mongo {
         BSONObj _keyPattern;
         int _direction;
         vector< BSONObj > _queries; // make sure mem owned
+        // This IndexSpec is lazily constructed directly from _keyPattern if needed.
+        mutable shared_ptr< IndexSpec > _indexSpec;
     };
         
     // generages FieldRangeSet objects, accounting for or clauses
