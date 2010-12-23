@@ -143,6 +143,18 @@ namespace mongo {
             //char dbname[];
         };
 
+        /** "last sequence number" */
+        struct LSNFile { 
+            unsigned ver;
+            unsigned reserved2;
+            unsigned long long lsn;
+            unsigned long long checkbytes;
+            unsigned long long reserved[8];
+
+            void set(unsigned long long lsn);
+            unsigned long long get();
+        };
+
 #pragma pack()
 
     }
