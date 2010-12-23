@@ -243,6 +243,12 @@ namespace mongo {
         /** called during recovery (the error message text below assumes that)
         */
         unsigned long long journalReadLSN() {
+            if( !debug ) { 
+                // in nondebug build, for now, be conservative until more tests written, and apply the whole journal.
+                // however we will still write the lsn file to exercise that code, and use in _DEBUG build.
+                return 0;
+            }
+
             if( !MemoryMappedFile::exists(lsnPath()) ) { 
                 log() << "info no lsn file in journal/ directory" << endl;
                 return 0;
@@ -254,7 +260,8 @@ namespace mongo {
                 MemoryMappedFile f;
                 LSNFile *L = static_cast<LSNFile*>(f.map(lsnPath().string().c_str()));
                 assert(L);
-                return L->get();
+                unsigned long long lsn = L->get();
+                return lsn;
             }
             catch(std::exception& e) { 
                 uasserted(13611, str::stream() << "can't read lsn file in journal directory : " << e.what());
