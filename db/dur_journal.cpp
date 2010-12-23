@@ -222,7 +222,25 @@ namespace mongo {
             }
         }
 
-        /** called during recovery (and error message text assumes that)
+
+        void LSNFile::set(unsigned long long x) { 
+            lsn = x;
+            checkbytes = ~x;
+        }
+
+        /** logs details of the situation, and returns 0, if anything surprising in the LSNFile 
+            if something highly surprising, throws to abort
+        */
+        unsigned long long LSNFile::get() {
+            uassert(10000, "unexpected version number of lsn file in journal/ directory", ver == 0);
+            if( ~lsn != checkbytes ) {
+                log() << "lsnfile not valid. recovery will be from log start. lsn: " << hex << lsn << " checkbytes: " << hex << checkbytes << endl;
+                return 0;
+            }
+            return lsn;
+        }
+
+        /** called during recovery (the error message text below assumes that)
         */
         unsigned long long journalReadLSN() {
             if( !MemoryMappedFile::exists(lsnPath()) ) { 
@@ -232,11 +250,11 @@ namespace mongo {
 
             try {
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
-                // however, given we actually close the file, that seems unlikely.
+                // however, given we actually close the file when writing, that seems unlikely.
                 MemoryMappedFile f;
-                unsigned long long *L = static_cast<unsigned long long*>(f.map(lsnPath().string().c_str()));
+                LSNFile *L = static_cast<LSNFile*>(f.map(lsnPath().string().c_str()));
                 assert(L);
-                return *L;
+                return L->get();
             }
             catch(std::exception& e) { 
                 uasserted(13611, str::stream() << "can't read lsn file in journal directory : " << e.what());
@@ -258,21 +276,18 @@ namespace mongo {
 
                 last = time(0);
 
-                (void)lsn; // mark as used
-#if 0
                 try {
                     // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
                     // however, given we actually close the file, that seems unlikely.
                     MemoryMappedFile f;
                     unsigned long long length = 8;
-                    unsigned long long *L = static_cast<unsigned long long*>(f.map(lsnPath().string().c_str(), length));
-                    assert(L);
-                    *L = lsn;
+                    LSNFile *lsnf = static_cast<LSNFile*>( f.map(lsnPath().string().c_str(), length) );
+                    assert(lsnf);
+                    lsnf->set(lsn);
                 }
                 catch(std::exception& e) { 
                     log() << "write to lsn file fails " << e.what() << endl;
                 }
-#endif
             }
         }
 
