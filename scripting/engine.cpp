@@ -183,7 +183,7 @@ namespace mongo {
         string coll = _localDBName + ".system.js";
         
         static DBClientBase * db = createDirectClient();
-        auto_ptr<DBClientCursor> c = db->query( coll , Query() );
+        auto_ptr<DBClientCursor> c = db->query( coll , Query(), 0, 0, NULL, QueryOption_SlaveOk, 0 );
         assert( c.get() );
         
         set<string> thisTime;
