@@ -8,6 +8,7 @@ var step = 1;
 var conn = null;
 
 function log(str) {
+    print();
     if(str)
         print(testname+" step " + step++ + " " + str);
     else
