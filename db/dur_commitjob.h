@@ -145,7 +145,7 @@ namespace mongo {
 #if defined(DEBUG_WRITE_INTENT)
         void assertAlreadyDeclared(void *, int len);
 #else
-        void assertAlreadyDeclared(void *, int len) { }
+        inline void assertAlreadyDeclared(void *, int len) { }
 #endif
 
         /** A commit job object for a group commit.  Currently there is one instance of this object.
