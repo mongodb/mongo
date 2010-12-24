@@ -43,6 +43,7 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 12 );
         BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 32 );
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
+        BOOST_STATIC_ASSERT( sizeof(LSNFile) == 88 );
 
         filesystem::path getJournalDir() { 
             filesystem::path p(dbpath);
@@ -287,7 +288,7 @@ namespace mongo {
                     // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
                     // however, given we actually close the file, that seems unlikely.
                     MemoryMappedFile f;
-                    unsigned long long length = 8;
+                    unsigned long long length = sizeof(LSNFile);
                     LSNFile *lsnf = static_cast<LSNFile*>( f.map(lsnPath().string().c_str(), length) );
                     assert(lsnf);
                     lsnf->set(lsn);
