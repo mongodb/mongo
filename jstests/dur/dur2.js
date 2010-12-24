@@ -15,7 +15,7 @@ function howLongSecs() {
 
 function log(str) {
     if(str)
-        print(testname+" step " + step++ + " " + str);
+        print("\n" + testname+" step " + step++ + " " + str);
     else
         print(testname+" step " + step++);
 }
@@ -39,6 +39,11 @@ function work() {
 
     // go long enough we will have time to kill it later during recovery
     var j = 2;
+    var MaxTime = 15;
+    if (Math.random() < 0.05) {
+        print("doing a longer pass");
+        MaxTime = 90;
+    }
     while (1) {
         d.foo.insert({ _id: j, z: x });
         d.foo.update({ _id: j }, { $inc: { a: 1} });
@@ -47,7 +52,9 @@ function work() {
         j++;
         if( j % 3 == 0 )
             d.foo.update({ _id: j }, { $inc: { a: 1} }, true);
-        if (howLongSecs() > 15)
+        if (j % 10000 == 0)
+            print(j);
+        if (howLongSecs() > MaxTime)
             break;
     }
 
