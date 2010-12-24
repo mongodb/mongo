@@ -25,6 +25,12 @@
 
 #include "dbtests.h"
 
+namespace mongo {
+    // here because we don't nesc. want to expose yet
+    int initialExtentSize(int len);
+    int followupExtentSize(int len, int lastExtentLen);
+}
+
 namespace PdfileTests {
 
     namespace ScanCapped {
@@ -304,6 +310,31 @@ namespace PdfileTests {
             }
         };
     } // namespace Insert
+
+    class ExtentSizing {
+    public:
+        struct SmallFilesControl {
+            SmallFilesControl(){
+                old = cmdLine.smallfiles;
+                cmdLine.smallfiles = false;
+            }
+            ~SmallFilesControl(){
+                cmdLine.smallfiles = old;
+            }
+            bool old;
+        };
+        void run(){
+            SmallFilesControl c;
+            // test that no matter what we start with, we always get to max extent size
+            for ( int obj=16; obj<BSONObjMaxUserSize; obj *= 1.3 ){
+                int sz = initialExtentSize( obj );
+                for ( int i=0; i<100; i++ ){
+                    sz = followupExtentSize( obj , sz );
+                }
+                ASSERT_EQUALS( Extent::maxSize() , sz );
+            }
+        }
+    };
     
     class All : public Suite {
     public:
@@ -324,6 +355,7 @@ namespace PdfileTests {
             add< ScanCapped::FirstInExtent >();
             add< ScanCapped::LastInExtent >();
             add< Insert::UpdateDate >();
+            add< ExtentSizing >();
         }
     } myall;
 

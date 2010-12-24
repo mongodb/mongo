@@ -1013,10 +1013,14 @@ namespace mongo {
         int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
         int sz = y > x ? y : x;
 
-        if ( sz < lastExtentLen )
-            sz = lastExtentLen;
-        else if ( sz > Extent::maxSize() )
+        if ( sz < lastExtentLen ){
+            // this means there was an int overflow
+            // so we should turn it into maxSize
             sz = Extent::maxSize();
+        }
+        else if ( sz > Extent::maxSize() ){
+            sz = Extent::maxSize();
+        }
         
         sz = ((int)sz) & 0xffffff00;
         assert( sz > len );
