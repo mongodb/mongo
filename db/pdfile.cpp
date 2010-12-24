@@ -170,7 +170,7 @@ namespace mongo {
         _applyOpToDataFiles( database, deleter, true );
     }
 
-    int initialExtentSize(int len) {
+    int Extent::initialSize(int len) {
         long long sz = len * 16;
         if ( len < 1000 ) sz = len * 64;
         if ( sz > 1000000000 )
@@ -195,7 +195,7 @@ namespace mongo {
         if( !isFreeList )
             addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
 
-        long long size = initialExtentSize(128);
+        long long size = Extent::initialSize(128);
         {
             BSONElement e = options.getField("size");
             if ( e.isNumber() ) {
@@ -1007,9 +1007,9 @@ namespace mongo {
         return dl;
     }
 
-    int followupExtentSize(int len, int lastExtentLen) {
+    int Extent::followupSize(int len, int lastExtentLen) {
         assert( len < Extent::maxSize() );
-        int x = initialExtentSize(len);
+        int x = initialSize(len);
         int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
         int sz = y > x ? y : x;
 
@@ -1458,7 +1458,7 @@ namespace mongo {
                also if this is an addIndex, those checks should happen before this!
             */
             // This may create first file in the database.
-            cc().database()->allocExtent(ns, initialExtentSize(len), false);
+            cc().database()->allocExtent(ns, Extent::initialSize(len), false);
             d = nsdetails(ns);
             if ( !god )
                 ensureIdIndexForNewNs(ns);
@@ -1525,13 +1525,13 @@ namespace mongo {
             // out of space
             if ( d->capped == 0 ) { // size capped doesn't grow
                 log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
-                cc().database()->allocExtent(ns, followupExtentSize(lenWHdr, d->lastExtentSize), false);
+                cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false);
                 loc = d->alloc(ns, lenWHdr, extentLoc);
                 if ( loc.isNull() ){
                     log() << "WARNING: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
                     for ( int zzz=0; zzz<10 && lenWHdr > d->lastExtentSize; zzz++ ){
                         log() << "try #" << zzz << endl;
-                        cc().database()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize), false);
+                        cc().database()->allocExtent(ns, Extent::followupSize(len, d->lastExtentSize), false);
                         loc = d->alloc(ns, lenWHdr, extentLoc);
                         if ( ! loc.isNull() )
                             break;

@@ -265,6 +265,16 @@ namespace mongo {
         Extent* getPrevExtent() { return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev); }
         
         static int maxSize();
+        /**
+         * @param len lengt of record we need
+         * @param lastRecord size of last extent which is a factor in next extent size
+         */
+        static int followupSize(int len, int lastExtentLen);
+        
+        /**
+         * @param len lengt of record we need
+         */
+        static int initialSize(int len);
 
         struct FL { 
             DiskLoc firstRecord;

@@ -25,12 +25,6 @@
 
 #include "dbtests.h"
 
-namespace mongo {
-    // here because we don't nesc. want to expose yet
-    int initialExtentSize(int len);
-    int followupExtentSize(int len, int lastExtentLen);
-}
-
 namespace PdfileTests {
 
     namespace ScanCapped {
@@ -327,9 +321,9 @@ namespace PdfileTests {
             SmallFilesControl c;
             // test that no matter what we start with, we always get to max extent size
             for ( int obj=16; obj<BSONObjMaxUserSize; obj *= 1.3 ){
-                int sz = initialExtentSize( obj );
+                int sz = Extent::initialSize( obj );
                 for ( int i=0; i<100; i++ ){
-                    sz = followupExtentSize( obj , sz );
+                    sz = Extent::followupSize( obj , sz );
                 }
                 ASSERT_EQUALS( Extent::maxSize() , sz );
             }
