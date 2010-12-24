@@ -122,6 +122,9 @@ namespace mongo {
         friend class BtreeBuilder;
         friend class KeyNode;
     public:
+        /** assert write intent declared for this bucket already */
+        void assertWritable();
+
         void assertValid(const Ordering &order, bool force = false) const;
         void assertValid(const BSONObj &orderObj, bool force = false) const { return assertValid(Ordering::make(orderObj),force); }
 
