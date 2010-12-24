@@ -4,7 +4,7 @@
    other tests can be slow
 */
 
-print("quick.js");
+print("a_quick.js");
 
 // directories
 var path1 = "/data/db/quicknodur";
@@ -40,7 +40,7 @@ d.getLastError(); // wait
 // we could actually do getlasterror fsync:1 now, but maybe this is agood 
 // as it will assure that commits happen on a timely basis.  a bunch of the other dur/*js
 // tests use fsync
-log("sleep a bit for a gruop commit");
+log("sleep a bit for a group commit");
 sleep(500);
 
 // kill the process hard
@@ -84,8 +84,13 @@ if (jfiles.length) {
     print("sleeping more waiting for mongod to stop");
     sleep(10000);
     jfiles = listFiles(path2 + "/journal");
-    printjson(jfiles);
-    assert(jfiles.length == 0, "journal dir not empty");
+
+    if (jfiles.length) {
+        print("ERROR journal dir " + path2 + "/journal is not empty:");
+        printjson(jfiles);
+        print("\n\n");  
+        assert(jfiles.length == 0, "journal dir not empty");
+    }
 }
 
 log("check data matches");

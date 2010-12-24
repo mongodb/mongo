@@ -126,6 +126,7 @@ namespace mongo {
         
         /** throws */
         void removeJournalFiles() { 
+            log() << "removeJournalFiles" << endl;
             try {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                       i != boost::filesystem::directory_iterator(); 
@@ -140,12 +141,18 @@ namespace mongo {
                         }
                     }
                 }
-                boost::filesystem::remove(lsnPath());
+                try {
+                    boost::filesystem::remove(lsnPath());
+                }
+                catch(...) { 
+                    log() << "couldn't remove " << lsnPath().string() << endl;
+                }
             }
             catch( std::exception& e ) { 
                 log() << "error removing journal files " << e.what() << endl;
                 throw;
             }
+            log() << "removeJournalFiles end" << endl; // temp
         }
 
         /** at clean shutdown */
