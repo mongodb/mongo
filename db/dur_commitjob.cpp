@@ -38,11 +38,27 @@ namespace mongo {
         }
 
         void Writes::clear() { 
+            dbMutex.assertAtLeastReadLocked();
+
             _alreadyNoted.clear();
             _writes.clear();
             _ops.clear();
             _drained = false;
+#if defined(DEBUG_WRITE_INTENT)
+            cout << "_debug clear\n";
+            _debug.clear();
+#endif
         }
+
+#if defined(DEBUG_WRITE_INTENT)
+        void assertAlreadyDeclared(void *p, int len) { 
+            if( commitJob.wi()._debug[p] >= len )
+                return;
+            log() << "assertAlreadyDeclared fails " << (void*)p << " len:" << len << ' ' << commitJob.wi()._debug[p] << endl;
+            printStackTrace();
+            abort();
+        }
+#endif
 
         void Writes::_insertWriteIntent(void* p, int len){
             WriteIntent wi(p, len);

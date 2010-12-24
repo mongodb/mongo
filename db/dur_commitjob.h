@@ -27,6 +27,8 @@
 #include "dur.h"
 #include "taskqueue.h"
 
+//#define DEBUG_WRITE_INTENT 1
+
 namespace mongo { 
     namespace dur {
 
@@ -118,10 +120,14 @@ namespace mongo {
             /** reset the Writes structure (empties all the above) */
             void clear();
 
-            /** merges into set */
+            /** merges into set (ie non-deferred version) */
             void _insertWriteIntent(void* p, int len); 
 
             void insertWriteIntent(void* p, int len) { 
+#if defined(DEBUG_WRITE_INTENT)
+                if( _debug[p] < len )
+                    _debug[p] = len;
+#endif
                 D d;
                 d.p = p;
                 d.len = len;
@@ -131,7 +137,16 @@ namespace mongo {
 #ifdef _DEBUG
             WriteIntent _last;
 #endif
+#if defined(DEBUG_WRITE_INTENT)
+            map<void*,int> _debug;
+#endif
         };
+
+#if defined(DEBUG_WRITE_INTENT)
+        void assertAlreadyDeclared(void *, int len);
+#else
+        void assertAlreadyDeclared(void *, int len) { }
+#endif
 
         /** A commit job object for a group commit.  Currently there is one instance of this object.
 
@@ -198,12 +213,6 @@ namespace mongo {
         // inlines
 
         inline void CommitJob::note(void* p, int len) {
-#if defined(_DEBUG)
-            // TEMP?
-            _wi._last = WriteIntent(p, len);
-            getDur().debugCheckLastDeclaredWrite();
-#endif
-
             // from the point of view of the dur module, it would be fine (i think) to only 
             // be read locked here.  but must be at least read locked to avoid race with 
             // remapprivateview
@@ -236,10 +245,6 @@ namespace mongo {
                         else { 
                             log() << "DEBUG note write intent " << w.p << ' ' << w.len << " NOT FOUND IN privateViews" << endl;
                         }
-                        /*if( w.len > 48 ) {
-                            log() << "big TEMP" << endl;
-                            log() << hexdump((char*) w.p, 48) << endl;
-                        }*/
                     }
                     else if( n == 10000 ) { 
                         log() << "DEBUG stopping write intent logging, too much to log" << endl;
