@@ -26,12 +26,11 @@
 #include "dbhelpers.h"
 #include "curop-inl.h"
 #include "stats/counters.h"
+#include "dur_commitjob.h"
 
 namespace mongo {
 
-//#define VERIFYTHISLOC dassert( thisLoc.btree() == this );
-// with _DURABLE, this assert wouldn't work without getting fancier as there are multiple mmap views for _DEBUG mode...
-#define VERIFYTHISLOC 
+#define VERIFYTHISLOC dassert( thisLoc.btree() == this || testIntent );
 
     /**
      * give us a writable version of the btree bucket (declares write intent). 
@@ -88,6 +87,11 @@ namespace mongo {
     }
 
     /* BucketBasics --------------------------------------------------- */
+
+    void BucketBasics::assertWritable() { 
+        if( cmdLine.dur ) 
+            dur::assertAlreadyDeclared(this, sizeof(*this));
+    }
 
     string BtreeBucket::bucketSummary() const {
         stringstream ss;
@@ -401,9 +405,21 @@ namespace mongo {
     void BucketBasics::_pack(const DiskLoc thisLoc, const Ordering &order, int &refPos) const {
         if ( flags & Packed )
             return;
+
+        VERIFYTHISLOC
+
+        /** TODO perhaps this can be optimized.  for example if packing does no write, we can skip intent decl. 
+                 an empirical approach is probably best than just adding new code : perhaps the bucket would need 
+                 declaration anyway within the group commit interval, in which case we would just be adding 
+                 code and complexity without benefit.
+        */
         thisLoc.btreemod()->_packReadyForMod(order, refPos);
     }
+
+    /** version when write intent already declared */
     void BucketBasics::_packReadyForMod( const Ordering &order, int &refPos ) {
+        assertWritable();
+
         if ( flags & Packed )
             return;
 
@@ -436,6 +452,10 @@ namespace mongo {
         n = i;
         int dataUsed = tdz - ofs;
         memcpy(data + ofs, temp + ofs, dataUsed);
+
+        // assertWritable();
+        // TEMP TEST getDur().declareWriteIntent(this, sizeof(*this));
+
         emptySize = tdz - dataUsed - n * sizeof(_KeyNode);
         assert( emptySize >= 0 );
 
@@ -445,6 +465,9 @@ namespace mongo {
     }
 
     inline void BucketBasics::truncateTo(int N, const Ordering &order, int &refPos) {
+        dbMutex.assertWriteLocked();
+        assertWritable();
+
         n = N;
         setNotPacked();
         _packReadyForMod( order, refPos );
@@ -1202,6 +1225,8 @@ namespace mongo {
 
     void BtreeBucket::split(const DiskLoc thisLoc, int keypos, const DiskLoc recordLoc, const BSONObj& key, const Ordering& order, const DiskLoc lchild, const DiskLoc rchild, IndexDetails& idx)
     {
+        assertWritable();
+
         if ( split_debug )
             out() << "    " << thisLoc.toString() << ".split" << endl;
 
