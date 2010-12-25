@@ -320,7 +320,7 @@ namespace PdfileTests {
         void run(){
             SmallFilesControl c;
             // test that no matter what we start with, we always get to max extent size
-            for ( int obj=16; obj<BSONObjMaxUserSize; obj *= 1.3 ){
+            for ( int obj=16; obj<BSONObjMaxUserSize; obj += 111 ){
                 int sz = Extent::initialSize( obj );
                 for ( int i=0; i<100; i++ ){
                     sz = Extent::followupSize( obj , sz );
