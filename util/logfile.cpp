@@ -118,11 +118,9 @@ namespace mongo {
 #endif
                    ,
                    S_IRUSR | S_IWUSR);
-        log() << "TEMP logfile open " << _fd << endl;
         if( _fd < 0 ) {
             uasserted(13516, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription());
         }
-        // log() << "\nWRITE TEST: " << write(_fd, "abc", 3) << ' ' << errno << endl;
     }
 
     LogFile::~LogFile() { 
