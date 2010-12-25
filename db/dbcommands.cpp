@@ -151,7 +151,15 @@ namespace mongo {
                 long long passes = 0;
                 char buf[32];
                 while ( 1 ){
-                    if ( opReplicatedEnough( c.getLastOp() , w ) )
+                    OpTime op(c.getLastOp());
+                    // if replication isn't enabled (e.g., config servers)
+                    if ( op.isNull() ) {
+                        errmsg = "replication not enabled";
+                        result.append( "err", "norepl" );
+                        return true;
+                    }
+                    
+                    if ( opReplicatedEnough( op, w ) )
                         break;
                     
                     if ( timeout > 0 && t.millis() >= timeout ){

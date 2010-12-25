@@ -52,8 +52,15 @@ for (var i = N; i < 2*N; i++) {
     db['foo'].insert({x: i, text: Text})
     var x = db.getLastErrorObj(2, 30000)  // wait to be copied to at least one secondary
     if (i % 30 == 0) print(i)
-    if (i % 30 == 0 || x.err != null) printjson(x)
-    assert.eq(x.err, null, tojson(x));
+    // if config is included, discard its error
+    if (x.shards && x.shards.length == 2) {
+        assert.eq(x.errs.length, 1);
+        assert.eq(x.err, "norepl");
+    }
+    else {
+        if (i % 30 == 0 || x.err != null) printjson(x);
+        assert.eq(x.err, null, tojson(x));
+    }
 }
 // BUG: above getLastError fails on about every 170 inserts
 
@@ -66,4 +73,4 @@ print('shard_insert_getlasterror_w2.js SUCCESS')
 }
 
 //Uncomment below to execute
-//go()
+go()
