@@ -273,7 +273,7 @@ namespace mongo {
                     }
                 }
             }
-            log() << "debugValidateMapsMatch " << t.millis() << "ms for " <<  (data / (1024*1024)) << "MB" << endl;
+            OCCASIONALLY log() << "DurParanoid map check " << t.millis() << "ms for " <<  (data / (1024*1024)) << "MB" << endl;
         }
 
         /** We need to remap the private views periodically. otherwise they would become very large.
