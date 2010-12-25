@@ -217,7 +217,7 @@ namespace mongo {
 
     /*virtual*/ void MongoMMF::close() {
         {
-            if( !testIntent && cmdLine.dur ) { 
+            if( !testIntent && cmdLine.dur && _view_write/*actually was opened*/ ) { 
                 dur::closingFileNotification();
             }
             privateViews.remove(_view_private);
