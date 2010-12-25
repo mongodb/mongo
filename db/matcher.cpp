@@ -568,29 +568,25 @@ namespace mongo {
             if ( em.myset->size() == 0 && !em.myregex.get() )
                 return -1; // is this desired?
             
-            BSONObjSetDefaultOrder actualKeys;
-            IndexSpec( BSON( fieldName << 1 ) ).getKeys( obj, actualKeys );
-            if ( actualKeys.size() == 0 )
-                return 0;
+            BSONElementSet myValues;
+            obj.getFieldsDotted( fieldName , myValues );
             
             for( set< BSONElement, element_lt >::const_iterator i = em.myset->begin(); i != em.myset->end(); ++i ) {
                 // ignore nulls
                 if ( i->type() == jstNULL )
                     continue;
-                // parallel traversal would be faster worst case I guess
-                BSONObjBuilder b;
-                b.appendAs( *i, "" );
-                if ( !actualKeys.count( b.done() ) )
+                
+                if ( myValues.count( *i ) == 0 )
                     return -1;
-            }
+            }            
 
             if ( !em.myregex.get() )
                 return 1;
             
             for( vector< RegexMatcher >::const_iterator i = em.myregex->begin(); i != em.myregex->end(); ++i ) {
                 bool match = false;
-                for( BSONObjSetDefaultOrder::const_iterator j = actualKeys.begin(); j != actualKeys.end(); ++j ) {
-                    if ( regexMatches( *i, j->firstElement() ) ) {
+                for( BSONElementSet::const_iterator j = myValues.begin(); j != myValues.end(); ++j ) {
+                    if ( regexMatches( *i, *j ) ) {
                         match = true;
                         break;
                     }
