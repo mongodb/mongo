@@ -860,15 +860,7 @@ namespace mongo {
                 ClientInfo * client = ClientInfo::get();
                 set<string> * shards = client->getPrev();
                 
-                // TODO: the config servers are included in the list of shards
-                // after a split.  This is a hack around their presence.
-                size_t withConfig = 0;
-                string config = configServerPtr->getPrimary().getConnString();
-                if (shards->find( config ) != shards->end()) {
-                    withConfig = 1;
-                }
-                
-                if ( shards->size() == withConfig ){
+                if ( shards->size() == 0 ){
                     result.appendNull( "err" );
                     return true;
                 }
@@ -915,10 +907,6 @@ namespace mongo {
                 vector<BSONObj> errorObjects;
                 for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
                     string theShard = *i;
-                    if (withConfig && theShard.compare(config) == 0) {
-                        continue;
-                    }
-                    
                     bbb.append( theShard );
                     ShardConnection conn( theShard , "" );
                     BSONObj res;

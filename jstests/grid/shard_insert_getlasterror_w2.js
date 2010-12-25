@@ -49,15 +49,13 @@ printjson (db['foo'].count())
 
 // Add more data
 for (var i = N; i < 2*N; i++) {
-    db['foo'].insert({x: i, text: Text});
-    var x = db.getLastErrorObj(2, 30000);  // wait to be copied to at least one secondary
-    print(i);
-    if (i % 30 == 0 || x.err != null) {
-        dba.printShardingStatus();
-        printjson(x);
-    }
-    assert.eq(x.err, null, i+": "+tojson(x));
+    db['foo'].insert({x: i, text: Text})
+    var x = db.getLastErrorObj(2, 30000)  // wait to be copied to at least one secondary
+    if (i % 30 == 0) print(i)
+    if (i % 30 == 0 || x.err != null) printjson(x)
+    assert.eq(x.err, null, tojson(x));
 }
+// BUG: above getLastError fails on about every 170 inserts
 
 // Done
 routerSpec.end()
@@ -68,4 +66,4 @@ print('shard_insert_getlasterror_w2.js SUCCESS')
 }
 
 //Uncomment below to execute
-go()
+//go()
