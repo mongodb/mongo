@@ -18,11 +18,14 @@
  */
 
 #include "pch.h"
-#include "../db/matcher.h"
+#include "../util/timer.h"
 
+#include "../db/matcher.h"
 #include "../db/json.h"
 
 #include "dbtests.h"
+
+
 
 namespace MatcherTests {
 
@@ -116,6 +119,28 @@ namespace MatcherTests {
         }        
     };
     
+    
+    class TimingBase {
+    public:
+        long time( const BSONObj& patt , const BSONObj& obj ){
+            Matcher m( patt );
+            Timer t;
+            for ( int i=0; i<10000; i++ ){
+                ASSERT( m.matches( obj ) );
+            }
+            return t.millis();
+        }
+    };
+
+    class AllTiming : public TimingBase {
+    public:
+        void run(){
+            long normal = time( BSON( "x" << 5 ) , BSON( "x" << 5 ) );
+            long all = time( BSON( "x" << BSON( "$all" << BSON_ARRAY( 5 ) ) ) , BSON( "x" << 5 ) );
+            
+            cout << "normal: " << normal << " all: " << all << endl;
+        }
+    };
 
     class All : public Suite {
     public:
@@ -130,6 +155,7 @@ namespace MatcherTests {
             add< MixedNumericIN >();
             add< Size >();
             add< MixedNumericEmbedded >();
+            add< AllTiming >();
         }
     } dball;
     
