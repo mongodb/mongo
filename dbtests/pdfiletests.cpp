@@ -323,7 +323,7 @@ namespace PdfileTests {
         void run(){
             SmallFilesControl c;
             // test that no matter what we start with, we always get to max extent size
-            for ( int obj=16; obj<(4*1024*1024); obj *= 1.3 ){
+            for ( int obj=16; obj<(4*1024*1024); obj += 111 ){
                 int sz = initialExtentSize( obj );
                 for ( int i=0; i<100; i++ ){
                     sz = followupExtentSize( obj , sz );
