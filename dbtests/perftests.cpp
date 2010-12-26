@@ -111,6 +111,7 @@ namespace PerfTests {
         virtual void post() { }
         virtual string name() = 0;
         virtual unsigned long long expectation() = 0;
+        virtual int howLongMillis() { return 5000; }
     public:
         void say(unsigned long long n, int ms, string s) { 
             cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
@@ -122,6 +123,8 @@ namespace PerfTests {
 
             prep();
 
+            int hlm = howLongMillis();
+
             dur::stats.curr.reset();
             Timer t;
             unsigned long long n = 0;
@@ -131,7 +134,7 @@ namespace PerfTests {
                 for( i = 0; i < Batch; i++ )
                     timed();
                 n += i;
-            } while( t.millis() < 5000 );
+            } while( t.millis() < hlm );
             client().getLastError(); // block until all ops are finished
             int ms = t.millis();
             say(n, ms, name());
@@ -154,7 +157,7 @@ namespace PerfTests {
                         for( i = 0; i < Batch; i++ )
                             timed2();
                         n += i;
-                        if( t.millis() > 5000 ) 
+                        if( t.millis() > hlm ) 
                             break;
                     }
                     int ms = t.millis();
@@ -199,6 +202,11 @@ namespace PerfTests {
 
     class InsertBig : public InsertDup { 
         BSONObj x;
+        virtual int howLongMillis() { 
+            if( sizeof(void*) == 4 ) 
+                return 1000;  // could exceed mmapping if run too long, as this function adds a lot fasta
+            return 5000;
+        }
     public:
         InsertBig() {
             char buf[200000];
