@@ -26,6 +26,7 @@ var conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur");
 log("without dur work");
 var d = conn.getDB("test");
 d.foo.insert({ _id:123 });
+d.getLastError();
 log("stop without dur");
 stopMongod(30000);
 
