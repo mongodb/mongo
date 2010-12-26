@@ -147,21 +147,27 @@ namespace mongo {
                 Timer t;
 
                 int w = e.numberInt();
-
+                
                 long long passes = 0;
                 char buf[32];
                 while ( 1 ){
                     OpTime op(c.getLastOp());
+
+                    if ( opReplicatedEnough( op, w ) )
+                        break;
+                    
                     // if replication isn't enabled (e.g., config servers)
-                    if ( op.isNull() ) {
+                    if ( ! anyReplEnabled() ){
                         errmsg = "replication not enabled";
                         result.append( "err", "norepl" );
                         return true;
                     }
                     
-                    if ( opReplicatedEnough( op, w ) )
-                        break;
-                    
+                    if ( op.isNull() ){
+                        result.append( "err" , "no write has been done on this connection" );
+                        return true;
+                    }
+
                     if ( timeout > 0 && t.millis() >= timeout ){
                         result.append( "wtimeout" , true );
                         errmsg = "timed out waiting for slaves";
