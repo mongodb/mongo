@@ -65,6 +65,9 @@ namespace mongo {
             }
 
             /*temp*/ mutable void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap 
+#if defined(_EXPERIMENTAL)
+            mutable unsigned ofsInJournalBuffer;
+#endif
         private:
             void *p;      // intent to write up to p
             unsigned len; // up to this len

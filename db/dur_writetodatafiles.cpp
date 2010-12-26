@@ -67,9 +67,32 @@ namespace mongo {
                 MongoFile::unmarkAllWritable();
         }
 
+#if defined(_EXPERIMENTAL)
+        void WRITETODATAFILES_Impl3() { 
+            MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
+
+            /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
+            for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ){
+                const WriteIntent& intent = *it;
+                stats.curr._writeToDataFilesBytes += intent.length();
+                dassert(intent.w_ptr);
+                memcpy(intent.w_ptr, 
+                    commitJob._ab.atOfs(intent.ofsInJournalBuffer), 
+                    intent.length());
+            }
+
+            if (!dbMutex.isWriteLocked())
+                MongoFile::unmarkAllWritable();
+        }
+#endif
+
         void WRITETODATAFILES() { 
             Timer t;
+#if defined(_EXPERIMENTAL)
+            WRITETODATAFILES_Impl3();
+#else
             WRITETODATAFILES_Impl1();
+#endif
             stats.curr._writeToDataFilesMillis += t.millis();
             debugValidateMapsMatch();
         }

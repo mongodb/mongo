@@ -82,8 +82,10 @@ namespace mongo {
                 bb.appendStr(lastDbPath.toString());
             }
             bb.appendStruct(e);
+#if defined(_EXPERIMENTAL)
+            i->ofsInJournalBuffer = bb.len();
+#endif
             bb.appendBuf(i->start(), e.len);
-
 
             if (e.len != (unsigned)i->length()){
                 // This only happens if we write to the last byte in a file and
