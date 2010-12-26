@@ -73,8 +73,17 @@ namespace mongo {
 
         Stats stats;
 
-        Stats::Stats() {
+        void Stats::S::reset() {
             memset(this, 0, sizeof(*this));
+        }
+
+        BSONObj Stats::S::asObj() { 
+            return BSON(
+                "commits" << _commits <<
+                "journaledMB" << _journaledBytes / 1000000.0 <<
+                "writeToDataFileMB" << _writeToDataFilesBytes / 1000000.0 <<
+                "commitsInWriteLock" << _commitsInWriteLock
+                );
         }
 
         DurableInterface* DurableInterface::_impl = new NonDurableImpl();
@@ -265,7 +274,7 @@ namespace mongo {
                         std::stringstream ss;
                         ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
-                        log() << "priv loc: " << (void*)(p+low) << ' ' << stats.curr._objCopies << endl;
+                        log() << "priv loc: " << (void*)(p+low) << ' ' << endl;
                         set<WriteIntent>& b = commitJob.writes();
                         (void)b; // mark as unused. Useful for inspection in debugger
 

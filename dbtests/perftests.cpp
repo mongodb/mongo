@@ -32,6 +32,7 @@
 #include "../db/taskqueue.h"
 #include "../util/timer.h"
 #include "dbtests.h"
+#include "../db/dur_stats.h"
 
 namespace PerfTests {
     typedef DBDirectClient DBClientType;
@@ -111,12 +112,17 @@ namespace PerfTests {
         virtual string name() = 0;
         virtual unsigned long long expectation() = 0;
     public:
+        void say(unsigned long long n, int ms, string s) { 
+            cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
+            cout << dur::stats.curr.asObj().toString() << endl;
+        }
         void run() { 
             _ns = string("perftest.") + name();
             client().dropCollection(ns());
 
             prep();
 
+            dur::stats.curr.reset();
             Timer t;
             unsigned long long n = 0;
             const unsigned Batch = 50;
@@ -128,7 +134,7 @@ namespace PerfTests {
             } while( t.millis() < 5000 );
             client().getLastError(); // block until all ops are finished
             int ms = t.millis();
-            cout << setw(36) << name() << ' ' << setw(7) << n*1000/ms << "/sec  " << setw(4) << ms << "ms" << endl;
+            say(n, ms, name());
 
             if( n < expectation() ) { 
                 cout << "test " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
@@ -140,6 +146,7 @@ namespace PerfTests {
             {
                 const char *test2name = timed2();
                 if( test2name ) {
+                    dur::stats.curr.reset();
                     Timer t;
                     unsigned long long n = 0;
                     while( 1 ) { 
@@ -151,7 +158,7 @@ namespace PerfTests {
                             break;
                     }
                     int ms = t.millis();
-                    cout << setw(36) << test2name << ' ' << setw(7) << n << "/sec  " << setw(4) << ms << "ms" << endl;
+                    say(n, ms, test2name);
                 }
             }
         }

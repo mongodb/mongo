@@ -7,10 +7,12 @@ namespace mongo {
             uncommon (from a serverStatus command and such).  Thus, there should not be multicore chatter overhead.
         */
         struct Stats { 
-            Stats();
+            Stats() { curr.reset(); }
             struct S { 
+                BSONObj asObj();
+                void reset();
+
                 unsigned _commits;
-                unsigned _objCopies;
                 unsigned long long _journaledBytes;
                 unsigned long long _writeToDataFilesBytes;
 
