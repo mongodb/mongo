@@ -81,7 +81,8 @@ namespace mongo {
             return BSON(
                 "commits" << _commits <<
                 "journaledMB" << _journaledBytes / 1000000.0 <<
-                "writeToDataFileMB" << _writeToDataFilesBytes / 1000000.0 <<
+                "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0 <<
+                "writeToDataFilesMs" << (long long) _writeToDataFilesMillis << 
                 "commitsInWriteLock" << _commitsInWriteLock
                 );
         }

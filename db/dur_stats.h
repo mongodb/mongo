@@ -15,6 +15,7 @@ namespace mongo {
                 unsigned _commits;
                 unsigned long long _journaledBytes;
                 unsigned long long _writeToDataFilesBytes;
+                unsigned long long _writeToDataFilesMillis;
 
                 // undesirable to be in write lock for the group commit (it can be done in a read lock), so good if we 
                 // have visibility when this happens.  can happen for a couple reasons

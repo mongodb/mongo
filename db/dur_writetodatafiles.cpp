@@ -20,6 +20,7 @@
 #include "dur_commitjob.h"
 #include "dur_stats.h"
 #include "dur_recover.h"
+#include "../util/timer.h"
 
 namespace mongo { 
     namespace dur {
@@ -67,7 +68,9 @@ namespace mongo {
         }
 
         void WRITETODATAFILES() { 
+            Timer t;
             WRITETODATAFILES_Impl1();
+            stats.curr._writeToDataFilesMillis += t.millis();
             debugValidateMapsMatch();
         }
 
