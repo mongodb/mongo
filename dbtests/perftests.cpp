@@ -190,6 +190,23 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
 
+    class InsertBig : public InsertDup { 
+        BSONObj x;
+    public:
+        InsertBig() {
+            char buf[200000];
+            BSONObjBuilder b;
+            b.append("x", 99);
+            b.appendBinData("bin", 200000, (BinDataType) 129, buf);
+            x = b.obj();
+        }
+        string name() { return "insert big"; }
+        void timed() {
+            client().insert( ns(), x );
+        }
+        unsigned long long expectation() { return 20; }
+    };
+
     class InsertRandom : public B { 
     public:
         string name() { return "random inserts"; }
@@ -267,6 +284,7 @@ namespace PerfTests {
             add< MoreIndexes<InsertRandom> >();
             add< Update1 >();
             add< MoreIndexes<Update1> >();
+            add< InsertBig >();
         }
     } myall;
 }
