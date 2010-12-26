@@ -162,6 +162,7 @@ namespace mongo {
                  "directory will be overwritten if it already exists")
                 ("debug", "run tests with verbose output")
                 ("list,l", "list available test suites")
+                ("bigfiles", "use big datafiles instead of smallfiles which is the default")
                 ("filter,f" , po::value<string>() , "string substring filter on test name" )
                 ("verbose,v", "verbose")
                 ("dur", "enable journaling")
@@ -239,7 +240,13 @@ namespace mongo {
             dbpath = dbpathString.c_str();
             
             cmdLine.prealloc = false;
+
+            // dbtest defaults to smallfiles
             cmdLine.smallfiles = true;
+            if( params.count("bigfiles") ) { 
+                cmdLine.dur = true;
+            }
+
             cmdLine.oplogSize = 10 * 1024 * 1024;
             Client::initThread("testsuite");
             acquirePathLock();
