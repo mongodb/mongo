@@ -113,15 +113,17 @@ namespace mongo {
 
                     case JEntry::OpCode_Footer:
                         { 
-                            const char* pos = (const char*) _br.pos();
-                            pos -= sizeof(lenOrOpCode); // rewind to include OpCode
-                            const JSectFooter& footer = *(const JSectFooter*)pos;
-                            int len = pos - (char*)_sectHead;
-                            if (!footer.checkHash(_sectHead, len)){
-                                massert(13594, str::stream() << "Journal checksum doesn't match. recorded: "
-                                    << toHex(footer.hash, sizeof(footer.hash))
-                                    << " actual: " << md5simpledigest(_sectHead, len)
-                                    , false);
+                            if (_doDurOps) {
+                                const char* pos = (const char*) _br.pos();
+                                pos -= sizeof(lenOrOpCode); // rewind to include OpCode
+                                const JSectFooter& footer = *(const JSectFooter*)pos;
+                                int len = pos - (char*)_sectHead;
+                                if (!footer.checkHash(_sectHead, len)){
+                                    massert(13594, str::stream() << "Journal checksum doesn't match. recorded: "
+                                            << toHex(footer.hash, sizeof(footer.hash))
+                                            << " actual: " << md5simpledigest(_sectHead, len)
+                                            , false);
+                                }
                             }
                             return false; // false return value denotes end of section
                         }
