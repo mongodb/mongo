@@ -119,9 +119,10 @@ namespace PerfTests {
 
             Timer t;
             unsigned long long n = 0;
+            const unsigned Batch = 50;
             do { 
                 unsigned i;
-                for( i = 0; i < 1000; i++ )
+                for( i = 0; i < Batch; i++ )
                     timed();
                 n += i;
             } while( t.millis() < 5000 );
@@ -143,7 +144,7 @@ namespace PerfTests {
                     unsigned long long n = 0;
                     while( 1 ) { 
                         unsigned i;
-                        for( i = 0; i < 10; i++ )
+                        for( i = 0; i < Batch; i++ )
                             timed2();
                         n += i;
                         if( t.millis() > 5000 ) 
