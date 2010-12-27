@@ -645,6 +645,9 @@ namespace mongo {
                 assert(!replSet);
                 return;
             }
+            if( !noauth ) {
+                cc().getAuthenticationInfo()->authorize("local");
+            }
             (theReplSet = new ReplSet(*replSetCmdline))->go();
         }
         catch(std::exception& e) { 

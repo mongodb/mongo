@@ -20,6 +20,7 @@
 #include "cmdline.h"
 #include "commands.h"
 #include "../util/processinfo.h"
+#include "security_key.h"
 
 namespace po = boost::program_options;
 
@@ -47,6 +48,7 @@ namespace mongo {
             ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
             ("logappend" , "append to logpath instead of over-writing" )
             ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
+            ("keyFile", po::value<string>(), "private key for cluster authentication (only for replica sets)")
 #ifndef _WIN32
             ("fork" , "fork server process" )
 #endif
@@ -222,6 +224,18 @@ namespace mongo {
         if ( params.count("pidfilepath")) {
             writePidFile( params["pidfilepath"].as<string>() );
         }
+
+        if (params.count("keyFile")){
+            const string f = params["keyFile"].as<string>();
+
+            if (!setUpSecurityKey(f)) {
+                // error message printed in setUpPrivateKey
+                dbexit(EXIT_BADOPTIONS);
+            }
+            
+            noauth = false;
+        }
+
 
         {
             BSONArrayBuilder b;

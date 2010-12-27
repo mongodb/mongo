@@ -26,9 +26,7 @@
 
 namespace mongo {
 
-    bool noauth = true;
-    
-	int AuthenticationInfo::warned = 0;
+    int AuthenticationInfo::warned = 0;
 
     void AuthenticationInfo::print(){
         cout << "AuthenticationInfo: " << this << '\n';

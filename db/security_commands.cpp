@@ -133,27 +133,34 @@ namespace mongo {
                     return false;
                 }
             }
-
-            static BSONObj userPattern = fromjson("{\"user\":1}");
-            string systemUsers = dbname + ".system.users";
-            OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
-
+            
             BSONObj userObj;
-            {
-                BSONObjBuilder b;
-                b << "user" << user;
-                BSONObj query = b.done();
-                if( !Helpers::findOne(systemUsers.c_str(), query, userObj) ) { 
-                    log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
-                    errmsg = "auth fails";
-                    return false;
-                }
+            string pwd;
+
+            if (user == internalSecurity.user) {
+                pwd = internalSecurity.pwd;
             }
+            else {
+                static BSONObj userPattern = fromjson("{\"user\":1}");
+                string systemUsers = dbname + ".system.users";
+                OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");            
+                {
+                    BSONObjBuilder b;
+                    b << "user" << user;
+                    BSONObj query = b.done();
+                    if( !Helpers::findOne(systemUsers.c_str(), query, userObj) ) { 
+                        log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
+                        errmsg = "auth fails";
+                        return false;
+                    }
+                }
+
+                pwd = userObj.getStringField("pwd");
+            }
+
             
             md5digest d;
             {
-                
-                string pwd = userObj.getStringField("pwd");
                 digestBuilder << user << pwd;
                 string done = digestBuilder.str();
                 

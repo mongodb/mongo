@@ -20,11 +20,9 @@
 
 #include "nonce.h"
 #include "concurrency.h"
+#include "security_key.h"
 
 namespace mongo {
-
-    // --noauth cmd line option
-    extern bool noauth;
 
     /* for a particular db */
     struct Auth {

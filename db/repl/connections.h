@@ -20,6 +20,7 @@
 
 #include <map>
 #include "../../client/dbclient.h"
+#include "../security_key.h"
 
 namespace mongo { 
 
@@ -96,7 +97,15 @@ namespace mongo {
 
         // we already locked above...
         string err;
-        x->cc.connect(hostport, err);
+        if (!x->cc.connect(hostport, err)) {
+            log() << "couldn't connect to " << hostport << ": " << err << rsLog;
+            return;
+        }
+
+        if (!noauth && !x->cc.auth("local", internalSecurity.user, internalSecurity.pwd, err, false)) {
+            log() << "could not authenticate against " << conn()->toString() << ", " << err << rsLog;
+            return;
+        }
     }
 
     inline ScopedConn::~ScopedConn() { 

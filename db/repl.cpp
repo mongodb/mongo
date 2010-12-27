@@ -1431,27 +1431,30 @@ namespace mongo {
 			return false;
 		}
 
-		BSONObj user;
-		{
-			dblock lk;
-			Client::Context ctxt("local.");
-			if( !Helpers::findOne("local.system.users", userReplQuery, user) ) { 
-				// try the first user is local
-				if( !Helpers::getSingleton("local.system.users", user) ) {
-					if( noauth ) 
-						return true; // presumably we are running a --noauth setup all around.
-
-					log() << "replauthenticate: no user in local.system.users to use for authentication\n";
-					return false;
-				}
-			}
-            
-		}
-
-		string u = user.getStringField("user");
-		string p = user.getStringField("pwd");
-		massert( 10392 , "bad user object? [1]", !u.empty());
-		massert( 10393 , "bad user object? [2]", !p.empty());
+        string u;
+        string p;
+        if (internalSecurity.pwd.length() > 0) {
+            u = internalSecurity.user;
+            p = internalSecurity.pwd;
+        }
+        else {
+            BSONObj user;
+            {
+                dblock lk;
+                Client::Context ctxt("local.");
+                if( !Helpers::findOne("local.system.users", userReplQuery, user) ||
+                    // try the first user in local
+                    !Helpers::getSingleton("local.system.users", user) ) {
+                    log() << "replauthenticate: no user in local.system.users to use for authentication\n";
+                    return noauth;
+                }
+            }
+            u = user.getStringField("user");
+            p = user.getStringField("pwd");
+            massert( 10392 , "bad user object? [1]", !u.empty());
+            massert( 10393 , "bad user object? [2]", !p.empty());
+        }
+                
 		string err;
 		if( !conn->auth("local", u.c_str(), p.c_str(), err, false) ) {
 			log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
