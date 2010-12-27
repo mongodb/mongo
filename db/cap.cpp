@@ -310,10 +310,10 @@ namespace mongo {
                 compact();
                 if ( theCapExtent()->lastRecord.isNull() ) {
                     assert( !theCapExtent()->xprev.isNull() );
-                    capExtent = theCapExtent()->xprev;
+                    capExtent.writing() = theCapExtent()->xprev;
                     theCapExtent()->assertOk();
                     if ( capExtent == firstExtent ) {
-                        cappedLastDelRecLastExtent() = DiskLoc();
+                        cappedLastDelRecLastExtent().writing() = DiskLoc();
                     } else {
                         // slow - there's no prev ptr for deleted rec
                         DiskLoc i = cappedListOfAllDeletedRecords();
@@ -322,7 +322,7 @@ namespace mongo {
                             !inCapExtent( i.drec()->nextDeleted );
                             i = i.drec()->nextDeleted );
                         assert( !i.drec()->nextDeleted.isNull() ); // I believe there is always at least one drec per extent
-                        cappedLastDelRecLastExtent() = i;
+                        cappedLastDelRecLastExtent().writing() = i;
                     }
                 }
                 continue;
@@ -331,12 +331,12 @@ namespace mongo {
             theDataFileMgr.deleteRecord(ns, curr.rec(), curr, true);
             compact();
             if ( curr == capFirstNewRecord ) { // invalid, but can compare locations
-                capExtent = ( capExtent == firstExtent ) ? lastExtent : theCapExtent()->xprev;
+                capExtent.writing() = ( capExtent == firstExtent ) ? lastExtent : theCapExtent()->xprev;
                 theCapExtent()->assertOk();
                 assert( !theCapExtent()->firstRecord.isNull() );
-                capFirstNewRecord = theCapExtent()->firstRecord;
+                capFirstNewRecord.writing() = theCapExtent()->firstRecord;
                 if ( capExtent == firstExtent ) {
-                    cappedLastDelRecLastExtent() = DiskLoc();
+                    cappedLastDelRecLastExtent().writing() = DiskLoc();
                 } else {
                     // slow - there's no prev ptr for deleted rec
                     DiskLoc i = cappedListOfAllDeletedRecords();
@@ -345,7 +345,7 @@ namespace mongo {
                         !inCapExtent( i.drec()->nextDeleted );
                         i = i.drec()->nextDeleted );
                     assert( !i.drec()->nextDeleted.isNull() ); // I believe there is always at least one drec per extent
-                    cappedLastDelRecLastExtent() = i;
+                    cappedLastDelRecLastExtent().writing() = i;
                 }
             }
         }
@@ -360,35 +360,36 @@ namespace mongo {
         ClientCursor::invalidate( ns );
 		NamespaceDetailsTransient::clearForPrefix( ns );
 
-        cappedLastDelRecLastExtent() = DiskLoc();
-        cappedListOfAllDeletedRecords() = DiskLoc();
+        NamespaceDetails *t = getDur().writing( this );
+        t->cappedLastDelRecLastExtent() = DiskLoc();
+        t->cappedListOfAllDeletedRecords() = DiskLoc();
         
         // preserve firstExtent/lastExtent
-        capExtent = firstExtent;
-        stats.datasize = stats.nrecords = 0;
+        t->capExtent = firstExtent;
+        t->stats.datasize = stats.nrecords = 0;
         // lastExtentSize preserve
         // nIndexes preserve 0
         // capped preserve true
         // max preserve
-        paddingFactor = 1.0;
-        flags = 0;
-        capFirstNewRecord = DiskLoc();
-        capFirstNewRecord.setInvalid();
-        cappedLastDelRecLastExtent().setInvalid();
+        t->paddingFactor = 1.0;
+        t->flags = 0;
+        t->capFirstNewRecord = DiskLoc();
+        t->capFirstNewRecord.setInvalid();
+        t->cappedLastDelRecLastExtent().setInvalid();
         // dataFileVersion preserve
         // indexFileVersion preserve
-        multiKeyIndexBits = 0;
-        reservedA = 0;
-        extraOffset = 0;
+        t->multiKeyIndexBits = 0;
+        t->reservedA = 0;
+        t->extraOffset = 0;
         // backgroundIndexBuildInProgress preserve 0
-        memset(reserved, 0, sizeof(reserved));
+        memset(t->reserved, 0, sizeof(t->reserved));
 
         for( DiskLoc ext = firstExtent; !ext.isNull(); ext = ext.ext()->xnext ) {
             DiskLoc prev = ext.ext()->xprev;
             DiskLoc next = ext.ext()->xnext;
             DiskLoc empty = ext.ext()->reuse( ns );
-            ext.ext()->xprev = prev;
-            ext.ext()->xnext = next;
+            ext.ext()->xprev.writing() = prev;
+            ext.ext()->xnext.writing() = next;
             addDeletedRec( empty.drec(), empty );
         }
     }
