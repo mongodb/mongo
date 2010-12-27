@@ -67,7 +67,7 @@ function doQueryOn(p) {
         r = p.foo.findOne();
     }
     catch(e) {
-        if (JSON) {
+        if (typeof(JSON) != "undefined") {
             err = JSON.parse(e.substring(6));
         }
         else if (e.indexOf("10057") > 0) {
