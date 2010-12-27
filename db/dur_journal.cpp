@@ -83,6 +83,8 @@ namespace mongo {
 
         Journal j;
 
+        const unsigned long long LsnShutdownSentinel = ~((unsigned long long)0);
+
         Journal::Journal() : 
             toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
             toStoreLastSeqNum(*(new MVar<unsigned long long>)),
@@ -157,11 +159,14 @@ namespace mongo {
 
         /** at clean shutdown */
         bool okToCleanUp = false; // failed recovery would set this to false
-        void journalCleanup() { 
+        void journalCleanupAtShutdown() { 
             if( testIntent ) 
                 return;
             if( !okToCleanUp ) 
                 return;
+
+            j.toStoreLastSeqNum.put(LsnShutdownSentinel);
+
             if( !j.tryToCloseCurJournalFile() ) {
                 return;
             }
@@ -284,6 +289,8 @@ namespace mongo {
             time_t last = 0;
             while( 1 ) {
                 unsigned long long lsn = j.toStoreLastSeqNum.take();
+                if( LsnShutdownSentinel == lsn )
+                    break;
 
                 // if you are on a really fast fsync interval, we don't write this as often
                 if( time(0) - last < 5 ) 
@@ -304,6 +311,8 @@ namespace mongo {
                     log() << "write to lsn file fails " << e.what() << endl;
                 }
             }
+
+            cc().shutdown();
         }
 
         void Journal::preFlush() { 

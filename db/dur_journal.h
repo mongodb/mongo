@@ -28,7 +28,7 @@ namespace mongo {
         extern bool okToCleanUp;
 
         /** at termination after db files closed & fsynced */
-        void journalCleanup();
+        void journalCleanupAtShutdown();
 
         /** assure journal/ dir exists. throws */
         void journalMakeDir();
