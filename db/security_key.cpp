@@ -41,11 +41,13 @@ namespace mongo {
             return false;
         }
 
+#if !defined(WIN32)
         // check permissions: must be X00, where X is >= 4
         if ((stats.st_mode & (S_IRWXG|S_IRWXO)) != 0) {
-            log() << "permissions on " << filename << " are to open" << endl;
+            log() << "permissions on " << filename << " are too open" << endl;
             return false;
         }
+#endif
 
         const unsigned long long fileLength = stats.st_size;
         if (fileLength < 6 || fileLength > 1024) { 
