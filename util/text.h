@@ -36,14 +36,19 @@ namespace mongo {
     
     class StringSplitter {
     public:
+        /** @param big the string to be split 
+            @param splitter the delimiter
+        */
         StringSplitter( const char * big , const char * splitter )
             : _big( big ) , _splitter( splitter ){
         }
 
+        /** @return true if more to be taken via next() */
         bool more(){
             return _big[0];
         }
 
+        /** get next split string fragment */
         string next(){
             const char * foo = strstr( _big , _splitter );
             if ( foo ){
