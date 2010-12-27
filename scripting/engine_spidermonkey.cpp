@@ -36,6 +36,9 @@
         massert(13072,(string)"JS_NewObject failed: " + w ,xx);    \
     }
 
+#define CHECKJSALLOC( newthing )                \
+    massert( 13615 , "JS allocation failed, either memory leak or using too much memory" , newthing )
+
 namespace mongo {
     
     class InvalidUTF8Exception : public UserException {
@@ -521,7 +524,7 @@ namespace mongo {
                 throw InvalidUTF8Exception();
             }
 
-            assert( s );
+            CHECKJSALLOC( s );
             return STRING_TO_JSVAL( s );
         }
 
@@ -592,7 +595,7 @@ namespace mongo {
                 int n = embed.nFields();
 
                 JSObject * array = JS_NewArrayObject( _context , n , 0 );
-                assert( array );
+                CHECKJSALLOC( array );
 
                 jsval myarray = OBJECT_TO_JSVAL( array );
 
