@@ -406,7 +406,7 @@ namespace mongo {
                 mutex::scoped_lock lk(_curLogFileMutex);
                 if( _curLogFile == 0 )
                     open();
-                stats.curr._journaledBytes += b.len();
+                stats.curr->_journaledBytes += b.len();
                 _written += b.len();
                 _curLogFile->synchronousAppend((void *) b.buf(), b.len());
             }

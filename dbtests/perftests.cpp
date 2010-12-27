@@ -125,6 +125,7 @@ namespace PerfTests {
 
             int hlm = howLongMillis();
 
+            dur::stats._intervalMicros = 0; // no auto rotate
             dur::stats.curr.reset();
             Timer t;
             unsigned long long n = 0;

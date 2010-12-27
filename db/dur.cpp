@@ -77,14 +77,46 @@ namespace mongo {
             memset(this, 0, sizeof(*this));
         }
 
-        BSONObj Stats::S::asObj() { 
+        Stats::Stats() { 
+            _a.reset();
+            _b.reset();
+            curr = &_a;
+            _intervalMicros = 3000000;
+        }
+
+        Stats::S * Stats::other() { 
+            return curr == &_a ? &_b : &_a;
+        }
+
+        BSONObj Stats::S::_asObj() { 
             return BSON(
                 "commits" << _commits <<
                 "journaledMB" << _journaledBytes / 1000000.0 <<
                 "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0 <<
-                "writeToDataFilesMs" << (long long) _writeToDataFilesMillis << 
-                "commitsInWriteLock" << _commitsInWriteLock
+                "commitsInWriteLock" << _commitsInWriteLock <<
+                "timeMs" << 
+                   BSON( "dt" << _dtMillis << 
+                         "prepLogBuffer" << (unsigned) (_prepLogBufferMicros/1000) << 
+                         "writeToJournal" << (unsigned) (_writeToJournalMicros/1000) << 
+                         "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) << 
+                         "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000)
+                       )
                 );
+        }
+
+        BSONObj Stats::asObj() { 
+            return other()->_asObj();
+        }
+
+        void Stats::rotate() {
+            unsigned long long now = curTimeMicros64();
+            unsigned long long dt = now - _lastRotate;
+            if( dt >= _intervalMicros && _intervalMicros ) { 
+                // rotate
+                curr->_dtMillis = (unsigned) (dt/1000);
+                _lastRotate = now;
+                curr = other();
+            }
         }
 
         DurableInterface* DurableInterface::_impl = new NonDurableImpl();
@@ -218,7 +250,9 @@ namespace mongo {
             outside of lock as that could be slow.
         */
         static void WRITETOJOURNAL(AlignedBuilder& ab) { 
+            Timer t;
             journal(ab);
+            stats.curr->_writeToJournalMicros += t.micros();
         }
 
         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
@@ -289,7 +323,7 @@ namespace mongo {
         /** We need to remap the private views periodically. otherwise they would become very large.
             Call within write lock.
         */
-        void REMAPPRIVATEVIEW() { 
+        void _REMAPPRIVATEVIEW() { 
             static unsigned startAt;
             static unsigned long long lastRemap;
 
@@ -342,6 +376,11 @@ namespace mongo {
                 }
             }
         }
+        void REMAPPRIVATEVIEW() { 
+            Timer t;
+            _REMAPPRIVATEVIEW();
+            stats.curr->_remapPrivateViewMicros += t.micros();
+        }
 
         void drainSome() { 
             Writes& writes = commitJob.wi();
@@ -352,11 +391,11 @@ namespace mongo {
             @see MongoMMF::close()
         */
         static void groupCommit() {
-            stats.curr._commits++;
+            stats.curr->_commits++;
 
             dbMutex.assertAtLeastReadLocked();
             if( dbMutex.isWriteLocked() ) { 
-                stats.curr._commitsInWriteLock++;
+                stats.curr->_commitsInWriteLock++;
             }
 
             if( !commitJob.hasWritten() )
@@ -455,6 +494,7 @@ namespace mongo {
                     drainSome();
 
                     go();
+                    stats.rotate();
                 }
                 catch(std::exception& e) { 
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;

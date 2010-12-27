@@ -32,6 +32,7 @@
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/alignedbuilder.h"
+#include "../util/timer.h"
 #include "dur_stats.h"
 
 using namespace mongoutils;
@@ -126,7 +127,7 @@ namespace mongo {
             we could be in read lock for this
             caller handles locking
         */
-        void PREPLOGBUFFER() { 
+        void _PREPLOGBUFFER() { 
             assert( cmdLine.dur );
 
             {
@@ -171,6 +172,11 @@ namespace mongo {
             }
 
             return;
+        }
+        void PREPLOGBUFFER() {
+            Timer t;
+            _PREPLOGBUFFER();
+            stats.curr->_prepLogBufferMicros += t.micros();
         }
 
     }

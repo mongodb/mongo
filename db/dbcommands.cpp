@@ -41,6 +41,7 @@
 #include "background.h"
 #include "../util/version.h"
 #include "../s/d_writeback.h"
+#include "dur_stats.h"
 
 namespace mongo {
 
@@ -469,6 +470,10 @@ namespace mongo {
             timeBuilder.appendNumber( "after asserts" , Listener::getElapsedTimeMillis() - start );            
 
             result.append( "writeBacksQueued" , ! writeBackManager.queuesEmpty() );
+
+            if( cmdLine.dur ) {
+                result.append("dur", dur::stats.asObj());
+            }
 
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
