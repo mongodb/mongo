@@ -436,7 +436,7 @@ ShardingTest.prototype.printCollectionInfo = function( ns , msg ){
     print( out );
 }
 
-printShardingStatus = function( configDB ){
+printShardingStatus = function( configDB , verbose ){
     if (configDB === undefined)
         configDB = db.getSisterDB('config')
     
@@ -470,12 +470,25 @@ printShardingStatus = function( configDB ){
                     function( coll ){
                         if ( coll.dropped == false ){
                             output("\t\t" + coll._id + " chunks:");
-                            configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
-                                function(chunk){
-                                    output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
-                                            " on : " + chunk.shard + " " + tojson( chunk.lastmod ) );
-                                }
-                            );
+                            
+                            res = configDB.chunks.group( { cond : { ns : coll._id } , key : { shard : 1 }  , reduce : function( doc , out ){ out.nChunks++; } , initial : { nChunks : 0 } } );
+                            var totalChunks = 0;
+                            res.forEach( function(z){
+                                totalChunks += z.nChunks;
+                                output( "\t\t\t\t" + z.shard + "\t" + z.nChunks );
+                            } )
+                            
+                            if ( totalChunks < 1000 || verbose ){
+                                configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
+                                    function(chunk){
+                                        output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
+                                                " on : " + chunk.shard + " " + tojson( chunk.lastmod ) );
+                                    }
+                                );
+                            }
+                            else {
+                                output( "\t\t\ttoo many chunksn to print, use verbose if you want to force print" );
+                            }
                         }
                     }
                 )
