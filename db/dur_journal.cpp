@@ -166,6 +166,7 @@ namespace mongo {
                 return;
 
             j.toStoreLastSeqNum.put(LsnShutdownSentinel);
+            j.toStoreLastSeqNum.put(LsnShutdownSentinel);
 
             if( !j.tryToCloseCurJournalFile() ) {
                 return;
