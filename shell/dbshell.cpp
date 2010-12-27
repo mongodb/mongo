@@ -477,7 +477,7 @@ string sayReplSetMemberState() {
     try {
         if( latestConn ) { 
             BSONObj info;
-            if( latestConn->simpleCommand("admin", &info, "replSetGetStatus") ) { 
+            if( latestConn->runCommand("admin", BSON( "replSetGetStatus" << 1 << "forShell" << 1 ) , info ) ) {
                 stringstream ss;
                 ss << info["set"].String() << ':';
                 int s = info["myState"].Int();

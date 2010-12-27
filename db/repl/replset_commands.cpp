@@ -103,6 +103,9 @@ namespace mongo {
         }
         CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if ( cmdObj["forShell"].trueValue() )
+                lastError.disableForCommand();
+
             if( !check(errmsg, result) ) 
                 return false;
             theReplSet->summarizeStatus(result);
