@@ -154,7 +154,7 @@ namespace mongo {
                 log() << "error removing journal files " << e.what() << endl;
                 throw;
             }
-            log() << "removeJournalFiles end" << endl; // temp
+            log(1) << "removeJournalFiles end" << endl;
         }
 
         /** at clean shutdown */
