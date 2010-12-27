@@ -281,70 +281,120 @@ namespace mongo {
         cout << "dl[1]: " << deletedList[1].toString() << endl;
     }
 
-    /* truncate everything from 'end' onward from the capped collection.
-       @param inclusive if true, deletes end (i.e. closed or open range)
-    */
     void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive) {
         DEV assert( this == nsdetails(ns) );
         assert( cappedLastDelRecLastExtent().isValid() );
         
+        // We iteratively remove the newest document until the newest document
+        // is 'end', then we remove 'end' if requested.
         bool foundLast = false;
         while( 1 ) {
             if ( foundLast ) {
+                // 'end' has been found and removed, so break.
                 break;
             }
+            // 'curr' will point to the newest document
             DiskLoc curr = theCapExtent()->lastRecord;
             assert( !curr.isNull() );
             if ( curr == end ) {
                 if ( inclusive ) {
+                    // 'end' has been found, so break next iteration.
                     foundLast = true;
                 } else {
+                    // 'end' has been found, so break.
                     break;
                 }
             }
             
+            // TODO The algorithm used in this function cannot generate an
+            // empty collection, but we could call emptyCappedCollection() in
+            // this case instead of asserting.
             uassert( 13415, "emptying the collection is not allowed", stats.nrecords > 1 );
             
+            // This is the case where we have not yet had to remove any
+            // documents to make room for other documents, and we are allocating
+            // documents from free space in fresh extents instead of reusing
+            // space from familiar extents.
             if ( !capLooped() ) {
+                
+                // Delete the newest record, and coalesce the new deleted
+                // record with existing deleted records.
                 theDataFileMgr.deleteRecord(ns, curr.rec(), curr, true);
                 compact();
+                
+                // We just removed the last record from the 'capExtent', and
+                // the 'capExtent' can't be empty, so we set 'capExtent' to
+                // capExtent's prev extent.
                 if ( theCapExtent()->lastRecord.isNull() ) {
                     assert( !theCapExtent()->xprev.isNull() );
+                    // NOTE Because we didn't delete the last document, and
+                    // capLooped() is false, capExtent is not the first extent
+                    // so xprev will be nonnull.
                     capExtent.writing() = theCapExtent()->xprev;
                     theCapExtent()->assertOk();
+                    
                     if ( capExtent == firstExtent ) {
+                        // Only one extent of the collection is in use, so there
+                        // is no deleted record in a previous extent, so nullify
+                        // cappedLastDelRecLastExtent().
                         cappedLastDelRecLastExtent().writing() = DiskLoc();
                     } else {
-                        // slow - there's no prev ptr for deleted rec
+                        // Scan through all deleted records in the collection
+                        // until the last deleted record for the extent prior
+                        // to the new capExtent is found.  Then set
+                        // cappedLastDelRecLastExtent() to that deleted record.
                         DiskLoc i = cappedListOfAllDeletedRecords();
                         for( ;
                             !i.drec()->nextDeleted.isNull() &&
                             !inCapExtent( i.drec()->nextDeleted );
                             i = i.drec()->nextDeleted );
-                        assert( !i.drec()->nextDeleted.isNull() ); // I believe there is always at least one drec per extent
+                        // In our capped storage model, every extent with real
+                        // records must have at least one deleted record.  Here
+                        // we check that 'i' is not the last deleted record.
+                        // (We expect that there will be deleted records in
+                        // the new capExtent as well.)
+                        assert( !i.drec()->nextDeleted.isNull() );
                         cappedLastDelRecLastExtent().writing() = i;
                     }
                 }
                 continue;
             }
 
+            // Delete the newest record, and coalesce the new deleted
+            // record with existing deleted records.
+            // TODO refactor with equivalent statement above.
             theDataFileMgr.deleteRecord(ns, curr.rec(), curr, true);
             compact();
-            if ( curr == capFirstNewRecord ) { // invalid, but can compare locations
+            
+            // This is the case where capLooped() is true, and we just deleted
+            // from capExtent, and we just deleted capFirstNewRecord, which was
+            // the last record on the fresh side of capExtent.
+            // NOTE In this comparison, curr and potentially capFirstNewRecord
+            // may point to invalid data, but we can still compare these
+            // references.
+            if ( curr == capFirstNewRecord ) {
+                // Set 'capExtent' to the cyclically previous extent
                 capExtent.writing() = ( capExtent == firstExtent ) ? lastExtent : theCapExtent()->xprev;
                 theCapExtent()->assertOk();
+                // Check that the new capExtent has a real record.
+                // TODO Validate that this will always be true, or else check
+                // the assert before setting capExtent.
                 assert( !theCapExtent()->firstRecord.isNull() );
+                // Place all documents in the new capExtent on the fresh side
+                // of the capExtent by setting capFirstNewRecord to the first
+                // document in the new capExtent
                 capFirstNewRecord.writing() = theCapExtent()->firstRecord;
+                
+                // Update cappedLastDelRecLastExtent(), see comments above.
                 if ( capExtent == firstExtent ) {
                     cappedLastDelRecLastExtent().writing() = DiskLoc();
                 } else {
-                    // slow - there's no prev ptr for deleted rec
                     DiskLoc i = cappedListOfAllDeletedRecords();
                     for( ;
                         !i.drec()->nextDeleted.isNull() &&
                         !inCapExtent( i.drec()->nextDeleted );
                         i = i.drec()->nextDeleted );
-                    assert( !i.drec()->nextDeleted.isNull() ); // I believe there is always at least one drec per extent
+                    assert( !i.drec()->nextDeleted.isNull() );
                     cappedLastDelRecLastExtent().writing() = i;
                 }
             }
@@ -357,10 +407,14 @@ namespace mongo {
         massert( 13425, "background index build in progress", !backgroundIndexBuildInProgress );
         massert( 13426, "indexes present", nIndexes == 0 );
 
+        // Clear all references to this namespace.
         ClientCursor::invalidate( ns );
 		NamespaceDetailsTransient::clearForPrefix( ns );
 
+        // Get a writeable reference to 'this' and reset all pertinent
+        // attributes.
         NamespaceDetails *t = getDur().writing( this );
+
         t->cappedLastDelRecLastExtent() = DiskLoc();
         t->cappedListOfAllDeletedRecords() = DiskLoc();
         
@@ -384,6 +438,7 @@ namespace mongo {
         // backgroundIndexBuildInProgress preserve 0
         memset(t->reserved, 0, sizeof(t->reserved));
 
+        // Reset all existing extents and recreate the deleted list.
         for( DiskLoc ext = firstExtent; !ext.isNull(); ext = ext.ext()->xnext ) {
             DiskLoc prev = ext.ext()->xprev;
             DiskLoc next = ext.ext()->xnext;

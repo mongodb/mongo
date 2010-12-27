@@ -223,7 +223,14 @@ namespace mongo {
         bool capLooped() const { return capped && capFirstNewRecord.isValid();  }
         bool inCapExtent( const DiskLoc &dl ) const;
         void cappedCheckMigrate();
-        void cappedTruncateAfter(const char *ns, DiskLoc after, bool inclusive); /** remove rest of the capped collection from this point onward */
+        /**
+         * Truncate documents newer than the document at 'end' from the capped
+         * collection.  The collection cannot be completely emptied using this
+         * function.  An assertion will be thrown if that is attempted.
+         * @param inclusive - Truncate 'end' as well iff true
+         */        
+        void cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive);
+        /** Remove all documents from the capped collection */
         void emptyCappedCollection(const char *ns);
         
         /* when a background index build is in progress, we don't count the index in nIndexes until 
