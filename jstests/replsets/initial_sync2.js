@@ -8,7 +8,7 @@
  * 5. Freeze #2
  * 6. Bring up #3
  * 7. Kill #1 in the middle of syncing
- * 8. Check that #1 doesn't make it into secondary state for a while
+ * 8. Check that #3 makes it into secondary state
  * 9. Bring #1 back up
  * 10. Initial sync should succeed
  * 11. Insert some stuff
@@ -99,17 +99,15 @@ print("7. Kill #1 in the middle of syncing");
 replTest.stop(0);
 
 
-print("8. Check that #3 doesn't make it into secondary state for a while");
-for (var i=0; i<100; i++) {
-  var status = admin_s2.runCommand({replSetGetStatus:1});
-  occasionally(function() { printjson(status);}, 10);
-  assert(status.members[2].state != 2);
-  if (status.members[2].state == 1) {
-    print("#3 completed its initial sync, we should just stop");
-    return;
-  }
-  sleep(1000);
-}
+print("8. Check that #3 makes it into secondary state");
+wait(function() {
+        var status = admin_s2.runCommand({replSetGetStatus:1});
+        occasionally(function() { printjson(status);}, 10);
+        if (status.members[2].state == 2 || status.members[2].state == 1) {
+            return true;
+        }
+        return false;
+    });
 
 
 print("9. Bring #1 back up");

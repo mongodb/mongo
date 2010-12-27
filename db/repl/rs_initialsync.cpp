@@ -181,18 +181,10 @@ namespace mongo {
     }
     
     /**
-     * Do the initial sync for this member.  There must be a primary available
-     * for the whole intial sync, even if we're syncing from a secondary.
+     * Do the initial sync for this member.
      */
     void ReplSetImpl::_syncDoInitialSync() { 
         sethbmsg("initial sync pending",0);
-        
-        const Member *cp = box.getPrimary();
-        if (!cp) {
-            sethbmsg("initial sync needs a member to be primary to begin");
-            sleepsecs(15);
-            return;
-        }
         
         const Member *source = getMemberToSyncTo();
         if (!source) {
@@ -248,7 +240,7 @@ namespace mongo {
 
         sethbmsg("initial sync query minValid",0);
 
-        isyncassert( "initial sync source must remain primary throughout our initial sync", box.getPrimary() == cp );
+        isyncassert( "initial sync source must remain readable throughout our initial sync", source->state().readable() );
 
         /* our cloned copy will be strange until we apply oplog events that occurred 
            through the process.  we note that time point here. */
@@ -261,7 +253,7 @@ namespace mongo {
         */
         {
             sethbmsg("initial sync initial oplog application");
-            isyncassert( "initial sync source must remain primary throughout our initial sync [2]", box.getPrimary() == cp );
+            isyncassert( "initial sync source must remain readable throughout our initial sync [2]", source->state().readable() );
             if( ! initialSyncOplogApplication(source, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
