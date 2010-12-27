@@ -301,12 +301,12 @@ namespace mongo {
         
         fromconn.done();
 
-        if ( worked ){
-            _manager->_reload();
-            return true;
-        }
+        // if succeeded, needs to reload to pick up the new location
+        // if failed, mongos may be stale
+        // reload is excessive here as the failure could be simply because collection metadata is taken
+        _manager->_reload();
 
-        return false;
+        return worked;
     }
     
     bool Chunk::splitIfShould( long dataWritten ){
