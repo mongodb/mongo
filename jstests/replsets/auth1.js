@@ -60,26 +60,27 @@ assert.eq(r.x, 1);
 
 s.setSlaveOk();
 slave = s.getDB("test");
-var err = {};
-try {
-    r = slave.foo.findOne();
-}
-catch(e) {
-    err = JSON.parse(e.substring(6));
-}
-assert.eq(err.code, 10057);
-err = {};
 
+function doQueryOn(p) {
+    var err = {};
+    try {
+        r = p.foo.findOne();
+    }
+    catch(e) {
+        if (JSON) {
+            err = JSON.parse(e.substring(6));
+        }
+        else if (e.indexOf("10057") > 0) {
+            err.code = 10057;
+        }
+    }
+    assert.eq(err.code, 10057);
+};
+
+doQueryOn(slave);
 master.adminCommand({logout:1});
+doQueryOn(master);
 
-try {
-    r = master.foo.findOne();
-}
-catch (e) { 
-    err = JSON.parse(e.substring(6));
-}
-assert.eq(err.code, 10057);
-err = {};
 
 result = slave.auth("bar", "baz");
 assert.eq(result, 1);
