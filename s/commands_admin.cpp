@@ -832,22 +832,6 @@ namespace mongo {
             }
             CmdShardingGetLastError() : Command("getLastError" , false , "getlasterror") { }
             
-            void addWriteBack( vector<OID>& all , const BSONObj& o ){
-                BSONElement e = o["writeback"];
-
-                if ( e.type() == jstOID )
-                    all.push_back( e.OID() );
-            }
-            
-            void handleWriteBacks( vector<OID>& all ){
-                if ( all.size() == 0 )
-                    return;
-                
-                for ( unsigned i=0; i<all.size(); i++ ){
-                    WriteBackListener::waitFor( all[i] );
-                }
-            }
-            
             virtual bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 LastError *le = lastError.disableForCommand();
                 {
@@ -859,110 +843,7 @@ namespace mongo {
                 }
                 
                 ClientInfo * client = ClientInfo::get();
-                set<string> * shards = client->getPrev();
-                
-                if ( shards->size() == 0 ){
-                    result.appendNull( "err" );
-                    return true;
-                }
-
-                //log() << "getlasterror enter: " << shards->size() << endl;
-
-
-                vector<OID> writebacks;
-                
-                // handle single server
-                if ( shards->size() == 1 ){
-                    string theShard = *(shards->begin() );
-                    result.append( "theshard" , theShard.c_str() );
-                    ShardConnection conn( theShard , "" );
-                    BSONObj res;
-                    bool ok = conn->runCommand( dbName , cmdObj , res );
-                    //log() << "\t" << res << endl;
-                    result.appendElements( res );
-                    conn.done();
-                    result.append( "singleShard" , theShard );
-                    addWriteBack( writebacks , res );
-                    
-                    // hit other machines just to block
-                    for ( set<string>::const_iterator i=client->sinceLastGetError().begin(); i!=client->sinceLastGetError().end(); ++i ){
-                        string temp = *i;
-                        if ( temp == theShard )
-                            continue;
-                        
-                        ShardConnection conn( temp , "" );
-                        addWriteBack( writebacks , conn->getLastErrorDetailed() );
-                        conn.done();
-                    }
-                    client->clearSinceLastGetError();
-                    handleWriteBacks( writebacks );
-                    return ok;
-                }
-                
-                BSONArrayBuilder bbb( result.subarrayStart( "shards" ) );
-
-                long long n = 0;
-
-                // hit each shard
-                vector<string> errors;
-                vector<BSONObj> errorObjects;
-                for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
-                    string theShard = *i;
-                    bbb.append( theShard );
-                    ShardConnection conn( theShard , "" );
-                    BSONObj res;
-                    bool ok = conn->runCommand( dbName , cmdObj , res );
-                    addWriteBack( writebacks, res );
-                    string temp = DBClientWithCommands::getLastErrorString( res );
-                    if ( ok == false || temp.size() ){
-                        errors.push_back( temp );
-                        errorObjects.push_back( res );
-                    }
-                    n += res["n"].numberLong();
-                    conn.done();
-                }
-                
-                bbb.done();
-                
-                result.appendNumber( "n" , n );
-
-                // hit other machines just to block
-                for ( set<string>::const_iterator i=client->sinceLastGetError().begin(); i!=client->sinceLastGetError().end(); ++i ){
-                    string temp = *i;
-                    if ( shards->count( temp ) )
-                        continue;
-                    
-                    ShardConnection conn( temp , "" );
-                    addWriteBack( writebacks, conn->getLastErrorDetailed() );
-                    conn.done();
-                }
-                client->clearSinceLastGetError();
-
-                if ( errors.size() == 0 ){
-                    result.appendNull( "err" );
-                    handleWriteBacks( writebacks );
-                    return true;
-                }
-                
-                result.append( "err" , errors[0].c_str() );
-                
-                { // errs
-                    BSONArrayBuilder all( result.subarrayStart( "errs" ) );
-                    for ( unsigned i=0; i<errors.size(); i++ ){
-                        all.append( errors[i].c_str() );
-                    }
-                    all.done();
-                }
-
-                { // errObjects
-                    BSONArrayBuilder all( result.subarrayStart( "errObjects" ) );
-                    for ( unsigned i=0; i<errorObjects.size(); i++ ){
-                        all.append( errorObjects[i] );
-                    }
-                    all.done();
-                }
-                handleWriteBacks( writebacks );
-                return true;
+                return client->getLastError( cmdObj , result );
             }
         } cmdGetLastError;
         

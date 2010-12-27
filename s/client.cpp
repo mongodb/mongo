@@ -1,20 +1,20 @@
 // s/client.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ *    Copyright (C) 2008 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "pch.h"
 #include "server.h"
@@ -32,7 +32,7 @@
 #include "stats.h"
 #include "cursors.h"
 #include "grid.h"
-
+#include "s/writeback_listener.h"
 
 namespace mongo {
     
@@ -121,6 +121,128 @@ namespace mongo {
         ci->disconnect();
         delete ci;
         _clients.erase( i );
+    }
+
+    void ClientInfo::_addWriteBack( vector<OID>& all , const BSONObj& o ){
+        BSONElement e = o["writeback"];
+        
+        if ( e.type() == jstOID )
+            all.push_back( e.OID() );
+    }
+    
+    void ClientInfo::_handleWriteBacks( vector<OID>& all ){
+        if ( all.size() == 0 )
+            return;
+        
+        for ( unsigned i=0; i<all.size(); i++ ){
+            WriteBackListener::waitFor( all[i] );
+        }
+    }
+    
+    
+
+    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result ){
+        set<string> * shards = getPrev();
+        
+        if ( shards->size() == 0 ){
+            result.appendNull( "err" );
+            return true;
+        }
+        
+        vector<OID> writebacks;
+        
+        // handle single server
+        if ( shards->size() == 1 ){
+            string theShard = *(shards->begin() );
+            result.append( "theshard" , theShard.c_str() );
+            ShardConnection conn( theShard , "" );
+            BSONObj res;
+            bool ok = conn->runCommand( "admin" , options , res );
+            //log() << "\t" << res << endl;
+            result.appendElements( res );
+            conn.done();
+            result.append( "singleShard" , theShard );
+            _addWriteBack( writebacks , res );
+            
+            // hit other machines just to block
+            for ( set<string>::const_iterator i=sinceLastGetError().begin(); i!=sinceLastGetError().end(); ++i ){
+                string temp = *i;
+                if ( temp == theShard )
+                    continue;
+                
+                ShardConnection conn( temp , "" );
+                _addWriteBack( writebacks , conn->getLastErrorDetailed() );
+                conn.done();
+            }
+            clearSinceLastGetError();
+            _handleWriteBacks( writebacks );
+            return ok;
+        }
+        
+        BSONArrayBuilder bbb( result.subarrayStart( "shards" ) );
+        
+        long long n = 0;
+        
+        // hit each shard
+        vector<string> errors;
+        vector<BSONObj> errorObjects;
+        for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
+            string theShard = *i;
+            bbb.append( theShard );
+            ShardConnection conn( theShard , "" );
+            BSONObj res;
+            bool ok = conn->runCommand( "admin" , options , res );
+            _addWriteBack( writebacks, res );
+            string temp = DBClientWithCommands::getLastErrorString( res );
+            if ( ok == false || temp.size() ){
+                errors.push_back( temp );
+                errorObjects.push_back( res );
+            }
+            n += res["n"].numberLong();
+            conn.done();
+        }
+                
+        bbb.done();
+                
+        result.appendNumber( "n" , n );
+
+        // hit other machines just to block
+        for ( set<string>::const_iterator i=sinceLastGetError().begin(); i!=sinceLastGetError().end(); ++i ){
+            string temp = *i;
+            if ( shards->count( temp ) )
+                continue;
+                    
+            ShardConnection conn( temp , "" );
+            _addWriteBack( writebacks, conn->getLastErrorDetailed() );
+            conn.done();
+        }
+        clearSinceLastGetError();
+        
+        if ( errors.size() == 0 ){
+            result.appendNull( "err" );
+            _handleWriteBacks( writebacks );
+            return true;
+        }
+                
+        result.append( "err" , errors[0].c_str() );
+                
+        { // errs
+            BSONArrayBuilder all( result.subarrayStart( "errs" ) );
+            for ( unsigned i=0; i<errors.size(); i++ ){
+                all.append( errors[i].c_str() );
+            }
+            all.done();
+        }
+
+        { // errObjects
+            BSONArrayBuilder all( result.subarrayStart( "errObjects" ) );
+            for ( unsigned i=0; i<errorObjects.size(); i++ ){
+                all.append( errorObjects[i] );
+            }
+            all.done();
+        }
+        _handleWriteBacks( writebacks );
+        return true;
     }
 
     ClientInfo::Cache& ClientInfo::_clients = *(new ClientInfo::Cache());

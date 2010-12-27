@@ -65,12 +65,25 @@ namespace mongo {
          */
         void clearSinceLastGetError(){ _sinceLastGetError.clear(); }
         
+        /**
+         * calls getLastError 
+         * resets shards since get last error
+         */
+        bool getLastError( const BSONObj& options , BSONObjBuilder& result );
+        
+
         static ClientInfo * get( int clientId = 0 , bool create = true );
         static void disconnect( int clientId );
 
     private:
-        int _id;
-        string _remote;
+
+        // for getLastError
+        void _addWriteBack( vector<OID>& all , const BSONObj& o );
+        void _handleWriteBacks( vector<OID>& all );
+
+        
+        int _id; // unique client id
+        string _remote; // server:port of remote socket end
         
         // we use _a and _b to store shards we've talked to on the current request and the previous
         // we use 2 so we can flip for getLastError type operations
