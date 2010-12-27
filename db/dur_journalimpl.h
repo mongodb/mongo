@@ -27,7 +27,6 @@ namespace mongo {
         public:
             string dir; // set by journalMakeDir() during initialization
             MVar<path> &toUnlink; // unlinks of old journal threads are via background thread
-            MVar<unsigned long long> &toStoreLastSeqNum;
 
             Journal();
 
@@ -70,10 +69,13 @@ namespace mongo {
             // ordered oldest to newest
             list<JFile> _oldJournalFiles; // use _curLogFileMutex
 
+            // lsn related
             static void preFlush();
             static void postFlush();
             unsigned long long _preFlushTime;
             unsigned long long _lastFlushTime; // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
+            bool _writeToLSNNeeded;
+            void updateLSNFile();
         };
 
     }

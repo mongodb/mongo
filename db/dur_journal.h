@@ -34,8 +34,9 @@ namespace mongo {
         void journalMakeDir();
 
         /** check if time to rotate files; assure a file is open. 
-            done separately from the journal() call as we can do this part
-            outside of lock.
+             done separately from the journal() call as we can do this part
+             outside of lock.
+            only called by durThread.
          */
         void journalRotate();
 

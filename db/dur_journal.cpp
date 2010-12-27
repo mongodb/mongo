@@ -87,12 +87,14 @@ namespace mongo {
 
         Journal::Journal() : 
             toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
-            toStoreLastSeqNum(*(new MVar<unsigned long long>)),
             _curLogFileMutex("JournalLfMutex")
         { 
             _written = 0;
             _nextFileNumber = 0;
             _curLogFile = 0; 
+            _preFlushTime = 0;
+            _lastFlushTime = 0;
+            _writeToLSNNeeded = false;
         }
 
         path Journal::getFilePathFor(int filenumber) const { 
@@ -164,9 +166,6 @@ namespace mongo {
                 return;
             if( !okToCleanUp ) 
                 return;
-
-            j.toStoreLastSeqNum.put(LsnShutdownSentinel);
-            j.toStoreLastSeqNum.put(LsnShutdownSentinel); // forces ourself to block for lsnthread
 
             if( !j.tryToCloseCurJournalFile() ) {
                 return;
@@ -283,37 +282,26 @@ namespace mongo {
             return 0;
         }
 
-        /** remember "last sequence number" to speed recoveries */
-        void lsnThread() { 
-            Client::initThread("lsn");
-
+        /** remember "last sequence number" to speed recoveries 
+            concurrency: called by durThread only.
+        */
+        void Journal::updateLSNFile() {
+            if( !_writeToLSNNeeded )
+                return;
+            _writeToLSNNeeded = false;
             time_t last = 0;
-            while( 1 ) {
-                unsigned long long lsn = j.toStoreLastSeqNum.take();
-                if( LsnShutdownSentinel == lsn )
-                    break;
-
-                // if you are on a really fast fsync interval, we don't write this as often
-                if( time(0) - last < 5 ) 
-                    continue;
-
-                last = time(0);
-
-                try {
-                    // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
-                    // however, given we actually close the file, that seems unlikely.
-                    MemoryMappedFile f;
-                    unsigned long long length = sizeof(LSNFile);
-                    LSNFile *lsnf = static_cast<LSNFile*>( f.map(lsnPath().string().c_str(), length) );
-                    assert(lsnf);
-                    lsnf->set(lsn);
-                }
-                catch(std::exception& e) { 
-                    log() << "write to lsn file fails " << e.what() << endl;
-                }
+            try {
+                // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
+                // however, given we actually close the file, that seems unlikely.
+                MemoryMappedFile f;
+                unsigned long long length = sizeof(LSNFile);
+                LSNFile *lsnf = static_cast<LSNFile*>( f.map(lsnPath().string().c_str(), length) );
+                assert(lsnf);
+                lsnf->set(_lastFlushTime);
             }
-
-            cc().shutdown();
+            catch(std::exception& e) { 
+                log() << "write to lsn file fails " << e.what() << endl;
+            }
         }
 
         void Journal::preFlush() { 
@@ -322,7 +310,7 @@ namespace mongo {
 
         void Journal::postFlush() { 
             j._lastFlushTime = j._preFlushTime;
-            j.toStoreLastSeqNum.tryPut( j._lastFlushTime );
+            j._writeToLSNNeeded = true;
         }
 
         // call from within _curLogFileMutex
@@ -378,6 +366,10 @@ namespace mongo {
             j.rotate();
         }
         void Journal::rotate() {
+            assert( !dbMutex.atLeastReadLocked() );
+
+            j.updateLSNFile();
+
             if( _curLogFile && _written < DataLimit ) 
                 return;
 
