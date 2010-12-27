@@ -166,7 +166,7 @@ namespace mongo {
                 return;
 
             j.toStoreLastSeqNum.put(LsnShutdownSentinel);
-            j.toStoreLastSeqNum.put(LsnShutdownSentinel);
+            j.toStoreLastSeqNum.put(LsnShutdownSentinel); // forces ourself to block for lsnthread
 
             if( !j.tryToCloseCurJournalFile() ) {
                 return;
