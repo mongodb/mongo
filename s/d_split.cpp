@@ -508,7 +508,7 @@ namespace mongo {
                 ShardChunkVersion shardVersion;
                 shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
 
-                log() << "splitChunk accepted on version " << shardVersion << endl;
+                log() << "splitChunk accepted at version " << shardVersion << endl;
 
             }
 
