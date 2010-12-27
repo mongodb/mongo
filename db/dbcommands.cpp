@@ -1151,13 +1151,18 @@ namespace mongo {
                 return false;
             }
 
+            bool verbose = jsobj["verbose"].trueValue();
+
             long long size = nsd->stats.datasize / scale;
             result.appendNumber( "count" , nsd->stats.nrecords );
             result.appendNumber( "size" , size );
             if( nsd->stats.nrecords )
                 result.append      ( "avgObjSize" , double(size) / double(nsd->stats.nrecords) );
+
             int numExtents;
-            result.appendNumber( "storageSize" , nsd->storageSize( &numExtents ) / scale );
+            BSONArrayBuilder extents;
+            
+            result.appendNumber( "storageSize" , nsd->storageSize( &numExtents , verbose ? &extents : 0  ) / scale );
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->nIndexes );
             result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
@@ -1172,6 +1177,9 @@ namespace mongo {
                 result.append( "capped" , nsd->capped );
                 result.append( "max" , nsd->max );
             }
+            
+            if ( verbose )
+                result.appendArray( "extents" , extents.arr() );
 
             return true;
         }

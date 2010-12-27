@@ -531,7 +531,7 @@ namespace mongo {
         return -1;
     }
     
-    long long NamespaceDetails::storageSize( int * numExtents ){
+    long long NamespaceDetails::storageSize( int * numExtents , BSONArrayBuilder * extentInfo ) const {
         Extent * e = firstExtent.ext();
         assert( e );
         
@@ -539,8 +539,13 @@ namespace mongo {
         int n = 0;
         while ( e ){
             total += e->length;
-            e = e->getNextExtent();
             n++;
+            
+            if ( extentInfo ){
+                extentInfo->append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
+            }
+            
+            e = e->getNextExtent();
         }
         
         if ( numExtents )
