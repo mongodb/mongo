@@ -690,13 +690,19 @@ namespace mongo {
                     result.append( "currMax" , currMax );
                     result.append( "requestedMin" , min );
                     result.append( "requestedMax" , max );
+
+                    log( LL_WARNING ) << errmsg << ": " << min << "->" << max << " is now " << currMin << "->" << currMax << endl;
+
                     return false;
                 }
 
                 if ( myOldShard != fromShard.getName() ){
-                    errmsg = "i'm out of date";
+                    errmsg = "chunk location is wrong (likely balance or migrate occurred)";
                     result.append( "from" , fromShard.getName() );
                     result.append( "official" , myOldShard );
+
+                    log( LL_WARNING ) << errmsg << ": chunk is at " << myOldShard << " and not at " << fromShard.getName() << endl;
+
                     return false;
                 }                
 
@@ -704,6 +710,9 @@ namespace mongo {
                     errmsg = "official version less than mine?";
                     result.appendTimestamp( "officialVersion" , maxVersion );
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
+
+                    log( LL_WARNING ) << errmsg << ": official " << maxVersion << " mine: " << shardingState.getVersion(ns) << endl;
+
                     return false;
                 }
 
