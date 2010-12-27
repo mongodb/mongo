@@ -513,7 +513,7 @@ namespace mongo {
                 getDur().debugCheckLastDeclaredWrite(); 
 #endif
 
-                if (commitJob.bytes() > 100*1024*1024)
+                if (commitJob.bytes() > 100*1024*1024 || cmdLine.durOptions & CmdLine::DurAlwaysCommit)
                     groupCommit();
             }
             catch(std::exception& e) {

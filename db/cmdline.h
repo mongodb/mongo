@@ -85,7 +85,8 @@ namespace mongo {
             DurDumpJournal = 1,   // dump diagnostics on the journal during recovery
             DurScanOnly = 2,      // don't do any real work, just scan and dump if dump specified
             DurRecoverOnly = 4,   // terminate after recovery step
-            DurParanoid = 8       // paranoid mode enables extra checks (default in _DEBUG builds)
+            DurParanoid = 8,      // paranoid mode enables extra checks
+            DurAlwaysCommit = 16  // do a group commit every time the writelock is released
         };
         int durOptions;          // --durOptions <n> for debugging
 
