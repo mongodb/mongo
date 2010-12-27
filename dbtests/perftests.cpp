@@ -115,7 +115,7 @@ namespace PerfTests {
     public:
         void say(unsigned long long n, int ms, string s) { 
             cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
-            cout << dur::stats.curr.asObj().toString() << endl;
+            cout << dur::stats.curr->_asObj().toString() << endl;
         }
         void run() { 
             _ns = string("perftest.") + name();
@@ -126,7 +126,7 @@ namespace PerfTests {
             int hlm = howLongMillis();
 
             dur::stats._intervalMicros = 0; // no auto rotate
-            dur::stats.curr.reset();
+            dur::stats.curr->reset();
             Timer t;
             unsigned long long n = 0;
             const unsigned Batch = 50;
@@ -148,7 +148,7 @@ namespace PerfTests {
             {
                 const char *test2name = timed2();
                 if( test2name ) {
-                    dur::stats.curr.reset();
+                    dur::stats.curr->reset();
                     Timer t;
                     unsigned long long n = 0;
                     while( 1 ) { 
