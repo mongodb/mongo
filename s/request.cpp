@@ -1,7 +1,4 @@
-/* dbgrid/request.cpp
-
-   Top level handling of requests (operations such as query, insert, ...)
-*/
+// s/request.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -34,6 +31,7 @@
 #include "stats.h"
 #include "cursors.h"
 #include "grid.h"
+#include "client.h"
 
 namespace mongo {
 
@@ -161,95 +159,4 @@ namespace mongo {
         _p->reply( _m , response , _id );
     }
     
-    ClientInfo::ClientInfo( int clientId ) : _id( clientId ){
-        _cur = &_a;
-        _prev = &_b;
-        newRequest();
-    }
-    
-    ClientInfo::~ClientInfo(){
-        if ( _lastAccess ){
-            scoped_lock lk( _clientsLock );
-            ClientCache::iterator i = _clients.find( _id );
-            if ( i != _clients.end() ){
-                _clients.erase( i );
-            }
-        }
-    }
-    
-    void ClientInfo::addShard( const string& shard ){
-        _cur->insert( shard );
-        _sinceLastGetError.insert( shard );
-    }
-    
-    void ClientInfo::newRequest( AbstractMessagingPort* p ){
-
-        if ( p ){
-            string r = p->remote().toString();
-            if ( _remote == "" )
-                _remote = r;
-            else if ( _remote != r ){
-                stringstream ss;
-                ss << "remotes don't match old [" << _remote << "] new [" << r << "]";
-                throw UserException( 13134 , ss.str() );
-            }
-        }
-        
-        _lastAccess = (int) time(0);
-        
-        set<string> * temp = _cur;
-        _cur = _prev;
-        _prev = temp;
-        _cur->clear();
-    }
-    
-    void ClientInfo::disconnect(){
-        _lastAccess = 0;
-    }
-        
-    ClientInfo * ClientInfo::get( int clientId , bool create ){
-        
-        if ( ! clientId )
-            clientId = getClientId();
-        
-        if ( ! clientId ){
-            ClientInfo * info = _tlInfo.get();
-            if ( ! info ){
-                info = new ClientInfo( 0 );
-                _tlInfo.reset( info );
-            }
-            info->newRequest();
-            return info;
-        }
-        
-        scoped_lock lk( _clientsLock );
-        ClientCache::iterator i = _clients.find( clientId );
-        if ( i != _clients.end() )
-            return i->second;
-        if ( ! create )
-            return 0;
-        ClientInfo * info = new ClientInfo( clientId );
-        _clients[clientId] = info;
-        return info;
-    }
-        
-    void ClientInfo::disconnect( int clientId ){
-        if ( ! clientId )
-            return;
-
-        scoped_lock lk( _clientsLock );
-        ClientCache::iterator i = _clients.find( clientId );
-        if ( i == _clients.end() )
-            return;
-
-        ClientInfo* ci = i->second;
-        ci->disconnect();
-        delete ci;
-        _clients.erase( i );
-    }
-
-    ClientCache& ClientInfo::_clients = *(new ClientCache());
-    mongo::mutex ClientInfo::_clientsLock("_clientsLock");
-    boost::thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
-
 } // namespace mongo

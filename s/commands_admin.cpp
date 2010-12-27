@@ -42,6 +42,7 @@
 #include "strategy.h"
 #include "stats.h"
 #include "writeback_listener.h"
+#include "client.h"
 
 namespace mongo {
 

@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "request.h"
+#include "client.h"
 #include "../client/dbclient.h"
 #include "../db/dbhelpers.h"
 #include "../db/matcher.h"

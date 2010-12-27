@@ -29,6 +29,7 @@
 
 #include "server.h"
 #include "request.h"
+#include "client.h"
 #include "config.h"
 #include "chunk.h"
 #include "balance.h"
