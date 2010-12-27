@@ -289,7 +289,6 @@ namespace mongo {
             if( !_writeToLSNNeeded )
                 return;
             _writeToLSNNeeded = false;
-            time_t last = 0;
             try {
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
                 // however, given we actually close the file, that seems unlikely.
