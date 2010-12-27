@@ -322,8 +322,12 @@ namespace mongo {
         
         fromconn.done();
 
+        // if succeeded, needs to reload to pick up the new location
+        // if failed, mongos may be stale
+        // reload is excessive here as the failure could be simply because collection metadata is taken
+        _manager->_reload();
+
         if ( worked ){
-            _manager->_reload();
             return true;
         }
         
