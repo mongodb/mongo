@@ -6,11 +6,17 @@ function debug( t ) {
     print( t );
 }
 
+function extraDebug() {
+    printjson( db.stats() );
+    db.printCollectionStats();    
+}
+
 // index extent freeing
 t.drop();
 t.save( {} );
 var s1 = db.stats().dataSize;
 debug( "s1: " + s1 );
+extraDebug();
 t.ensureIndex( {a:1} );
 var s2 = db.stats().dataSize;
 debug( "s2: " + s2 );
@@ -18,6 +24,7 @@ assert.automsg( "s1 < s2" );
 t.dropIndex( {a:1} );
 var s3 = db.stats().dataSize;
 debug( "s3: " + s3 );
+extraDebug();
 assert.eq.automsg( "s1", "s3" );
 
 // index node freeing
