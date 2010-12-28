@@ -953,6 +953,8 @@ namespace mongo {
         _delKeyAtPos( leftIndex, true );
         if ( n == 0 ) {
             // will trash this and thisLoc
+            // TODO To ensure all leaves are of equal height, we should ensure
+            // this is only called on the root.
             replaceWithNextChild( thisLoc, id );
         } else {
             // balance recursively - maybe we should do this even when n == 0?
