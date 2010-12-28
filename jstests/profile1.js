@@ -1,4 +1,6 @@
 
+try {
+
 /* With pre-created system.profile (capped) */
 db.runCommand({profile: 0});
 db.getCollection("system.profile").drop();
@@ -40,3 +42,8 @@ assert.eq(2, db.runCommand({profile: -1}).was, "I");
 assert.eq(1, db.system.profile.stats().capped, "J");
 var auto_size = db.system.profile.storageSize();
 assert.gt(auto_size, capped_size, "K");
+
+} finally {
+    // disable profiling for subsequent tests
+    assert.commandWorked( db.runCommand( {profile:0} ) );
+}
