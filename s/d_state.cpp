@@ -61,6 +61,7 @@ namespace mongo {
     
     void ShardingState::gotShardName( const string& name ){
         if ( _shardName.size() == 0 ){
+            // TODO SERVER-2299 verify the name is sound w.r.t IPs
             _shardName = name;
             return;
         }
