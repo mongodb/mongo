@@ -55,20 +55,29 @@ namespace mongo {
 
     class MoveTimingHelper {
     public:
-        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max )
-            : _where( where ) , _ns( ns ){
-            _next = 1;
+        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max , int total )
+            : _where( where ) , _ns( ns ) , _next( 0 ) , _total( total ) {
             _nextNote = 0;
             _b.append( "min" , min );
             _b.append( "max" , max );
         }
 
         ~MoveTimingHelper(){
-            configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
+            // even if logChange doesn't throw, bson does
+            // sigh
+            try { 
+                if ( _next != _total ) {
+                    note( "aborted" );
+                }
+                configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
+            } catch ( const std::exception& e ) {
+                log( LL_WARNING ) << "couldn't record timing for moveChunk '" << _where << "': " << e.what() << endl;
+            }
         }
         
         void done( int step ){
-            assert( step == _next++ );
+            assert( step == ++_next );
+            assert( step <= _total );
             
             stringstream ss;
             ss << "step" << step;
@@ -112,6 +121,7 @@ namespace mongo {
         string _ns;
         
         int _next;
+        int _total; // expected # of steps
         int _nextNote;
         
         BSONObjBuilder _b;
@@ -646,7 +656,7 @@ namespace mongo {
                 configServer.init( configdb );
             }
 
-            MoveTimingHelper timing( "from" , ns , min , max );
+            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */);
 
             Shard fromShard( from );
             Shard toShard( to );
@@ -1092,7 +1102,7 @@ namespace mongo {
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
             
-            MoveTimingHelper timing( "to" , ns , min , max );
+            MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ );
             
             ScopedDbConnection conn( from );
             conn->getLastError(); // just test connection
