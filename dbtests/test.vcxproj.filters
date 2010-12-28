@@ -761,6 +761,9 @@
     <ClCompile Include="directclienttests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\security_key.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
