@@ -96,10 +96,28 @@ if (jfiles.length) {
 
 log("check data matches");
 var diff = run("diff", path1 + "/test.ns", path2 + "/test.ns");
-print("diff .ns:" + diff);
-assert(diff == "", "error test.ns files differ");
-var diff = run("diff", path1 + "/test.0", path2 + "/test.0");
-print("diff .0:" + diff);
-assert(diff == "", "error test.0 files differ");
+print("diff of .ns files returns:" + diff);
 
+function showfiles() {
+    print("\n\nERROR: files for dur and nodur do not match");
+    print(path1 + " files:");
+    printjson(listFiles(path1));
+    print(path2 + " files:");
+    printjson(listFiles(path2));
+    print();
+}
+
+if (diff != "") {
+    showfiles();    
+    assert(diff == "", "error test.ns files differ");
+}
+
+var diff = run("diff", path1 + "/test.0", path2 + "/test.0");
+print("diff of .0 files returns:" + diff);
+if (diff != "") {
+    showfiles();
+    assert(diff == "", "error test.0 files differ");
+}
+    
 print("quick.js SUCCESS");
+showfiles();
