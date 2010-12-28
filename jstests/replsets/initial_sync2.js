@@ -139,7 +139,7 @@ for (var i = 0; i<30; i++) {
     break;
   }
   else if (result.primary) {
-    master = connect(result.primary+"/admin");
+    master = connect(result.primary+"/admin").getMongo();
     break;
   }
   sleep(1000);
