@@ -193,6 +193,11 @@ namespace mongo {
             return p;
         }
 
+        void DurableImpl::commitIfNeeded() {
+            if (commitJob.bytes() > 50*1024*1024) // should this also fire if CmdLine::DurAlwaysCommit?
+                groupCommit();
+        }
+
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
             that was declared.  called just before writelock release.  we check a few
             bytes after the declared region to see if they changed.
