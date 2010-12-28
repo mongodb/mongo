@@ -88,7 +88,6 @@ namespace mongo {
 
         // un write lock 
         void unlock() { 
-            _releasingWriteLock();
             int s = _state.get();
             if( s > 1 ) { 
                 _state.set(s-1); // recursive lock case
@@ -101,6 +100,7 @@ namespace mongo {
                 }
                 massert( 12599, "internal error: attempt to unlock when wasn't in a write lock", false);
             }
+            _releasingWriteLock();
             MongoFile::unmarkAllWritable(); // _DEBUG validation
             _state.set(0);
             _minfo.leaving();
