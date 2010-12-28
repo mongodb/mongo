@@ -248,7 +248,6 @@ namespace mongo {
                     log() << ss.str() << endl;
                 } 
                 if( apply ) {
-                    //TODO(mathias) look into writev() on linux
                     File& file = getFile(entry.dbName, entry.e->getFileNo());
                     file.write(entry.e->ofs, entry.e->srcData(), entry.e->len);
                 }
