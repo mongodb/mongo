@@ -319,7 +319,7 @@ namespace mongo {
                 // 'end' has been found and removed, so break.
                 break;
             }
-            // 'curr' will point to the newest document
+            // 'curr' will point to the newest document in the collection.
             DiskLoc curr = theCapExtent()->lastRecord;
             assert( !curr.isNull() );
             if ( curr == end ) {
@@ -372,17 +372,25 @@ namespace mongo {
             // may point to invalid data, but we can still compare the
             // references themselves.
             if ( curr == capFirstNewRecord ) {
-                // Set 'capExtent' to the cyclically previous extent
-                capExtent.writing() = ( capExtent == firstExtent ) ? lastExtent : theCapExtent()->xprev;
-                theCapExtent()->assertOk();
-                // Check that the new capExtent has a real record.
-                // TODO Validate that this will always be true, or else check
-                // the assert before setting capExtent.
-                assert( !theCapExtent()->firstRecord.isNull() );
-
+                
+                // Set 'capExtent' to the first nonempty extent prior to the
+                // initial capExtent.  There must be such an extent because we
+                // have not deleted the last document in the collection.  It is
+                // possible that all extents other than the capExtent are empty.
+                // In this case we will keep the initial capExtent and specify
+                // that all records contained within are on the fresh rather than
+                // stale side of the extent.
+                DiskLoc newCapExtent = capExtent;
+                do {
+                    // Find the previous extent, looping if necessary.
+                    newCapExtent = ( newCapExtent == firstExtent ) ? lastExtent : newCapExtent.ext()->xprev;
+                    newCapExtent.ext()->assertOk();
+                } while ( newCapExtent.ext()->firstRecord.isNull() );
+                capExtent.writing() = newCapExtent;
+                
                 // Place all documents in the new capExtent on the fresh side
                 // of the capExtent by setting capFirstNewRecord to the first
-                // document in the new capExtent
+                // document in the new capExtent.
                 capFirstNewRecord.writing() = theCapExtent()->firstRecord;
 
                 // update cappedLastDelRecLastExtent()

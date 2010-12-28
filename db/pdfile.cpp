@@ -217,19 +217,36 @@ namespace mongo {
             }
         }
 
-        // $nExtents just for debug/testing.  We create '$nExtents' extents,
-        // each of size 'size'.
+        // $nExtents just for debug/testing.
         BSONElement e = options.getField( "$nExtents" );
-        int nExtents = int( e.number() );
         Database *database = cc().database();
-        if ( nExtents > 0 ) {
-            assert( size <= 0x7fffffff );
-            for ( int i = 0; i < nExtents; ++i ) {
-                assert( size <= 0x7fffffff );
-                // $nExtents is just for testing - always allocate new extents
-                // rather than reuse existing extents so we have some predictibility
-                // in the extent size used by our tests
-                database->suitableFile( (int) size, false )->createExtent( ns, (int) size, newCapped );
+        if ( !e.eoo() ) {
+            if ( e.type() == Array ) {
+                // We create one extent per array entry, with size specified
+                // by the array value.
+                BSONObjIterator i( e.embeddedObject() );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    int size = int( e.number() );
+                    assert( size <= 0x7fffffff );
+                    // $nExtents is just for testing - always allocate new extents
+                    // rather than reuse existing extents so we have some predictibility
+                    // in the extent size used by our tests
+                    database->suitableFile( (int) size, false )->createExtent( ns, (int) size, newCapped );                    
+                }
+            } else {
+                // We create '$nExtents' extents, each of size 'size'.
+                int nExtents = int( e.number() );
+                if ( nExtents > 0 ) {
+                    assert( size <= 0x7fffffff );
+                    for ( int i = 0; i < nExtents; ++i ) {
+                        assert( size <= 0x7fffffff );
+                        // $nExtents is just for testing - always allocate new extents
+                        // rather than reuse existing extents so we have some predictibility
+                        // in the extent size used by our tests
+                        database->suitableFile( (int) size, false )->createExtent( ns, (int) size, newCapped );
+                    }
+                }
             }
         } else {
             while ( size > 0 ) {
