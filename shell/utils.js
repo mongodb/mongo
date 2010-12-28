@@ -652,8 +652,9 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/evalb.js",
                                    "jstests/evald.js",
                                    "jstests/evalf.js",
-				    "jstests/killop.js",
-				    "jstests/run_program1.js"] );
+                                   "jstests/killop.js",
+                                   "jstests/run_program1.js",
+                                   "jstests/notablescan.js"] );
         
         // some tests can't be run in parallel with each other
         var serialTestsArr = [ "jstests/fsync.js",
