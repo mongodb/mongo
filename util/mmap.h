@@ -16,7 +16,7 @@
  */
 
 #pragma once
-
+#include <boost/thread/xtime.hpp>
 #include "concurrency/rwlock.h"
 
 namespace mongo {
