@@ -292,7 +292,7 @@ namespace mongo {
             try {
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
                 // however, given we actually close the file, that seems unlikely.
-                MemoryMappedFile f;
+                MemoryMappedFile f; // not a MongoMMF so no closing notification
                 unsigned long long length = sizeof(LSNFile);
                 LSNFile *lsnf = static_cast<LSNFile*>( f.map(lsnPath().string().c_str(), length) );
                 assert(lsnf);
