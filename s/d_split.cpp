@@ -490,8 +490,8 @@ namespace mongo {
                     result.append( "requestedMin" , min );
                     result.append( "requestedMax" , max );
 
-                    log( LL_WARNING ) << errmsg << ": " << min << "->" << max << " is now " << currMin << "->" << currMax << endl;
-                    
+                    log( LL_WARNING ) << "aborted split because " << errmsg << ": " << min << "->" << max 
+                                      << " is now " << currMin << "->" << currMax << endl;
                     return false;
                 }
 
@@ -500,8 +500,8 @@ namespace mongo {
                     result.appendTimestamp( "officialVersion" , maxVersion );
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
 
-                    log( LL_WARNING ) << errmsg << ": official " << maxVersion << " mine: " << shardingState.getVersion(ns) << endl;
-
+                    log( LL_WARNING ) << "aborted split because " << errmsg << ": official " << maxVersion 
+                                      << " mine: " << shardingState.getVersion(ns) << endl;
                     return false;
                 }
 

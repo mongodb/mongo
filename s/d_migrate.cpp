@@ -685,24 +685,24 @@ namespace mongo {
                 BSONObj currMin = currChunk["min"].Obj();
                 BSONObj currMax = currChunk["max"].Obj();
                 if ( currMin.woCompare( min ) || currMax.woCompare( max ) ) {
-                    errmsg = "chunk boundaries are outdated (likely a split occurred)";
+                    errmsg = "boundaries are outdated (likely a split occurred)";
                     result.append( "currMin" , currMin );
                     result.append( "currMax" , currMax );
                     result.append( "requestedMin" , min );
                     result.append( "requestedMax" , max );
 
-                    log( LL_WARNING ) << errmsg << ": " << min << "->" << max << " is now " << currMin << "->" << currMax << endl;
-
+                    log( LL_WARNING ) << "aborted moveChunk because" <<  errmsg << ": " << min << "->" << max 
+                                      << " is now " << currMin << "->" << currMax << endl;
                     return false;
                 }
 
                 if ( myOldShard != fromShard.getName() ){
-                    errmsg = "chunk location is wrong (likely balance or migrate occurred)";
+                    errmsg = "location is outdated (likely balance or migrate occurred)";
                     result.append( "from" , fromShard.getName() );
                     result.append( "official" , myOldShard );
 
-                    log( LL_WARNING ) << errmsg << ": chunk is at " << myOldShard << " and not at " << fromShard.getName() << endl;
-
+                    log( LL_WARNING ) << "aborted moveChunk because " << errmsg << ": chunk is at " << myOldShard 
+                                      << " and not at " << fromShard.getName() << endl;
                     return false;
                 }                
 
@@ -711,8 +711,8 @@ namespace mongo {
                     result.appendTimestamp( "officialVersion" , maxVersion );
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
 
-                    log( LL_WARNING ) << errmsg << ": official " << maxVersion << " mine: " << shardingState.getVersion(ns) << endl;
-
+                    log( LL_WARNING ) << "aborted moveChunk because " << errmsg << ": official " << maxVersion 
+                                      << " mine: " << shardingState.getVersion(ns) << endl;
                     return false;
                 }
 
