@@ -373,6 +373,8 @@ namespace mongo {
             unsigned reserved2;
             unsigned reserved3;
         };
+        /** Update cappedLastDelRecLastExtent() after capExtent changed in cappedTruncateAfter() */
+        void cappedTruncateLastDelUpdate();
         BOOST_STATIC_ASSERT( NIndexesMax <= NIndexesBase + NIndexesExtra*2 );
         BOOST_STATIC_ASSERT( NIndexesMax <= 64 ); // multiKey bits
 		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::ExtraOld) == 496 );
