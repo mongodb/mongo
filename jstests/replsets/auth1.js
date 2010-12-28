@@ -53,7 +53,7 @@ wait(function() {
     });
 
 master.foo.insert({x:1});
-rs.awaitReplication();
+master.runCommand({getlasterror:1, w:3, wtimeout:60000});
 
 
 print("try some legal and illegal reads");
