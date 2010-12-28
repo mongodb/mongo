@@ -222,6 +222,9 @@
     <ClCompile Include="..\..\bson\oid.cpp">
       <Filter>bson</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\client\dbclient_rs.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\SConstruct" />

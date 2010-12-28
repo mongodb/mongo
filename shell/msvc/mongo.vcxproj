@@ -90,6 +90,7 @@
     <ClCompile Include="..\..\bson\oid.cpp" />
     <ClCompile Include="..\..\client\clientOnly.cpp" />
     <ClCompile Include="..\..\client\connpool.cpp" />
+    <ClCompile Include="..\..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\..\client\syncclusterconnection.cpp" />
     <ClCompile Include="..\..\db\commands.cpp" />
     <ClCompile Include="..\..\db\lasterror.cpp" />
