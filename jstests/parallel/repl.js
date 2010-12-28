@@ -1,4 +1,4 @@
-// test all operations in parallel
+// test basic operations in parallel, with replication
 
 baseName = "parallel_repl"
 
@@ -25,7 +25,7 @@ for( id = 0; id < 10; ++id ) {
                 g.addRemove( { _id:Random.randInt( 1000 ) } );
                 break;
             case 2: // update
-                g.addUpdate( {_id:{$lt:1000}}, {a:{$inc:5}} );
+                g.addUpdate( {_id:{$lt:1000}}, {$inc:{a:5}} );
                 break;
             default:
                 assert( false, "Invalid op code" );
