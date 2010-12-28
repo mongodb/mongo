@@ -7,8 +7,8 @@ function debug( t ) {
 }
 
 function extraDebug() {
-    printjson( db.stats() );
-    db.printCollectionStats();    
+//    printjson( db.stats() );
+//    db.printCollectionStats();    
 }
 
 // index extent freeing
