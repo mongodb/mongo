@@ -297,11 +297,10 @@ namespace mongo {
                 !i.drec()->nextDeleted.isNull() &&
                 !inCapExtent( i.drec()->nextDeleted );
                 i = i.drec()->nextDeleted );
-            // In our capped storage model, every extent with real
-            // records must have at least one deleted record.  Here
-            // we check that 'i' is not the last deleted record.
-            // (We expect that there will be deleted records in
-            // the new capExtent as well.)
+            // In our capped storage model, every extent must have at least one
+            // deleted record.  Here we check that 'i' is not the last deleted
+            // record.  (We expect that there will be deleted records in the new
+            // capExtent as well.)
             assert( !i.drec()->nextDeleted.isNull() );
             cappedLastDelRecLastExtent().writing() = i;
         }        
