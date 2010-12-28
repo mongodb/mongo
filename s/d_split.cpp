@@ -264,7 +264,7 @@ namespace mongo {
             shared_ptr<Cursor> c( bc );
             scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
             if ( ! cc->ok() ){
-                errmsg = "can't open a cursor for splitting";
+                errmsg = "can't open a cursor for splitting (desired range is possibly empty)";
                 return false;
             }
 
