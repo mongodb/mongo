@@ -64,7 +64,8 @@ namespace mongo {
                 return (out << "p: " << wi.p << " end: " << wi.end() << " len: " << wi.len);
             }
 
-            /*temp*/ mutable void *w_ptr;  // p is mapped from private to equivalent location in the writable mmap 
+            mutable void *w_ptr;  // writable mapping of p.
+                                  // mutable because set::iterator is const but this isn't used in op<
 #if defined(_EXPERIMENTAL)
             mutable unsigned ofsInJournalBuffer;
 #endif
