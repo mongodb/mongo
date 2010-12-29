@@ -457,7 +457,7 @@ namespace mongo {
 
             Shard myShard( from );
 
-            log() << "got splitchunk: " << cmdObj << endl;
+            log() << "received splitChunk request: " << cmdObj << endl;
 
             //
             // 2. lock the collection's metadata and get highest version for the current shard
