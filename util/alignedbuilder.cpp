@@ -45,7 +45,7 @@ namespace mongo {
         assert( a );
         while( 1 ) {
             a *= 2;
-            assert( a < 0x20000000 );
+            assert( a < 512*1024*1024 );
             if( _len < a )
                 break;
         }
