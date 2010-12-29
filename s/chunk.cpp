@@ -253,6 +253,11 @@ namespace mongo {
 
         if ( ! conn->runCommand( "admin" , cmdObj , res )) {
             conn.done();
+
+            // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
+            // but we issue here so that mongos may refresh wihtout needing to be written/read against
+            _manager->_reload();
+
             return ChunkPtr();
         }
 
