@@ -8,6 +8,7 @@ conn = startMongodEmpty("--port", 30000, "--dbpath", "/data/db/dur_passthrough",
 db = conn.getDB("test");
 
 var files = listFiles("jstests");
+files = files.sort(compareOn('name'));
 
 var runnerStart = new Date()
 
