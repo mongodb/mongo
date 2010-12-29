@@ -457,7 +457,7 @@ namespace mongo {
             return true;
             
         } catch ( const SocketException & e ) {
-            log(_logLevel + (e.shouldPrint() ? 0 : 1) ) << "SocketException: " << e << endl;
+            log(_logLevel + (e.shouldPrint() ? 0 : 1) ) << "SocketException: remote: " << remote() << " error: " << e << endl;
             m.reset();
             return false;
         }
@@ -486,7 +486,8 @@ namespace mongo {
             if ( response.header()->responseTo == toSend.header()->id )
                 break;
             error() << "MessagingPort::call() wrong id got:" << hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << '\n'
-                    << "  toSend op: " << toSend.operation() << '\n'
+                    << dec 
+                    << "  toSend op: " << (unsigned)toSend.operation() << '\n'
                     << "  response msgid:" << (unsigned)response.header()->id << '\n'
                     << "  response len:  " << (unsigned)response.header()->len << '\n'
                     << "  response op:  " << response.operation() << '\n'
