@@ -57,9 +57,11 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
             spec[ "scope" ] = scope;
         }
 
+        stringifiedSpec = tojson( spec ).toString().replace( /\n/g, ' ' );
+        
         // The assert below won't be caught by this test script, but it will cause error messages
         // to be printed.
-        s = startParallelShell( "assert.commandWorked( db.runCommand( " + tojson( spec ) + " ) );" );
+        s = startParallelShell( "print( '" + stringifiedSpec + "' ); assert.commandWorked( db.runCommand( " + stringifiedSpec + " ) );" );
         
         if ( wait ) {
             sleep( 2000 );
