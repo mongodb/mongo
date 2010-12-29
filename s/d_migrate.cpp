@@ -617,11 +617,11 @@ namespace mongo {
             }
             
             if ( to.empty() ){
-                errmsg = "need to specify server to move shard to";
+                errmsg = "need to specify server to move chunk to";
                 return false;
             }
             if ( from.empty() ){
-                errmsg = "need to specify server to move shard from (redundat i know)";
+                errmsg = "need to specify server to move chunk from";
                 return false;
             }
             
