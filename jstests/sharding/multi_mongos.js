@@ -32,27 +32,29 @@ assert.eq( 0 , secondary.count() , "s1" )
 assert.eq( 1 , s1.onNumShards( "foo" ) , "on 1 shards" );
 
 // 
-// STEP 1
+// STEP 1 (builds a bit of context so there should probably not be a step 2 in this same test)
 //   where we try to issue a move chunk from a mongos that's stale
-//   when staleness means chunk boundaries are wrong, splits and migrates should not work
+//   followed by a split on a valid chunk, albeit one with not the highest lastmod
 
-// [Minkey->1), [1->N), [N,Maxkey)
+// split in [Minkey->1), [1->N), [N,Maxkey)
 s1.adminCommand( { split : "test.foo" , middle : { num : 1 } } );
 s1.adminCommand( { split : "test.foo" , middle : { num : N } } );
 
-// s2 is stale w.r.t boundaires around { num: 1 }
+// s2 is now stale w.r.t boundaires around { num: 1 }
 res = s2.getDB( "admin" ).runCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
-assert.eq( 0 , res.ok , "a move with stale boundaries should not have succeeded" ); 
+assert.eq( 0 , res.ok , "a move with stale boundaries should not have succeeded" + tojson(res) ); 
 
 // s2 must have reloaded as a result of a failed move; retrying should work
 res = s2.getDB( "admin" ).runCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
-assert.eq( 1 , res.ok , "mongos did not reload after a failed migrate" );
+assert.eq( 1 , res.ok , "mongos did not reload after a failed migrate" + tojson(res) );
 
-// s1 is now stale about location of { num : 1 } (where { num: 2 } falls)
-res = s1.getDB( "admin" ).runCommand( { split : "test.foo" , middle : { num : 2 } } );
-assert.eq( 0 , res.ok , "a split with stale boundaries should not have succeeded" );
-
-s1.printShardingStatus();
+// s1 is not stale about the boundaries of [MinKey->1) (where { num: -1 } falls)
+// but we'll try to split a chunk whose lastmod.major was not touched by the previous move
+// in 1.6, that chunk would be with [Minkey->1)
+// after 1.6, it would be with [N->Maxkey]
+// s.printShardingStatus()
+res = s1.getDB( "admin" ).runCommand( { split : "test.foo" , middle : { num : N+1 } } ); // replace with { num: -1 } instead in 1.6
+assert.eq( 1, res.ok , "split over accurate boudaries should have succeeded" + tojson(res) );
 
 // { num : 4 } is on primary
 // { num : 1 , 2 , 3 } are on secondary
