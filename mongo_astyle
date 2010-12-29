@@ -1,5 +1,5 @@
 --indent=spaces=4
-
+--convert-tabs
 --lineend=linux
 
 --indent-namespaces
