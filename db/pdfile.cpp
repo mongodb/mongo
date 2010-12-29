@@ -428,7 +428,7 @@ namespace mongo {
         }
 
         {
-            NamespaceDetails *dw = getDur().writing(details);
+            NamespaceDetails *dw = details->writingWithoutExtra();
             dw->lastExtentSize = e->length;
         }
         details->addDeletedRec(emptyLoc.drec(), emptyLoc);
@@ -1524,7 +1524,7 @@ namespace mongo {
         if ( lenWHdr == 0 ) {
             // old datafiles, backward compatible here.
             assert( d->paddingFactor == 0 );
-            d->paddingFactor = 1.0;
+            *getDur().writingNoLog(&d->paddingFactor) = 1.0;
             lenWHdr = len + Record::HeaderSize;
         }
         

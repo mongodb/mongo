@@ -7,6 +7,8 @@
 
 namespace mongo {
 
+    class NamespaceDetails;
+    
     namespace dur {
 
         class DurableInterface : boost::noncopyable { 
@@ -53,7 +55,15 @@ namespace mongo {
                 @return new buffer pointer.  this is modified when testIntent is true.
             */
             virtual void* writingAtOffset(void *buf, unsigned ofs, unsigned len) = 0;
-
+            
+            /** declare intent to write
+                @param ranges vector of pairs representing ranges.  Each pair
+                comprises an offset from buf where a range begins, then the
+                range length.
+                @return new buffer pointer.  this is modified when testIntent is true.
+             */
+            virtual void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges ) = 0;
+            
             /** Wait for acknowledgement of the next group commit. 
                 @return true if --dur is on.  There will be delay.
                 @return false if --dur is off.
@@ -118,7 +128,11 @@ namespace mongo {
                 this will override the templated version and yield an unresolved external
             */
             Record* writing(Record* r);
-
+            /** Unimplemented: BtreeBuckets are allocated in buffers larger than sizeof( BtreeBucket ). */
+            BtreeBucket* writing( BtreeBucket* );
+            /** Unimplemented: NamespaceDetails may be based on references to 'Extra' objects. */
+            NamespaceDetails* writing( NamespaceDetails* );
+            
             /** declare our intent to write, but it doesn't have to be journaled, as this write is 
                 something 'unimportant'.  depending on our implementation, we may or may not be able 
                 to take advantage of this versus doing the normal work we do.
@@ -149,6 +163,7 @@ namespace mongo {
             void startup();
             void* writingPtr(void *x, unsigned len) { return x; }
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
+            void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges) { return buf; }
             void declareWriteIntent(void *, unsigned) { }
             void createdFile(string filename, unsigned long long len) { }
             void droppingDb(string db) { }
@@ -164,6 +179,7 @@ namespace mongo {
             void startup();
             void* writingPtr(void *x, unsigned len);
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len);
+            void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges);
             void declareWriteIntent(void *, unsigned);
             void createdFile(string filename, unsigned long long len);
             void droppingDb(string db);

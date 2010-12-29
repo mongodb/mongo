@@ -185,6 +185,17 @@ namespace mongo {
             declareWriteIntent(p+ofs, len);
             return p;
         }
+        
+        void* DurableImpl::writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges ) {
+            char *p = (char *) buf;
+            if( testIntent )
+                p = (char *) MongoMMF::switchToPrivateView(buf);
+            for( vector< pair< long long, unsigned > >::const_iterator i = ranges.begin();
+                i != ranges.end(); ++i ) {
+                declareWriteIntent( p + i->first, i->second );
+            }
+            return p;
+        }
 
         void DurableImpl::commitIfNeeded() {
             if (commitJob.bytes() > 50*1024*1024) // should this also fire if CmdLine::DurAlwaysCommit?

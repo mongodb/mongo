@@ -112,7 +112,7 @@ namespace PdfileTests {
 
         class EmptyLooped : public Base {
             virtual void prepare() {
-                getDur().writing(nsd())->capFirstNewRecord = DiskLoc();
+                nsd()->writingWithExtra()->capFirstNewRecord = DiskLoc();
             }
             virtual int count() const {
                 return 0;
@@ -121,7 +121,7 @@ namespace PdfileTests {
 
         class EmptyMultiExtentLooped : public Base {
             virtual void prepare() {
-                getDur().writing( nsd() ) ->capFirstNewRecord = DiskLoc();
+                nsd()->writingWithExtra()->capFirstNewRecord = DiskLoc();
             }
             virtual int count() const {
                 return 0;
@@ -133,7 +133,7 @@ namespace PdfileTests {
 
         class Single : public Base {
             virtual void prepare() {
-                getDur().writing( nsd() )->capFirstNewRecord = insert( nsd()->capExtent, 0 );
+                nsd()->writingWithExtra()->capFirstNewRecord = insert( nsd()->capExtent, 0 );
             }
             virtual int count() const {
                 return 1;
@@ -143,7 +143,7 @@ namespace PdfileTests {
         class NewCapFirst : public Base {
             virtual void prepare() {
                 DiskLoc x = insert( nsd()->capExtent, 0 );
-                getDur().writing( nsd() )->capFirstNewRecord = x;
+                nsd()->writingWithExtra()->capFirstNewRecord = x;
                 insert( nsd()->capExtent, 1 );
             }
             virtual int count() const {

@@ -620,7 +620,7 @@ namespace NamespaceTests {
                 return ns_;
             }
             NamespaceDetails *nsd() const {
-                return getDur().writing( nsdetails( ns() ) );
+                return nsdetails( ns() )->writingWithExtra();
             }
             static BSONObj bigObj() {
                 string as( 187, 'a' );

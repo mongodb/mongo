@@ -410,7 +410,7 @@ namespace mongo {
 
         // Get a writeable reference to 'this' and reset all pertinent
         // attributes.
-        NamespaceDetails *t = getDur().writing( this );
+        NamespaceDetails *t = writingWithoutExtra();
 
         t->cappedLastDelRecLastExtent() = DiskLoc();
         t->cappedListOfAllDeletedRecords() = DiskLoc();

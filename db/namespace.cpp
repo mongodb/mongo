@@ -554,6 +554,15 @@ namespace mongo {
         return total;
     }
     
+    NamespaceDetails *NamespaceDetails::writingWithExtra() {
+        vector< pair< long long, unsigned > > writeRanges;
+        writeRanges.push_back( make_pair( 0, sizeof( NamespaceDetails ) ) );
+        for( Extra *e = extra(); e; e = e->next( this ) ) {
+            writeRanges.push_back( make_pair( (char*)e - (char*)this, sizeof( Extra ) ) );
+        }
+        return reinterpret_cast< NamespaceDetails* >( getDur().writingRangesAtOffsets( this, writeRanges ) );
+    }
+    
     /* ------------------------------------------------------------------------- */
 
     mongo::mutex NamespaceDetailsTransient::_qcMutex("qc");

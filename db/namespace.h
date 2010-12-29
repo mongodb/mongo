@@ -360,6 +360,12 @@ namespace mongo {
             return (int) (stats.datasize / stats.nrecords);
         }
         
+        NamespaceDetails *writingWithoutExtra() {
+            return ( NamespaceDetails* ) getDur().writingPtr( this, sizeof( NamespaceDetails ) );
+        }
+        /** Make all linked Extra objects writeable as well */
+        NamespaceDetails *writingWithExtra();
+        
     private:
         DiskLoc _alloc(const char *ns, int len);
         void maybeComplain( const char *ns, int len ) const;
