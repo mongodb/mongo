@@ -493,10 +493,12 @@ namespace mongo {
                 assert( chunk.get() );
                 log() << "splitting: " << ns << "  shard: " << chunk << endl;
 
-                if ( middle.isEmpty() )
-                    chunk->singleSplit( true /* force a split even if not enough data */ );
+                BSONObj res;
+                ChunkPtr p;
+                if ( middle.isEmpty() ) {
+                    p = chunk->singleSplit( true /* force a split even if not enough data */ , res );
 
-                else {
+                } else {
                     // sanity check if the key provided is a valid split point
                     if ( ( middle == chunk->getMin() ) || ( middle == chunk->getMax() ) ) {
                         errmsg = "cannot split on initial or final chunk's key";
@@ -505,7 +507,13 @@ namespace mongo {
 
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
-                    chunk->multiSplit( splitPoints );
+                    p = chunk->multiSplit( splitPoints , res );
+                }
+
+                if ( p.get() == NULL ) {
+                    errmsg = "split failed";
+                    result.append( "cause" , res );
+                    return false;
                 }
 
                 return true;

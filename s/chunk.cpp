@@ -172,7 +172,7 @@ namespace mongo {
         conn.done();
     }
 
-    ChunkPtr Chunk::singleSplit( bool force ){
+    ChunkPtr Chunk::singleSplit( bool force , BSONObj& res ){
         vector<BSONObj> splitPoint;
 
         // if splitting is not obligatory we may return early if there are not enough data
@@ -227,10 +227,10 @@ namespace mongo {
             return ChunkPtr();
         }
 
-        return multiSplit( splitPoint );
+        return multiSplit( splitPoint , res );
     }
     
-    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m ) {
+    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) {
         const size_t maxSplitPoints = 256;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -239,7 +239,7 @@ namespace mongo {
         uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
         
         ScopedDbConnection conn( getShard().getConnString() );
-        BSONObj result;
+
         BSONObjBuilder cmd;
         cmd.append( "splitChunk" , _manager->getns() );
         cmd.append( "keyPattern" , _manager->getShardKey().key() );
@@ -250,13 +250,9 @@ namespace mongo {
         cmd.append( "configdb" , configServer.modelServer() ); 
         BSONObj cmdObj = cmd.obj();
 
-        if ( ! conn->runCommand( "admin" , cmdObj , result )) {
+        if ( ! conn->runCommand( "admin" , cmdObj , res )) {
             conn.done();
-
-            // TODO decide if push up the error instead of asserting
-            ostringstream os;
-            os << "split chunk command failed: " << result;
-            uassert( 13504 , os.str() , 0 );
+            return ChunkPtr();
         }
 
         conn.done();
@@ -326,7 +322,8 @@ namespace mongo {
             
             _dataWritten = 0; // reset so we check often enough
             
-            ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ );
+            BSONObj res; 
+            ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ , res );
             if ( newShard.get() == NULL ){
                 // singleSplit would have issued a message if we got here
                 return false;
@@ -874,7 +871,13 @@ namespace mongo {
             return;
         }
 
-        soleChunk->multiSplit( splitPoints );
+        BSONObj res;
+        ChunkPtr p;
+        p = soleChunk->multiSplit( splitPoints , res );
+        if ( p.get() == NULL ) {
+            log( LL_WARNING ) << "could not split '" << getns() << "': " << res << endl;
+            return;
+        }
     }
 
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const{
