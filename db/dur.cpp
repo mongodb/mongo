@@ -121,14 +121,7 @@ namespace mongo {
 
         DurableInterface* DurableInterface::_impl = new NonDurableImpl();
 
-        void NonDurableImpl::startup() {
-            if( haveJournalFiles() ) { 
-                log() << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
-                log() << "It is recommended that you start with journalling enabled so that recovery may occur." << endl;
-                log() << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
-                uasserted(13597, "can't start without --dur enabled when journal/ files are present");
-            }
-        }
+        void NonDurableImpl::startup() { }
 
         /** base declare write intent function that all the helpers call. */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
