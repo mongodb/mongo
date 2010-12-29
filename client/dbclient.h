@@ -722,7 +722,7 @@ namespace mongo {
          You may format as
            { query: { ... }, orderby: { ... } }
          to specify a sort order.
-         @param nToReturn n to return.  0 = unlimited
+         @param nToReturn n to return (i.e., limit).  0 = unlimited
          @param nToSkip start with the nth item
          @param fieldsToReturn optional template of which fields to select. if unspecified, returns all fields
          @param queryOptions see options enum at top of this file
