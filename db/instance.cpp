@@ -818,17 +818,36 @@ namespace mongo {
             uassert( 10310 ,  "Unable to acquire lock for lockfilepath: " + name,  0 );
         }
 
-        if ( oldFile && !cmdLine.dur ){
+        if ( oldFile ){
             // we check this here because we want to see if we can get the lock
             // if we can't, then its probably just another mongod running
-            cout << "************** \n" 
-                 << "old lock file: " << name << ".  probably means unclean shutdown\n"
-                 << "recommend removing file and running --repair\n" 
-                 << "see: http://dochub.mongodb.org/core/repair for more information\n"
-                 << "*************" << endl;
-            close ( lockFile );
-            lockFile = 0;
-            uassert( 12596 , "old lock file" , 0 );
+
+            string errmsg;
+            if (cmdLine.dur) {
+                if (!dur::haveJournalFiles()){
+                    errmsg = str::stream()
+                         << "************** \n"
+                         << "old lock file: " << name << ".  probably means unclean shutdown\n"
+                         << "but there are no journal files to recover.\n"
+                         << "see: http://dochub.mongodb.org/core/repair for more information\n"
+                         << "*************";
+                }
+            }
+            else {
+                errmsg = str::stream()
+                     << "************** \n"
+                     << "old lock file: " << name << ".  probably means unclean shutdown\n"
+                     << "recommend removing file and running --repair\n"
+                     << "see: http://dochub.mongodb.org/core/repair for more information\n"
+                     << "*************";
+            }
+
+            if (!errmsg.empty()) {
+                cout << errmsg << endl;
+                close ( lockFile );
+                lockFile = 0;
+                uassert( 12596 , "old lock file" , 0 );
+            }
         }
 
         uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
