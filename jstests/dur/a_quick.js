@@ -10,6 +10,25 @@ print("a_quick.js");
 var path1 = "/data/db/quicknodur";
 var path2 = "/data/db/quickdur";
 
+function runDiff(a, b) {
+    function reSlash(s) {
+        var x = s;
+        if (_isWindows()) {
+            while (1) {
+                var y = x.replace('/', '\\');
+                if (y == x)
+                    break;
+                x = y;
+            }
+        }
+        return x;
+    }
+    a = reSlash(a);
+    b = reSlash(b);
+    print("diff " + a + " " + b);
+    return run("diff", a, b);
+}
+
 var step = 1;
 function log(str) {
     if(str)
@@ -95,7 +114,7 @@ if (jfiles.length) {
 }
 
 log("check data matches");
-var diff = run("diff", path1 + "/test.ns", path2 + "/test.ns");
+var diff = runDiff(path1 + "/test.ns", path2 + "/test.ns");
 print("diff of .ns files returns:" + diff);
 
 function showfiles() {
@@ -112,7 +131,7 @@ if (diff != "") {
     assert(diff == "", "error test.ns files differ");
 }
 
-var diff = run("diff", path1 + "/test.0", path2 + "/test.0");
+var diff = runDiff(path1 + "/test.0", path2 + "/test.0");
 print("diff of .0 files returns:" + diff);
 if (diff != "") {
     showfiles();
