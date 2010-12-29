@@ -48,10 +48,10 @@ assert.eq( 0 , res.ok , "a move with stale boundaries should not have succeeded"
 res = s2.getDB( "admin" ).runCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
 assert.eq( 1 , res.ok , "mongos did not reload after a failed migrate" + tojson(res) );
 
-// s1 is not stale about the boundaries of [MinKey->1) (where { num: -1 } falls)
+// s1 is not stale about the boundaries of [MinKey->1) 
 // but we'll try to split a chunk whose lastmod.major was not touched by the previous move
-// in 1.6, that chunk would be with [Minkey->1)
-// after 1.6, it would be with [N->Maxkey]
+// in 1.6, that chunk would be with [Minkey->1) (where { num: -1 } falls)
+// after 1.6, it would be with [N->Maxkey] (where { num: N+1 } falls)
 // s.printShardingStatus()
 res = s1.getDB( "admin" ).runCommand( { split : "test.foo" , middle : { num : N+1 } } ); // replace with { num: -1 } instead in 1.6
 assert.eq( 1, res.ok , "split over accurate boudaries should have succeeded" + tojson(res) );
