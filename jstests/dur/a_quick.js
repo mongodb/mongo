@@ -120,4 +120,3 @@ if (diff != "") {
 }
     
 print("quick.js SUCCESS");
-showfiles();
