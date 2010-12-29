@@ -92,6 +92,18 @@ namespace mongo {
                 setClientId( r.getClientId() );
                 r.process();
             }
+            catch ( AssertionException & e ){
+                log( e.isUserAssertion() ? 1 : 0 ) << "AssertionException in process: " << e.what() << endl;
+
+                le->raiseError( e.getCode() , e.what() );
+                
+                m.header()->id = r.id();
+                
+                if ( r.expectResponse() ){
+                    BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
+                    replyToQuery( ResultFlag_ErrSet, p , m , err );
+                }
+            }
             catch ( DBException& e ){
                 log() << "DBException in process: " << e.what() << endl;
                 

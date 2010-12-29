@@ -45,31 +45,24 @@ namespace mongo {
     }
     
     void Strategy::doQuery( Request& r , const Shard& shard ){
-        try{
-            ShardConnection dbcon( shard , r.getns() );
-            DBClientBase &c = dbcon.conn();
-            
-            Message response;
-            bool ok = c.call( r.m(), response);
-
-            {
-                QueryResult *qr = (QueryResult *) response.singleData();
+        
+        ShardConnection dbcon( shard , r.getns() );
+        DBClientBase &c = dbcon.conn();
+        
+        Message response;
+        bool ok = c.call( r.m(), response);
+        uassert( 10200 , "mongos: error calling db", ok );
+        
+        {
+            QueryResult *qr = (QueryResult *) response.singleData();
                 if ( qr->resultFlags() & ResultFlag_ShardConfigStale ){
                     dbcon.done();
                     throw StaleConfigException( r.getns() , "Strategy::doQuery" );
                 }
-            }
-
-            uassert( 10200 , "mongos: error calling db", ok);
-            r.reply( response , c.getServerAddress() );
-            dbcon.done();
         }
-        catch ( AssertionException& e ) {
-            BSONObjBuilder err;
-            e.getInfo().append( err );
-            BSONObj errObj = err.done();
-            replyToQuery(ResultFlag_ErrSet, r.p() , r.m() , errObj);
-        }
+        
+        r.reply( response , c.getServerAddress() );
+        dbcon.done();
     }
     
     void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj ){

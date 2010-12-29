@@ -35,67 +35,49 @@ namespace mongo {
         virtual void queryOp( Request& r ){
             QueryMessage q( r.d() );
             
-            bool lateAssert = false;
-        
             log(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << endl;
             
-            try {
-                if ( r.isCommand() ){
-                    
-                    if ( handleSpecialNamespaces( r , q ) )
-                        return;
-                    
-                    int loops = 5;
-                    while ( true ){
-                        BSONObjBuilder builder;
-                        try {
-                            bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
-                            if ( ok ) {
-                                BSONObj x = builder.done();
-                                replyToQuery(0, r.p(), r.m(), x);
-                                return;
-                            }
-                            break;
-                        }
-                        catch ( StaleConfigException& e ){
-                            if ( loops <= 0 )
-                                throw e;
-                            
-                            loops--;
-                            log() << "retrying command: " << q.query << endl;
-                            ShardConnection::checkMyConnectionVersions( e.getns() );
-                        }
-                        catch ( AssertionException& e ){
-                            e.getInfo().append( builder , "assertion" , "assertionCode" );
-                            builder.append( "errmsg" , "db assertion failure" );
-                            builder.append( "ok" , 0 );
+            if ( r.isCommand() ){
+                
+                if ( handleSpecialNamespaces( r , q ) )
+                    return;
+                
+                int loops = 5;
+                while ( true ){
+                    BSONObjBuilder builder;
+                    try {
+                        bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
+                        if ( ok ) {
                             BSONObj x = builder.done();
                             replyToQuery(0, r.p(), r.m(), x);
                             return;
                         }
+                        break;
                     }
-                    
-                    string commandName = q.query.firstElement().fieldName();
-
-                    uassert(13390, "unrecognized command: " + commandName, _commandsSafeToPass.count(commandName) != 0);
+                    catch ( StaleConfigException& e ){
+                        if ( loops <= 0 )
+                            throw e;
+                        
+                        loops--;
+                        log() << "retrying command: " << q.query << endl;
+                        ShardConnection::checkMyConnectionVersions( e.getns() );
+                    }
+                    catch ( AssertionException& e ){
+                        e.getInfo().append( builder , "assertion" , "assertionCode" );
+                        builder.append( "errmsg" , "db assertion failure" );
+                        builder.append( "ok" , 0 );
+                        BSONObj x = builder.done();
+                        replyToQuery(0, r.p(), r.m(), x);
+                        return;
+                    }
                 }
                 
-                lateAssert = true;
-                doQuery( r , r.primaryShard() );
+                string commandName = q.query.firstElement().fieldName();
+                
+                uassert(13390, "unrecognized command: " + commandName, _commandsSafeToPass.count(commandName) != 0);
             }
-            catch ( AssertionException& e ) {
-                if ( lateAssert ){
-                    log() << "lateAssert: " << e.getInfo() << endl;
-                    assert( !lateAssert );
-                }
-
-                BSONObjBuilder err;
-                e.getInfo().append( err );
-                BSONObj errObj = err.done();
-                replyToQuery(ResultFlag_ErrSet, r.p() , r.m() , errObj);
-                return;
-            }
-
+            
+            doQuery( r , r.primaryShard() );
         }
         
         virtual void getMore( Request& r ){
