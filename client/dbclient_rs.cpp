@@ -53,15 +53,17 @@ namespace mongo {
         string errmsg;
         
         for ( unsigned i=0; i<servers.size(); i++ ){
-            DBClientConnection conn( true );
-            if (!conn.connect( servers[i] , errmsg ) ){
+            auto_ptr<DBClientConnection> conn( new DBClientConnection( true ) );
+            if (!conn->connect( servers[i] , errmsg ) ){
                 log(1) << "error connecting to seed " << servers[i] << ": " << errmsg << endl;
                 // skip seeds that don't work
                 continue;
             }
-
+            
+            _nodes.push_back( Node( servers[i] , conn.release() ) );
+            
             string maybePrimary;
-            if (_checkConnection(&conn, maybePrimary, false)) {
+            if (_checkConnection( _nodes[_nodes.size()-1].conn , maybePrimary, false)) {
                 break;
             }
         }
@@ -233,11 +235,11 @@ namespace mongo {
     }
     
     bool ReplicaSetMonitor::_checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose ) {
-        bool good = false;
+        bool isMaster = false;
         bool changed = false;
         try {
             BSONObj o;
-            c->isMaster(good, &o);
+            c->isMaster(isMaster, &o);
             
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << '\n';
             
@@ -246,7 +248,7 @@ namespace mongo {
             if ( o["hosts"].type() == Array ){
                 if ( o["primary"].type() == String )
                     maybePrimary = o["primary"].String();
-
+                
                 _checkHosts(o["hosts"].Obj(), changed);
             }
             if (o.hasField("passives") && o["passives"].type() == Array) {
@@ -259,10 +261,10 @@ namespace mongo {
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception " << c->toString() << ' ' << e.what() << endl;
         }
         
-        if ( _hook )
+        if ( changed && _hook )
             _hook( this );
 
-        return good;
+        return isMaster;
     }
 
     void ReplicaSetMonitor::_check() {

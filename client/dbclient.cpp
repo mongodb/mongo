@@ -863,6 +863,7 @@ namespace mongo {
                 failed = true;
                 if ( assertOk )
                     uasserted( 10278 , str::stream() << "dbclient error communicating with server: " << getServerAddress() );
+
                 return false;
             }
         }
