@@ -1,7 +1,7 @@
 // multi_mongos.js
 
 // setup sharding with two mongos, s1 and s2
-s1 = new ShardingTest( "multi_mongos" , 2 , 1 , 2 );
+s1 = new ShardingTest( "multi_mongos1" , 2 , 1 , 2 );
 s2 = s1._mongos[1];
 
 s1.adminCommand( { enablesharding : "test" } );
