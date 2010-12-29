@@ -17,7 +17,6 @@ files.forEach(
         if (/[\/\\]_/.test(x.name) ||
              !/\.js$/.test(x.name) ||
              /repair/.test(x.name) || // fails on recovery
-             /index_many2/.test(x.name) || // fails
              /shellkillop/.test(x.name) || // takes forever and don't test anything new
              false // placeholder so all real tests end in ||
            )
