@@ -24,7 +24,7 @@ updater=startParallelShell("db=db.getSisterDB('concurrency');\
 			   e=db.getLastError();\
 			   print('update error: '+ e);\
 			   db.concflag.update({},{inprog:false});\
-			   assert.eq(e, null, \"update failed\");");
+			   assert.eq(e, null, 'update failed');");
 
 assert.soon( function(){ var x = db.concflag.findOne(); return x && x.inprog; } , 
              "wait for fork" , 30000 , 1 );

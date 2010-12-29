@@ -1033,6 +1033,8 @@ SyncCCTest.prototype.tempStart = function( num ){
 
 
 function startParallelShell( jsCode, port ){
+    assert( jsCode.indexOf( '"' ) == -1,
+           "double quotes should not be used in jsCode because the windows shell will stip them out" );
     var x;
     if ( port ) {
         x = startMongoProgramNoConnect( "mongo" , "--port" , port , "--eval" , jsCode );
