@@ -1330,6 +1330,20 @@ def build_docs(env, target, source):
 env.Alias("docs", [], [build_docs])
 env.AlwaysBuild("docs")
 
+#  ---- astyle ----
+
+def doStyling( env , target , source ):
+    cmd = "astyle --options=mongo_astyle " + " ".join( utils.getAllSourceFiles() ) 
+    res = utils.execsys( cmd )
+    print( res[0] )
+    print( res[1] )
+
+
+#env.Alias( "style" , [] , [ doStyling ] )
+#env.AlwaysBuild( "style" )
+
+
+
 #  ----  INSTALL -------
 
 def getSystemInstallName():
