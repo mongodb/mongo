@@ -53,10 +53,16 @@ namespace mongo {
         string errmsg;
         
         for ( unsigned i=0; i<servers.size(); i++ ){
-            _nodes.push_back( Node( servers[i] , new DBClientConnection( true ) ) );
-            if ( ! _nodes[i].conn->connect( _nodes[i].addr , errmsg ) ){
-                // this connection failed, but it'll try to reconnect
-                 continue; 
+            DBClientConnection conn( true );
+            if (!conn.connect( servers[i] , errmsg ) ){
+                log(1) << "error connecting to seed " << servers[i] << ": " << errmsg << endl;
+                // skip seeds that don't work
+                continue;
+            }
+
+            string maybePrimary;
+            if (_checkConnection(&conn, maybePrimary, false)) {
+                break;
             }
         }
     }
@@ -160,24 +166,6 @@ namespace mongo {
             }
         }
 
-        {
-            scoped_lock lk( _lock );
-            for ( unsigned i=0; i<_nodes.size(); i++ ){
-                _nodes[i].ok = true;
-            }
-        }
-        
-        {
-            scoped_lock lk( _lock );
-            for ( unsigned i=0; i<_nodes.size(); i++ ){
-                int p = ( i + x ) % _nodes.size();
-                if ( p == _master )
-                    continue;
-                if ( _nodes[p].ok )
-                    return _nodes[p].addr;
-            }
-        }
-        
         return _nodes[0].addr;
     }
 
@@ -192,6 +180,58 @@ namespace mongo {
         }
     }
 
+    void ReplicaSetMonitor::_checkStatus(DBClientConnection *conn) {
+        BSONObj status;
+
+        if (!conn->runCommand("admin", BSON("replSetGetStatus" << 1), status) ||
+            !status.hasField("members") ||
+            status["members"].type() != Array) {
+            return;
+        }
+          
+        BSONObjIterator hi(status["members"].Obj());
+        while (hi.more()) {
+            BSONObj member = hi.next().Obj();
+            string host = member["name"].String();
+            
+            int m = -1;
+            if ((m = _find(host)) <= 0) {
+                continue;
+            }
+
+            double state = member["state"].Number();
+            if (member["health"].Number() == 1 && (state == 1 || state == 2)) {
+                scoped_lock lk( _lock );
+                _nodes[m].ok = true;
+            }
+            else { 
+                scoped_lock lk( _lock );
+                _nodes[m].ok = false;
+            }
+        }
+    }
+
+    void ReplicaSetMonitor::_checkHosts( const BSONObj& hostList, bool& changed ) {
+        BSONObjIterator hi(hostList);
+        while ( hi.more() ){
+            string toCheck = hi.next().String();
+                    
+            if ( _find( toCheck ) >= 0 )
+                continue;
+
+            HostAndPort h( toCheck );
+            DBClientConnection * newConn = new DBClientConnection( true );
+            string temp;
+            newConn->connect( h , temp );
+            {
+                scoped_lock lk( _lock );
+                _nodes.push_back( Node( h , newConn ) );
+            }
+            log() << "updated set (" << _name << ") to: " << getServerAddress() << endl;
+            changed = true;
+        }
+    }
+    
     bool ReplicaSetMonitor::_checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose ) {
         bool good = false;
         bool changed = false;
@@ -206,27 +246,14 @@ namespace mongo {
             if ( o["hosts"].type() == Array ){
                 if ( o["primary"].type() == String )
                     maybePrimary = o["primary"].String();
-                
-                BSONObjIterator hi(o["hosts"].Obj());
-                while ( hi.more() ){
-                    string toCheck = hi.next().String();
-                    
-                    if ( _find( toCheck ) >= 0 )
-                        continue;
-                    
-                    HostAndPort h( toCheck );
-                    DBClientConnection * newConn = new DBClientConnection( true );
-                    string temp;
-                    newConn->connect( h , temp );
-                    {
-                        scoped_lock lk( _lock );
-                        _nodes.push_back( Node( h , newConn ) );
-                    }
-                    log() << "updated set (" << _name << ") to: " << getServerAddress() << endl;
-                    changed = true;
-                }
-            }
 
+                _checkHosts(o["hosts"].Obj(), changed);
+            }
+            if (o.hasField("passives") && o["passives"].type() == Array) {
+                _checkHosts(o["passives"].Obj(), changed);
+            }
+            
+            _checkStatus(c);
         }
         catch ( std::exception& e ) {
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception " << c->toString() << ' ' << e.what() << endl;

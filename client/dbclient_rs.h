@@ -84,15 +84,37 @@ namespace mongo {
         string getServerAddress() const;
         
     private:
+        /**
+         * This populates a list of hosts from the list of seeds (discarding the
+         * seed list). 
+         * @param name set name
+         * @param servers seeds
+         */
         ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers );
 
         void _check();
+        
+        /**
+         * Use replSetGetStatus command to make sure hosts in host list are up
+         * and readable.  Sets Node::ok appropriately.
+         */
+        void _checkStatus(DBClientConnection *conn);
 
-        /** 
+        /**
+         * Add array of hosts to host list. Doesn't do anything if hosts are
+         * already in host list.
+         * @param hostList the list of hosts to add
+         * @param changed if new hosts were added
+         */
+        void _checkHosts(const BSONObj& hostList, bool& changed);
+        
+        /**
+         * Updates host list.
          * @param c the connection to check
          * @param maybePrimary OUT
          * @param verbose
-         * @return if the connection is good */
+         * @return if the connection is good
+         */
         bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose );
 
         int _find( const string& server ) const ;
@@ -111,6 +133,10 @@ namespace mongo {
             // this is too simple, should make it better
             bool ok; 
         };
+
+        /**
+         * Host list.
+         */
         vector<Node> _nodes;
 
         int _master; // which node is the current master.  -1 means no master is known
