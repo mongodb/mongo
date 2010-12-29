@@ -237,7 +237,7 @@ namespace mongo {
         uassert( 13332 , "need a split key to split chunk" , !m.empty() );
         uassert( 13333 , "can't split a chunk in that many parts", m.size() < maxSplitPoints );
         uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) ); 
-        
+
         ScopedDbConnection conn( getShard().getConnString() );
 
         BSONObjBuilder cmd;
@@ -245,6 +245,7 @@ namespace mongo {
         cmd.append( "keyPattern" , _manager->getShardKey().key() );
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
+        cmd.append( "from" , getShard().getConnString() );
         cmd.append( "splitKeys" , m );
         cmd.append( "shardId" , genID() );
         cmd.append( "configdb" , configServer.modelServer() ); 

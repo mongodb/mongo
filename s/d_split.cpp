@@ -419,6 +419,12 @@ namespace mongo {
                 return false;
             }
 
+            string from = cmdObj["from"].str();
+            if ( from.empty() ){
+                errmsg = "need specify server to split chunk at";
+                return false;
+            }
+
             BSONObj splitKeysElem = cmdObj["splitKeys"].Obj();
             if ( splitKeysElem.isEmpty() ){
                 errmsg = "need to provide the split points to chunk over";
@@ -448,6 +454,8 @@ namespace mongo {
                 shardingState.enable( configdb );
                 configServer.init( configdb );
             }
+
+            Shard myShard( from );
 
             log() << "got splitchunk: " << cmdObj << endl;
 
@@ -492,6 +500,16 @@ namespace mongo {
 
                     log( LL_WARNING ) << "aborted split because " << errmsg << ": " << min << "->" << max 
                                       << " is now " << currMin << "->" << currMax << endl;
+                    return false;
+                }
+
+                if ( shard != myShard.getName() ) {
+                    errmsg = "location is outdated (likely balance or migrate occurred)";
+                    result.append( "from" , myShard.getName() );
+                    result.append( "official" , shard );
+
+                    log( LL_WARNING ) << "aborted split because " << errmsg << ": chunk is at " << shard
+                                      << " and not at " << myShard.getName() << endl;
                     return false;
                 }
 
