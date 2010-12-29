@@ -429,6 +429,14 @@ Array.stdDev = function( arr ){
     return Math.sqrt( sum / arr.length );
 }
 
+//these two are helpers for Array.sort(func)
+compare = function(l, r){ return (l == r ? 0 : (l < r ? -1 : 1)); }
+
+// arr.sort(compareOn('name'))
+compareOn = function(field){
+    return function(l, r) { return compare(l[field], r[field]); }
+}
+
 Object.keySet = function( o ) {
     var ret = new Array();
     for( i in o ) {
