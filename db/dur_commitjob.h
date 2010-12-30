@@ -43,7 +43,7 @@ namespace mongo {
 
             void* start() const { return (char*)p - len; }
             void* end() const { return p; }
-            int length() const { return len; }
+            unsigned length() const { return len; }
 
             bool operator < (const WriteIntent& rhs) const { return end() < rhs.end(); }
 

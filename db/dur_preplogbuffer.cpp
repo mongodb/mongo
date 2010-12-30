@@ -69,7 +69,7 @@ namespace mongo {
             i->w_ptr = ((char*)mmf->view_write()) + ofs;
 
             JEntry e;
-            e.len = min((unsigned long long)i->length(), mmf->length() - ofs); //dont write past end of file
+            e.len = min(i->length(), (unsigned)(mmf->length() - ofs)); //dont write past end of file
             assert( ofs <= 0x80000000 );
             e.ofs = (unsigned) ofs;
             e.setFileNo( mmf->fileSuffixNo() );
