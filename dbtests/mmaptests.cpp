@@ -52,6 +52,13 @@ namespace MMapTests {
                     char *w = (char *) f.view_write();
                     strcpy(w + 6, "world");
                 }
+                MongoFileFinder ff;
+                ASSERT( ff.findByPath(fn) );
+                ASSERT( ff.findByPath("asdf") == 0 );
+            }
+            {
+                MongoFileFinder ff;
+                ASSERT( ff.findByPath(fn) == 0 );
             }
 
             int N = 10000;

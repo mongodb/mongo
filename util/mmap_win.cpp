@@ -23,7 +23,7 @@
 namespace mongo {
 
     MemoryMappedFile::MemoryMappedFile()
-        : _flushMutex(new mutex("flushMutex")), _filename("??")
+        : _flushMutex(new mutex("flushMutex"))
     {
         fd = 0;
         maphandle = 0;
@@ -64,7 +64,7 @@ namespace mongo {
         void *p = MapViewOfFile(maphandle, FILE_MAP_COPY, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
-            log() << "FILE_MAP_COPY MapViewOfFile failed " << _filename << " " << errnoWithDescription(e) << endl;
+            log() << "FILE_MAP_COPY MapViewOfFile failed " << filename() << " " << errnoWithDescription(e) << endl;
         }
         else { 
             views.push_back(p);
@@ -77,7 +77,7 @@ namespace mongo {
         void *p = MapViewOfFile(maphandle, FILE_MAP_READ, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
-            log() << "FILE_MAP_READ MapViewOfFile failed " << _filename << " " << errnoWithDescription(e) << endl;
+            log() << "FILE_MAP_READ MapViewOfFile failed " << filename() << " " << errnoWithDescription(e) << endl;
         }
         else { 
             views.push_back(p);
@@ -86,7 +86,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::map(const char *filenameIn, unsigned long long &length, int options) {
-        _filename = filenameIn;
+        setFilename(filenameIn);
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];
         strncpy(filename, filenameIn, 255);
@@ -209,13 +209,13 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
         if( !views.empty() ) {
-            WindowsFlushable f( views[0] , fd , _filename , _flushMutex);
+            WindowsFlushable f( views[0] , fd , filename() , _flushMutex);
             f.flush();
         }
     }
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new WindowsFlushable( views.empty() ? 0 : views[0] , fd , _filename , _flushMutex );
+        return new WindowsFlushable( views.empty() ? 0 : views[0] , fd , filename() , _flushMutex );
     }
     void MemoryMappedFile::_lock() {}
     void MemoryMappedFile::_unlock() {}

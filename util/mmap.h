@@ -44,6 +44,7 @@ namespace mongo {
         template < class F >
         static void forEach( F fun );
 
+        /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically. */
         static set<MongoFile*>& getAllFiles()  { return mmfiles; }
 
         // callbacks if you need them
@@ -62,7 +63,11 @@ namespace mongo {
 
         virtual bool isMongoMMF() { return false; }
 
+        string filename() const { return _filename; }
+        void setFilename(string fn);
+
     private:
+        string _filename;
         static int _flushAll( bool sync ); // returns n flushed
     protected:
         virtual void close() = 0;
@@ -83,6 +88,8 @@ namespace mongo {
         virtual void _unlock() {}
 
         static set<MongoFile*> mmfiles;
+    public:
+        static map<string,MongoFile*> pathToFile;
         static RWLock mmmutex;
     };
 
@@ -91,6 +98,28 @@ namespace mongo {
     inline void MongoFile::markAllWritable() {}
     inline void MongoFile::unmarkAllWritable() {}
 #endif
+
+    /** look up a MMF by filename. scoped mutex locking convention.  
+        example:
+          MMFFinderByName finder;
+          MongoMMF *a = finder.find("file_name_a");
+          MongoMMF *b = finder.find("file_name_b");
+    */
+    class MongoFileFinder : boost::noncopyable {
+    public:
+        MongoFileFinder() : _lk(MongoFile::mmmutex,false) { }
+
+        /** @return The MongoFile object associated with the specified file name.  If no file is open 
+                    with the specified name, returns null.
+        */
+        MongoFile* findByPath(string path) { 
+            map<string,MongoFile*>::iterator i = MongoFile::pathToFile.find(path);
+            return  i == MongoFile::pathToFile.end() ? 0 : i->second;
+        }
+
+    private:
+        rwlock _lk;
+    };
 
     struct MongoFileAllowWrites {
         MongoFileAllowWrites(){
@@ -132,7 +161,6 @@ namespace mongo {
 
         long shortLength() const          { return (long) len; }
         unsigned long long length() const { return len; }
-        string filename() const           { return _filename; }
 
         /** create a new view with the specified properties. 
             automatically cleaned up upon close/destruction of the MemoryMappedFile object. 
@@ -147,7 +175,6 @@ namespace mongo {
         HANDLE maphandle;
         vector<void *> views;
         unsigned long long len;
-        string _filename;
 
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;

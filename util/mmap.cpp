@@ -23,6 +23,7 @@
 namespace mongo {
 
     set<MongoFile*> MongoFile::mmfiles;
+    map<string,MongoFile*> MongoFile::pathToFile;
 
     /* Create. Must not exist. 
     @param zero fill file with zeros when true
@@ -77,6 +78,7 @@ namespace mongo {
     void MongoFile::destroyed() {
         rwlock lk( mmmutex , true );
         mmfiles.erase(this);
+        pathToFile.erase( filename() );
     }
 
     /*static*/
@@ -165,6 +167,15 @@ namespace mongo {
     void MongoFile::created(){
         rwlock lk( mmmutex , true );
         mmfiles.insert(this);
+    }
+    
+    void MongoFile::setFilename(string fn) { 
+        rwlock( mmmutex, true );
+        assert( _filename.empty() );
+        _filename = fn;
+        MongoFile *&ptf = pathToFile[fn];
+        massert(10000, "MongoFile : multiple opens of same filename", ptf == 0);
+        ptf = this;
     }
 
 #if defined(_DEBUG) && !defined(_TESTINTENT)

@@ -764,6 +764,9 @@
     <ClCompile Include="..\db\security_key.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\file_allocator.cpp">
+      <Filter>util\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
