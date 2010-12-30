@@ -87,6 +87,7 @@ namespace mongo {
 #endif
 
         void WRITETODATAFILES() { 
+            dbMutex.assertAtLeastReadLocked();
             Timer t;
 #if defined(_EXPERIMENTAL)
             WRITETODATAFILES_Impl3();
