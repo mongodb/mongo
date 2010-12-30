@@ -186,6 +186,7 @@ namespace mongo {
     }
 
     void FileAllocator::run( FileAllocator * fa ){
+        setThreadName( "FileAllocator" );
         while( 1 ) {
             {
                 scoped_lock lk( fa->pendingMutex_ );
