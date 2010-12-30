@@ -72,6 +72,8 @@ namespace mongo {
 
         DataFileHeader *getHeader() { return header(); }
 
+        unsigned long long length() const { return mmf.length(); }
+
         /* return max size an extent may be */
         static int maxSize();
         
