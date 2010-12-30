@@ -161,18 +161,26 @@ namespace mongo {
     }
 
     MongoDataFile* Database::suitableFile( int sizeNeeded, bool preallocate ) {
-        MongoDataFile* f = newestFile();
-        if ( !f ) {
-            f = addAFile( sizeNeeded, preallocate );                
-        }
-        for ( int i = 0; i < 8; i++ ) {
+
+        // check existing files
+        for ( int i=numFiles()-1; i>=0; i-- ){
+            MongoDataFile* f = getFile( i );
             if ( f->getHeader()->unusedLength >= sizeNeeded )
-                break;
-            f = addAFile( sizeNeeded, preallocate );
-            if ( f->getHeader()->fileLength >= MongoDataFile::maxSize() ) // this is as big as they get so might as well stop
-                break;
+                return f;
         }
-        return f;
+
+        // allocate files until we either get one big enough or hit maxSize
+        for ( int i = 0; i < 8; i++ ) {
+            MongoDataFile* f = addAFile( sizeNeeded, preallocate );
+            
+            if ( f->getHeader()->unusedLength >= sizeNeeded )
+                return f;
+
+            if ( f->getHeader()->fileLength >= MongoDataFile::maxSize() ) // this is as big as they get so might as well stop
+                return f;
+        }
+        
+        return 0;
     }
 
     MongoDataFile* Database::newestFile() {

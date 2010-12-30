@@ -330,6 +330,51 @@ namespace PdfileTests {
         }
     };
     
+    class ExtentAllocOrder {
+    public:
+        void run(){
+            string dbname = "unittest_ex";
+            
+            string c1 = dbname + ".x1";
+            string c2 = dbname + ".x2";
+
+            {
+                DBDirectClient db;
+                db.dropDatabase( dbname );
+            }
+
+            dblock mylock;
+            Client::Context cx( dbname );
+            
+            bool isnew;
+            Database * d = dbHolder.getOrCreate( dbname , dbpath , isnew );
+            assert( d );
+
+            int big = 10 * 1024;
+            //int small = 1024;
+            
+            unsigned long long l = 0;
+            while ( 1 ){
+                MongoDataFile * f = d->addAFile( big , false );
+                cout << f->length() << endl;
+                if ( f->length() == l )
+                    break;
+                l = f->length();
+            }
+            
+            int start = d->numFiles();
+            for ( int i=0; i<start; i++ )
+                d->allocExtent( c1.c_str() , d->getFile( i )->getHeader()->unusedLength , false );
+            ASSERT_EQUALS( start , d->numFiles() );
+
+            {
+                DBDirectClient db;
+                db.dropDatabase( dbname );
+            }
+        }
+    };
+
+    
     class All : public Suite {
     public:
         All() : Suite( "pdfile" ){}
@@ -350,6 +395,7 @@ namespace PdfileTests {
             add< ScanCapped::LastInExtent >();
             add< Insert::UpdateDate >();
             add< ExtentSizing >();
+            add< ExtentAllocOrder >();
         }
     } myall;
 
