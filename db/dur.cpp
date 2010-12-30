@@ -121,17 +121,15 @@ namespace mongo {
 
         DurableInterface* DurableInterface::_impl = new NonDurableImpl();
 
-        void NonDurableImpl::startup() { }
-
         /** base declare write intent function that all the helpers call. */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
             commitJob.note(p, len);
         }
 
-        void enableDurability() { // TODO: merge with startup() ?
-            assert(typeid(*DurableInterface::_impl) == typeid(NonDurableImpl));
+        void DurableInterface::enableDurability() {
+            assert(typeid(*_impl) == typeid(NonDurableImpl));
             // lets NonDurableImpl instance leak, but its tiny and only happens once
-            DurableInterface::_impl = new DurableImpl();
+            _impl = new DurableImpl();
         }
 
         bool DurableImpl::commitNow() {
@@ -530,9 +528,12 @@ namespace mongo {
         }
 
         /** at startup, recover, and then start the journal threads */
-        void DurableImpl::startup() {
+        void startup() {
             if( !cmdLine.dur )
                 return;
+
+            DurableInterface::enableDurability();
+
             if( testIntent )
                 return;
             journalMakeDir();

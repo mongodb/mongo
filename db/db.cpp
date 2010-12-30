@@ -553,10 +553,7 @@ sendmore:
         Client::initThread("initandlisten");
         _diaglog.init();
 
-        if (cmdLine.dur)
-            dur::enableDurability();
-
-        getDur().startup();
+        dur::startup();
 
         if( cmdLine.durOptions & CmdLine::DurRecoverOnly ) 
             return;

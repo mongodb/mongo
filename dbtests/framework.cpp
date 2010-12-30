@@ -205,7 +205,6 @@ namespace mongo {
             }
             if( params.count("dur") || cmdLine.dur ) { 
                 cmdLine.dur = true;
-                dur::enableDurability();
             }
 
             if (params.count("debug") || params.count("verbose") ) {
@@ -268,7 +267,7 @@ namespace mongo {
                 filter = params["filter"].as<string>();
             }
 
-            getDur().startup();
+            dur::startup();
 
             int ret = run(suites,filter);
 

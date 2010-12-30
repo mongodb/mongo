@@ -11,14 +11,15 @@ namespace mongo {
     
     namespace dur {
 
+        /** Call during startup so durability module can initialize 
+            Throws if fatal error
+            Does nothing if cmdLine.dur is false
+         */
+        void startup();
+
         class DurableInterface : boost::noncopyable { 
         public:
             virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << endl; }
-
-            /** Call during startup so durability module can initialize 
-                throws if fatal error
-            */
-            virtual void startup() = 0;
 
             /** Declare that a file has been created 
                 Normally writes are applied only after journalling, for safety.  But here the file 
@@ -152,15 +153,13 @@ namespace mongo {
             static DurableInterface& getDur() { return *_impl; }
 
         private:
-            static DurableInterface* _impl;
+            static DurableInterface* _impl; // NonDurableImpl at startup()
+            static void enableDurability(); // makes _impl a DurableImpl
 
-            friend void enableDurability(); // should only be called once at startup
+            friend void startup();
         }; // class DurableInterface
 
-        void enableDurability();
-
         class NonDurableImpl : public DurableInterface {
-            void startup();
             void* writingPtr(void *x, unsigned len) { return x; }
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
             void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges) { return buf; }
@@ -176,7 +175,6 @@ namespace mongo {
         };
 
         class DurableImpl : public DurableInterface {
-            void startup();
             void* writingPtr(void *x, unsigned len);
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len);
             void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges);
@@ -190,9 +188,6 @@ namespace mongo {
             void debugCheckLastDeclaredWrite();
 #endif
         };
-
-        /** puts DurableImpl into effect. call druing startup if --dur specified. */
-        void enableDurability();
 
     } // namespace dur
 
