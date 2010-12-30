@@ -4,7 +4,7 @@
 
 //TODO(mathias) use paranoid mode once we are reasonably sure it will pass
 
-conn = startMongodEmpty("--port", 30000, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles");
+conn = startMongodEmpty("--port", 30100, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles");
 db = conn.getDB("test");
 
 var files = listFiles("jstests");
@@ -29,7 +29,7 @@ files.forEach(
     }
 );
 
-stopMongod(30000);
+stopMongod(30100);
 
 var runnerEnd = new Date()
 

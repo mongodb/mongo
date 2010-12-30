@@ -3,7 +3,7 @@
 //
 
 //TODO(mathias) add --master or make another test
-conn = startMongodEmpty("--port", 30000, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles", "--durOptions", "24");
+conn = startMongodEmpty("--port", 30200, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles", "--durOptions", "24");
 db = conn.getDB("test");
 
 var files = listFiles("jstests");
@@ -33,7 +33,7 @@ files.forEach(
     }
 );
 
-stopMongod(30000);
+stopMongod(30200);
 
 var runnerEnd = new Date()
 
