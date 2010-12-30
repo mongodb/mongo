@@ -7,6 +7,25 @@ var testname = "dur1";
 var step = 1;
 var conn = null;
 
+function runDiff(a, b) {
+    function reSlash(s) {
+        var x = s;
+        if (_isWindows()) {
+            while (1) {
+                var y = x.replace('/', '\\');
+                if (y == x)
+                    break;
+                x = y;
+            }
+        }
+        return x;
+    }
+    a = reSlash(a);
+    b = reSlash(b);
+    print("diff " + a + " " + b);
+    return run("diff", a, b);
+}
+
 function log(str) {
     print();
     if(str)
@@ -102,7 +121,7 @@ log("check no journal files");
 }
 
 log("check data matches ns");
-var diff = run("diff", path1 + "/test.ns", path2 + "/test.ns");
+var diff = runDiff(path1 + "/test.ns", path2 + "/test.ns");
 if (diff != "") {
     print("\n\n\nDIFFERS\n");
     print(diff);
@@ -110,7 +129,7 @@ if (diff != "") {
 assert(diff == "", "error test.ns files differ");
 
 log("check data matches .0");
-var diff = run("diff", path1 + "/test.0", path2 + "/test.0");
+var diff = runDiff(path1 + "/test.0", path2 + "/test.0");
 if (diff != "") {
     print("\n\n\nDIFFERS\n");
     print(diff);
