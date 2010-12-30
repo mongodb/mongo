@@ -23,10 +23,12 @@
 
 namespace MMapTests {
 
-    string fn = "/tmp/testfile.map";
-    
     class LeakTest  {
+        const string fn;
     public:
+        LeakTest() : 
+          fn( (path(dbpath) / "testfile.map").string() )
+        { }
         ~LeakTest() { 
             try { boost::filesystem::remove(fn); } catch(...) { }
         }
