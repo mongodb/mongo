@@ -17,6 +17,14 @@ namespace mongo {
          */
         void startup();
 
+
+        struct TempDisableDurability : boost::noncopyable {
+            TempDisableDurability();  // disables durability iff it is enabled
+            ~TempDisableDurability(); // enables durability iff constructor disabled it
+        private:
+            bool _wasDur;
+        };
+
         class DurableInterface : boost::noncopyable { 
         public:
             virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << endl; }
@@ -95,6 +103,7 @@ namespace mongo {
             */
             virtual void commitIfNeeded() = 0;
 
+
 #if defined(_DEBUG)
             virtual void debugCheckLastDeclaredWrite() = 0;
 #endif
@@ -155,8 +164,11 @@ namespace mongo {
         private:
             static DurableInterface* _impl; // NonDurableImpl at startup()
             static void enableDurability(); // makes _impl a DurableImpl
+            static void disableDurability(); // makes _impl a NonDurableImpl
 
+            // these need to be able to enable/disable Durability
             friend void startup();
+            friend class TempDisableDurability;
         }; // class DurableInterface
 
         class NonDurableImpl : public DurableInterface {

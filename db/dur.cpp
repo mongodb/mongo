@@ -119,17 +119,40 @@ namespace mongo {
             }
         }
 
-        DurableInterface* DurableInterface::_impl = new NonDurableImpl();
-
         /** base declare write intent function that all the helpers call. */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
             commitJob.note(p, len);
         }
 
+        static DurableImpl* durableImpl = new DurableImpl();
+        static NonDurableImpl* nonDurableImpl = new NonDurableImpl();
+        DurableInterface* DurableInterface::_impl = nonDurableImpl;
+
         void DurableInterface::enableDurability() {
-            assert(typeid(*_impl) == typeid(NonDurableImpl));
-            // lets NonDurableImpl instance leak, but its tiny and only happens once
-            _impl = new DurableImpl();
+            assert(_impl == nonDurableImpl);
+            _impl = durableImpl;
+        }
+
+        void DurableInterface::disableDurability() {
+            assert(_impl == durableImpl);
+            massert(13616, "can't disable durability with pending writes", !commitJob.hasWritten());
+            _impl = nonDurableImpl;
+        }
+
+        TempDisableDurability::TempDisableDurability() : _wasDur(cmdLine.dur) {
+            dbMutex.assertWriteLocked();
+            if (_wasDur){
+                DurableInterface::disableDurability();
+                cmdLine.dur = false;
+            }
+        }
+
+        TempDisableDurability::~TempDisableDurability(){
+            dbMutex.assertWriteLocked();
+            if (_wasDur){
+                cmdLine.dur = true;
+                DurableInterface::enableDurability();
+            }
         }
 
         bool DurableImpl::commitNow() {
