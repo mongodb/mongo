@@ -18,7 +18,8 @@ namespace mongo {
         void startup();
 
 
-        struct TempDisableDurability : boost::noncopyable {
+        class TempDisableDurability : boost::noncopyable {
+        public:
             TempDisableDurability();  // disables durability iff it is enabled
             ~TempDisableDurability(); // enables durability iff constructor disabled it
         private:
