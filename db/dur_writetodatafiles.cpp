@@ -25,7 +25,7 @@
 namespace mongo { 
     namespace dur {
 
-        void debugValidateMapsMatch();
+        void debugValidateAllMapsMatch();
 
         /** apply the writes back to the non-private MMF after they are for certain in redo log 
 
@@ -95,7 +95,7 @@ namespace mongo {
             WRITETODATAFILES_Impl1();
 #endif
             stats.curr->_writeToDataFilesMicros += t.micros();
-            debugValidateMapsMatch();
+            debugValidateAllMapsMatch();
         }
 
     }

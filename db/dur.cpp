@@ -285,32 +285,27 @@ namespace mongo {
             stats.curr->_writeToJournalMicros += t.micros();
         }
 
-        /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
-        */
-        void debugValidateMapsMatch() {
-            if( ! (cmdLine.durOptions & CmdLine::DurParanoid) )
-                 return;
+        // Functor to be called over all MongoFiles
 
-            unsigned long long data = 0;
-            Timer t;
-            set<MongoFile*>& files = MongoFile::getAllFiles();
-            for( set<MongoFile*>::iterator i = files.begin(); i != files.end(); i++ ) { 
-                MongoFile *mf = *i;
+        class validateSingleMapMatches {
+        public:
+            validateSingleMapMatches(unsigned long long& bytes) :_bytes(bytes)  {}
+            void operator () (MongoFile *mf){
                 if( mf->isMongoMMF() ) { 
                     MongoMMF *mmf = (MongoMMF*) mf;
                     const char *p = (const char *) mmf->getView();
                     const char *w = (const char *) mmf->view_write();
 
-                    if (!p && !w) continue;
+                    if (!p && !w) return;
 
                     assert(p);
                     assert(w);
 
-                    data += mmf->length();
+                    _bytes += mmf->length();
 
                     assert( mmf->length() == (unsigned) mmf->length() );
                     if (memcmp(p, w, (unsigned) mmf->length()) == 0)
-                        continue; // next file
+                        return; // next file
 
                     unsigned low = 0xffffffff;
                     unsigned high = 0;
@@ -347,7 +342,20 @@ namespace mongo {
                     }
                 }
             }
-            OCCASIONALLY log() << "DurParanoid map check " << t.millis() << "ms for " <<  (data / (1024*1024)) << "MB" << endl;
+        private: 
+            unsigned long long& _bytes;
+        };
+
+        /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
+        */
+        void debugValidateAllMapsMatch() {
+            if( ! (cmdLine.durOptions & CmdLine::DurParanoid) )
+                 return;
+
+            unsigned long long bytes = 0;
+            Timer t;
+            MongoFile::forEach(validateSingleMapMatches(bytes));
+            OCCASIONALLY log() << "DurParanoid map check " << t.millis() << "ms for " <<  (bytes / (1024*1024)) << "MB" << endl;
         }
 
         /** We need to remap the private views periodically. otherwise they would become very large.
