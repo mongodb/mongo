@@ -65,12 +65,13 @@ namespace mongo {
         /** called from the worked thread */
         static void run( FileAllocator * fa );
 
-        mutable mongo::mutex pendingMutex_;
-        mutable boost::condition pendingUpdated_;
-        list< string > pending_;
-        mutable map< string, long > pendingSize_;
-        bool failed_;
-        
+        mutable mongo::mutex _pendingMutex;
+        mutable boost::condition _pendingUpdated;
+
+        list< string > _pending;
+        mutable map< string, long > _pendingSize;
+
+        bool _failed;
 #endif    
     };
     

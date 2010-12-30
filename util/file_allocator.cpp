@@ -65,7 +65,7 @@ namespace mongo {
 #else
     
     FileAllocator::FileAllocator() 
-        : pendingMutex_("FileAllocator"), failed_() {
+        : _pendingMutex("FileAllocator"), _failed() {
     }
     
 
@@ -74,21 +74,21 @@ namespace mongo {
     }
     
     void FileAllocator::requestAllocation( const string &name, long &size ) {
-        scoped_lock lk( pendingMutex_ );
-        if ( failed_ )
+        scoped_lock lk( _pendingMutex );
+        if ( _failed )
             return;
         long oldSize = prevSize( name );
         if ( oldSize != -1 ) {
             size = oldSize;
             return;
         }
-        pending_.push_back( name );
-        pendingSize_[ name ] = size;
-        pendingUpdated_.notify_all();
+        _pending.push_back( name );
+        _pendingSize[ name ] = size;
+        _pendingUpdated.notify_all();
     }
     
     void FileAllocator::allocateAsap( const string &name, unsigned long long &size ) {
-        scoped_lock lk( pendingMutex_ );
+        scoped_lock lk( _pendingMutex );
         long oldSize = prevSize( name );
         if ( oldSize != -1 ) {
             size = oldSize;
@@ -96,29 +96,29 @@ namespace mongo {
                 return;
         }
         checkFailure();
-        pendingSize_[ name ] = size;
-        if ( pending_.size() == 0 )
-            pending_.push_back( name );
-        else if ( pending_.front() != name ) {
-            pending_.remove( name );
-            list< string >::iterator i = pending_.begin();
+        _pendingSize[ name ] = size;
+        if ( _pending.size() == 0 )
+            _pending.push_back( name );
+        else if ( _pending.front() != name ) {
+            _pending.remove( name );
+            list< string >::iterator i = _pending.begin();
             ++i;
-            pending_.insert( i, name );
+            _pending.insert( i, name );
         }
-        pendingUpdated_.notify_all();
+        _pendingUpdated.notify_all();
         while( inProgress( name ) ) {
             checkFailure();
-            pendingUpdated_.wait( lk.boost() );
+            _pendingUpdated.wait( lk.boost() );
         }
         
     }
     
     void FileAllocator::waitUntilFinished() const {
-        if ( failed_ )
+        if ( _failed )
             return;
-        scoped_lock lk( pendingMutex_ );
-        while( pending_.size() != 0 )
-            pendingUpdated_.wait( lk.boost() );
+        scoped_lock lk( _pendingMutex );
+        while( _pending.size() != 0 )
+            _pendingUpdated.wait( lk.boost() );
     }
     
     void FileAllocator::ensureLength(int fd , long size) {
@@ -163,23 +163,23 @@ namespace mongo {
     }
     
     void FileAllocator::checkFailure() {
-        if (failed_) {
+        if (_failed) {
             // we want to log the problem (diskfull.js expects it) but we do not want to dump a stack tracke
             msgassertedNoTrace( 12520, "new file allocation failure" );
         }
     }
     
     long FileAllocator::prevSize( const string &name ) const {
-        if ( pendingSize_.count( name ) > 0 )
-            return pendingSize_[ name ];
+        if ( _pendingSize.count( name ) > 0 )
+            return _pendingSize[ name ];
         if ( boost::filesystem::exists( name ) )
             return boost::filesystem::file_size( name );
         return -1;
     }
          
-    // caller must hold pendingMutex_ lock.
+    // caller must hold _pendingMutex lock.
     bool FileAllocator::inProgress( const string &name ) const {
-        for( list< string >::const_iterator i = pending_.begin(); i != pending_.end(); ++i )
+        for( list< string >::const_iterator i = _pending.begin(); i != _pending.end(); ++i )
             if ( *i == name )
                 return true;
         return false;
@@ -189,19 +189,19 @@ namespace mongo {
         setThreadName( "FileAllocator" );
         while( 1 ) {
             {
-                scoped_lock lk( fa->pendingMutex_ );
-                if ( fa->pending_.size() == 0 )
-                    fa->pendingUpdated_.wait( lk.boost() );
+                scoped_lock lk( fa->_pendingMutex );
+                if ( fa->_pending.size() == 0 )
+                    fa->_pendingUpdated.wait( lk.boost() );
             }
             while( 1 ) {
                 string name;
                 long size;
                 {
-                    scoped_lock lk( fa->pendingMutex_ );
-                    if ( fa->pending_.size() == 0 )
+                    scoped_lock lk( fa->_pendingMutex );
+                    if ( fa->_pending.size() == 0 )
                         break;
-                    name = fa->pending_.front();
-                    size = fa->pendingSize_[ name ];
+                    name = fa->_pending.front();
+                    size = fa->_pendingSize[ name ];
                 }
                 try {
                     log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
@@ -237,18 +237,18 @@ namespace mongo {
                         BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
                     } catch ( ... ) {
                     }
-                    scoped_lock lk( fa->pendingMutex_ );
-                    fa->failed_ = true;
+                    scoped_lock lk( fa->_pendingMutex );
+                    fa->_failed = true;
                     // not erasing from pending
-                    fa->pendingUpdated_.notify_all();
+                    fa->_pendingUpdated.notify_all();
                     return; // no more allocation
                 }
                         
                 {
-                    scoped_lock lk( fa->pendingMutex_ );
-                    fa->pendingSize_.erase( name );
-                    fa->pending_.pop_front();
-                    fa->pendingUpdated_.notify_all();
+                    scoped_lock lk( fa->_pendingMutex );
+                    fa->_pendingSize.erase( name );
+                    fa->_pending.pop_front();
+                    fa->_pendingUpdated.notify_all();
                 }
             }
         }
