@@ -307,6 +307,7 @@ namespace mongo {
             JFile jf;
             jf.filename = _curLogFile->_name;
             jf.lastEventTimeMs = Listener::getElapsedTimeMillis();
+            _oldJournalFiles.push_back(jf);
 
             delete _curLogFile; // close
             _curLogFile = 0;
