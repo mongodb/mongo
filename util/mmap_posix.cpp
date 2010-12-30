@@ -26,6 +26,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "mongoutils/str.h"
+using namespace mongoutils;
+
 namespace mongo {
 
     MemoryMappedFile::MemoryMappedFile() {
