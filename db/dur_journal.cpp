@@ -86,7 +86,6 @@ namespace mongo {
         const unsigned long long LsnShutdownSentinel = ~((unsigned long long)0);
 
         Journal::Journal() : 
-            toUnlink(*(new MVar<path>)), /* freeing MVar at program termination would be problematic */
             _curLogFileMutex("JournalLfMutex")
         { 
             _written = 0;
@@ -221,21 +220,6 @@ namespace mongo {
             _open();
         }
 
-        /** background removal of old journal files */
-        void unlinkThread() { 
-            Client::initThread("unlink");
-            while( 1 ) {
-                path p = j.toUnlink.take();
-                try {
-                    remove(p);
-                }
-                catch(std::exception& e) { 
-                    log() << "error unlink of journal file " << p.string() << " failed " << e.what() << endl;
-                }
-            }
-        }
-
-
         void LSNFile::set(unsigned long long x) { 
             lsn = x;
             checkbytes = ~x;
@@ -326,7 +310,7 @@ namespace mongo {
         }
 
         /** remove older journal files. 
-            be in mutex when calling
+            be in _curLogFileMutex but not dbMutex when calling
         */
         void Journal::removeUnneededJournalFiles() { 
             while( !_oldJournalFiles.empty() ) {
@@ -337,16 +321,7 @@ namespace mongo {
                     path p( f.filename );
                     log() << "old journal file will be removed: " << f.filename << endl;
 
-                    // we do the unlink in a separate thread unless for some reason unlinks are backlogging
-                    if( !j.toUnlink.tryPut(p) ) {
-                        /* DR___ for durability error and warning codes 
-                            Compare to RS___ for replica sets
-                        */
-                        log() << "DR100 latency warning on journal unlink " << endl;
-                        Timer t;
-                        j.toUnlink.put(p);
-                        log() << "toUnlink.put(" << f.filename << ") " << t.millis() << "ms" << endl;
-                    }
+                    remove(p);
                 }
                 else {
                     break; 

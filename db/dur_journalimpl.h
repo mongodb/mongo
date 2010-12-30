@@ -26,7 +26,6 @@ namespace mongo {
         class Journal {
         public:
             string dir; // set by journalMakeDir() during initialization
-            MVar<path> &toUnlink; // unlinks of old journal threads are via background thread
 
             Journal();
 

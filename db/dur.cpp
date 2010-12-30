@@ -512,7 +512,6 @@ namespace mongo {
             }
         }
 
-        void unlinkThread();
         void recover();
 
         void releasingWriteLock() {
@@ -545,7 +544,6 @@ namespace mongo {
                 throw;
             }
             boost::thread t(durThread);
-            boost::thread t2(unlinkThread);
         }
 
     } // namespace dur
