@@ -141,6 +141,7 @@ namespace mongo {
                         }
                         catch(std::exception& e) {
                             log() << "couldn't remove " << fileName << ' ' << e.what() << endl;
+                            throw;
                         }
                     }
                 }
@@ -149,6 +150,7 @@ namespace mongo {
                 }
                 catch(...) { 
                     log() << "couldn't remove " << lsnPath().string() << endl;
+                    throw;
                 }
             }
             catch( std::exception& e ) { 
@@ -174,6 +176,7 @@ namespace mongo {
             }
             catch(std::exception& e) {
                 log() << "error couldn't remove journal file during shutdown " << e.what() << endl;
+                throw;
             }
         }
 
@@ -284,6 +287,7 @@ namespace mongo {
             }
             catch(std::exception& e) { 
                 log() << "write to lsn file fails " << e.what() << endl;
+                // don't care if this fails
             }
         }
 
@@ -368,6 +372,7 @@ namespace mongo {
             }
             catch(std::exception& e) { 
                 log() << "warning exception opening journal file " << e.what() << endl;
+                throw;
             }
         }
 
@@ -388,6 +393,7 @@ namespace mongo {
             }
             catch(std::exception& e) { 
                 log() << "warning exception in dur::journal " << e.what() << endl;
+                throw;
             }
         }
 
