@@ -996,7 +996,6 @@ int main(int argc, char* argv[])
                 dbexit( EXIT_BADOPTIONS );
             }
             log() << "--cacheSize option not currently supported" << endl;
-            //setRecCacheSize(x);
         }
         if (params.count("port") == 0 ) { 
             if( params.count("configsvr") ) {
