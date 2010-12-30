@@ -168,10 +168,6 @@ namespace mongo {
         }
     } utilTest;
     
-    // The mutex contained in this object may be held on shutdown.
-    FileAllocator &theFileAllocator_ = *(new FileAllocator());
-    FileAllocator &theFileAllocator() { return theFileAllocator_; }
-    
     OpTime OpTime::last(0, 0);
     
     /* this is a good place to set a breakpoint when debugging, as lots of warning things
