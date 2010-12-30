@@ -54,7 +54,7 @@ namespace mongo {
 
     void* MemoryMappedFile::map(const char *filename, unsigned long long &length, int options) {
         // length may be updated by callee.
-        _filename = filename;
+        setFilename(filename);
         theFileAllocator().allocateAsap( filename, length );
         len = length;
 
