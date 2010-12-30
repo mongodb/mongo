@@ -174,7 +174,7 @@ namespace mongo {
         assert( _filename.empty() );
         _filename = fn;
         MongoFile *&ptf = pathToFile[fn];
-        massert(10000, "MongoFile : multiple opens of same filename", ptf == 0);
+        massert(13617, "MongoFile : multiple opens of same filename", ptf == 0);
         ptf = this;
     }
 
