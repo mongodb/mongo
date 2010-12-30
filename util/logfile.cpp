@@ -102,7 +102,7 @@ namespace mongo {
 
 namespace mongo { 
 
-    LogFile::LogFile(string name) {
+    LogFile::LogFile(string name) : _name(name) {
         _fd = open(name.c_str(), 
                      O_APPEND 
                    | O_CREAT | O_EXCL
