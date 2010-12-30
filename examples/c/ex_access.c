@@ -1,7 +1,7 @@
 /*
  * ex_access.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
- * This is an example demostrating how to create and access a simple table.
+ * This is an example demonstrating how to create and access a simple table.
  */
 
 #include <stdio.h>
@@ -36,11 +36,12 @@ int main()
 		ret = cursor->set_key(cursor, "key1");
 		ret = cursor->set_value(cursor, "value1");
 		ret = cursor->insert(cursor);
-		ret = cursor->first(cursor);
 	}
 
 	/* Show all records. */
-	while ((ret = cursor->next(cursor)) == 0) {
+	for (ret = cursor->first(cursor);
+	    ret == 0;
+	    ret = cursor->next(cursor)) {
 		ret = cursor->get_key(cursor, &key);
 		ret = cursor->get_value(cursor, &value);
 

@@ -1,7 +1,7 @@
 /*
  * ex_stat.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
- * This is an example demostrating how to query a database's statistics.
+ * This is an example demonstrating how to query a database's statistics.
  */
 
 #include <stdio.h>

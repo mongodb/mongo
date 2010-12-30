@@ -1,0 +1,14 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \page extending Extending WiredTiger
+
+- must be in C/C++
+
+\section modules Loadable Modules
+
+\section cursor_factory Adding Cursor Types
+
+\section collations Custom Collators
+
+\section extractors Custom Field Extractors
+ */

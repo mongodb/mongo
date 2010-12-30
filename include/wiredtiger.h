@@ -637,6 +637,12 @@ int wiredtiger_struct_pack(void *buffer, int size, const char *fmt, ...);
 /*! Pack a structure into a buffer.
  *
  * stdarg version of ::wiredtiger_struct_pack.
+ *
+ * \param buffer a pointer to a packed byte array
+ * \param size the number of valid bytes in the buffer
+ * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \param ap the list of values to pack
+ * \errors
  */
 int wiredtiger_struct_packv(void *buffer, int size, const char *fmt, va_list ap);
 
@@ -654,6 +660,10 @@ int wiredtiger_struct_size(const char *fmt, ...);
 /*! Calculate the size required to pack a structure.
  *
  * stdarg version of ::wiredtiger_struct_size.
+ *
+ * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \param ap the list of values to be packed
+ * \returns the number of bytes needed for the matching call to ::wiredtiger_struct_pack
  */
 int wiredtiger_struct_sizev(const char *fmt, va_list ap);
 
@@ -671,6 +681,12 @@ int wiredtiger_struct_unpack(const void *buffer, int size, const char *fmt, ...)
 /*! Unpack a structure from a buffer.
  *
  * stdarg version of ::wiredtiger_struct_unpack.
+ *
+ * \param buffer a pointer to a packed byte array
+ * \param size the number of valid bytes in the buffer
+ * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \param ap the list of locations where values are unpacked
+ * \errors
  */
 int wiredtiger_struct_unpackv(const void *buffer, int size, const char *fmt, va_list ap);
 

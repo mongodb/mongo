@@ -1,0 +1,6 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \page transactions Transactions
+
+\section acid The ACID properties.
+ */

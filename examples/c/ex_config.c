@@ -1,7 +1,7 @@
 /*
  * ex_config.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
- * This is an example demostrating how to configure various database and table
+ * This is an example demonstrating how to configure various database and table
  * properties.
  */
 
@@ -26,6 +26,9 @@ int main()
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
+
+	if (conn->is_new(conn))
+		session->create_table(session, "access", "keyfmt=S,valuefmt=S");
 
 	/* Open a cursor on the (virtual) configuration table. */
 	ret = session->open_cursor(session, "config:", NULL, &cursor);

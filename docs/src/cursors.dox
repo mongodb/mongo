@@ -1,7 +1,15 @@
 /* vim: set filetype=c.doxygen : */
 
-/*!
-\page cursor_types Cursor Types
+/*! \page cursors WiredTiger Cursors
+
+Most common operations in WiredTiger are performed using cursors.  A cursor includes:
+
+- a position within a data source
+- access to key and value fields
+- encoding of fields to store in the data source
+- methods to navigate around and iterate through the data
+
+\section cursor_types Cursor Types
 
 The following are builtin cursor types:
 <table>

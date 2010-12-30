@@ -1,0 +1,62 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \page basic_api Getting Started with the WiredTiger API
+
+\dontinclude ex_access.c
+
+All applications that use WiredTiger will be structured roughly as follows.  The code below is taken from the complete example program \ref ex_access.c "ex_access.c" which is available in the source tree as \c examples/c/ex_access.c.
+
+\section basic_connection Connecting to a database
+
+To access a database, first open a connection with the following code:
+\skip main
+\until wiredtiger_open
+
+Here the configuration string \c "create" is passed to ::wiredtiger_open to indicate that the database should be created if it does not exist when the program starts running.
+
+\section basic_session Opening a Session
+
+Next we open a session handle for the single thread accessing the database:
+
+\until Note
+
+The code block above also shows simple error handling with ::wiredtiger_strerror.  The default behavior for more detailed errors is to write them to \c stderr.  That can be overridden by passing an implementation of WT_ERROR_HANDLER to ::wiredtiger_open or WT_CONNECTION::open_session.
+
+\section basic_create_table Creating a Table
+
+If the database was created by the ::wiredtiger_open call above, it will be empty.  We now create a table that we can use to store data:
+
+\until ;
+
+This call creates a table called \c "access", configured to use strings for its key and value columns.  We go into more details about what is possible later in the section on \ref schema.
+
+\section basic_cursors Accessing Data With Cursors
+
+Now that we're sure we have a table, we open a cursor to perform some operations on it:
+
+\until }
+
+Here, the string \c "table:access" specifies that we are opening the cursor on the table named \c "access" that we created above.
+
+The WT_CURSOR::set_key and WT_CURSOR::set_value calls marshal the application's data into the cursor.  The WT_CURSOR::insert call then creates a record containing that data and inserts it into the table.
+
+Now we iterate through all of the records in the table, printing them out as we go:
+
+\until }
+
+Note that the key and value parts of the records are returned as C strings because the table was created that way (even if it was created by a previous run of the example).  No extracting or converting of needs to be done in the application.
+
+If we weren't using the cursor for the call to WT_CURSOR::insert above, this loop would simplify to:
+
+\code
+	while ((ret = cursor->next(cursor)) == 0) {
+		...
+	}
+\endcode
+
+\section basic_close Closing Handles
+
+Lastly, we close the connection, which implicitly closes the cursor and session handles:
+
+\skipline close
+ */

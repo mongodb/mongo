@@ -1,0 +1,16 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \page using Using WiredTiger
+
+- \subpage basic_api
+- \subpage config_strings
+- \subpage packing
+- \subpage schema
+- \subpage cursors
+- \subpage threads
+- \subpage processes
+- \subpage transactions
+- \subpage tuning
+- \subpage command_line
+- \subpage extending
+ */

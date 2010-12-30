@@ -35,4 +35,12 @@ A column-oriented database serializes all of the values of a column together, th
       Joe,Mary,Cathy;
       40000,50000,44000;
 </pre>
+
+\section packing Serializing Values
+
+\section schema_storage How Schemas are Stored
+
+\section schema_startup Loading of Schemas during Startup
+
+\section schema_mapping Mapping Tables onto Access Methods
  */

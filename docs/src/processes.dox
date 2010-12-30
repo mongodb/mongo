@@ -1,0 +1,10 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \page processes Sharing Between Processes
+
+WiredTiger includes a server that provides remote access to databases.  The primary process to open a database can optionally start a server that handles requests from other processes.
+
+The remote interface is the way languages other than C/C++ are supported, and the interface for client processes in multiprocess C/C++ applications.
+
+The server can be embedded in the application or run from the command line.  For more details, see \ref command_line.
+ */

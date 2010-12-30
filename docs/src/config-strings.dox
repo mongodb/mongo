@@ -2,13 +2,21 @@
 
 /*! \page config_strings Configuration Strings
 
+\section config_intro Introduction
+
 Many operations in WiredTiger accept a string to configure options.  These strings all have the same format:
 
 <pre>
-  [key1[=value1]][','+[key2[=value2]]]*
+  [key['='value]][','[key['='value]]]*
 </pre>
 
 That is, they are simple comma-separated lists of <code>"<key>=<value>"</code> pairs.  If the <code>"=<value>"</code> part is omitted, the value of 1 is assumed.
+
+Values may be nested lists, for example:
+
+<pre>
+  schema=(keyfmt=S,valuefmt=S,columns=(name,notes))
+</pre>
 
 Empty configuration strings may be represented in C or C++ by passing <code>NULL</code>.
 
@@ -16,9 +24,13 @@ Superfluous commas and whitespace in the configuration string are ignored (inclu
 
 Keys are processed in order from left to right, with later settings overriding earlier ones unless multiple settings for a key are permitted.
 
-\section config_examples Examples
+\section config_examples Code Samples
 
-TODO: more whitespace, complete code fragments.
+The code below is taken from the complete example program \ref ex_config.c "ex_config.c" which is available in the source tree as \c examples/c/ex_config.c.
+
+\dontinclude ex_config.c
+\skip wiredtiger_open
+\until close
 
 <ul>
 <li>To open a connection to a database, creating it if it does not exist and set a cache size of 10MiB, pass <code>"create,cache_size=10M"</code> to ::wiredtiger_open.

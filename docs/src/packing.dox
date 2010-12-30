@@ -1,0 +1,6 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \page packing Packing and Unpacking Data
+
+What are WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and WT_CURSOR::set_value all about?
+ */

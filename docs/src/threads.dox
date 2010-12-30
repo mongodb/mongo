@@ -1,0 +1,8 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! \page threads Multithreading
+
+Just add WT_SESSION ;-)
+
+WT_CONNECTION handles can be shared between threads, and applications should generally only open one connection per process.  WT_SESSION and WT_CURSOR handles cannot be shared between threads: applications should open one WT_SESSION for each thread that accesses a database.
+ */

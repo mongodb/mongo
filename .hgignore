@@ -2,6 +2,7 @@
 \.swp$
 \.pyc$
 \.class$
+^build.*/.*
 docs/doxygen.log
 docs/html
 docs/java

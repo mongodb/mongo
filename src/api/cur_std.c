@@ -10,25 +10,71 @@
 static int
 __curstd_get_key(WT_CURSOR *cursor, ...)
 {
-	return ENOTSUP;
+	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
+	const char *fmt;
+	va_list ap;
+
+	va_start(ap, cursor);
+	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->keyfmt;
+	return wiredtiger_struct_unpackv(stdc->key.data, stdc->key.size,
+	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->keyfmt, ap);
 }
 
 static int
 __curstd_get_value(WT_CURSOR *cursor, ...)
 {
-	return ENOTSUP;
+	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
+	const char *fmt;
+	va_list ap;
+
+	va_start(ap, cursor);
+	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->valuefmt;
+	return wiredtiger_struct_unpackv(stdc->value.data, stdc->value.size,
+	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->valuefmt, ap);
 }
 
 static int
 __curstd_set_key(WT_CURSOR *cursor, ...)
 {
-	return ENOTSUP;
+	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
+	const char *fmt;
+	size_t sz;
+	va_list ap;
+		
+	va_start(ap, cursor);
+	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->keyfmt;
+	sz = wiredtiger_struct_sizev(fmt, ap);
+	if (stdc->keybufsz < sz) {
+		stdc->keybuf = (stdc->keybuf == NULL) ?
+		    malloc(sz) : realloc(stdc->keybuf, sz);
+		/* TODO ENOMEM */
+		stdc->keybufsz = sz;
+	}
+	stdc->key.data = stdc->keybuf;
+	stdc->key.size = sz;
+	return wiredtiger_struct_packv(stdc->keybuf, sz, fmt, ap);
 }
 
 static int
 __curstd_set_value(WT_CURSOR *cursor, ...)
 {
-	return ENOTSUP;
+	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
+	const char *fmt;
+	size_t sz;
+	va_list ap;
+
+	va_start(ap, cursor);
+	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->valuefmt;
+	sz = wiredtiger_struct_sizev(fmt, ap);
+	if (stdc->valuebufsz < sz) {
+		stdc->valuebuf = (stdc->valuebuf == NULL) ?
+		    malloc(sz) : realloc(stdc->valuebuf, sz);
+		/* TODO ENOMEM */
+		stdc->valuebufsz = sz;
+	}
+	stdc->value.data = stdc->valuebuf;
+	stdc->value.size = sz;
+	return wiredtiger_struct_packv(stdc->valuebuf, sz, fmt, ap);
 }
 
 void
@@ -41,9 +87,9 @@ __wt_curstd_init(WT_CURSOR_STD *stdc)
 	c->set_key = __curstd_set_key;
 	c->set_value = __curstd_set_value;
 
-	stdc->key.data = NULL;
+	stdc->key.data = stdc->keybuf = NULL;
 	stdc->keybufsz = 0;
-	stdc->value.data = NULL;
+	stdc->value.data = stdc->valuebuf = NULL;
 	stdc->valuebufsz = 0;
 }
 
