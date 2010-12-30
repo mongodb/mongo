@@ -85,7 +85,112 @@ namespace mongo {
         magic = 781231;
     }
 
+    boost::filesystem::path Database::fileName( int n ) const {
+        stringstream ss;
+        ss << name << '.' << n;
+        boost::filesystem::path fullName;
+        fullName = boost::filesystem::path(path);
+        if ( directoryperdb )
+            fullName /= name;
+        fullName /= ss.str();
+        return fullName;
+    }
 
+    void Database::openAllFiles() { 
+        int n = 0;
+        while( exists(n) ) { 
+            getFile(n);
+            n++;
+        }
+        // If last file is empty, consider it preallocated and make sure it's not mapped
+        // until a write is requested
+        if ( n > 1 && getFile( n - 1 )->getHeader()->isEmpty() ) {
+            delete files[ n - 1 ];
+            files.pop_back();
+        }
+    }
+
+    MongoDataFile* Database::getFile( int n, int sizeNeeded , bool preallocateOnly) {
+        assert(this);
+        
+        namespaceIndex.init();
+        if ( n < 0 || n >= DiskLoc::MaxFiles ) {
+            out() << "getFile(): n=" << n << endl;
+            massert( 10295 , "getFile(): bad file number value (corrupt db?): run repair", false);
+        }
+        DEV {
+            if ( n > 100 )
+                out() << "getFile(): n=" << n << "?" << endl;
+        }
+        MongoDataFile* p = 0;
+        if ( !preallocateOnly ) {
+            while ( n >= (int) files.size() )
+                files.push_back(0);
+            p = files[n];
+        }
+        if ( p == 0 ) {
+            boost::filesystem::path fullName = fileName( n );
+            string fullNameString = fullName.string();
+            p = new MongoDataFile(n);
+            int minSize = 0;
+            if ( n != 0 && files[ n - 1 ] )
+                minSize = files[ n - 1 ]->getHeader()->fileLength;
+            if ( sizeNeeded + DataFileHeader::HeaderSize > minSize )
+                minSize = sizeNeeded + DataFileHeader::HeaderSize;
+            try {
+                p->open( fullNameString.c_str(), minSize, preallocateOnly );
+            }
+            catch ( AssertionException& ) {
+                delete p;
+                throw;
+            }
+            if ( preallocateOnly )
+                delete p;
+            else
+                files[n] = p;
+        }
+        return preallocateOnly ? 0 : p;
+    }
+    
+    MongoDataFile* Database::addAFile( int sizeNeeded, bool preallocateNextFile ) {
+        int n = (int) files.size();
+        MongoDataFile *ret = getFile( n, sizeNeeded );
+        if ( preallocateNextFile )
+            preallocateAFile();
+        return ret;
+    }
+
+    MongoDataFile* Database::suitableFile( int sizeNeeded, bool preallocate ) {
+        MongoDataFile* f = newestFile();
+        if ( !f ) {
+            f = addAFile( sizeNeeded, preallocate );                
+        }
+        for ( int i = 0; i < 8; i++ ) {
+            if ( f->getHeader()->unusedLength >= sizeNeeded )
+                break;
+            f = addAFile( sizeNeeded, preallocate );
+            if ( f->getHeader()->fileLength >= MongoDataFile::maxSize() ) // this is as big as they get so might as well stop
+                break;
+        }
+        return f;
+    }
+
+    MongoDataFile* Database::newestFile() {
+        int n = numFiles();
+        if ( n == 0 )
+            return 0;
+        return getFile(n-1);
+    }
+
+    
+    Extent* Database::allocExtent( const char *ns, int size, bool capped ) { 
+        Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
+        if( e ) 
+            return e;
+        return suitableFile( size, !capped )->createExtent( ns, size, capped );
+    }
+    
+    
     bool Database::setProfilingLevel( int newLevel , string& errmsg ){
         if ( profile == newLevel )
             return true;
@@ -130,11 +235,18 @@ namespace mongo {
         return good == ns.size();
     }
 
-    void Database::flushFiles( bool sync ){
+    void Database::flushFiles( bool sync ) const {
         dbMutex.assertAtLeastReadLocked();
         for ( unsigned i=0; i<files.size(); i++ ){
             files[i]->flush( sync );
         }
+    }
+
+    long long Database::fileSize() const {
+        long long size=0;
+        for (int n=0; exists(n); n++)
+            size += boost::filesystem::file_size( fileName(n) );
+        return size;
     }
 
     Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ){
