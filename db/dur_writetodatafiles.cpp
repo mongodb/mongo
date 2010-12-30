@@ -74,7 +74,7 @@ namespace mongo {
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
             for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ){
                 const WriteIntent& intent = *it;
-                stats.curr._writeToDataFilesBytes += intent.length();
+                stats.curr->_writeToDataFilesBytes += intent.length();
                 dassert(intent.w_ptr);
                 memcpy(intent.w_ptr, 
                     commitJob._ab.atOfs(intent.ofsInJournalBuffer), 
