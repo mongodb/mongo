@@ -38,26 +38,9 @@ namespace mongo {
     */
     class OID {
     public:
-        struct MachineAndPid { 
-            unsigned char _machineNumber[3];
-            unsigned short _pid;
-        };
-    private:
-        union {
-            struct {
-                // 12 bytes total
-                unsigned char _time[4];
-                MachineAndPid _machineAndPid;
-                unsigned char _inc[3];
-            };
-            struct {
-                long long a;
-                unsigned b;
-            };
-            unsigned char data[12];
-        };
-    public:
         OID() { }
+
+        /** init from a 24 char hex string */
         explicit OID(const string &s) { init(s); }
 
 		/** initialize to 'null' */
@@ -70,7 +53,7 @@ namespace mongo {
         int compare( const OID& other ) const { return memcmp( data , other.data , 12 ); }
         bool operator<( const OID& other ) const { return compare( other ) < 0; }
 
-        /** The object ID output as 24 hex digits. */
+        /** @return the object ID output as 24 hex digits */
         string str() const { return toHexLower(data, 12); }
         string toString() const { return str(); }
 
@@ -79,7 +62,7 @@ namespace mongo {
         /** sets the contents to a new oid / randomized value */
         void init();
 
-        /** Set to the hex string value specified. */
+        /** init from a 24 char hex string */
         void init( string s );
 
         /** Set to the min/max OID that could be generated at given timestamp. */
@@ -93,8 +76,33 @@ namespace mongo {
         /** call this after a fork to update the process id */
         static void justForked();
 
-        static unsigned getMachineId();
-        static void regenMachineId();
+        static unsigned getMachineId(); // features command uses
+        static void regenMachineId(); // used by unit tests
+
+    private:
+        struct MachineAndPid { 
+            unsigned char _machineNumber[3];
+            unsigned short _pid;
+            bool operator!=(const OID::MachineAndPid& rhs) const;
+        };
+        static MachineAndPid ourMachine, ourMachineAndPid;
+        union {
+            struct {
+                // 12 bytes total
+                unsigned char _time[4];
+                MachineAndPid _machineAndPid;
+                unsigned char _inc[3];
+            };
+            struct {
+                long long a;
+                unsigned b;
+            };
+            unsigned char data[12];
+        };
+
+        static unsigned ourPid();
+        static void foldInPid(MachineAndPid& x);
+        static MachineAndPid genMachineAndPid();
     };
 #pragma pack()
 

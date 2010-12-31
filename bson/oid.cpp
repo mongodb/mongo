@@ -20,12 +20,14 @@
 #include "util/atomic_int.h"
 #include "../db/nonce.h"
 
-BOOST_STATIC_ASSERT( sizeof(mongo::OID::MachineAndPid) == 5 );
 BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
 
-    static unsigned ourPid() { 
+    // machine # before folding in the process id
+    OID::MachineAndPid OID::ourMachine;
+
+    unsigned OID::ourPid() { 
         unsigned pid;
 #if defined(_WIN32)
         pid = (unsigned short) GetCurrentProcessId();
@@ -37,10 +39,7 @@ namespace mongo {
         return pid;
     }
 
-    // machine # before folding in the process id
-    static OID::MachineAndPid ourMachine;
-
-    static void foldInPid(OID::MachineAndPid& x) { 
+    void OID::foldInPid(OID::MachineAndPid& x) { 
         unsigned p = ourPid();
         x._pid ^= (unsigned short) p;
         // when the pid is greater than 16 bits, let the high bits modulate the machine id field.
@@ -48,17 +47,16 @@ namespace mongo {
         rest ^= p >> 16;
     }
 
-    static OID::MachineAndPid __gen() { 
+    OID::MachineAndPid OID::genMachineAndPid() { 
+        BOOST_STATIC_ASSERT( sizeof(mongo::OID::MachineAndPid) == 5 );
+
         // this is not called often, so the following is not expensive, and gives us some 
         // testing that nonce generation is working right and that our OIDs are (perhaps) ok.
         {
             nonce a = security.getNonce();
             nonce b = security.getNonce();
             nonce c = security.getNonce();
-            nonce d = security.getNonce();
-            assert( a != b && a != c && a != d );
-            assert( b != c && b != d );
-            assert( c != d );
+            assert( !(a==b && b==c) );
         }
 
         unsigned long long n = security.getNonce();
@@ -68,14 +66,14 @@ namespace mongo {
     }
 
     // after folding in the process id
-    static OID::MachineAndPid ourMachineAndPid = __gen();
+    OID::MachineAndPid OID::ourMachineAndPid = OID::genMachineAndPid();
 
     void OID::regenMachineId() { 
-        ourMachineAndPid = __gen();
+        ourMachineAndPid = genMachineAndPid();
     }
 
-    inline bool operator!=(const OID::MachineAndPid& l, const OID::MachineAndPid& r) { 
-        return l._pid != r._pid || l._machineNumber != r._machineNumber;
+    inline bool OID::MachineAndPid::operator!=(const OID::MachineAndPid& rhs) const { 
+        return _pid != rhs._pid || _machineNumber != rhs._machineNumber;
     }
 
     unsigned OID::getMachineId() { 
@@ -92,7 +90,7 @@ namespace mongo {
         // we let the random # for machine go into all 5 bytes of MachineAndPid, and then 
         // xor in the pid into _pid.  this reduces the probability of collisions.
         foldInPid(x);
-        ourMachineAndPid = __gen();
+        ourMachineAndPid = genMachineAndPid();
         assert( x != ourMachineAndPid );
         ourMachineAndPid = x;
     }
