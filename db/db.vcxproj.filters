@@ -154,6 +154,7 @@
     <ClCompile Include="repl\replset_commands.cpp" />
     <ClCompile Include="repl\rs_config.cpp" />
     <ClCompile Include="security_key.cpp" />
+    <ClCompile Include="..\util\file_allocator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />

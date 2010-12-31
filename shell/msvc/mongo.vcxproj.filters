@@ -253,7 +253,6 @@
   <ItemGroup>
     <Library Include="..\..\..\js\js32d.lib" />
     <Library Include="..\..\..\js\js32r.lib" />
-    <Library Include="..\..\..\readline\lib\readline.lib" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\db\lasterror.h">
