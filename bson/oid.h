@@ -57,23 +57,21 @@ namespace mongo {
             unsigned char data[12];
         };
     public:
+        OID() { }
+        explicit OID(const string &s) { init(s); }
+
 		/** initialize to 'null' */
 		void clear() { a = 0; b = 0; }
 
         const unsigned char *getData() const { return data; }
 
-        bool operator==(const OID& r) const {
-            return a==r.a&&b==r.b;
-        }
-        bool operator!=(const OID& r) const {
-            return a!=r.a||b!=r.b;
-        }
+        bool operator==(const OID& r) const { return a==r.a && b==r.b; }
+        bool operator!=(const OID& r) const { return a!=r.a || b!=r.b; }
+        int compare( const OID& other ) const { return memcmp( data , other.data , 12 ); }
+        bool operator<( const OID& other ) const { return compare( other ) < 0; }
 
         /** The object ID output as 24 hex digits. */
-        string str() const {
-            return toHexLower(data, 12);
-        }
-
+        string str() const { return toHexLower(data, 12); }
         string toString() const { return str(); }
 
         static OID gen() { OID o; o.init(); return o; }
@@ -92,11 +90,7 @@ namespace mongo {
         
         bool isSet() const { return a || b; }
         
-        int compare( const OID& other ) const { return memcmp( data , other.data , 12 ); }
-        
-        bool operator<( const OID& other ) const { return compare( other ) < 0; }
-
-        /** call this after a fork */
+        /** call this after a fork to update the process id */
         static void justForked();
 
         static unsigned getMachineId();
