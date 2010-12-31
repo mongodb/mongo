@@ -834,6 +834,29 @@ namespace mongo {
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
+
+    JSBool timestamp_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        smuassert( cx , "Timestamp needs 0 or 2 args" , argc == 0 || argc == 2 );
+        
+        if ( ! JS_InstanceOf( cx , obj , &timestamp_class , 0 ) ){
+            obj = JS_NewObject( cx , &timestamp_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "timestamp_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
+        Convertor c( cx );
+        if ( argc == 0 ) {
+            c.setProperty( obj, "t", c.toval( 0.0 ) );
+            c.setProperty( obj, "i", c.toval( 0.0 ) );
+        } 
+        else {
+            c.setProperty( obj, "t", argv[ 0 ] );
+            c.setProperty( obj, "i", argv[ 1 ] );
+        } 
+        
+        return JS_TRUE;
+    }
+
     
     JSClass numberlong_class = {
         "NumberLong" , JSCLASS_HAS_PRIVATE ,
@@ -1002,7 +1025,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
 
-        assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
