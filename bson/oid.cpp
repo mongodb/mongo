@@ -56,7 +56,9 @@ namespace mongo {
             nonce b = security.getNonce();
             nonce c = security.getNonce();
             nonce d = security.getNonce();
-            assert( !(a == b == c == d) );
+            assert( a != b && a != c && a != d );
+            assert( b != c && b != d );
+            assert( c != d );
         }
 
         unsigned long long n = security.getNonce();
