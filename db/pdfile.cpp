@@ -186,7 +186,7 @@ namespace mongo {
             return false;
         }
 
-        log(1) << "create collection " << ns << ' ' << options << '\n';
+        log(1) << "create collection " << ns << ' ' << options << endl;
 
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
            and then go back and set to ok : 1 after we are done.
@@ -1444,7 +1444,7 @@ namespace mongo {
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
         massert( 10093 , "cannot insert into reserved $ collection", god || isANormalNSName( ns ) );
-        uassert( 10094 , "invalid ns", strchr( ns , '.' ) > 0 );
+        uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
             uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
@@ -1961,7 +1961,7 @@ namespace mongo {
             BOOST_CHECK_EXCEPTION( ok = fo.apply(q) );
             if ( ok ) {
                 if ( extra != 10 ){
-                    log(1) << fo.op() << " file " << q.string() << '\n';
+                    log(1) << fo.op() << " file " << q.string() << endl;
                     log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;
                 }
             }
@@ -2012,6 +2012,17 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    bool isValidNS( const StringData& ns ){
+        // TODO: should check for invalid characters
+
+        const char * x = strchr( ns.data() , '.' );
+        if ( ! x )
+            return false;
+        
+        x++;
+        return *x > 0;
     }
     
 

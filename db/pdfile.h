@@ -55,6 +55,8 @@ namespace mongo {
     // -1 if library unavailable.
     boost::intmax_t freeSpace( const string &path = dbpath );
 
+    bool isValidNS( const StringData& ns );
+
     /*---------------------------------------------------------------------*/
 
     class MongoDataFile {
