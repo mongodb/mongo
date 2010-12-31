@@ -16,7 +16,11 @@ files.forEach(
     function (x) {
 
         if (/[\/\\]_/.test(x.name) ||
-             !/\.js$/.test(x.name)) {
+             !/\.js$/.test(x.name) ||
+             /repair/.test(x.name) ||
+             false // placeholder so all real tests end in ||
+           )
+        {
             print(" >>>>>>>>>>>>>>> skipping " + x.name);
             return;
         }
