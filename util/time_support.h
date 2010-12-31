@@ -21,6 +21,8 @@
 #include <ctime>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/xtime.hpp>
+#undef assert
+#define assert MONGO_assert
 
 namespace mongo {
 
