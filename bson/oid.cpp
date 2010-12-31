@@ -49,6 +49,16 @@ namespace mongo {
     }
 
     static OID::MachineAndPid __gen() { 
+        // this is not called often, so the following is not expensive, and gives us some 
+        // testing that nonce generation is working right and that our OIDs are (perhaps) ok.
+        {
+            nonce a = security.getNonce();
+            nonce b = security.getNonce();
+            nonce c = security.getNonce();
+            nonce d = security.getNonce();
+            assert( !(a == b == c == d) );
+        }
+
         unsigned long long n = security.getNonce();
         OID::MachineAndPid x = ourMachine = (OID::MachineAndPid&) n;
         foldInPid(x);
