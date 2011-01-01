@@ -10,15 +10,26 @@ function run( n , atomic ){
 
     print("cursora.js startParallelShell n:"+n+" atomic:"+atomic)
     join = startParallelShell( "sleep(50); db.cursora.remove( {"  + ( atomic ? "$atomic:true" : "" ) + "} ); db.getLastError();" );
-    
-    start = new Date()
-    ex = t.find( function(){ num = 2; for ( var x=0; x<1000; x++ ) num += 2; return num > 0; } ).sort( { _id : -1 } ).explain()
-    num = ex.n
-    end = new Date()
+
+    var start = null;
+    var ex = null;
+    var num = null;
+    var end = null;
+    try {
+        start = new Date()
+        ex = t.find(function () { num = 2; for (var x = 0; x < 1000; x++) num += 2; return num > 0; }).sort({ _id: -1 }).explain()
+        num = ex.n
+        end = new Date()
+    }
+    catch (e) {
+        print("cursora.js FAIL " + e);
+        join();
+        throw e;
+    }
     
     join()
 
-    print( "cursora.js num: " + num + " time:" + ( end.getTime() - start.getTime() ) )
+    //print( "cursora.js num: " + num + " time:" + ( end.getTime() - start.getTime() ) )
     assert.eq( 0 , t.count() , "after remove: " + tojson( ex ) )
     // assert.lt( 0 , ex.nYields , "not enough yields : " + tojson( ex ) ); // TODO make this more reliable so cen re-enable assert
     if ( n == num )
