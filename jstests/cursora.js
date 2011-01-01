@@ -1,7 +1,11 @@
 t = db.cursora
 
 function run( n , atomic ){
-    assert(isNumber(n), "cursora.js isNumber");
+    if( !isNumber(n) ) {
+	print("n:");
+	printjson(n);
+	assert(isNumber(n), "cursora.js isNumber");
+    }
     t.drop()
     
     for ( i=0; i<n; i++ )
