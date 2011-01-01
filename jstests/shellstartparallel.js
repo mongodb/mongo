@@ -1,3 +1,7 @@
+function f() {
+    throw "intentional_throw_to_test_assert_throws";
+}
+assert.throws(f);
 
 // verify that join works
 db.sps.drop();
