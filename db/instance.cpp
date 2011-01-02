@@ -875,7 +875,7 @@ namespace mongo {
             cout << "It is recommended that you start with journalling enabled so that recovery may occur." << endl;
             cout << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
-            uasserted(13597, "can't start without --dur enabled when journal/ files are present");
+            uasserted(13618, "can't start without --dur enabled when journal/ files are present");
         }
     }
 #endif    
