@@ -14,3 +14,5 @@ assert(db.sps.count() == 1, "join problem?");
 join = startParallelShell("db.sps.insert({x:1}); throw 'intentionally_uncaught';");
 join();
 assert(db.sps.count() == 2, "join2 problem?");
+
+print("shellstartparallel.js SUCCESS");
