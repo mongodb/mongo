@@ -2,6 +2,10 @@
 // 
 // TODO(mathias) use paranoid mode (--durOptions 8) once we are reasonably sure it will pass
 
+// DEBUG : set this variable to debug by skipping to a specific test to start with and go from there
+//var skippingTo = /null.js/;
+var skippingTo = false;
+
 conn = startMongodEmpty("--port", 30100, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles");
 db = conn.getDB("test");
 
@@ -18,6 +22,7 @@ function durPassThrough() {
             if (/[\/\\]_/.test(x.name) ||
                     !/\.js$/.test(x.name) ||
                     /repair/.test(x.name) ||
+//		/numberlong/.test(x.name) ||
                     false // placeholder so all real tests end in ||
                 ) {
                 print("dur_passthrough.js >>>> skipping " + x.name);
@@ -42,23 +47,21 @@ function durPassThrough() {
 
     var files = listFiles("jstests");
 
-    // run something that will almost surely pass and is fast just to make sure our framework 
-    // here is really working
-    run({ name: 'jstests/basic1.js' });
+    if( !skippingTo ) {
+	    // run something that will almost surely pass and is fast just to make sure our framework 
+	    // here is really working
+	    run({ name: 'jstests/basic1.js' });
 
-    // run "suspicious" tests early.  these are tests that have ever failed in buildbot.  we run them 
-    // early and try to get a fail fast
-    run({ name: 'jstests/shellstartparallel.js' });
-    run({ name: 'jstests/cursora.js' });
+	    // run "suspicious" tests early.  these are tests that have ever failed in buildbot.  we run them 
+	    // early and try to get a fail fast
+	    run({ name: 'jstests/shellstartparallel.js' });
+	    run({ name: 'jstests/cursora.js' });
 
-    // run the shell-oriented tests early. if the shell is broken the other tests aren't meaningful
-    run({ name: 'jstests/run_program1.js' });
-    run({ name: 'jstests/shellspawn.js' });
-    run({ name: 'jstests/shellkillop.js' });
-
-    // set this variable to debug by skipping to a specific test to start with and go from there
-    // var skippingTo = /cursora/;
-    var skippingTo = false;
+	    // run the shell-oriented tests early. if the shell is broken the other tests aren't meaningful
+	    run({ name: 'jstests/run_program1.js' });
+	    run({ name: 'jstests/shellspawn.js' });
+	    run({ name: 'jstests/shellkillop.js' });
+    }
 
     files = files.sort(compareOn('name'));
     files.forEach(
@@ -79,4 +82,3 @@ function durPassThrough() {
 }
 
 durPassThrough();
-

@@ -111,7 +111,7 @@ namespace mongo {
         }
 
         /** never throws 
-            @return true if journal dir is not emptya
+            @return true if journal dir is not empty
         */
         bool haveJournalFiles() { 
             try {
