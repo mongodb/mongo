@@ -47,6 +47,7 @@
 #include "../util/text.h"
 #include "../util/heapcheck.h"
 #include "../util/time_support.h"
+#include "../util/file.h"
 
 namespace mongo {
     
@@ -274,6 +275,26 @@ namespace mongo {
             b.appendBool( "removed" , found );
             return b.obj();
         }
+
+        /**
+         * @param args - [ name, byte index ]
+         * In this initial implementation, all bits in the specified byte are flipped.
+         */
+        BSONObj fuzzFile(const BSONObj& args){
+            uassert( 13619, "fuzzFile takes 2 arguments", args.nFields() == 2 );
+            shared_ptr< File > f( new File() );
+            f->open( args.getStringField( "0" ) );
+            uassert( 13620, "couldn't open file to fuzz", !f->bad() && f->is_open() );
+            
+            char c;
+            f->read( args.getIntField( "1" ), &c, 1 );
+            c = ~c;
+            f->write( args.getIntField( "1" ), &c, 1 );
+
+            return undefined_;
+            // f close is implicit            
+        }        
+        
         map< int, pair< pid_t, int > > dbs;
         map< pid_t, int > shells;
 #ifdef _WIN32
@@ -875,6 +896,7 @@ namespace mongo {
 
             scope.injectNative( "getHostName" , getHostName );
             scope.injectNative( "removeFile" , removeFile );
+            scope.injectNative( "fuzzFile" , fuzzFile );
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "ls" , ls );
             scope.injectNative( "pwd", pwd );
