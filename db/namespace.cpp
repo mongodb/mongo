@@ -102,7 +102,7 @@ namespace mongo {
             cout << "ns offsets which follow will not display correctly with --dur disabled" << endl;
 
         size_t ofs = 1; // 1 is sentinel that the find call below failed
-        privateViews.find(this, ofs);
+        privateViews.find(this, /*out*/ofs);
 
         cout << "ns" << hex << setw(8) << ofs << ' ';
         cout << k.toString() << '\n';
