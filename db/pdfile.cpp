@@ -1524,7 +1524,7 @@ namespace mongo {
         if ( lenWHdr == 0 ) {
             // old datafiles, backward compatible here.
             assert( d->paddingFactor == 0 );
-            *getDur().writingNoLog(&d->paddingFactor) = 1.0;
+            *getDur().writing(&d->paddingFactor) = 1.0;
             lenWHdr = len + Record::HeaderSize;
         }
         
