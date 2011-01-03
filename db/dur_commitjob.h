@@ -162,7 +162,7 @@ namespace mongo {
         public:
             AlignedBuilder _ab; // for direct i/o writes to journal
 
-            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytes(0) { }
+            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytesDeclared(0) { }
 
             /** record/note an intent to write */
             void note(void* p, int len);
@@ -199,7 +199,7 @@ namespace mongo {
             }
 
             /** we check how much written and if it is getting to be a lot, we commit sooner. */
-            size_t bytes() const { return _bytes; }
+            size_t bytes() const { return _bytesDeclared; }
 
 #if defined(_DEBUG)
             const WriteIntent& lastWrite() const { return _wi._last; }
@@ -209,7 +209,7 @@ namespace mongo {
         private:
             bool _hasWritten;
             Writes _wi; // todo: fix name
-            size_t _bytes;
+            size_t _bytesDeclared;
             NotifyAll _notify; // for getlasterror fsync:true acknowledgements
         };
         extern CommitJob commitJob;
@@ -258,7 +258,7 @@ namespace mongo {
 
                 // remember intent. we will journal it in a bit
                 _wi.insertWriteIntent(p, len);
-                _bytes += len;
+                _bytesDeclared += len;
                 wassert( _wi._writes.size() <  2000000 );
                 assert(  _wi._writes.size() < 20000000 );
             }
