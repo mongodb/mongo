@@ -78,6 +78,16 @@ namespace mongo {
         
         return binData;
     }    
+
+    v8::Handle<v8::FunctionTemplate> getTimestampFunctionTemplate() {
+        v8::Local<v8::FunctionTemplate> ts = newV8Function< dbTimestampInit >();
+        v8::Local<v8::Template> proto = ts->PrototypeTemplate();
+        
+        ts->InstanceTemplate()->SetInternalFieldCount( 1 );
+        
+        return ts;
+    }    
+
     
     void installDBTypes( Handle<ObjectTemplate>& global ){
         v8::Local<v8::FunctionTemplate> db = newV8Function< dbInit >();
@@ -103,6 +113,7 @@ namespace mongo {
 
         global->Set( v8::String::New("NumberLong") , getNumberLongFunctionTemplate() );
 
+        global->Set( v8::String::New("Timestamp") , getTimestampFunctionTemplate() );
     }
 
     void installDBTypes( Handle<v8::Object>& global ){
@@ -128,6 +139,8 @@ namespace mongo {
         global->Set( v8::String::New("BinData") , getBinDataFunctionTemplate()->GetFunction() );
 
         global->Set( v8::String::New("NumberLong") , getNumberLongFunctionTemplate()->GetFunction() );
+
+        global->Set( v8::String::New("Timestamp") , getTimestampFunctionTemplate()->GetFunction() );
 
         BSONObjBuilder b;
         b.appendMaxKey( "" );
@@ -595,6 +608,28 @@ namespace mongo {
         
         return it;
     }
+
+    v8::Handle<v8::Value> dbTimestampInit( const v8::Arguments& args ) {
+
+        v8::Handle<v8::Object> it = args.This();
+        
+        if ( args.Length() == 0 ){
+            it->Set( v8::String::New( "t" ) , v8::Number::New( 0 ) );
+            it->Set( v8::String::New( "i" ) , v8::Number::New( 0 ) );
+        }
+        else if ( args.Length() == 2 ){
+            it->Set( v8::String::New( "t" ) , args[0] );
+            it->Set( v8::String::New( "i" ) , args[1] );
+        }
+        else {
+            return v8::ThrowException( v8::String::New( "Timestamp needs 0 or 2 arguments" ) );
+        }
+        
+        it->SetInternalField( 0, v8::Uint32::New( Timestamp ) );
+
+        return it;
+    }
+
 
     v8::Handle<v8::Value> binDataInit( const v8::Arguments& args ) {
         v8::Handle<v8::Object> it = args.This();

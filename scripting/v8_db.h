@@ -60,6 +60,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> dbRefInit( const v8::Arguments& args );
     v8::Handle<v8::Value> dbPointerInit( const v8::Arguments& args );
+    v8::Handle<v8::Value> dbTimestampInit( const v8::Arguments& args );
 
     v8::Handle<v8::Value> binDataInit( const v8::Arguments& args );
     v8::Handle<v8::Value> binDataToString( const v8::Arguments& args );
