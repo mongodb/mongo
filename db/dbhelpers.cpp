@@ -246,7 +246,7 @@ namespace mongo {
         IndexDetails& i = nsd->idx( ii );
 
         shared_ptr<Cursor> c( new BtreeCursor( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
-        scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+        auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
         cc->setDoingDeletes( true );
         
         while ( c->ok() ){
@@ -267,6 +267,7 @@ namespace mongo {
 
             if ( yield && ! cc->yieldSometimes() ){
                 // cursor got finished by someone else, so we're done
+                cc.release(); // if the collection/db is dropped, cc may be deleted
                 break;
             }
         }
