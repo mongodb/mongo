@@ -4,7 +4,8 @@
    other tests can be slow
 */
 
-print("a_quick.js");
+testname = "a_quick";
+load("jstests/_tst.js");
 
 // directories
 var path1 = "/data/db/quicknodur";
@@ -31,7 +32,7 @@ function runDiff(a, b) {
 
 var step = 1;
 function log(str) {
-    if(str)
+    if (str)
         print("\n\nstep " + step++ + " " + str);
     else
         print("\n\nstep " + step++);
@@ -95,7 +96,7 @@ log("stop");
 stopMongod(30002);
 
 // stopMongod is asynchronous unfortunately.  wait some.
-sleep(2000);
+// sleep(2000);
 
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files");
