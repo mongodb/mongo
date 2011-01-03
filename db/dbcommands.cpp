@@ -111,7 +111,7 @@ namespace mongo {
             Client& c = cc();
             c.appendLastOp( result );
             
-            result.append( "connectionId" , c.getConnectionId() );
+            result.appendNumber( "connectionId" , c.getConnectionId() );
 
             BSONObj cmdObj = _cmdObj;
             { 
