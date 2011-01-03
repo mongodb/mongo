@@ -44,7 +44,7 @@ resetDbpath(data);
 runMongoProgram( "mongodump", "--host", "127.0.0.1:"+port, "--out", data );
 
 var x = runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+replTest.ports[1], "--dir", data );
-assert.eq(x, 255, "mongorestore should exit w/ -1 on slave");
+assert.eq(x, _isWindows() ? -1 : 255, "mongorestore should exit w/ -1 on slave");
 
 step("try mongoimport to slave");
 
