@@ -5,7 +5,6 @@ if (_isWindows()) {
     print("shellkillop.js see http://jira.mongodb.org/browse/SERVER-1451");
 }
 else {
-
     db[baseName].drop();
 
     print("shellkillop.js insert data");
@@ -29,20 +28,25 @@ else {
 
     print("count abcdefghijkl:" + db[baseName].find({ i: 'abcdefghijkl' }).count());
 
-    assert.soon(
-    function f() {
-        var inprog = db.currentOp().inprog;
-        for (i in inprog) {
-            if (inprog[i].ns == "test." + baseName)
-                print("shellkillop.js op is still running, waiting");
-            //printjson(inprog);
-            return false;
-        }
-        return true;
-    },
-    "shellkillop.js FAIL op is still running"
-    );
+    try {
+	assert.soon(
+	    function f() {
+		var inprog = db.currentOp().inprog;
+		for (i in inprog) {
+		    if (inprog[i].ns == "test." + baseName)
+			print("shellkillop.js op is still running, waiting");
+		    //printjson(inprog);
+		    return false;
+		}
+		return true;
+	    },
+	    "shellkillop.js FAIL op is still running"
+	    );
+    } catch(e) { 
+	print("shellkillop.js FAIL op is still running. currentOp():");
+	printjson(db.currentOp().inprog);
+	throw "cancelled op is still running";
+    }
 
     print("shellkillop.js SUCCESS");
-
 }
