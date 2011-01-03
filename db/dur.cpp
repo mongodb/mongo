@@ -444,10 +444,6 @@ namespace mongo {
         static void _groupCommit() {
             stats.curr->_commits++;
 
-            if( dbMutex.isWriteLocked() ) { 
-                stats.curr->_commitsInWriteLock++;
-            }
-
             if( !commitJob.hasWritten() )
                 return;
 
@@ -477,6 +473,7 @@ namespace mongo {
                 dbMutex._remapPrivateViewRequested = true;
             }
             else { 
+                stats.curr->_commitsInWriteLock++;
                 // however, if we are already write locked, we must do it now -- up the call tree someone 
                 // may do a write without a new lock acquisition.  this can happen when MongoMMF::close() calls
                 // this method when a file (and its views) is about to go away.
