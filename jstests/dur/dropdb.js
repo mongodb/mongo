@@ -61,12 +61,12 @@ function verify() {
     assert(d.foo.count() == 1,"count1");
     assert(d.foo.findOne()._id == 100, "100");
 
-    print("\n\nteste:");
+    print("\n\ndropdb.js:");
     printjson(conn.getDB("teste").foo.findOne());
     print();
 
     var teste = conn.getDB("teste");
-    print("teste count " + teste.foo.count());
+    print("dropdb count " + teste.foo.count());
     assert(teste.foo.findOne()._id == 99, "teste");
 
 }
