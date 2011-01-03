@@ -735,7 +735,7 @@ namespace mongo {
                     break;
                 sleepmillis( 1000 );
             }
-            if ( i == 65 ) {
+            if ( i == 130 ) {
                 char now[64];
                 time_t_to_String(time(0), now);
                 now[ 20 ] = 0;
@@ -750,6 +750,8 @@ namespace mongo {
                 close( shells[ pid ] );
                 shells.erase( pid );
             }
+            // FIXME I think the intention here is to do an extra sleep only when SIGKILL is sent to the child process.
+            // We may want to change the 4 below to 29, since values of i greater than that indicate we sent a SIGKILL.
             if ( i > 4 || signal == SIGKILL ) {
                 sleepmillis( 4000 ); // allow operating system to reclaim resources
             }
