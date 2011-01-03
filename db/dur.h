@@ -94,6 +94,15 @@ namespace mongo {
             */
             virtual bool commitNow() = 0;
 
+            /** Commit if enough bytes have been modified. Current threshold is 50MB
+
+                The idea is that long running write operations that dont yield
+                (like creating an index or update with $atomic) can call this
+                whenever the db is in a sane state and it will prevent commits
+                from growing too large.
+            */
+            virtual void commitIfNeeded() = 0;
+
             /** Declare write intent for a DiskLoc.  @see DiskLoc::writing() */
             inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
 
@@ -162,6 +171,7 @@ namespace mongo {
             void droppingDb(string db) { }
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
+            void commitIfNeeded() { }
             void setNoJournal(void *dst, void *src, unsigned len);
         };
 
@@ -174,6 +184,7 @@ namespace mongo {
             void droppingDb(string db);
             bool awaitCommit();
             bool commitNow();
+            void commitIfNeeded();
             void setNoJournal(void *dst, void *src, unsigned len);
         };
 
