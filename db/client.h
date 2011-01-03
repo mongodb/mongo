@@ -97,7 +97,10 @@ namespace mongo {
         
         MessagingPort * port() const { return _mp; }
 
+        unsigned getConnectionId() const { return _connectionId; }
+
     private:
+        unsigned _connectionId; // > 0 for things "conn", 0 otherwise
         CurOp * _curOp;
         Context * _context;
         bool _shutdown;

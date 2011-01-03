@@ -111,6 +111,8 @@ namespace mongo {
             Client& c = cc();
             c.appendLastOp( result );
             
+            result.append( "connectionId" , c.getConnectionId() );
+
             BSONObj cmdObj = _cmdObj;
             { 
                 BSONObj::iterator i(_cmdObj);

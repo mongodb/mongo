@@ -40,16 +40,19 @@ namespace mongo {
 
     boost::thread_specific_ptr<string> _threadName;
     
-    void _setThreadName( const char * name ){
+    unsigned _setThreadName( const char * name ){
         static unsigned N = 0;
+
         if ( strcmp( name , "conn" ) == 0 ){
+            unsigned n = ++N;
             stringstream ss;
-            ss << name << ++N;
+            ss << name << n;
             _threadName.reset( new string( ss.str() ) );
+            return n;
         }
-        else {
-            _threadName.reset( new string(name) );        
-        }
+        
+        _threadName.reset( new string(name) );        
+        return 0;
     }
 
 #if defined(_WIN32)
@@ -82,21 +85,22 @@ namespace mongo {
         }
     }
 
-    void setThreadName(const char *name)
+    unsigned setThreadName(const char *name)
     {
-        _setThreadName( name );
+        unsigned n = _setThreadName( name );
 #if !defined(_DEBUG)
         // naming might be expensive so don't do "conn*" over and over
         if( string("conn") == name )
-            return;
+            return n;
 #endif
         setWinThreadName(name);
+        return n;
     }
 
 #else
 
-    void setThreadName(const char * name ) { 
-        _setThreadName( name );
+    unsigned setThreadName(const char * name ) { 
+        return _setThreadName( name );
     }
 
 #endif

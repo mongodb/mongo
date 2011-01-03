@@ -44,7 +44,6 @@ namespace mongo {
        call this when your thread starts. 
     */
     Client& Client::initThread(const char *desc, MessagingPort *mp) {
-        setThreadName(desc);
         assert( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);
         currentClient.reset(c);
@@ -60,6 +59,7 @@ namespace mongo {
       _lastOp(0), 
       _mp(p)
     {
+        _connectionId = setThreadName(desc);
         _curOp = new CurOp( this );
         scoped_lock bl(clientsMutex);
         clients.insert(this);
