@@ -58,12 +58,6 @@ namespace mongo {
 
     namespace dur {
 
-#if defined(_DEBUG)
-        const bool DebugCheckLastDeclaredWrite = false;
-#else
-        const bool DebugCheckLastDeclaredWrite = false;
-#endif
-
         void WRITETODATAFILES();
         void PREPLOGBUFFER();
 
@@ -258,11 +252,8 @@ namespace mongo {
 
             SLOW
         */
-#if defined(_DEBUG)
+#if 0
         void DurableImpl::debugCheckLastDeclaredWrite() { 
-            if( !DebugCheckLastDeclaredWrite )
-                return;
-
             if( testIntent )
                 return;
 
@@ -572,10 +563,6 @@ namespace mongo {
 
         void releasingWriteLock() {
             try {
-#if defined(_DEBUG)
-                getDur().debugCheckLastDeclaredWrite(); 
-#endif
-
                 if (commitJob.bytes() > 100*1024*1024 || cmdLine.durOptions & CmdLine::DurAlwaysCommit)
                     groupCommit();
             }

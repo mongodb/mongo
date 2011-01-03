@@ -17,13 +17,12 @@ namespace mongo {
          */
         void startup();
 
-
         class TempDisableDurability : boost::noncopyable {
         public:
             TempDisableDurability();  // disables durability iff it is enabled
             ~TempDisableDurability(); // enables durability iff constructor disabled it
         private:
-            bool _wasDur;
+            const bool _wasDur;
         };
 
         class DurableInterface : boost::noncopyable { 
@@ -104,11 +103,6 @@ namespace mongo {
             */
             virtual void commitIfNeeded() = 0;
 
-
-#if defined(_DEBUG)
-            virtual void debugCheckLastDeclaredWrite() = 0;
-#endif
-
             /** Declare write intent for a DiskLoc.  @see DiskLoc::writing() */
             inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
 
@@ -135,13 +129,14 @@ namespace mongo {
                 return (T*) writingPtr(x, sizeof(T));
             }
 
-            /** it's very easy to manipulate Record::data open ended.  Thus a call to writing(Record*) is suspect. 
-                this will override the templated version and yield an unresolved external
+            /** Intentionally unimplemented method.
+                It's very easy to manipulate Record::data open ended.  Thus a call to writing(Record*) is suspect. 
+                This will override the templated version and yield an unresolved external.
             */
             Record* writing(Record* r);
-            /** Unimplemented: BtreeBuckets are allocated in buffers larger than sizeof( BtreeBucket ). */
+            /** Intentionally unimplemented method. BtreeBuckets are allocated in buffers larger than sizeof( BtreeBucket ). */
             BtreeBucket* writing( BtreeBucket* );
-            /** Unimplemented: NamespaceDetails may be based on references to 'Extra' objects. */
+            /** Intentionally unimplemented method. NamespaceDetails may be based on references to 'Extra' objects. */
             NamespaceDetails* writing( NamespaceDetails* );
 
             /** write something that doesn't have to be journaled, as this write is "unimportant".
@@ -178,9 +173,6 @@ namespace mongo {
             bool commitNow() { return false; }
             void commitIfNeeded() { }
             void setNoJournal(void *dst, void *src, unsigned len);
-#if defined(_DEBUG)
-            void debugCheckLastDeclaredWrite() {}
-#endif
         };
 
         class DurableImpl : public DurableInterface {
@@ -194,9 +186,6 @@ namespace mongo {
             bool commitNow();
             void commitIfNeeded();
             void setNoJournal(void *dst, void *src, unsigned len);
-#if defined(_DEBUG)
-            void debugCheckLastDeclaredWrite();
-#endif
         };
 
     } // namespace dur
