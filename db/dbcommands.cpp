@@ -133,7 +133,7 @@ namespace mongo {
                     result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
                 }
                 else { 
-                    // this perhpas is temp.  how long we wait for the group commit to occur.
+                    // this perhaps is temp.  how long we wait for the group commit to occur.
                     result.append( "waited", t.millis() );
                 }
             }

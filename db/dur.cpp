@@ -444,8 +444,11 @@ namespace mongo {
         static void _groupCommit() {
             stats.curr->_commits++;
 
-            if( !commitJob.hasWritten() )
+            if( !commitJob.hasWritten() ) {
+                // getlasterror request could have came after the data was already committed
+                commitJob.notifyCommitted();
                 return;
+            }
 
             PREPLOGBUFFER();
 
