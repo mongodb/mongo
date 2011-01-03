@@ -128,6 +128,7 @@ namespace mongo {
                - finish implementation of _switchToReachableView
                - performance test it.  privateViews.find() uses a mutex, so that could make 
                  it slow.
+            */
             /*
             if( testIntent ) {
                 memcpy(MongoMMF::switchToPrivateView(dst), src, len);
