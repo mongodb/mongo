@@ -288,6 +288,9 @@ namespace mongo {
 
             if( _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) { 
                 log() << "recover skipping application of section " << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
+
+                // TODO: shouldn't we return here?
+                // http://jira.mongodb.org/browse/SERVER-2320
             }
 
             // first read all entries to make sure this section is valid
