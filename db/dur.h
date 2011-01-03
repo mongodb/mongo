@@ -143,17 +143,12 @@ namespace mongo {
             BtreeBucket* writing( BtreeBucket* );
             /** Unimplemented: NamespaceDetails may be based on references to 'Extra' objects. */
             NamespaceDetails* writing( NamespaceDetails* );
-            
-            /** declare our intent to write, but it doesn't have to be journaled, as this write is 
-                something 'unimportant'.  depending on our implementation, we may or may not be able 
-                to take advantage of this versus doing the normal work we do.
+
+            /** write something that doesn't have to be journaled, as this write is "unimportant".
+                a good example is paddingFactor.
+                can be thought of as memcpy(dst,src,len)
             */
-            template <typename T> 
-            inline 
-            T* writingNoLog(T *x) { 
-                DEV RARELY log() << "todo dur nolog not yet optimized" << endl;
-                return (T*) writingPtr(x, sizeof(T));
-            }
+            virtual void setNoJournal(void *dst, void *src, unsigned len) = 0;
 
             /* assert that we have not (at least so far) declared write intent for p */
             inline void assertReading(void *p) { 
@@ -182,6 +177,7 @@ namespace mongo {
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
             void commitIfNeeded() { }
+            void setNoJournal(void *dst, void *src, unsigned len);
 #if defined(_DEBUG)
             void debugCheckLastDeclaredWrite() {}
 #endif
@@ -197,6 +193,7 @@ namespace mongo {
             bool awaitCommit();
             bool commitNow();
             void commitIfNeeded();
+            void setNoJournal(void *dst, void *src, unsigned len);
 #if defined(_DEBUG)
             void debugCheckLastDeclaredWrite();
 #endif

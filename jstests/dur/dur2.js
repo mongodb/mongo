@@ -1,6 +1,5 @@
-/* 
-   test durability
-   a little longer
+/* test durability
+   runs mongod, kill -9's, recovers
 */
 
 var debugging = false;

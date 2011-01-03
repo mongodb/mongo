@@ -301,12 +301,12 @@ namespace mongo {
         void paddingFits() {
             double x = paddingFactor - 0.01;
             if ( x >= 1.0 )
-                *getDur().writingNoLog(&paddingFactor) = x;
+                getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
         }
         void paddingTooSmall() {
             double x = paddingFactor + 0.6;
             if ( x <= 2.0 )
-                *getDur().writingNoLog(&paddingFactor) = x;
+                getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
         }
 
         // @return offset in indexes[]

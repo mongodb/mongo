@@ -119,6 +119,33 @@ namespace mongo {
             }
         }
 
+        void NonDurableImpl::setNoJournal(void *dst, void *src, unsigned len) { 
+            memcpy(dst, src, len);
+        }
+
+        void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) { 
+            // for now, journalled
+            memcpy( writingPtr(dst, len), src, len );
+
+            /* todo before doing this:
+               - finish implementation of _switchToReachableView
+               - performance test it.  privateViews.find() uses a mutex, so that could make 
+                 it slow.
+            /*
+            if( testIntent ) {
+                memcpy(MongoMMF::switchToPrivateView(dst), src, len);
+                return;
+            }
+
+            void *writeView = MongoMMF::_switchToWritableView(dst);
+            memcpy(writeView, src, len);
+            if( memcmp(writeView, src, len) ) {
+                // a copy of the page exists, so need to write it there also
+                memcpy(dst, src, len);
+            }
+            */
+        }
+
         /** base declare write intent function that all the helpers call. */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
             commitJob.note(p, len);
