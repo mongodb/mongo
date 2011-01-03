@@ -52,7 +52,7 @@ dataFile = "/data/db/dumprestore3-other2.json";
 runMongoProgram( "mongoexport", "--host", "127.0.0.1:"+port, "--out", dataFile, "--db", "foo", "--collection", "bar" );
 
 x = runMongoProgram( "mongoimport", "--host", "127.0.0.1:"+replTest.ports[1], "--file", dataFile );
-assert.eq(x, 255, "mongoreimport should exit w/ -1 on slave");
+assert.eq(x, _isWindows() ? -1 : 255, "mongoreimport should exit w/ -1 on slave"); // windows return is signed
 
 step("stopSet");
 replTest.stopSet();
