@@ -61,7 +61,10 @@ namespace mongo {
         void WRITETODATAFILES();
         void PREPLOGBUFFER();
 
-        static void groupCommit(); // later in this file
+        /** declared later in this file
+            only used in this file -- use DurableInterface::commitNow() outside
+        */
+        static void groupCommit(); 
 
         CommitJob commitJob;
 
