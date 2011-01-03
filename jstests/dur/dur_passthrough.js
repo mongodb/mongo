@@ -82,3 +82,4 @@ function durPassThrough() {
 }
 
 durPassThrough();
+print("dur_passthrough.js SUCCESS");
