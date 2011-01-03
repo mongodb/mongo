@@ -109,6 +109,22 @@ namespace mongo {
         if ( doauth )
             _auth();
     }
+    
+    Client::Context::Context(const string& ns, string path , mongolock * lock , bool doauth ) 
+        : _client( currentClient.get() ) , _oldContext( _client->_context ) , 
+          _path( path ) , _lock( lock ) , 
+          _ns( ns ), _db(0){
+        _finishInit( doauth );
+    }
+    
+    /* this version saves the context but doesn't yet set the new one: */
+    
+    Client::Context::Context() 
+        : _client( currentClient.get() ) , _oldContext( _client->_context ), 
+          _path( dbpath ) , _lock(0) , _justCreated(false), _db(0){
+        _client->_context = this;
+        clear();
+    }
 
     void Client::Context::_finishInit( bool doauth ){
         int lockState = dbMutex.getState();
@@ -192,6 +208,22 @@ namespace mongo {
         _client->_curOp->leave( this );
         _client->_context = _oldContext; // note: _oldContext may be null
     }
+
+    bool Client::Context::inDB( const string& db , const string& path ) const {
+        if ( _path != path )
+            return false;
+        
+        if ( db == _ns )
+            return true;
+        
+        string::size_type idx = _ns.find( db );
+        if ( idx != 0 )
+            return false;
+        
+        return  _ns[db.size()] == '.';
+    }
+    
+
 
     string Client::clientAddress(bool includePort) const {
         if( _curOp )

@@ -68,41 +68,15 @@ namespace mongo {
            Note this is also helpful if an exception happens as the state if fixed up.
         */
         class Context : boost::noncopyable{
-            Client * _client;
-            Context * _oldContext;
-            
-            string _path;
-            mongolock * _lock;
-            bool _justCreated;
-
-            string _ns;
-            Database * _db;
-
-            /**
-             * at this point _client, _oldContext and _ns have to be set
-             * _db should not have been touched
-             * this will set _db and create if needed
-             * will also set _client->_context to this
-             */
-            void _finishInit( bool doauth=true);
-            
-            void _auth( int lockState = dbMutex.getState() );
         public:
-            Context(const string& ns, string path=dbpath, mongolock * lock = 0 , bool doauth=true ) 
-                : _client( currentClient.get() ) , _oldContext( _client->_context ) , 
-                  _path( path ) , _lock( lock ) , 
-                  _ns( ns ), _db(0){
-                _finishInit( doauth );
-            }
+            /** 
+             * this is the main constructor
+             * use this unless there is a good reason not to
+             */
+            Context(const string& ns, string path=dbpath, mongolock * lock = 0 , bool doauth=true );
             
             /* this version saves the context but doesn't yet set the new one: */
-            
-            Context() 
-                : _client( currentClient.get() ) , _oldContext( _client->_context ), 
-                  _path( dbpath ) , _lock(0) , _justCreated(false), _db(0){
-                _client->_context = this;
-                clear();
-            }
+            Context();
             
             /**
              * if you are doing this after allowing a write there could be a race condition
@@ -115,46 +89,52 @@ namespace mongo {
             Client* getClient() const { return _client; }            
             Database* db() const { return _db; }
             const char * ns() const { return _ns.c_str(); }            
+            
+            /** @return if the db was created by this Context */
             bool justCreated() const { return _justCreated; }
 
-            bool equals( const string& ns , const string& path=dbpath ) const {
-                return _ns == ns && _path == path;
-            }
+            bool equals( const string& ns , const string& path=dbpath ) const { return _ns == ns && _path == path; }
+            
+            /**
+             * @return true iff the current Context is using db/path
+             */
+            bool inDB( const string& db , const string& path=dbpath ) const;
 
-            bool inDB( const string& db , const string& path=dbpath ) const {
-                if ( _path != path )
-                    return false;
-                
-                if ( db == _ns )
-                    return true;
-
-                string::size_type idx = _ns.find( db );
-                if ( idx != 0 )
-                    return false;
-                
-                return  _ns[db.size()] == '.';
-            }
-
-            void clear(){
-                _ns = "";
-                _db = 0;
-            }
+            void clear(){ _ns = ""; _db = 0; }
 
             /**
              * call before unlocking, so clear any non-thread safe state
              */
-            void unlocked(){
-                _db = 0;
-            }
+            void unlocked(){ _db = 0; }
 
             /**
              * call after going back into the lock, will re-establish non-thread safe stuff
              */
-            void relocked(){
-                _finishInit();
-            }
+            void relocked(){ _finishInit(); }
 
             friend class CurOp;
+
+        private:
+            /**
+             * at this point _client, _oldContext and _ns have to be set
+             * _db should not have been touched
+             * this will set _db and create if needed
+             * will also set _client->_context to this
+             */
+            void _finishInit( bool doauth=true);
+            
+            void _auth( int lockState = dbMutex.getState() );
+
+            Client * _client;
+            Context * _oldContext;
+            
+            string _path;
+            mongolock * _lock;
+            bool _justCreated;
+
+            string _ns;
+            Database * _db;
+
         }; // class Client::Context
         
     private:
@@ -168,10 +148,11 @@ namespace mongo {
         BSONObj _handshake;
         BSONObj _remoteId;
 
+        Client(const char *desc, MessagingPort *p = 0);
+
     public:
         MessagingPort * const _mp;
 
-        Client(const char *desc, MessagingPort *p = 0);
         ~Client();
 
         string clientAddress(bool includePort=false) const;
