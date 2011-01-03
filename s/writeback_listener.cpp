@@ -34,7 +34,7 @@ namespace mongo {
     map<string,WriteBackListener*> WriteBackListener::_cache;
     mongo::mutex WriteBackListener::_cacheLock("WriteBackListener");
 
-    set<OID> WriteBackListener::_seenWritebacks;
+    map<ConnectionId,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;
     mongo::mutex WriteBackListener::_seenWritebacksLock("WriteBackListener::seen");
 
     WriteBackListener::WriteBackListener( const string& addr ) : _addr( addr ){
@@ -52,13 +52,16 @@ namespace mongo {
     }
 
     /* static */
-    void WriteBackListener::waitFor( const OID& oid ){
+    void WriteBackListener::waitFor( ConnectionId connectionId, const OID& oid ){
         Timer t;
         for ( int i=0; i<5000; i++ ){
             {
                 scoped_lock lk( _seenWritebacksLock );
-                if ( _seenWritebacks.count( oid ) )
+                WBStatus s = _seenWritebacks[connectionId];
+                if ( oid <= s.id ){
+                    // TODO return gle
                     return;
+                }
             }
             sleepmillis( 10 );
         }
@@ -68,16 +71,9 @@ namespace mongo {
     }
 
     void WriteBackListener::run(){
-        OID lastID;
-        lastID.clear();
         int secsToSleep = 0;
         while ( ! inShutdown() && Shard::isMember( _addr ) ){
                 
-            if ( lastID.isSet() ){
-                scoped_lock lk( _seenWritebacksLock );
-                _seenWritebacks.insert( lastID );
-                lastID.clear();
-            }
 
             try {
                 ScopedDbConnection conn( _addr );
@@ -100,20 +96,25 @@ namespace mongo {
                 BSONObj data = result.getObjectField( "data" );
                 if ( data.getBoolField( "writeBack" ) ){
                     string ns = data["ns"].valuestrsafe();
-                    {
-                        BSONElement e = data["id"];
-                        if ( e.type() == jstOID )
-                            lastID = e.OID();
+                    
+                    ConnectionId cid = 0;
+                    OID wid;
+                    if ( data["connectionId"].isNumber() && data["id"].type() == jstOID ){
+                        cid = data["connectionId"].numberLong();
+                        wid = data["id"].OID();
                     }
-                    int len;
+                    else {
+                        warning() << "mongos/mongod version mismatch (1.7.5 is the split)" << endl;
+                    }
 
+                    int len; // not used, but needed for next call
                     Message m( (void*)data["msg"].binData( len ) , false );
                     massert( 10427 ,  "invalid writeback message" , m.header()->valid() );                        
 
                     DBConfigPtr db = grid.getDBConfig( ns );
                     ShardChunkVersion needVersion( data["version"] );
                         
-                    log(1) << "writeback id: " << lastID << " needVersion : " << needVersion.toString() 
+                    log(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString() 
                            << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
                         
                     if ( logLevel ) log(1) << debugString( m ) << endl;
@@ -129,10 +130,32 @@ namespace mongo {
                         // we need to reload the chunk manager and get the new shard versions
                         db->getChunkManager( ns , true );
                     }
-                        
-                    Request r( m , 0 );
-                    r.init();
-                    r.process();
+                    
+                    // do reequest and then call getLastError
+                    // we have to call getLastError so we can return the right fields to the user if they decide to call getLastError
+
+                    BSONObj gle;
+                    try {
+                        Request r( m , 0 );
+                        r.init();
+                        r.process();
+
+                        gle = BSONObj(); // TODO
+                    }
+                    catch ( DBException& e ){
+                        error() << "error processing writeback: " << e << endl;
+                        BSONObjBuilder b;
+                        b.append( "err" , e.toString() );
+                        e.getInfo().append( b );
+                        gle = b.obj();
+                    }
+                    
+                    {
+                        scoped_lock lk( _seenWritebacksLock );
+                        WBStatus& s = _seenWritebacks[cid];
+                        s.id = wid;
+                        s.gle = gle;
+                    }
                 }
                 else if ( result["noop"].trueValue() ){
                     // no-op

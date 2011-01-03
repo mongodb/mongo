@@ -123,19 +123,29 @@ namespace mongo {
         _clients.erase( i );
     }
 
-    void ClientInfo::_addWriteBack( vector<OID>& all , const BSONObj& o ){
-        BSONElement e = o["writeback"];
+    void ClientInfo::_addWriteBack( vector<WBInfo>& all , const BSONObj& o ){
+        BSONElement w = o["writeback"];
         
-        if ( e.type() == jstOID )
-            all.push_back( e.OID() );
+        if ( w.type() != jstOID )
+            return;
+        
+        BSONElement cid = o["connectionId"];
+        cout << "ELIOT : " << cid << endl;
+        
+        if ( cid.eoo() ){
+            error() << "getLastError writeback can't work because of version mis-match" << endl;
+            return;
+        }
+        
+        all.push_back( WBInfo( cid.numberLong() , w.OID() ) );
     }
     
-    void ClientInfo::_handleWriteBacks( vector<OID>& all ){
+    void ClientInfo::_handleWriteBacks( vector<WBInfo>& all ){
         if ( all.size() == 0 )
             return;
         
         for ( unsigned i=0; i<all.size(); i++ ){
-            WriteBackListener::waitFor( all[i] );
+            WriteBackListener::waitFor( all[i].connectionId , all[i].id );
         }
     }
     
@@ -149,7 +159,7 @@ namespace mongo {
             return true;
         }
         
-        vector<OID> writebacks;
+        vector<WBInfo> writebacks;
         
         // handle single server
         if ( shards->size() == 1 ){

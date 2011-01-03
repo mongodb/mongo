@@ -77,9 +77,15 @@ namespace mongo {
 
     private:
 
+        struct WBInfo {
+            WBInfo( ConnectionId c , OID o ) : connectionId( c ) , id( o ){}
+            ConnectionId connectionId;
+            OID id;
+        };
+
         // for getLastError
-        void _addWriteBack( vector<OID>& all , const BSONObj& o );
-        void _handleWriteBacks( vector<OID>& all );
+        void _addWriteBack( vector<WBInfo>& all , const BSONObj& o );
+        void _handleWriteBacks( vector<WBInfo>& all );
 
         
         int _id; // unique client id

@@ -22,6 +22,7 @@
 
 #include "../client/connpool.h"
 #include "../util/background.h"
+#include "../db/client.h"
 
 namespace mongo {
 
@@ -36,7 +37,7 @@ namespace mongo {
     public:
         static void init( DBClientBase& conn );
 
-        static void waitFor( const OID& oid );
+        static void waitFor( ConnectionId connectionId, const OID& oid );
 
     protected:
         WriteBackListener( const string& addr );
@@ -48,10 +49,15 @@ namespace mongo {
         string _addr;
 
         static mongo::mutex _cacheLock; // protects _cache
-        static map<string,WriteBackListener*> _cache;
+        static map<string,WriteBackListener*> _cache; // server to listener
         
+        struct WBStatus {
+            OID id;
+            BSONObj gle;
+        };
+
         static mongo::mutex _seenWritebacksLock;  // protects _seenWritbacks
-        static set<OID> _seenWritebacks; // TODO: this can grow unbounded
+        static map<ConnectionId,WBStatus> _seenWritebacks; // connectionId -> last write back GLE
     };
     
     void waitForWriteback( const OID& oid );
