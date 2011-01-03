@@ -120,16 +120,6 @@ namespace mongo {
                 return (T*) writingPtr(x, sizeof(T));
             }
 
-            /** Intentionally unimplemented method.
-                It's very easy to manipulate Record::data open ended.  Thus a call to writing(Record*) is suspect. 
-                This will override the templated version and yield an unresolved external.
-            */
-            Record* writing(Record* r);
-            /** Intentionally unimplemented method. BtreeBuckets are allocated in buffers larger than sizeof( BtreeBucket ). */
-            BtreeBucket* writing( BtreeBucket* );
-            /** Intentionally unimplemented method. NamespaceDetails may be based on references to 'Extra' objects. */
-            NamespaceDetails* writing( NamespaceDetails* );
-
             /** write something that doesn't have to be journaled, as this write is "unimportant".
                 a good example is paddingFactor.
                 can be thought of as memcpy(dst,src,len)
@@ -144,6 +134,16 @@ namespace mongo {
             static DurableInterface& getDur() { return *_impl; }
 
         private:
+            /** Intentionally unimplemented method.
+             It's very easy to manipulate Record::data open ended.  Thus a call to writing(Record*) is suspect. 
+             This will override the templated version and yield an unresolved external.
+             */
+            Record* writing(Record* r);
+            /** Intentionally unimplemented method. BtreeBuckets are allocated in buffers larger than sizeof( BtreeBucket ). */
+            BtreeBucket* writing( BtreeBucket* );
+            /** Intentionally unimplemented method. NamespaceDetails may be based on references to 'Extra' objects. */
+            NamespaceDetails* writing( NamespaceDetails* );
+                        
             static DurableInterface* _impl; // NonDurableImpl at startup()
             static void enableDurability(); // makes _impl a DurableImpl
             static void disableDurability(); // makes _impl a NonDurableImpl
