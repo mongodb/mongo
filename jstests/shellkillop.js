@@ -24,29 +24,17 @@ else {
 
     stopMongoProgramByPid(spawn);
 
-    sleep(200);
+    sleep(100);
 
     print("count abcdefghijkl:" + db[baseName].find({ i: 'abcdefghijkl' }).count());
 
-    try {
-	assert.soon(
-	    function f() {
-		var inprog = db.currentOp().inprog;
-		for (i in inprog) {
-		    if (inprog[i].ns == "test." + baseName)
-			print("shellkillop.js op is still running, waiting");
-		    //printjson(inprog);
-		    return false;
-		}
-		return true;
-	    },
-	    "shellkillop.js FAIL op is still running"
-	    );
-    } catch(e) { 
-	print("shellkillop.js FAIL op is still running. currentOp():");
-	printjson(db.currentOp().inprog);
-	throw "cancelled op is still running";
+    var inprog = db.currentOp().inprog;
+    for (i in inprog) {
+	if (inprog[i].ns == "test." + baseName)
+	    throw "shellkillop.js op is still running: " + tojson( inprog[i] );
     }
+
+    assert(db[baseName].find({ i: 'abcdefghijkl' }).count() < 100000, "update ran too fast, test was not valid");
 
     print("shellkillop.js SUCCESS");
 }
