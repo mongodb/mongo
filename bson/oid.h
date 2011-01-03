@@ -52,6 +52,7 @@ namespace mongo {
         bool operator!=(const OID& r) const { return a!=r.a || b!=r.b; }
         int compare( const OID& other ) const { return memcmp( data , other.data , 12 ); }
         bool operator<( const OID& other ) const { return compare( other ) < 0; }
+        bool operator<=( const OID& other ) const { return compare( other ) <= 0; }
 
         /** @return the object ID output as 24 hex digits */
         string str() const { return toHexLower(data, 12); }
