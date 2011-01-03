@@ -44,17 +44,76 @@ namespace mongo {
 
     class Client : boost::noncopyable { 
     public:
+        class Context;
+
+        static mongo::mutex clientsMutex;
+        static set<Client*> clients; // always be in clientsMutex when manipulating this
+        static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
+        static int getActiveClientCount( int& writers , int& readers );
+
         static Client *syncThread;
+
+
+        /* each thread which does db operations has a Client object in TLS.  
+           call this when your thread starts. 
+        */
+        static Client& initThread(const char *desc, MessagingPort *mp = 0);
+
+        /* 
+           this has to be called as the client goes away, but before thread termination
+           @return true if anything was done
+         */
+        bool shutdown();
+
+
+        ~Client();
+
         void iAmSyncThread() { 
             wassert( syncThread == 0 );
             syncThread = this; 
         }
         bool isSyncThread() const { return this == syncThread; } // true if this client is the replication secondary pull thread
 
-        static mongo::mutex clientsMutex;
-        static set<Client*> clients; // always be in clientsMutex when manipulating this
-        static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
-        static int getActiveClientCount( int& writers , int& readers );
+
+        string clientAddress(bool includePort=false) const;
+        AuthenticationInfo * getAuthenticationInfo() { return &_ai; }
+        bool isAdmin() { return _ai.isAuthorized( "admin" ); }
+        CurOp* curop() const { return _curOp; }        
+        Context* getContext() const { return _context; }
+        Database* database() const {  return _context ? _context->db() : 0; }
+        const char *ns() const { return _context->ns(); }
+        const char *desc() const { return _desc; }
+        void setLastOp( ReplTime op ) { _lastOp = op; }
+        ReplTime getLastOp() const { return _lastOp; }
+
+        /* report what the last operation was.  used by getlasterror */
+        void appendLastOp( BSONObjBuilder& b ) const;
+
+        bool isGod() const { return _god; } /* this is for map/reduce writes */
+        string toString() const;
+        void gotHandshake( const BSONObj& o );
+        BSONObj getRemoteID() const { return _remoteId; }
+        BSONObj getHandshake() const { return _handshake; }
+        
+        MessagingPort * port() const { return _mp; }
+
+    private:
+        CurOp * _curOp;
+        Context * _context;
+        bool _shutdown;
+        const char *_desc;
+        bool _god;
+        AuthenticationInfo _ai;
+        ReplTime _lastOp;
+        BSONObj _handshake;
+        BSONObj _remoteId;
+        MessagingPort * const _mp;
+
+        Client(const char *desc, MessagingPort *p = 0);
+
+        friend class CurOp;
+
+    public:
 
         /* set _god=true temporarily, safely */
         class GodScope {
@@ -64,6 +123,7 @@ namespace mongo {
             ~GodScope();
         };
 
+        
         /* Set database we want to use, then, restores when we finish (are out of scope)
            Note this is also helpful if an exception happens as the state if fixed up.
         */
@@ -137,65 +197,7 @@ namespace mongo {
 
         }; // class Client::Context
         
-    private:
-        CurOp * _curOp;
-        Context * _context;
-        bool _shutdown;
-        const char *_desc;
-        bool _god;
-        AuthenticationInfo _ai;
-        ReplTime _lastOp;
-        BSONObj _handshake;
-        BSONObj _remoteId;
 
-        Client(const char *desc, MessagingPort *p = 0);
-
-    public:
-        MessagingPort * const _mp;
-
-        ~Client();
-
-        string clientAddress(bool includePort=false) const;
-        AuthenticationInfo * getAuthenticationInfo(){ return &_ai; }
-        bool isAdmin() { return _ai.isAuthorized( "admin" ); }
-        CurOp* curop() { return _curOp; }        
-        Context* getContext(){ return _context; }
-        Database* database() {  return _context ? _context->db() : 0; }
-        const char *ns() const { return _context->ns(); }
-        const char *desc() const { return _desc; }
-        void setLastOp( ReplTime op ) { _lastOp = op; }
-        ReplTime getLastOp() const { return _lastOp; }
-
-        /* report what the last operation was.  used by getlasterror */
-        void appendLastOp( BSONObjBuilder& b ) {
-            if( theReplSet ) { 
-                b.append("lastOp" , (long long) _lastOp);
-            }
-            else {
-                OpTime lo(_lastOp);
-                if ( ! lo.isNull() )
-                    b.appendTimestamp( "lastOp" , lo.asDate() );
-            }
-        }
-
-        /* each thread which does db operations has a Client object in TLS.  
-           call this when your thread starts. 
-        */
-        static Client& initThread(const char *desc, MessagingPort *mp = 0);
-
-        /* 
-           this has to be called as the client goes away, but before thread termination
-           @return true if anything was done
-         */
-        bool shutdown();
-
-        bool isGod() const { return _god; } /* this is for map/reduce writes */
-        string toString() const;
-        void gotHandshake( const BSONObj& o );
-        BSONObj getRemoteID() const { return _remoteId; }
-        BSONObj getHandshake() const { return _handshake; }
-
-        friend class CurOp;
     };
     
     /** get the Client object for this thread. */

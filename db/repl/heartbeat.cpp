@@ -65,7 +65,7 @@ namespace mongo {
 
             /* we want to keep heartbeat connections open when relinquishing primary.  tag them here. */
             {
-                MessagingPort *mp = cc()._mp;
+                MessagingPort *mp = cc().port();
                 if( mp ) 
                     mp->tag |= 1;
             }

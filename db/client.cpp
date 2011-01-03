@@ -223,7 +223,17 @@ namespace mongo {
         return  _ns[db.size()] == '.';
     }
     
-
+    void Client::appendLastOp( BSONObjBuilder& b ) const {
+        if( theReplSet ) { 
+            b.append("lastOp" , (long long) _lastOp);
+        }
+        else {
+            OpTime lo(_lastOp);
+            if ( ! lo.isNull() )
+                b.appendTimestamp( "lastOp" , lo.asDate() );
+        }
+    }    
+    
 
     string Client::clientAddress(bool includePort) const {
         if( _curOp )
