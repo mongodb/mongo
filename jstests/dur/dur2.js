@@ -71,13 +71,11 @@ if( debugging ) {
     quit();
 }
 
-log();
-
 // directories
 var path2 = "/data/db/" + testname+"dur";
 
 // durable version
-log();
+log("run mongod with --dur");
 conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master", "--oplogSize", 64);
 work();
 
@@ -87,7 +85,7 @@ stopMongod(30001, /*signal*/9);
 // journal file should be present, and non-empty as we killed hard
 
 // restart and recover
-log();
+log("restart and recover");
 conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8, "--master", "--oplogSize", 64);
 verify();
 
