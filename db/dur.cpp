@@ -441,13 +441,9 @@ namespace mongo {
             writes._deferred.invoke();
         }
 
-        /** locking in read lock when called 
-            @see MongoMMF::close()
-        */
-        static void groupCommit() {
+        static void _groupCommit() {
             stats.curr->_commits++;
 
-            dbMutex.assertAtLeastReadLocked();
             if( dbMutex.isWriteLocked() ) { 
                 stats.curr->_commitsInWriteLock++;
             }
@@ -459,7 +455,7 @@ namespace mongo {
 
             WRITETOJOURNAL(commitJob._ab);
 
-            // data is now in the journal, which is sufficient for acknowledging getlasterror. 
+            // data is now in the journal, which is sufficient for acknowledging getLastError. 
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
@@ -486,6 +482,19 @@ namespace mongo {
                 // this method when a file (and its views) is about to go away.
                 //
                 REMAPPRIVATEVIEW();
+            }
+        }
+        /** locking in read lock when called 
+            @see MongoMMF::close()
+        */
+        static void groupCommit() {
+            dbMutex.assertAtLeastReadLocked();
+            try {
+                _groupCommit();
+            }
+            catch(std::exception& e) {
+                log() << "exception in dur::groupCommit causing immediate shutdown: " << e.what() << endl;
+                abort(); // based on myTerminate()
             }
         }
 
