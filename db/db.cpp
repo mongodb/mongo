@@ -436,7 +436,7 @@ sendmore:
         boost::filesystem::path path( dbpath );
         for ( boost::filesystem::directory_iterator i( path );
                 i != boost::filesystem::directory_iterator(); ++i ) {
-            string fileName = boost::filesystem::path(*i).leaf();
+            string fileName = boost::filesystem::path(*i).filename().string();
             if ( boost::filesystem::is_directory( *i ) &&
                 fileName.length() && fileName[ 0 ] == '$' )
                 boost::filesystem::remove_all( *i );
@@ -769,7 +769,6 @@ int main(int argc, char* argv[])
     dbExecCommand = argv[0];
 
     srand(curTimeMicros());
-    boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
     {
         unsigned x = 0x12345678;

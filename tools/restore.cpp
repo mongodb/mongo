@@ -121,7 +121,8 @@ public:
         log(2) << "drillDown: " << root.string() << endl;
 
         // skip hidden files and directories
-        if (root.leaf()[0] == '.' && root.leaf() != ".")
+        string filename = root.filename().string();
+        if (filename[0] == '.' && filename != ".")
             return;
 
         if ( is_directory( root ) ) {
@@ -151,10 +152,10 @@ public:
                 }
 
                 // don't insert oplog
-                if (top_level && !use_db && p.leaf() == "oplog.bson")
+                if (top_level && !use_db && p.filename().string() == "oplog.bson")
                     continue;
 
-                if ( p.leaf() == "system.indexes.bson" )
+                if ( p.filename().string() == "system.indexes.bson" )
                     indexes = p;
                 else
                     drillDown(p, use_db, use_coll);
@@ -174,7 +175,7 @@ public:
 
         log() << root.string() << endl;
 
-        if ( root.leaf() == "system.profile.bson" ){
+        if ( root.filename().string() == "system.profile.bson" ){
             log() << "\t skipping" << endl;
             return;
         }
@@ -199,7 +200,7 @@ public:
         if (use_coll) {
             ns += "." + _coll;
         } else {
-            string l = root.leaf();
+            string l = root.filename().string();
             l = l.substr( 0 , l.find_last_of( "." ) );
             ns += "." + l;
         }

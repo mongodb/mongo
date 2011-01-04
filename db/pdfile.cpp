@@ -1782,7 +1782,7 @@ namespace mongo {
             virtual bool apply( const Path &p ) {
                 if ( !boost::filesystem::exists( p ) )
                     return false;
-                boostRenameWrapper( p, newPath_ / ( p.leaf() + ".bak" ) );
+                boostRenameWrapper( p, newPath_ / ( p.filename().string() + ".bak" ) );
                 return true;
             }
             virtual const char * op() const {
@@ -1900,7 +1900,7 @@ namespace mongo {
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
                                 "backup" : "$tmp" );
         BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
-        string reservedPathString = reservedPath.native_directory_string();
+        string reservedPathString = reservedPath.string();
         
         bool res;
         { // clone to temp location, which effectively does repair

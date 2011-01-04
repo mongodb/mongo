@@ -97,8 +97,6 @@ namespace mongo {
         
         cmdLine.prealloc = false;
 
-        boost::filesystem::path::default_name_check( boost::filesystem::no_check );
-
         _name = argv[0];
 
         /* using the same style as db.cpp */

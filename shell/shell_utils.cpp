@@ -400,7 +400,7 @@ namespace mongo {
 #endif
                 }
 
-                argv_.push_back( programPath.native_file_string() );
+                argv_.push_back( programPath.string() );
                 
                 port_ = -1;
                 
