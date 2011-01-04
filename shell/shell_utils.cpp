@@ -627,7 +627,7 @@ namespace mongo {
             shells.erase( pid );
             return x;
         }
-        
+
         BSONObj WaitMongoProgramOnPort( const BSONObj &a ) {
             int port = oneArg( a ).numberInt();
             uassert( 13621, "no known mongo program on port", dbs.count( port ) != 0 );
