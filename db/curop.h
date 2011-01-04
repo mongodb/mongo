@@ -51,7 +51,11 @@ namespace mongo {
             reset();
         }
 
-        void reset( int sz = 0 ) { _size[0] = sz; }
+        void reset( int sz = 0 ) {
+            _lock.lock();
+            _size[0] = sz;
+            _lock.unlock();
+        }
 
         void set( const BSONObj& o ) {
             _lock.lock();
@@ -59,7 +63,7 @@ namespace mongo {
                 int sz = o.objsize();
 
                 if ( sz > (int) sizeof(_buf) ) {
-                    reset(TOO_BIG_SENTINEL);
+                    _reset(TOO_BIG_SENTINEL);
                 }
                 else {
                     memcpy(_buf, o.objdata(), sz );
@@ -114,6 +118,9 @@ namespace mongo {
                 return _tooBig;
             return BSONObj( _buf ).copy();
         }
+
+        /** you have to be locked when you call this */
+        void _reset( int sz = 0 ) { _size[0] = sz; }
 
         SpinLock _lock;
         int * _size;
