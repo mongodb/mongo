@@ -65,7 +65,7 @@ namespace PerfTests {
     DBClientType ClientBase::_client;
 
     // todo: use a couple threads. not a very good test yet.
-    class DefInvoke {
+    class TaskQueueTest {
         static int tot;
         struct V {
             int val;
@@ -90,7 +90,7 @@ namespace PerfTests {
             assert( x == tot );
         }
     };
-    int DefInvoke::tot;
+    int TaskQueueTest::tot;
 
     class CappedTest : public ClientBase {
     };
@@ -291,7 +291,7 @@ namespace PerfTests {
         All() : Suite( "perf" ) {
         }
         void setupTests() {
-            add< DefInvoke >();
+            add< TaskQueueTest >();
             add< InsertDup >();
             add< Insert1 >();
             add< InsertRandom >();
