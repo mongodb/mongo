@@ -770,7 +770,8 @@ namespace mongo {
 
                 timingBuilder.append( "total" , t.millis() );
 
-                result.append( "result" , config.finalShort );
+                if ( config.finalShort.size() )
+                    result.append( "result" , config.finalShort );
                 result.append( "timeMillis" , t.millis() );
                 countsBuilder.appendNumber( "output" , finalCount );
                 if ( config.verbose ) result.append( "timing" , timingBuilder.obj() );
@@ -845,7 +846,8 @@ namespace mongo {
 
                     BSONList values;
 
-                    result.append( "result" , config.finalShort );
+                    if ( config.finalShort.size() )
+                        result.append( "result" , config.finalShort );
 
                     while ( cursor.more() ) {
                         BSONObj t = cursor.next().getOwned();
